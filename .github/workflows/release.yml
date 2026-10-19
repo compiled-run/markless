@@ -22,7 +22,7 @@
 #   cut          One click (`gh workflow run release.yml -f mode=cut` on main):
 #                the `cut` job bumps to the next minor, writes the CHANGELOG
 #                section, commits and tags vX.Y.0, runs CI on that commit, and
-#                moves main and the tag to it once main's required checks pass;
+#                merges it into main and pushes the tag once main's required checks pass;
 #                the `release` job publishes that tag; the `announce` job creates
 #                the GitHub Release. See docs/ci-process.md, "Cutting a release".
 #   cut-dry-run  The cut's bump, changelog, hooked commit and pack checks, with no
@@ -77,8 +77,10 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 90
         permissions:
-            # Push the release branch, main and the tag.
+            # Push the release branch and the tag.
             contents: write
+            # Open and merge the release pull request into main.
+            pull-requests: write
             # Dispatch and watch CI on the release commit.
             actions: write
             # Read the release commit's check runs.
@@ -204,12 +206,44 @@ jobs:
                   SHA: ${{ steps.cut.outputs.sha }}
               run: node scripts/release/required-checks.mjs --sha "$SHA"
 
-            - name: Move main to the release commit and push the tag
+            # main's ruleset refuses a direct push from this token even with every check green,
+            # but it accepts a pull request merge, so main gets a merge commit with the same tree.
+            - name: Merge the release pull request into main
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
                   SHA: ${{ steps.cut.outputs.sha }}
-              run: git push --atomic origin "${SHA}:refs/heads/main" "refs/tags/${TAG}"
+              run: |
+                  set -euo pipefail
+                  base="$(git rev-parse "${SHA}^")"
+                  main="$(git ls-remote origin refs/heads/main | cut -f1)"
+                  if [ "$main" != "$base" ]; then
+                    echo "::error::main moved from ${base} to ${main} during the cut; nothing was released, run the cut again."
+                    exit 1
+                  fi
+                  pr="$(gh pr create --base main --head "release/${TAG}" --title "chore(release): ${TAG}" \
+                    --body "The release cut's commit for ${TAG}. CI passed on ${SHA} before this pull request was opened.")"
+                  state=UNKNOWN
+                  for _ in $(seq 1 24); do
+                    state="$(gh pr view "$pr" --json mergeStateStatus --jq .mergeStateStatus)"
+                    [ "$state" != UNKNOWN ] && break
+                    sleep 5
+                  done
+                  echo "${pr} merge state: ${state}"
+                  gh pr merge "$pr" --merge --match-head-commit "$SHA" --subject "Merge release ${TAG}"
+                  merged="$(gh pr view "$pr" --json mergeCommit --jq .mergeCommit.oid)"
+                  if [ "$(gh api "repos/${GITHUB_REPOSITORY}/commits/${merged}" --jq .commit.tree.sha)" != "$(git rev-parse "${SHA}^{tree}")" ]; then
+                    echo "::error::main's merge commit ${merged} does not have the release commit's tree."
+                    exit 1
+                  fi
+                  # A merge made with this token starts no workflow, and the next cut needs main's CI.
+                  gh workflow run ci.yml --ref main
+
+            - name: Push the tag
+              if: inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'
+              env:
+                  TAG: ${{ steps.cut.outputs.tag }}
+              run: git push origin "refs/tags/${TAG}"
 
             - name: Delete the release branch
               if: always() && inputs.mode == 'cut' && steps.cut.outputs.tag != ''

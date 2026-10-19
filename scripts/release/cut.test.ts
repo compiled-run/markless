@@ -178,6 +178,35 @@ describe('release cut command', () => {
 	);
 
 	test(
+		'a merged release commit whose tag was never pushed is tagged and finished',
+		async () => {
+			const fixture = await cutFixture('1.0.0');
+			git(fixture.work, ['checkout', '-b', 'release']);
+			await writeFile(
+				join(fixture.work, 'package.json'),
+				`${JSON.stringify({ version: '1.1.0' }, null, '\t')}\n`,
+			);
+			await writeFile(
+				join(fixture.work, 'packages', 'a', 'package.json'),
+				`${JSON.stringify({ name: '@example/a', version: '1.1.0' }, null, '\t')}\n`,
+			);
+			git(fixture.work, ['commit', '-am', 'chore(release): v1.1.0']);
+			const release = git(fixture.work, ['rev-parse', 'HEAD']);
+			git(fixture.work, ['checkout', 'main']);
+			git(fixture.work, ['merge', '--no-ff', '-m', 'Merge release v1.1.0', 'release']);
+			git(fixture.work, ['push', 'origin', 'HEAD:main']);
+			const result = runCut(fixture);
+			expect(result.stderr).toBe('');
+			expect(result.exitCode).toBe(0);
+			expect(result.stdout).toContain('release-cut: resumed=true');
+			expect(result.stdout).toContain('release-cut: push_tag=true');
+			expect(result.stdout).toContain(`release-cut: sha=${release}`);
+			expect(git(fixture.work, ['rev-list', '-n', '1', 'refs/tags/v1.1.0'])).toBe(release);
+		},
+		SPAWN_HEAVY_TIMEOUT_MS,
+	);
+
+	test(
 		'a tagged version without a GitHub Release is finished instead of cutting the next one',
 		async () => {
 			const fixture = await cutFixture('1.1.0', { announced: false });

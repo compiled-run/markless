@@ -63,12 +63,12 @@ describe('release.yml mode=cut', () => {
 		expect(run).toContain('node scripts/release/cut.mjs\n');
 	});
 
-	test('moves main only after CI passed every required check on the release commit itself', () => {
+	test('merges into main only after CI passed every required check on the release commit itself', () => {
 		const order = [
 			'Push the release commit to its release branch',
 			'Run CI on the release commit',
 			"Require every check main's protection names on the release commit",
-			'Move main to the release commit and push the tag',
+			'Merge the release pull request into main',
 		];
 		for (const name of order) {
 			expect(step(cut, name).if).toBe(
@@ -83,9 +83,14 @@ describe('release.yml mode=cut', () => {
 		expect(step(cut, order[2]!).run).toBe(
 			'node scripts/release/required-checks.mjs --sha "$SHA"',
 		);
-		expect(step(cut, order[3]!).run).toBe(
-			'git push --atomic origin "${SHA}:refs/heads/main" "refs/tags/${TAG}"',
-		);
+		const merge = step(cut, order[3]!).run!;
+		expect(merge).toContain('gh pr merge "$pr" --merge --match-head-commit "$SHA"');
+		expect(merge).not.toContain('--admin');
+		expect(merge).not.toMatch(/refs\/heads\/main"?\s*$/mu);
+		const pushTag = step(cut, 'Push the tag');
+		expect(pushTag.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'");
+		expect(names(cut).indexOf('Push the tag')).toBeGreaterThan(names(cut).indexOf(order[3]!));
+		expect(cut.permissions!['pull-requests']).toBe('write');
 		expect(step(cut, 'Delete the release branch').if).toContain('always()');
 		expect(
 			step(cut, "Check that ci.yml reports every check main's protection requires").run,

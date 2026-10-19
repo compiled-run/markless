@@ -87,10 +87,25 @@ function gitIn(cwd) {
 
 function tagSha(git, tag) {
 	try {
-		return git('rev-list', '-n', '1', `refs/tags/${tag}`);
+		return git('rev-parse', '--quiet', '--verify', `refs/tags/${tag}^{commit}`);
 	} catch {
 		return null;
 	}
+}
+
+/** The `chore(release): <tag>` commit `head` merged, when its tag was never pushed; null otherwise. */
+function untaggedReleaseCommit(git, head, tag) {
+	const subject = `chore(release): ${tag}`;
+	const found = git(
+		'log',
+		'-1',
+		'--format=%H%x00%s',
+		'--fixed-strings',
+		`--grep=${subject}`,
+		head,
+	);
+	const [sha, foundSubject] = found.split('\0');
+	return sha && foundSubject === subject ? sha : null;
 }
 
 function checkoutRefusals(git) {
@@ -183,14 +198,22 @@ export function main(argv) {
 	const { head, refusals } = checkoutRefusals(git);
 	const current = rootVersion(root);
 	const currentTag = `v${current}`;
-	const currentSha = tagSha(git, currentTag);
+	let currentSha = tagSha(git, currentTag);
+	let pushTag = false;
 	if (currentSha === null) {
-		throw new CutError(
-			`package.json says ${current} but there is no ${currentTag} tag, so it is unclear what was released`,
-		);
+		// A cut that merged its release pull request but stopped before pushing the tag.
+		currentSha = untaggedReleaseCommit(git, head, currentTag);
+		if (currentSha === null) {
+			throw new CutError(
+				`package.json says ${current} but there is no ${currentTag} tag, so it is unclear what was released`,
+			);
+		}
+		if (!dryRun)
+			run('git', ['tag', '-a', currentTag, '-m', currentTag, currentSha], { cwd: root });
+		pushTag = true;
 	}
 	// A tag without a GitHub Release is a cut that stopped after pushing: finish it, never skip it.
-	const resume = !githubReleaseExists(currentTag, root);
+	const resume = pushTag || !githubReleaseExists(currentTag, root);
 	const ciProblem = ciRefusalFor(resume ? currentSha : head, root);
 	if (ciProblem) refusals.push(ciProblem);
 	if (refusals.length > 0 && !dryRun) {
@@ -217,6 +240,7 @@ export function main(argv) {
 			sha: currentSha,
 			notes_file: notesFile,
 			resumed: 'true',
+			push_tag: pushTag ? 'true' : 'false',
 		});
 		return refusals.length > 0 ? 1 : 0;
 	}
@@ -296,7 +320,14 @@ export function main(argv) {
 		} else {
 			run('git', ['tag', '-a', tag, '-m', tag], { cwd: workdir });
 		}
-		writeOutputs({ version, tag, sha, notes_file: notesFile, resumed: 'false' });
+		writeOutputs({
+			version,
+			tag,
+			sha,
+			notes_file: notesFile,
+			resumed: 'false',
+			push_tag: dryRun ? 'false' : 'true',
+		});
 	} finally {
 		if (dryRun) {
 			spawnSync('git', ['worktree', 'remove', '--force', workdir], {
