@@ -22,6 +22,18 @@ const FIXED_MICROTASK_TURNS = 8;
 const STATIC_ROUTER_BRIDGE_DOWNLOAD_CAP = 3_072;
 // Measured 862 bytes: the bridge adding its listeners and the inline line that calls it.
 const STATIC_ROUTER_EXECUTED_AT_LOAD_CAP = 1_024;
+// Measured 15,323 bytes: the resume entry, the route's lean dispatch and its helpers; the full resume runtime is fallback only.
+const STATIC_ROUTER_FIRST_CLICK_DOWNLOAD_CAP = 16_384;
+// Measured 364 ms (runs 356-366); unmet target 212 ms, the time before static pages stopped preloading code (252 ms here).
+const STATIC_ROUTER_NAVIGATION_MS_CAP = 384;
+const NAVIGATION_SAMPLES = 5;
+// 150 ms latency, 1.6 Mbps down: the network profile the navigation regression was reported under.
+const THROTTLED_NETWORK = {
+	offline: false,
+	latency: 150,
+	downloadThroughput: 1_600_000 / 8,
+	uploadThroughput: 750_000 / 8,
+};
 const MODE = process.argv[2];
 // Whole-app executed bytes grow with app code, so they are reported against the last accepted
 // numbers, never gated (owner ruling 2026-09-24). The gate is the four proofs plus exact repeatability.
@@ -202,6 +214,27 @@ async function gateStaticRouter() {
 		console.log(
 			`-- static-router "/counter/": downloaded ${handlerPage.downloadedBytes} bytes of JS at load, executed ${handlerPage.executedBytes}; after the first click executed ${handlerPage.afterClick.executedBytes} (${handlerPage.afterClick.executed.map((d) => `${d.url} ${d.executedBytes}`).join(', ')}); downloads ${handlerPage.downloads.map((d) => `${d.url} ${d.bytes}`).join(', ')}.`,
 		);
+		console.log(
+			`-- static-router "/counter/": the first click needed ${handlerPage.firstClick.downloadedBytes} bytes of JS downloaded (${handlerPage.firstClick.downloads.map((d) => `${d.url} ${d.bytes}`).join(', ')}).`,
+		);
+		const failed = [];
+		if (handlerPage.firstClick.downloadedBytes > STATIC_ROUTER_FIRST_CLICK_DOWNLOAD_CAP)
+			failed.push(
+				`static-router "/counter/": the first click needed ${handlerPage.firstClick.downloadedBytes} bytes of JS downloaded; it must stay within ${STATIC_ROUTER_FIRST_CLICK_DOWNLOAD_CAP}.`,
+			);
+		const navigation = await measureStaticNavigation(combo);
+		console.log(
+			`-- static-router "/" -> "/counter/" under 150 ms / 1.6 Mbps: median ${navigation.cold.median} ms (${navigation.cold.samples.join(', ')}); after idle median ${navigation.afterIdle.median} ms (${navigation.afterIdle.samples.join(', ')}).`,
+		);
+		if (navigation.cold.median > STATIC_ROUTER_NAVIGATION_MS_CAP)
+			failed.push(
+				`static-router: navigating from "/" to "/counter/" took a median ${navigation.cold.median} ms under throttling; it must stay within ${STATIC_ROUTER_NAVIGATION_MS_CAP}.`,
+			);
+		if (navigation.afterIdle.median > navigation.cold.median)
+			failed.push(
+				`static-router: navigating after idle (${navigation.afterIdle.median} ms) was slower than without idle (${navigation.cold.median} ms).`,
+			);
+		if (failed.length) throw new Error(failed.join('\n'));
 	} finally {
 		try {
 			process.kill(-preview.pid, 'SIGTERM');
@@ -326,6 +359,10 @@ async function measureStaticRouter(combo) {
 			handlerUrl,
 			handlerRun.scriptUrlById,
 		);
+		await handlerRun.settled();
+		const firstClickDownloads = handlerRun.downloads.filter(
+			(entry) => !entry.url.startsWith('/_markless/links/'),
+		);
 		handlerRun.failures.assertClean('static-router "/counter/"');
 
 		return {
@@ -346,6 +383,13 @@ async function measureStaticRouter(combo) {
 				afterClick: {
 					executedBytes: handlerAfterClick.executedBytes,
 					executed: handlerAfterClick.scripts,
+				},
+				firstClick: {
+					downloadedBytes: firstClickDownloads.reduce(
+						(sum, entry) => sum + entry.bytes,
+						0,
+					),
+					downloads: firstClickDownloads,
 				},
 			},
 		};
@@ -396,6 +440,76 @@ async function measureStaticRouter(combo) {
 		});
 		const settled = () => Promise.all(bodies);
 		return { page, cdp, scriptUrlById, downloads, fragments, failures, settled };
+	}
+}
+
+// Pointer press on the Counter link until its heading is in the document, timed in the page.
+async function measureStaticNavigation(combo) {
+	const browser = await chromium.launch();
+	try {
+		const sample = async (afterIdle) => {
+			const context = await browser.newContext();
+			try {
+				const page = await context.newPage();
+				const failures = capturePageFailures(page);
+				const cdp = await context.newCDPSession(page);
+				await cdp.send('Network.enable');
+				await cdp.send('Network.emulateNetworkConditions', THROTTLED_NETWORK);
+				await page.addInitScript((holdIdle) => {
+					if (holdIdle) globalThis.requestIdleCallback = () => 0;
+					addEventListener(
+						'pointerdown',
+						() => (globalThis.__navStart = performance.now()),
+						{
+							capture: true,
+						},
+					);
+					new MutationObserver(() => {
+						if (
+							globalThis.__navEnd === undefined &&
+							document.querySelector('h1')?.textContent === 'Counter'
+						)
+							globalThis.__navEnd = performance.now();
+					}).observe(document, { subtree: true, childList: true, characterData: true });
+				}, !afterIdle);
+				await page.goto(comboUrl(combo), { waitUntil: 'load' });
+				await page.waitForLoadState('networkidle');
+				if (afterIdle) {
+					await page.evaluate(
+						() =>
+							new Promise((done) =>
+								requestIdleCallback(() => setTimeout(done, 500), {
+									timeout: 5_000,
+								}),
+							),
+					);
+					await page.waitForLoadState('networkidle');
+				}
+				await page.evaluate(() => (globalThis.__navSameDocument = true));
+				await page.click('a[href="/counter/"]');
+				await page.waitForFunction(() => globalThis.__navEnd !== undefined, null, {
+					timeout: 15_000,
+				});
+				if (!(await page.evaluate(() => globalThis.__navSameDocument === true)))
+					throw new Error('static-router: the timed navigation reloaded the document.');
+				failures.assertClean('static-router navigation timing');
+				return Math.round(
+					await page.evaluate(() => globalThis.__navEnd - globalThis.__navStart),
+				);
+			} finally {
+				await context.close();
+			}
+		};
+		const series = async (afterIdle) => {
+			const samples = [];
+			for (let index = 0; index < NAVIGATION_SAMPLES; index++)
+				samples.push(await sample(afterIdle));
+			const sorted = [...samples].sort((a, b) => a - b);
+			return { median: sorted[sorted.length >> 1], samples };
+		};
+		return { cold: await series(false), afterIdle: await series(true) };
+	} finally {
+		await browser.close();
 	}
 }
 

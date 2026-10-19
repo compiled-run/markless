@@ -217,6 +217,19 @@ test('a conservatively classed payload page runs its scalar action lean and dema
 		expect.arrayContaining(['web/fns/scalar-served', 'web/resume-runtime']),
 	);
 	expect(resume(plain)).not.toContain('marklessRunScalar');
+
+	const firstUse = (host: string) => {
+		const action = served.manifest.runtimeDemandMap?.actions.find(
+			(candidate) => candidate.hostNodeId === host,
+		);
+		return action?.firstUse && action.firstUse !== 'unknown'
+			? action.firstUse.runtimeModuleIds
+			: [];
+	};
+	// The lean action escalates to the full runtime only on its fallback path, so its first use never names it.
+	expect(firstUse('h1')).toEqual(expect.arrayContaining(['web/fns/scalar-served']));
+	expect(firstUse('h1')).not.toContain('web/resume-runtime');
+	expect(firstUse('h2')).toContain('web/resume-runtime');
 });
 
 test('scalar-looking actions with extra authored work stay on the full dispatch path', async () => {

@@ -1287,6 +1287,8 @@ function withServedScalarDemand(
 			return {
 				...action,
 				runtimeModuleIds: union(action.runtimeModuleIds, lean.runtimeModuleIds),
+				// The full runtime runs only when the lean path escalates, so first use is the lean path's.
+				...(lean.firstUse ? { firstUse: lean.firstUse } : {}),
 				...(lean.plan?.kind === 'closure' ? { plan: lean.plan } : {}),
 			};
 		}),

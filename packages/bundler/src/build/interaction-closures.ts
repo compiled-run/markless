@@ -42,6 +42,10 @@ const LEAN_DISPATCH_MODULE_IDS: ReadonlySet<string> = new Set(
 	Object.values(LEAN_DISPATCH_MARKER_MODULES).flat(),
 );
 
+function isLeanAction(runtimeModuleIds: Iterable<string>): boolean {
+	return [...runtimeModuleIds].some((id) => LEAN_DISPATCH_MODULE_IDS.has(id));
+}
+
 export type InteractionClosureModule = {
 	readonly dependencies: readonly string[];
 	readonly dynamicDependencies?: readonly string[];
@@ -79,8 +83,9 @@ type MergedDemand = {
 	missing: boolean;
 	replaced: boolean;
 	readonly records: Map<string, Set<string>>;
-	// Symbols of the records whose code can run before any input.
+	// Symbols and runtime of the records whose code can run before any input.
 	readonly landingSymbols: Set<string>;
+	readonly landingRuntimeModuleIds: Set<string>;
 	readonly actions: Map<
 		string,
 		{
@@ -93,6 +98,8 @@ type MergedDemand = {
 			firstUse: RuntimeDemandMapFirstUse[] | null;
 			// Some consequence of the action could not be classified by the compiler.
 			unknown: boolean;
+			// The same, over only the sources that serve it on a lean dispatch path.
+			lean?: { firstUse: RuntimeDemandMapFirstUse[] | null; unknown: boolean };
 		}
 	>;
 	readonly unknownRecordModuleIds: Set<string>;
@@ -307,12 +314,29 @@ export function computeInteractionClosures(input: {
 		if (resume !== 'unknown')
 			for (const [owner, symbolIds] of resume.symbols)
 				for (const symbolId of symbolIds) seedSymbol(owner, symbolId);
+		// A first input on a full-dispatch control resumes the whole page; a lean one runs only its own path,
+		// so runtime the resume module imports for escalation is first-use code only where something names it.
+		const leanOnly =
+			resume !== 'unknown' &&
+			[...files].every((file) => {
+				const merged = demand.get(file)!;
+				return (
+					merged.landingSymbols.size === 0 &&
+					merged.landingRuntimeModuleIds.size === 0 &&
+					[...merged.actions.values()].every(
+						(action) =>
+							isLeanAction(action.runtimeModuleIds) &&
+							!(action.lean ?? action).unknown,
+					)
+				);
+			});
+		const bootBound = leanOnly ? { runtimeIds: new Set(resume.runtimeModuleIds) } : {};
 		const consumers: InteractionConsumer[] = [
 			{
 				key: 'boot',
 				kind: 'boot',
 				modules: bootBounded
-					? useClosure(route, reach, bootSeeds, {}, bootSeeds)
+					? useClosure(route, reach, bootSeeds, bootBound, bootSeeds)
 					: useClosure(route, reach, bootRoots),
 			},
 			...(renderRoots.length
@@ -331,7 +355,10 @@ export function computeInteractionClosures(input: {
 			for (const [actionKey, action] of [...merged.actions].sort(([a], [b]) =>
 				a < b ? -1 : a > b ? 1 : 0,
 			)) {
-				const firstUse = merged.replaced ? null : action.firstUse;
+				const lean = isLeanAction(action.runtimeModuleIds);
+				// A client-render variant of the file dispatches it in full; the landing serves it lean.
+				const served = (lean && action.lean) || action;
+				const firstUse = merged.replaced ? null : served.firstUse;
 				// Resume start runs page-wide, so every bounded control joins what it runs.
 				const joined = firstUse
 					? joinPage(
@@ -339,7 +366,7 @@ export function computeInteractionClosures(input: {
 							page,
 						)
 					: null;
-				if (action.unknown || joined === 'unknown') {
+				if (served.unknown || joined === 'unknown') {
 					consumers.push({
 						key: `action:${display(file, input.root)}#${actionKey}`,
 						kind: 'action',
@@ -377,8 +404,9 @@ export function computeInteractionClosures(input: {
 						else widen('unresolved-symbol');
 					}
 				}
+				// A lean action also demands the full runtime it escalates to; its first use names only what it runs.
 				const runtimeIds = new Set([
-					...action.runtimeModuleIds,
+					...(lean && joined ? [] : action.runtimeModuleIds),
 					...(joined?.runtimeModuleIds ?? []),
 				]);
 				if (
@@ -400,9 +428,7 @@ export function computeInteractionClosures(input: {
 					key: `action:${display(file, input.root)}#${actionKey}`,
 					kind: 'action',
 					...(conservative ? { conservative } : {}),
-					...([...action.runtimeModuleIds].some((id) => LEAN_DISPATCH_MODULE_IDS.has(id))
-						? { lean: true }
-						: {}),
+					...(lean ? { lean: true } : {}),
 					modules: useClosure(route, reach, seeds, { runtimeIds }, seeds),
 				});
 			}
@@ -520,6 +546,7 @@ function mergeDemand(
 				replaced: false,
 				records: new Map(),
 				landingSymbols: new Set(),
+				landingRuntimeModuleIds: new Set(),
 				actions: new Map(),
 				unknownRecordModuleIds: new Set(),
 				page: {
@@ -542,8 +569,9 @@ function mergeDemand(
 			entry.records.set(record.recordId, symbols);
 			if (landingArmsServed && record.kind === 'async-boundary') continue;
 			for (const id of record.symbolIds ?? []) symbols.add(id);
-			if (RUNS_WITHOUT_INPUT[record.kind])
-				for (const id of record.symbolIds ?? []) entry.landingSymbols.add(id);
+			if (!RUNS_WITHOUT_INPUT[record.kind]) continue;
+			for (const id of record.symbolIds ?? []) entry.landingSymbols.add(id);
+			for (const id of record.runtimeModuleIds) entry.landingRuntimeModuleIds.add(id);
 		}
 		for (const action of [...map.actions, ...(map.armActions ?? [])]) {
 			const key = `${action.hostNodeId}:${action.eventName}`;
@@ -556,9 +584,16 @@ function mergeDemand(
 				firstUse: action.firstUse ? [] : null,
 				unknown: false,
 			};
-			if (action.firstUse === 'unknown') existing.unknown = true;
-			else if (!action.firstUse) existing.firstUse = null;
-			else existing.firstUse?.push(action.firstUse);
+			const views: Array<{ firstUse: RuntimeDemandMapFirstUse[] | null; unknown: boolean }> =
+				[existing];
+			if (isLeanAction(action.runtimeModuleIds))
+				views.push(
+					(existing.lean ??= { firstUse: action.firstUse ? [] : null, unknown: false }),
+				);
+			for (const view of views)
+				if (action.firstUse === 'unknown') view.unknown = true;
+				else if (!action.firstUse) view.firstUse = null;
+				else view.firstUse?.push(action.firstUse);
 			for (const kind of action.recordKinds) existing.recordKinds.add(kind);
 			for (const id of action.payloadRecordIds) existing.recordIds.add(id);
 			for (const id of action.runtimeModuleIds) existing.runtimeModuleIds.add(id);

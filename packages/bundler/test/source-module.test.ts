@@ -482,6 +482,11 @@ test('composed pages resolve scalar hosts only through served locators', () => {
 	expect(resumeCode).not.toContain('marklessFindElementAtDomOrderIndex(input.root, 3)');
 	expect(resumeCode).toContain("import('@markless/core/web/resume')");
 	expect(resumeCode).toContain('return marklessScalarSpecializedFallback(input, "event-match");');
+	// An event the execution log forwards only to record it never wakes the full runtime.
+	expect(resumeCode.indexOf('if (input.logOnly) return;')).toBeGreaterThan(-1);
+	expect(resumeCode.indexOf('if (input.logOnly) return;')).toBeLessThan(
+		resumeCode.indexOf('return marklessScalarSpecializedFallback(input, "event-match");'),
+	);
 });
 
 test('a page that needs full resume keeps its scalar actions lean behind a full fallback', () => {

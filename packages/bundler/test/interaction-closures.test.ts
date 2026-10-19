@@ -791,6 +791,147 @@ test('boot leaves a symbol only a control or nothing loads to that control, unle
 	expect(unbounded.get('boot')).toContain(symbol(file, 'symbol:3'));
 });
 
+test('runtime only a fallback path imports joins boot only when something that runs at landing names it', () => {
+	for (const [file, marker, full, loadsLean] of [
+		[
+			`${root}/pages/counter.tsrx`,
+			LEAN_DISPATCH_MARKER_MODULES.scalar[1],
+			'resume-runtime',
+			'static',
+		],
+		[
+			`${root}/screens/tally.tsrx`,
+			LEAN_DISPATCH_MARKER_MODULES.row[0],
+			'payload-resume',
+			'lazy',
+		],
+	] as const) {
+		const lean = marker.replace(/^web\//, '');
+		const modules = new Map<string, InteractionClosureModule>([
+			[
+				`${file}?markless-resume`,
+				{
+					dependencies: loadsLean === 'static' ? [runtime(lean)] : [],
+					dynamicDependencies: [
+						runtime(full),
+						symbol(file, 'symbol:0'),
+						...(loadsLean === 'lazy' ? [runtime(lean)] : []),
+					],
+					source: file,
+				},
+			],
+			[symbol(file, 'symbol:0'), { dependencies: [], source: file }],
+			[symbol(file, 'symbol:1'), { dependencies: [], source: file }],
+			[runtime(lean), { dependencies: [], source: runtime(lean) }],
+			[runtime(full), { dependencies: [], source: runtime(full) }],
+		]);
+		const route = relative(file);
+		const consumers = (map: RuntimeDemandMapManifest) =>
+			new Map(
+				computeInteractionClosures({
+					root,
+					modules,
+					routes: new Map([[route, [`${file}?markless-resume`]]]),
+					demand: [{ source: `${file}?markless-symbols`, map }],
+				})[0]!.consumers.map((consumer) => [consumer.key, consumer.modules]),
+			);
+		const action = {
+			hostNodeId: 'h3',
+			eventName: 'click',
+			recordKind: 'event' as const,
+			recordKinds: ['event' as const],
+			payloadRecordIds: ['event:h3:click'],
+			runtimeModuleIds: [`web/${lean}`, `web/${full}`],
+			firstUse: { symbolIds: ['symbol:0'], runtimeModuleIds: [`web/${lean}`] },
+		};
+		const event = {
+			recordId: 'event:h3:click',
+			kind: 'event' as const,
+			symbolIds: ['symbol:0'],
+			runtimeModuleIds: [`web/${lean}`, `web/${full}`],
+		};
+		const lone = consumers(
+			demandMap({ payloadRecords: [event], actions: [action], unknown: [`web/${full}`] }),
+		);
+		for (const modules of lone.values()) expect(modules).not.toContain(runtime(full));
+		expect(lone.get(`action:${route}#h3:click`)).toContain(runtime(lean));
+		expect(lone.get(`action:${route}#h3:click`)).toContain(symbol(file, 'symbol:0'));
+
+		const behavior = {
+			recordId: 'behavior:h4:symbol:1',
+			kind: 'behavior' as const,
+			symbolIds: ['symbol:1'],
+			runtimeModuleIds: [`web/${full}`],
+		};
+		const attached = consumers(
+			demandMap({
+				payloadRecords: [event, behavior],
+				actions: [action],
+				unknown: [`web/${full}`],
+			}),
+		);
+		expect(attached.get('boot')).toContain(runtime(full));
+		expect(attached.get('boot')).toContain(symbol(file, 'symbol:1'));
+	}
+
+	function relative(file: string) {
+		return file.slice(root.length + 1);
+	}
+});
+
+test('a lean action keeps the lean first use when a client-render variant of its file dispatches it in full', () => {
+	const file = `${root}/components/tally.tsrx`;
+	const marker = LEAN_DISPATCH_MARKER_MODULES.scalar[0];
+	const modules = new Map<string, InteractionClosureModule>([
+		[
+			`${file}?markless-resume`,
+			{
+				dependencies: [runtime(marker.replace(/^web\//, ''))],
+				dynamicDependencies: [runtime('resume-runtime'), symbol(file, 'symbol:0')],
+				source: file,
+			},
+		],
+		[symbol(file, 'symbol:0'), { dependencies: [], source: file }],
+		[
+			runtime(marker.replace(/^web\//, '')),
+			{ dependencies: [], source: runtime(marker.replace(/^web\//, '')) },
+		],
+		[runtime('resume-runtime'), { dependencies: [], source: runtime('resume-runtime') }],
+	]);
+	const action = (runtimeModuleIds: string[], firstUse: string[]) => ({
+		hostNodeId: 'h1',
+		eventName: 'click',
+		recordKind: 'event' as const,
+		recordKinds: ['event' as const],
+		payloadRecordIds: ['event:h1:click'],
+		runtimeModuleIds,
+		firstUse: { symbolIds: ['symbol:0'], runtimeModuleIds: firstUse },
+	});
+	const [route] = computeInteractionClosures({
+		root,
+		modules,
+		routes: new Map([['components/tally.tsrx', [`${file}?markless-resume`]]]),
+		demand: [
+			{
+				source: `${file}?markless-symbols`,
+				map: demandMap({
+					actions: [action([marker, 'web/resume-runtime'], [marker])],
+					unknown: ['web/resume-runtime'],
+				}),
+			},
+			{
+				source: `${file}?markless-render-data&markless-reached-from=route`,
+				map: demandMap({
+					actions: [action(['web/resume-runtime'], ['web/resume-runtime'])],
+					unknown: ['web/resume-runtime'],
+				}),
+			},
+		],
+	});
+	for (const consumer of route!.consumers)
+		expect(consumer.modules).not.toContain(runtime('resume-runtime'));
+});
+
 test('runtime a feature needs stays out of a route whose own demand maps never name it', () => {
 	const list = `${root}/pages/list.tsrx`;
 	const about = `${root}/pages/about.tsrx`;

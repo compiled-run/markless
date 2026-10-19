@@ -159,6 +159,7 @@ type InlineDispatchInput = {
 	readonly eventRecord?: InlineEventRecord | null;
 	readonly syncPolicyAlreadyApplied?: boolean;
 	readonly propagationStopped?: boolean;
+	readonly logOnly?: boolean;
 };
 type InlineResumeModule = {
 	resumeContainerEvent(input: InlineDispatchInput): Promise<void> | void;
@@ -1177,7 +1178,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			});
 		}
 		if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {
-			return forward({ event, element: event.target, eventRecord: null });
+			return forward({ event, element: event.target, eventRecord: null, logOnly: true });
 		}
 	};
 	root.__marklessListen = (eventName) => {

@@ -66,7 +66,6 @@ export function startFragmentNavigation(
 		const url = followed(anchor);
 		const code = url && routes[url.pathname];
 		if (!code || here(url)) return;
-		for (const item of [...intent.code, ...code]) preload(item);
 		const target = new URL(url.href);
 		target.hash = '';
 		target.pathname = intent.requestPrefix + target.pathname;
@@ -77,6 +76,8 @@ export function startFragmentNavigation(
 			signal: controller.signal,
 		});
 		response.catch(() => {});
+		// After the page fetch, so an origin's per-host connection limit never queues the page behind its code.
+		for (const item of [...intent.code, ...code]) preload(item);
 		pressed = { url: url.href, at: w.performance.now(), controller, response };
 	};
 	const wake = (event?: Event) => {
