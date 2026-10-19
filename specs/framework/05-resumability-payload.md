@@ -203,6 +203,38 @@ refs, and DOM-order skip runs for static nodes are all expected tools. The
 view/wiring arena encodes metadata for the existing DOM; it is not a public
 VNode format and does not imply a client VDOM or component re-render path.
 
+### Record templates
+
+A served page must not repeat a record's shape once per list row or composed
+instance. Records that differ only in their per-instance values (the numbers
+of an instance path, a keyed row segment, a DOM-order index) are served once as
+a template, and each record carries only the values that differ between the
+records sharing it. The serializer owns the encoding (`PROTOCOL_TEMPLATED_LISTS`
+names the record lists that may use it; `encodeProtocolPayloadLists` writes a
+served page's lists, `decodeProtocolPayloadLists` reads them back) and every
+reader of a served `markless/state` or `markless/view` script decodes through
+it, so the decoded payload is byte-for-byte the payload the renderer produced.
+
+Contract:
+
+- Decoding is exact. A template is the record's JSON text with its values cut
+  out, so any record, value or string round-trips unchanged; the encoder needs no
+  knowledge of record kinds.
+- A list is templated only when that shortens it by at least a quarter;
+  otherwise it stays a plain array, which every reader also accepts. Gzip
+  already folds a few repeats, so small lists gain nothing worth the decode.
+- A record no other record shares is served as itself inside a templated list.
+- Lists the inline resumer reads at load (locators, events, keyed repeats,
+  branches, async boundaries) and the state cells a sync policy reads at event
+  time stay plain until the boot reads a compact form directly; decoding never
+  runs at load.
+- Payload scripts a browser renders for itself (client renders that hand
+  records to resume without a server) are never templated: only the served
+  html pays the encode.
+
+The resume data each list row adds is gated by perf guard G13 on a list-heavy
+fixture.
+
 ### View locator materialization
 
 The v1 `markless/view` locator model uses a browser-native `TreeWalker` over

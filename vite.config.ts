@@ -105,6 +105,7 @@ const buildOrder: PackUserConfig[] = [
 			'decode-client': './src/value-decode-client.ts',
 			protocol: './src/protocol.ts',
 			'protocol-validation': './src/protocol-validation-storage.ts',
+			'record-templates': './src/protocol-record-templates.ts',
 		},
 	}),
 	marklessPack({

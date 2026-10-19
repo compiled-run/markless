@@ -7,6 +7,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from './protocol.ts';
+import { decodeProtocolPayloadLists } from './protocol-record-templates.ts';
 
 export type EncodedPayloadScripts = {
 	readonly stateScript: string;
@@ -97,7 +98,10 @@ function parseDataScript(script: string, type: RuntimePayloadType): unknown {
 	}
 
 	try {
-		return JSON.parse(script.slice(prefix.length, -suffix.length));
+		return decodeProtocolPayloadLists(
+			type,
+			JSON.parse(script.slice(prefix.length, -suffix.length)),
+		);
 	} catch {
 		throw payloadInvalidError(
 			type,

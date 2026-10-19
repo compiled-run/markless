@@ -1,6 +1,7 @@
 import { renderSSRIslands } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
+import { decodeProtocolPayloadLists } from '../../../../serializer/src/protocol-record-templates.ts';
 import MultiIslandAccordion from './multi-island-accordion.tsrx';
 import PageScopedCounter from './page-scoped-counter.tsrx';
 
@@ -18,7 +19,10 @@ type StatePayload = {
 function statePayload(): StatePayload {
 	const script = document.querySelector('script[type="markless/state"]');
 	if (!script?.textContent) throw new Error('Expected a serialized markless/state payload.');
-	return JSON.parse(script.textContent) as StatePayload;
+	return decodeProtocolPayloadLists(
+		'markless/state',
+		JSON.parse(script.textContent) as StatePayload,
+	);
 }
 
 function el(locator: { element(): Element | null }) {

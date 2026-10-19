@@ -1,5 +1,6 @@
 // Splits a page's resume data scripts into their record lists, raw and gzip.
 import { gzipSync } from 'node:zlib';
+import { decodeProtocolPayloadLists } from '../../../packages/serializer/src/protocol-record-templates.ts';
 
 const gzip = (text) => gzipSync(text, { level: 9 }).length;
 const DATA_SCRIPT = /<script type="(markless\/(?:state|view))"[^>]*>([\s\S]*?)<\/script>/g;
@@ -17,7 +18,9 @@ const LISTS = {
 	],
 };
 
-export function resumeDataBreakdown(html, decode = (_type, text) => JSON.parse(text)) {
+const decodeScript = (type, text) => decodeProtocolPayloadLists(type, JSON.parse(text));
+
+export function resumeDataBreakdown(html, decode = decodeScript) {
 	const total = { raw: 0, gzip: 0 };
 	const scripts = {};
 	const lists = {};

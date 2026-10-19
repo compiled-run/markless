@@ -10,6 +10,7 @@ import {
 	protocolInstancePath,
 	protocolIslandSegment,
 } from '../../../serializer/src/protocol-constants.ts';
+import { decodeProtocolPayloadLists } from '../../../serializer/src/protocol-record-templates.ts';
 
 /**
  * The multi-embed half of the family conformance gate. One page, N same-shape
@@ -241,7 +242,10 @@ function mountedStatePayload(mode: MultiEmbedMode, mounted: unknown): StatePaylo
 	if (mode === 'ssr') {
 		const script = document.querySelector('script[type="markless/state"]');
 		if (!script?.textContent) throw new Error('Expected a serialized markless/state payload.');
-		return JSON.parse(script.textContent) as StatePayload;
+		return decodeProtocolPayloadLists(
+			'markless/state',
+			JSON.parse(script.textContent) as StatePayload,
+		);
 	}
 	const state = (mounted as Pick<CsrIslandsRenderResult, 'state'>).state;
 	if (!state) throw new Error('The CSR island mount composed no merged state payload.');

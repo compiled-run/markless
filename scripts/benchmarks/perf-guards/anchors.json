@@ -1269,6 +1269,122 @@
 			"from": 16609,
 			"to": 20390,
 			"reason": "swap module runs the destination page's scripts in landing order (head libraries, blocking/defer/module/async, load listeners); +3.8 kB rendered, loaded on link intent only, nothing at page load"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "serializer/protocol-record-templates",
+			"from": null,
+			"to": 1118,
+			"reason": "the reader of templated record lists: served pages carry each repeated record shape once (shadcn-admin /users resume data 679 -> 269 kB raw); minified it is a few hundred bytes, run only when a resume path decodes"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "web/fns/closure-action",
+			"from": 7401,
+			"to": 7539,
+			"reason": "closure actions read served computeds through the templated-list reader"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "keyed rows",
+			"from": 1298,
+			"to": 542,
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "fixed row slots",
+			"from": 3631,
+			"to": 1002,
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "bench /",
+			"from": {
+				"raw": 14716,
+				"gzip": 2065
+			},
+			"to": {
+				"raw": 11809,
+				"gzip": 2164
+			},
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "bench /records",
+			"from": {
+				"raw": 52220,
+				"gzip": 8175
+			},
+			"to": {
+				"raw": 51150,
+				"gzip": 8220
+			},
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "bench /settings",
+			"from": {
+				"raw": 14603,
+				"gzip": 1930
+			},
+			"to": {
+				"raw": 11667,
+				"gzip": 2014
+			},
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "docs /markless/",
+			"from": {
+				"raw": 404894,
+				"gzip": 17481
+			},
+			"to": {
+				"raw": 103887,
+				"gzip": 9334
+			},
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "docs /markless/concepts/state",
+			"from": {
+				"raw": 404922,
+				"gzip": 17486
+			},
+			"to": {
+				"raw": 103915,
+				"gzip": 9339
+			},
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "docs /markless/ui/accordion",
+			"from": {
+				"raw": 404918,
+				"gzip": 17485
+			},
+			"to": {
+				"raw": 103911,
+				"gzip": 9339
+			},
+			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
 		}
 	],
 	"runtimeModules": {
@@ -1303,6 +1419,7 @@
 		"serializer/protocol-locator-paths-format": 352,
 		"serializer/protocol-page-markers": 377,
 		"serializer/protocol-prop-prefix": 270,
+		"serializer/protocol-record-templates": 1118,
 		"serializer/storage-slot": 780,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,
@@ -1314,7 +1431,7 @@
 		"web/dom-journal": 7373,
 		"web/dom-journal-direct": 1223,
 		"web/fns/bound-symbol": 1497,
-		"web/fns/closure-action": 7401,
+		"web/fns/closure-action": 7539,
 		"web/fns/composition": 19605,
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
@@ -1392,33 +1509,33 @@
 		"async boundary": 7807
 	},
 	"resumeRows": {
-		"keyed rows": 1298,
-		"fixed row slots": 3631
+		"keyed rows": 542,
+		"fixed row slots": 1002
 	},
 	"resumeData": {
 		"bench /": {
-			"raw": 14716,
-			"gzip": 2065
+			"raw": 11809,
+			"gzip": 2164
 		},
 		"bench /records": {
-			"raw": 52220,
-			"gzip": 8175
+			"raw": 51150,
+			"gzip": 8220
 		},
 		"bench /settings": {
-			"raw": 14603,
-			"gzip": 1930
+			"raw": 11667,
+			"gzip": 2014
 		},
 		"docs /markless/": {
-			"raw": 404894,
-			"gzip": 17481
+			"raw": 103887,
+			"gzip": 9334
 		},
 		"docs /markless/concepts/state": {
-			"raw": 404922,
-			"gzip": 17486
+			"raw": 103915,
+			"gzip": 9339
 		},
 		"docs /markless/ui/accordion": {
-			"raw": 404918,
-			"gzip": 17485
+			"raw": 103911,
+			"gzip": 9339
 		}
 	}
 }

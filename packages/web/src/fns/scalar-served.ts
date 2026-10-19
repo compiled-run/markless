@@ -1,3 +1,4 @@
+import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { marklessFindElementAtDomOrderIndex } from './dom-order.ts';
 
 // Served-view ownership for per-action scalar dispatch on pages that also need full resume.
@@ -45,7 +46,10 @@ const servedView = (r: ServedRoot): ServedView | undefined => {
 	if (!s) return;
 	if (r.__marklessScalarView?.s === s) return r.__marklessScalarView;
 	try {
-		const v = JSON.parse(s.textContent || 'null') as {
+		const v = decodeProtocolPayloadLists(
+			'markless/view',
+			JSON.parse(s.textContent || 'null'),
+		) as {
 			readonly locators: ReadonlyArray<ServedLocator & { readonly hostNodeId: string }>;
 			readonly events: ReadonlyArray<ServedEvent>;
 			readonly domUpdates?: ReadonlyArray<MarklessServedDomUpdate>;

@@ -1,3 +1,4 @@
+import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import type {
 	ProtocolStatePayload,
 	ProtocolViewPayload,
@@ -250,5 +251,5 @@ function readPayloadScript(
 			site: type,
 		});
 	}
-	return JSON.parse(text);
+	return decodeProtocolPayloadLists(type, JSON.parse(text));
 }

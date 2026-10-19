@@ -30,6 +30,7 @@ import {
 	type PayloadWiringEvaluation,
 } from './payload-wiring.ts';
 import { classifyRequest, type RequestClassificationInput } from './requests.ts';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 import type { AnalyzerTextArtifact } from './strip-guarantee.ts';
 
 export async function collectServedBuildArtifacts(page: Page): Promise<AnalyzerTextArtifact[]> {
@@ -91,7 +92,9 @@ export async function collectLocatorResolution(page: Page): Promise<LocatorResol
 		commentData: (node: SerializedDomNode) => node.data,
 	};
 	for (const container of containers) {
-		const parsed = locatorPlansFromView(container.view);
+		const parsed = locatorPlansFromView(
+			decodeProtocolPayloadLists('markless/view', container.view),
+		);
 		const result = evaluateLocatorResolution(
 			parsed.plans,
 			[container.root],

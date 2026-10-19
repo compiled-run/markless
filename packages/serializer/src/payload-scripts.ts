@@ -1,4 +1,5 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
+import type { RuntimePayloadType } from './protocol-client.ts';
 
 export type RenderPayloadScriptsInput = {
 	readonly state: ProtocolStatePayload;
@@ -12,17 +13,28 @@ export type RenderedPayloadScripts = {
 	readonly viewScript: string;
 };
 
-export function renderPayloadScripts(input: RenderPayloadScriptsInput): RenderedPayloadScripts {
+/** How a payload's record lists are written; a served page passes encodeProtocolPayloadLists. */
+export type PayloadListEncoder = <T extends object>(type: RuntimePayloadType, payload: T) => T;
+
+export function renderPayloadScripts(
+	input: RenderPayloadScriptsInput,
+	encodeLists?: PayloadListEncoder,
+): RenderedPayloadScripts {
 	return {
 		state: input.state,
 		view: input.view,
-		stateScript: renderDataScript('markless/state', input.state),
-		viewScript: renderDataScript('markless/view', input.view),
+		stateScript: renderDataScript('markless/state', input.state, encodeLists),
+		viewScript: renderDataScript('markless/view', input.view, encodeLists),
 	};
 }
 
-function renderDataScript(type: 'markless/state' | 'markless/view', payload: unknown): string {
-	return `<script type="${type}">${escapeScriptJson(JSON.stringify(payload))}</script>`;
+function renderDataScript(
+	type: RuntimePayloadType,
+	payload: object,
+	encodeLists: PayloadListEncoder | undefined,
+): string {
+	const served = encodeLists ? encodeLists(type, payload) : payload;
+	return `<script type="${type}">${escapeScriptJson(JSON.stringify(served))}</script>`;
 }
 
 // Only `</` and `<!` can end or escape a script's raw text; any other `<` is inert there.

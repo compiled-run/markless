@@ -3,6 +3,10 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer/protocol';
+import {
+	decodeProtocolPayloadLists,
+	type RuntimePayloadType,
+} from '@markless/serializer/record-templates';
 import { marklessAttributeValue } from './dom-attribute.ts';
 import { pageNodes } from './resume-anchor-census.ts';
 import { marklessControlWriteHeld, marklessNoteControlEdits } from './control-edit-hold.ts';
@@ -198,12 +202,15 @@ async function createEventResumeContainerState(
 	};
 }
 
-function readPayloadJson<T>(document: EventResumePayloadDocument, type: string): T {
+function readPayloadJson<T>(document: EventResumePayloadDocument, type: RuntimePayloadType): T {
 	const script = document.querySelector(`script[type="${type}"]`);
 	const text = script?.textContent ?? script?.text ?? script?.innerHTML;
 	if (text == null) throw new Error(`Missing ${type} payload script.`);
 
-	const payload = JSON.parse(text) as { readonly version?: unknown };
+	const payload = decodeProtocolPayloadLists(
+		type,
+		JSON.parse(text) as { readonly version?: unknown },
+	);
 	if (payload.version !== 1) throw new Error(`Unsupported ${type} payload version.`);
 	return payload as T;
 }

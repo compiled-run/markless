@@ -1,3 +1,4 @@
+import { decodePayloadScriptsFromDocument } from '@markless/web/payload';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import Page from './fixtures/namespace-state-consumer.tsrx';
@@ -13,16 +14,9 @@ import Page from './fixtures/namespace-state-consumer.tsrx';
 // export, or the barrel's re-export fails to link at all.
 afterEach(() => cleanup());
 
-type StatePayload = {
-	readonly cells: ReadonlyArray<{ readonly graphNodeId: string }>;
-	readonly computed: ReadonlyArray<{ readonly graphNodeId: string }>;
-};
-
 function statePayloadIds(container: ParentNode): string[] {
-	const script = container.querySelector<HTMLScriptElement>('script[type="markless/state"]');
-	if (!script) throw new Error('Expected markless/state payload script.');
-	const payload = JSON.parse(script.textContent ?? 'null') as StatePayload;
-	return [...payload.cells, ...payload.computed].map((node) => node.graphNodeId);
+	const { state } = decodePayloadScriptsFromDocument(container);
+	return [...(state.cells ?? []), ...(state.computed ?? [])].map((node) => node.graphNodeId);
 }
 
 function widget(container: ParentNode, name: string) {

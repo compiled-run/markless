@@ -5,6 +5,7 @@ import type {
 	ProtocolViewPayload,
 } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
+import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { derivedReconcilePlane, installDerivedReconcilePlane } from '../reconcile-plane-slot.ts';
 
 // A runtime that wakes while the server still streams an @pending boundary's arm
@@ -114,7 +115,8 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 			if (node.dependencies) derivedFrom.set(node.graphNodeId, node.dependencies);
 	};
 	const stateText = root.querySelector('script[type="markless/state"]')?.textContent;
-	if (stateText) learn(JSON.parse(stateText) as StateDelta);
+	if (stateText)
+		learn(decodeProtocolPayloadLists('markless/state', JSON.parse(stateText) as StateDelta));
 	for (const patch of document.querySelectorAll(STATE_PATCH))
 		learn(JSON.parse(patch.textContent ?? 'null') as StateDelta | null);
 

@@ -14,6 +14,10 @@ import {
 	protocolInstanceQualifies,
 	protocolStateVersion,
 } from '../../../../serializer/src/protocol-constants.ts';
+import {
+	decodeProtocolPayloadLists,
+	type RuntimePayloadType,
+} from '../../../../serializer/src/protocol-record-templates.ts';
 import { marklessDecodeScalarCell } from '../../../../web/src/fns/scalar-specialized.ts';
 import { marklessFindElementAtDomOrderIndex } from '../../../../web/src/fns/dom-order.ts';
 
@@ -298,9 +302,9 @@ function locate(root: MdxScalarRoot, view: ProtocolViewPayload, host: string): E
 	return element?.tagName.toLowerCase() === locator.tagName.toLowerCase() ? element : null;
 }
 
-function readScript<T>(root: Element, type: string): T | undefined {
+function readScript<T>(root: Element, type: RuntimePayloadType): T | undefined {
 	const text = root.querySelector(`script[type="${type}"]`)?.textContent;
-	return text ? (JSON.parse(text) as T) : undefined;
+	return text ? (decodeProtocolPayloadLists(type, JSON.parse(text)) as T) : undefined;
 }
 
 function references(value: unknown, id: string): boolean {

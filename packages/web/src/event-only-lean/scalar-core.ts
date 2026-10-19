@@ -1,3 +1,4 @@
+import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import type {
 	EventOnlyResumeContainer,
 	EventOnlyResumeDomElement,
@@ -202,7 +203,7 @@ function readPayloadScript(
 			site: type,
 		});
 	}
-	return JSON.parse(text);
+	return decodeProtocolPayloadLists(type, JSON.parse(text));
 }
 
 function readComputedEntries(computed: unknown): ReadonlyArray<unknown> {

@@ -5,6 +5,7 @@ import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	STORAGE_PROTOCOL_VERSION,
 } from './protocol-constants.ts';
+import { decodeProtocolPayloadLists } from './protocol-record-templates.ts';
 // Type-only on purpose: taking a runtime value from protocol.ts here drags it
 // back into the browser payload closure the event-only-resume wall measures.
 import type {
@@ -76,7 +77,7 @@ function parse(script: string, type: RuntimePayloadType): unknown {
 		throw payloadInvalidError(type, `Expected ${type} payload script.`);
 	}
 	try {
-		return JSON.parse(script.slice(prefix.length, -9));
+		return decodeProtocolPayloadLists(type, JSON.parse(script.slice(prefix.length, -9)));
 	} catch {
 		throw payloadInvalidError(type, `Invalid ${type} payload JSON.`);
 	}

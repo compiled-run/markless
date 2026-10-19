@@ -13,7 +13,7 @@ import {
 	type ProtocolViewPayload,
 	type StorageSeedMetadata,
 } from '@markless/serializer';
-import { renderPayloadScripts } from '@markless/serializer';
+import { encodeProtocolPayloadLists, renderPayloadScripts } from '@markless/serializer';
 import {
 	type ProtocolArmRecordSet,
 	protocolEventDispatchesMarkless,
@@ -193,6 +193,7 @@ export async function assembleSsrContainer(
 		hasPayload && browserTriggers && classification?.kind !== 'empty'
 			? renderPayloadScripts(
 					payloadRecords === requestRecords ? { state, view: servedView } : payloadRecords,
+					encodeProtocolPayloadLists,
 				)
 			: undefined;
 	const selectedResumeModuleUrl = wakeChannelEnabled ? prerenderWakeModuleUrl : resumeModuleUrl;

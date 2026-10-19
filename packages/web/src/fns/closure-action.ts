@@ -1,3 +1,4 @@
+import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { marklessAttributeValue } from '../dom-attribute.ts';
 import { marklessDecodeScalarCell, marklessScalarSpecializedError } from './scalar-specialized.ts';
 import { marklessScalarLocate, marklessServedDomUpdate } from './scalar-served.ts';
@@ -69,7 +70,7 @@ const servedState = (r: ClosureRoot): ServedState => {
 		} | null>;
 	} | null = null;
 	try {
-		parsed = JSON.parse(s.textContent || 'null');
+		parsed = decodeProtocolPayloadLists('markless/state', JSON.parse(s.textContent || 'null'));
 	} catch {}
 	if (!parsed) return escalate('state');
 	return (r.__marklessClosureState = {

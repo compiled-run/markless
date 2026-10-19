@@ -21,6 +21,7 @@
 		"./resume-record-merge": "./src/resume-record-merge.ts",
 		"./decode-client": "./src/value-decode-client.ts",
 		"./protocol": "./src/protocol.ts",
+		"./record-templates": "./src/protocol-record-templates.ts",
 		"./protocol-validation": "./src/protocol-validation-storage.ts"
 	},
 	"publishConfig": {
@@ -53,6 +54,10 @@
 			"./protocol": {
 				"types": "./dist/protocol.d.ts",
 				"default": "./dist/protocol.js"
+			},
+			"./record-templates": {
+				"types": "./dist/record-templates.d.ts",
+				"default": "./dist/record-templates.js"
 			},
 			"./protocol-validation": {
 				"types": "./dist/protocol-validation.d.ts",
