@@ -424,7 +424,15 @@ export async function forceImportedModules(
 	environment: MarklessEnvironment,
 ): Promise<Set<string>> {
 	for (const child of children) {
-		const loadSource = linkedModuleLoadSource(child, moduleArtifacts.has(child.source));
+		const artifact = moduleArtifacts.get(child.source);
+		// A child waiting on this parent cannot finish first, so the parent links its first pass.
+		const pendingRequest =
+			options.dev === true || metadata.waitsOn(environment, child.source, pathname(child.parent))
+				? undefined
+				: artifact?.provisionalUntil;
+		const loadSource =
+			linkedModuleLoadSource(child, artifact !== undefined && pendingRequest === undefined) &&
+			(pendingRequest ?? child.source);
 		if (loadSource !== undefined) {
 			await metadata.whileWaiting(
 				environment,
@@ -683,6 +691,20 @@ export function moduleLinkArtifact(
 		moduleImports: result.moduleImports,
 		delegateChildren: delegateChildResolutionRequests(result.artifactChildren).length > 0,
 	};
+}
+
+// A first pass never replaces a final artifact in a build: which variant of a source compiled last must not change what importers link against.
+export function publishModuleLinkArtifact(
+	artifacts: Map<string, MarklessModuleLinkArtifact>,
+	source: string,
+	artifact: MarklessModuleLinkArtifact,
+	options: { readonly provisionalUntil?: string; readonly dev: boolean },
+): void {
+	const current = artifacts.get(source);
+	if (options.provisionalUntil !== undefined) {
+		if (!options.dev && current && current.provisionalUntil === undefined) return;
+		artifacts.set(source, { ...artifact, provisionalUntil: options.provisionalUntil });
+	} else artifacts.set(source, artifact);
 }
 
 export async function materializeDelegateChildren(

@@ -9,7 +9,11 @@ import {
 import type { LinkedModuleChildResolution } from '@markless/compiler';
 import type { createMarklessDevGraph } from './dev.ts';
 import { createBuildDelegateLoader } from './build/delegate-loader.ts';
-import { createDelegateModuleCache, moduleLinkArtifact } from './link-driver.ts';
+import {
+	createDelegateModuleCache,
+	moduleLinkArtifact,
+	publishModuleLinkArtifact,
+} from './link-driver.ts';
 import { hasExecutionLogModuleHook, requalifyExecutionLogModuleHook } from './execution-log.ts';
 import { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { symbolExecutionLogId } from './module-id.ts';
@@ -168,6 +172,10 @@ export function registerTransformArtifacts(
 		root?: string;
 		tracksSourceClaimPublication?: boolean;
 		replaceOwnedArtifacts?: boolean;
+		// A dev server's edit compiles a first pass that must replace the stale final artifact.
+		devServer?: boolean;
+		// The request whose final compile replaces this first pass.
+		request?: string;
 		updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 	},
 ) {
@@ -182,7 +190,9 @@ export function registerTransformArtifacts(
 				? { source: requalifyExecutionLogModuleHook(module.source, logId) }
 				: {}),
 			...(input.finalPublication === false &&
-			(module.type === 'resolver' || module.type === 'symbol')
+			(module.type === 'resolver' ||
+				module.type === 'symbol' ||
+				(module.type === 'render-data' && input.devServer !== true))
 				? { provisional: true }
 				: {}),
 		};
@@ -230,7 +240,15 @@ export function registerTransformArtifacts(
 			);
 		}
 	}
-	state.moduleLinkArtifacts(input.environment).set(input.source, moduleLinkArtifact(input.result));
+	publishModuleLinkArtifact(
+		state.moduleLinkArtifacts(input.environment),
+		input.source,
+		moduleLinkArtifact(input.result),
+		{
+			provisionalUntil: input.finalPublication === false ? input.request : undefined,
+			dev: input.devServer === true,
+		},
+	);
 	const previouslyOwned = state.transformVirtualModules.get(input.owner) ?? new Set<string>();
 	if (input.replaceOwnedArtifacts === true) {
 		for (const staleId of previouslyOwned) {
@@ -257,8 +275,8 @@ function publishesVirtualModule(
 ): boolean {
 	if (!current) return true;
 	if (next.provisional === true) return false;
+	if (current.provisional === true) return true;
 	if (next.type === 'resolver' && current.type === 'resolver') {
-		if (current.provisional === true) return true;
 		const verdict = linkedResolverClaimVerdict({
 			resolverId: next.id,
 			current: current.symbolClaims,

@@ -17,6 +17,7 @@ import {
 	linkedInterfaces,
 	mergeLinkedModuleChildren,
 	moduleIsEntry,
+	publishModuleLinkArtifact,
 	resolveImportedModuleInterfaces,
 } from '../link-driver.ts';
 import { isReExportOnlySource } from '../build/undemanded-runtime.ts';
@@ -260,7 +261,10 @@ async function runFirstPassTransform(
 			} catch {
 				throw error;
 			}
-			moduleLinkArtifacts.set(source, provisional);
+			publishModuleLinkArtifact(moduleLinkArtifacts, source, provisional, {
+				provisionalUntil: request.id,
+				dev: internalOptions.dev === true,
+			});
 			const provisionalImports = await resolveImportedModuleInterfaces(
 				pluginContext,
 				manifestSource,

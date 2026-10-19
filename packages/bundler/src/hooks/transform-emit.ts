@@ -16,6 +16,7 @@ import {
 	materializeDelegateChildren,
 	mergeLinkedModuleChildren,
 	moduleLinkArtifact,
+	publishModuleLinkArtifact,
 	warnDelegateImportFailures,
 } from '../link-driver.ts';
 import { nativePackingEnabled } from '../packing-option.ts';
@@ -79,6 +80,8 @@ export function registerFirstPassArtifacts(
 			environment: currentEnvironment,
 			finalPublication: false,
 			tracksSourceClaimPublication: false,
+			devServer: internalOptions.dev === true,
+			request: request.id,
 			updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 		});
 	} else {
@@ -87,7 +90,10 @@ export function registerFirstPassArtifacts(
 			manifestSource,
 			renderDataClaimManifest(transformed.manifest, manifestSource),
 		);
-		moduleLinkArtifacts.set(source, moduleLinkArtifact(transformed));
+		publishModuleLinkArtifact(moduleLinkArtifacts, source, moduleLinkArtifact(transformed), {
+			provisionalUntil: request.id,
+			dev: internalOptions.dev === true,
+		});
 	}
 }
 
@@ -119,6 +125,7 @@ export function registerFinalTransformArtifacts(
 			manifestSource,
 			renderDataClaimManifest(transformed.manifest, manifestSource),
 		);
+		state.moduleLinkArtifacts(currentEnvironment).set(source, moduleLinkArtifact(transformed));
 	}
 }
 
@@ -360,7 +367,9 @@ function sharesCanonicalRenderData(
 		return false;
 	const registered = request.ctx.state.virtualModules.get(renderDataModule.id);
 	return (
-		registered?.canonicalRenderData !== true || registered.source === renderDataModule.source
+		registered?.canonicalRenderData !== true ||
+		registered.provisional === true ||
+		registered.source === renderDataModule.source
 	);
 }
 

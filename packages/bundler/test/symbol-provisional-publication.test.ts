@@ -132,3 +132,41 @@ test('a sibling first pass cannot replace a published symbol or its execution si
 	});
 	expect(state.virtualModules.get(module.id)?.source).toContain("return 'updated'");
 });
+
+test('a sibling first pass leaves render data provisional until a final compile publishes it', async () => {
+	const state = createPluginState();
+	const result = await transformTsrxModule({
+		filename,
+		source: fixture('onToggle', 'open').page,
+		environment: 'client',
+	});
+	const id = `virtual:markless:render-data:${filename}`;
+	const renderData = (source: string) => ({
+		...result,
+		virtualModules: [{ id, type: 'render-data' as const, canonicalRenderData: true, source }],
+	});
+	const input = {
+		source: filename,
+		manifestSource: filename,
+		dev: createMarklessDevGraph(),
+		environment: 'client' as const,
+	};
+	const sibling = { ...input, owner: `${filename}?markless-symbols`, finalPublication: false };
+	registerTransformArtifacts(state, {
+		...sibling,
+		result: renderData('export const unlinked = 1;'),
+	});
+	expect(state.virtualModules.get(id)).toMatchObject({ provisional: true });
+	registerTransformArtifacts(state, {
+		...input,
+		owner: `${filename}?markless-render-data`,
+		finalPublication: true,
+		result: renderData('export const linked = 1;'),
+	});
+	registerTransformArtifacts(state, {
+		...sibling,
+		result: renderData('export const unlinked = 2;'),
+	});
+	expect(state.virtualModules.get(id)).toMatchObject({ source: 'export const linked = 1;' });
+	expect(state.virtualModules.get(id)?.provisional).toBeUndefined();
+});

@@ -4873,6 +4873,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_RENDER_DATA_UNPUBLISHED',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_RENDER_DATA_UNPUBLISHED: <type> <normalizedId> was loaded before its owner <ownerSource> published a final compile.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/hooks/resolve-load.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/hooks/resolve-load.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
 		packageName: '@markless/compiler',
 		stage: 'compile',

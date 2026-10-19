@@ -156,6 +156,8 @@ export type MarklessModuleLinkArtifact = Pick<
 > & {
 	/** The module composes a child this build did not compile, so only its reached render data is canonical. */
 	readonly delegateChildren?: boolean;
+	/** Written by a first pass compiled before its imports were linked: the request whose final compile replaces it. */
+	readonly provisionalUntil?: string;
 };
 
 export interface MarklessTransformManifest {

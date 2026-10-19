@@ -146,7 +146,12 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 		},
 	);
 	if (module?.provisional === true) {
-		const kind = module.type === 'symbol' ? 'SYMBOL' : 'RESOLVER';
+		const kind =
+			module.type === 'symbol'
+				? 'SYMBOL'
+				: module.type === 'resolver'
+					? 'RESOLVER'
+					: 'RENDER_DATA';
 		throw new Error(
 			`MARKLESS_${kind}_UNPUBLISHED: ${module.type} ${JSON.stringify(normalizedId)} was loaded before its owner ${JSON.stringify(ownerSource)} published a final compile.`,
 		);

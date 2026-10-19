@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { resolve } from 'pathe';
+import { relative, resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { MARKLESS_EXECUTION_SIZES } from '../src/build/chunking.ts';
@@ -59,4 +60,62 @@ async function buildOnce() {
 	const modulesByChunk = [...byChunk.values()].map((ids) => ids.sort().join(', ')).sort();
 
 	return { chunkNames, modulesByChunk };
+}
+
+const website = resolve(root, 'website');
+const websiteOutput = resolve(website, '.output');
+
+/**
+ * The website composes the same widgets from many pages, so several variants of
+ * one source compile at once. A sibling variant's first pass used to publish
+ * unlinked render data under the shared id, and a page's render-data request that
+ * read it in that window inlined its own copy instead of importing the shared
+ * module: the toaster page's chunk then changed bytes, names and every plan that
+ * lists it, about one build in three.
+ */
+test('the website build writes the same bytes twice from one tree', async () => {
+	const { first, second } = await withDemoBuildLock(website, async () => ({
+		first: await buildWebsite(),
+		second: await buildWebsite(),
+	}));
+	const differing = [...new Set([...first.keys(), ...second.keys()])].filter(
+		(file) => first.get(file) !== second.get(file),
+	);
+	expect(differing).toEqual([]);
+	expect(first.size).toBeGreaterThan(0);
+}, 900_000);
+
+async function buildWebsite(): Promise<Map<string, string>> {
+	await rm(websiteOutput, { force: true, recursive: true });
+	await exec('pnpm', ['exec', 'vp', 'build'], {
+		cwd: website,
+		env: { ...process.env, MARKLESS_CONSUMER_BUILD: '1' },
+		maxBuffer: 256 * 1024 * 1024,
+	});
+	const digests = new Map<string, string>();
+	for (const file of (await readdir(websiteOutput, { recursive: true, withFileTypes: true }))
+		.filter((entry) => entry.isFile())
+		.map((entry) => relative(websiteOutput, resolve(entry.parentPath, entry.name)))
+		// Nitro stamps the build time into its descriptor.
+		.filter((file) => file !== 'nitro.json')
+		.sort()) {
+		const bytes = await readFile(resolve(websiteOutput, file));
+		digests.set(
+			file,
+			createHash('sha256')
+				.update(
+					file === 'server/index.mjs' ? withoutNitroAssetTable(bytes.toString()) : bytes,
+				)
+				.digest('hex'),
+		);
+	}
+	return digests;
+}
+
+// Nitro lists the public files it serves with their mtimes, in filesystem order; the files themselves are compared above.
+function withoutNitroAssetTable(code: string): string {
+	return code.replace(
+		/\/\/#region #nitro\/virtual\/public-assets-data\n[\s\S]*?\/\/#endregion\n/,
+		'',
+	);
 }

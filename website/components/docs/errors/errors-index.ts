@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 281,
+	total: 282,
 	guided: 41,
 	groups: [
 		{
@@ -870,6 +870,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_RENDER_DATA_READER_SPECIFIER_UNRESOLVABLE',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_RENDER_DATA_UNPUBLISHED',
 					kind: 'build error',
 					guided: false,
 				},
