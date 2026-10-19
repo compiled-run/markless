@@ -623,6 +623,25 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('the first swap from a landing drops an html attribute only the landing page was served with, and keeps what a script set', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			const html = () =>
+				page.evaluate(() => ({
+					landing: document.documentElement.getAttribute('data-landing-only'),
+					shell: document.documentElement.getAttribute('data-page-shell'),
+					scripted: document.documentElement.getAttribute('data-scripted'),
+				}));
+			expect(await html()).toEqual({ landing: 'home', shell: '/', scripted: 'yes' });
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'alpha');
+			expect(await html()).toEqual({ landing: null, shell: '/alpha', scripted: 'yes' });
+			await page.locator('[data-crumb-home]').click();
+			await landedOn(page, 'index');
+			expect(await html()).toEqual({ landing: 'home', shell: '/', scripted: 'yes' });
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('a URL-dependent document keeps its chrome, updates its head, and never reloads', async () => {
 			const { page, errors, requests } = await open(browser, '/', docOrigin);
 			await page.evaluate(() => {

@@ -5,7 +5,12 @@ import {
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
 } from '../../link-attributes.ts';
-import { HTML_ATTRIBUTES_SLOT, ROUTE_SCRIPT_TYPE } from '../../route-dom.ts';
+import {
+	HTML_ATTRIBUTES_SLOT,
+	ROUTE_SCRIPT_TYPE,
+	SERVED_HTML_ATTRIBUTES_PROPERTY,
+	servedHtmlAttributesScript,
+} from '../../route-dom.ts';
 import {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
@@ -376,6 +381,11 @@ export function createServerEntry(options: ServerEntryOptions) {
 				),
 		};
 
+		// A landing the router swaps away from needs its served <html> attribute names: scripts may add others before it runs.
+		const headStart =
+			(documentLoads && fragmentNavigation && !fragment ? servedHtmlAttributesScript() : '') +
+			(options.importMap ?? '');
+
 		// Blocking opt-out: the pre-T107 whole-page await.
 		if (options.render === 'blocking') {
 			const pageHtml = splitPageHtml(
@@ -386,7 +396,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				documentModule,
 				pageProps,
 				pageHtml.headHtml,
-				options.importMap,
+				headStart,
 			);
 			return new Response(
 				wholeDocument(shell, pageHtml, fragment, documentLoads),
@@ -405,7 +415,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			documentModule,
 			pageProps,
 			pageHtml.headHtml,
-			options.importMap,
+			headStart,
 		);
 		if (stream.pendingArmCount === 0) {
 			return new Response(
@@ -1045,6 +1055,7 @@ function fragmentConfig(
 		replaceAttribute: REPLACE_ATTRIBUTE,
 		scrollAttribute: SCROLL_ATTRIBUTE,
 		routeScriptType: ROUTE_SCRIPT_TYPE,
+		servedHtmlAttributesProperty: SERVED_HTML_ATTRIBUTES_PROPERTY,
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,

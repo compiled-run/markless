@@ -10,6 +10,13 @@ export const ROUTE_SCRIPT_TYPE = '@markless/core/route';
 // Render-context slot where <Html> leaves its attributes for the router's <html> tag.
 export const HTML_ATTRIBUTES_SLOT = '__marklessRouterHtmlAttributes';
 
+// Property on a landing page's <html> listing the attribute names the served document gave it, read before any page script runs.
+export const SERVED_HTML_ATTRIBUTES_PROPERTY = '__marklessServedHtmlAttributes';
+
+export function servedHtmlAttributesScript(): string {
+	return `<script>document.documentElement.${SERVED_HTML_ATTRIBUTES_PROPERTY}=document.documentElement.getAttributeNames()</script>`;
+}
+
 export function routeMountTarget(document: Document, currentRoot?: Element) {
 	const root =
 		currentRoot ?? document.querySelector(`script[type="${ROUTE_SCRIPT_TYPE}"]`)?.parentElement;

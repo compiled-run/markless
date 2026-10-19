@@ -9,6 +9,7 @@ export interface FragmentNavigationConfig {
 	readonly replaceAttribute: string;
 	readonly scrollAttribute: string;
 	readonly routeScriptType: string;
+	readonly servedHtmlAttributesProperty: string;
 	readonly retireProperty: string;
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
@@ -409,10 +410,13 @@ async function mergeHead(d: Document, next: Document) {
 // Only attributes a server document set are the server's to remove: scripts own the rest (a theme class).
 const serverHtmlAttributes = new WeakMap<Document, Set<string>>();
 
-function syncHtmlAttributes(d: Document, next: Document): void {
+function syncHtmlAttributes(d: Document, next: Document, servedProperty: string): void {
 	const root = d.documentElement;
 	const incoming = next.documentElement;
-	for (const name of serverHtmlAttributes.get(d) ?? [])
+	const served =
+		serverHtmlAttributes.get(d) ??
+		((root as unknown as Record<string, readonly string[] | undefined>)[servedProperty] || []);
+	for (const name of served)
 		if (!incoming.hasAttribute(name)) root.removeAttribute(name);
 	for (const attribute of incoming.attributes)
 		if (root.getAttribute(attribute.name) !== attribute.value)
@@ -702,7 +706,7 @@ export async function navigate(
 	(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
 	for (const element of d.querySelectorAll(state.config.streamedArmSelector)) element.remove();
 	state.shown = pageKey(new URL(w.location.href));
-	if (documentLoads) syncHtmlAttributes(d, next);
+	if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
 	let region: Element;
 	let end: Comment;
 	let scripts: Element[];

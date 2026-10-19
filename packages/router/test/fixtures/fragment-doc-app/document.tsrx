@@ -11,9 +11,10 @@ export default function Document({
 	const pathname = url?.pathname ?? '/';
 	const title = titles[pathname] ?? 'Guide';
 
-	<html lang="en" data-page-shell={pathname} style="scroll-behavior: smooth">
+	<html lang="en" data-page-shell={pathname} data-landing-only={pathname === '/' ? 'home' : undefined} style="scroll-behavior: smooth">
 		<head>
 			<meta charset="utf-8" />
+			<script>{'document.documentElement.dataset.scripted = "yes";'}</script>
 			<title>{title}</title>
 			<meta name="description" content={`About ${title}`} />
 			<link rel="canonical" href={`https://guide.test${pathname}`} />
