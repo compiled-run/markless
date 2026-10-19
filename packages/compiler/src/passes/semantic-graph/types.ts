@@ -89,7 +89,10 @@ export type MutableSemanticGraphArtifact = {
 export type PendingElementHandleIdref = Omit<
 	SemanticElementHandleIdref,
 	'boundHostNodeId' | 'handleGraphNodeId' | 'order'
->;
+> & {
+	/** The factory or component that declared the handle: two families in one module may each declare one name. */
+	readonly declaringScope?: string;
+};
 
 export type WalkState = {
 	readonly filename: string;

@@ -720,7 +720,7 @@ export function collectElementHandleDiagnostics(
 
 	collectElementHandleDeriveReads(graph);
 
-	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle, pluralHandleNames);
+	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle, firstBindingByScopedHandle, pluralHandleNames);
 }
 
 /**
@@ -831,10 +831,14 @@ function resolveElementHandleIdrefs(
 	graph: MutableSemanticGraphArtifact,
 	pendingIdrefs: ReadonlyArray<PendingElementHandleIdref>,
 	boundByHandle: ReadonlyMap<string, SemanticElementHandleBinding>,
+	boundByScopedHandle: ReadonlyMap<string, SemanticElementHandleBinding>,
 	pluralHandleNames: ReadonlySet<string>,
 ): void {
-	for (const reference of pendingIdrefs) {
-		const bound = boundByHandle.get(reference.handleName);
+	for (const { declaringScope, ...reference } of pendingIdrefs) {
+		const bound =
+			declaringScope === undefined
+				? boundByHandle.get(reference.handleName)
+				: boundByScopedHandle.get(`${declaringScope}\u0000${reference.handleName}`);
 		if (!bound) {
 			graph.diagnostics.push(unboundIdrefElementHandleDiagnostic(reference));
 			continue;
@@ -850,7 +854,10 @@ function resolveElementHandleIdrefs(
 			continue;
 		}
 		const handleBinding = graph.graphBindings.find(
-			(binding) => binding.kind === 'element' && binding.name === bound.handleName,
+			(binding) =>
+				binding.kind === 'element' &&
+				binding.name === bound.handleName &&
+				(declaringScope === undefined || handleDeclaringScope(binding) === declaringScope),
 		);
 		if (!handleBinding) {
 			graph.diagnostics.push(unboundIdrefElementHandleDiagnostic(reference));
@@ -1459,8 +1466,12 @@ function resolvePropForwardedElementHandle(
 }
 
 type IdrefValueClassification =
-	| { readonly kind: 'handle'; readonly handleName: string }
-	| { readonly kind: 'handle-list'; readonly handleNames: ReadonlyArray<string> }
+	| { readonly kind: 'handle'; readonly handleName: string; readonly scope: string }
+	| {
+			readonly kind: 'handle-list';
+			readonly handleNames: ReadonlyArray<string>;
+			readonly scopes: ReadonlyArray<string>;
+	  }
 	| { readonly kind: 'composite' };
 
 /**
@@ -1509,6 +1520,7 @@ function collectIdrefAttribute(
 
 	const handleNames =
 		classified.kind === 'handle' ? [classified.handleName] : [...classified.handleNames];
+	const scopes = classified.kind === 'handle' ? [classified.scope] : [...classified.scopes];
 	if (handleNames.length > 1) {
 		if (!acceptsIdrefList(attributeName)) return refuse('single-valued');
 		// The child writes the attribute from ONE prop value, so a list has no
@@ -1517,11 +1529,12 @@ function collectIdrefAttribute(
 	}
 	// No templateRead and no boundHostNodeId yet: whether these handles are ever
 	// bound is not knowable until the whole file has been walked.
-	for (const handleName of handleNames) {
+	for (const [index, handleName] of handleNames.entries()) {
 		state.pendingElementHandleIdrefs.push({
 			hostNodeId,
 			attributeName,
 			handleName,
+			declaringScope: scopes[index] ?? '',
 			source,
 			componentName: state.currentComponentName ?? undefined,
 			sourceSpan: sourceSpan(expressionValue, state.filename),
@@ -1540,10 +1553,16 @@ function classifyIdrefValue(
 	expression: AnyNode,
 	state: WalkState,
 ): IdrefValueClassification | null {
-	const handleName = resolvedElementHandleName(expression, state);
-	if (handleName) return { kind: 'handle', handleName };
-	const handleNames = staticHandleListNames(expression, state);
-	if (handleNames) return { kind: 'handle-list', handleNames };
+	const handle = resolvedElementHandle(expression, state);
+	if (handle) return { kind: 'handle', handleName: handle.name, scope: handleDeclaringScope(handle) };
+	const handles = staticHandleList(expression, state);
+	if (handles) {
+		return {
+			kind: 'handle-list',
+			handleNames: handles.map((entry) => entry.name),
+			scopes: handles.map(handleDeclaringScope),
+		};
+	}
 	return mentionsElementHandle(expression, state) ? { kind: 'composite' } : null;
 }
 
@@ -1553,22 +1572,27 @@ function classifyIdrefValue(
  * hole, a spread, or anything the compiler cannot resolve to one handle makes the
  * whole value composite, because the list would then be a guess about order.
  */
-function staticHandleListNames(
+function staticHandleList(
 	expression: AnyNode,
 	state: WalkState,
-): ReadonlyArray<string> | null {
+): ReadonlyArray<SemanticGraphBinding> | null {
 	if (expression.type !== 'ArrayExpression') return null;
 	const raw = expression.elements;
 	if (!Array.isArray(raw)) return null;
 	const entries = asNodes(raw);
 	if (entries.length === 0 || entries.length !== raw.length) return null;
-	const names: string[] = [];
+	const handles: SemanticGraphBinding[] = [];
 	for (const entry of entries) {
-		const name = resolvedElementHandleName(entry, state);
-		if (!name) return null;
-		names.push(name);
+		const handle = resolvedElementHandle(entry, state);
+		if (!handle) return null;
+		handles.push(handle);
 	}
-	return names;
+	return handles;
+}
+
+/** The handle's identity scope, as the duplicate check keys it: its factory, else its component. */
+function handleDeclaringScope(binding: SemanticGraphBinding): string {
+	return binding.sharedDefinitionId ?? binding.componentName ?? '';
 }
 
 // A resolution is an element() handle only when it lands on an element node
@@ -1581,6 +1605,10 @@ function elementHandlePath(
 }
 
 function resolvedElementHandleName(expression: AnyNode, state: WalkState): string | null {
+	return resolvedElementHandle(expression, state)?.name ?? null;
+}
+
+function resolvedElementHandle(expression: AnyNode, state: WalkState): SemanticGraphBinding | null {
 	const source = expressionSource(expression, state.source);
 	if (!source) return null;
 	// `checkbox.triggerEl` names a handle the shared factory declared; the same
@@ -1595,8 +1623,7 @@ function resolvedElementHandleName(expression: AnyNode, state: WalkState): strin
 		elementHandlePath(
 			resolveGraphPath(source, graphBindingMap(state.graph), semanticAliasMap(state.graph)),
 		);
-	if (!resolved) return null;
-	return resolved.binding.name;
+	return resolved?.binding ?? null;
 }
 
 function mentionsElementHandle(expression: AnyNode, state: WalkState): boolean {
