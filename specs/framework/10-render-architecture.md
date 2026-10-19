@@ -122,7 +122,8 @@ layer.
 ## Fragment Root Ownership (accepted 2026-07-02)
 
 Fragment-rooted components have no single root element, so the render range
-is owned by the environment container: in SSR the resumable container div, in
+is owned by the environment container: in SSR the resumable container div
+(or, under the router, the document element that holds `{children}`), in
 CSR the mount target. `render(App, { target })` mounts the compiled document
 fragment first (DOM expands it into the target), then creates the runtime
 with the target as the container root; `CsrRenderContainer.root` therefore

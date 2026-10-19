@@ -1,5 +1,6 @@
 import { extname, join, normalize, relative } from 'pathe';
 import { joinURL, withLeadingSlash, withoutLeadingSlash, withoutTrailingSlash } from 'ufo';
+import { parseRequestFile } from './request-files.ts';
 
 const PAGES_DIR = 'pages';
 const PAGE_EXTENSIONS = new Set(['.tsrx', '.mdx']);
@@ -108,12 +109,6 @@ function normalizePage(file: string): NormalizedPage {
 	const pageFile = pageRelativeFile(file)!;
 	const extension = extname(pageFile);
 	const withoutExtension = pageFile.slice(0, -extension.length);
-
-	if (withoutExtension === 'api' || withoutExtension.startsWith('api/')) {
-		throw new Error(
-			`API routes inside pages/ are not supported. Use top-level api/: ${relativeFile}`,
-		);
-	}
 
 	const routeFile = normalize(join(withoutExtension));
 	const rawSegments = routeFile === '.' ? [] : routeFile.split('/');
@@ -228,6 +223,57 @@ function assertNoRouteConflicts(routes: readonly InternalRouteManifestRoute[]): 
 				...files.map((file) => `- ${file}`),
 			].join('\n'),
 		);
+	}
+}
+
+// Methods whose request a page also answers: an endpoint for any other method leaves the page its GET.
+const PAGE_METHODS = new Set(['all', 'get', 'head']);
+
+/**
+ * Page files may live under pages/api/ beside the endpoints in api/; the build fails only when one
+ * address is answered by both, since the endpoint would always win and the page could never be served.
+ */
+export function assertNoEndpointConflicts(
+	manifest: RouteManifest,
+	endpointFileIds: readonly string[],
+): void {
+	for (const fileId of endpointFileIds) {
+		const endpoint = parseRequestFile(fileId, '');
+		if (endpoint.kind !== 'api' || !PAGE_METHODS.has(endpoint.method)) continue;
+		const segments = pathSegments(endpoint.route.pathname);
+		for (const route of manifest.routes) {
+			const address = sharedAddress(pathSegments(route.pathname), segments);
+			if (address === undefined) continue;
+			throw new Error(
+				[
+					`Route conflict: ${address} is answered by both a page and an endpoint:`,
+					`- ${route.file}`,
+					`- ${endpoint.file}`,
+				].join('\n'),
+			);
+		}
+	}
+}
+
+const pathSegments = (pathname: string) => pathname.split('/').filter(Boolean);
+
+// One address both patterns match, or undefined when none does; a catch-all takes one or more segments.
+function sharedAddress(left: readonly string[], right: readonly string[]): string | undefined {
+	const address: string[] = [];
+	for (let index = 0; ; index++) {
+		const a = left[index];
+		const b = right[index];
+		if (a === '**' || b === '**') {
+			const other = a === '**' ? right : left;
+			return other.length > index
+				? `/${[...address, ...other.slice(index)].join('/')}`
+				: undefined;
+		}
+		if (a === undefined || b === undefined)
+			return a === b ? `/${address.join('/')}` : undefined;
+		if (a.startsWith(':')) address.push(b);
+		else if (b.startsWith(':') || a === b) address.push(a);
+		else return undefined;
 	}
 }
 

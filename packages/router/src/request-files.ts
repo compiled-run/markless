@@ -1,9 +1,9 @@
 import { basename, extname, join, normalize, relative } from 'pathe';
 import { joinURL, withLeadingSlash, withoutLeadingSlash } from 'ufo';
 
-const API_DIR = 'api';
+export const API_DIR = 'api';
 const MIDDLEWARE_DIR = 'middleware';
-const REQUEST_FILE_EXTENSION = '.ts';
+export const REQUEST_FILE_EXTENSION = '.ts';
 const HTTP_METHODS = new Set([
 	'connect',
 	'delete',

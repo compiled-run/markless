@@ -66,7 +66,7 @@ is one string: for `/docs/guide/intro`, `slug` is `guide/intro`.
 <Callout
 	sprite="cross"
 	title="Why does my build stop on a route?"
-	text="Some file names stop the build, and the message names the file. Two files for one address do it, like docs.tsrx next to docs.mdx. A partial bracket like post-[id].tsrx does it too. So does a catch-all that is not the last part. So does a 404.tsrx or 500.tsrx inside a folder, or any page file in pages/api/."
+	text="Some file names stop the build, and the message names the file. Two files for one address do it, like docs.tsrx next to docs.mdx. A partial bracket like post-[id].tsrx does it too. So does a catch-all that is not the last part. So does a 404.tsrx or 500.tsrx inside a folder. So does a page in pages/api/ at the same address as a file in api/ that answers GET, like pages/api/health.tsrx next to api/health.ts."
 />
 
 ## Answer with a status

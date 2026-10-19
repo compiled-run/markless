@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+	assertNoEndpointConflicts,
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
 	type RouteManifest,
@@ -103,10 +104,51 @@ test('fails on static and dynamic route conflicts with exact files', () => {
 	);
 });
 
-test('fails on page-tree API routes and non-final catch-all segments', () => {
-	expect(() => buildRouteManifestFromFileIds(['/pages/api/health.tsrx'])).toThrow(
-		'API routes inside pages/ are not supported. Use top-level api/: pages/api/health.tsrx',
+test('serves page files under pages/api/ as pages beside the endpoints in api/', () => {
+	const manifest = buildRouteManifestFromFileIds([
+		'/pages/api/index.tsrx',
+		'/pages/api/reference.mdx',
+		'/pages/api/contact.tsrx',
+	]);
+	expect(routePairs(manifest)).toEqual([
+		['/api', 'pages/api/index.tsrx'],
+		['/api/contact', 'pages/api/contact.tsrx'],
+		['/api/reference', 'pages/api/reference.mdx'],
+	]);
+	expect(() =>
+		assertNoEndpointConflicts(manifest, [
+			'api/health.ts',
+			'api/users/[id].get.ts',
+			'api/contact.post.ts',
+		]),
+	).not.toThrow();
+});
+
+test('fails when a page and an endpoint both answer a GET at one address', () => {
+	expect(() =>
+		assertNoEndpointConflicts(buildRouteManifestFromFileIds(['/pages/api/health.tsrx']), [
+			'api/health.get.ts',
+		]),
+	).toThrow(
+		[
+			'Route conflict: /api/health is answered by both a page and an endpoint:',
+			'- pages/api/health.tsrx',
+			'- api/health.get.ts',
+		].join('\n'),
 	);
+	expect(() =>
+		assertNoEndpointConflicts(buildRouteManifestFromFileIds(['/pages/api/[name].tsrx']), [
+			'api/users.ts',
+		]),
+	).toThrow('Route conflict: /api/users is answered by both a page and an endpoint:');
+	expect(() =>
+		assertNoEndpointConflicts(buildRouteManifestFromFileIds(['/pages/api/index.tsrx']), [
+			'api/[...rest].ts',
+		]),
+	).not.toThrow();
+});
+
+test('fails on non-final catch-all segments', () => {
 	expect(() => buildRouteManifestFromFileIds(['/pages/docs/[...slug]/edit.tsrx'])).toThrow(
 		'Catch-all route segments must be final: pages/docs/[...slug]/edit.tsrx',
 	);

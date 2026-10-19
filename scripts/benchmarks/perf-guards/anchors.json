@@ -1051,19 +1051,43 @@
 			"from": 16480,
 			"to": 16645,
 			"reason": "a callback a handler calls holds the scheduled flush until its code has loaded and run, so its writes land in the handler task"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "router/route-dom",
+			"from": 531,
+			"to": 1579,
+			"reason": "client renders of #/ routes now mount the page into a fresh copy of the document's own <body>, not a wrapper div: +1048 B rendered, navigation entry only"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 13515,
+			"to": 15171,
+			"reason": "fragment swaps replace the document's <body> container, keep document nodes after the page-end comment and script-set attributes: +1656 B rendered, loaded on first navigation only"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "web/fns/container-region",
+			"from": null,
+			"to": 279,
+			"reason": "names of the container attribute and page-end comment the router reads in the browser: 279 B rendered, navigation code only"
 		}
 	],
 	"runtimeModules": {
 		"core/web/resume-storage-free": 219,
 		"router/link-attributes": 380,
 		"router/navigation-hold": 508,
-		"router/route-dom": 531,
+		"router/route-dom": 1579,
 		"router/route-manifest": 7039,
 		"router/route-renderer": 1735,
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 13515,
+		"router/vite/entries/fragment-entry": 15171,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8906,
@@ -1096,6 +1120,7 @@
 		"web/fns/bound-symbol": 1497,
 		"web/fns/closure-action": 7401,
 		"web/fns/composition": 19605,
+		"web/fns/container-region": 279,
 		"web/fns/dom-order": 464,
 		"web/fns/element-handle-prop": 751,
 		"web/fns/instance-scope": 17232,

@@ -300,10 +300,7 @@ function isReservedOrUnsupportedPage(fileId: string): boolean {
 	const routeFile = normalize(withoutExtension);
 	const segments: string[] = routeFile === '.' ? [] : routeFile.split('/').filter(Boolean);
 
-	return (
-		segments[0] === 'api' ||
-		(segments.length === 1 && (segments[0] === '404' || segments[0] === '500'))
-	);
+	return segments.length === 1 && (segments[0] === '404' || segments[0] === '500');
 }
 
 function routeFromFileId(fileId: string): { readonly pattern: string; readonly params: string[] } {

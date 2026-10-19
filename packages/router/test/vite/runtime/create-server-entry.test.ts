@@ -704,8 +704,7 @@ describe('server entry rendering', () => {
 		expect(html).toContain(
 			'<!doctype html><html lang="en" data-status="200"><head><title>/docs</title><link rel="modulepreload" href="/build/docs-current.js"',
 		);
-		expect(html).toContain('</head><body class="docs"><div data-async-container>');
-		expect(html).toContain('<main>Docs</main>');
+		expect(html).toContain('</head><body class="docs" data-async-container><main>Docs</main>');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).toContain('</body></html>');
 	});
@@ -730,8 +729,7 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
-		expect(html).toContain('<body><div data-async-container>');
-		expect(html).toContain('<main>Home</main>');
+		expect(html).toContain('<body data-async-container><main>Home</main>');
 		expect(html).not.toContain('&lt;main&gt;Home&lt;/main&gt;');
 	});
 

@@ -14,6 +14,10 @@ export interface FragmentNavigationConfig {
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
+	// Closes the page's nodes when the document's own element is the container; what follows is the document's.
+	readonly pageEndComment: string;
+	// The container's own attributes, never carried from the leaving page's element to the next one.
+	readonly containerAttributes: readonly [container: string, paths: string];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
 	readonly documentLoads: boolean;
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
@@ -167,12 +171,15 @@ function regionOf(state: FragmentNavigationState, doc: Document): Element | null
 		(
 			doc.querySelector(`script[type="${state.config.routeScriptType}"]`) ??
 			doc.querySelector('script[data-markless-router-link-resumer]')
-		)?.closest('[data-async-container]') ?? null
+		)?.closest(`[${state.config.containerAttributes[0]}]`) ?? null
 	);
 }
 
 function retire(state: FragmentNavigationState, root: Element): void {
-	for (const container of [root, ...root.querySelectorAll('[data-async-container]')]) {
+	for (const container of [
+		root,
+		...root.querySelectorAll(`[${state.config.containerAttributes[0]}]`),
+	]) {
 		const retireContainer = (container as unknown as Record<string, unknown>)[
 			state.config.retireProperty
 		];
@@ -266,12 +273,50 @@ function syncHtmlAttributes(d: Document, next: Document): void {
 	serverHtmlAttributes.set(d, new Set(incoming.getAttributeNames()));
 }
 
+// Set from the page's config at the start of every swap.
+let containerAttribute = '';
+
 const isContainer = (node: Node): boolean =>
-	node.nodeType === 1 && (node as Element).hasAttribute('data-async-container');
+	node.nodeType === 1 && (node as Element).hasAttribute(containerAttribute);
+
+function pageEnd(host: Node, data: string): Comment | undefined {
+	for (let node = host.lastChild; node; node = node.previousSibling)
+		if (node.nodeType === 8 && (node as Comment).data === data) return node as Comment;
+	return undefined;
+}
+
+function nodesAfter(d: Document, node: Node): DocumentFragment {
+	const nodes = d.createDocumentFragment();
+	while (node.nextSibling) nodes.append(node.nextSibling);
+	return nodes;
+}
+
+const scriptsIn = (element: Element): Element[] =>
+	element.localName === 'script' ? [element] : [...element.querySelectorAll('script')];
+
+const serverHostAttributes = new WeakMap<Document, Set<string>>();
+
+// The incoming container is a fresh element; attributes a script set on the outgoing one stay.
+function carryHostAttributes(
+	d: Document,
+	from: Element,
+	to: Element,
+	own: readonly string[],
+): void {
+	const server = serverHostAttributes.get(d);
+	serverHostAttributes.set(d, new Set(to.getAttributeNames()));
+	for (const attribute of from.attributes)
+		if (
+			!to.hasAttribute(attribute.name) &&
+			!server?.has(attribute.name) &&
+			!own.includes(attribute.name)
+		)
+			to.setAttribute(attribute.name, attribute.value);
+}
 
 // A document app's shell has no runtime, so it is morphed in place: unchanged chrome keeps its nodes.
 // Containers are always replaced whole: their DOM is the new page's resume payload's to locate.
-function morphChildren(d: Document, from: Element, to: Element, fresh: Element[]): void {
+function morphChildren(d: Document, from: Node, to: Node, fresh: Element[]): void {
 	let cursor = from.firstChild;
 	const skipContainers = () => {
 		while (cursor && isContainer(cursor)) {
@@ -409,7 +454,7 @@ async function streamAppends(
 		}
 	}
 	flush(true);
-	end.parentNode?.removeChild(end);
+	if ((end as Comment).data !== state.config.pageEndComment) end.parentNode?.removeChild(end);
 	return signal.aborted ? undefined : all;
 }
 
@@ -422,6 +467,7 @@ export async function navigate(
 	const state = (d as FragmentHost).__marklessFragmentNav;
 	const w = d.defaultView;
 	if (!state || !w) return;
+	containerAttribute = state.config.containerAttributes[0];
 	const session = sessionFor(d);
 	const id = ++session.navigation;
 	session.streaming?.abort();
@@ -442,7 +488,7 @@ export async function navigate(
 	const documentLoads = state.config.documentLoads;
 	const incoming = documentLoads ? next.body : regionOf(state, next);
 	const outgoing = documentLoads ? d.body : regionOf(state, d);
-	const scope = documentLoads ? d.body : outgoing?.parentElement;
+	const scope = documentLoads && !isContainer(d.body) ? d.body : outgoing?.parentElement;
 	if (!incoming || !outgoing || !scope) {
 		fallback(fetched.url);
 		return;
@@ -486,30 +532,44 @@ export async function navigate(
 	for (const element of d.querySelectorAll(state.config.streamedArmSelector)) element.remove();
 	state.shown = pageKey(new URL(w.location.href));
 	if (documentLoads) syncHtmlAttributes(d, next);
-	const fresh: Element[] = [];
 	let region: Element;
-	if (documentLoads) {
+	let end: Comment;
+	let scripts: Element[];
+	if (documentLoads && !isContainer(d.body)) {
+		const fresh: Element[] = [];
 		region = d.body;
 		morphChildren(d, region, incoming, fresh);
+		scripts = fresh.flatMap(scriptsIn);
+		region.append((end = d.createComment('')));
 	} else {
 		region = d.adoptNode(incoming);
-		outgoing.replaceWith(region);
-		fresh.push(region);
+		const leavingEnd = pageEnd(outgoing, state.config.pageEndComment);
+		if (leavingEnd) {
+			carryHostAttributes(d, outgoing, region, state.config.containerAttributes);
+			end =
+				pageEnd(region, state.config.pageEndComment) ??
+				region.appendChild(d.createComment(state.config.pageEndComment));
+			// The document's own nodes after the page stay; a document app morphs them to its next shell.
+			const kept = nodesAfter(d, leavingEnd);
+			const arriving = nodesAfter(d, end);
+			const fresh: Element[] = [];
+			if (documentLoads) morphChildren(d, kept, arriving, fresh);
+			scripts = [...scriptsIn(region), ...fresh.flatMap(scriptsIn)];
+			region.append(kept);
+			outgoing.replaceWith(region);
+		} else {
+			scripts = scriptsIn(region);
+			outgoing.replaceWith(region);
+			region.after((end = d.createComment('')));
+		}
 	}
 	// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
 	for (const box of offsets)
 		sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
-	const end = d.createComment('');
-	if (documentLoads) region.append(end);
-	else region.after(end);
 	for (const element of head.stale) element.remove();
 	if (next.title && d.title !== next.title) d.title = next.title;
 	for (const script of head.scripts) execute(d, script);
-	for (const element of fresh)
-		for (const script of element.localName === 'script'
-			? [element]
-			: element.querySelectorAll('script'))
-			execute(d, script as HTMLScriptElement);
+	for (const script of scripts) execute(d, script as HTMLScriptElement);
 	const active = d.activeElement as HTMLElement | null;
 	if (active && active !== d.body && !region.contains(active)) active.blur?.();
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();

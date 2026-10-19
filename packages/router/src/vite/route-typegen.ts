@@ -1,7 +1,8 @@
 import { dirname, extname, join, relative } from 'pathe';
 import type { Plugin } from 'vite';
 import { withLeadingSlash } from 'ufo';
-import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
+import { assertNoEndpointConflicts, buildRouteManifestFromFileIds } from '../route-manifest.ts';
+import { API_DIR, REQUEST_FILE_EXTENSION } from '../request-files.ts';
 import {
 	createRouteTypesDeclaration,
 	routeTypesEnvDeclaration,
@@ -23,6 +24,7 @@ export type RouteTypegenDirent = {
 };
 
 const PAGE_EXTENSIONS = new Set(['.tsrx', '.mdx']);
+const ENDPOINT_EXTENSIONS = new Set([REQUEST_FILE_EXTENSION]);
 
 export function routeTypegenPlugin(): Plugin {
 	let root = '';
@@ -44,6 +46,10 @@ export function routeTypegenPlugin(): Plugin {
 export async function writeRouteTypes(fs: RouteTypegenFileSystem, root: string): Promise<void> {
 	const pageFiles = await discoverPageFiles(fs, root);
 	const manifest = buildRouteManifestFromFileIds(pageFiles);
+	assertNoEndpointConflicts(
+		manifest,
+		await discoverFiles(fs, root, API_DIR, ENDPOINT_EXTENSIONS),
+	);
 
 	await writeIfChanged(fs, join(root, routeTypesEnvPath), routeTypesEnvDeclaration);
 	await writeIfChanged(
@@ -53,46 +59,40 @@ export async function writeRouteTypes(fs: RouteTypegenFileSystem, root: string):
 	);
 }
 
-export async function discoverPageFiles(
+export function discoverPageFiles(fs: RouteTypegenFileSystem, root: string): Promise<string[]> {
+	return discoverFiles(fs, root, 'pages', PAGE_EXTENSIONS);
+}
+
+async function discoverFiles(
 	fs: RouteTypegenFileSystem,
 	root: string,
+	dir: string,
+	extensions: ReadonlySet<string>,
 ): Promise<string[]> {
-	const pagesDir = join(root, 'pages');
 	const files: string[] = [];
 
-	await collectPageFiles(fs, root, pagesDir, files);
+	await collectFiles(fs, root, join(root, dir), extensions, files);
 
 	return files.toSorted((left, right) => left.localeCompare(right));
 }
 
-async function collectPageFiles(
+async function collectFiles(
 	fs: RouteTypegenFileSystem,
 	root: string,
 	dir: string,
+	extensions: ReadonlySet<string>,
 	files: string[],
 ): Promise<void> {
 	const entries = await readdirIfExists(fs, dir);
 
-	await Promise.all(entries.map((entry) => collectPageFile(fs, root, dir, files, entry)));
-}
-
-async function collectPageFile(
-	fs: RouteTypegenFileSystem,
-	root: string,
-	dir: string,
-	files: string[],
-	entry: RouteTypegenDirent,
-): Promise<void> {
-	const path = join(dir, entry.name);
-
-	if (entry.isDirectory()) {
-		await collectPageFiles(fs, root, path, files);
-		return;
-	}
-
-	if (entry.isFile() && PAGE_EXTENSIONS.has(extname(path))) {
-		files.push(withLeadingSlash(relative(root, path)));
-	}
+	await Promise.all(
+		entries.map(async (entry) => {
+			const path = join(dir, entry.name);
+			if (entry.isDirectory()) await collectFiles(fs, root, path, extensions, files);
+			else if (entry.isFile() && extensions.has(extname(path)))
+				files.push(withLeadingSlash(relative(root, path)));
+		}),
+	);
 }
 
 async function readdirIfExists(

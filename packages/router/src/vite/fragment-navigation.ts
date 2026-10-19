@@ -82,13 +82,18 @@ export function startFragmentNavigation(
 			return module;
 		};
 		// A same-origin anchor, router Link or plain, counts only when its path names one of the app's pages.
-		const pages = config.pages.map((page) => page.split('/').filter(Boolean));
+		const underEndpoints = (pathname: string) =>
+			config.endpointPrefixes.some((prefix) => (pathname + '/').startsWith(prefix + '/'));
+		const pages = config.pages.map(
+			(page) => [underEndpoints(page), page.split('/').filter(Boolean)] as const,
+		);
 		// Server endpoints are never fetched ahead of a click or as a fragment: a GET there may have side effects.
+		// Only a page file under the endpoint prefix itself (pages/api/) answers a path there.
 		const isPage = (pathname: string) => {
-			if (config.endpointPrefixes.some((prefix) => (pathname + '/').startsWith(prefix + '/')))
-				return false;
+			const endpoint = underEndpoints(pathname);
 			const parts = pathname.split('/').filter(Boolean);
-			return pages.some((page) => {
+			return pages.some(([under, page]) => {
+				if (endpoint && !under) return false;
 				const rest = page.indexOf('**');
 				if (rest === -1 ? page.length !== parts.length : parts.length <= rest) return false;
 				return page.every(

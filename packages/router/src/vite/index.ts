@@ -605,6 +605,8 @@ function requestFileIdForTransform(root: string, id: string): string | undefined
 	if (relativeFileId.startsWith('api/') || relativeFileId.startsWith('middleware/')) {
 		return relativeFileId;
 	}
+	// A module beside the pages under pages/api/ is page code, not an endpoint.
+	if (relativeFileId.startsWith('pages/')) return undefined;
 
 	return relativeFileId.match(/(?:^|\/)((?:api|middleware)\/.+\.ts)$/)?.[1];
 }

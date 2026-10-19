@@ -6,6 +6,9 @@ import type { RenderTarget } from './render.ts';
 // the page as the container root, so it must be layout-transparent
 // (display: contents) — the page's own top-level elements keep their layout.
 export function createFragmentHolder(target: RenderTarget): ResumeDomElement | undefined {
+	// A target whose own element becomes the root (the router's <body>) hands over that element.
+	const own = (target as { readonly createHolder?: () => unknown }).createHolder?.();
+	if (own) return own as ResumeDomElement;
 	const documentHost =
 		(target as { readonly ownerDocument?: unknown }).ownerDocument ??
 		(globalThis as { readonly document?: unknown }).document;

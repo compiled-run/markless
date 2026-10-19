@@ -42,8 +42,7 @@ describe('server entry with async compiled artifacts', () => {
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
-		expect(html).toContain('<main>Hello async</main>');
-		expect(html).toContain('<body>');
+		expect(html).toContain('<body data-async-container><main>Hello async</main>');
 	});
 
 	it('links the document stylesheets on every route ahead of the route’s own, once', async () => {

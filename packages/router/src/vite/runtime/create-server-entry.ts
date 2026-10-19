@@ -24,6 +24,11 @@ import {
 } from '@markless/web/render-to-stream';
 import { CONTAINER_RETIRE_PROPERTY } from '@markless/web/render-to-string';
 import {
+	CONTAINER_ATTRIBUTE,
+	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+} from '@markless/web/fns/container-region';
+import {
 	normalizeMarklessDevError,
 	renderMarklessDevErrorDocument,
 } from '@markless/bundler/dev-error';
@@ -31,6 +36,7 @@ import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channe
 import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
 import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
 import { createPageHttp } from './page-http.ts';
+import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-region.ts';
 import {
 	FRAGMENT_APPEND_END,
 	FRAGMENT_HOVER_DWELL_MS,
@@ -112,11 +118,6 @@ interface DocumentModule {
 
 type PageComponentProps = PageProps & Record<string, unknown>;
 
-interface PageHtml {
-	readonly bodyHtml: string;
-	readonly headHtml: string;
-}
-
 const DOCUMENT_CHILDREN_PLACEHOLDER = '__markless_router_document_children__';
 
 export type LinkBridgeOptions = Pick<
@@ -184,11 +185,14 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const fragmentUrl = fragmentNavigation ? fragmentPageUrl(requestUrl) : undefined;
 		const fragment = fragmentUrl !== undefined;
 		const url = fragmentUrl ?? requestUrl;
-		if (isNitroApiPathname(url.pathname)) {
+		const match = matchRouteManifest(url.pathname, manifest);
+		// Under the endpoint prefix only a page file in pages/api/ answers; a root catch-all never does.
+		if (
+			isNitroApiPathname(url.pathname) &&
+			!(match && isNitroApiPathname(match.route.pathname))
+		) {
 			return new Response('Not found', createPageHttp(request, url).commit(404, {}));
 		}
-
-		const match = matchRouteManifest(url.pathname, manifest);
 		if (!match) {
 			return renderStatusPage(
 				url,
@@ -364,7 +368,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 
 		// Blocking opt-out: the pre-T107 whole-page await.
 		if (options.render === 'blocking') {
-			const pageHtml = splitLeadingHeadHtml(
+			const pageHtml = splitPageHtml(
 				await renderToString(routedArtifact as never, renderOptions),
 			);
 			privateToVisitor();
@@ -374,10 +378,10 @@ export function createServerEntry(options: ServerEntryOptions) {
 				pageHtml.headHtml,
 				options.importMap,
 			);
-			const html = fragment
-				? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
-				: fillDocumentChildren(shell, pageHtml.bodyHtml);
-			return new Response(html, http.commit(status, headers));
+			return new Response(
+				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				http.commit(status, headers),
+			);
 		}
 
 		// Streaming default (owner ruling 2026-07-07): out-of-order streaming is
@@ -386,7 +390,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		// same open response.
 		const stream = await renderToStream(routedArtifact as never, renderOptions);
 		privateToVisitor();
-		const pageHtml = splitLeadingHeadHtml(stream.shell);
+		const pageHtml = splitPageHtml(stream.shell);
 		const shell = await renderDocumentShell(
 			documentModule,
 			pageProps,
@@ -394,22 +398,17 @@ export function createServerEntry(options: ServerEntryOptions) {
 			options.importMap,
 		);
 		if (stream.pendingArmCount === 0) {
-			const html = fragment
-				? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
-				: fillDocumentChildren(shell, pageHtml.bodyHtml);
-			return new Response(html, http.commit(status, headers));
+			return new Response(
+				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				http.commit(status, headers),
+			);
 		}
-		const placeholderAt = shell.indexOf(DOCUMENT_CHILDREN_PLACEHOLDER);
+		const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, pageHtml);
 		// A fragment is a whole region document first; each settled arm then follows on its own, delimited.
 		const prefix = fragment
-			? fragmentDocument(shell, pageHtml.bodyHtml, documentLoads) + FRAGMENT_REGION_END
-			: placeholderAt === -1
-				? shell
-				: shell.slice(0, placeholderAt) + pageHtml.bodyHtml;
-		const suffix =
-			fragment || placeholderAt === -1
-				? ''
-				: shell.slice(placeholderAt + DOCUMENT_CHILDREN_PLACEHOLDER.length);
+			? fragmentDocument(shell, pageHtml, documentLoads) + FRAGMENT_REGION_END
+			: placed.prefix;
+		const suffix = fragment ? '' : placed.suffix;
 		const appendEnd = fragment ? FRAGMENT_APPEND_END : '';
 		const encoder = new TextEncoder();
 		const sent = http.commit(status, headers);
@@ -687,15 +686,6 @@ function addModulePreloads(
 	}
 }
 
-function splitLeadingHeadHtml(html: string): PageHtml {
-	const containerStart = html.indexOf('<div data-async-container');
-	if (containerStart <= 0) return { bodyHtml: html, headHtml: '' };
-	return {
-		bodyHtml: html.slice(containerStart),
-		headHtml: html.slice(0, containerStart),
-	};
-}
-
 // The document with the children placeholder INTACT: blocking responses fill
 // it in one piece; streaming responses split at it so everything after the
 // page (and the closing tags) flushes only when the last boundary settled.
@@ -749,12 +739,21 @@ function fillDocumentChildren(documentShell: string, children: string): string {
 	);
 }
 
-// A client-navigation shell never varies by route, so its body is left out: the region document is the shell's head plus the page.
-function fragmentDocument(shell: string, bodyHtml: string, documentLoads: boolean): string {
-	const bodyAt = documentLoads ? -1 : shell.search(/<body[\s>]/i);
-	const bodyOpenEnd = bodyAt === -1 ? -1 : shell.indexOf('>', bodyAt);
-	if (bodyOpenEnd === -1) return fillDocumentChildren(shell, bodyHtml);
-	return `${shell.slice(0, bodyOpenEnd + 1)}${bodyHtml}</body></html>`;
+function fragmentDocument(shell: string, page: PageHtml, documentLoads: boolean): string {
+	if (!documentLoads) return fragmentPage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, page);
+	const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, page);
+	return placed.prefix + placed.suffix;
+}
+
+function wholeDocument(
+	shell: string,
+	page: PageHtml,
+	fragment: boolean,
+	documentLoads: boolean,
+): string {
+	if (fragment) return fragmentDocument(shell, page, documentLoads) + FRAGMENT_REGION_END;
+	const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, page);
+	return placed.prefix + placed.suffix;
 }
 
 async function renderDocumentModule(
@@ -1018,6 +1017,8 @@ function fragmentConfig(
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,
+		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,
+		containerAttributes: [CONTAINER_ATTRIBUTE, PROTOCOL_LOCATOR_PATHS_ATTRIBUTE],
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,

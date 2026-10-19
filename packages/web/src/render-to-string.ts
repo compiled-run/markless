@@ -41,6 +41,7 @@ import {
 } from './inline/resumer.ts';
 import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
+import { CONTAINER_ATTRIBUTE } from './fns/container-region.ts';
 import {
 	marklessSsrRosterCounted,
 	marklessSsrRosterPositionContext,
@@ -820,7 +821,39 @@ function renderContainer(
 	const paths = servedLocatorPaths(inner, locators);
 	const id = containerId ? `="${escapeAttribute(containerId)}"` : '';
 	const located = paths ? ` ${PROTOCOL_LOCATOR_PATHS_ATTRIBUTE}="${paths}"` : '';
-	return `<div data-async-container${id}${located}>${inner}</div>`;
+	return `${CONTAINER_OPEN}${id}${located}>${inner}${CONTAINER_CLOSE}`;
+}
+
+const CONTAINER_OPEN = `<div ${CONTAINER_ATTRIBUTE}`;
+const CONTAINER_CLOSE = '</div>';
+
+/**
+ * Splits assembled SSR html into what precedes the container, the container's own
+ * attributes (` data-async-container ...`, ready to write on another element), and its
+ * children, for a host that makes an element of its own the container.
+ */
+export function splitSsrContainer(
+	html: string,
+): { readonly before: string; readonly attributes: string; readonly inner: string } | undefined {
+	const start = html.indexOf(CONTAINER_OPEN);
+	let openEnd = -1;
+	for (
+		let at = start + CONTAINER_OPEN.length, quoted = false;
+		start >= 0 && at < html.length;
+		at++
+	) {
+		if (html[at] === '"') quoted = !quoted;
+		else if (html[at] === '>' && !quoted) {
+			openEnd = at;
+			break;
+		}
+	}
+	if (openEnd < 0 || !html.endsWith(CONTAINER_CLOSE)) return undefined;
+	return {
+		before: html.slice(0, start),
+		attributes: html.slice(start + '<div'.length, openEnd),
+		inner: html.slice(openEnd + 1, -CONTAINER_CLOSE.length),
+	};
 }
 
 /**

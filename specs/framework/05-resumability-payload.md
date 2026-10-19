@@ -233,6 +233,12 @@ ones; extra elements are left out and missing ones leave null slots. Arm,
 boundary and keyed-row records already locate relative to their own comment
 anchor or row root, so they are unaffected by changes outside their range.
 
+A container that is an author's element (the router makes the document's
+`<body>` the container) can hold nodes after the page; the host closes the
+page's nodes with the `PROTOCOL_CONTAINER_END_COMMENT` comment. Those nodes
+come after every served element, so no served index moves, and the inline boot
+takes its census where the page's last script runs, before the parser reaches them.
+
 No static node gains an attribute: the paths ride on the container element only.
 A foreign change that removes or swaps a located element itself drops that one
 host. Under the paths attribute a host whose element is missing or has the wrong

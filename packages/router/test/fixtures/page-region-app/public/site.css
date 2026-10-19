@@ -1,0 +1,3 @@
+body > header:first-child { color: rgb(1, 2, 3); }
+header + main { color: rgb(4, 5, 6); }
+body > footer { color: rgb(7, 8, 9); }
