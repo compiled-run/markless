@@ -101,7 +101,9 @@ const resumeOnDemandEntries = [
 // 22,411 -> 22,915 (105 of it the formatter wrapping long lines); minified+gzip 3,092 -> 3,153 bytes, under the 4,800 gzip wall.
 // 2026-10-18: a repeat whose rows the browser can never change skips following its collection: 22,931.
 // 2026-10-18: merge of reactivity + lists branches (both changes above together): 23,165.
-const sourceByteLimit = 23165;
+// 2026-10-18: a repeat over a static prop loads its row code when idle, not in the gesture that resumed the page: resume-keyed-repeats.ts
+// plus the 854-char instance-path grammar it now imports, 25,360 raw; minified+gzip 3,259 -> 3,524 bytes, under the 4,800 gzip wall.
+const sourceByteLimit = 25360;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

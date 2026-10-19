@@ -473,6 +473,13 @@ function nodesBetweenAnchors(
 	endAnchor: ResumeDomNode,
 ): ResumeDomNode[] {
 	const nodes: ResumeDomNode[] = [];
+	// The arm is the anchors' shared parent's children between them; walking from the root per branch made resume quadratic.
+	if ('nextSibling' in startAnchor) {
+		type Sibling = ResumeDomNode & { readonly nextSibling: Sibling | null };
+		for (let node = (startAnchor as Sibling).nextSibling; node && node !== endAnchor; node = node.nextSibling)
+			nodes.push(node);
+		return nodes;
+	}
 	function visit(node: ResumeDomNode): boolean {
 		let within = false;
 		for (const child of node.childNodes ?? []) {

@@ -1131,6 +1131,22 @@
 			"from": 16188,
 			"to": 16609,
 			"reason": "the swap now waits for the destination code the press started, so a page shown is a page ready; it loads on link intent, never at page load"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "serializer/protocol-instance-path",
+			"from": null,
+			"to": 778,
+			"reason": "keyed-repeat resume reads which component row owns a prop list, so a gesture skips waiting for row code of constant-prop lists"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 16117,
+			"to": 16976,
+			"reason": "constant-prop lists load row code when idle, not inside the first gesture (alpine port /directives/on 58 -> 53 ms at 4x CPU)"
 		}
 	],
 	"runtimeModules": {
@@ -1161,6 +1177,7 @@
 		"serializer/protocol-client": 6652,
 		"serializer/protocol-constants": 697,
 		"serializer/protocol-event-names": 264,
+		"serializer/protocol-instance-path": 778,
 		"serializer/protocol-locator-paths": 292,
 		"serializer/protocol-locator-paths-format": 352,
 		"serializer/protocol-page-markers": 377,
@@ -1227,7 +1244,7 @@
 		"web/resume-events": 16645,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 16117,
+		"web/resume-keyed-repeats": 16976,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,

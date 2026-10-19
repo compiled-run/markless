@@ -11,6 +11,11 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
+import {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
+	protocolInstancePath,
+	protocolRowOwnerPaths,
+} from '../../serializer/src/protocol-instance-path.ts';
 
 // Nothing has moved yet, so deriving a computed collection reproduces the served rows.
 export async function primeKeyedRepeatCollections(input: {
@@ -143,12 +148,14 @@ export function wireKeyedRepeats(
 		readonly storeContainerSubscription: (release: () => void) => void;
 		readonly renderData?: ResumeRenderDataThunk;
 		readonly root?: ResumeDomElement;
+		readonly pageRepeats?: ReadonlyArray<ResumeKeyedRepeatRecord>;
 	},
 	rowComponentHost?: RowComponentHost,
 	onRow?: ResumeRepeatRowHook,
 ): void | Promise<void> {
+	const pageRepeats = input.pageRepeats ?? input.view.keyedRepeats ?? [];
 	const nested = !onRow && (globalThis as ResumeNestedRepeatsHost).__marklessNestedRepeats;
-	if (nested) return nested(input, rowComponentHost);
+	if (nested) return nested({ ...input, pageRepeats }, rowComponentHost);
 	if (!armRows && input.view.keyedRepeats?.some((repeat) => repeat.branchArm))
 		return import('./resume-repeat-branch-arm.ts').then((module) => {
 			armRows = module;
@@ -231,8 +238,16 @@ export function wireKeyedRepeats(
 				slots.settled = true;
 				return mint;
 			});
-		const loading = builds ? readyMint() : undefined;
-		void loading?.then((mint) => apply(mint)).catch(() => undefined);
+		let loading: Promise<RowMint> | undefined;
+		const startLoading = (): void => {
+			if (!builds || loading) return;
+			loading = readyMint();
+			void loading?.then((mint) => apply(mint)).catch(() => undefined);
+		};
+		// No gesture changes a static prop, so none waits for these rows' code: it loads when idle.
+		const propCollection = followsStaticProp(repeat.collectionGraphNodeId, pageRepeats);
+		if (propCollection) afterIdle(startLoading);
+		else startLoading();
 		let pending: ReturnType<NonNullable<RowMint['rows']>> | undefined;
 		const settledMint = (): { readonly mint: RowMint | undefined } | undefined => {
 			if (!builds) return { mint: undefined };
@@ -254,7 +269,7 @@ export function wireKeyedRepeats(
 			graphNodeId: repeat.collectionGraphNodeId,
 			path: repeat.collectionPath,
 			settle: () =>
-				(builds && (!cell?.mint || !(slots.ready || slots.settled))
+				(builds && !propCollection && (!cell?.mint || !(slots.ready || slots.settled))
 					? loading
 					: typeof pending === 'object'
 						? pending
@@ -310,6 +325,26 @@ export function wireKeyedRepeats(
 			}),
 		);
 	}
+}
+// Composition reroutes a live prop to its source, so a prop node here is served data only a changeable component row above rewrites.
+function followsStaticProp(id: string, pageRepeats: ReadonlyArray<ResumeKeyedRepeatRecord>): boolean {
+	return (
+		id.slice(protocolInstancePath(id).length).startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX) &&
+		protocolRowOwnerPaths(id).every(
+			(owner) =>
+				!pageRepeats.some(
+					(repeat) =>
+						repeat.rowComponent &&
+						!repeat.fixed &&
+						repeat.collectionGraphNodeId &&
+						(repeat.instancePath ?? '') === owner,
+				),
+		)
+	);
+}
+function afterIdle(run: () => void): void {
+	if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 2000 });
+	else requestAnimationFrame(() => setTimeout(run, 0));
 }
 function applyKeyedRepeatRowOrder(
 	graph: RuntimeGraph,

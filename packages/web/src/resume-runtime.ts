@@ -297,6 +297,7 @@ export function createResumeRuntime(
 						storeContainerSubscription: (release) =>
 							storeHostSubscription(record.parentHostNodeId, release),
 						renderData: input.renderData,
+						pageRepeats: input.view.keyedRepeats,
 					});
 			},
 			addBehaviors: behaviors
