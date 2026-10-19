@@ -14,6 +14,7 @@ import {
 } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { urlKeyedCache } from '../support/url-keyed-cache.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A built router app served by its real Nitro server and driven in real browsers:
 // every route change here is a fragment swap, and each case pins one thing the
@@ -180,7 +181,7 @@ for (const [name, browserType] of [
 	describe(`fragment navigation (${name})`, () => {
 		let browser: Browser;
 		beforeAll(async () => {
-			browser = await browserType.launch();
+			browser = await launchBrowser(browserType);
 		});
 		afterAll(async () => {
 			await browser?.close();

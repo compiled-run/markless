@@ -17,6 +17,7 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // Shapes real app ports (a dashboard and a notes app) hit, pinned on a built app
 // served by its own Nitro server and driven in Chromium.
@@ -44,7 +45,7 @@ beforeAll(async () => {
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 });
 
 afterAll(async () => {

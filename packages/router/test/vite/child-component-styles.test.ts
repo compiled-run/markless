@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A page that keeps no <style> of its own still links the <style> blocks of the components it renders.
 
@@ -43,7 +44,7 @@ beforeAll(async () => {
 	});
 	origin = server.origin;
 	close = () => server.close();
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 }, 120_000);
 
 afterAll(async () => {

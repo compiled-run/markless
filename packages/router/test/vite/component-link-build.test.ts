@@ -7,6 +7,7 @@ import { afterAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A Link with no href rendered by a component file (not by the page itself) must
 // not leave the pages composing that component importing render data it never exports.
@@ -49,7 +50,7 @@ test('a component file holding an href-less Link builds and serves every page co
 		expect(html, path).toMatch(/<a [^>]*href="\/second"[^>]*>Second<\/a>/);
 	}
 
-	const browser = await chromium.launch();
+	const browser = await launchBrowser(chromium);
 	cleanups.push(() => browser.close());
 	const page = await browser.newPage();
 	await page.goto(origin + '/');

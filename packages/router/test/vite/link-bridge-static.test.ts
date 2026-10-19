@@ -8,6 +8,7 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A built app whose middleware redirects every path that is not one of its pages, as a signed-in-only app does.
 
@@ -58,7 +59,7 @@ beforeAll(async () => {
 	});
 	origin = server.origin;
 	close = () => server.close();
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 }, 240_000);
 
 afterAll(async () => {

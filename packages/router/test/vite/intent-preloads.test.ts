@@ -6,6 +6,7 @@ import { chromium } from '@playwright/test';
 import type { Plugin } from 'vite';
 import { router } from '../../src/vite/index.ts';
 import { rolldown } from 'rolldown';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 test('prefetch: false does not ship an unused options initializer', async () => {
 	const plugins = router({ nitro: false, prefetch: false }).flat(Infinity) as Plugin[];
@@ -104,7 +105,7 @@ test('SSR link intent fetches only its destination without evaluating modules', 
 		}
 	});
 	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-	const browser = await chromium.launch({ headless: true });
+	const browser = await launchBrowser(chromium);
 	try {
 		for (const event of ['pointerover', 'focusin', 'pointerdown']) {
 			fetched.length = 0;
@@ -182,7 +183,7 @@ test('router option reaches the server entry and client delegation survives repl
 	expect(
 		quietLoad.call({} as never, '\0virtual:markless-router/server-entry') as string,
 	).toContain('prefetch: false');
-	const browser = await chromium.launch({ headless: true });
+	const browser = await launchBrowser(chromium);
 	try {
 		const page = await browser.newPage();
 		await page.route('https://docs.test/**', (route) =>

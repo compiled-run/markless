@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A page with no storage() of its own renders two components that share one
 // module-scope storage() cell, built for production and served by its real server.
@@ -44,7 +45,7 @@ beforeAll(async () => {
 	});
 	cleanups.push(() => server.close());
 	origin = server.origin;
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 	cleanups.push(() => browser.close());
 }, 240_000);
 

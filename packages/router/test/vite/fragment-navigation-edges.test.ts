@@ -8,6 +8,7 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // Links the fragment router must leave to the browser, or fetch no more than once:
 // in-page anchors, server endpoints, the document's own head scripts, and prefetches the user never takes.
@@ -99,7 +100,7 @@ const logouts = async () =>
 describe('fragment navigation edges (chromium)', () => {
 	let browser: Browser;
 	beforeAll(async () => {
-		browser = await chromium.launch();
+		browser = await launchBrowser(chromium);
 	});
 	afterAll(async () => {
 		await browser?.close();

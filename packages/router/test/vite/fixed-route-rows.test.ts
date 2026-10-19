@@ -9,6 +9,7 @@ import { marklessBuildManifestPath } from '../../../bundler/src/build/build-mani
 import { MARKLESS_BYTE_ATTRIBUTION } from '../../../bundler/src/build/chunking.ts';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // `pages/solo.tsrx` lists rows over its own props and nothing imports it, so its
 // rows can never change and the page ships no row-building code. `pages/list.tsrx`
@@ -54,7 +55,7 @@ test('a page nothing imports ships its fixed rows without row-building code, and
 	expect(repeat).toMatchObject({ fixed: true });
 	expect(repeat).not.toHaveProperty('rowTemplate');
 
-	const browser = await chromium.launch();
+	const browser = await launchBrowser(chromium);
 	cleanups.push(() => browser.close());
 	const page = await browser.newPage();
 	const scripts: string[] = [];
@@ -90,7 +91,7 @@ test('the same shape rendered as a child keeps changeable rows and follows its p
 	expect(repeats.some((repeat) => repeat.fixed)).toBe(false);
 	expect(repeats.every((repeat) => 'rowTemplate' in repeat)).toBe(true);
 
-	const browser = await chromium.launch();
+	const browser = await launchBrowser(chromium);
 	cleanups.push(() => browser.close());
 	const page = await browser.newPage();
 	const errors: string[] = [];

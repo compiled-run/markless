@@ -4,6 +4,7 @@ import type { Plugin } from 'vite';
 import { router } from '../../src/vite/index.ts';
 import { MARKLESS_CHUNK_SPECIFIER_PREFIX } from '@markless/bundler/rolldown';
 import { compactRoutePreloadData } from '../../src/vite/route-preload-data.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 const hook = (value: any) => (typeof value === 'function' ? value : value?.handler);
 const plugins = () => router().flat(Infinity) as Plugin[];
@@ -285,7 +286,7 @@ test('browser modulepreload fetches the destination without evaluating it', asyn
 		}
 	});
 	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-	const browser = await chromium.launch({ headless: true });
+	const browser = await launchBrowser(chromium);
 	try {
 		const page = await browser.newPage();
 		const address = server.address() as { port: number };

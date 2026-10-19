@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A built router app whose page loads a parser-blocking third-party script in the middle of its
 // markup: the script edits the page while the HTML is still arriving, before Markless boots.
@@ -136,7 +137,7 @@ beforeAll(async () => {
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 }, 240_000);
 
 afterAll(async () => {

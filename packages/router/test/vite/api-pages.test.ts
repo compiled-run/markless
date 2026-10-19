@@ -8,6 +8,7 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A site whose content lives at /api/: page files in pages/api/ are pages, the files in api/
 // stay endpoints, and the build stops only when one address is answered by both.
@@ -51,7 +52,7 @@ beforeAll(async () => {
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 }, 120_000);
 
 afterAll(async () => {

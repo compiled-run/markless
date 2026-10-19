@@ -8,6 +8,7 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A page swapped in place runs its scripts as a fresh load of it would: head additions first,
 // classic scripts in document order, then deferred and module scripts, then its load listeners.
@@ -107,7 +108,7 @@ for (const [name, browserType] of [
 	describe(`scripts on a page swapped in place (${name})`, () => {
 		let browser: Browser;
 		beforeAll(async () => {
-			browser = await browserType.launch();
+			browser = await launchBrowser(browserType);
 		});
 		afterAll(async () => {
 			await browser?.close();

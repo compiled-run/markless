@@ -9,6 +9,7 @@ import { router } from '../../src/vite/index.ts';
 import { FRAGMENT_REGION_END, fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { urlKeyedCache } from '../support/url-keyed-cache.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A Nitro `vercel` build served through Vercel's routing (test/support/vercel-sim.mjs), with a
 // cache keyed on the URL in front. An ISR route reaches the function through Nitro's ISR rewrite,
@@ -22,7 +23,7 @@ const cleanups: Array<() => Promise<void> | void> = [];
 let browser: Browser;
 
 beforeAll(async () => {
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 	cleanups.push(() => browser.close());
 });
 

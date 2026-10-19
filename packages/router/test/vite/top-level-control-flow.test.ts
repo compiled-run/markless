@@ -8,6 +8,7 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { PROTOCOL_CONTAINER_END_COMMENT } from '../../../serializer/src/protocol-page-markers.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A keyed @for written straight into a page's template, with no element around it, keeps its rows
 // as the container's own children: served, resumed, client-rendered and swapped in by navigation.
@@ -294,7 +295,7 @@ for (const [name, browserType] of [
 	describe(`top-level control flow (${name})`, () => {
 		let browser: Browser;
 		beforeAll(async () => {
-			browser = await browserType.launch();
+			browser = await launchBrowser(browserType);
 		});
 		afterAll(async () => {
 			await browser?.close();

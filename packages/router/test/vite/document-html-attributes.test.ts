@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 
@@ -95,7 +96,7 @@ test('attributes written on <Html> in document.tsrx reach the served <html> tag'
 	expect(openTag).toContain('data-path="/"');
 	expect(html.match(/<html[\s>]/g)).toHaveLength(1);
 
-	const browser = await chromium.launch();
+	const browser = await launchBrowser(chromium);
 	try {
 		const page = await browser.newPage();
 		const errors: string[] = [];

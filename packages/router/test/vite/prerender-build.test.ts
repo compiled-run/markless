@@ -7,6 +7,7 @@ import { afterAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // Nitro builds its prerenderer separately from the Vite services; a page it cannot reach prerenders as a 404.
 const packagesRoot = resolve(import.meta.dirname, '../../..');
@@ -44,7 +45,7 @@ test('routes with a prerender route rule are written as their page HTML at build
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
 	cleanups.push(() => server.close());
-	const browser = await chromium.launch();
+	const browser = await launchBrowser(chromium);
 	cleanups.push(() => browser.close());
 	const page = await browser.newPage();
 	const errors: string[] = [];

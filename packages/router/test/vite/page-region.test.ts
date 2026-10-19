@@ -8,6 +8,7 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // The page's markup lands where its author put it: a document whose body holds only {children}
 // serves the page as body's own children, so the site's `body > footer` CSS keeps matching on
@@ -195,7 +196,7 @@ for (const [name, browserType] of [
 	describe(`page region (${name})`, () => {
 		let browser: Browser;
 		beforeAll(async () => {
-			browser = await browserType.launch();
+			browser = await launchBrowser(browserType);
 		});
 		afterAll(async () => {
 			await browser?.close();

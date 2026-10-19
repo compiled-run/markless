@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { documentNavigationFor } from '../../src/vite/document-navigation.ts';
 import { router } from '../../src/vite/index.ts';
 import { createServerEntry } from '../../src/vite/runtime/create-server-entry.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 describe('document navigation detection', () => {
 	const cases: ReadonlyArray<readonly [string, string | undefined, 'client' | 'document']> = [
@@ -134,7 +135,7 @@ describe('Link clicks under a URL-dependent document', () => {
 
 	test('a URL-dependent document turns Link clicks into full document loads', async () => {
 		const app = await serve('document');
-		const browser = await chromium.launch({ headless: true });
+		const browser = await launchBrowser(chromium);
 		try {
 			const page = await browser.newPage();
 			await page.goto(`${app.origin}/`);
@@ -158,7 +159,7 @@ describe('Link clicks under a URL-dependent document', () => {
 
 	test('a route-invariant document keeps Link clicks on client navigation', async () => {
 		const app = await serve('client');
-		const browser = await chromium.launch({ headless: true });
+		const browser = await launchBrowser(chromium);
 		try {
 			const page = await browser.newPage();
 			await page.goto(`${app.origin}/`);

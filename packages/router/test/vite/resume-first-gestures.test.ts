@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A built router app in a real browser: each page is opened fresh, so the gesture under test is the one that wakes it.
 
@@ -217,7 +218,7 @@ beforeAll(async () => {
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
-	browser = await chromium.launch();
+	browser = await launchBrowser(chromium);
 }, 240_000);
 
 afterAll(async () => {
