@@ -1147,6 +1147,30 @@
 			"from": 16117,
 			"to": 16976,
 			"reason": "constant-prop lists load row code when idle, not inside the first gesture (alpine port /directives/on 58 -> 53 ms at 4x CPU)"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "serializer/protocol-prop-prefix",
+			"from": null,
+			"to": 270,
+			"reason": "keyed-repeat resume tells a list over a prop from one over state without loading the rest of the protocol"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 16976,
+			"to": 16763,
+			"reason": "the constant-prop rule reads page-wide and imports only the prop prefix: smaller than the first cut"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "web/resume-branches",
+			"from": 15471,
+			"to": 15037,
+			"reason": "the arm walk is the sibling walk alone; the per-branch root walk is gone"
 		}
 	],
 	"runtimeModules": {
@@ -1177,10 +1201,10 @@
 		"serializer/protocol-client": 6652,
 		"serializer/protocol-constants": 697,
 		"serializer/protocol-event-names": 264,
-		"serializer/protocol-instance-path": 778,
 		"serializer/protocol-locator-paths": 292,
 		"serializer/protocol-locator-paths-format": 352,
 		"serializer/protocol-page-markers": 377,
+		"serializer/protocol-prop-prefix": 270,
 		"serializer/storage-slot": 780,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,
@@ -1238,13 +1262,13 @@
 		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 7339,
 		"web/resume-behaviors": 8804,
-		"web/resume-branches": 15471,
+		"web/resume-branches": 15037,
 		"web/resume-census": 1471,
 		"web/resume-commit-arm": 9551,
 		"web/resume-events": 16645,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 16976,
+		"web/resume-keyed-repeats": 16763,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,

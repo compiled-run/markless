@@ -91,6 +91,11 @@ function element(tagName: string, childNodes: FakeNode[] = []): FakeElement {
 	};
 	for (const child of childNodes) {
 		if (child.nodeType === 1) child.parentElement = node;
+		// A live sibling, as the DOM answers it: resume walks a branch arm from its start anchor.
+		Object.defineProperty(child, 'nextSibling', {
+			configurable: true,
+			get: () => node.childNodes[node.childNodes.indexOf(child) + 1] ?? null,
+		});
 	}
 	return node;
 }

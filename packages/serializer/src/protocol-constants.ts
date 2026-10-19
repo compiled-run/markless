@@ -1,5 +1,3 @@
-import { protocolInstancePath } from './protocol-instance-path.ts';
-
 export const ASYNC_PROTOCOL_VERSION = 1;
 export const STORAGE_PROTOCOL_VERSION = 2;
 
@@ -26,11 +24,6 @@ export {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 } from './protocol-page-markers.ts';
-export {
-	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
-	protocolInstancePath,
-	protocolRowOwnerPaths,
-} from './protocol-instance-path.ts';
 export { PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE } from './protocol-sync-policy-host.ts';
 
 export const ASYNC_BOUNDARY_ARM_MIN = 0;
@@ -49,6 +42,7 @@ export const ASYNC_BOUNDARY_ARM_MAX = 2;
 // MDX route) mounted. Each island composes from its own root, so two islands of
 // one component spell identical `c`/`p` paths; without this segment their
 // widget cells, computeds and element-handle rosters merge into one.
+const PROTOCOL_INSTANCE_PATH = /^(?:[cpm]\d+:|r:[^:]*:)+/;
 
 export function protocolInstanceSegment(edgeIndex: number): string {
 	return `c${edgeIndex}:`;
@@ -68,8 +62,13 @@ export function protocolRowSegment(key: unknown): string {
 	return `r:${encodeURIComponent(String(key))}:`;
 }
 
+/** The leading instance path of a composed id, or '' when the id is page-local. */
+export function protocolInstancePath(id: string): string {
+	return PROTOCOL_INSTANCE_PATH.exec(id)?.[0] ?? '';
+}
 
 export const PROTOCOL_PROPS_GRAPH_NODE_ID = 'prop:props';
+export { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from './protocol-prop-prefix.ts';
 
 // Compiler-synthesized graph node id families. Composition classifies every
 // child node id against these; an unknown family answers `undefined` so the

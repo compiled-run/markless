@@ -352,7 +352,7 @@ function materializeBranchArmRecords(
 	const set = branch.armRecords?.[armIndex];
 	if (!set) return [];
 	const { elementHandles, graph } = input;
-	const armNodes = nodesBetweenAnchors(input.root, branch.startAnchor, branch.endAnchor);
+	const armNodes = nodesBetweenAnchors(branch.startAnchor, branch.endAnchor);
 	const claim = (hostPath: ReadonlyArray<number>) => {
 		const element = armRecordHost(armNodes, hostPath);
 		if (!element) return;
@@ -467,33 +467,12 @@ function materializeBranchLocators(
 	return records;
 }
 
-function nodesBetweenAnchors(
-	root: ResumeDomElement,
-	startAnchor: ResumeDomNode,
-	endAnchor: ResumeDomNode,
-): ResumeDomNode[] {
+// The arm is its anchors' siblings between them; walking from the root per branch made resume quadratic.
+function nodesBetweenAnchors(startAnchor: ResumeDomNode, endAnchor: ResumeDomNode): ResumeDomNode[] {
+	type Sibling = ResumeDomNode & { readonly nextSibling?: Sibling | null };
 	const nodes: ResumeDomNode[] = [];
-	// The arm is the anchors' shared parent's children between them; walking from the root per branch made resume quadratic.
-	if ('nextSibling' in startAnchor) {
-		type Sibling = ResumeDomNode & { readonly nextSibling: Sibling | null };
-		for (let node = (startAnchor as Sibling).nextSibling; node && node !== endAnchor; node = node.nextSibling)
-			nodes.push(node);
-		return nodes;
-	}
-	function visit(node: ResumeDomNode): boolean {
-		let within = false;
-		for (const child of node.childNodes ?? []) {
-			if (child === startAnchor) {
-				within = true;
-				continue;
-			}
-			if (child === endAnchor) return true;
-			if (within) nodes.push(child);
-			else if (visit(child)) return true;
-		}
-		return within;
-	}
-	visit(root);
+	for (let node = (startAnchor as Sibling).nextSibling; node && node !== endAnchor; node = node.nextSibling)
+		nodes.push(node);
 	return nodes;
 }
 
