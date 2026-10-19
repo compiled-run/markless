@@ -1385,6 +1385,22 @@
 				"gzip": 9339
 			},
 			"reason": "per-template records: computed, dom-update, behavior, element-handle and shared lists serve each repeated record shape once with per-row values"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "serializer/protocol-record-keys",
+			"from": null,
+			"to": 1134,
+			"reason": "generated field-name table the templated-list reader expands keys from: shadcn-admin /users resume data 268.6 -> 245.9 kB raw; loaded only with the reader, nothing runs at page load"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "serializer/protocol-templated-lists",
+			"from": null,
+			"to": 437,
+			"reason": "the templated list names, moved out of protocol-record-templates so the key-table generator reads them without the reader"
 		}
 	],
 	"runtimeModules": {
@@ -1419,7 +1435,9 @@
 		"serializer/protocol-locator-paths-format": 352,
 		"serializer/protocol-page-markers": 377,
 		"serializer/protocol-prop-prefix": 270,
+		"serializer/protocol-record-keys": 1134,
 		"serializer/protocol-record-templates": 1118,
+		"serializer/protocol-templated-lists": 437,
 		"serializer/storage-slot": 780,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,

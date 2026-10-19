@@ -11,6 +11,7 @@ import {
 } from '../src/protocol-record-templates-encode.ts';
 import { decodePayloadScripts } from '../src/protocol-client.ts';
 import { renderPayloadScripts } from '../src/payload-scripts.ts';
+import { PROTOCOL_RECORD_KEYS } from '../src/protocol-record-keys.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../src/protocol.ts';
 
 const rowUpdates = (count: number) =>
@@ -130,6 +131,31 @@ test('payload scripts serve templated lists and decode back to the same payloads
 	expect(scripts.viewScript).toContain('"domUpdates":{"t":[');
 	expect(scripts.stateScript.length).toBeLessThan(JSON.stringify(state).length / 3);
 	expect(decodePayloadScripts(scripts)).toEqual({ state, view });
+});
+
+test('field names the key table spells travel as indexes, and unknown ones as themselves', () => {
+	const keys = PROTOCOL_RECORD_KEYS['markless/view'].domUpdates;
+	const records = [
+		...rowUpdates(3),
+		{ hostNodeId: 'h1', graphNodeId: 'state:x', path: [], hostPath: [0], '~odd^': 1 },
+	];
+	const encoded = encodeRecordTemplates(records, keys) as ProtocolTemplatedRecords;
+	const wire = JSON.stringify(encoded);
+	expect(wire).not.toContain('graphNodeId');
+	expect(wire).toContain('hostPath');
+	const decoded = expandRecordTemplates(JSON.parse(wire), keys);
+	expect(decoded).toEqual(records);
+});
+
+test('the key tables are the ones the protocol types generate', async () => {
+	const { generateRecordKeysSource, RECORD_KEYS_FILE } = await import(
+		'../scripts/generate-record-keys.ts'
+	);
+	const { readFileSync } = await import('node:fs');
+	expect(
+		readFileSync(RECORD_KEYS_FILE, 'utf8'),
+		'run node packages/serializer/scripts/generate-record-keys.ts',
+	).toBe(generateRecordKeysSource());
 });
 
 test('a payload already served as plain arrays decodes unchanged', () => {

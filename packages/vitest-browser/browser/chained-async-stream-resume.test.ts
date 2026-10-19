@@ -1,3 +1,4 @@
+import { decodePayloadScriptsFromDocument } from '@markless/web/payload';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, renderServerHTML, renderStreamShell } from '../src/index.ts';
 import KilnResume from './fixtures/chained-async-kiln-resume.tsrx';
@@ -8,7 +9,10 @@ test('resume gates a serialized pending downstream until its upstream settles, t
 	const shell = await renderStreamShell(KilnResume);
 	expect(shell).toContain('Heating kiln');
 	expect(shell).toContain('Lettering plaque');
-	expect(shell).toContain('"status":"pending"');
+	const { state } = decodePayloadScriptsFromDocument(
+		new DOMParser().parseFromString(shell, 'text/html'),
+	);
+	expect(JSON.stringify(state)).toContain('"status":"pending"');
 
 	// The stream command runs in Node, so its counters do not enter the browser
 	// realm. Initialize browser witnesses after receiving the serialized shell.

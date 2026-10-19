@@ -223,7 +223,13 @@ Contract:
 - A list is templated only when that shortens it by at least a quarter;
   otherwise it stays a plain array, which every reader also accepts. Gzip
   already folds a few repeats, so small lists gain nothing worth the decode.
-- A record no other record shares is served as itself inside a templated list.
+- Field names travel as indexes into a key table generated from the protocol
+  types (`packages/serializer/scripts/generate-record-keys.ts` writes
+  `protocol-record-keys.ts`; a test fails when the two drift). A name the table
+  does not spell travels as itself, so a record with an unforeseen field still
+  round-trips.
+- A record no other record shares is served as a template of its own when its
+  key indexes shorten it, and as itself otherwise.
 - Lists the inline resumer reads at load (locators, events, keyed repeats,
   branches, async boundaries) and the state cells a sync policy reads at event
   time stay plain until the boot reads a compact form directly; decoding never
