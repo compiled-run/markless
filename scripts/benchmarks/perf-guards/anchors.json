@@ -1171,6 +1171,14 @@
 			"from": 15471,
 			"to": 15037,
 			"reason": "the arm walk is the sibling walk alone; the per-branch root walk is gone"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "web/render-route-holder",
+			"from": 753,
+			"to": 1005,
+			"reason": "fragment page mounts moved their locator shift from web/render (-136 B) into this lazy module and now map the container host for a page's top-level @for rows; net +116 B, loaded only by fragment-rooted client renders"
 		}
 	],
 	"runtimeModules": {
@@ -1254,7 +1262,7 @@
 		"web/render": 4003,
 		"web/render-canonical": 2642,
 		"web/render-csr": 17028,
-		"web/render-route-holder": 753,
+		"web/render-route-holder": 1005,
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
 		"web/resume-anchor-census": 1003,
