@@ -1020,7 +1020,8 @@ export function App() @{
 		});
 
 		try {
-			await writeFile(filename, source);
+			// Still broken on disk: a recheck that runs before the delete must not read it as recovered.
+			await writeFile(filename, source.replace('</button>', '</button>>'));
 			hmr.configureServer({ environments: { client: environment } } as never);
 			hmr.reportError(environment as never, {
 				payload: {
