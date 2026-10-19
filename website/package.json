@@ -10,6 +10,7 @@
 		"doctor": "node scripts/markless-doctor.mjs",
 		"fmt": "vp fmt",
 		"test": "vp test",
+		"test:boxes": "witness run",
 		"seo": "node --experimental-strip-types scripts/generate-seo.ts",
 		"witness": "node --experimental-strip-types scripts/witness.ts",
 		"typecheck": "pnpm run typecheck:tsrx",

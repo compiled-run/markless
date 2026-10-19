@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { box } from '@async/witness';
 
 const WAIT = { timeoutMs: 30_000 };
+// The home page's heading as its page source writes it, so a copy edit does not strand the box.
+const HOME_HEADING = /^# (.+)$/m.exec(
+	readFileSync(new URL('../pages/index.mdx', import.meta.url), 'utf8'),
+)![1]!;
 
 export default box(
 	{
@@ -13,7 +18,7 @@ export default box(
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
 		const page = await browser.visit('/');
-		await expect.page.text(page, 'h1', 'Write a variable. The page follows it.', WAIT);
+		await expect.page.text(page, 'h1', HOME_HEADING, WAIT);
 		await page.click('.sidebar-summary', WAIT);
 		await page.click('.sidebar a[href="/start/new-app"]', WAIT);
 		await expect.page.text(page, 'h1', 'Creating a new app', WAIT);
@@ -41,15 +46,15 @@ export default box(
 				WAIT,
 			);
 		}
-		await page.click('.sidebar .site-mark', WAIT);
-		await expect.page.text(page, 'h1', 'Write a variable. The page follows it.', WAIT);
+		await page.click('.site-header .crumb-home', WAIT);
+		await expect.page.text(page, 'h1', HOME_HEADING, WAIT);
 		if (
 			(await page.networkRequests()).filter((request) => request.resourceType === 'Document')
 				.length !== 1
 		) {
-			throw new Error('The sidebar home link reloaded the document.');
+			throw new Error('The header home link reloaded the document.');
 		}
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
-		await receipt.capture('sidebar page and home links preserve the document');
+		await receipt.capture('sidebar page link and header home link preserve the document');
 	},
 );

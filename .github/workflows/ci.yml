@@ -121,11 +121,14 @@ jobs:
             run_boxes_music_player_ssr: ${{ steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}
             key_receipts: ${{ steps.receipts.outputs.cache-primary-key }}
             run_receipts: ${{ steps.receipts.outputs.cache-hit != 'true' }}
+            key_website_boxes: ${{ steps.website_boxes.outputs.cache-primary-key }}
+            run_website_boxes: ${{ steps.website_boxes.outputs.cache-hit != 'true' }}
             run_playwright:
                 ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' || steps.boxes_bundler.outputs.cache-hit
                 != 'true' || steps.boxes_router.outputs.cache-hit != 'true' ||
                 steps.boxes_music_player.outputs.cache-hit != 'true' ||
-                steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}
+                steps.boxes_music_player_ssr.outputs.cache-hit != 'true' ||
+                steps.website_boxes.outputs.cache-hit != 'true' }}
 
         steps:
             - uses: actions/checkout@v4
@@ -238,6 +241,16 @@ jobs:
                       boxes-music-player-ssr-${{ hashFiles('ci-base-key.txt', 'demos/music-player-ssr/**/*',
                       '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
 
+            - name: Probe the website box lane
+              id: website_boxes
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  path: website-boxes-completed.txt
+                  key:
+                      website-boxes-${{ hashFiles('ci-base-key.txt', 'website/**/*',
+                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+
             # The receipt set is the union of what the box lanes wrote, so every
             # box key feeds this one: a box lane that re-runs re-runs receipts.
             - name: Record the box lane keys
@@ -270,6 +283,7 @@ jobs:
                   echo "boxes-music-player=${{ steps.boxes_music_player.outputs.cache-hit != 'true' }}"
                   echo "boxes-music-player-ssr=${{ steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}"
                   echo "receipts=${{ steps.receipts.outputs.cache-hit != 'true' }}"
+                  echo "website-boxes=${{ steps.website_boxes.outputs.cache-hit != 'true' }}"
 
     # One browser download for the whole run: the unit, browser and box lanes
     # restore this cache instead of each fetching its own copy, which is what
@@ -788,6 +802,67 @@ jobs:
                       boxes-music-player-ssr-completed.txt
                       demos/music-player-ssr/.witness/receipts
 
+    # The docs site's own boxes, against its dev server: they read the site's pages
+    # and components, so copy and markup edits that strand them fail here. About
+    # 30 seconds of boxes. Not part of the receipt set: they write no analyzer receipts.
+    website-boxes:
+        needs: [typecheck, lanes, prepare-playwright]
+        if: needs.lanes.outputs.run_website_boxes == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        env:
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Restore the Playwright browser cache
+              id: playwright-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+
+            - name: Install Playwright system dependencies
+              run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
+
+            - name: Install Playwright browsers for the website boxes
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install chromium
+
+            - name: Run website boxes
+              run: pnpm --dir website test:boxes
+
+            - name: Mark the website box lane complete
+              run: echo ok > website-boxes-completed.txt
+
+            - name: Save the website box lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_website_boxes }}
+                  path: website-boxes-completed.txt
+
     # Reassembles the receipt tree the split box lanes wrote on four different
     # runners, adds the @markless/web receipt that receipts:generate writes
     # here, and runs the same receipts:check that used to run at the end of the
@@ -994,6 +1069,7 @@ jobs:
                 boxes-music-player,
                 boxes-music-player-ssr,
                 receipts,
+                website-boxes,
             ]
         if: always()
         runs-on: ubuntu-latest
