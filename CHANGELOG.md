@@ -10,6 +10,24 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.7.0
+
+### @markless/bundler
+
+- **Fixed:** Dev routes follow added and removed pages, and an edit reloads only the pages it reaches.
+
+### @markless/compiler
+
+- **Fixed:** An IDREF to a handle names the handle of the factory it was read from, when two widget families in one module declare the same name.
+- **Fixed:** A dynamic tag spreading a part's rest props leaves out the names the signature took out of them.
+
+### @markless/serializer
+
+- **Faster:** Serve repeated resume records once as templates with per-row values.
+- **Faster:** Spell templated record field names as indexes into a generated key table.
+
+[All 8 commits since v0.6.0](https://github.com/compiled-run/markless/compare/v0.6.0...v0.7.0)
+
 ## 0.6.0
 
 ### General
