@@ -6,6 +6,7 @@ import { relative, resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { MARKLESS_EXECUTION_SIZES } from '../src/build/chunking.ts';
+import { DEFAULT_FENCE_CACHE_DIR } from '../../../website/tooling/fence-pool.ts';
 import { withDemoBuildLock } from './helpers/demo-build-lock.ts';
 
 const exec = promisify(execFile);
@@ -67,16 +68,23 @@ const websiteOutput = resolve(website, '.output');
 
 /**
  * The website composes the same widgets from many pages, so several variants of
- * one source compile at once. A sibling variant's first pass used to publish
- * unlinked render data under the shared id, and a page's render-data request that
+ * one source compile at once, and which finishes first varies from build to build.
+ * Two races used to show in the output. A sibling variant's first pass published
+ * unlinked render data under the shared id, so a page's render-data request that
  * read it in that window inlined its own copy instead of importing the shared
- * module: the toaster page's chunk then changed bytes, names and every plan that
- * lists it, about one build in three.
+ * module, changing the toaster page's chunk about one build in three. And an
+ * importer that found only a child's first pass loaded the child's plain module
+ * to wait for its final one, pulling a module no page imports into the deferred
+ * packs whenever that child compiled slowly.
+ *
+ * The first build starts without the fence cache and the second reuses what the
+ * first wrote, so the two compile at very different speeds: that exposed the
+ * second race.
  */
 test('the website build writes the same bytes twice from one tree', async () => {
 	const { first, second } = await withDemoBuildLock(website, async () => ({
-		first: await buildWebsite(),
-		second: await buildWebsite(),
+		first: await buildWebsite({ coldFences: true }),
+		second: await buildWebsite({ coldFences: false }),
 	}));
 	const differing = [...new Set([...first.keys(), ...second.keys()])].filter(
 		(file) => first.get(file) !== second.get(file),
@@ -85,8 +93,9 @@ test('the website build writes the same bytes twice from one tree', async () => 
 	expect(first.size).toBeGreaterThan(0);
 }, 900_000);
 
-async function buildWebsite(): Promise<Map<string, string>> {
+async function buildWebsite(options: { coldFences: boolean }): Promise<Map<string, string>> {
 	await rm(websiteOutput, { force: true, recursive: true });
+	if (options.coldFences) await rm(DEFAULT_FENCE_CACHE_DIR, { force: true, recursive: true });
 	await exec('pnpm', ['exec', 'vp', 'build'], {
 		cwd: website,
 		env: { ...process.env, MARKLESS_CONSUMER_BUILD: '1' },

@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { entryReachableModuleIds } from '../src/build/bundle-graph.ts';
 import { deferredRuntimePacks } from '../src/build/deferred-runtime.ts';
 import { isReExportDoor } from '../src/build/undemanded-runtime.ts';
 import { planModulePreloadUrls } from '../src/build/preload-plan.ts';
@@ -152,4 +153,35 @@ test('a deferred pack and the facade in front of it are both lazy, and no preloa
 			lazyChunks: new Set([...lazy].map((name) => name.slice('build/'.length))),
 		}),
 	).toEqual(['start.js']);
+});
+
+test('pack planning reads only modules an entry reaches, never one a link step merely loaded', () => {
+	const graph: Record<string, { isEntry?: boolean; static?: string[]; dynamic?: string[] }> = {
+		'/app/page.tsrx?markless-route': {
+			isEntry: true,
+			static: ['/app/card.tsrx?markless-symbols'],
+		},
+		'/app/card.tsrx?markless-symbols': { dynamic: ['virtual:markless:resolver:card'] },
+		'virtual:markless:resolver:card': {},
+		'/app/card.tsrx': { static: ['virtual:markless:payload:card'] },
+		'virtual:markless:payload:card': {},
+	};
+	const ids = entryReachableModuleIds({
+		getModuleIds: () => Object.keys(graph),
+		getModuleInfo: (id) => {
+			const node = graph[id];
+			return node
+				? {
+						isEntry: node.isEntry === true,
+						importedIds: node.static ?? [],
+						dynamicallyImportedIds: node.dynamic ?? [],
+					}
+				: null;
+		},
+	});
+	expect(ids).toEqual([
+		'/app/page.tsrx?markless-route',
+		'/app/card.tsrx?markless-symbols',
+		'virtual:markless:resolver:card',
+	]);
 });

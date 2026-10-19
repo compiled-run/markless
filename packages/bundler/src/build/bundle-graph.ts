@@ -257,3 +257,24 @@ function* bundleGraphEdges(graph: Record<string, BundleGraphRecord>): Generator<
 function normalizeManifestOrigin(origin: string) {
 	return withoutLeadingSlash(normalize(origin));
 }
+
+// A module only `this.load` reached ships in no chunk, and which ones it reached depends on compile order.
+export function entryReachableModuleIds(context: {
+	getModuleIds(): Iterable<string>;
+	getModuleInfo(id: string): {
+		readonly isEntry: boolean;
+		readonly importedIds: readonly string[];
+		readonly dynamicallyImportedIds: readonly string[];
+	} | null;
+}): string[] {
+	const ids = [...context.getModuleIds()];
+	const reached = new Set<string>();
+	const pending = ids.filter((id) => context.getModuleInfo(id)?.isEntry);
+	for (let id = pending.pop(); id !== undefined; id = pending.pop()) {
+		if (reached.has(id)) continue;
+		reached.add(id);
+		const info = context.getModuleInfo(id);
+		if (info) pending.push(...info.importedIds, ...info.dynamicallyImportedIds);
+	}
+	return ids.filter((id) => reached.has(id));
+}

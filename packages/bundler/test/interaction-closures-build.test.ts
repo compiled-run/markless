@@ -82,7 +82,7 @@ test('planned first-use files list the facade chunk an import() fetches in front
 		getModuleInfo: (id: string) => ({
 			importedIds: graph[id]!.imports,
 			dynamicallyImportedIds: graph[id]!.dynamic,
-			isEntry: false,
+			isEntry: id === `${page}?markless-route`,
 			code: 'x',
 		}),
 	});

@@ -1,6 +1,6 @@
 import type { Plugin } from 'rolldown';
 import type { RuntimeDemandMapManifest } from '../types.ts';
-import { runtimeModuleIdFromOrigin } from './bundle-graph.ts';
+import { entryReachableModuleIds, runtimeModuleIdFromOrigin } from './bundle-graph.ts';
 import { MARKLESS_DEFERRED_PACK } from './route-pack-groups.ts';
 import {
 	isReExportDoor,
@@ -91,7 +91,7 @@ export function deferredRuntimePlugin(
 			packs = new Map();
 			if (error) return;
 			const modules = new Map<string, ModuleEdges>();
-			for (const id of this.getModuleIds()) {
+			for (const id of entryReachableModuleIds(this)) {
 				const info = this.getModuleInfo(id);
 				if (!info || ('isExternal' in info && info.isExternal)) continue;
 				modules.set(id, {

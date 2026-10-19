@@ -2,6 +2,7 @@ import type { Plugin } from 'rolldown';
 import { isAbsolute, relative } from 'pathe';
 import { isStartupPack, planRoutePackGroups } from './route-pack-groups.ts';
 import { isAppModule } from './byte-attribution.ts';
+import { entryReachableModuleIds } from './bundle-graph.ts';
 import { lazyModuleFacadesPlugin } from './lazy-module-facades.ts';
 import { shortExportNamesPlugin } from './short-export-names.ts';
 import { packTopLevelPlugin } from './pack-top-level.ts';
@@ -97,7 +98,7 @@ export function nativePackingPlugins(
 				const routeSources = new Set<string>();
 				const entrySources = new Set<string>();
 				const entryIds = new Set<string>();
-				for (const id of this.getModuleIds()) {
+				for (const id of entryReachableModuleIds(this)) {
 					const info = this.getModuleInfo(id);
 					if (!info || ('isExternal' in info && info.isExternal)) continue;
 					const handlerSource = sourceForSymbolVirtualImporter(id);
