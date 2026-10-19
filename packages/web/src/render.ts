@@ -161,37 +161,27 @@ async function renderCsr(
 	// the same discipline containerScopedView applies for SSR containers.
 	if ((output.root as { readonly nodeType?: number }).nodeType === 11) {
 		const fragment = await import('./render-route-holder.ts');
-		const fragmentView = output.view
-			? fragment.offsetElementLocators(output.view, 1)
-			: output.view;
 		// A held route swap cannot mount into the visible target first: the
 		// fragment expands into a layout-transparent holder that stays the
 		// container root, and the holder itself mounts when the hold commits.
 		const holder = options.beforeMount
 			? fragment.createFragmentHolder(options.target)
 			: undefined;
+		const mounted = fragment.fragmentOutput(
+			output,
+			holder ?? (options.target as unknown as ResumeDomElement),
+		);
 		if (holder) {
 			mountRoot(holder as RenderTarget, output.root);
-			const container = await startCsrRuntime({
-				...output,
-				root: holder,
-				view: fragmentView,
-			});
+			const container = await startCsrRuntime(mounted);
 			if ((await options.beforeMount!(container)) === false) {
 				return { container: disposeCancelledMount(container), selfWake: false };
 			}
 			mountRoot(options.target, holder);
-			return csrRenderSettlement(container, fragmentView);
+			return csrRenderSettlement(container, mounted.view);
 		}
 		mountRoot(options.target, output.root);
-		return csrRenderSettlement(
-			await startCsrRuntime({
-				...output,
-				root: options.target as unknown as ResumeDomElement,
-				view: fragmentView,
-			}),
-			fragmentView,
-		);
+		return csrRenderSettlement(await startCsrRuntime(mounted), mounted.view);
 	}
 
 	const container = await startCsrRuntime(output);

@@ -130,8 +130,15 @@ with the target as the container root; `CsrRenderContainer.root` therefore
 means the container root, which is the mount target for fragment-rooted
 components and the created root element otherwise. Fragment-relative
 dom-order locators shift +1 when the target joins the walk, mirroring the
-SSR container offset. Only fragments whose top-level children are all plain
-host elements render; dynamic fragment shapes await the comment-anchor work.
+SSR container offset. A fragment's top-level children may be plain host
+elements, text, expressions and `@if`/`@for`/`@switch`/`@try` blocks; components
+still need a single root element. A keyed `@for` at the top level names the
+container as its rows' parent (`PROTOCOL_CONTAINER_HOST_NODE_ID`, located at
+index 0), and its rows count only the container's page nodes between the
+page-start and page-end comments, growing before the page-end comment. A
+component with such a loop placed inside another component is refused at
+compile time with `MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT`, because there its rows
+would land in an element the child never wrote.
 
 ## Browser Resume Architecture
 

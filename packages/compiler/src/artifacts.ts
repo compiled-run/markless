@@ -334,6 +334,11 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
+			 * Present when a keyed repeat sits at this component's top level, so its
+			 * rows need the container as their parent.
+			 */
+			readonly containerRepeat?: true;
+			/**
 			 * Present when this component's tree holds a keyed repeat whose rows fill
 			 * expression slots through a render-data reader, so a page placing it
 			 * must hand its resumed runtime the render-data surface.
@@ -756,6 +761,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
 		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
 		| 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED'
+		| 'MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
 		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'

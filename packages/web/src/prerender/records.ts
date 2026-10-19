@@ -1,5 +1,6 @@
 import {
 	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_CONTAINER_HOST_NODE_ID,
 	serializeRuntimeAsyncSnapshots,
 	serializeRuntimeStateCells,
 	type ProtocolStatePayload,
@@ -25,13 +26,23 @@ export async function prepareSsrResumeRecords(
 }
 
 function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {
-	return {
-		...view,
-		locators: view.locators.map((locator) => ({
-			...locator,
-			index: locator.index + 1,
-		})),
-	};
+	const locators = view.locators.map((locator) => ({
+		...locator,
+		index: locator.index + 1,
+	}));
+	// Index 0 is the container itself, the parent of rows written at the page's top level.
+	if (
+		view.keyedRepeats?.some(
+			(repeat) => repeat.parentHostNodeId === PROTOCOL_CONTAINER_HOST_NODE_ID,
+		)
+	)
+		locators.unshift({
+			hostNodeId: PROTOCOL_CONTAINER_HOST_NODE_ID,
+			strategy: 'dom-order',
+			index: 0,
+			tagName: '*',
+		});
+	return { ...view, locators };
 }
 
 function emptyStatePayload(): ProtocolStatePayload {

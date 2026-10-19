@@ -1,6 +1,6 @@
-import type { ProtocolViewPayload } from '@markless/serializer';
+import { PROTOCOL_CONTAINER_HOST_NODE_ID } from '../../serializer/src/protocol-page-markers.ts';
 import type { ResumeDomElement } from './resume.ts';
-import type { RenderTarget } from './render.ts';
+import type { CsrRenderOutput, RenderTarget } from './render.ts';
 
 // The holder wraps a fragment-rooted page for a held route swap. It stays in
 // the page as the container root, so it must be layout-transparent
@@ -24,15 +24,17 @@ export function createFragmentHolder(target: RenderTarget): ResumeDomElement | u
 	return holder;
 }
 
-export function offsetElementLocators(
-	view: ProtocolViewPayload,
-	offset: number,
-): ProtocolViewPayload {
+// The container joins the locator walk at index 0 and parents top-level rows.
+export function fragmentOutput(output: CsrRenderOutput, root: ResumeDomElement): CsrRenderOutput {
+	const { view, liveHostNodes } = output;
 	return {
-		...view,
-		locators: view.locators.map((locator) => ({
-			...locator,
-			index: locator.index + offset,
-		})),
+		...output,
+		root,
+		view: view && {
+			...view,
+			locators: view.locators.map((locator) => ({ ...locator, index: locator.index + 1 })),
+		},
+		liveHostNodes:
+			liveHostNodes && new Map(liveHostNodes).set(PROTOCOL_CONTAINER_HOST_NODE_ID, root),
 	};
 }

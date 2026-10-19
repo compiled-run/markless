@@ -376,6 +376,22 @@ export function projectedRepeatHoleRepeatedDiagnostic(input: {
 	});
 }
 
+export function childRepeatWithoutElementDiagnostic(input: {
+	readonly childComponentName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const child = `<${input.childComponentName}>`;
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT',
+		title: 'This component renders a list with no element around it',
+		message: `${child} has a @for loop at the top level of its template, with no element of its own around the rows. As a page that works, because the page's container holds the rows, but inside another component the rows have no element of their own, so they would never update after the page loads.`,
+		why: 'A keyed repeat records one parent element: resume keys the served rows under it and inserts new rows into it. Inside another component the rows land in an element the child never wrote, at a position the child cannot know.',
+		span: input.span,
+		suggestion: `Wrap the @for in ${child} in an element, for example <ul>@for (...) { <li>...</li> }</ul>.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT',
+	});
+}
+
 function semanticGraphDiagnostic(input: {
 	readonly code: SemanticGraphDiagnostic['code'];
 	readonly title: string;

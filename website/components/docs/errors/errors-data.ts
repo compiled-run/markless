@@ -1601,6 +1601,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'This component renders a list with no element around it: a Markless build error.',
+		printed: [
+			"MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT: <child> has a @for loop at the top level of its template, with no element of its own around the rows. As a page that works, because the page's container holds the rows, but inside another component the rows have no element of their own, so they would never update after the page loads.",
+			'A keyed repeat records one parent element: resume keys the served rows under it and inserts new rows into it. Inside another component the rows land in an element the child never wrote, at a position the child cannot know.',
+			'Wrap the @for in <child> in an element, for example <ul>@for (...) { <li>...</li> }</ul>.',
+			'https://markless.dev/errors/MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_CHILD_SYMBOL_MISSING',
 		packageName: '@markless/bundler',
 		stage: 'build',

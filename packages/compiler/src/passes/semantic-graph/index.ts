@@ -57,6 +57,7 @@ import {
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
 import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
+import { childContainerRepeatDiagnostics, containerRepeatComponents } from './container-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
@@ -175,6 +176,13 @@ export async function buildSemanticGraph(
 			? { importedModuleInterfaces: input.importedModuleInterfaces }
 			: {}),
 	});
+	childContainerRepeatDiagnostics({
+		graph,
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
+	});
+	const containerRepeats = containerRepeatComponents(graph);
 	// Shared definitions publish here rather than with the rest of the interface:
 	// a definition's returned properties and the factory nodes they name are
 	// collected after that point, and a consumer adopts exactly those.
@@ -241,6 +249,9 @@ export async function buildSemanticGraph(
 							rootChunkId: root.id,
 						}),
 						...armMaterialField(graph, component.name, chunks),
+						...(containerRepeats.has(component.name)
+							? { containerRepeat: true as const }
+							: {}),
 						...(propSpends.get(component.name)?.length
 							? { propSpends: propSpends.get(component.name)! }
 							: {}),

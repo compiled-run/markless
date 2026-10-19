@@ -1,6 +1,7 @@
 import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
 import type { RuntimeGraph } from '@markless/runtime';
 import { marklessAttributeValue } from '../dom-attribute.ts';
+import { pageNodes } from '../resume-anchor-census.ts';
 import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '../resume-types.ts';
 
 /**
@@ -14,10 +15,11 @@ import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '.
  * repeats only reorder never writes this module's specifier and never emits its
  * chunk at all. Every helper below is therefore spelled locally: an
  * import from the repeat module would pull that module's whole closure back in
- * and there would be nothing left to gate. The one import is `dom-attribute`, a
- * leaf holding the attribute presence rule every render path shares - forking
- * that rule would be worse than the handful of bytes it costs. The two other
- * imports are types, which erase.
+ * and there would be nothing left to gate. The value imports are leaves:
+ * `dom-attribute`, the attribute presence rule every render path shares, and
+ * `resume-anchor-census`, the page's own nodes in a container that is an author's
+ * element - forking either rule would be worse than the handful of bytes it
+ * costs. The other imports are types, which erase.
  */
 
 /** The read half of the live graph, for a row's outside reads. */
@@ -59,7 +61,7 @@ export function servedEmptyArm(
 	rangeEnd?: ResumeDomNode,
 ): ReadonlyArray<ResumeDomNode> {
 	const shape = renderEmptyArm(parent, repeat),
-		children = Array.from(parent.childNodes ?? []),
+		children = pageNodes(parent),
 		elements = children.filter((node) => node.nodeType === 1),
 		before = elements[(repeat.rowStartOffset ?? 0) - 1],
 		after = repeat.rowEndOffset ? elements[elements.length - repeat.rowEndOffset] : undefined,

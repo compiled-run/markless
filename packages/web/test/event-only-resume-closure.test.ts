@@ -105,7 +105,11 @@ const resumeOnDemandEntries = [
 // plus the 854-char instance-path grammar it now imports, 25,360 raw; minified+gzip 3,259 -> 3,524 bytes, under the 4,800 gzip wall.
 // 2026-10-19: the same rule read page-wide (no changeable component row means no prop list can change) and only the prop prefix
 // imported, after the JS framework benchmark flagged +0.70 kB raw: 24,471 raw; minified+gzip 3,259 -> 3,373 bytes against main before it.
-const sourceByteLimit = 24471;
+// 2026-10-19: a page's top-level @for keeps its rows among the container's page nodes, between the page markers, and
+// grows them before the page-end comment: resume-keyed-repeats.ts 24,471 -> 26,457 raw, most of it resume-anchor-census.ts
+// counted whole while the bundle keeps only its pageNodes; minified+gzip 3,451 -> 3,536 bytes (rolldown, same method both
+// sides), under the 4,800 gzip wall, and the shipped module is the one resume already loads.
+const sourceByteLimit = 26457;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

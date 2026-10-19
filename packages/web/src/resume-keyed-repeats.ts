@@ -12,6 +12,7 @@ import type {
 } from './resume-types.ts';
 import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '../../serializer/src/protocol-prop-prefix.ts';
+import { pageNodes } from './resume-anchor-census.ts';
 
 // Nothing has moved yet, so deriving a computed collection reproduces the served rows.
 export async function primeKeyedRepeatCollections(input: {
@@ -415,7 +416,10 @@ function applyKeyedRepeatRowOrder(
 		rangeEnd ??
 		elementChildren(parent)
 			.slice(rowsFrom(parent, repeat))
-			.find((child) => !knownRows.has(child));
+			.find((child) => !knownRows.has(child)) ??
+		// Past the page's last node: before the page-end comment when an author's element is the container.
+		(pageNodes(parent).at(-1) as Sibling | undefined)?.nextSibling ??
+		undefined;
 	// A row already in place stays attached: re-inserting a focused row drops its focus.
 	let after = anchor;
 	for (let at = nextRows.length; at--; after = nextRows[at]) {
@@ -614,7 +618,7 @@ function rowsFrom(parent: ResumeDomElement, repeat: ResumeKeyedRepeatRecord, cou
 		: Math.max(0, elementChildren(parent).length - repeat.rowEndOffset - count);
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
-	return elementsOf(Array.from(element.childNodes ?? []));
+	return elementsOf(pageNodes(element));
 }
 function elementsOf(nodes: ReadonlyArray<ResumeDomNode>): ResumeDomElement[] {
 	return nodes.filter((child): child is ResumeDomElement => child.nodeType === 1);

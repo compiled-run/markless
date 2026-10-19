@@ -31,6 +31,7 @@ export {
 	protocolProjectionSegment,
 	protocolRowSegment,
 } from './protocol-constants.ts';
+export { PROTOCOL_CONTAINER_HOST_NODE_ID } from './protocol-page-markers.ts';
 
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 
