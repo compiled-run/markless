@@ -30,6 +30,7 @@ import {
 } from './passes/link/children-seed-paths.ts';
 import { withClosureActionOwners } from './passes/link/closure-action-owners.ts';
 import { withRosterDerivations } from './passes/link/roster-derivations.ts';
+import { withStorageCells } from './passes/link/storage-cells.ts';
 import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
 import { PROJECTION_PROP_NAME } from './passes/public-render/shared-seed-pass.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
@@ -103,6 +104,11 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 	};
 
+	const storageCellsInput = {
+		componentEdges: artifacts.semanticGraph.componentEdges,
+		protocolState: artifacts.protocolState,
+		importedModuleInterfaces: input.importedModuleInterfaces,
+	};
 	return {
 		passGraph: pipeline.passGraph,
 		semanticGraph: artifacts.semanticGraph,
@@ -110,7 +116,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 			withClosureActionOwners(
 				withRosterDerivations(
 					withRowSlotReaders(
-						withSeedsFromProps(artifacts.semanticGraph.moduleGraphInterface, {
+						withSeedsFromProps(withStorageCells(artifacts.semanticGraph.moduleGraphInterface, storageCellsInput), {
 							symbolResolver: artifacts.symbolResolver,
 							protocolState: artifacts.protocolState,
 						}),

@@ -363,6 +363,11 @@ export type ModuleGraphInterfaceArtifact = {
 			 */
 			readonly rosterDerivation?: true;
 			/**
+			 * Present when this component's tree reads or writes a storage() cell, so
+			 * a page placing it serves a storage payload and must resume with storage.
+			 */
+			readonly storageCells?: true;
+			/**
 			 * What runs in the browser when a composing module changes one of this
 			 * component's props or creates an instance of it. Read by the build-time
 			 * pack planner only.

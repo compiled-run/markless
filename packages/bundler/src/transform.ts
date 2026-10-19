@@ -411,6 +411,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.rosterDerivation === true,
 	);
+	const storageCells = compiled.moduleGraphInterface.render.components.some(
+		(component) => component.storageCells === true,
+	);
 	const pageNeedsFullResume = needsFullResume(
 		compiled.protocolState,
 		compiled.protocolView,
@@ -576,6 +579,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				linkedRowTemplates: importedRowTemplateMints(input.importedModuleInterfaces),
 				linkedNestedRepeats: importedNestedRepeats(input.importedModuleInterfaces),
 				rosterDerivation,
+				storageCells,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
 				symbols: symbolRows,
@@ -604,6 +608,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 								moduleId: triggerGroupVirtualModuleId(input.filename, index),
 							})),
 							rosterDerivation,
+							storageCells,
 							installResumeSummary: true,
 							recordsOnly: true,
 							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,

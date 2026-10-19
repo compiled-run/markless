@@ -26,7 +26,6 @@ import type {
 	SymbolResolverPlan,
 } from '../artifacts.ts';
 import {
-	ASYNC_PROTOCOL_VERSION,
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	PROTOCOL_VISIBLE_EVENT_NAME,
@@ -39,6 +38,7 @@ import {
 } from '@markless/serializer';
 import { LEAN_DISPATCH_MARKER_MODULES } from '../lean-dispatch-modules.ts';
 import { closureActionPlan } from './closure-action-plan.ts';
+import { moduleReachesStorageCells } from './link/storage-cells.ts';
 import { PROJECTION_PROP_NAME } from './public-render/shared-seed-pass.ts';
 import {
 	isSharedCallbackSlotGraphNodeId,
@@ -180,8 +180,14 @@ export function createRuntimeDemandMap(
 	},
 	demandClass: RuntimeDemandClass,
 ): RuntimeDemandMapArtifact {
-	const storageRequiresFullResume = (input.protocolState.storage?.length ?? 0) > 0;
-	const storageFreePayload = input.protocolState.version === ASYNC_PROTOCOL_VERSION;
+	const storageRequiresFullResume = moduleReachesStorageCells({
+		componentEdges: Array.isArray(input.componentEdges)
+			? (input.componentEdges as ReadonlyArray<SemanticComponentEdge>)
+			: [],
+		protocolState: input.protocolState,
+		importedModuleInterfaces: input.importedModuleInterfaces,
+	});
+	const storageFreePayload = !storageRequiresFullResume;
 	const dispatchCore = [...payloadResumeModules(storageFreePayload), ...DISPATCH_CORE_COMMON];
 	const fullTier = [...payloadResumeModules(storageFreePayload), ...FULL_TIER_COMMON];
 	const emittedModules = new Map(

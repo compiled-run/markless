@@ -779,6 +779,8 @@ export function emitResumeModule(input: {
 	readonly linkedNestedRepeats?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
+	// The page's tree reaches a storage() cell, possibly in a child module whose cells this payload never holds.
+	readonly storageCells?: boolean;
 	readonly installResumeSummary?: boolean;
 	// Some async boundary authors an @pending arm, so a served page of this module can stream it.
 	readonly streamsArms?: boolean;
@@ -817,8 +819,9 @@ export function emitResumeModule(input: {
 		emitResumeContainerEvent(
 			resumeSymbolLoader,
 			input.needsFullResume ?? false,
-			(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
-				ASYNC_PROTOCOL_VERSION,
+			input.storageCells !== true &&
+				(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
+					ASYNC_PROTOCOL_VERSION,
 			servedPlansOnly
 				? 'scalar'
 				: composedLeanMode(
