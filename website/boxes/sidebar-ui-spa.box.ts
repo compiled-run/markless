@@ -12,6 +12,8 @@ export default box(
 		await pipeline.dev({
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
+		// A page's first compile writes its code-block modules, and a new module file reloads open pages.
+		for (const route of ['/ui/select', '/ui/combobox']) await browser.request(route);
 		const page = await browser.visit('/ui/select');
 		await expect.page.text(page, 'h1', 'select', WAIT);
 		await page.click('.sidebar-summary', WAIT);
