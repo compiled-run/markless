@@ -125,3 +125,45 @@ test('a part that destructures nothing still spreads its whole props', async () 
 	expect(slot, 'the element spread must emit one spread-attributes slot').toBeTruthy();
 	expect(slot?.excludeNames).toEqual([]);
 });
+
+// A dynamic tag spreads through its own attribute slots, not a spread-attributes
+// slot, so the same exclusion has to ride on its spread entry.
+type DynamicSpread = { readonly kind: 'spread'; readonly excludeNames?: ReadonlyArray<string> };
+
+async function dynamicSpreads(source: string): Promise<ReadonlyArray<DynamicSpread>> {
+	const result = await compileTsrxModule({
+		filename: '/parts/family.tsrx',
+		source,
+		symbols: [],
+		importedModuleInterfaces: {},
+	});
+	return result.renderData.chunks
+		.flatMap((chunk) => chunk.slots)
+		.flatMap((slot) => (slot.kind === 'dynamic-host' ? slot.attributeSlots : []))
+		.filter((attribute): attribute is DynamicSpread => attribute.kind === 'spread');
+}
+
+test('a dynamic tag spreading the rest binding leaves out the names the signature took', async () => {
+	const [spread] = await dynamicSpreads(`export function Description({ asChild, children, ...rest }) @{
+	const tag = asChild === true ? 'div' : 'p';
+	<{tag} {...rest} data-part="description">{children}</{tag}>
+}
+`);
+	expect(spread, 'the dynamic tag must emit one spread attribute slot').toBeTruthy();
+	expect(spread?.excludeNames).toEqual(expect.arrayContaining(['asChild', 'children', 'data-part']));
+});
+
+test('the dynamic-tag exclusion is structural, and an author-built object keeps its keys', async () => {
+	const [own] = await dynamicSpreads(`export function Heading({ level, label, ...others }) @{
+	const name = level === 1 ? 'h1' : 'h2';
+	<{name} {...others} title={label}>{label}</{name}>
+}
+`);
+	expect(own?.excludeNames).toEqual(expect.arrayContaining(['level', 'label', 'title']));
+	const [built] = await dynamicSpreads(`export function Box({ kind, ...rest }) @{
+	const mine = { kind: 'kept' };
+	<{kind} {...mine}>x</{kind}>
+}
+`);
+	expect(built?.excludeNames ?? []).not.toContain('kind');
+});

@@ -1194,7 +1194,12 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 							readonly name: string;
 							readonly residue: SemanticMarkupResidue;
 					  }
-					| { readonly kind: 'spread'; readonly residue: SemanticMarkupResidue }
+					| {
+							readonly kind: 'spread';
+							readonly residue: SemanticMarkupResidue;
+							// What the spread may not write: the element's own attributes, and the names a rest binding was taken from.
+							readonly excludeNames?: ReadonlyArray<string>;
+					  }
 				>;
 				readonly childChunkId: string;
 		  }

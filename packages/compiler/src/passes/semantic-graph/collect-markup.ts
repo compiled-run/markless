@@ -846,18 +846,33 @@ function emitDynamicHost(
 				readonly name: string;
 				readonly residue: SemanticMarkupResidue;
 		  }
-		| { readonly kind: 'spread'; readonly residue: SemanticMarkupResidue }
+		| {
+				readonly kind: 'spread';
+				readonly residue: SemanticMarkupResidue;
+				readonly excludeNames: ReadonlyArray<string>;
+		  }
 	> = [];
 	const elementAttributes = getElementAttributes(node);
+	const declaredAttributeNames = elementAttributes.flatMap((candidate) => {
+		if (isSpreadAttribute(candidate)) return [];
+		const name = getIdentifierName(candidate.name as AnyNode | undefined);
+		return name ? [name] : [];
+	});
 	for (const attribute of elementAttributes) {
 		if (isSpreadAttribute(attribute)) {
 			const expression = unwrapExpressionContainer(
 				(attribute.argument ?? attribute.value) as AnyNode | undefined,
 			);
 			if (expression) {
+				// The static-host rule: the rest binding can never hold what the signature took out of it.
+				const spreadsRestBinding =
+					context.restName !== null && getIdentifierName(expression) === context.restName;
 				attributeSlots.push({
 					kind: 'spread',
 					residue: expressionResidue(expression, context, repeat, builder.componentName),
+					excludeNames: spreadsRestBinding
+						? [...new Set([...declaredAttributeNames, ...context.destructuredNames])]
+						: [...declaredAttributeNames],
 				});
 			}
 			continue;

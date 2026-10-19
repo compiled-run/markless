@@ -94,7 +94,7 @@ export type SsrDataSlot = LocatedSlot &
 				readonly staticAttributes: Readonly<Record<string, string>>;
 				readonly attributeSlots: ReadonlyArray<
 					| { readonly kind: 'attribute'; readonly name: string; readonly residue: SsrDataResidue }
-					| { readonly kind: 'spread'; readonly residue: SsrDataResidue }
+					| { readonly kind: 'spread'; readonly residue: SsrDataResidue; readonly excludeNames?: ReadonlyArray<string> }
 				>;
 				readonly childChunkId: string;
 		  }
@@ -787,7 +787,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					const place = (attribute: (typeof slot.attributeSlots)[number], value: unknown) => {
 						attributes += attribute.kind === 'attribute'
 							? renderAttribute(attribute.name, value)
-							: renderSpreadAttributes(value);
+							: renderSpreadAttributes(value, attribute.excludeNames);
 					};
 					const walkAttributes = (from: number): Awaitable<void> => {
 						for (let index = from; index < slot.attributeSlots.length; index++) {

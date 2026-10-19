@@ -144,6 +144,36 @@ describe('renderSsrData', () => {
 		expect((await render(null)).html).toBe('<section></section>');
 	});
 
+	test('a dynamic host spread writes none of the names its slot excludes', async () => {
+		const output = await renderSsrData({
+			renderData: {
+				root: { componentName: 'Dynamic', templateId: 'template:Dynamic' },
+				chunks: [
+					{
+						id: 'template:Dynamic', kind: 'template', componentName: 'Dynamic',
+						statics: ['<!--markless-slot:0-->'], hosts: [],
+						slots: [{
+							kind: 'dynamic-host', hostNodeId: 'h1', cardinality: 'zero-or-one',
+							nullishTag: 'omit', staticIndex: 0,
+							coordinate: { kind: 'comment-anchor', path: [0] },
+							tag: { kind: 'graph-read', graphNodeId: 'state:tag', path: [] },
+							staticAttributes: {},
+							attributeSlots: [{ kind: 'spread', residue: { kind: 'graph-read', graphNodeId: 'prop:props', path: [] }, excludeNames: ['asChild', 'children'] }],
+							childChunkId: 'dynamic:children',
+						}],
+					},
+					{
+						id: 'dynamic:children', kind: 'dynamic-host-children', componentName: 'Dynamic',
+						statics: ['text'], hosts: [], slots: [],
+					},
+				], boundaries: [], repeats: [],
+			},
+			read: (residue) => ((residue as { graphNodeId?: string }).graphNodeId === 'state:tag' ? 'div' : { asChild: true, children: 'x', class: 'note' }),
+		});
+
+		expect(output.html).toBe('<div class="note">text</div>');
+	});
+
 	test('fails loudly when a child renderer omits structural records', async () => {
 		const renderData = {
 			root: { componentName: 'Parent', templateId: 'template:Parent' },
