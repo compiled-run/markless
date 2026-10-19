@@ -29,6 +29,8 @@ import {
 	undemandedRuntimeModules,
 } from './attribution.mjs';
 import { measureConstructGlue } from './construct-glue.mjs';
+import { measureResumeRows } from './resume-rows.mjs';
+import { resumeDataBreakdown } from '../resume-data/breakdown.mjs';
 import { marklessBuildManifestPath } from '../../../packages/bundler/src/build/build-manifests.ts';
 import { MARKLESS_EXECUTION_DEMAND } from '../../../packages/bundler/src/build/chunking.ts';
 import { LEAN_DISPATCH_MARKER_MODULES } from '../../../packages/compiler/src/lean-dispatch-modules.ts';
@@ -531,6 +533,7 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 						: {}),
 				};
 				routes[route].html = staticInfo.html;
+				routes[route].resumeData = resumeDataBreakdown(staticInfo.html).total;
 			}
 			const siteResult = { routes, chunkNameReferences: chunkNameReferences(publicDir) };
 			if (site === 'bench') {
@@ -573,5 +576,7 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 	}
 	log('construct glue on minimal fixtures');
 	result.constructGlue = await measureConstructGlue();
+	log('resume data per list row on the rows fixture');
+	result.resumeRows = await measureResumeRows({ build });
 	return result;
 }

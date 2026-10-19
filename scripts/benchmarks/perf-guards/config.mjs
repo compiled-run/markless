@@ -24,6 +24,7 @@ export const COST_MODEL = {
 export const BUDGETS = {
 	runtimeModuleGrowthBytes: 128,
 	constructGlueGrowthBytes: 24,
+	resumeRowGrowthBytes: 16,
 	executionGrowth: 0.25,
 	executionMinChars: 2048,
 	initializerMinExtra: 2,

@@ -1179,6 +1179,88 @@
 			"from": 753,
 			"to": 1005,
 			"reason": "fragment page mounts moved their locator shift from web/render (-136 B) into this lazy module and now map the container host for a page's top-level @for rows; net +116 B, loaded only by fragment-rooted client renders"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "keyed rows",
+			"from": null,
+			"to": 1298,
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "fixed row slots",
+			"from": null,
+			"to": 3631,
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "bench /",
+			"from": null,
+			"to": {
+				"raw": 14716,
+				"gzip": 2065
+			},
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "bench /records",
+			"from": null,
+			"to": {
+				"raw": 52220,
+				"gzip": 8175
+			},
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "bench /settings",
+			"from": null,
+			"to": {
+				"raw": 14603,
+				"gzip": 1930
+			},
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "docs /markless/",
+			"from": null,
+			"to": {
+				"raw": 404894,
+				"gzip": 17481
+			},
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "docs /markless/concepts/state",
+			"from": null,
+			"to": {
+				"raw": 404922,
+				"gzip": 17486
+			},
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "resume",
+			"subject": "docs /markless/ui/accordion",
+			"from": null,
+			"to": {
+				"raw": 404918,
+				"gzip": 17485
+			},
+			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
 		}
 	],
 	"runtimeModules": {
@@ -1300,5 +1382,35 @@
 		"@if": 6135,
 		"keyed @for": 5343,
 		"async boundary": 7807
+	},
+	"resumeRows": {
+		"keyed rows": 1298,
+		"fixed row slots": 3631
+	},
+	"resumeData": {
+		"bench /": {
+			"raw": 14716,
+			"gzip": 2065
+		},
+		"bench /records": {
+			"raw": 52220,
+			"gzip": 8175
+		},
+		"bench /settings": {
+			"raw": 14603,
+			"gzip": 1930
+		},
+		"docs /markless/": {
+			"raw": 404894,
+			"gzip": 17481
+		},
+		"docs /markless/concepts/state": {
+			"raw": 404922,
+			"gzip": 17486
+		},
+		"docs /markless/ui/accordion": {
+			"raw": 404918,
+			"gzip": 17485
+		}
 	}
 }

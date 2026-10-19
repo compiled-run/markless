@@ -1,0 +1,74 @@
+import { computed, state } from '@markless/core';
+import { makeUsers, toggle, viewRows } from './table.ts';
+import { UserRow } from './user-row.tsrx';
+
+// 8 fixed row slots, one component edge each: the shape a table with a fixed page size compiles to.
+export default function Slots8() @{
+	const users = makeUsers(8);
+	let selected = state<string[]>([]);
+	const rows = computed(() => viewRows(users, selected));
+
+	<main>
+		<table>
+			<tbody>
+				<UserRow
+					rows={rows}
+					slot={0}
+					onToggle={() => {
+						selected = toggle(selected, users[0]?.id);
+					}}
+				/>
+				<UserRow
+					rows={rows}
+					slot={1}
+					onToggle={() => {
+						selected = toggle(selected, users[1]?.id);
+					}}
+				/>
+				<UserRow
+					rows={rows}
+					slot={2}
+					onToggle={() => {
+						selected = toggle(selected, users[2]?.id);
+					}}
+				/>
+				<UserRow
+					rows={rows}
+					slot={3}
+					onToggle={() => {
+						selected = toggle(selected, users[3]?.id);
+					}}
+				/>
+				<UserRow
+					rows={rows}
+					slot={4}
+					onToggle={() => {
+						selected = toggle(selected, users[4]?.id);
+					}}
+				/>
+				<UserRow
+					rows={rows}
+					slot={5}
+					onToggle={() => {
+						selected = toggle(selected, users[5]?.id);
+					}}
+				/>
+				<UserRow
+					rows={rows}
+					slot={6}
+					onToggle={() => {
+						selected = toggle(selected, users[6]?.id);
+					}}
+				/>
+				<UserRow
+					rows={rows}
+					slot={7}
+					onToggle={() => {
+						selected = toggle(selected, users[7]?.id);
+					}}
+				/>
+			</tbody>
+		</table>
+		<output>{selected.length}</output>
+	</main>;
+}

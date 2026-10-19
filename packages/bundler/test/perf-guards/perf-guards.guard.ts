@@ -33,6 +33,7 @@ const guards = {
 	G10: 'each framework runtime module within its per-feature anchor',
 	G11: 'a page ships only runtime feature modules its own compiled demand names',
 	G12: 'compiler-emitted glue per construct within its anchor',
+	G13: 'resume data each list row adds within its anchor',
 } as const;
 
 for (const [guard, title] of Object.entries(guards)) {

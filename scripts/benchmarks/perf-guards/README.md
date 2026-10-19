@@ -25,6 +25,7 @@ Whole-app byte totals (G1 bytes, G6, the music-player stage bytes, executed byte
 - **G10 per-feature runtime cost:** each runtime module's rendered bytes (before minification, so neighbours in its chunk cannot move it) against its anchor. The failure names the module and the compiled features (record kinds, actions, symbol kinds) that demand it.
 - **G11 pay-per-use:** a runtime module that any compiled demand names (a feature module) may ship in a page's download only when a demand map of that page's own modules names it. Records inside `@if` arms, `@for` rows and async arms count through each map's `nestedRecordModuleIds`; where a map cannot list them (an escalating branch, a row rooted by a component), that page is judged on capability modules only. Native packing plans for this: a route's closures follow a dynamic import into a feature module only when that route's own demand maps name it, so the module lands in a pack only the demanding routes load. It rides a pack a non-demanding route also loads only when the pack cost model (`packages/bundler/src/build/pack-cost-model.ts`) finds the extra bytes cheaper than one more file, and this guard then reports that trade.
 - **G12 per-construct glue:** the bytes the compiler emits per event handler, text binding, `@if`, keyed `@for` and async boundary, measured as the marginal cost of one more instance on a minimal fixture (`construct-glue.mjs`).
+- **G13 resume data per row:** the bytes of `markless/state` and `markless/view` data one more list row adds to the served html, on `packages/bundler/fixtures/vite-ssr-resume-rows` (a keyed `@for` of inline and component rows, and fixed row slots with one component edge each) rendered at two row counts (`resume-rows.mjs`). Each guarded route's resume data is reported against its `resumeData` anchor, never gated.
 
 ## What each guard protects
 
@@ -47,6 +48,7 @@ Two kinds of check are used:
 | G10 runtime per feature    | budget: +128 B rendered per module | See above. A new runtime module fails until accepted; a removed one is reported.                                                                                                                                                                                                                                                                                                                                                                      |
 | G11 pay-per-use            | invariant                          | See above. Checked on every benchmark route's download.                                                                                                                                                                                                                                                                                                                                                                                               |
 | G12 glue per construct     | budget: +24 B per instance         | See above.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| G13 resume data per row    | budget: +16 B per row              | See above. Every row of every list on every page pays it, in html the browser parses before the page can respond.                                                                                                                                                                                                                                                                                                                                     |
 
 Each failure message names the site, route or action, the measured value, the anchor, the estimated user cost, and, for budgets, the exact command that accepts it.
 
@@ -61,8 +63,9 @@ Anchors live in `anchors.json`. They are the values measured on the tree where t
     pnpm perf:guard:accept construct "keyed @for" --reason "rows carry their key for reorder"
     pnpm perf:guard:accept execution dialog --reason "dialog now validates on open"
     pnpm perf:guard:accept lean "/" --reason "toggle reads an element handle, which lean dispatch cannot serve"
+    pnpm perf:guard:accept resume "keyed rows" --reason "rows carry their sort key"
     ```
-    Guards: `runtime`, `construct`, `execution`, `lean`, or `all`. Use `"*"` as the subject for every subject of that guard. `--from-last` reuses the measurement the last `pnpm perf:guard` run saved instead of measuring again.
+    Guards: `runtime`, `construct`, `execution`, `lean`, `resume`, or `all`. Use `"*"` as the subject for every subject of that guard. `--from-last` reuses the measurement the last `pnpm perf:guard` run saved instead of measuring again.
 3. Commit `anchors.json` with the change that caused the move.
 
 Never re-anchor to make an unexplained regression pass. Invariants (G1 rounds, G2, G5, G7, G8, G9, G11) cannot be accepted. `knownViolations` holds only violations that already existed when a guard was introduced. Each entry carries its reason and is reported on every run. Remove it once the violation is fixed; the report says when that happens.
@@ -83,6 +86,7 @@ pnpm bench:interaction:guard --lock /private/tmp/mlbench-timing.lock   # later, 
 - `evaluate.mjs`: compares a measurement with the anchors.
 - `attribution.mjs`: reads `byte-attribution.json` and `execution-demand.json`; byte split, runtime module sizes, pay-per-use.
 - `construct-glue.mjs`: the minimal construct fixtures behind G12.
+- `resume-rows.mjs`: builds and renders the rows fixture behind G13; `../resume-data/` weighs whole pages.
 - `cli.mjs`: `check`, `measure`, and `accept`.
 - `evaluate.test.ts`: proves each guard fails with a clear message.
 - The shared browser helpers are `demos/interaction-benchmark/runner/lib/controls.mjs` (control discovery and first-use visits) and `coverage.mjs` (V8 coverage windows).

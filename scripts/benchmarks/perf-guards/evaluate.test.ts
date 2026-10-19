@@ -91,6 +91,15 @@ function measurement(): Json {
 			'event handler': { bytesPerInstance: 2_900, oneInstance: 15_000 },
 			'keyed @for': { bytesPerInstance: 5_300, oneInstance: 16_000 },
 		},
+		resumeRows: {
+			'keyed rows': {
+				rows: 10,
+				bytesPerRow: 300,
+				gzipBytesPerRow: 40,
+				recordsPerRow: 8,
+				resumeBytes: 9_000,
+			},
+		},
 	};
 }
 
@@ -98,6 +107,7 @@ const anchors = (): Json => ({
 	version: 2,
 	runtimeModules: { 'web/resume-branches': 4_000, 'web/resume-runtime': 9_000 },
 	constructGlue: { 'event handler': 2_900, 'keyed @for': 5_300 },
+	resumeRows: { 'keyed rows': 300 },
 	execution: { counter: { executedChars: 20_000, functions: 100, modules: 10 } },
 	lean: { '/': ['click@counter-increment'] },
 	allowFullResume: [],
@@ -285,6 +295,30 @@ describe('performance guards', () => {
 				'[G12] event handler: the compiler emits 2964 B of glue per instance on the minimal fixture, anchor 2900 B: +64 B per event handler (budget +24 B)',
 			),
 		]);
+	});
+
+	test('G13 fails resume data per list row past its budget and names the list shape', () => {
+		const within = measurement();
+		within.resumeRows['keyed rows'].bytesPerRow += 16;
+		expect(failures(within)).toEqual([]);
+
+		const over = measurement();
+		over.resumeRows['keyed rows'].bytesPerRow += 150;
+		expect(failures(over)).toEqual([
+			expect.stringContaining(
+				'[G13] keyed rows: each row adds 450 B of resume data (40 B gzip, 8 records), anchor 300 B: +150 B per row (budget +16 B)',
+			),
+		]);
+		const next = accept(
+			anchors(),
+			over,
+			'resume',
+			'keyed rows',
+			'rows carry a new record',
+			'2026-10-19',
+		);
+		expect(next.resumeRows).toEqual({ 'keyed rows': 450 });
+		expect(failures(over, next)).toEqual([]);
 	});
 
 	test('accept re-anchors one subject and records the reason', () => {

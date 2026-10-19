@@ -3,11 +3,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ANCHORS_PATH } from './config.mjs';
-import { evaluate, formatReport, isLean } from './evaluate.mjs';
+import { evaluate, formatReport, isLean, routeKey } from './evaluate.mjs';
 import { measure } from './measure.mjs';
 
 export const LAST_MEASUREMENT = join(tmpdir(), 'markless-perf-guards', 'last-measurement.json');
-const GUARDS = ['runtime', 'construct', 'execution', 'lean', 'all'];
+const GUARDS = ['runtime', 'construct', 'execution', 'lean', 'resume', 'all'];
 const USAGE = `usage:
   node scripts/benchmarks/perf-guards/cli.mjs check [--no-build] [--sites bench,docs] [--from <measurement.json>]
   node scripts/benchmarks/perf-guards/cli.mjs measure [--no-build] [--out <file>]
@@ -69,6 +69,25 @@ export function accept(
 			next.constructGlue[construct] = cost.bytesPerInstance;
 			matched++;
 		}
+	}
+	if (guard === 'resume' || guard === 'all') {
+		for (const [shape, cost] of Object.entries(measurement.resumeRows ?? {})) {
+			if (!pick(shape)) continue;
+			next.resumeRows ??= {};
+			log('resume', shape, next.resumeRows[shape], cost.bytesPerRow);
+			next.resumeRows[shape] = cost.bytesPerRow;
+			matched++;
+		}
+		for (const [site, siteResult] of Object.entries(measurement.sites))
+			for (const [route, result] of Object.entries(siteResult.routes)) {
+				const key = routeKey(site, route);
+				if (!result.resumeData || !pick(key)) continue;
+				next.resumeData ??= {};
+				const value = { raw: result.resumeData.raw, gzip: result.resumeData.gzip };
+				log('resume', key, next.resumeData[key], value);
+				next.resumeData[key] = value;
+				matched++;
+			}
 	}
 	for (const [, siteResult] of Object.entries(measurement.sites)) {
 		if ((guard === 'runtime' || guard === 'all') && siteResult.runtimeModules) {

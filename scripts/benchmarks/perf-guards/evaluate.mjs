@@ -47,6 +47,12 @@ export function evaluate(measurement, anchors) {
 	}
 	if (measurement.constructGlue)
 		checkConstructGlue(measurement.constructGlue, anchors.constructGlue ?? {}, fail, note);
+	if (measurement.resumeRows)
+		checkResumeRows(measurement.resumeRows, anchors.resumeRows ?? {}, fail, note);
+	for (const [site, siteResult] of Object.entries(measurement.sites))
+		for (const [route, result] of Object.entries(siteResult.routes))
+			if (result.resumeData)
+				noteResumeData(routeKey(site, route), result.resumeData, anchors.resumeData, note);
 	for (const key of known.keys())
 		if (!seenKnown.has(key))
 			note(
@@ -371,6 +377,32 @@ function checkLocalRenames(site, references, fail, note) {
 		'G9',
 		`${site}: ${references.map((r) => `${r.file} names ${r.names.join(', ')}`).join('; ')}. A chunk that names another chunk's hashed file is re-downloaded whenever that file changes, so one edit re-fetches its importers too (a one-line shared edit re-downloaded 302 of 336 KB on the docs home page before chunks imported each other through the import map). ${INVARIANT}`,
 		`${site} chunk names`,
+	);
+}
+
+function checkResumeRows(rows, anchors, fail, note) {
+	for (const [shape, cost] of Object.entries(rows)) {
+		const anchor = anchors[shape];
+		const line = `${shape}: each row adds ${cost.bytesPerRow} B of resume data (${cost.gzipBytesPerRow} B gzip, ${cost.recordsPerRow} records)`;
+		if (anchor === undefined) {
+			fail('G13', `${line}: no anchor recorded. ${acceptHint('resume', shape)}`);
+			continue;
+		}
+		const delta = cost.bytesPerRow - anchor;
+		if (delta > BUDGETS.resumeRowGrowthBytes)
+			fail(
+				'G13',
+				`${line}, anchor ${anchor} B: +${delta} B per row (budget +${BUDGETS.resumeRowGrowthBytes} B). Every row of every list on every page pays it. ${acceptHint('resume', shape)}`,
+			);
+		else note('G13', `${line}, anchor ${anchor} B`);
+	}
+}
+
+function noteResumeData(subject, data, anchors, note) {
+	const anchor = anchors?.[subject];
+	note(
+		'G13',
+		`${subject}: resume data ${kb(data.raw)} (${kb(data.gzip)} gzip)${anchor ? `, anchor ${kb(anchor.raw)} (${kb(anchor.gzip)} gzip)` : ''}. Informational: it grows with the page.`,
 	);
 }
 
