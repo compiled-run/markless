@@ -35,7 +35,8 @@ export default box(
 
 		// A brand-new request has to render the edited component too: the nitro
 		// environment renders pages from its own module runner, and a stale runner
-		// keeps serving the old markup however often the browser reloads.
+		// keeps serving the old markup however often the browser reloads. A visit served before the
+		// watcher sees the edit reloads when its client connects, even after the reload went out.
 		const second = await browser.visit('/');
 		await expect.page.text(second, '[data-counter-added]', 'counter added', WAIT);
 		await expect.page.text(page, '[data-counter-added]', 'counter added', WAIT);

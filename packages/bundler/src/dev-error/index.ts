@@ -4,6 +4,9 @@ import type { CompilerDiagnostic, SourceSpan } from '@markless/compiler';
 export const MARKLESS_DEV_ERROR_EVENT = 'markless:dev-error';
 export const MARKLESS_DEV_ERROR_CLEAR_EVENT = 'markless:dev-error-clear';
 export const MARKLESS_DEV_ERROR_CLIENT_ID = 'virtual:markless:dev-error-client';
+// A served page names the count of edit reloads it was rendered after, so one that connects late still reloads.
+export const MARKLESS_DEV_RELOADS_EVENT = 'markless:dev-reloads';
+export const MARKLESS_DEV_RELOADS_ATTRIBUTE = 'data-markless-dev-reloads';
 
 const PLUGIN_CODE_KIND = 'markless-dev-error';
 const PLUGIN_CODE_VERSION = 1;

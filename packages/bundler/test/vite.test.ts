@@ -7,6 +7,8 @@ import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
 	MARKLESS_DEV_ERROR_CLIENT_ID,
 	MARKLESS_DEV_ERROR_EVENT,
+	MARKLESS_DEV_RELOADS_ATTRIBUTE,
+	MARKLESS_DEV_RELOADS_EVENT,
 } from '../src/dev-error/index.ts';
 import { transformTsrxModule } from '../src/rolldown.ts';
 import { createViteHmr } from '../src/vite/hmr.ts';
@@ -839,6 +841,81 @@ export function App() @{
 			'\0virtual:markless:render-data:App',
 		]);
 		expect(order).toEqual(['snapshot:\0virtual:markless:render-data:App', 'reload']);
+	});
+
+	// A page served before an edit reached the watcher, whose client connected after that edit's
+	// reload went out, never hears the reload; it says what it was served after and is told to reload.
+	test('a page served before an edit reloads when its client connects after the reload went out', async () => {
+		const filename = '/workspace/app/src/App.tsrx';
+		const listeners = new Map<string, (data: unknown, client: { send: unknown }) => void>();
+		const send = vi.fn();
+		const client = {
+			config: { consumer: 'client' },
+			hot: {
+				send,
+				on: (event: string, listener: (data: unknown, client: { send: unknown }) => void) =>
+					listeners.set(event, listener),
+			},
+			moduleGraph: {
+				getModuleById: vi.fn(),
+				invalidateModule: vi.fn(),
+				getModulesByFile: () =>
+					new Set([
+						{
+							id: filename,
+							file: filename,
+							url: '/src/App.tsrx',
+							type: 'js',
+							importers: new Set(),
+						},
+					]),
+			},
+		};
+		const nitro = {
+			config: { consumer: 'server' },
+			dispatchFetch: async (_request: Request) =>
+				new Response('<html><head></head><body><main>page</main></body></html>', {
+					headers: { 'content-type': 'text/html' },
+				}),
+		};
+		const hmr = createViteHmr({ base: '/', clientEnvironment: 'client', enabled: true });
+		hmr.configureServer({
+			config: { root: '/workspace/app' },
+			environments: { client, nitro },
+		} as never);
+		const servedAfter = async () => {
+			const html = await (await nitro.dispatchFetch(new Request('http://localhost/'))).text();
+			return new RegExp(`${MARKLESS_DEV_RELOADS_ATTRIBUTE}="(\\d+)"`).exec(html)?.[1];
+		};
+		const connect = (reloads: string | undefined) => {
+			const reply = vi.fn();
+			listeners.get(MARKLESS_DEV_RELOADS_EVENT)!(
+				{ reloads: Number(reloads) },
+				{ send: reply },
+			);
+			return reply.mock.calls.map(([message]) => message);
+		};
+
+		const stale = await servedAfter();
+		expect(stale).toBe('0');
+		expect(connect(stale)).toEqual([]);
+
+		const edit = {
+			file: filename,
+			modules: [],
+			read: async () => source.replace('{count}', '{count + 1}'),
+			timestamp: 127,
+			type: 'update',
+		} as never;
+		await hmr.hotUpdate(client as never, edit);
+		expect(send.mock.calls.filter(([message]) => message.type === 'full-reload')).toHaveLength(
+			1,
+		);
+
+		expect(connect(stale)).toEqual([{ type: 'full-reload' }]);
+		const fresh = await servedAfter();
+		expect(fresh).toBe('1');
+		expect(connect(fresh)).toEqual([]);
 	});
 
 	test('rechecks invalid files on disk when the restoring watcher event is swallowed', async () => {

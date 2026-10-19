@@ -16,6 +16,8 @@ import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
 	MARKLESS_DEV_ERROR_CLIENT_ID,
 	MARKLESS_DEV_ERROR_EVENT,
+	MARKLESS_DEV_RELOADS_ATTRIBUTE,
+	MARKLESS_DEV_RELOADS_EVENT,
 	normalizeMarklessDevError,
 	type MarklessDevErrorPayload,
 } from '../dev-error/index.ts';
@@ -62,6 +64,15 @@ export function createViteHmr(options: ViteHmrOptions) {
 	// Module ids each out-of-process runner still has to be told about, keyed by
 	// Vite environment name. Only environments with the fetch gate installed appear.
 	const unreportedInvalidations = new Map<string, Set<string>>();
+
+	// Edits that reloaded the pages, counted once each however many environment passes report one.
+	let editReloads = 0;
+	let lastReloadedEdit: string | undefined;
+	function countEditReload(edit: string) {
+		if (edit === lastReloadedEdit) return;
+		lastReloadedEdit = edit;
+		editReloads += 1;
+	}
 
 	// A pass is where this file invalidates the module graphs a render transforms
 	// from, so a server render that starts mid-pass waits for that pass to finish.
@@ -230,6 +241,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				recovered = true;
 			}
 			if (recovered) {
+				countEditReload(`recovered\0${Date.now()}`);
 				server?.environments?.[options.clientEnvironment]?.hot?.send?.({
 					type: 'full-reload',
 				});
@@ -262,7 +274,17 @@ export function createViteHmr(options: ViteHmrOptions) {
 			nextServer.httpServer?.once('close', cleanup);
 			nextServer.watcher?.once?.('close', cleanup);
 			if (options.enabled) {
-				installFetchViteClient(nextServer, options);
+				installFetchViteClient(nextServer, options, async () => {
+					await settledHotUpdate();
+					return editReloads;
+				});
+				// A page served before an edit whose client connected after that edit's reload went out.
+				nextServer.environments?.[options.clientEnvironment]?.hot?.on?.(
+					MARKLESS_DEV_RELOADS_EVENT,
+					(data: { reloads?: unknown } | undefined, client) => {
+						if (data?.reloads !== editReloads) client.send({ type: 'full-reload' });
+					},
+				);
 			}
 		},
 		transformIndexHtml() {
@@ -465,6 +487,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 		}
 
 		reloadModuleRunner();
+		countEditReload(`${ctx.file}\0${ctx.timestamp}`);
 		hot.send({
 			type: 'full-reload',
 			path: firstChangedFile(files),
@@ -495,18 +518,23 @@ function hasErrorCode(error: unknown, code: string) {
 	);
 }
 
-function installFetchViteClient(server: ViteDevServer, options: ViteHmrOptions) {
+function installFetchViteClient(
+	server: ViteDevServer,
+	options: ViteHmrOptions,
+	servedAfterReloads: () => Promise<number>,
+) {
 	for (const environment of Object.values(server.environments)) {
 		const fetchEnv = fetchableDevEnvironment(environment);
 		if (!fetchEnv) continue;
 
 		const dispatchFetch = fetchEnv.dispatchFetch.bind(fetchEnv);
 		fetchEnv.dispatchFetch = async (request) => {
+			const reloads = await servedAfterReloads();
 			const response = await dispatchFetch(request);
 			if (!response.headers.get('content-type')?.includes('text/html')) return response;
 
 			const html = await response.text();
-			const nextHtml = injectDevClients(html, options.base);
+			const nextHtml = injectDevClients(html, options.base, reloads);
 			const headers = new Headers(response.headers);
 			if (nextHtml !== html) headers.delete('content-length');
 			return new Response(nextHtml, {
@@ -518,7 +546,7 @@ function installFetchViteClient(server: ViteDevServer, options: ViteHmrOptions) 
 	}
 }
 
-export function injectDevClients(html: string, base: string) {
+export function injectDevClients(html: string, base: string, reloads?: number) {
 	if (!html) return html;
 	const tags = [
 		...(html.includes('/@vite/client')
@@ -527,7 +555,7 @@ export function injectDevClients(html: string, base: string) {
 		...(html.includes(MARKLESS_DEV_ERROR_CLIENT_ID)
 			? []
 			: [
-					`<script type="module" src="${joinURL(base, `/@id/__x00__${MARKLESS_DEV_ERROR_CLIENT_ID}`)}"></script>`,
+					`<script type="module" src="${joinURL(base, `/@id/__x00__${MARKLESS_DEV_ERROR_CLIENT_ID}`)}"${reloads === undefined ? '' : ` ${MARKLESS_DEV_RELOADS_ATTRIBUTE}="${reloads}"`}></script>`,
 				]),
 	].join('');
 	if (!tags) return html;
