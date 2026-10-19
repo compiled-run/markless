@@ -13,8 +13,8 @@ const doctrine =
 const SYMBOLS_ONLY_ALLOWLIST: Readonly<Record<string, string>> = {};
 
 const EMITTED_DOM_ORDER_WALK_ALLOWLIST: Readonly<Record<string, string>> = {
-	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 1);':
-		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
+	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 129);':
+		"The neutral emitted locator helper walks elements by compiler-recorded DOM order, counting the page's elements between the start and end comments an author's element carries.",
 };
 
 // Exact conditional sites are intentional: adding another environment decision

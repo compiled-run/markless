@@ -4,6 +4,13 @@ import { createInlineDeferTriggerSource, INLINE_DEFER_LOADER_SOURCE } from '../s
 import { renderToString } from '../src/render-to-string.ts';
 
 type Host = { readonly name: string };
+
+// The page's elements in DOM order, the way a tree walker over the container yields them.
+const elementWalker = (root: { getElementsByTagName?: (name: string) => ArrayLike<unknown> }) => {
+	const all = root.getElementsByTagName?.('*') ?? [];
+	let next = 0;
+	return { nextNode: () => all[next++] ?? null };
+};
 type Entry = { readonly target: Host; readonly isIntersecting: boolean };
 
 afterEach(() => {
@@ -45,6 +52,7 @@ function boot(options: { readonly startsRuntime?: boolean } = {}) {
 				getAttribute: (name: string) =>
 					name === 'data-markless-resume-module' ? '/build/resume.js' : null,
 			},
+			createTreeWalker: elementWalker,
 		},
 		FakeObserver,
 		load,

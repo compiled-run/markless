@@ -4,7 +4,7 @@ import {
 	missingElementLocatorError,
 	runtimeResumeError,
 } from './inline/resume-errors.ts';
-import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { isArmBranchAnchorComment, pageCommentCensus } from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -92,7 +92,9 @@ export function registerServedArmEventRecords(
 	}
 	return painted.size
 		? {
-				eventNames: [...new Set([...painted.values()].flat().map((record) => record.eventName))],
+				eventNames: [
+					...new Set([...painted.values()].flat().map((record) => record.eventName)),
+				],
 				claim: (target) => claimPaintedArmHosts(target, painted, register),
 			}
 		: undefined;
@@ -119,17 +121,28 @@ function claimPaintedArmHosts(
 ): void {
 	const chain: SiblingNode[] = [];
 	const path: number[] = [];
-	for (let node = target as SiblingNode | null | undefined; node && painted.size; node = node.parentNode) {
+	for (
+		let node = target as SiblingNode | null | undefined;
+		node && painted.size;
+		node = node.parentNode
+	) {
 		chain.unshift(node);
 		let offset = 0;
-		for (let sibling = node.previousSibling; sibling; sibling = sibling.previousSibling, offset++) {
+		for (
+			let sibling = node.previousSibling;
+			sibling;
+			sibling = sibling.previousSibling, offset++
+		) {
 			// An arm closed before this node cannot match: its records' first index is below the offset.
 			const data = sibling.nodeType === 8 ? sibling.data! : '';
 			if (painted.has(data)) {
 				const armPath = [offset, ...path];
 				const left = painted.get(data)!.filter((record) => {
 					const host = chain[record.hostPath.length - 1];
-					if (!record.hostPath.every((index, at) => armPath[at] === index) || host?.nodeType !== 1)
+					if (
+						!record.hostPath.every((index, at) => armPath[at] === index) ||
+						host?.nodeType !== 1
+					)
 						return true;
 					register(host, { hostNodeId: '', ...record });
 					return false;
@@ -149,17 +162,6 @@ type ServedBranchArm = {
 		}
 	>;
 };
-
-function pageCommentCensus(root: ResumeDomElement): ReadonlyArray<ResumeDomComment> {
-	// Arm-branch anchors index in their boundary's own census, never here.
-	const comments: ResumeDomComment[] = [];
-	(function visit(node: ResumeDomNode): void {
-		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
-			comments.push(node as ResumeDomComment);
-		for (const child of node.childNodes ?? []) visit(child);
-	})(root);
-	return comments;
-}
 
 type ArmMaterializeInput = {
 	readonly root: ResumeDomElement;

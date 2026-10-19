@@ -1,6 +1,7 @@
 import {
 	CONTAINER_ATTRIBUTE,
 	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 } from '@markless/web/fns/container-region';
 
@@ -30,6 +31,13 @@ function containerPageEnd(host: Node) {
 	return undefined;
 }
 
+function containerPageStart(host: Node) {
+	for (let node = host.firstChild; node; node = node.nextSibling)
+		if (node.nodeType === 8 && (node as Comment).data === PROTOCOL_CONTAINER_START_COMMENT)
+			return node as Comment;
+	return undefined;
+}
+
 // Each page gets a fresh copy of the author's element, so nothing the last page attached survives.
 function authorElementTarget(document: Document, host: Element) {
 	const copy = () => {
@@ -46,9 +54,20 @@ function authorElementTarget(document: Document, host: Element) {
 			const next = children.length === 1 && children[0] === holder ? holder : copy();
 			if (next !== holder) next.append(...children);
 			const end = containerPageEnd(host)!;
+			const focused = document.activeElement as HTMLElement | null;
+			const start = containerPageStart(host);
+			if (start) {
+				const before: Node[] = [];
+				for (let node = host.firstChild; node !== start; node = node!.nextSibling)
+					before.push(node!);
+				next.prepend(...before, document.createComment(PROTOCOL_CONTAINER_START_COMMENT));
+			}
 			next.append(document.createComment(PROTOCOL_CONTAINER_END_COMMENT));
 			while (end.nextSibling) next.append(end.nextSibling);
 			host.replaceWith(next);
+			// The document's own nodes moved to the new element; focus inside them stays put.
+			if (focused && focused !== document.activeElement && next.contains(focused))
+				focused.focus({ preventScroll: true });
 		},
 	};
 }

@@ -32,7 +32,50 @@ const documentWith = (body: string) =>
 const chromeDocument = documentWith(
 	'<body>{children}<aside data-chrome><input data-chrome-field value="" /></aside></body>',
 );
-const leadingDocument = documentWith('<body><nav data-chrome>Site</nav>{children}</body>');
+// The common layout: site chrome before and after the page, in the same element.
+const leadingFiles = {
+	'document.tsrx': documentWith(
+		'<body><header data-site><a href="/" data-nav="home">Home</a><a href="/other" data-nav="other">Other</a><a href="/slow" data-nav="slow">Slow</a><button type="button" data-site-button>Menu</button></header>{children}<footer data-site-footer>Site footer</footer></body>',
+	),
+	'pages/index.tsrx': [
+		"import { state } from '@markless/core';",
+		'export default function Home() @{',
+		'\tlet count = state(0);',
+		'\t<main data-page="home"><button type="button" data-bump onClick={() => count++}>Bump</button><output data-count>{count}</output></main>',
+		'\t<aside data-page-aside>home aside</aside>',
+		'}',
+	].join('\n'),
+	'pages/other.tsrx': [
+		"import { state } from '@markless/core';",
+		'export default function Other() @{',
+		'\tlet taps = state(0);',
+		'\t<main data-page="other"><button type="button" data-tap onClick={() => taps++}>Tap</button><output data-taps>{taps}</output></main>',
+		'}',
+	].join('\n'),
+	'pages/slow.tsrx': [
+		"import { computed, state } from '@markless/core';",
+		'export default function Slow() @{',
+		'\tlet taps = state(0);',
+		'\tconst report = computed(async () => {',
+		'\t\tawait new Promise((resolve) => setTimeout(resolve, 300));',
+		"\t\treturn { text: 'report ready' };",
+		'\t});',
+		'\t<main data-page="slow">',
+		'\t\t<button type="button" data-tap onClick={() => taps++}>Taps {taps}</button>',
+		'\t\t@try {',
+		'\t\t\t<p data-settled>{report.text} <button type="button" data-settled-tap onClick={() => taps++}>more</button></p>',
+		'\t\t} @pending {',
+		'\t\t\t<p data-pending>loading report</p>',
+		'\t\t} @catch {',
+		'\t\t\t<p data-failed>report failed</p>',
+		'\t\t}',
+		'\t\t<output data-taps>{taps}</output>',
+		'\t</main>',
+		'}',
+	].join('\n'),
+	'public/site.css':
+		'body > header:first-child { color: rgb(1, 2, 3); }\nheader + main { color: rgb(4, 5, 6); }\nbody > main { background-color: rgb(9, 9, 9); }\nbody > footer:last-of-type { color: rgb(7, 8, 9); }\n',
+};
 
 type App = { readonly origin: string; readonly close: () => Promise<void> };
 
@@ -89,7 +132,7 @@ beforeAll(async () => {
 	[plain, chrome, leading, prerendered] = await Promise.all([
 		serve('page-region'),
 		serve('page-region-chrome', chromeFiles),
-		serve('page-region-leading', { 'document.tsrx': leadingDocument }),
+		serve('page-region-leading', leadingFiles),
 		serve('page-region-prerendered', chromeFiles, true),
 	]);
 }, 240_000);
@@ -241,14 +284,100 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('document content before the page keeps the page in its own container', async () => {
+		// What the site's CSS sees around the page: the document's header first, its footer last.
+		async function expectLeadingShape(page: Page, pageElements: readonly string[]) {
+			expect(await bodyShape(page)).toEqual(['header', ...pageElements, 'footer']);
+			expect(await page.locator('div[data-async-container]').count()).toBe(0);
+			expect(await page.locator('[data-markless-route-holder]').count()).toBe(0);
+			expect(await page.locator('body > main').count()).toBe(1);
+			expect(await color(page, 'header[data-site]')).toBe('rgb(1, 2, 3)');
+			expect(await color(page, 'main')).toBe('rgb(4, 5, 6)');
+			expect(
+				await page
+					.locator('main')
+					.evaluate((element) => getComputedStyle(element).backgroundColor),
+			).toBe('rgb(9, 9, 9)');
+			expect(await color(page, 'footer[data-site-footer]')).toBe('rgb(7, 8, 9)');
+		}
+
+		const markSiteChrome = (page: Page) =>
+			page.evaluate(() => {
+				const site = window as { __header?: Element; __menu?: number };
+				site.__header = document.querySelector('[data-site]')!;
+				site.__menu = 0;
+				document
+					.querySelector('[data-site-button]')!
+					.addEventListener('click', () => site.__menu!++);
+			});
+
+		const siteChromeKept = (page: Page) =>
+			page.evaluate(() => {
+				const site = window as { __header?: Element; __menu?: number };
+				(document.querySelector('[data-site-button]') as HTMLElement).click();
+				return site.__header === document.querySelector('[data-site]') && site.__menu === 1;
+			});
+
+		test('document content before the page leaves the page as body children and resumes', async () => {
 			const { page, errors } = await open(browser, `${leading.origin}/`);
-			expect(await bodyShape(page)).toEqual(['nav', 'div']);
-			expect(await page.locator('body > div[data-async-container] > header').count()).toBe(1);
+			await expectLeadingShape(page, ['main', 'aside']);
 			await page.locator('[data-bump]').click();
-			await expect.poll(() => page.locator('[data-count]').textContent()).toBe('1');
+			await page.locator('[data-bump]').click();
+			await expect.poll(() => page.locator('[data-count]').textContent()).toBe('2');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a fragment swap replaces only the page between the document content', async () => {
+			const { page, errors, requests } = await open(browser, `${leading.origin}/`);
+			await markSiteChrome(page);
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
+			await expectLeadingShape(page, ['main']);
+			expect(await page.locator('[data-page-aside]').count()).toBe(0);
+			expect(await siteChromeKept(page)).toBe(true);
+			await page.locator('[data-tap]').click();
+			await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('1');
+			await page.locator('[data-nav="home"]').click();
+			await landedOn(page, 'home');
+			await expectLeadingShape(page, ['main', 'aside']);
+			await page.locator('[data-bump]').click();
+			await expect.poll(() => page.locator('[data-count]').textContent()).toBe('1');
+			expect(requests).toContain('/other fragment');
+			expect(requests.filter((request) => request === '/')).toHaveLength(1);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a streamed @pending page between document content settles and resumes', async () => {
+			const { page, errors } = await open(browser, `${leading.origin}/slow`);
+			await expectLeadingShape(page, ['main']);
+			await page.locator('[data-settled]').waitFor();
+			await page.locator('[data-tap]').click();
+			await page.locator('[data-settled-tap]').click();
+			await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('2');
+			expect(await bodyShape(page)).toEqual(['header', 'main', 'footer']);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a fragment swap to a streamed @pending page keeps the document content', async () => {
+			const { page, errors } = await open(browser, `${leading.origin}/`);
+			await markSiteChrome(page);
+			await page.locator('[data-nav="slow"]').click();
+			await landedOn(page, 'slow');
+			await page.locator('[data-settled]').waitFor();
+			await expectLeadingShape(page, ['main']);
+			expect(await siteChromeKept(page)).toBe(true);
+			await page.locator('[data-settled-tap]').click();
+			await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('1');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a client render of a hash route between document content keeps its shape', async () => {
+			const { page, errors } = await open(browser, `${leading.origin}/#/other`);
+			await landedOn(page, 'other');
+			await expectLeadingShape(page, ['main']);
 			await page.locator('[data-tap]').click();
 			await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('1');
 			expect(errors).toEqual([]);

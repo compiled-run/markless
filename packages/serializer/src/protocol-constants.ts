@@ -18,14 +18,12 @@ export const PROTOCOL_EVENT_ACTION_KIND = {
 } as const;
 
 // Element-owned trigger events no DOM listener raises; own module so browser resume imports only these.
-export {
-	PROTOCOL_IDLE_EVENT_NAME,
-	PROTOCOL_VISIBLE_EVENT_NAME,
-} from './protocol-event-names.ts';
+export { PROTOCOL_IDLE_EVENT_NAME, PROTOCOL_VISIBLE_EVENT_NAME } from './protocol-event-names.ts';
+export { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from './protocol-locator-paths.ts';
 export {
 	PROTOCOL_CONTAINER_END_COMMENT,
-	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
-} from './protocol-locator-paths.ts';
+	PROTOCOL_CONTAINER_START_COMMENT,
+} from './protocol-page-markers.ts';
 export { PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE } from './protocol-sync-policy-host.ts';
 
 export const ASYNC_BOUNDARY_ARM_MIN = 0;

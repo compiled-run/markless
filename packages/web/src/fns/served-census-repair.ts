@@ -1,5 +1,6 @@
 import { PROTOCOL_LOCATOR_PATHS_DIGITS } from '../../../serializer/src/protocol-locator-paths-format.ts';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../../serializer/src/protocol-locator-paths.ts';
+import { pageNodes } from '../resume-anchor-census.ts';
 
 type ShiftedRoot = Element & {
 	__marklessCensus?: Array<Element | null>;
@@ -66,10 +67,11 @@ export function marklessRepairCensus(root: ShiftedRoot): void {
 	const { count, entries } = decodeLocatorPaths(value);
 	const taken = new Set(live);
 	const located = new Map<number, Element>([[0, root]]);
+	const pageChildren = servedPageChildren(root);
 	const served = new Map<Element | null, number>([[root, 0]]);
 	const reserved = new Set<number>();
 	for (const { index, parent, siblings, child, tag } of entries) {
-		const children = located.get(parent)?.children ?? [];
+		const children = parent ? (located.get(parent)?.children ?? []) : pageChildren;
 		// More children than served means insertions, so the match can only sit further right; fewer, further left.
 		const extra = children.length - siblings;
 		reserved.add(index);
@@ -97,4 +99,9 @@ export function marklessRepairCensus(root: ShiftedRoot): void {
 	}
 	live.length = 0;
 	for (const element of census) live.push(element);
+}
+
+/** The container's element children that are the page's, where served child places count. */
+export function servedPageChildren(root: Element): Element[] {
+	return pageNodes<Node>(root).filter((node): node is Element => node.nodeType === 1);
 }

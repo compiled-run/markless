@@ -3,6 +3,10 @@ import {
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '../../../serializer/src/protocol-event-names.ts';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../../serializer/src/protocol-locator-paths.ts';
+import {
+	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_CONTAINER_START_COMMENT,
+} from '../../../serializer/src/protocol-page-markers.ts';
 
 /** Test seam: a root (or its prototype) may carry a clock that replaces the browser's frame and idle scheduling. */
 export type MarklessDeferClock = {
@@ -54,6 +58,8 @@ export type MarklessDefer = ((
  */
 export function createMarklessDefer(
 	loadModule: (url: string) => Promise<DeferModule>,
+	pageStart: string,
+	pageEnd: string,
 	pathsAttribute?: string,
 ): MarklessDefer {
 	const scope = globalThis as typeof globalThis & {
@@ -70,6 +76,16 @@ export function createMarklessDefer(
 						? requestIdleCallback(run, { timeout: 2000 })
 						: setTimeout(run, 200),
 		};
+	// The page's elements only: an author's element as the container marks where the page starts and ends.
+	const census = (root: DeferRoot): Element[] => {
+		const live: Element[] = [root];
+		const walker = document.createTreeWalker(root, 129);
+		for (let next = walker.nextNode(); next; next = walker.nextNode())
+			if (next.nodeType !== 8) live.push(next as Element);
+			else if ((next as Comment).data === pageStart) live.length = 1;
+			else if ((next as Comment).data === pageEnd) break;
+		return live;
+	};
 	const idle = (root: DeferRoot, run: () => void) => {
 		const clock = clockOf(root);
 		// Records an arm is still registering would leave the event unmatched, so wait one more idle period.
@@ -105,7 +121,7 @@ export function createMarklessDefer(
 				return idle(root, () => claim(host));
 			claimed.add(host);
 			if (lane !== 'visible') fired.add(host);
-			root.__marklessCensus ||= [root, ...root.getElementsByTagName('*')];
+			root.__marklessCensus ||= census(root);
 			root.__marklessDelegatedDispatch ||= eventName;
 			pending++;
 			(queue
@@ -120,14 +136,14 @@ export function createMarklessDefer(
 					root.__marklessDelegatedDispatch = undefined;
 			});
 		};
-		const all = root.getElementsByTagName('*');
+		const all = (root.__marklessCensus as Element[] | undefined) ?? census(root);
 		const paths = pathsAttribute && root.getAttribute?.(pathsAttribute);
-		if (paths && parseInt(paths) !== all.length + 1) root.__marklessShifted = 1;
+		if (paths && parseInt(paths) !== all.length) root.__marklessShifted = 1;
 		// A page a script outside Markless changed hands the container to the runtime, which finds each host by its record.
 		const hosts = root.__marklessShifted
 			? [root]
 			: hostIndexes.flatMap((index) => {
-					const host = index ? all[index - 1] : root;
+					const host = all[index];
 					return host ? [host] : [];
 				});
 		if (lane === 'idle') return idle(root, () => hosts.forEach(claim));
@@ -147,7 +163,7 @@ export const INLINE_DEFER_LOADER_SOURCE = '(url) => import(/* @vite-ignore */ ur
 
 /** An expression that installs the helper once per document and evaluates to it; a build passes the factory minified. */
 export function inlineDeferSource(factory = createMarklessDefer.toString()): string {
-	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)}))`;
+	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE},${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)},${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)}))`;
 }
 
 /** One lane's registration, appended only to a served page whose records name that lane's event. */
@@ -165,6 +181,10 @@ let moduleDefer: MarklessDefer | undefined;
 export function marklessDefer(): MarklessDefer {
 	return (
 		(globalThis as typeof globalThis & { __mDefer?: MarklessDefer }).__mDefer ??
-		(moduleDefer ||= createMarklessDefer((url) => import(/* @vite-ignore */ url)))
+		(moduleDefer ||= createMarklessDefer(
+			(url) => import(/* @vite-ignore */ url),
+			PROTOCOL_CONTAINER_START_COMMENT,
+			PROTOCOL_CONTAINER_END_COMMENT,
+		))
 	);
 }

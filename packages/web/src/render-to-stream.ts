@@ -8,6 +8,8 @@ import {
 	type ProtocolSyncPolicyCondition,
 } from '@markless/serializer';
 import {
+	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
 	type ProtocolArmRecordSet,
 } from '@markless/serializer/protocol';
@@ -360,8 +362,16 @@ function renderArmAppend(
 // A streamed arm can land after the page changed state, so its branches name the arm this render painted.
 function withPaintedBranchArms(armRecords: object, output: SsrRenderOutput): object {
 	const painted = new Map(
-		((output as { readonly servedBranches?: ReadonlyArray<{ readonly id: string; readonly takenArm: number }> })
-			.servedBranches ?? []).map((branch) => [branch.id, branch.takenArm]),
+		(
+			(
+				output as {
+					readonly servedBranches?: ReadonlyArray<{
+						readonly id: string;
+						readonly takenArm: number;
+					}>;
+				}
+			).servedBranches ?? []
+		).map((branch) => [branch.id, branch.takenArm]),
 	);
 	const branches = (armRecords as { readonly branches?: ReadonlyArray<{ readonly id: string }> })
 		.branches;
@@ -514,9 +524,12 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 	if (root && root.__mArmLive && root.__mArmLive(id)) return;
 	if (root && root.__mAdopted) return;
-	if (root && !root.__marklessCensus && root.getElementsByTagName) {
-		const c = [root], all = root.getElementsByTagName('*');
-		for (let i = 0; i < all.length; i++) c.push(all[i]);
+	if (root && !root.__marklessCensus) {
+		const c = [root], cw = d.createTreeWalker(root, 129);
+		for (let x; (x = cw.nextNode());)
+			if (x.nodeType !== 8) c.push(x);
+			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)}) c.length = 1;
+			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)}) break;
 		root.__marklessCensus = c;
 	}
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);

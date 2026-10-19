@@ -1,5 +1,5 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
-import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { pageCommentCensus } from './resume-anchor-census.ts';
 import type {
 	ResumeBehaviorRecord,
 	ResumeBranchRecord,
@@ -444,7 +444,7 @@ function materializeBranchLocators(
 	branches: NonNullable<ResumeViewRecord['branches']>,
 ): Array<RegisteredResumeBranch> {
 	const records: RegisteredResumeBranch[] = [],
-		comments = walkComments(root);
+		comments = pageCommentCensus(root);
 	for (const branch of branches) {
 		if (!branch.symbolId || !branch.testReads?.length) {
 			if (!isDecidedBranch(branch)) continue;
@@ -509,17 +509,6 @@ function rowEventHost(
 		if (!current) return;
 	}
 	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
-}
-
-function walkComments(root: ResumeDomElement): ResumeDomComment[] {
-	// Arm-branch anchors index in their boundary's own census, never here.
-	const comments: ResumeDomComment[] = [];
-	(function visit(node: ResumeDomNode): void {
-		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
-			comments.push(node as ResumeDomComment);
-		for (const child of node.childNodes ?? []) visit(child);
-	})(root);
-	return comments;
 }
 
 function missingCommentAnchorError(

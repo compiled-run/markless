@@ -16,10 +16,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Lean scalar payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/event-resume.ts :: const text = script?.textContent ?? script?.text ?? script?.innerHTML;':
 		'Event payload decoding accepts innerHTML only as a legacy script-text fallback.',
-	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 1);':
-		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
 	'packages/web/src/fns/row-component-mint.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
-		"A client-minted row censuses the compiler-emitted branch anchors in the fragment it just built, before the row joins the page.",
+		'A client-minted row censuses the compiler-emitted branch anchors in the fragment it just built, before the row joins the page.',
 	'packages/web/src/fns/streamed-arms.ts :: for (const patch of document.querySelectorAll(STATE_PATCH))':
 		'Streamed-arm adoption reads dependency edges from the inert state-patch scripts the server emitted.',
 	'packages/web/src/fns/streamed-arms.ts :: html: arm.innerHTML,':
@@ -34,8 +32,6 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The prerender log summary counts module-preload links and does not locate components.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
 		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
-	'packages/web/src/inline/served-census.ts :: const walker = document.createTreeWalker(root, 1);':
-		'The inline boots census the container in DOM order and flag a count the server did not serve.',
 	'packages/web/src/payload-document-common.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
 		'Shared payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/payload.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
@@ -44,18 +40,12 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Stream debug code maps compiler-recorded locators across elements and comments.',
 	'packages/web/src/render-to-stream.ts :: const w = d.createTreeWalker(d.body, 128);':
 		'The streamed-arm executor finds its compiler-emitted boundary comment anchors.',
-	'packages/web/src/resume-arm-records.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
-		'CSR mount maps serialized boundary indexes to compiler-emitted comment anchors before the runtime starts.',
 	'packages/web/src/resume-arm-records.ts :: if (within && node.nodeType === 8 && isArmBranchAnchorComment(node as ResumeDomComment)) {':
 		'Arm-record adoption censuses compiler-emitted branch anchors within an explicit range.',
 	"packages/web/src/resume-arm-records.ts :: const data = sibling.nodeType === 8 ? sibling.data! : '';":
 		"A CSR event's own target claims a painted arm's hosts: it reads only the target's ancestors and their preceding siblings for the arm's start anchor, never the page.",
-	'packages/web/src/resume-async-boundaries.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
-		'Async-boundary adoption maps serialized indexes to compiler-emitted comment anchors.',
 	'packages/web/src/resume-branches.ts :: (value as { readonly nodeType?: number }).nodeType === 8':
 		'Branch adoption validates that a supplied live anchor is a comment node.',
-	'packages/web/src/resume-branches.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
-		'Branch adoption maps serialized indexes to compiler-emitted comment anchors.',
 	'packages/web/src/resume-census.ts :: const walker = (node as Node).ownerDocument?.createTreeWalker?.(node as Node, 1);':
 		'The pinned locator census walks elements in the compiler-recorded DOM order fns/dom-order shares.',
 	'packages/web/src/resume-stream-patches.ts :: const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);':
@@ -64,8 +54,30 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The resume host-document surface declares the narrow script-query capability it consumes.',
 	'packages/web/src/resume.ts :: const live = start?.nodeType === 8 && end?.nodeType === 8;':
 		'Async-boundary adoption validates caller-supplied live comment anchors.',
-	'packages/web/src/resume.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
-		'Async-boundary adoption maps serialized indexes to compiler-emitted comment anchors.',
+	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 129);':
+		"The neutral emitted locator helper walks elements by compiler-recorded DOM order, counting the page's elements between the start and end comments an author's element carries.",
+	'packages/web/src/fns/dom-order.ts :: if (n.nodeType !== 8) c.push(n);':
+		'The emitted locator census tells the page start and end comments from the elements it counts.',
+	'packages/web/src/inline/defer.ts :: const walker = document.createTreeWalker(root, 129);':
+		"The deferred-trigger helper censuses the container in DOM order to reach its compiler-emitted host indexes, counting the page's elements between the start and end comments an author's element carries.",
+	'packages/web/src/inline/defer.ts :: if (next.nodeType !== 8) live.push(next as Element);':
+		'The deferred-trigger census tells the page start and end comments from the elements it counts.',
+	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 129);':
+		"The overlay primer pins the container's DOM-order census before a dismissal moves it, counting the page's elements between the start and end comments an author's element carries.",
+	'packages/web/src/inline/resumer.ts :: if (next.nodeType !== 8) census.push(next as Element);':
+		'The overlay primer census tells the page start and end comments from the elements it counts.',
+	'packages/web/src/inline/served-census.ts :: const walker = document.createTreeWalker(root, 129);':
+		"The inline boots census the container in DOM order and flag a count the server did not serve, counting the page's elements between the start and end comments an author's element carries.",
+	'packages/web/src/inline/served-census.ts :: if (next.nodeType !== 8) live.push(next as Element);':
+		'The inline census tells the page start and end comments from the elements it counts.',
+	'packages/web/src/render-to-stream.ts :: const c = [root], cw = d.createTreeWalker(root, 129);':
+		"The streamed-arm executor pins the container's DOM-order census before an arm commit moves it, counting the page's elements between the start and end comments an author's element carries.",
+	'packages/web/src/render-to-stream.ts :: if (x.nodeType !== 8) c.push(x);':
+		'The streamed-arm census tells the page start and end comments from the elements it counts.',
+	'packages/web/src/resume-anchor-census.ts :: const data = child.nodeType === 8 ? (child as { data?: string }).data : undefined;':
+		"The page's top-level nodes are found by the start and end comments among the container's own children.",
+	'packages/web/src/resume-anchor-census.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
+		"Async-boundary and branch adoption map serialized indexes to compiler-emitted comment anchors among the page's nodes.",
 };
 
 type SourceMatch = {

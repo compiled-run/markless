@@ -48,27 +48,35 @@ the page its GET.
 ## Page placement
 
 The page's markup lands where the document's `{children}` sits, with no element
-of the router's own around it. When `{children}` is the first thing inside an
-element that can hold any content (normally `<body>`), that element is the
-page's resume container: the page's top-level elements are its own children, it
-carries the container attributes, and a `<!--markless:page-end-->` comment
-(`PROTOCOL_CONTAINER_END_COMMENT`) closes the page's nodes, so document content
-after `{children}` stays in place and is never counted as the page's. A site's
-`body > footer`, `body > header:first-child` and sibling selectors between the
-page's own parts keep matching on the landing, after a navigation swap and
-after a client render of a `#/` route.
+of the router's own around it. When `{children}` sits inside an element that can
+hold any content (normally `<body>`), that element is the page's resume
+container: the page's top-level elements are its own children and it carries
+the container attributes. A `<!--markless:page-end-->` comment
+(`PROTOCOL_CONTAINER_END_COMMENT`) closes the page's nodes, and when document
+content precedes `{children}` in that element (`<body><header />{children}
+<footer /></body>`) a `<!--markless:page-start-->` comment
+(`PROTOCOL_CONTAINER_START_COMMENT`) opens them. Document content on either side
+stays where the author wrote it and is never counted as the page's: every
+position resume reads counts from the start comment. A site's `body > main`,
+`header + main`, `body > footer` and sibling selectors between the page's own
+parts keep matching on the landing, after a navigation swap and after a client
+render of a `#/` route.
 
 - The page's payload and resumer scripts follow its last element, so `+` and
   `:last-child` between the page's last element and what follows it see those
   scripts.
-- Document content before `{children}` inside the same element (`<body><nav />
-  {children}</body>`) would shift every page element the browser finds by its
-  position, which built resume modules record, so that page keeps a
-  `<div data-async-container>` around it.
+- Only whitespace before `{children}` writes no start comment. Any other
+  element `{children}` sits in (a `<ul>`, a `<p>`) keeps a
+  `<div data-async-container>` around the page.
+- A navigation response carries only the page and the start comment, never the
+  document content before it.
 - A navigation swap replaces the container element with a fresh one, so
   nothing the leaving page attached to it survives. Attributes a script set on
-  it, and the nodes after the page-end comment, move to the new one; a script
-  holding a reference to the old `<body>` element holds a detached one.
+  it, and the document's nodes before the start comment and after the end
+  comment, move to the new one: they are the same nodes, so their listeners and
+  state stay, and focus inside them is put back. A script holding a reference to
+  the old `<body>` element holds a detached one, and an `<iframe>` among the
+  moved nodes reloads.
 
 ## Page request and response
 

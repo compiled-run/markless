@@ -10,6 +10,7 @@ import {
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
 } from './inline/resume-errors.ts';
+import { pageNodes } from './resume-anchor-census.ts';
 import { censusElements, spliceCensus } from './resume-census.ts';
 import { qualifiedElementHandleId } from './resume-handle-qualifier.ts';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../serializer/src/protocol-locator-paths.ts';
@@ -19,7 +20,11 @@ export function materializeDomLocators(
 	locators: ResumeViewRecord['locators'],
 ): Map<string, ResumeDomElement> {
 	// The root shares a pinned census with wake chunks without adding an import edge.
-	const elements = (root.__marklessCensus ??= censusElements([root]) as ResumeDomElement[]),
+	const elements = (root.__marklessCensus ??= (
+			root.nodeType === 1
+				? [root, ...censusElements(pageNodes(root))]
+				: censusElements([root])
+		) as ResumeDomElement[]),
 		byHostId = new Map<string, ResumeDomElement>();
 	for (const locator of locators) {
 		const element = elements[locator.index];
@@ -33,7 +38,8 @@ export function materializeDomLocators(
 			? mismatchedElementLocatorError(locator, actual!)
 			: missingElementLocatorError(locator);
 		// Paths are measured off the served html, so a mismatch under them means the page changed since.
-		if (!(root as unknown as Element).getAttribute?.(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)) throw error;
+		if (!(root as unknown as Element).getAttribute?.(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE))
+			throw error;
 		// A script outside Markless took this host: drop it alone so every other host still resumes.
 		if (!import.meta.env?.DEV) globalThis.reportError?.(error);
 		else

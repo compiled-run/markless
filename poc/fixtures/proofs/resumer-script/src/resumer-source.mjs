@@ -32,12 +32,15 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	pressTimePath: 14,
 	// Paired OXC builds measured 1,312 -> 1,329: a press whose host left the page with a redrawn ancestor is dropped.
 	detachedHostDrop: 17,
+	// Paired OXC builds measured 1,329 -> 1,384: the census counts only the page's elements between the start and end comments an author's element carries around them.
+	pageMarkers: 55,
 	gzipCrossTerm: 3,
 };
 
-export const EVENT_ONLY_RESUMER_TARGET_BYTES = Object.values(
-	EVENT_ONLY_RESUMER_ATTRIBUTION,
-).reduce((total, bytes) => total + bytes, 0);
+export const EVENT_ONLY_RESUMER_TARGET_BYTES = Object.values(EVENT_ONLY_RESUMER_ATTRIBUTION).reduce(
+	(total, bytes) => total + bytes,
+	0,
+);
 
 // The proof-of-concept source below stays gated on the budget it was written to.
 export const POC_EVENT_ONLY_RESUMER_TARGET_BYTES = 700;

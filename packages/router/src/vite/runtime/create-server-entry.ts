@@ -26,6 +26,7 @@ import { CONTAINER_RETIRE_PROPERTY } from '@markless/web/render-to-string';
 import {
 	CONTAINER_ATTRIBUTE,
 	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 } from '@markless/web/fns/container-region';
 import {
@@ -1018,6 +1019,7 @@ function fragmentConfig(
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,
 		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,
+		pageStartComment: PROTOCOL_CONTAINER_START_COMMENT,
 		containerAttributes: [CONTAINER_ATTRIBUTE, PROTOCOL_LOCATOR_PATHS_ATTRIBUTE],
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,

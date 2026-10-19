@@ -2,6 +2,10 @@ import { chromium } from '@playwright/test';
 import { expect, test } from 'vitest';
 import { censusElements } from '../src/resume-census.ts';
 import { marklessFindElementAtDomOrderIndex } from '../src/fns/dom-order.ts';
+import {
+	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_CONTAINER_START_COMMENT,
+} from '../../serializer/src/protocol-page-markers.ts';
 
 // The recursive childNodes walk the census used before it took the native walker.
 function recursiveCensus(nodes: ArrayLike<Node>): Node[] {
@@ -24,9 +28,13 @@ test('the native census pins the same root-first order as the recursive walk and
 		const page = await browser.newPage();
 		await page.setContent('<!doctype html><body></body>');
 		const mismatches = await page.evaluate(
-			({ census, domOrder, recursive }) => {
+			({ census, domOrder, recursive, markers }) => {
 				const censusElements = new Function(`return ${census}`)() as PageCensus;
-				const findAt = new Function(`return ${domOrder}`)() as PageDomOrder;
+				// The transform reads the marker constants off an import binding the page lacks.
+				const findAt = new Function(
+					'markers',
+					`return ${domOrder.replace(/__vite_ssr_import_\d+__/g, 'markers')}`,
+				)(markers) as PageDomOrder;
 				const reference = new Function(`return ${recursive}`)() as PageCensus;
 				let seed = 7;
 				const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -83,6 +91,27 @@ test('the native census pins the same root-first order as the recursive walk and
 						fragmentExpected.some((node, index) => node !== fragmentCensus[index])
 					)
 						failures.push(`fragment ${trial}`);
+					// An author's element as the container: only the nodes between the markers are the page's.
+					const host = document.createElement('body') as HTMLElement & {
+						__marklessCensus?: Node[];
+					};
+					grow(host, 2);
+					const start = host.appendChild(
+						document.createComment(markers.PROTOCOL_CONTAINER_START_COMMENT),
+					);
+					grow(host, 0);
+					const end = host.appendChild(
+						document.createComment(markers.PROTOCOL_CONTAINER_END_COMMENT),
+					);
+					grow(host, 2);
+					const page: Node[] = [];
+					for (let node = start.nextSibling; node !== end; node = node!.nextSibling)
+						page.push(node!);
+					const pageExpected = [host, ...reference(page)];
+					if (pageExpected.some((node, index) => findAt(host, index) !== node))
+						failures.push(`page markers ${trial}`);
+					if (host.__marklessCensus!.length !== pageExpected.length)
+						failures.push(`page marker count ${trial}`);
 				}
 				return failures;
 			},
@@ -90,6 +119,7 @@ test('the native census pins the same root-first order as the recursive walk and
 				census: censusElements.toString(),
 				domOrder: marklessFindElementAtDomOrderIndex.toString(),
 				recursive: recursiveCensus.toString(),
+				markers: { PROTOCOL_CONTAINER_START_COMMENT, PROTOCOL_CONTAINER_END_COMMENT },
 			},
 		);
 		expect(mismatches).toEqual([]);

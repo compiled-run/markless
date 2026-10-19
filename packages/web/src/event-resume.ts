@@ -4,6 +4,7 @@ import {
 	type ProtocolViewPayload,
 } from '@markless/serializer/protocol';
 import { marklessAttributeValue } from './dom-attribute.ts';
+import { pageNodes } from './resume-anchor-census.ts';
 import { marklessControlWriteHeld, marklessNoteControlEdits } from './control-edit-hold.ts';
 import type {
 	DomJournalEntry,
@@ -387,7 +388,12 @@ async function dispatchEvent(input: {
 			// did when the innermost match was the only record that ever ran.
 			if (!protocolEventDispatchesMarkless(matched.eventRecord)) return;
 			if (stopAfterElement && matched.element !== stopAfterElement) return;
-			await runEventRecord(input, matched.element, matched.eventRecord, propagation.stoppedImmediate);
+			await runEventRecord(
+				input,
+				matched.element,
+				matched.eventRecord,
+				propagation.stoppedImmediate,
+			);
 			if (propagation.stoppedImmediate()) return;
 			if (propagation.stopped()) stopAfterElement = matched.element;
 		}
@@ -564,12 +570,12 @@ function materializeDomLocators(
 }
 
 function collectElements(root: EventResumeDomElement): EventResumeDomElement[] {
-	const elements: EventResumeDomElement[] = [];
+	const elements: EventResumeDomElement[] = root.nodeType === 1 ? [root] : [];
 	const visit = (node: EventResumeDomNode): void => {
 		if (node.nodeType === 1) elements.push(node as EventResumeDomElement);
 		for (const child of Array.from(node.childNodes ?? [])) visit(child);
 	};
-	visit(root);
+	for (const child of pageNodes(root)) visit(child);
 	return elements;
 }
 

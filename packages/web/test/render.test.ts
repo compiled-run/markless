@@ -2598,7 +2598,8 @@ test('renderToString envelope-encodes live directValue state cells before servin
 });
 
 // Exact serialized source size, including comments retained by the test transformer.
-const OVERLAY_PRIMER_BYTES = 1354;
+// 1,354 -> 1,514: the primer's census counts only the page's elements between the page-start and page-end comments.
+const OVERLAY_PRIMER_BYTES = 1514;
 
 function inlineResumerSourceOf(html: string): string {
 	const found = /<script data-async-resumer[^>]*>([\s\S]*?)<\/script>/.exec(html);
@@ -4246,7 +4247,8 @@ export async function resumeContainerEvent({ root, event }) {
 }
 
 function createQueuedResumeModuleUrl(cacheKey = 'global-queue'): string {
-	const source = emitQueuedResumeContainerEvent(`
+	const source = emitQueuedResumeContainerEvent(
+		`
 // ${cacheKey}
 export async function resumeContainerEvent({ event }) {
 	const state = globalThis.__marklessQueueTest;
@@ -4254,12 +4256,15 @@ export async function resumeContainerEvent({ event }) {
 	if (event.key === 'first') await new Promise((resolve) => { state.release = resolve; });
 	state.order.push('end:' + event.key);
 }
-`, { censusRepair: false });
+`,
+		{ censusRepair: false },
+	);
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
 
 function createResumeRuntimeStartedModuleUrl(cacheKey = 'runtime-started'): string {
-	const source = emitQueuedResumeContainerEvent(`
+	const source = emitQueuedResumeContainerEvent(
+		`
 // ${cacheKey}
 globalThis.__asyncResumerTest.imports++;
 export async function resumeContainerEvent({ root, event }) {
@@ -4269,7 +4274,9 @@ export async function resumeContainerEvent({ root, event }) {
 		globalThis.__asyncResumerTest.events.push('registered:' + nextEvent.type + ':' + root.tagName);
 	});
 }
-`, { censusRepair: false });
+`,
+		{ censusRepair: false },
+	);
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
 

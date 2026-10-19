@@ -1,5 +1,5 @@
 import { RuntimeResumeError, runtimeResumeError } from './inline/resume-errors.ts';
-import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { pageCommentCensus } from './resume-anchor-census.ts';
 import {
 	connectedElement,
 	materializeDomLocators,
@@ -11,7 +11,6 @@ import type {
 	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomEvent,
-	ResumeDomNode,
 	ResumeRuntime,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
@@ -104,7 +103,7 @@ function materializeAsyncBoundaryLocators(
 ): Map<string, ResumeAsyncBoundaryRecord> {
 	const byId = new Map<string, ResumeAsyncBoundaryRecord>();
 	if (boundaries.length === 0) return byId;
-	const comments = walkComments(root);
+	const comments = pageCommentCensus(root);
 	for (const boundary of boundaries) {
 		const start = boundary.startAnchor as typeof boundary.startAnchor & ResumeDomComment;
 		const end = boundary.endAnchor as typeof boundary.endAnchor & ResumeDomComment;
@@ -118,15 +117,6 @@ function materializeAsyncBoundaryLocators(
 	return byId;
 }
 
-function walkComments(root: ResumeDomElement): ResumeDomComment[] {
-	const comments: ResumeDomComment[] = [];
-	(function visit(node: ResumeDomNode): void {
-		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
-			comments.push(node as ResumeDomComment);
-		for (const child of node.childNodes ?? []) visit(child);
-	})(root);
-	return comments;
-}
 function missingCommentAnchorError(
 	id: string,
 	name: 'startAnchor' | 'endAnchor',

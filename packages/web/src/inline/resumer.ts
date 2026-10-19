@@ -7,6 +7,8 @@ import type {
 	ProtocolViewPayload,
 } from '@markless/serializer/protocol';
 import {
+	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
@@ -17,6 +19,16 @@ import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overla
 import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } from './defer.ts';
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
+
+declare const __MARKLESS_PAGE_START__: string;
+declare const __MARKLESS_PAGE_END__: string;
+
+const withPageMarkers = (source: string) =>
+	source
+		.replaceAll('__MARKLESS_PAGE_START__', JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT))
+		.replaceAll('__MARKLESS_PAGE_END__', JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT));
+
+const servedCensusSource = () => withPageMarkers(marklessServedCensus.toString());
 
 type InlineDebugControls = {
 	record(
@@ -201,7 +213,7 @@ const __MARKLESS_INLINE_DEBUG__=${JSON.stringify(options.debug)};
 const __MARKLESS_INLINE_EXECUTION_LOG__=${JSON.stringify(options.executionLog)};
 const __MARKLESS_INLINE_RESUME_MODULE_URL__=${JSON.stringify(options.resumeModuleUrl)};
 const __MARKLESS_INLINE_VISIBLE_EVENT__=${JSON.stringify(PROTOCOL_VISIBLE_EVENT_NAME)};
-const __MARKLESS_INLINE_CENSUS__=${marklessServedCensus.toString()};
+const __MARKLESS_INLINE_CENSUS__=${servedCensusSource()};
 const __MARKLESS_INLINE_PATHS_ATTRIBUTE__=${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)};
 const __MARKLESS_INLINE_SYNC_ATTRIBUTE__=${JSON.stringify(PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
@@ -254,7 +266,7 @@ function runInlineResumerStorageWake(
 export function createInlineResumerOverlayPrimerSource(
 	resumeModuleUrl: string | undefined,
 ): string {
-	return `;(${runInlineResumerOverlayPrimer.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
+	return `;(${withPageMarkers(runInlineResumerOverlayPrimer.toString())})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
 }
 
 // The page's event names vary, so a precompiled boot cannot bake them in. The
@@ -282,7 +294,7 @@ export function createPrerenderInlineResumerSource(
 		readonly executionLog?: MarklessExecutionLogMode;
 	},
 ): string {
-	const plain = `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u),${marklessServedCensus.toString()},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)});`;
+	const plain = `(${runPrerenderInlineResumer.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u),${servedCensusSource()},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)});`;
 	const logging = options?.executionLog !== undefined && options.executionLog !== 'never';
 	if (!options?.debug && !logging) return plain;
 	return `{
@@ -299,7 +311,7 @@ export function createPrerenderSettleInlineResumerSource(
 	eventNames: ReadonlyArray<string>,
 	resumeModuleUrl: string | undefined,
 ): string {
-	return `(${runPrerenderSettleBoot.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u),${marklessServedCensus.toString()},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)});`;
+	return `(${runPrerenderSettleBoot.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u),${servedCensusSource()},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)});`;
 }
 
 type SettlePlanDocument = {
@@ -734,8 +746,11 @@ function runInlineResumerOverlayPrimer(
 		if (root.__marklessDelegatedDispatch === true) return;
 		if (!root.__marklessCensus) {
 			const census: Element[] = [root];
-			const all = root.getElementsByTagName?.('*') ?? [];
-			for (let index = 0; index < all.length; index++) census.push(all[index]!);
+			const walker = document.createTreeWalker(root, 129);
+			for (let next = walker.nextNode(); next; next = walker.nextNode())
+				if (next.nodeType !== 8) census.push(next as Element);
+				else if ((next as Comment).data === __MARKLESS_PAGE_START__) census.length = 1;
+				else if ((next as Comment).data === __MARKLESS_PAGE_END__) break;
 			root.__marklessCensus = census;
 		}
 		setTimeout(() => {
@@ -822,7 +837,8 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 					: [],
 			),
 		])
-			if (event.syncPolicy) policyEvents.set(`${event.hostNodeId}\n${event.eventName}`, event);
+			if (event.syncPolicy)
+				policyEvents.set(`${event.hostNodeId}\n${event.eventName}`, event);
 
 	const globalScope = globalThis as typeof globalThis & {
 		__marklessInlineSyncPolicy?: InlineSyncPolicyRuntime;

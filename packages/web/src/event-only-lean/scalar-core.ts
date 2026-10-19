@@ -10,6 +10,7 @@ import type { LeanActionPlan, LeanPlan, RuntimeDemandMap } from './lean-shared.t
 // so its plan type carries that record.
 type ScalarCorePlan = LeanPlan & { readonly eventRecord: EventOnlyResumeRecord };
 import { resumeFullEventOnly } from './lean-shared.ts';
+import { pageNodes } from '../resume-anchor-census.ts';
 import type { ProtocolSyncPolicyCondition } from '../../../serializer/src/protocol.ts';
 
 export async function resumeScalarCoreEventFromPayloadDocument(
@@ -414,8 +415,8 @@ function locateHost(
 	if (cached) return cached;
 	const locator = locators.find((candidate) => candidate.hostNodeId === hostNodeId);
 	if (!locator) return undefined;
-	let index = 0,
-		found: EventOnlyResumeDomElement | undefined;
+	let index = root.nodeType === 1 ? 1 : 0,
+		found: EventOnlyResumeDomElement | undefined = locator.index < index ? root : undefined;
 	const visit = (node: {
 		readonly nodeType: number;
 		readonly childNodes?: ArrayLike<unknown>;
@@ -427,7 +428,7 @@ function locateHost(
 		}
 		for (const child of Array.from(node.childNodes ?? [])) visit(child as never);
 	};
-	visit(root);
+	for (const child of pageNodes(root)) visit(child as never);
 	if (
 		!found ||
 		(locator.tagName !== '*' && found.tagName.toLowerCase() !== locator.tagName.toLowerCase())

@@ -242,14 +242,20 @@ test('a visibility forward leaves the crossing primer armed, and both share one 
 			},
 		};
 	};
-	resumer.root.getElementsByTagName = () => [resumer.host];
 	const primer = createInlineDeferTriggerSource('visible', [1])
 		.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
 		.slice(1);
 	// eslint-disable-next-line @typescript-eslint/no-implied-eval
 	new Function('document', 'IntersectionObserver', 'load', primer)(
 		{
-			currentScript: { closest: () => resumer.root, getAttribute: () => '/build/resume-C3d4.js' },
+			currentScript: {
+				closest: () => resumer.root,
+				getAttribute: () => '/build/resume-C3d4.js',
+			},
+			createTreeWalker: () => {
+				let done = false;
+				return { nextNode: () => (done ? null : ((done = true), resumer.host)) };
+			},
 		},
 		FakeObserver,
 		loadVisible,

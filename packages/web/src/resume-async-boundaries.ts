@@ -1,13 +1,11 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
 import { RuntimeResumeError, runtimeResumeError } from './inline/resume-errors.ts';
-import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { pageCommentCensus } from './resume-anchor-census.ts';
 import type {
 	ElementHandleRegistry,
 	ResumeAsyncBoundaryRead,
 	ResumeAsyncBoundaryRecord,
-	ResumeDomComment,
 	ResumeDomElement,
-	ResumeDomNode,
 	ResumeRuntimeInput,
 	ResumeViewRecord,
 } from './resume-types.ts';
@@ -106,7 +104,7 @@ function materializeAsyncBoundaryLocators(
 	root: ResumeDomElement,
 	boundaries: ResumeViewRecord['asyncBoundaries'],
 ): Map<string, ResumeAsyncBoundaryRecord> {
-	const comments = walkComments(root),
+	const comments = pageCommentCensus(root),
 		byId = new Map<string, ResumeAsyncBoundaryRecord>();
 	for (const boundary of boundaries) {
 		const startAnchor = comments[boundary.startAnchor.index],
@@ -126,16 +124,6 @@ function materializeAsyncBoundaryLocators(
 		});
 	}
 	return byId;
-}
-function walkComments(root: ResumeDomElement): ResumeDomComment[] {
-	// Arm-branch anchors index in their boundary's own census, never here.
-	const comments: ResumeDomComment[] = [];
-	(function visit(node: ResumeDomNode): void {
-		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
-			comments.push(node as ResumeDomComment);
-		for (const child of node.childNodes ?? []) visit(child);
-	})(root);
-	return comments;
 }
 function missingCommentAnchorError(
 	id: string,

@@ -16,6 +16,7 @@ import type {
 	ResumeEventOnlyFromPayloadDocumentInput,
 } from './types.ts';
 import { marklessUpdateText } from '../fns/update-text.ts';
+import { pageNodes } from '../resume-anchor-census.ts';
 import { marklessWriteScalar } from '../fns/write-scalar.ts';
 
 export type RuntimeDemandMap = {
@@ -317,7 +318,9 @@ function findElementAtDomOrderIndex(
 	root: EventOnlyResumeDomElement,
 	index: number,
 ): EventOnlyResumeDomElement | undefined {
-	let currentIndex = 0;
+	const counted = root.nodeType === 1 ? 1 : 0;
+	if (index < counted) return root;
+	let currentIndex = counted;
 	let found: EventOnlyResumeDomElement | undefined;
 	const visit = (node: EventOnlyResumeDomNode): void => {
 		if (found) return;
@@ -330,7 +333,7 @@ function findElementAtDomOrderIndex(
 		}
 		for (const child of Array.from(node.childNodes ?? [])) visit(child);
 	};
-	visit(root);
+	for (const child of pageNodes(root)) visit(child);
 	return found;
 }
 

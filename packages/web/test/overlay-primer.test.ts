@@ -5,6 +5,13 @@ import { createInlineResumerOverlayPrimerSource } from '../src/inline/resumer.ts
 
 type Gesture = { type: string; key?: string };
 
+// The page's elements in DOM order, the way a tree walker over the container yields them.
+const elementWalker = (root: { getElementsByTagName?: (name: string) => ArrayLike<unknown> }) => {
+	const all = root.getElementsByTagName?.('*') ?? [];
+	let next = 0;
+	return { nextNode: () => all[next++] ?? null };
+};
+
 function boot(shown: boolean) {
 	const listeners = new Map<string, (event: Gesture) => void>();
 	const tasks: Array<() => void> = [];
@@ -21,8 +28,15 @@ function boot(shown: boolean) {
 		'(url) => import(/* @vite-ignore */ url)',
 		'load',
 	);
-	new Function('document', 'addEventListener', 'removeEventListener', 'setTimeout', 'load', source)(
-		{ currentScript: { closest: () => root } },
+	new Function(
+		'document',
+		'addEventListener',
+		'removeEventListener',
+		'setTimeout',
+		'load',
+		source,
+	)(
+		{ currentScript: { closest: () => root }, createTreeWalker: elementWalker },
 		(type: string, listener: (event: Gesture) => void) => listeners.set(type, listener),
 		(type: string) => listeners.delete(type),
 		(task: () => void) => tasks.push(task),
@@ -134,7 +148,10 @@ test('a visible forward from the deferred-trigger helper leaves the overlay prim
 				.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
 				.slice(1),
 		)(
-			{ currentScript: { closest: () => f.root, getAttribute: () => '/build/resume.js' } },
+			{
+				currentScript: { closest: () => f.root, getAttribute: () => '/build/resume.js' },
+				createTreeWalker: elementWalker,
+			},
 			FakeIntersectionObserver,
 			f.load,
 		);

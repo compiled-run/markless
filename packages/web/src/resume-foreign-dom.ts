@@ -1,5 +1,5 @@
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../serializer/src/protocol-locator-paths.ts';
-import { decodeLocatorPaths } from './fns/served-census-repair.ts';
+import { decodeLocatorPaths, servedPageChildren } from './fns/served-census-repair.ts';
 import type { ResumeDomElement } from './resume-types.ts';
 
 type ForeignRoot = ResumeDomElement & {
@@ -23,7 +23,11 @@ export function describeForeignChange(
 	const { parent: parentIndex, child } = entry;
 	const parent = census[parentIndex];
 	if (!parent) return '';
-	const standIn = (parent as ForeignRoot).children?.[child];
+	const standIn = (
+		parentIndex
+			? (parent as ForeignRoot).children
+			: (servedPageChildren(root as never) as unknown as ResumeDomElement[])
+	)?.[child];
 	return standIn && !census.includes(standIn)
 		? ` A script outside Markless put ${describeNode(standIn)} in its place (at ${selectorOf(root, standIn)}) before the page woke; that element is left alone and the rest of the page still resumes.`
 		: ` A script outside Markless removed or moved it from ${selectorOf(root, parent)} before the page woke; the rest of the page still resumes.`;

@@ -1,5 +1,9 @@
 import { afterEach, expect, test } from 'vitest';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../serializer/src/protocol-locator-paths.ts';
+import {
+	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_CONTAINER_START_COMMENT,
+} from '../../serializer/src/protocol-page-markers.ts';
 import { marklessRepairCensus } from '../../web/src/fns/served-census-repair.ts';
 import { createPrerenderInlineResumerSource } from '../../web/src/inline/resumer.ts';
 import { servedLocatorPaths } from '../../web/src/locator-paths.ts';
@@ -69,4 +73,45 @@ test('an unchanged page keeps the census it walked and is never flagged', async 
 
 	expect(root.__marklessShifted).toBeUndefined();
 	expect(root.__marklessCensus).toEqual([root, ...root.querySelectorAll('*')]);
+});
+
+// An author's element as the container: the document's own nodes sit outside the page's markers.
+function servedBetweenDocumentContent(): Root {
+	const root = served();
+	const site = document.createElement('main');
+	site.setAttribute('data-site', '');
+	root.prepend(site, document.createComment(PROTOCOL_CONTAINER_START_COMMENT));
+	return root;
+}
+
+function closePage(root: Root): void {
+	const footer = document.createElement('footer');
+	root.append(document.createComment(PROTOCOL_CONTAINER_END_COMMENT), footer);
+}
+
+test('document content around the page is left out of the census and its served count', async () => {
+	const root = servedBetweenDocumentContent();
+	const forwarded = boot(root);
+	closePage(root);
+	root.querySelector<HTMLButtonElement>('[data-bump]')!.click();
+	await forwarded;
+
+	expect(root.__marklessShifted).toBeUndefined();
+	expect(root.__marklessCensus![5]).toBe(root.querySelector('main:not([data-site])'));
+	expect(root.__marklessCensus![7]).toBe(root.querySelector('[data-bump]'));
+	expect(root.__marklessCensus).not.toContain(root.querySelector('[data-site]'));
+	expect(root.__marklessCensus).not.toContain(root.querySelector('footer'));
+});
+
+test('resume renumbers a changed page by its own children, never the document element before it', async () => {
+	const root = servedBetweenDocumentContent();
+	root.querySelector('header')!.after(document.createElement('div'));
+	const forwarded = boot(root);
+	closePage(root);
+	root.querySelector<HTMLButtonElement>('[data-bump]')!.click();
+	await forwarded;
+
+	expect(root.__marklessShifted).toBe(0);
+	expect(root.__marklessCensus![6]).toBe(root.querySelector('[data-owned]'));
+	expect(root.__marklessCensus![7]).toBe(root.querySelector('[data-bump]'));
 });

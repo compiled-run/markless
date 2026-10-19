@@ -14,8 +14,9 @@ export interface FragmentNavigationConfig {
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
-	// Closes the page's nodes when the document's own element is the container; what follows is the document's.
+	// Close and open the page's nodes when the document's own element is the container; what is outside is the document's.
 	readonly pageEndComment: string;
+	readonly pageStartComment: string;
 	// The container's own attributes, never carried from the leaving page's element to the next one.
 	readonly containerAttributes: readonly [container: string, paths: string];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
@@ -285,6 +286,18 @@ function pageEnd(host: Node, data: string): Comment | undefined {
 	return undefined;
 }
 
+function pageStart(host: Node, data: string): Comment | undefined {
+	for (let node = host.firstChild; node; node = node.nextSibling)
+		if (node.nodeType === 8 && (node as Comment).data === data) return node as Comment;
+	return undefined;
+}
+
+function nodesBefore(d: Document, node: Node): DocumentFragment {
+	const nodes = d.createDocumentFragment();
+	while (node.previousSibling) nodes.prepend(node.previousSibling);
+	return nodes;
+}
+
 function nodesAfter(d: Document, node: Node): DocumentFragment {
 	const nodes = d.createDocumentFragment();
 	while (node.nextSibling) nodes.append(node.nextSibling);
@@ -550,13 +563,31 @@ export async function navigate(
 				pageEnd(region, state.config.pageEndComment) ??
 				region.appendChild(d.createComment(state.config.pageEndComment));
 			// The document's own nodes after the page stay; a document app morphs them to its next shell.
+			const focused = d.activeElement as HTMLElement | null;
 			const kept = nodesAfter(d, leavingEnd);
 			const arriving = nodesAfter(d, end);
 			const fresh: Element[] = [];
 			if (documentLoads) morphChildren(d, kept, arriving, fresh);
+			const leavingStart = pageStart(outgoing, state.config.pageStartComment);
+			let start = pageStart(region, state.config.pageStartComment);
+			if (leavingStart || start) {
+				start ??= region.insertBefore(
+					d.createComment(state.config.pageStartComment),
+					region.firstChild,
+				);
+				const keptBefore = leavingStart
+					? nodesBefore(d, leavingStart)
+					: d.createDocumentFragment();
+				const arrivingBefore = nodesBefore(d, start);
+				if (documentLoads) morphChildren(d, keptBefore, arrivingBefore, fresh);
+				region.insertBefore(keptBefore, start);
+			}
 			scripts = [...scriptsIn(region), ...fresh.flatMap(scriptsIn)];
 			region.append(kept);
 			outgoing.replaceWith(region);
+			// The document's own nodes moved to the new element; focus inside them stays put.
+			if (focused && focused !== d.activeElement && region.contains(focused))
+				focused.focus({ preventScroll: true });
 		} else {
 			scripts = scriptsIn(region);
 			outgoing.replaceWith(region);

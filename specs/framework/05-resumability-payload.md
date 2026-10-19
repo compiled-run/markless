@@ -234,10 +234,16 @@ boundary and keyed-row records already locate relative to their own comment
 anchor or row root, so they are unaffected by changes outside their range.
 
 A container that is an author's element (the router makes the document's
-`<body>` the container) can hold nodes after the page; the host closes the
-page's nodes with the `PROTOCOL_CONTAINER_END_COMMENT` comment. Those nodes
-come after every served element, so no served index moves, and the inline boot
-takes its census where the page's last script runs, before the parser reaches them.
+`<body>` the container) can hold nodes the page did not render. The host closes
+the page's nodes with the `PROTOCOL_CONTAINER_END_COMMENT` comment and, when
+document content precedes them, opens them with the
+`PROTOCOL_CONTAINER_START_COMMENT` comment. Every page-level position the
+browser reads counts only the nodes between the two: the element census and its
+served count, comment-anchor indexes, and the child places the paths attribute
+records under the container. The server measures the page's html alone, so
+built resume modules hold the same positions whatever the document puts around
+the page. The census walk resets at the start comment and stops at the end
+comment in the same pass, so finding them costs no extra walk.
 
 No static node gains an attribute: the paths ride on the container element only.
 A foreign change that removes or swaps a located element itself drops that one
