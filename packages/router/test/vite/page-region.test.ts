@@ -374,6 +374,40 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		// A click on the document's own chrome after the arm commits wakes the runtime through the
+		// streamed arm's listener; every press after it must still run its handler once.
+		test.each(['landing', 'fragment swap'])(
+			'a document click before a streamed @pending page wakes leaves each press dispatched once (%s)',
+			async (arrival) => {
+				const page = await browser.newPage();
+				const errors: string[] = [];
+				page.on('pageerror', (error) => errors.push(String(error)));
+				// The defer clock seam holds the idle wake, so the arm commits before any runtime starts.
+				await page.addInitScript(() => {
+					(HTMLElement.prototype as { __mClock?: unknown }).__mClock = {
+						idle: () => {},
+						frame: (run: () => void) => requestAnimationFrame(run),
+					};
+				});
+				if (arrival === 'landing') await page.goto(`${leading.origin}/slow`);
+				else {
+					await page.goto(`${leading.origin}/`);
+					await page.locator('[data-nav="slow"]').click();
+					await landedOn(page, 'slow');
+				}
+				await page.locator('[data-settled]').waitFor();
+				await page.locator('[data-site-button]').click();
+				await page.locator('[data-settled-tap]').click();
+				await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('1');
+				await page.locator('[data-settled-tap]').click();
+				await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('2');
+				await page.locator('[data-tap]').click();
+				await expect.poll(() => page.locator('[data-taps]').textContent()).toBe('3');
+				expect(errors).toEqual([]);
+				await page.close();
+			},
+		);
+
 		test('a client render of a hash route between document content keeps its shape', async () => {
 			const { page, errors } = await open(browser, `${leading.origin}/#/other`);
 			await landedOn(page, 'other');

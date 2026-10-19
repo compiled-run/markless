@@ -437,7 +437,8 @@ function applyStreamedArmSyncPolicy(
 // The once-installed inline executor. Real range replacement between the
 // boundary's existing comment anchors (no reveal dance, no placeholder).
 // After the swap it wires wake triggers for the streamed arm's event names,
-// mirroring the inline resumer's record-less fallback. Once the runtime has
+// mirroring the inline resumer's record-less fallback; a runtime it wakes adds no
+// listeners beside it, since a second listener would dispatch every press twice. Once the runtime has
 // read the streamed patches (`__mAdopted`), the client settle path owns the
 // boundary: no-op, and the template stays so the commit still reads as unflushed.
 //
@@ -486,8 +487,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			for (const x of records.events || []) if (x.syncPolicy) policies.set(x.hostNodeId + ' ' + x.eventName, x);
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
-			for (const t of names) {
-			r.addEventListener(t, async (e) => {
+			const forward = async (e) => {
+				const t = e.type;
 				let applied = false;
 				for (let el = e.target; el && !applied; el = el.parentElement) {
 					const x = policies.get(el.getAttribute(${JSON.stringify(PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE)}) + ' ' + t);
@@ -497,9 +498,13 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				const input = { root: r, event: e, element: e.target, eventRecord: null, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
 				if (r.__marklessDispatch) return r.__marklessDispatch(input);
 				if (r.__asyncResumeRuntimeStarted) return;
+				r.__marklessDelegatedDispatch = true;
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent(input);
-			}, true);
+			};
+			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);
+			for (const t of names) {
+			r.addEventListener(t, forward, true);
 				${debugRegistration}
 			}
 			${debugActivate}`

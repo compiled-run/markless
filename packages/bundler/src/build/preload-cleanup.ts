@@ -193,12 +193,44 @@ export function stripImportedVitePreloadHelper(code: string): string {
 	}
 
 	const initCall = `${escapeRegExp(helper.initFunction)}\\(\\)`;
-	return withoutImport
+	const stripped = withoutImport
 		.replace(new RegExp(String.raw`,${initCall},`, 'g'), ',')
 		.replace(new RegExp(String.raw`\{${initCall},`, 'g'), '{')
 		.replace(new RegExp(String.raw`,${initCall},`, 'g'), ',')
 		.replace(new RegExp(String.raw`,${initCall}\}`, 'g'), '}')
 		.replace(new RegExp(String.raw`\{${initCall}\}`, 'g'), '{}');
+	return withoutInitStatements(stripped, helper.initFunction) ?? code;
+}
+
+// Unminified output calls the init as a statement of its own; a call left in any other shape keeps the import.
+function withoutInitStatements(code: string, name: string): string | undefined {
+	const offsets = calleeOffsets(code, name);
+	if (offsets.length === 0) return code;
+	const program = tryParseJavaScriptModule(code);
+	if (!program) return undefined;
+	const statements: Array<{ readonly start: number; readonly end: number }> = [];
+	walkReferenceScopes(program, [], { removedImports: new Set(), offsets }, (node, scopes) => {
+		const call =
+			node.type === 'ExpressionStatement'
+				? (node.expression as JavaScriptAstNode)
+				: undefined;
+		if (
+			call?.type !== 'CallExpression' ||
+			identifierName(call.callee as JavaScriptAstNode) !== name ||
+			asNodes(call.arguments).length > 0 ||
+			isDeclaredInScope(name, scopes)
+		)
+			return;
+		statements.push(node as unknown as { start: number; end: number });
+	});
+	let next = code;
+	for (const { start, end } of statements.sort((left, right) => right.start - left.start)) {
+		const before = next.slice(0, start).trimEnd();
+		const own = before === '' || /[;{]$/.test(before);
+		next = next.slice(0, start) + (own ? '' : ';') + next.slice(end);
+	}
+	const after = tryParseJavaScriptModule(next);
+	return after && !callsFreeName(next, after, name, new Set()) ? next : undefined;
 }
 
 function findImportedVitePreloadHelper(code: string): ImportedVitePreloadHelper | undefined {

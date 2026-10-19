@@ -94,6 +94,37 @@ describe('Vite preload cleanup', () => {
 			'import{__esmMin as e}from"./shared.js";async function load(){return import("./chunk.js")}var m,h=e((()=>{f(),m=()=>import("./symbols.js")}));e((()=>{h()}))();',
 		);
 	});
+	test('removes unminified Vite preload helper init calls written as their own statements', () => {
+		const code = [
+			'import { rF as init_resume_locators } from "@markless/c/5DN-Wwks";',
+			'import { __vitePreload, init_preload_helper } from "@markless/c/_C2pHzSj";',
+			'var held;',
+			'function init_canonical() {',
+			'\treturn (init_canonical = __esmMin((() => {',
+			'\t\tinit_resume_locators();',
+			'\t\tinit_preload_helper();',
+			'\t\theld = new Map();',
+			'\t\tif (held.size) init_preload_helper();',
+			'\t})))();',
+			'}',
+			'init_canonical();',
+		].join('\n');
+
+		const stripped = stripEmptyVitePreloadWrappers(code);
+		expect(stripped).not.toContain('init_preload_helper');
+		expect(stripped).toContain('\t\tinit_resume_locators();\n\t\t\n\t\theld = new Map();');
+		expect(stripped).toContain('if (held.size) ;');
+	});
+
+	test('keeps an imported Vite preload helper whose init call is not a statement of its own', () => {
+		const code = [
+			'import { __vitePreload, init_preload_helper } from "./preload.js";',
+			'var ready = init_preload_helper();',
+		].join('\n');
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
 	test('keeps other bindings imported beside a removed Vite preload helper', () => {
 		const code =
 			'import{__vitePreload as t,init_pending as r,init_preload_helper as n,settle as s}from"./shared.js";import{__esmMin as e}from"./runtime.js";async function load(){return import("./chunk.js")}var A=e((()=>{n(),r()}));async function hold(v){return s(v)}e((()=>{A()}))();';
