@@ -230,6 +230,73 @@ test('commitArm routes settled-arm computed refreshes through the shared registr
 	]);
 });
 
+test('a host disposed while its records register is skipped, not reported missing', async () => {
+	const { root, start, end } = fixture();
+	const count = element('output');
+	const section = element('section', [count]);
+	const subscriptions: Array<{ readonly graphNodeId: string }> = [];
+	const elementsByHostId = new Map<string, ResumeDomElement>();
+	const disposedHosts = new Set<string>();
+	const disposeHost = (hostNodeId: string) => {
+		disposedHosts.add(hostNodeId);
+		elementsByHostId.delete(hostNodeId);
+	};
+	const commitArm = createArmCommitter(
+		({
+			root: asElement(root),
+			renderHtml: () => [asElement(section) as ResumeDomNode],
+			elementsByHostId,
+			disposedHosts,
+			disposeHost,
+			addEventRecord: () => {},
+			registerElementHandle: () => {},
+			graph: {
+				subscribe(subscription: { readonly graphNodeId: string }) {
+					subscriptions.push(subscription);
+					return () => {};
+				},
+			} as never,
+			loadSymbol: () => () => {},
+			storeHostSubscription: () => {},
+			// The container is torn down while the registration waits on this.
+			async registerComputedRefreshes() {
+				await Promise.resolve();
+				for (const hostNodeId of Array.from(elementsByHostId.keys())) disposeHost(hostNodeId);
+			},
+		} as never),
+		() => {},
+	);
+
+	await commitArm(boundaryFor(start, end), {
+		html: '<section><output></output></section>',
+		computed: [
+			{
+				graphNodeId: 'computed:weightedCount',
+				name: 'weightedCount',
+				async: false,
+				deriveSymbolId: 'symbol:derive',
+				dependencies: [{ graphNodeId: 'state:weight', path: [] }],
+			},
+		],
+		armRecords: emptyArmRecords({
+			locators: [{ hostNodeId: 'h-count', index: 1, tagName: 'output' }],
+			domUpdates: [
+				{
+					hostNodeId: 'h-count',
+					source: 'weightedCount',
+					graphNodeId: 'computed:weightedCount',
+					path: [],
+					target: { kind: 'text' },
+					symbolId: 'symbol:update',
+				},
+			],
+		}),
+	});
+
+	expect(disposedHosts.has('h-count')).toBe(true);
+	expect(subscriptions).toEqual([]);
+});
+
 test('commitArm fails loud when the anchor pair is not intact in the live DOM', async () => {
 	const { root, start, oldSection } = fixture();
 	// The end anchor lives in a DIFFERENT parent: the census is corrupt.

@@ -286,6 +286,8 @@ export type RuntimeGraph = {
 	readonly settleWriteObservers?: () => Promise<void> | undefined;
 	/** Whether a write is waiting on a flush that has not yet reached the journal. */
 	readonly hasPendingFlush?: () => boolean;
+	/** Keeps the scheduled flush back until each returned release has run once; `flush()` itself still runs. */
+	readonly holdFlush?: () => () => void;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -307,6 +309,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	let flushing = false;
 	let notifyingWrite = false;
 	let activeFlush: Promise<void> | undefined;
+	let flushHolds = 0;
 
 	for (const cell of input.cells) {
 		cells.set(cell.graphNodeId, cell.value);
@@ -411,9 +414,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (flushScheduled || flushing) return;
 
 		flushScheduled = true;
-		scheduleMicrotask(() => {
-			void flush();
-		});
+		scheduleMicrotask(runScheduledFlush);
+	};
+
+	const runScheduledFlush = (): void => {
+		if (!flushHolds) void flush();
 	};
 
 	// The plane holds every piece of reconcile bookkeeping, so a graph without
@@ -601,6 +606,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			};
 		},
 		hasPendingFlush: () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined,
+		holdFlush() {
+			flushHolds++;
+			return () => {
+				if (!--flushHolds && flushScheduled) scheduleMicrotask(runScheduledFlush);
+			};
+		},
 		settleWriteObservers() {
 			let pending: Promise<unknown>[] | undefined;
 			for (const observer of writeObservers) {

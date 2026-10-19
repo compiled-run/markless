@@ -265,6 +265,8 @@ function registerArmDomUpdates(
 		if (!deps.graph || !deps.loadSymbol || !deps.storeHostSubscription)
 			throw new Error('Markless async arm DOM-update registration is unavailable.');
 		const element = deps.elementsByHostId.get(domUpdate.hostNodeId);
+		// A host disposed while this registration awaited is gone, not missing.
+		if (!element && deps.disposedHosts.has(domUpdate.hostNodeId)) continue;
 		if (!element) throw armRecordHostMissingError(domUpdate.hostNodeId, 'DOM update');
 		if (
 			typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&

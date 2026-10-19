@@ -129,8 +129,7 @@ for (const mode of MODES) {
 
 		el(SaveClose).click();
 		await expect.poll(() => el(StepSave).hasAttribute('hidden')).toBe(true);
-		// The page-level text commits a task after the family's own writes on a cold first click.
-		await expect.poll(() => el(Closes).textContent).toBe('1');
+		expect(el(Closes).textContent).toBe('1');
 		expect(el(Backdrop).hasAttribute('hidden')).toBe(true);
 	});
 

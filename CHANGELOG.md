@@ -90,6 +90,12 @@ its message now names which and how to fix it.
   text. Now every DOM change from one handler's writes lands in the same task,
   on client-rendered and server-rendered pages, whether the code was already
   loaded or not.
+- When a component's handler changes its own state and then calls a callback
+  prop (for example `onOpenChange`), the component's DOM changes and the
+  callback's land in the same task. Before, the first time the callback ran,
+  Markless committed the component's changes while it was still loading the
+  callback's code, so for a task the page showed, say, a closed dialog beside a
+  close count that had not moved yet.
 - A click (or Enter on a link) whose target a capture-phase `document`
   listener redraws before Markless sees it now runs the handler of the
   Markless element it was inside, instead of being dropped or logging

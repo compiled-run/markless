@@ -676,15 +676,26 @@ export function createEventWiring(input: {
 			await input.prepareRuntimeShared();
 			const { rowScope, locals } = await prepare();
 			// A widget rooted inside this row files its handles under the row, which only the row-scoped qualifier reaches.
-			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
-				(await input.loadSymbol(symbolId))({
-					...context,
-					...(rowScope && isBoundSymbolId(symbolId)
-						? rowScopedSymbolContext(context, rowScope)
-						: {}),
-					invokeCallback,
-					invokeSymbol,
-				});
+			const runSymbol = async (
+				symbolId: string,
+				context: DispatchSymbolContext,
+				held?: boolean,
+			) => {
+				// The caller's writes wait for this symbol's own, so loading its code splits no task.
+				const releaseFlush = held ? input.graph.holdFlush?.() : undefined;
+				try {
+					return (await input.loadSymbol(symbolId))({
+						...context,
+						...(rowScope && isBoundSymbolId(symbolId)
+							? rowScopedSymbolContext(context, rowScope)
+							: {}),
+						invokeCallback,
+						invokeSymbol,
+					});
+				} finally {
+					releaseFlush?.();
+				}
+			};
 			// A symbol reached through a callback slot runs inside a dispatching
 			// body no caller awaits, so its failure is reported here rather than
 			// escaping the dispatch as an unhandled rejection.
@@ -692,10 +703,14 @@ export function createEventWiring(input: {
 				try {
 					// The callback channel belongs to this dispatch, so a context that
 					// arrived without one runs on the dispatch's own graph.
-					return await runSymbol(symbolId, {
-						...context,
-						graph: context.graph ?? input.graph,
-					});
+					return await runSymbol(
+						symbolId,
+						{
+							...context,
+							graph: context.graph ?? input.graph,
+						},
+						true,
+					);
 				} catch (error) {
 					await report(error, symbolId);
 					return undefined;

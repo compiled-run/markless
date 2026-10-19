@@ -1035,6 +1035,22 @@
 			"from": 17390,
 			"to": 17028,
 			"reason": "17390 -> 17028 B (-362): element journal writes moved to the shared dom-journal-direct module, net of the client-rendered onVisible wiring and the composed-path press walk"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "runtime/graph",
+			"from": 8683,
+			"to": 8906,
+			"reason": "holdFlush keeps the scheduled flush back while a handler loads a callback it calls, so the handler and callback writes land in one task"
+		},
+		{
+			"date": "2026-10-18",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 16480,
+			"to": 16645,
+			"reason": "a callback a handler calls holds the scheduled flush until its code has loaded and run, so its writes land in the handler task"
 		}
 	],
 	"runtimeModules": {
@@ -1050,7 +1066,7 @@
 		"router/vite/entries/fragment-entry": 13515,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
-		"runtime/graph": 8683,
+		"runtime/graph": 8906,
 		"runtime/graph-async": 4122,
 		"runtime/graph-collections": 4282,
 		"runtime/graph-computed": 2313,
@@ -1126,7 +1142,7 @@
 		"web/resume-branches": 15471,
 		"web/resume-census": 1471,
 		"web/resume-commit-arm": 9551,
-		"web/resume-events": 16480,
+		"web/resume-events": 16645,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 16117,

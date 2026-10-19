@@ -1,6 +1,6 @@
 {
 	"@fixtures/vite-csr": {
-		"runtime/graph": 8671,
+		"runtime/graph": 8894,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
 		"runtime/graph-computed": 2301,
@@ -60,7 +60,7 @@
 		"web/resume-branches": 15459,
 		"web/resume-census": 1453,
 		"web/resume-commit-arm": 9539,
-		"web/resume-events": 16458,
+		"web/resume-events": 16623,
 		"web/resume-foreign-dom": 1841,
 		"web/resume-handle-qualifier": 491,
 		"web/resume-handoff": 1340,
@@ -82,7 +82,7 @@
 		"web/storage-plane": 1798
 	},
 	"@fixtures/vite-plus": {
-		"runtime/graph": 8671,
+		"runtime/graph": 8894,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
 		"runtime/graph-computed": 2301,
@@ -141,7 +141,7 @@
 		"web/resume-branches": 15459,
 		"web/resume-census": 1453,
 		"web/resume-commit-arm": 9539,
-		"web/resume-events": 16458,
+		"web/resume-events": 16623,
 		"web/resume-foreign-dom": 1841,
 		"web/resume-handle-qualifier": 491,
 		"web/resume-handoff": 1340,
