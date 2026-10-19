@@ -173,20 +173,21 @@ SSR containers with no browser triggers emit no resumer script.
 For the event-only v1 path, the resumer owns only:
 
 - locating the current SSR container
-- reading the compact `markless/view` data for that container
-- materializing locator side tables against the existing DOM
-- installing delegated listeners for the event names present in that data
-- walking from `event.target` to the container root
-- matching the element/event record
-- resolving the module/export row through the generated table
-- importing and calling the lazy symbol
+- installing delegated listeners for the event names baked into it for this page
+- walking from `event.target` to the container root, reading each element's
+  `m:on` attribute
+- applying the sync policy that attribute names
+- pinning the element census at the first forwarded event
+- importing the resume module and handing it the event, the host and the
+  host's record reference
 
 The compiler/bundler/render pipeline owns locator planning, event extraction,
 symbol IDs, chunk emission, finalized module URL/specifier tables, feature
 selection, and minified inline source generation. The generated loader source is
 constant-size over compact row data and may use
 `import(/* @vite-ignore */ url)` against finalized chunk specifiers. The resumer
-must not scan event attributes, discover chunks, parse build metadata,
+must not scan event attributes ahead of an event, parse payload scripts at load,
+discover chunks, parse build metadata,
 plan symbols, decode the whole graph, run the DOM journal, start behaviors,
 demand async boundaries, or include visibility/sync-policy code unless the
 container payload needs that feature.
@@ -307,10 +308,11 @@ Verification contract:
 
 - One container-scoped delegated event listener (capture phase) from the resumer.
 - Before importing handler symbols, the delegated listener evaluates any
-  compiler-emitted sync event policy for the target/event. This is the only v1
-  path for synchronous `preventDefault()` / `stopPropagation()` behavior. The
-  policy reads the already-materialized graph data plane by ID; it does not load
-  app chunks or execute component/handler code.
+  compiler-emitted sync event policy for the target/event, found through the
+  host's `m:on` attribute. This is the only v1 path for synchronous
+  `preventDefault()` / `stopPropagation()` behavior. A graph read in the policy
+  reads the served value of that cell by ID; it does not load app chunks or
+  execute component/handler code.
 - First interaction: look up the ordered symbol list for that element/event,
   resolve each symbol through the generated symbol resolver's compact table,
   materialize its captured graph references and element handles, and run
@@ -328,8 +330,9 @@ Verification contract:
   discarded.
 - State writes during that run propagate through the graph and are flushed by
   the scheduler above; subscribed DOM update symbols are loaded on demand and
-  update the DOM in place. Nothing re-renders; there is no component
-  re-execution path in the browser runtime at all.
+  update the DOM in place. Nothing re-renders. The only browser path that runs
+  compiled render code is the one-time record rebuild below, and it produces
+  records, never DOM.
 - Async computed invalidation aborts the prior request version, imports the async
   run function only when a visible/demanded boundary needs it, and applies only the
   newest matching result to the graph.
@@ -349,3 +352,37 @@ Verification contract:
   ],
 }
 ```
+
+### Records rebuilt on first interaction
+
+A served page may ship without its resume records (`05-resumability-payload.md`,
+"Records rebuilt from compiled code"). The resume module then rebuilds them on
+the first interaction or deferred trigger by evaluating the page's compiled
+render data against the request values the page served. This is allowed, and
+it is the only browser path that evaluates compiled render code. It is held to
+one rule: **nothing a user or the page can observe happens because of it.**
+Precisely, the rebuild:
+
+- evaluates only compiled render data: state and shared initializers, computed
+  derive symbols, template and attribute expressions, control-flow tests, row
+  keys and arm plans. Authored statements in a component body that are not part
+  of render derivation are not compiled into render data and so never run;
+- reads the served request values, never the live DOM, the network, storage,
+  cookies, timers or the clock, so it reaches the same records the server did;
+- writes nothing: no DOM node, attribute or text changes, no graph cell is
+  written (its output seeds the graph the runtime then owns), no storage or
+  cookie is touched, nothing is logged in production;
+- runs no event handler, `attach` behavior, async runner, `onVisible`/`onIdle`
+  symbol, effect or cleanup, and fetches nothing beyond the chunks that hold the
+  render data and the symbols it names;
+- runs at most once per container and only after a trigger, never at load.
+
+Its output is checked by construction: the server rebuilt the same records from
+the same inputs before it served the page and refused to serve on any
+difference. A rebuild that throws in the browser is reported through the
+runtime's error path and commits no partial records.
+
+Witness boxes prove the rule the same way they prove that component bodies do
+not run during resume: a page whose component body has an observable statement
+(a counter, a log, a storage write) resumes, takes a first interaction, and the
+statement's effect is absent.

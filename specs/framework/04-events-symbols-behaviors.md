@@ -319,14 +319,15 @@ from graph state, constants/props, and event fields, compilation fails with a
 diagnostic rather than silently emitting a handler whose default action is too
 late to matter.
 
-A served element whose event record carries a sync policy is the one element
-that carries an attribute for its event: the server writes
-`data-markless-sync="<hostNodeId>"` on it (`PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE`),
-in the shell, in a served `@try` arm and in a streamed arm. The inline boot and
-the streamed-arm executor walk from the event target up to the nearest marked
-element and run that record's policy before the event returns. The policy is
-never found by the element's position, so a script that changed the page before
-Markless woke cannot make a form submit natively.
+A served element whose event record carries a sync policy names it in its `m:on`
+event host attribute (`05-resumability-payload.md`, "Event host attribute"), in
+the shell, in a served `@try` arm and in a streamed arm. An unconditional policy
+is spelled inline (`p`, `s`, `ps`); a conditional one indexes the container's
+sync-policy table. The inline boot and the streamed-arm executor walk from the
+event target up to the nearest element whose entry for that event names a
+policy and run it before the event returns. The policy is never found by the
+element's position, so a script that changed the page before Markless woke
+cannot make a form submit natively.
 
 For `attach`, behavior entries install in authored order and clean up in reverse
 order. Each behavior has its own serialized input and code reference, so one
@@ -342,12 +343,13 @@ compile to encoded `markless/view` records:
 DOM locator + event name + optional sync policy IR + ordered handler symbol IDs
 ```
 
-The generated HTML does not need an `onClick={async (...) => import(...)}` shape,
-and production output should not require per-node event attributes beyond the
-sync-policy mark above. The
-`markless/view` arena locates nodes by DOM-order streams, skip runs, branch anchors,
-or other private locator data, then the resumer builds internal side tables such
-as `WeakMap<Element, EventRecord>`.
+The generated HTML does not need an `onClick={async (...) => import(...)}` shape.
+Each event host carries one `m:on` attribute holding, per event, a short index
+of its record and its sync policy, read by the one delegated listener at the
+container (the JSAction shape); no handler code or symbol id is written on the
+element. The view arena locates every other host by DOM-order streams, skip
+runs, branch anchors, or other private locator data, then the resume module
+builds internal side tables such as `WeakMap<Element, EventRecord>`.
 
 An event record reaches the graph through the instance its symbols were
 rendered with. A composed child's symbol IDs carry that instance path (see
@@ -361,8 +363,8 @@ already page-space graph references.
 
 The compiler and bundler own event discovery, locator assignment, symbol IDs,
 chunk/export tables, and compact resolver rows. The browser resumer does not
-scan QRL-like attributes, infer event names from markup, discover chunks, or
-plan symbols. CSR may use the same event-record model after `render()` creates a
+scan QRL-like attributes ahead of an event, infer event names from markup,
+discover chunks, or plan symbols. CSR may use the same event-record model after `render()` creates a
 live container, but CSR does not use the inline SSR resumer to avoid component
 execution.
 

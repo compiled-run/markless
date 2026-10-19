@@ -149,10 +149,8 @@ browser.
 On startup, the inline resumer may:
 
 - locate its nearest resumable container
-- read compact container payload scripts
-- materialize DOM locator side tables
-- install container-scoped delegated listeners or observers for features present
-  in the payload
+- install container-scoped delegated listeners or observers for the event names
+  and features baked into it for this page
 - keep constant-size metadata needed to resolve the first trigger
 
 On startup, the inline resumer must not:
@@ -163,21 +161,27 @@ On startup, the inline resumer must not:
 - run behavior symbols
 - run async runner symbols
 - parse build metadata
-- scan event attributes
+- parse container payload scripts or walk the container's elements
+- scan event attributes ahead of an event (it reads the `m:on` attribute of the
+  elements an event passes through, at that event)
 - plan symbols from DOM
 - diff or reconcile DOM
 - decode unused feature blocks
 
-On first interaction or another explicit trigger, the resumer matches the real
-DOM target against the container view payload, resolves ordered symbol rows, and
-imports the needed symbols through finalized module URLs. The resolver owns the
+On first interaction or another explicit trigger, the resumer pins the element
+census, finds the event's host from its `m:on` attribute, and hands the event to
+the resume module, which rebuilds the page's records from compiled render data
+where the page ships none (`06-runtime-resumer.md`, "Records rebuilt on first
+interaction"), resolves ordered symbol rows, and imports the needed symbols
+through finalized module URLs. The resolver owns the
 dynamic import. Runtime imports may use `import(/* @vite-ignore */ url)` when the
 specifier comes from finalized build output.
 
 Event dispatch after resume is graph-first. The handler writes graph state;
 the scheduler invalidates graph subscribers; DOM update symbols patch concrete
-DOM nodes. Nothing re-renders, and no component body executes in the browser
-resume path.
+DOM nodes. Nothing re-renders. The one-time record rebuild evaluates compiled
+render data under the no-observable-effect rule of `06-runtime-resumer.md`; no
+other component code executes in the browser resume path.
 
 ## Build Architecture
 
@@ -291,9 +295,10 @@ Renderer APIs choose the phase:
   bodies because it must create DOM and graph state from an empty target.
 - SSR `renderToString(App, options)` consumes the SSR plan and executes
   component bodies on the server once to produce HTML and payload data.
-- Browser resume consumes the SSR payload and resolver metadata already emitted
-  by `renderToString()`. It does not consume the CSR plan and does not execute
-  component bodies.
+- Browser resume consumes the request values and resolver metadata emitted by
+  `renderToString()`, and rebuilds records from the page's compiled render data
+  where the page serves none. It does not consume the CSR plan, and it executes
+  no component body statement outside render derivation.
 
 ## Component Tree Composition
 

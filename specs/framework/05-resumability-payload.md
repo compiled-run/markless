@@ -119,11 +119,14 @@ Payloads are specified as logical arenas, not as public object-shaped JSON:
    policies, DOM update records, element handle locators, async boundary
    anchors, and `attach={...}` host metadata.
 
-Production payloads should encode all arena data into compact private data
-scripts, rather than relying on verbose JSON objects or scattered per-node
-attributes. In particular, production output should not require Qwik-style
-per-node `on:click` attributes to know what code is on the page. By default, the
-core renderer emits two inert data scripts:
+Production payloads encode arena data into compact private data scripts rather
+than verbose JSON objects. The one per-node exception is the event host
+attribute (see "Event host attribute" below): every served element that hosts an
+event record carries a short `m:on` attribute naming its events, so the inline
+boot finds a press's handler from the event target alone, with no data script
+parsed and no element walk at load. Everything else stays off the elements.
+Until records are rebuilt from compiled code (see "Records rebuilt from compiled
+code" below), the core renderer emits two inert data scripts:
 
 ```html
 <script type="markless/state">
@@ -149,10 +152,12 @@ metadata and must be unnecessary for the default browser startup and
 symbol-loading path.
 
 The SSR container also includes a tiny inline or module resumer bootstrap. That
-bootstrap is executable framework code, but it must only decode container-scoped
-payloads, install side tables/listeners/observers, and wait for explicit
-triggers. It must not import app symbols or execute component, handler,
-behavior, or async-runner code during browser startup.
+bootstrap is executable framework code, but at load it must only install
+container-scoped listeners/observers for a page-specific list of event names
+baked into it, and wait for explicit triggers. It does not parse `markless/view`
+or `markless/state` and does not walk the container's elements at load. It must
+not import app symbols or execute component, handler, behavior, or async-runner
+code during browser startup.
 
 A fully static SSR container with no browser triggers emits no resumer. When the
 container has event-triggered work, production should prefer a generated
@@ -164,14 +169,12 @@ that ships it, plus gzip; authored source length is not an acceptance criterion.
 That measured scope includes only:
 
 - finding the current SSR container
-- reading compact `markless/view` data
-- materializing DOM locator side tables
-- installing the delegated listener set required by the event table
-- walking `event.target` back to the container root
-- matching an element/event record
-- importing the matching symbol through the generated table
-- calling the symbol with framework-owned event, element, root, and runtime
-  context
+- installing the delegated listener set for the baked event-name list
+- walking `event.target` back to the container root, reading the `m:on`
+  attribute of each element on the way
+- pinning the container's element census at the first forwarded event
+- importing the resume module and handing it the event, the matched host and
+  that host's event record reference
 
 That base budget excludes graph decoding, the full runtime graph, DOM journal
 application, async boundary demand, behavior startup, visibility observers,
@@ -203,6 +206,47 @@ refs, and DOM-order skip runs for static nodes are all expected tools. The
 view/wiring arena encodes metadata for the existing DOM; it is not a public
 VNode format and does not imply a client VDOM or component re-render path.
 
+### Event host attribute
+
+The server writes one `m:on` attribute (`PROTOCOL_EVENT_HOST_ATTRIBUTE`, grammar
+owned by `packages/serializer`) on each served element that hosts an event
+record. Its value is a `;`-separated list of entries:
+
+```txt
+entry  = name [ ":" ref ] [ "!" policy ]
+ref    = index | "-"
+policy = "p" | "s" | "ps" | index
+```
+
+- `name` is the DOM event name.
+- `ref` is the record's index in the event list of the region the element was
+  served in: the container's top-level `events`, or for an element served
+  inside a streamed arm, that arm's `events`. `-` marks an event an external
+  delegate owns: the press is not forwarded. No `ref` means the element has no
+  record of its own for that event but scopes records the boot cannot index (a
+  keyed repeat parent whose rows have handlers, or a host inside a served arm):
+  the press is forwarded with no record and the resume module matches it.
+- `policy` is the record's sync policy. `p`, `s` and `ps` are an unconditional
+  `preventDefault`, `stopPropagation` or both. A number indexes the container's
+  sync-policy table, an inert `<script type="markless/policy">` holding each
+  distinct conditional policy once; the boot parses it only at the first event
+  that needs one. A host in a streamed arm takes its policy from the arm's own
+  record instead, which its executor has already parsed.
+
+The inline boot listens for the baked event names. On an event it walks from
+the target to the container, applies the first policy it meets, and forwards
+the first entry with a `ref` for that event name, passing the element it was
+found on as the host. When no entry has a `ref`, a press of an event name that
+nested records (rows, arms) or a later-registered listener use is forwarded
+with no record unless it is a link click outside every scoped element on a page
+with no branches and no async boundaries, which leaves the page without waking
+it. The resume module turns a `ref` back into the record it names.
+
+The attribute is the only wiring a static or unrelated element never pays for:
+elements without an event record carry nothing. A script that changes the page
+before it wakes cannot misroute a press, because the host is found from the
+event target, not by position.
+
 ### Record templates
 
 A served page must not repeat a record's shape once per list row or composed
@@ -230,10 +274,9 @@ Contract:
   round-trips.
 - A record no other record shares is served as a template of its own when its
   key indexes shorten it, and as itself otherwise.
-- Lists the inline resumer reads at load (locators, events, keyed repeats,
-  branches, async boundaries) and the state cells a sync policy reads at event
-  time stay plain until the boot reads a compact form directly; decoding never
-  runs at load.
+- The view lists the resume module reads before it decodes anything (locators,
+  events, keyed repeats, branches, async boundaries) and the state cells a sync
+  policy reads at event time stay plain; decoding never runs at load.
 - Payload scripts a browser renders for itself (client renders that hand
   records to resume without a server) are never templated: only the served
   html pays the encode.
@@ -262,7 +305,9 @@ for that reason. The container carries one `data-markless-paths` attribute
 (`PROTOCOL_LOCATOR_PATHS_ATTRIBUTE`), written by the server from the html it
 served: the served element count, then for every located host and each of its
 ancestors its parent, its parent's served element-child count, its place among
-those children and its tag. The inline boot walks the container once. When the
+those children and its tag. The inline boot walks the container once, at the
+first event it forwards (or the first deferred trigger), not at load: that is the
+moment the census is pinned, before the woken runtime commits any arm. When the
 count matches, the census is the walk. When it does not, each located element is
 matched by tag among its parent's children, scanning only as far as that
 parent's child count grew or shrank, so a change moves nothing outside the
@@ -283,7 +328,8 @@ built resume modules hold the same positions whatever the document puts around
 the page. The census walk resets at the start comment and stops at the end
 comment in the same pass, so finding them costs no extra walk.
 
-No static node gains an attribute: the paths ride on the container element only.
+No static node gains an attribute: the paths ride on the container element only,
+and only event hosts carry `m:on`.
 A foreign change that removes or swaps a located element itself drops that one
 host. Under the paths attribute a host whose element is missing or has the wrong
 tag is reported through `reportError` and skipped, and the rest of the page
@@ -314,3 +360,56 @@ encoding, but production compactness remains the contract. The runtime and tools
 must provide a decoded human-readable dump of the private payload so authors can
 inspect why state, listeners, sync policies, DOM updates, or element behaviors
 were included.
+
+### Records rebuilt from compiled code
+
+Almost every record in `markless/state` and `markless/view` is something the
+compiler already emitted into the page's render data: ids, wiring, update
+records, shared definitions, computed records, row templates and arm plans. A
+served page does not ship them. On the first interaction (or deferred trigger)
+the resume module rebuilds the page's records by running the page's compiled
+render data in the browser against the values the request rendered with, then
+matches DOM-order indexes against the census pinned at that event. This is the
+prerender wake channel, and it is the default for every page whose route the
+build can wake.
+
+What the server sends instead is only what the compiled code cannot know (see
+"Request values" below). The server checks parity at render time: it rebuilds
+the records the same way the browser will, from the same inputs, and compares
+them with the records the render produced. A mismatch is the build or render
+error `MARKLESS_RESUME_RECORD_DELTA_PARITY_MISMATCH`, never a page that resumes
+with records that differ from its HTML.
+
+A page the build cannot wake (its route has no wake module, or its render data
+reaches something only the server holds) keeps serving its records. The next
+best form of those records is a cacheable file the HTML references and the
+browser fetches on first interaction or prefetches when idle, which runs no JS
+at load; the inline payload scripts remain the form of last resort.
+
+The rebuild is subject to `06-runtime-resumer.md` ("Records rebuilt on first
+interaction"): it produces records only and has no effect a user can observe.
+
+### Request values
+
+What a served page still sends is the set of values the compiler cannot
+reproduce from source:
+
+- state cell values that differ from their compiled initializer, including
+  route props that are not a function of the URL;
+- async snapshot values and status;
+- the row keys of a keyed repeat whose collection is request data;
+- `attach` input values that are not literals;
+- minted element ids the instance path cannot re-mint.
+
+They travel per container in one inert `<script type="markless/values">` in the
+tagged-JSON encoding: plain JSON for everything JSON can express, one-key tags
+for the rest (`$u` undefined, `$n` NaN/±Infinity/-0, `$b` BigInt, `$d` Date, `$m`
+Map, `$s` Set, `$x` RegExp, `$l` URL, `$o` for a real key that starts with `$`,
+`$i`/`$r` for shared or cyclic objects), plus a list of which entries carry tags
+so untagged entries come out of one native `JSON.parse`. Its decoder loads with
+the resume module, never at load. A value a sync policy reads at event time is
+read from the same script, untagged, so the boot needs no decoder.
+
+Values are not read back from the rendered DOM: text a translator, extension or
+early keystroke changed before the page woke would seed state with the wrong
+value.
