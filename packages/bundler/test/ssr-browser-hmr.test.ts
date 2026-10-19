@@ -163,6 +163,67 @@ describe('SSR browser HMR', () => {
 		}
 	});
 
+	test('a new .tsrx file nothing loaded imports sends no reload and no error', async () => {
+		const fixture = await createSsrFixture();
+		const hookedFiles: string[] = [];
+		let server: ViteDevServer | undefined;
+		try {
+			server = await createServer({
+				configFile: false,
+				mode: 'ssr',
+				root: fixture.root,
+				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
+				plugins: [
+					markless(),
+					fixtureSsrHost(),
+					{
+						name: 'observe-hot-update',
+						enforce: 'post',
+						hotUpdate({ file }) {
+							hookedFiles.push(file);
+						},
+					},
+				],
+				resolve: { alias: marklessSourceAliases(root) },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+			server.watcher.unwatch(fixture.root);
+
+			const send = vi.spyOn(server.environments.client.hot, 'send');
+			expect(await requestHtml(server)).toContain('<span>hello</span>');
+			const environments = Object.keys(server.environments).length;
+
+			const unrelated = join(fixture.root, 'src/code-block.tsrx');
+			const broken = join(fixture.root, 'src/broken.tsrx');
+			await writeFile(unrelated, 'export function Block() @{\n\t<pre>block</pre>\n}\n');
+			await writeFile(broken, 'export function Broken() @{\n\t<pre>block</pre>>\n}\n');
+			server.watcher.emit('add', unrelated);
+			server.watcher.emit('add', broken);
+			await vi.waitFor(() => {
+				for (const file of [unrelated, broken])
+					expect(hookedFiles.filter((hooked) => hooked === file)).toHaveLength(
+						environments,
+					);
+			});
+			expect(send.mock.calls.map(([message]) => (message as HotPayload).type)).toEqual([]);
+
+			await editFile(
+				server,
+				fixture.entry,
+				fixture.source.replace('<span>hello</span>', '<span>edited</span>'),
+			);
+			await waitForFullReloadCountAbove(send, 0, fixture.root);
+			expect(
+				send.mock.calls.map(
+					([message]) => (message as { triggeredBy?: string }).triggeredBy,
+				),
+			).toEqual([fixture.entry]);
+			expect(customMessages(send, MARKLESS_DEV_ERROR_EVENT)).toEqual([]);
+		} finally {
+			await server?.close();
+		}
+	});
+
 	test('clears an invalid edit when restoring the original bytes emits no watcher update', async () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;
@@ -561,4 +622,3 @@ function customMessages(send: ReturnType<typeof vi.spyOn>, event: string) {
 		.map(([message]) => message as { type?: string; event?: string; data?: unknown })
 		.filter((message) => message.type === 'custom' && message.event === event);
 }
-

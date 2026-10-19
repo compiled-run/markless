@@ -293,6 +293,19 @@ export function createViteHmr(options: ViteHmrOptions) {
 		},
 	};
 
+	function loadedOrInvalid(environments: Iterable<DevEnvironment>, file: string) {
+		const path = parsePath(file).pathname;
+		if (invalidSources.has(path)) return true;
+		let answered = false;
+		for (const environment of environments) {
+			// Partial adapters and test doubles omit getModulesByFile; one that cannot say counts as loading it.
+			if (typeof environment.moduleGraph?.getModulesByFile !== 'function') continue;
+			answered = true;
+			if (environment.moduleGraph.getModulesByFile(path)?.size) return true;
+		}
+		return !answered;
+	}
+
 	async function runHotUpdate(environment: DevEnvironment | undefined, ctx: HotUpdateOptions) {
 		if (!environment) {
 			return undefined;
@@ -333,6 +346,8 @@ export function createViteHmr(options: ViteHmrOptions) {
 					modules.add(module);
 			}
 		}
+		// A file no environment loaded (a generated code-block file, a new unimported component) is no page's business.
+		if (modules.size === 0 && ctx.file && !loadedOrInvalid(targets.keys(), ctx.file)) return [];
 		const files = changedFiles([...modules]);
 		const root = server?.config?.root;
 		if (ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file)) {
