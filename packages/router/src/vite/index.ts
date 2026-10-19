@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { nitro } from 'nitro/vite';
 import { dirname, isAbsolute, join, normalize, relative, resolve } from 'pathe';
@@ -15,6 +15,7 @@ import type { InputOption, OutputChunk } from 'rolldown';
 import {
 	decodePath,
 	joinURL,
+	withoutBase,
 	parsePath,
 	parseQuery,
 	parseURL,
@@ -71,7 +72,12 @@ import {
 	serverBuildState,
 	type ServerBuildState,
 } from './nitro-prerender.ts';
-import { isPageModuleFile, normalizeRouteFileId } from '../route-manifest.ts';
+import {
+	buildRouteManifestFromFileIds,
+	isPageModuleFile,
+	matchRouteManifest,
+	normalizeRouteFileId,
+} from '../route-manifest.ts';
 import { routerLinkBridgeModules, type LinkBridgeModule } from './runtime/create-server-entry.ts';
 import { LINK_BRIDGE_DIR } from './runtime/link-bridge-module.ts';
 
@@ -181,6 +187,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			serverBuild,
 		),
 		devSourceModuleRequestPlugin(),
+		devPageForUrlPlugin(options),
 		pageServerOnlyPropsPlugin(),
 		mdxTransformPlugin(),
 		requestFileTransformPlugin(),
@@ -230,6 +237,62 @@ function pageServerOnlyPropsPlugin(): Plugin {
 			);
 		},
 	};
+}
+
+// The dev server reloads an open page only for edits its page module imports, so it asks which page a URL shows.
+function devPageForUrlPlugin(options: MarklessRouterOptions): Plugin {
+	return {
+		name: 'markless-router:dev-page-for-url',
+		apply: 'serve',
+		configResolved(config) {
+			const markless = config.plugins.find(
+				(plugin) =>
+					typeof (plugin as { api?: { declarePageForUrl?: unknown } }).api
+						?.declarePageForUrl === 'function',
+			) as
+				| {
+						api: {
+							declarePageForUrl(
+								pageForUrl: (url: string) => string | undefined,
+							): void;
+						};
+				  }
+				| undefined;
+			markless?.api.declarePageForUrl((href) =>
+				devPageForUrl(config.root, config.base, options.mode, href),
+			);
+		},
+	};
+}
+
+function devPageForUrl(
+	root: string,
+	base: string,
+	mode: MarklessRouterOptions['mode'],
+	href: string,
+): string | undefined {
+	let url: URL;
+	try {
+		url = new URL(href);
+	} catch {
+		return undefined;
+	}
+	const pagesDir = join(root, 'pages');
+	if (!existsSync(pagesDir)) return undefined;
+	const fileIds = readdirSync(pagesDir, { recursive: true, encoding: 'utf8' }).map((file) =>
+		join('pages', file),
+	);
+	let manifest: ReturnType<typeof buildRouteManifestFromFileIds>;
+	try {
+		manifest = buildRouteManifestFromFileIds(fileIds);
+	} catch {
+		return undefined;
+	}
+	const pathname =
+		mode === 'hash' && url.hash.startsWith('#/')
+			? url.hash.slice(1)
+			: withoutBase(url.pathname, base);
+	return matchRouteManifest(pathname, manifest)?.route.file ?? manifest.statusPages.notFound;
 }
 
 // Dev module requests for authored source files: Vite's glob imports (the

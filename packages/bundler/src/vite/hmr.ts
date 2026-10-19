@@ -16,6 +16,7 @@ import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
 	MARKLESS_DEV_ERROR_CLIENT_ID,
 	MARKLESS_DEV_ERROR_EVENT,
+	MARKLESS_DEV_PAGE_EDIT_EVENT,
 	MARKLESS_DEV_RELOADS_ATTRIBUTE,
 	MARKLESS_DEV_RELOADS_EVENT,
 	normalizeMarklessDevError,
@@ -27,6 +28,7 @@ import {
 	isServerViteEnvironment,
 	marklessEnvironment,
 } from './environment.ts';
+import { moduleIdFor } from '../module-id.ts';
 
 const SOURCE_FILE_EXTENSION = /\.tsrx(?:[?#].*)?$/;
 const RESOLVED_DEV_ERROR_CLIENT_ID = `\0${MARKLESS_DEV_ERROR_CLIENT_ID}`;
@@ -45,7 +47,13 @@ interface ViteHmrOptions {
 	) => string[] | Promise<string[]>;
 	invalidatePrerenderSnapshots?: (renderDataIds: readonly string[]) => void;
 	invalidSourceRecheckMs?: number;
+	// Both come from the host that routes pages; without them every edit reloads every open page.
+	isPage?: (moduleId: string) => boolean;
+	pageForUrl?: (url: string) => string | undefined;
 }
+
+// The root-relative page module ids one edit reached, or every page.
+type EditedPages = ReadonlySet<string> | 'all';
 
 interface PreflightVerdict {
 	error?: MarklessDevErrorPayload;
@@ -65,13 +73,25 @@ export function createViteHmr(options: ViteHmrOptions) {
 	// Vite environment name. Only environments with the fetch gate installed appear.
 	const unreportedInvalidations = new Map<string, Set<string>>();
 
-	// Edits that reloaded the pages, counted once each however many environment passes report one.
-	let editReloads = 0;
+	// Edits that reloaded pages, each recorded once however many environment passes report it.
+	const edits: EditedPages[] = [];
 	let lastReloadedEdit: string | undefined;
-	function countEditReload(edit: string) {
-		if (edit === lastReloadedEdit) return;
+	function recordEdit(edit: string, pages: EditedPages) {
+		if (edit === lastReloadedEdit) return undefined;
 		lastReloadedEdit = edit;
-		editReloads += 1;
+		return edits.push(pages) - 1;
+	}
+
+	// A page reports the edit count it was served after and its URL; it is stale when a later edit reached it.
+	function servedPageIsStale(data: { reloads?: unknown; href?: unknown } | undefined) {
+		const since = typeof data?.reloads === 'number' ? data.reloads : edits.length;
+		const later = edits.slice(Math.max(0, since));
+		if (later.length === 0) return false;
+		const page =
+			typeof data?.href === 'string' && options.pageForUrl
+				? options.pageForUrl(data.href)
+				: undefined;
+		return later.some((pages) => pages === 'all' || page === undefined || pages.has(page));
 	}
 
 	// A pass is where this file invalidates the module graphs a render transforms
@@ -241,7 +261,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				recovered = true;
 			}
 			if (recovered) {
-				countEditReload(`recovered\0${Date.now()}`);
+				recordEdit(`recovered\0${Date.now()}`, 'all');
 				server?.environments?.[options.clientEnvironment]?.hot?.send?.({
 					type: 'full-reload',
 				});
@@ -276,13 +296,12 @@ export function createViteHmr(options: ViteHmrOptions) {
 			if (options.enabled) {
 				installFetchViteClient(nextServer, options, async () => {
 					await settledHotUpdate();
-					return editReloads;
+					return edits.length;
 				});
-				// A page served before an edit whose client connected after that edit's reload went out.
 				nextServer.environments?.[options.clientEnvironment]?.hot?.on?.(
 					MARKLESS_DEV_RELOADS_EVENT,
-					(data: { reloads?: unknown } | undefined, client) => {
-						if (data?.reloads !== editReloads) client.send({ type: 'full-reload' });
+					(data: { reloads?: unknown; href?: unknown } | undefined, client) => {
+						if (servedPageIsStale(data)) client.send({ type: 'full-reload' });
 					},
 				);
 			}
@@ -328,6 +347,48 @@ export function createViteHmr(options: ViteHmrOptions) {
 		return !answered;
 	}
 
+	// The pages whose server render imports the edited file. Anything else that imports it, such
+	// as the document every page shares, reaches a module nothing imports and so reaches every page.
+	function editedPages(
+		targets: Map<DevEnvironment, MarklessEnvironment>,
+		file: string,
+	): EditedPages {
+		const isPage = options.isPage;
+		const root = server?.config?.root;
+		if (!isPage || !options.pageForUrl || !root) return 'all';
+		const pageOf = (module: EnvironmentModuleNode) => {
+			const id = module.file ? moduleIdFor(module.file, root) : undefined;
+			return id !== undefined && isPage(id) ? id : undefined;
+		};
+		const pending: EnvironmentModuleNode[] = [];
+		for (const [target, scope] of targets) {
+			if (scope !== 'server') continue;
+			pending.push(
+				...(target.moduleGraph?.getModulesByFile?.(parsePath(file).pathname) ?? []),
+			);
+		}
+		if (pending.length === 0) return 'all';
+
+		const pages = new Set<string>();
+		const seen = new Set<EnvironmentModuleNode>();
+		while (pending.length > 0) {
+			const module = pending.pop()!;
+			if (seen.has(module)) continue;
+			seen.add(module);
+			const page = pageOf(module);
+			const importers = [...(module.importers ?? [])];
+			if (page) {
+				pages.add(page);
+				// A page's other importers are the router's page table; a page importing it renders it too.
+				pending.push(...importers.filter((importer) => pageOf(importer)));
+				continue;
+			}
+			if (importers.length === 0) return 'all';
+			pending.push(...importers);
+		}
+		return pages;
+	}
+
 	async function runHotUpdate(environment: DevEnvironment | undefined, ctx: HotUpdateOptions) {
 		if (!environment) {
 			return undefined;
@@ -368,8 +429,28 @@ export function createViteHmr(options: ViteHmrOptions) {
 					modules.add(module);
 			}
 		}
+		// Adding or removing a file changes what every environment's glob imports list, the router's page table among them.
+		const listingModules = new Map<DevEnvironment, Set<EnvironmentModuleNode>>();
+		if (ctx.type !== 'update') {
+			listingModules.set(environment, new Set(ctx.modules ?? []));
+			for (const target of targets.keys()) {
+				for (const module of await globImporters(target, ctx)) {
+					const listed = listingModules.get(target) ?? new Set<EnvironmentModuleNode>();
+					listed.add(module);
+					listingModules.set(target, listed);
+					modules.add(module);
+				}
+			}
+		}
 		// A file no environment loaded (a generated code-block file, a new unimported component) is no page's business.
 		if (modules.size === 0 && ctx.file && !loadedOrInvalid(targets.keys(), ctx.file)) return [];
+		for (const [target, listed] of listingModules) {
+			for (const module of listed) {
+				const invalidated = new Set<EnvironmentModuleNode>();
+				target.moduleGraph?.invalidateModule?.(module, invalidated, ctx.timestamp, true);
+				recordUnreportedInvalidation(target, invalidated);
+			}
+		}
 		const files = changedFiles([...modules]);
 		const root = server?.config?.root;
 		if (ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file)) {
@@ -487,15 +568,31 @@ export function createViteHmr(options: ViteHmrOptions) {
 		}
 
 		reloadModuleRunner();
-		countEditReload(`${ctx.file}\0${ctx.timestamp}`);
-		hot.send({
-			type: 'full-reload',
-			path: firstChangedFile(files),
-			triggeredBy: ctx.file,
-		});
+		const pages = ctx.type === 'update' && ctx.file ? editedPages(targets, ctx.file) : 'all';
+		const edit = recordEdit(`${ctx.file}\0${ctx.timestamp}`, pages);
+		if (pages === 'all') {
+			hot.send({
+				type: 'full-reload',
+				path: firstChangedFile(files),
+				triggeredBy: ctx.file,
+			});
+		} else if (edit !== undefined) {
+			hot.send({ type: 'custom', event: MARKLESS_DEV_PAGE_EDIT_EVENT, data: { edit } });
+		}
 
 		return [];
 	}
+}
+
+// Vite's glob plugin names, per environment, the modules whose import.meta.glob lists the added
+// or removed file; asked here so the first pass refreshes every environment's listing.
+async function globImporters(environment: DevEnvironment, ctx: HotUpdateOptions) {
+	const plugin = environment.plugins?.find((candidate) => candidate.name === 'vite:import-glob');
+	const hook = plugin?.hotUpdate;
+	const handler = typeof hook === 'function' ? hook : hook?.handler;
+	if (!handler) return [];
+	const modules = await handler.call({ environment } as never, { ...ctx, modules: [] });
+	return Array.isArray(modules) ? (modules as EnvironmentModuleNode[]) : [];
 }
 
 // The runner asks by request URL; the pending set holds resolved module ids.

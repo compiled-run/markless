@@ -7,6 +7,8 @@ export const MARKLESS_DEV_ERROR_CLIENT_ID = 'virtual:markless:dev-error-client';
 // A served page names the count of edit reloads it was rendered after, so one that connects late still reloads.
 export const MARKLESS_DEV_RELOADS_EVENT = 'markless:dev-reloads';
 export const MARKLESS_DEV_RELOADS_ATTRIBUTE = 'data-markless-dev-reloads';
+// An edit that reached only some pages: each page reports its URL and reloads if the edit reached it.
+export const MARKLESS_DEV_PAGE_EDIT_EVENT = 'markless:dev-page-edit';
 
 const PLUGIN_CODE_KIND = 'markless-dev-error';
 const PLUGIN_CODE_VERSION = 1;

@@ -2250,3 +2250,39 @@ test('no landing or navigation plan names the execution log chunk', () => {
 		}
 	}
 });
+
+test('tells the dev server which page module each URL shows', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'markless-router-page-for-url-'));
+	onTestFinished(() => rm(root, { recursive: true, force: true }));
+	for (const file of ['index.tsrx', '404.tsrx', 'tides/[harbor].tsrx', 'charts/index.mdx']) {
+		await mkdir(join(root, 'pages', file, '..'), { recursive: true });
+		await writeFile(join(root, 'pages', file), '');
+	}
+	const lookup = (options: Parameters<typeof router>[0], base: string) => {
+		let pageForUrl: ((url: string) => string | undefined) | undefined;
+		const plugin = flattenPlugins([router(options)]).find(
+			(candidate) => candidate.name === 'markless-router:dev-page-for-url',
+		);
+		const markless = {
+			api: { declarePageForUrl: (declared: typeof pageForUrl) => (pageForUrl = declared) },
+		};
+		const configResolved = plugin!.configResolved as (config: unknown) => void;
+		configResolved({ root, base, plugins: [markless] });
+		return pageForUrl!;
+	};
+
+	const pageForUrl = lookup({}, '/');
+	expect(pageForUrl('http://localhost/')).toBe('pages/index.tsrx');
+	expect(pageForUrl('http://localhost/tides/pier?x=1#top')).toBe('pages/tides/[harbor].tsrx');
+	expect(pageForUrl('http://localhost/charts')).toBe('pages/charts/index.mdx');
+	expect(pageForUrl('http://localhost/no-such-chart')).toBe('pages/404.tsrx');
+	expect(lookup({}, '/docs/')('http://localhost/docs/tides/pier')).toBe(
+		'pages/tides/[harbor].tsrx',
+	);
+	expect(lookup({ mode: 'hash' }, '/')('http://localhost/#/charts')).toBe(
+		'pages/charts/index.mdx',
+	);
+
+	await writeFile(join(root, 'pages/lighthouse.tsrx'), '');
+	expect(pageForUrl('http://localhost/lighthouse')).toBe('pages/lighthouse.tsrx');
+});

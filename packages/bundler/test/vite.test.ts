@@ -7,6 +7,7 @@ import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
 	MARKLESS_DEV_ERROR_CLIENT_ID,
 	MARKLESS_DEV_ERROR_EVENT,
+	MARKLESS_DEV_PAGE_EDIT_EVENT,
 	MARKLESS_DEV_RELOADS_ATTRIBUTE,
 	MARKLESS_DEV_RELOADS_EVENT,
 } from '../src/dev-error/index.ts';
@@ -916,6 +917,164 @@ export function App() @{
 		const fresh = await servedAfter();
 		expect(fresh).toBe('1');
 		expect(connect(fresh)).toEqual([]);
+	});
+
+	// Server graph: badge <- the harbor page only; banner <- the shared layout <- the server entry.
+	function pageGraph(root: string) {
+		const node = (file: string, importers: object[] = []) => ({
+			id: file,
+			file,
+			url: `/${file.slice(root.length + 1)}`,
+			type: 'js',
+			importers: new Set(importers),
+		});
+		const entry = node(`${root}/entry.ts`);
+		const table = node(`${root}/routes.ts`, [entry]);
+		const harbor = node(`${root}/pages/harbor.tsrx`, [table]);
+		const quay = node(`${root}/pages/quay.tsrx`, [table]);
+		const badge = node(`${root}/parts/badge.tsrx`, [harbor]);
+		const shell = node(`${root}/shell.tsrx`, [entry]);
+		const banner = node(`${root}/parts/banner.tsrx`, [shell]);
+		const byFile = new Map(
+			[entry, table, harbor, quay, badge, shell, banner].map((module) => [
+				module.file,
+				module,
+			]),
+		);
+		return {
+			getModuleById: vi.fn(),
+			invalidateModule: vi.fn(),
+			getModulesByFile: (file: string) => new Set(byFile.has(file) ? [byFile.get(file)] : []),
+		};
+	}
+
+	test('an edit only the harbor page imports reloads only the clients showing the harbor page', async () => {
+		const root = '/workspace/docks';
+		const listeners = new Map<string, (data: unknown, client: { send: unknown }) => void>();
+		const send = vi.fn();
+		const client = {
+			config: { consumer: 'client' },
+			hot: {
+				send,
+				on: (event: string, listener: (data: unknown, client: { send: unknown }) => void) =>
+					listeners.set(event, listener),
+			},
+			moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
+		};
+		const ssr = { name: 'ssr', config: { consumer: 'server' }, moduleGraph: pageGraph(root) };
+		const hmr = createViteHmr({
+			base: '/',
+			clientEnvironment: 'client',
+			enabled: true,
+			isPage: (moduleId) => moduleId.startsWith('pages/'),
+			pageForUrl: (url) =>
+				({ '/harbor': 'pages/harbor.tsrx', '/quay': 'pages/quay.tsrx' })[
+					new URL(url).pathname
+				],
+		});
+		hmr.configureServer({ config: { root }, environments: { client, ssr } } as never);
+		const report = (data: object) => {
+			const reply = vi.fn();
+			listeners.get(MARKLESS_DEV_RELOADS_EVENT)!(data, { send: reply });
+			return reply.mock.calls.map(([message]) => message);
+		};
+		const edit = (file: string, timestamp: number) =>
+			hmr.hotUpdate(
+				client as never,
+				{
+					file: `${root}/${file}`,
+					modules: [],
+					read: async () => source.replace('{count}', `{count + ${timestamp}}`),
+					timestamp,
+					type: 'update',
+				} as never,
+			);
+
+		await edit('parts/badge.tsrx', 1);
+		expect(send.mock.calls.map(([message]) => message)).toEqual([
+			{ type: 'custom', event: MARKLESS_DEV_PAGE_EDIT_EVENT, data: { edit: 0 } },
+		]);
+		expect(report({ reloads: 0, href: 'http://localhost/harbor' })).toEqual([
+			{ type: 'full-reload' },
+		]);
+		expect(report({ reloads: 0, href: 'http://localhost/quay?tab=1' })).toEqual([]);
+		// A URL no page matches reloads, since nothing says the edit missed it.
+		expect(report({ reloads: 0, href: 'http://localhost/unknown' })).toEqual([
+			{ type: 'full-reload' },
+		]);
+
+		send.mockClear();
+		await edit('parts/banner.tsrx', 2);
+		expect(send.mock.calls.map(([message]) => message)).toEqual([
+			expect.objectContaining({ type: 'full-reload' }),
+		]);
+		// The quay page skipped the badge edit but not the banner edit every page shares.
+		expect(report({ reloads: 0, href: 'http://localhost/quay' })).toEqual([
+			{ type: 'full-reload' },
+		]);
+		expect(report({ reloads: 2, href: 'http://localhost/quay' })).toEqual([]);
+	});
+
+	test('adding a file refreshes the glob listings of every environment in the first pass, and reloads every page', async () => {
+		const root = '/workspace/docks';
+		const send = vi.fn();
+		const listing = (environment: string) => ({
+			id: `\0listing:${environment}`,
+			file: null,
+			url: `/@id/listing:${environment}`,
+			type: 'js',
+			importers: new Set(),
+		});
+		const environment = (name: string, consumer: string, hot?: object) => {
+			const module = listing(name);
+			const invalidateModule = vi.fn((target: unknown, seen: Set<unknown>) =>
+				seen.add(target),
+			);
+			return {
+				name,
+				config: { consumer },
+				...(hot ? { hot } : {}),
+				moduleGraph: {
+					getModuleById: vi.fn(),
+					getModulesByFile: () => new Set(),
+					invalidateModule,
+				},
+				plugins: [
+					{
+						name: 'vite:import-glob',
+						hotUpdate(this: { environment: { name: string } }) {
+							return this.environment.name === name ? [module] : [];
+						},
+					},
+				],
+				module,
+				invalidateModule,
+			};
+		};
+		const client = environment('client', 'client', { send });
+		const ssr = environment('ssr', 'server');
+		const hmr = createViteHmr({ base: '/', clientEnvironment: 'client', enabled: true });
+		hmr.configureServer({ config: { root }, environments: { client, ssr } } as never);
+
+		await hmr.hotUpdate(
+			client as never,
+			{
+				file: `${root}/pages/lighthouse.tsrx`,
+				modules: [],
+				read: async () => source,
+				timestamp: 3,
+				type: 'create',
+			} as never,
+		);
+
+		expect(client.invalidateModule).toHaveBeenCalledWith(
+			client.module,
+			expect.any(Set),
+			3,
+			true,
+		);
+		expect(ssr.invalidateModule).toHaveBeenCalledWith(ssr.module, expect.any(Set), 3, true);
+		expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'full-reload' }));
 	});
 
 	test('rechecks invalid files on disk when the restoring watcher event is swallowed', async () => {

@@ -2,6 +2,7 @@ import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
 	MARKLESS_DEV_ERROR_CLIENT_ID,
 	MARKLESS_DEV_ERROR_EVENT,
+	MARKLESS_DEV_PAGE_EDIT_EVENT,
 	MARKLESS_DEV_RELOADS_ATTRIBUTE,
 	MARKLESS_DEV_RELOADS_EVENT,
 } from './index.ts';
@@ -17,6 +18,7 @@ const ERROR_EVENT = ${JSON.stringify(MARKLESS_DEV_ERROR_EVENT)};
 const CLEAR_EVENT = ${JSON.stringify(MARKLESS_DEV_ERROR_CLEAR_EVENT)};
 const RELOADS_EVENT = ${JSON.stringify(MARKLESS_DEV_RELOADS_EVENT)};
 const RELOADS_ATTRIBUTE = ${JSON.stringify(MARKLESS_DEV_RELOADS_ATTRIBUTE)};
+const PAGE_EDIT_EVENT = ${JSON.stringify(MARKLESS_DEV_PAGE_EDIT_EVENT)};
 const ELEMENT = 'markless-dev-error-overlay';
 const SUPPRESSION = 'data-markless-vite-overlay-suppression';
 const OPEN_IN_EDITOR = ${JSON.stringify(`${base}/__open-in-editor`)};
@@ -91,6 +93,8 @@ hot.on('vite:beforeFullReload', reset);
 addEventListener('keydown', (event) => { if (event.key === 'Escape') document.querySelector(ELEMENT)?.remove(); });
 if (window.__MARKLESS_DEV_ERROR__) show(window.__MARKLESS_DEV_ERROR__);
 const servedAfter = document.querySelector('script[' + RELOADS_ATTRIBUTE + ']')?.getAttribute(RELOADS_ATTRIBUTE);
-if (servedAfter != null) hot.send(RELOADS_EVENT, { reloads: Number(servedAfter) });
+const report = (edit) => hot.send(RELOADS_EVENT, { reloads: servedAfter != null ? Number(servedAfter) : edit, href: location.href });
+if (servedAfter != null) report();
+hot.on(PAGE_EDIT_EVENT, ({ edit }) => report(edit));
 `;
 }

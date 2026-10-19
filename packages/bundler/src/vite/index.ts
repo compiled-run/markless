@@ -123,6 +123,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		invalidatePrerenderSnapshots: undefined as
 			| ((renderDataIds: readonly string[]) => void)
 			| undefined,
+		isPage: undefined as ((moduleId: string) => boolean) | undefined,
+		pageForUrl: undefined as ((url: string) => string | undefined) | undefined,
 	};
 	let devPrerender: ReturnType<typeof createDevPrerender> | undefined;
 	const devTags = createDevTags();
@@ -133,6 +135,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		prerenderRecordsBySource,
 	}) as Plugin & {
 		api: {
+			declareRouteModules: MarklessRolldownPluginApi['declareRouteModules'];
 			invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules;
 			runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
 			runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
@@ -147,6 +150,13 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		sharedDuringBuild: true,
 		api: {
 			...basePlugin.api,
+			declareRouteModules: (isRoute: (moduleId: string) => boolean) => {
+				basePlugin.api.declareRouteModules(isRoute);
+				hmrOptions.isPage = isRoute;
+			},
+			declarePageForUrl: (pageForUrl: (url: string) => string | undefined) => {
+				hmrOptions.pageForUrl = pageForUrl;
+			},
 			registerBundleGraphAdder: (adder: BundleGraphAdder) => bundleGraphAdders.add(adder),
 			registerDevInjection: (injection: GlobalInjections) => devTags.register(injection),
 			registerPreloadGraphEntries: (adder: PreloadGraphEntriesAdder) =>
@@ -667,6 +677,9 @@ type MarklessVitePluginApi = {
 	invalidateGeneratedModules: MarklessRolldownPluginApi['invalidateGeneratedModules'];
 	runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
 	runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
+	declareRouteModules: MarklessRolldownPluginApi['declareRouteModules'];
+	/** A host plugin names the root-relative page module it renders at a URL, so a dev edit reloads only the open pages it reached. */
+	declarePageForUrl: (pageForUrl: (url: string) => string | undefined) => void;
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
 	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;
