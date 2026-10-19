@@ -48,6 +48,7 @@ import {
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
 	fragmentPageUrl,
+	runFragmentNavigation,
 	startFragmentNavigation,
 	type FragmentNavigationConfig,
 } from '../fragment-navigation.ts';
@@ -82,8 +83,12 @@ export interface ServerEntryOptions {
 	readonly navigation?: 'fragment' | 'render';
 	// The fragment swap module; without it route changes render client-side.
 	readonly fragmentEntryPath?: string;
+	// The files the fragment entry statically imports, preloaded beside it.
+	readonly fragmentEntryImports?: readonly string[];
 	// The inline half of fragment navigation, minified by the build (the source form serves otherwise).
 	readonly fragmentNavigationSource?: string;
+	// The half of fragment navigation the bridge loads on the first link intent or at idle, minified the same way.
+	readonly fragmentNavigationRunSource?: string;
 	// The link bridge files the build wrote into the client output; without them the entry derives the paths itself.
 	readonly linkBridgePaths?: readonly [withoutHashLinks: string, withHashLinks: string];
 }
@@ -129,7 +134,9 @@ export type LinkBridgeOptions = Pick<
 	| 'documentNavigation'
 	| 'navigation'
 	| 'fragmentEntryPath'
+	| 'fragmentEntryImports'
 	| 'fragmentNavigationSource'
+	| 'fragmentNavigationRunSource'
 	| 'routeFileIds'
 > & {
 	// The build computes the bridge outside the bundle, where markless()'s debug define does not reach.
@@ -143,7 +150,9 @@ function fragmentBridgeFor(
 	return options.fragmentEntryPath !== undefined && options.navigation !== 'render'
 		? {
 				entry: options.fragmentEntryPath,
+				entryImports: options.fragmentEntryImports ?? [],
 				source: options.fragmentNavigationSource ?? startFragmentNavigation.toString(),
+				runSource: options.fragmentNavigationRunSource ?? runFragmentNavigation.toString(),
 				prefetch: options.prefetch !== false,
 				pages: manifest.routes.map((route) => route.pathname.replace(/:[^/]+/g, ':')),
 			}
@@ -154,7 +163,7 @@ function fragmentBridgeFor(
 export function routerLinkBridgeModules(
 	options: LinkBridgeOptions,
 	manifest = buildRouteManifestFromFileIds(options.routeFileIds),
-): readonly [withoutHashLinks: LinkBridgeModule, withHashLinks: LinkBridgeModule] | undefined {
+): LinkBridgeFiles | undefined {
 	if (!options.navigationEntryPath) return undefined;
 	const fragmentBridge = fragmentBridgeFor(options, manifest);
 	return linkBridgeModules(
@@ -360,9 +369,9 @@ export function createServerEntry(options: ServerEntryOptions) {
 			cookie,
 			props: pageProps,
 			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
-			modulePreloads: (html: string) =>
+			modulePreloads: (html: string, resumes: boolean) =>
 				landingModulePreloads(
-					options.routeSsrModulePreloads?.[file],
+					resumes ? options.routeSsrModulePreloads?.[file] : undefined,
 					linkBridges?.[html.includes('href="#/') ? 1 : 0],
 				),
 		};
@@ -631,7 +640,9 @@ function linkIntentPreloads(
 		const url = parseSameOriginUrl(href, baseHref);
 		const match = url && matchRouteManifest(url.pathname, manifest);
 		const preloads = match && routes?.[match.route.file];
-		if (url && preloads?.length) destinations[url.pathname] = preloads;
+		// A fragment destination with nothing to preload is still listed, so the idle tier fetches its page.
+		if (url && preloads && (preloads.length > 0 || plainAnchors))
+			destinations[url.pathname] = preloads;
 	}
 	return destinations;
 }
@@ -810,14 +821,16 @@ function linkBridgeBody(
 	linkIntent: boolean,
 	documentLoads: boolean,
 	fragment: FragmentBridge | undefined,
-	page: LinkBridgePage | { readonly module: true; readonly hashLinks: boolean },
+	page:
+		| LinkBridgePage
+		| { readonly module: true; readonly hashLinks: boolean; readonly runPath?: string },
 	debug = debugDefined(),
 ): string {
 	const inline = !('module' in page);
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>(${escapeScriptJson(fragmentConfig(fragment, documentLoads))}),${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href));`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE }) : 'null'}));`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -933,17 +946,29 @@ function linkBridgeModules(
 	documentLoads: boolean,
 	fragment: FragmentBridge | undefined,
 	debug: boolean | undefined,
-): readonly [withoutHashLinks: LinkBridgeModule, withHashLinks: LinkBridgeModule] {
+): LinkBridgeFiles {
+	const runSource = fragment && `export default ${boundFragmentRun(fragment, documentLoads)};`;
+	const run: LinkBridgeModule | undefined = runSource
+		? { path: linkBridgeModulePath(base, contentHash(runSource)), source: runSource }
+		: undefined;
 	const variant = (hashLinks: boolean): LinkBridgeModule => {
-		const source = `export default(r,p,q)=>{const d=document;${linkBridgeBody(resumeEntryPath, linkIntent, documentLoads, fragment, { module: true, hashLinks }, debug)}\n};`;
+		const source = `export default(r,p,q)=>{const d=document;${linkBridgeBody(resumeEntryPath, linkIntent, documentLoads, fragment, { module: true, hashLinks, runPath: run?.path }, debug)}\n};`;
 		return {
 			path: linkBridgeModulePath(base, contentHash(source)),
 			source,
 		};
 	};
 	const withoutHashLinks = variant(false);
-	return [withoutHashLinks, fragment ? variant(true) : withoutHashLinks];
+	const pages = [withoutHashLinks, fragment ? variant(true) : withoutHashLinks] as const;
+	return run ? [...pages, run] : pages;
 }
+
+/** The two page-imported bridges (without and with '#/' links), then any file they load later. */
+export type LinkBridgeFiles = readonly [
+	withoutHashLinks: LinkBridgeModule,
+	withHashLinks: LinkBridgeModule,
+	...later: LinkBridgeModule[],
+];
 
 function contentHash(text: string): string {
 	let hash = 0x811c9dc5;
@@ -997,8 +1022,15 @@ function renderLinkBridgeScript(
 interface FragmentBridge {
 	readonly entry: string;
 	readonly source: string;
+	readonly runSource: string;
+	readonly entryImports: readonly string[];
 	readonly prefetch: boolean;
 	readonly pages: readonly string[];
+}
+
+// The run half with the app's config bound in, so the page bridge never carries the config.
+function boundFragmentRun(fragment: FragmentBridge, documentLoads: boolean): string {
+	return `(d,...a)=>(${fragment.runSource})(d,${escapeScriptJson(fragmentConfig(fragment, documentLoads))},...a)`;
 }
 
 function fragmentConfig(
@@ -1007,6 +1039,7 @@ function fragmentConfig(
 ): FragmentNavigationConfig {
 	return {
 		entry: fragment.entry,
+		entryImports: fragment.entryImports,
 		linkAttribute: LINK_ATTRIBUTE,
 		prefetchAttribute: PREFETCH_ATTRIBUTE,
 		replaceAttribute: REPLACE_ATTRIBUTE,

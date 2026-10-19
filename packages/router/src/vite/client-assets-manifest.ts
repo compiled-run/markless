@@ -23,6 +23,8 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly prerenderWake?: string;
 		readonly navigation: string;
 		readonly fragment?: string;
+		// The files the fragment entry statically imports: a preload of the entry alone leaves them a round late.
+		readonly fragmentImports?: readonly string[];
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
 	// Maps the chunk specifiers chunks import each other by to their hashed URLs; every document carries it.
@@ -35,6 +37,7 @@ export function createClientAssetsManifest(input: {
 	readonly prerenderWakeEntry?: string;
 	readonly navigationEntry: string;
 	readonly fragmentEntry?: string;
+	readonly fragmentImports?: readonly string[];
 	readonly routes: MarklessRouterClientAssetRoutes;
 }): MarklessRouterClientAssetsManifest {
 	return {
@@ -45,6 +48,7 @@ export function createClientAssetsManifest(input: {
 			...(input.prerenderWakeEntry ? { prerenderWake: input.prerenderWakeEntry } : {}),
 			navigation: input.navigationEntry,
 			...(input.fragmentEntry ? { fragment: input.fragmentEntry } : {}),
+			...(input.fragmentImports?.length ? { fragmentImports: input.fragmentImports } : {}),
 		},
 		routes: {
 			navigation: sortRouteMap(input.routes.navigation),
@@ -238,6 +242,14 @@ async function validateClientAssetsManifest(
 		...(input.entries.fragment !== undefined
 			? { fragment: requiredString(input.entries.fragment, 'entries.fragment') }
 			: {}),
+		...(input.entries.fragmentImports !== undefined
+			? {
+					fragmentImports: requiredStrings(
+						input.entries.fragmentImports,
+						'entries.fragmentImports',
+					),
+				}
+			: {}),
 	};
 	const routes = {
 		navigation: routeMap(input.routes.navigation, 'routes.navigation'),
@@ -252,6 +264,7 @@ async function validateClientAssetsManifest(
 		...(entries.prerenderWake !== undefined ? [entries.prerenderWake] : []),
 		entries.navigation,
 		...(entries.fragment !== undefined ? [entries.fragment] : []),
+		...(entries.fragmentImports ?? []),
 		...Object.values(routes.navigation).flat(),
 		...Object.values(routes.ssr).flat(),
 		...Object.values(routes.styles).flat(),
@@ -287,6 +300,11 @@ async function validateClientAssetsManifest(
 		routes,
 		...(importMap ? { importMap } : {}),
 	};
+}
+
+function requiredStrings(input: unknown, label: string): readonly string[] {
+	if (!Array.isArray(input)) throw clientAssetsManifestError(`has invalid ${label}`);
+	return input.map((item, index) => requiredString(item, `${label}[${index}]`));
 }
 
 function routeMap(input: unknown, label: string): Record<string, readonly string[]> {

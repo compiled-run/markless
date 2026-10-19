@@ -650,7 +650,10 @@ describe('server entry rendering', () => {
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
 				'pages/docs/[...slug].mdx': async () => ({
-					default: page('<main><button data-mdx-counter>MDX Count 0</button></main>'),
+					default: page(
+						'<main><button data-mdx-counter>MDX Count 0</button></main>',
+						clickPayload(),
+					),
 				}),
 			},
 			routeFileIds: ['/pages/index.tsrx', '/pages/docs/[...slug].mdx'],
@@ -667,6 +670,27 @@ describe('server entry rendering', () => {
 		expect(head).toContain('<link rel="modulepreload" href="/build/docs.js"');
 		expect(body).not.toContain('rel="modulepreload"');
 		expect(html).not.toContain('/build/index.js');
+	});
+
+	it('a page with nothing to resume preloads none of its landing plan', async () => {
+		const entry = createServerEntry({
+			navigationEntryPath: '/build/navigation.js',
+			resumeEntryPath: '/build/resume.js',
+			routeSsrModulePreloads: { 'pages/index.tsrx': ['/build/resume.js', '/build/index.js'] },
+			documentModuleLoader: undefined,
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main><h1>Static</h1></main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const html = await (await entry.fetch(new Request('http://markless-router.test/'))).text();
+
+		expect(html).not.toContain('/build/resume.js');
+		expect(html).not.toContain('/build/index.js');
+		expect(
+			[...html.matchAll(/rel="modulepreload" href="([^"]+)"/g)].map((match) => match[1]),
+		).toEqual([expect.stringMatching(/^\/_markless\/links\/[0-9a-z]+\.js$/)]);
 	});
 
 	it('renders the document module shell around routed page output', async () => {
@@ -692,7 +716,9 @@ describe('server entry rendering', () => {
 				'pages/docs/index.tsrx': ['/build/docs-current.js'],
 			},
 			pageModuleLoaders: {
-				'pages/docs/index.tsrx': async () => ({ default: page('<main>Docs</main>') }),
+				'pages/docs/index.tsrx': async () => ({
+					default: page('<main><button>Docs</button></main>', clickPayload()),
+				}),
 			},
 			routeFileIds: ['/pages/docs/index.tsrx'],
 		});
@@ -704,7 +730,8 @@ describe('server entry rendering', () => {
 		expect(html).toContain(
 			'<!doctype html><html lang="en" data-status="200"><head><title>/docs</title><link rel="modulepreload" href="/build/docs-current.js"',
 		);
-		expect(html).toContain('</head><body class="docs" data-async-container><main>Docs</main>');
+		expect(html).toContain('</head><body class="docs" data-async-container');
+		expect(html).toContain('<main><button>Docs</button></main>');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).toContain('</body></html>');
 	});
@@ -1196,6 +1223,25 @@ describe('server entry streaming (default)', () => {
 		expect(text).not.toContain('__mArm');
 	});
 });
+
+// A main element holding one button with a click handler: enough for the page to resume.
+function clickPayload() {
+	return {
+		state: { version: 1, cells: [], computed: [] },
+		view: {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'h0', index: 0, strategy: 'dom-order', tagName: 'main' },
+				{ hostNodeId: 'h1', index: 1, strategy: 'dom-order', tagName: 'button' },
+			],
+			events: [{ eventName: 'click', hostNodeId: 'h1', symbolIds: ['symbol:0'] }],
+			domUpdates: [],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+	};
+}
 
 function page(
 	html: string,

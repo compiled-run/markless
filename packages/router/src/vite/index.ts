@@ -33,6 +33,8 @@ import {
 	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
 	plannedLandingFiles,
+	resolverVirtualModuleSourceFile,
+	warmEvaluatedImports,
 	symbolVirtualModuleSourceFile,
 } from '@markless/bundler/preload';
 import {
@@ -61,7 +63,7 @@ import { LINK_ATTRIBUTE, PREFETCH_ATTRIBUTE } from '../link-attributes.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
 import { listenForLinkIntent } from './link-intent.ts';
 import { documentNavigationFor } from './document-navigation.ts';
-import { startFragmentNavigation } from './fragment-navigation.ts';
+import { runFragmentNavigation, startFragmentNavigation } from './fragment-navigation.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
 	prerenderRendererModule,
@@ -410,6 +412,7 @@ function routerConfigPlugin(
 			fragmentEntry.fileName = manifest.entries.fragment
 				? clientAssetFileName(manifest.entries.fragment, manifest.base)
 				: undefined;
+			fragmentEntry.imports = manifest.entries.fragmentImports;
 			routePreloads.routes = manifest.routes;
 			routePreloads.persisted = true;
 			routePreloads.importMap = manifest.importMap;
@@ -460,6 +463,15 @@ function routerConfigPlugin(
 				);
 				if (fragmentChunk) {
 					fragmentEntry.fileName = fragmentChunk.fileName;
+					const everyChunk = new Map(
+						outputChunks(bundle).map((chunk) => [chunk.fileName, chunk]),
+					);
+					const closure = new Set<string>();
+					includeChunk(closure, { chunks: everyChunk, everyChunk }, fragmentChunk.fileName);
+					closure.delete(fragmentChunk.fileName);
+					fragmentEntry.imports = [...closure].map((fileName) =>
+						joinURL(routePreloads.base, fileName),
+					);
 				}
 				routePreloads.routes = routeModulePreloadsFromBundle({
 					base: routePreloads.base,
@@ -503,7 +515,10 @@ function routerConfigPlugin(
 							: {}),
 						navigationEntry: joinURL(routePreloads.base, navigationEntry.fileName),
 						...(fragmentEntry.fileName
-							? { fragmentEntry: joinURL(routePreloads.base, fragmentEntry.fileName) }
+							? {
+									fragmentEntry: joinURL(routePreloads.base, fragmentEntry.fileName),
+									fragmentImports: fragmentEntry.imports,
+								}
 							: {}),
 						routes: routePreloads.routes,
 					});
@@ -539,6 +554,7 @@ function routerConfigPlugin(
 				])
 					if (entry.fileName)
 						entry.fileName = renames.get(entry.fileName) ?? entry.fileName;
+				fragmentEntry.imports = pendingClientAssets.entries.fragmentImports;
 			}
 			const importMap = bundle?.[MARKLESS_IMPORT_MAP_ASSET];
 			if (importMap?.type === 'asset')
@@ -763,6 +779,7 @@ function isRecord(input: unknown): input is Record<string, unknown> {
 interface ResumeEntryState {
 	base: string;
 	fileName: string | undefined;
+	imports?: readonly string[];
 }
 
 interface RoutePreloadState {
@@ -1024,7 +1041,10 @@ function linkBridgeFilesPlugin(
 					base,
 					navigationEntryPath: entryPath(navigationEntry, NAVIGATION_ENTRY_ID, root),
 					fragmentEntryPath: entryPath(fragmentEntry, FRAGMENT_ENTRY_ID, root),
+					fragmentEntryImports: fragmentEntry.imports,
 					fragmentNavigationSource: minifiedFragmentNavigationSource(),
+					fragmentNavigationRunSource:
+						minifiedFragmentNavigationSource(runFragmentNavigation),
 					prefetch: options.prefetch,
 					documentNavigation: documentNavigationFor(documentSource, documentFile),
 					routeFileIds: bundledPageFileIds(chunks, root),
@@ -1033,7 +1053,9 @@ function linkBridgeFilesPlugin(
 				modules = built;
 				target.code = target.code!.replace(
 					LINK_BRIDGE_PATHS_PLACEHOLDER,
-					jsStringLiteralContent(JSON.stringify(built.map((module) => module.path))),
+					jsStringLiteralContent(
+						JSON.stringify(built.slice(0, 2).map((module) => module.path)),
+					),
 				);
 			},
 		},
@@ -1084,6 +1106,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  navigationEntryPath,`,
 		`  fragmentEntryPath,`,
 		`  fragmentNavigationSource: ${JSON.stringify(minifiedFragmentNavigationSource())},`,
+		`  fragmentNavigationRunSource: ${JSON.stringify(minifiedFragmentNavigationSource(runFragmentNavigation))},`,
 		...(options.prefetch === false ? ['  prefetch: false,'] : []),
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
@@ -1101,10 +1124,12 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 }
 
 // The bridge carries this inline on every page, so it ships minified.
-function minifiedFragmentNavigationSource(): string {
+function minifiedFragmentNavigationSource(
+	source: (...args: never[]) => unknown = startFragmentNavigation,
+): string {
 	const result = minifySync(
 		'markless-fragment-navigation.js',
-		`export default (${startFragmentNavigation.toString()});`,
+		`export default (${source.toString()});`,
 		{ compress: true, mangle: true, module: true },
 	);
 	const prefix = 'export default';
@@ -1297,6 +1322,16 @@ function routeModulePreloadsFromBundle(input: {
 	}
 
 	const symbolChunks = symbolChunksBySourceFile(chunks);
+	const resolverSourceFiles = new Set(
+		allChunks.flatMap((chunk) =>
+			(chunk.moduleIds ?? []).flatMap((moduleId) => {
+				const sourceFile = resolverVirtualModuleSourceFile(
+					moduleId.startsWith('\0') ? moduleId.slice(1) : moduleId,
+				);
+				return sourceFile ? [sourceModulePathname(sourceFile)] : [];
+			}),
+		),
+	);
 	// Loaded at runtime only where window.navigation is missing, so no plan names it.
 	const polyfillFileNames = new Set(
 		chunks
@@ -1408,8 +1443,10 @@ function routeModulePreloadsFromBundle(input: {
 			new Set([...navigationFileNames, ...ssrFileNames]),
 			chunksByFileName,
 		);
+		let routeHasSymbols = false;
 		for (const [sourceFile, symbolFileNames] of symbolChunks) {
 			if (!routeSourceFiles.has(sourceFile)) continue;
+			routeHasSymbols = true;
 			for (const fileName of symbolFileNames) {
 				includeChunk(navigationFileNames, scope, fileName, true);
 				includeChunk(ssrFileNames, landingScope, fileName, true);
@@ -1425,6 +1462,10 @@ function routeModulePreloadsFromBundle(input: {
 				input.resumeChunk,
 				input.prerenderWakeChunk,
 			]);
+		// A landing chunk evaluates these packs a task after the first event; unpreloaded, that task fetches them.
+		for (const fileName of ssrFileNames)
+			for (const specifier of warmEvaluatedImports(everyChunk.get(fileName)?.code ?? ''))
+				includeChunk(ssrFileNames, landingScope, normalize(join(dirname(fileName), specifier)));
 
 		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
 			joinURL(input.base, fileName),
@@ -1445,10 +1486,15 @@ function routeModulePreloadsFromBundle(input: {
 				includeChunk(firstEventPath, landingScope, fileName);
 		}
 		for (const fileName of lazySiblings) includeChunk(firstEventPath, landingScope, fileName);
-		ssr[routeFile] = [
-			...[...firstEventPath].filter((fileName) => ssrFileNames.has(fileName)),
-			...[...ssrFileNames].filter((fileName) => !firstEventPath.has(fileName)),
-		].map((fileName) => joinURL(input.base, fileName));
+		// The page's resolver lists no symbol: no handler, trigger or reactive text ever wakes the resume runtime.
+		const resolvesNothing =
+			!routeHasSymbols && [...routeSourceFiles].some((file) => resolverSourceFiles.has(file));
+		ssr[routeFile] = resolvesNothing
+			? []
+			: [
+					...[...firstEventPath].filter((fileName) => ssrFileNames.has(fileName)),
+					...[...ssrFileNames].filter((fileName) => !firstEventPath.has(fileName)),
+				].map((fileName) => joinURL(input.base, fileName));
 		styles[routeFile] = routeStylesheetsForChunks(
 			routeFileChunks,
 			styleFileNames,

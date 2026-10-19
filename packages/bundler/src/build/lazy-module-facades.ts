@@ -13,6 +13,7 @@ import { RolldownMagicString, type Plugin } from 'rolldown';
 import { rootRelativeId } from '../module-id.ts';
 import { withoutMachinePaths } from './machine-paths.ts';
 import { startupPackOfLazy } from './route-pack-groups.ts';
+import { warmPacksSuffix } from './warm-packs.ts';
 
 export function lazyModuleFacadesPlugin(
 	root: () => string = () => '',
@@ -591,12 +592,12 @@ export function collapseLazyModuleFacades(
 				: []),
 			...(evaluated.size
 				? [
-						`setTimeout(()=>{for(const pack of[${[...evaluated]
-							.map((target) => {
+						warmPacksSuffix(
+							[...evaluated].map((target) => {
 								const path = relative(dirname(chunk.fileName), target.fileName);
-								return `import(${JSON.stringify(path.startsWith('.') ? path : `./${path}`)})`;
-							})
-							.join(',')}])pack.catch(()=>{})});`,
+								return path.startsWith('.') ? path : `./${path}`;
+							}),
+						),
 					]
 				: []),
 		].join('\n');

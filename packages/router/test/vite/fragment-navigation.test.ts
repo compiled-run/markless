@@ -228,6 +228,66 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a click with no press or hover before it, ahead of the idle tier, still swaps in place', async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			const errors: string[] = [];
+			const requests: string[] = [];
+			page.on('pageerror', (error) => errors.push(String(error)));
+			page.on('request', (request) => {
+				const url = new URL(request.url());
+				const fragment = fragmentPageUrl(url);
+				requests.push(`${(fragment ?? url).pathname}${fragment ? ' fragment' : ''}`);
+			});
+			// Held idle: the page has loaded only its listening bridge when the click lands.
+			await page.addInitScript(() => {
+				(window as { requestIdleCallback?: unknown }).requestIdleCallback = () => 0;
+			});
+			// The production build serves the bridge as static files; dev inlines both halves.
+			await page.goto(productionOrigin + '/');
+			const bridgeFiles = () =>
+				requests.filter((request) => request.startsWith('/_markless/links/'));
+			expect(bridgeFiles()).toHaveLength(1);
+			await page.evaluate(() =>
+				(document.querySelector('[data-nav="other"]') as HTMLElement).click(),
+			);
+			await landedOn(page, 'other');
+			expect(bridgeFiles()).toHaveLength(2);
+			expect(requests).toContain('/other fragment');
+			expect(requests).not.toContain('/other');
+			await page.locator('[data-tap]').click();
+			await expect.poll(() => text(page, '[data-taps]')).toBe('1');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a plain anchor clicked ahead of the idle tier swaps by fragment, and one to an unknown path still loads', async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			const errors: string[] = [];
+			const requests: string[] = [];
+			page.on('pageerror', (error) => errors.push(String(error)));
+			page.on('request', (request) => {
+				const url = new URL(request.url());
+				const fragment = fragmentPageUrl(url);
+				requests.push(`${(fragment ?? url).pathname}${fragment ? ' fragment' : ''}`);
+			});
+			await page.addInitScript(() => {
+				(window as { requestIdleCallback?: unknown }).requestIdleCallback = () => 0;
+			});
+			await page.goto(productionOrigin + '/other');
+			await page.evaluate(() => (document.querySelector('[data-plain-home]') as HTMLElement).click());
+			await landedOn(page, 'home');
+			expect(requests).toContain('/ fragment');
+			expect(requests).not.toContain('/');
+			await page.goto(productionOrigin + '/other');
+			await Promise.all([
+				page.waitForURL(`${productionOrigin}/nowhere`),
+				page.evaluate(() => (document.querySelector('[data-plain-unknown]') as HTMLElement).click()),
+			]);
+			expect(requests).not.toContain('/nowhere fragment');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('route stylesheets and the title follow the destination', async () => {
 			const { page, errors } = await open(browser);
 			const color = () =>

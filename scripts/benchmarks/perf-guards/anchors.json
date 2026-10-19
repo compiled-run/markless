@@ -1123,6 +1123,14 @@
 			"from": 376,
 			"to": 1003,
 			"reason": "the page-level comment census moved here from four modules and now counts only nodes between the page markers"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 16188,
+			"to": 16609,
+			"reason": "the swap now waits for the destination code the press started, so a page shown is a page ready; it loads on link intent, never at page load"
 		}
 	],
 	"runtimeModules": {
@@ -1135,7 +1143,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 16188,
+		"router/vite/entries/fragment-entry": 16609,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8906,

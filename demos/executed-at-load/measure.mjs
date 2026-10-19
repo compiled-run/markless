@@ -18,6 +18,10 @@ const require = createRequire(resolve(ROOT, 'demos/news/package.json'));
 const { chromium } = require('playwright');
 const BASELINE_PATH = resolve(PACKAGE_DIR, 'baselines/executed-at-load.json');
 const FIXED_MICROTASK_TURNS = 8;
+// Measured 2,958 bytes: listeners plus the press-time page fetch that keeps a navigation to one round.
+const STATIC_ROUTER_BRIDGE_DOWNLOAD_CAP = 3_072;
+// Measured 862 bytes: the bridge adding its listeners and the inline line that calls it.
+const STATIC_ROUTER_EXECUTED_AT_LOAD_CAP = 1_024;
 const MODE = process.argv[2];
 // Whole-app executed bytes grow with app code, so they are reported against the last accepted
 // numbers, never gated (owner ruling 2026-09-24). The gate is the four proofs plus exact repeatability.
@@ -78,7 +82,7 @@ const repeatCount = MODE === 'gate' ? 3 : 1;
 const measurements = {};
 const heldPendingRuns = [];
 
-for (const combo of combos) {
+for (const combo of process.env.MARKLESS_MEASURE_ONLY_STATIC_ROUTER ? [] : combos) {
 	console.log(`\n== ${combo.id}: consumer build ==`);
 	await run('pnpm', ['--dir', resolve(ROOT, combo.demo), 'build'], {
 		env: { ...process.env, MARKLESS_CONSUMER_BUILD: '1' },
@@ -130,6 +134,9 @@ for (const combo of combos) {
 	}
 }
 
+await gateStaticRouter();
+if (process.env.MARKLESS_MEASURE_ONLY_STATIC_ROUTER) process.exit(0);
+
 const proofIds = Object.keys(measurements);
 if (proofIds.length !== combos.length || combos.some((combo) => !measurements[combo.id])) {
 	throw new Error('All four proved combinations must be present before recording.');
@@ -169,6 +176,228 @@ if (MODE === 'baseline') {
 // Any straggler handle (an orphaned pipe, a browser that ignored close) must
 // not turn a finished measurement into an hours-long silent hang.
 process.exit(0);
+
+// A router page with no handlers runs no framework code at load and downloads only the link bridge's intent listener;
+// at idle it may fetch next-page HTML, never framework modules. The counter page is the one-handler comparison.
+async function gateStaticRouter() {
+	const combo = { id: 'static-router', demo: 'demos/static-router', path: '/' };
+	combo.port = await freePort();
+	console.log(`\n== ${combo.id}: consumer build ==`);
+	await run('pnpm', ['--dir', resolve(ROOT, combo.demo), 'build'], {
+		env: { ...process.env, MARKLESS_CONSUMER_BUILD: '1' },
+	});
+	const preview = startPreview(combo);
+	try {
+		await waitForServer(comboUrl(combo), preview);
+		const runs = [];
+		for (let runIndex = 0; runIndex < repeatCount; runIndex++)
+			runs.push(await measureStaticRouter(combo));
+		const signatures = runs.map((entry) => JSON.stringify(entry));
+		if (signatures.some((signature) => signature !== signatures[0]))
+			throw new Error(`static-router was not exactly repeatable:\n${signatures.join('\n')}`);
+		const { staticPage, handlerPage } = runs[0];
+		console.log(
+			`-- static-router "/": downloaded ${staticPage.downloadedBytes} bytes of JS at load (${staticPage.downloads.map((d) => `${d.url} ${d.bytes}`).join(', ') || 'none'}), executed ${staticPage.executedBytes} (${staticPage.executed.map((d) => `${d.url} ${d.executedBytes}`).join(', ') || 'none'}); after idle downloaded ${staticPage.afterIdle.downloadedBytes}, executed ${staticPage.afterIdle.executedBytes}.`,
+		);
+		console.log(
+			`-- static-router "/counter/": downloaded ${handlerPage.downloadedBytes} bytes of JS at load, executed ${handlerPage.executedBytes}; after the first click executed ${handlerPage.afterClick.executedBytes} (${handlerPage.afterClick.executed.map((d) => `${d.url} ${d.executedBytes}`).join(', ')}); downloads ${handlerPage.downloads.map((d) => `${d.url} ${d.bytes}`).join(', ')}.`,
+		);
+	} finally {
+		try {
+			process.kill(-preview.pid, 'SIGTERM');
+		} catch {
+			preview.kill('SIGTERM');
+		}
+		await waitForExit(preview);
+	}
+}
+
+async function measureStaticRouter(combo) {
+	const url = comboUrl(combo);
+	const origin = new URL(url).origin;
+	const browser = await chromium.launch();
+	try {
+		const staticRun = await openMeasuredPage(browser);
+		const { page, cdp, scriptUrlById, downloads, fragments, failures } = staticRun;
+		await page.goto(url, { waitUntil: 'load' });
+		await fixedMicrotaskWindow(page);
+		const atLoad = coverageSnapshot(
+			await cdp.send('Profiler.takePreciseCoverage'),
+			url,
+			scriptUrlById,
+		);
+		const loadDownloads = downloads.map((entry) => entry);
+		await staticRun.settled();
+		const bridgePath = await page.evaluate(
+			() =>
+				/import b from"([^"]+)"/.exec(
+					document.querySelector('script[data-markless-router-link-resumer]')
+						?.textContent ?? '',
+				)?.[1] ?? null,
+		);
+		const preloads = await page.evaluate(() =>
+			[...document.querySelectorAll('link[rel="modulepreload"]')].map(
+				(link) => new URL(link.href).pathname,
+			),
+		);
+		const frameworkDownloads = loadDownloads.filter((entry) => entry.url !== bridgePath);
+		if (
+			!bridgePath ||
+			frameworkDownloads.length > 0 ||
+			preloads.some((href) => href !== bridgePath)
+		)
+			throw new Error(
+				`static-router "/": a page with no handlers must download only the link bridge at load; bridge ${bridgePath}, downloads ${JSON.stringify(loadDownloads)}, modulepreloads ${JSON.stringify(preloads)}.`,
+			);
+		const bridgeBytes = loadDownloads.reduce((sum, entry) => sum + entry.bytes, 0);
+		if (bridgeBytes > STATIC_ROUTER_BRIDGE_DOWNLOAD_CAP)
+			throw new Error(
+				`static-router "/": the link bridge downloads ${bridgeBytes} bytes at load; its intent listener must stay within ${STATIC_ROUTER_BRIDGE_DOWNLOAD_CAP}.`,
+			);
+		const frameworkExecuted = atLoad.scripts.filter(
+			(script) => script.url !== '/' && script.url !== bridgePath,
+		);
+		if (frameworkExecuted.length > 0)
+			throw new Error(
+				`static-router "/": no framework module may execute at load; ran ${JSON.stringify(frameworkExecuted)}.`,
+			);
+		if (atLoad.executedBytes > STATIC_ROUTER_EXECUTED_AT_LOAD_CAP)
+			throw new Error(
+				`static-router "/": ${atLoad.executedBytes} bytes ran at load; installing the link listeners must stay within ${STATIC_ROUTER_EXECUTED_AT_LOAD_CAP}.`,
+			);
+
+		await page.evaluate(
+			() =>
+				new Promise((done) => {
+					globalThis.__releaseIdle();
+					requestIdleCallback(() => setTimeout(done, 1_000), { timeout: 5_000 });
+				}),
+		);
+		await page.waitForLoadState('networkidle');
+		await staticRun.settled();
+		const idleDownloadedBytes = downloads.reduce((sum, entry) => sum + entry.bytes, 0);
+		const afterIdle = coverageSnapshot(
+			await cdp.send('Profiler.takePreciseCoverage'),
+			url,
+			scriptUrlById,
+		);
+		const idleModules = downloads.filter((entry) => !entry.url.startsWith('/_markless/links/'));
+		const idleRan = afterIdle.scripts.filter(
+			(script) => script.url !== '/' && !script.url.startsWith('/_markless/links/'),
+		);
+		if (idleModules.length > 0 || idleRan.length > 0)
+			throw new Error(
+				`static-router "/": idle may fetch next-page HTML, never framework modules; downloaded ${JSON.stringify(idleModules)}, ran ${JSON.stringify(idleRan)}.`,
+			);
+
+		// In-place navigation still swaps on a click, and the swapped-in page resumes.
+		await page.evaluate(() => (globalThis.__staticRouterSameDocument = true));
+		await page.click('a[href="/counter/"]');
+		await waitForText(page, 'h1', 'Counter');
+		if (!(await page.evaluate(() => globalThis.__staticRouterSameDocument === true)))
+			throw new Error(
+				'static-router: the Counter link reloaded the document instead of swapping in place.',
+			);
+		if (!fragments.some((path) => path.includes('/counter')))
+			throw new Error(
+				'static-router: the Counter link swapped without fetching its fragment.',
+			);
+		await page.click('[data-counter]');
+		await waitForText(page, '[data-counter]', 'Count 1');
+		failures.assertClean('static-router "/"');
+		await page.close();
+
+		const handlerRun = await openMeasuredPage(browser);
+		const handlerUrl = new URL('/counter/', url).href;
+		await handlerRun.page.goto(handlerUrl, { waitUntil: 'load' });
+		await fixedMicrotaskWindow(handlerRun.page);
+		const handlerAtLoad = coverageSnapshot(
+			await handlerRun.cdp.send('Profiler.takePreciseCoverage'),
+			handlerUrl,
+			handlerRun.scriptUrlById,
+		);
+		const handlerDownloads = [...handlerRun.downloads];
+		await handlerRun.settled();
+		await handlerRun.page.click('[data-counter]');
+		await waitForText(handlerRun.page, '[data-counter]', 'Count 1');
+		await fixedMicrotaskWindow(handlerRun.page);
+		const handlerAfterClick = coverageSnapshot(
+			await handlerRun.cdp.send('Profiler.takePreciseCoverage'),
+			handlerUrl,
+			handlerRun.scriptUrlById,
+		);
+		handlerRun.failures.assertClean('static-router "/counter/"');
+
+		return {
+			staticPage: {
+				downloadedBytes: bridgeBytes,
+				downloads: loadDownloads,
+				executedBytes: atLoad.executedBytes,
+				executed: atLoad.scripts,
+				afterIdle: {
+					downloadedBytes: idleDownloadedBytes,
+					executedBytes: afterIdle.executedBytes,
+				},
+			},
+			handlerPage: {
+				downloadedBytes: handlerDownloads.reduce((sum, entry) => sum + entry.bytes, 0),
+				executedBytes: handlerAtLoad.executedBytes,
+				downloads: handlerDownloads,
+				afterClick: {
+					executedBytes: handlerAfterClick.executedBytes,
+					executed: handlerAfterClick.scripts,
+				},
+			},
+		};
+	} finally {
+		await browser.close();
+	}
+
+	async function openMeasuredPage(browser) {
+		const page = await browser.newPage();
+		const failures = capturePageFailures(page);
+		const cdp = await page.context().newCDPSession(page);
+		const scriptUrlById = new Map();
+		const downloads = [];
+		const fragments = [];
+		await cdp.send('Profiler.enable');
+		await cdp.send('Debugger.enable');
+		cdp.on('Debugger.scriptParsed', (event) => scriptUrlById.set(event.scriptId, event.url));
+		await cdp.send('Profiler.startPreciseCoverage', {
+			callCount: false,
+			detailed: true,
+			allowTriggeredUpdates: false,
+		});
+		// Idle work is after load by definition; hold it so the load snapshot never races an idle callback.
+		await page.addInitScript(() => {
+			const held = [];
+			const idle = globalThis.requestIdleCallback.bind(globalThis);
+			globalThis.requestIdleCallback = (callback, options) => held.push([callback, options]);
+			globalThis.__releaseIdle = () => {
+				globalThis.requestIdleCallback = idle;
+				for (const [callback, options] of held.splice(0)) idle(callback, options);
+			};
+		});
+		const bodies = [];
+		page.on('request', (request) => {
+			const requestUrl = new URL(request.url());
+			if (requestUrl.origin !== origin) return;
+			if (request.resourceType() === 'fetch') fragments.push(requestUrl.pathname);
+			if (!requestUrl.pathname.endsWith('.js')) return;
+			const entry = { url: requestUrl.pathname, bytes: 0 };
+			downloads.push(entry);
+			bodies.push(
+				request
+					.response()
+					.then((response) => response?.body())
+					.then((body) => (entry.bytes = body?.length ?? 0))
+					.catch(() => {}),
+			);
+		});
+		const settled = () => Promise.all(bodies);
+		return { page, cdp, scriptUrlById, downloads, fragments, failures, settled };
+	}
+}
 
 function startPreview(combo) {
 	const child = spawn(

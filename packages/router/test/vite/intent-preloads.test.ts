@@ -58,7 +58,8 @@ test('link intent keeps destination packs out of initial modulepreload links', a
 	});
 	const html = await (await entry.fetch(new Request('https://docs.test/'))).text();
 	const bridge = servedLinkBridge(html, entry) ?? '';
-	expect(html).toContain('rel="modulepreload" href="/current.js"');
+	// The page resumes nothing, so its own landing plan stays off it too.
+	expect(html).not.toContain('/current.js');
 	expect(html).not.toContain('rel="modulepreload" href="/destination.js"');
 	expect(html).toContain('/destination.js');
 	expect(bridge).toContain('pointerover');
@@ -112,9 +113,9 @@ test('SSR link intent fetches only its destination without evaluating modules', 
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(String(error)));
 			await page.goto(`http://127.0.0.1:${(server.address() as { port: number }).port}/`);
-			expect(fetched).toEqual(['/current.js']);
+			expect(fetched).toEqual([]);
 			await page.getByText('Download', { exact: true }).dispatchEvent(event);
-			expect(fetched).toEqual(['/current.js']);
+			expect(fetched).toEqual([]);
 			await page.locator('a span').dispatchEvent(event);
 			await expect.poll(() => fetched).toEqual(['/current.js', '/destination.js']);
 			await page.locator('a span').dispatchEvent(event);
@@ -158,7 +159,7 @@ test('prefetch: false leaves every destination to the click', async () => {
 		routeFileIds: ['/pages/index.tsrx', '/pages/next.tsrx'],
 	});
 	const html = await (await entry.fetch(new Request('https://docs.test/'))).text();
-	expect(html).toContain('rel="modulepreload" href="/current.js"');
+	expect(html).not.toContain('/current.js');
 	expect(html).not.toContain('/destination.js');
 	expect(html).not.toContain('pointerover');
 	expect(html).toContain('data-markless-router-link-resumer');

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { servedLinkBridge } from '../support/link-bridge.ts';
+import { laterLinkBridge, servedLinkBridge } from '../support/link-bridge.ts';
 import {
 	createServerEntry,
 	type ServerEntryOptions,
@@ -95,7 +95,10 @@ test('the link bridge carries each destination landing plan and no client-render
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
 	const bridge = servedLinkBridge(html, served) ?? '';
 	expect(bridge).toContain('"/next":["/landing-next.js"]');
-	expect(bridge).toContain('"entry":"/fragment.js"');
+	// The page bridge only listens; the config and fetch logic load on the first intent or at idle.
+	expect(bridge).not.toContain('"entry":"/fragment.js"');
+	expect(bridge).toContain(served.linkBridgeModules![2]!.path);
+	expect(laterLinkBridge(served)).toContain('"entry":"/fragment.js"');
 	expect(html).not.toContain('/client-render-next.js');
 	expect(html).not.toContain('rel="modulepreload" href="/navigation.js"');
 });
@@ -127,15 +130,15 @@ test('plain anchors to pages get their landing plan, and the bridge names every 
 	const bridge = servedLinkBridge(html, served) ?? '';
 	expect(bridge).toContain('"/next":["/landing-next.js"]');
 	expect(bridge).not.toContain('notes.txt');
-	expect(bridge).toContain('"pages":["/","/next"]');
-	expect(bridge).toContain('"prefetch":true');
+	expect(laterLinkBridge(served)).toContain('"pages":["/","/next"]');
+	expect(laterLinkBridge(served)).toContain('"prefetch":true');
 });
 
 test('prefetch: false turns every speculative fetch off in the bridge', async () => {
 	const served = entry({ prefetch: false });
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
-	const bridge = servedLinkBridge(html, served) ?? '';
-	expect(bridge).toContain('"prefetch":false');
+	expect(servedLinkBridge(html, served)).toBeDefined();
+	expect(laterLinkBridge(served)).toContain('"prefetch":false');
 });
 
 test('only a page that links a hash route loads the bridge carrying its click path', async () => {
@@ -157,4 +160,15 @@ test('only a page that links a hash route loads the bridge carrying its click pa
 	expect(modulePath(plainHtml)).not.toBe(modulePath(hashHtml));
 	expect(plainHtml).toContain(`rel="modulepreload" href="${modulePath(plainHtml)}"`);
 	expect(hashHtml).toContain(`rel="modulepreload" href="${modulePath(hashHtml)}"`);
+});
+
+test('a destination with nothing to preload is still listed, so the idle tier fetches its page', async () => {
+	const served = entry({
+		routeSsrModulePreloads: {
+			'pages/index.tsrx': ['/landing-index.js'],
+			'pages/next.tsrx': [],
+		},
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	expect(servedLinkBridge(html, served)).toContain('"/next":[]');
 });

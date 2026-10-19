@@ -21,3 +21,13 @@ export function servedLinkBridge(
 		.replace(/;$/, '');
 	return `(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;(${bridge})(${stub[2]});})();`;
 }
+
+// The bridge files a page loads only once it shows link intent or goes idle: the fragment navigation run half and its config.
+export function laterLinkBridge(entry: {
+	readonly linkBridgeModules?: readonly LinkBridgeModule[];
+}): string {
+	return (entry.linkBridgeModules ?? [])
+		.slice(2)
+		.map((module) => module.source)
+		.join('\n');
+}

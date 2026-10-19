@@ -144,16 +144,15 @@ export default box(
 			await waitForSettledNetwork(page);
 			await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 
-			// Fast network: the idle tier fetches the visible link's round, so the click itself fetches nothing.
+			// Fast network: the idle tier fetches the visible link's HTML only; its code waits for the press.
 			const idlePage = (await preview.browser.visit('/', {
 				networkConditions: FAST_4G,
 			})) as Page;
 			idlePage.allowedLazyHrefs = plan.observabilityHrefs;
 			await expect.page.text(idlePage, 'h1', 'Markless Router', WAIT);
 			const idleLanding = await waitForRequests(idlePage, plan.index.landing);
-			const idleRound = await waitForRequests(idlePage, [...plan.docsRound, DOCS_PATH]);
+			const idleRound = await waitForRequests(idlePage, [DOCS_PATH]);
 			receipt.note(`idle-tier docs round:\n${timeline(idleRound)}`);
-			expectOneRound(idleRound, 'idle-tier docs round');
 			await waitForSettledNetwork(idlePage);
 			const idleBefore = await idlePage.networkRequests();
 			const idleExtra = appRequests(idleBefore, plan).filter(
@@ -164,7 +163,7 @@ export default box(
 			);
 			if (idleExtra.length > 0)
 				throw new Error(
-					`Expected the idle tier to fetch only the docs fragment and its landing code, saw:\n${timeline(idleExtra)}`,
+					`Expected the idle tier to fetch only the docs fragment, no code, saw:\n${timeline(idleExtra)}`,
 				);
 			await idlePage.click(DOCS_LINK, WAIT);
 			await expect.page.text(idlePage, 'h1', 'Docs', WAIT);
@@ -175,14 +174,19 @@ export default box(
 				plan,
 			).filter((request) => !plan.observabilityPaths.has(pathOf(request.url)));
 			receipt.note(`idle-tier click requests:\n${timeline(clickRequests)}`);
-			// The destination's own idle tier may fetch fragments for the links it shows; code and the docs fragment may not come again.
-			const clickFetched = clickRequests.filter(
-				(request) =>
-					jsBuildRequests([request]).length > 0 || pathOf(request.url) === DOCS_PATH,
-			);
-			if (clickFetched.length > 0)
+			// The press fetches the docs code round once; the destination's own idle tier may fetch fragments for the links it shows.
+			const clickCode = jsBuildRequests(clickRequests);
+			const expectedCode = [...plan.docsRound].sort();
+			const seenCode = clickCode.map((request) => pathOf(request.url)).sort();
+			if (seenCode.join('\n') !== expectedCode.join('\n'))
 				throw new Error(
-					`Expected a click after the idle round to fetch nothing, saw:\n${timeline(clickFetched)}`,
+					`Expected a click after the idle round to fetch the docs code once and nothing more.\nexpected: ${expectedCode.join(', ')}\nsaw:\n${timeline(clickCode)}`,
+				);
+			expectOneRound(clickCode, 'idle-tier click code round');
+			const refetched = clickRequests.filter((request) => pathOf(request.url) === DOCS_PATH);
+			if (refetched.length > 0)
+				throw new Error(
+					`Expected a click after the idle round not to fetch the docs fragment again, saw:\n${timeline(refetched)}`,
 				);
 			await expectNothingWasted(idlePage, plan, 'idle-tier index -> docs');
 			await idlePage.clearNetworkEmulation();

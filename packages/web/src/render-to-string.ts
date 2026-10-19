@@ -102,7 +102,7 @@ export type RenderToStringOptions = {
 	// (streaming hosts compute Link-target preloads from the shell output).
 	readonly modulePreloads?:
 		| ReadonlyArray<ModulePreloadInput>
-		| ((html: string) => ReadonlyArray<ModulePreloadInput> | undefined);
+		| ((html: string, resumes: boolean) => ReadonlyArray<ModulePreloadInput> | undefined);
 	readonly inlineRuntimeRegistry?: Set<string>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	// Page props forwarded to the compiled renderSsr (router hosts).
@@ -199,7 +199,7 @@ export async function assembleSsrContainer(
 	const artifactSources = artifactInlineResumerSources(component);
 	const optionPreloads =
 		typeof options.modulePreloads === 'function'
-			? options.modulePreloads(output.html)
+			? options.modulePreloads(output.html, hasPayload && browserTriggers)
 			: options.modulePreloads;
 	const modulePreloads =
 		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
@@ -306,7 +306,7 @@ export async function assemblePrerenderPageParts(
 		artifactResumeModuleUrl(component);
 	const optionPreloads =
 		typeof options.modulePreloads === 'function'
-			? options.modulePreloads(output.html)
+			? options.modulePreloads(output.html, browserTriggers && resumeModuleUrl !== undefined)
 			: options.modulePreloads;
 	const modulePreloads =
 		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);

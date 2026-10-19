@@ -3,6 +3,7 @@ import type { ModulePreloadInput } from '@markless/web/render-to-string';
 
 export interface FragmentNavigationConfig {
 	readonly entry: string;
+	readonly entryImports: readonly string[];
 	readonly linkAttribute: string;
 	readonly prefetchAttribute: string;
 	readonly replaceAttribute: string;
@@ -69,9 +70,11 @@ export type FragmentNavigationState = {
 	readonly prefetch: (url: URL) => void;
 	readonly parse: (url: string, text: string) => FragmentFetched;
 	readonly idleDownloads: boolean;
-	// Schedules the idle tier: at idle, download the landing code and a few fragments of the page links in view.
+	// Schedules the idle tier: at idle, fetch a few page fragments of the links in view; their code waits for intent.
 	readonly rescan: () => void;
 	readonly scrolled: Set<Element>;
+	// Code the intent started preloading, by absolute href, settling once each file has arrived.
+	readonly arriving: Map<string, Promise<unknown>>;
 };
 
 export type FragmentScroll =
@@ -506,7 +509,19 @@ export async function navigate(
 		fallback(fetched.url);
 		return;
 	}
+	// The destination shows once its own code has arrived, so its first interaction never waits on a fetch.
+	const code = [...next.head.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')].map(
+		(link) => state.arriving.get(new URL(link.getAttribute('href') ?? '', d.baseURI).href),
+	);
+	for (const item of state.routes[url.pathname] ?? [])
+		code.push(
+			state.arriving.get(new URL(typeof item === 'string' ? item : item.href, d.baseURI).href),
+		);
 	const head = await mergeHead(d, next);
+	await Promise.race([
+		Promise.all(code),
+		new Promise((resolve) => w.setTimeout(resolve, 3000)),
+	]);
 	if (id !== session.navigation) return taken.abort();
 	let restore = scroll;
 	if (mode === 'traverse') {

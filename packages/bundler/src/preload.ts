@@ -25,8 +25,10 @@ export {
 	isResumeSourceRequest,
 	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
+	resolverVirtualModuleSourceFile,
 } from './virtual-ids.ts';
 export { plannedLandingFiles } from './build/planned-landing.ts';
+export { warmEvaluatedImports } from './build/warm-packs.ts';
 export { isExecutionLogChunk } from './execution-log.ts';
 export {
 	isMarklessDeferredPack,

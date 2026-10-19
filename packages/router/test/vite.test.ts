@@ -20,6 +20,7 @@ import {
 	MARKLESS_PUBLIC_BUILD_METADATA_FILES,
 	MARKLESS_BUILD_PREFIX,
 } from '@markless/bundler/rolldown';
+import { warmPacksSuffix } from '../../bundler/src/build/warm-packs.ts';
 import { router } from '../src/vite/index.ts';
 import { LINK_BRIDGE_DIR } from '../src/vite/runtime/link-bridge-module.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
@@ -665,6 +666,92 @@ test('persists client assets for a fresh server plugin instance', async () => {
 	}
 });
 
+test('a page whose resolver lists no symbol gets no landing plan; the swap module lists what it imports', async () => {
+	const workspace = await mkdtemp(join(tmpdir(), 'markless-router-quiet-landing-'));
+	const root = join(workspace, 'app');
+	const clientOutDir = join(root, 'dist/client');
+	const resolvedConfig = {
+		base: '/',
+		command: 'build',
+		environments: {
+			browser: { consumer: 'client', build: { outDir: 'dist/client' } },
+			ssr: { consumer: 'server', build: { outDir: join(root, 'dist/server') } },
+		},
+		root,
+	};
+	const resolverId = (file: string) =>
+		`\0virtual:markless:resolver:${encodeURIComponent(join(root, file))}`;
+	const bundle = {
+		'build/navigation.js': chunk({
+			code: `const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? "__MARKLESS_ROUTER_ROUTE_PRELOADS__";`,
+			dynamicImports: ['build/home.js', 'build/notes.js'],
+			fileName: 'build/navigation.js',
+			moduleIds: ['/repo/packages/router/src/vite/entries/client-entry.ts'],
+		}),
+		'build/resume.js': chunk({
+			code: `const routes = {"/pages/index.tsrx":()=>import("./home.js"),"/pages/notes.tsrx":()=>import("./notes.js")};`,
+			dynamicImports: ['build/home.js', 'build/notes.js'],
+			fileName: 'build/resume.js',
+			imports: ['build/runtime.js'],
+			moduleIds: ['/repo/packages/router/src/vite/entries/resume-entry.ts'],
+		}),
+		'build/runtime.js': chunk({ fileName: 'build/runtime.js' }),
+		'build/home.js': chunk({
+			fileName: 'build/home.js',
+			moduleIds: [join(root, 'pages/index.tsrx'), resolverId('pages/index.tsrx')],
+		}),
+		'build/home-handler.js': chunk({
+			fileName: 'build/home-handler.js',
+			moduleIds: [
+				`\0virtual:markless:symbol:${encodeURIComponent(join(root, 'pages/index.tsrx'))}:${encodeURIComponent('symbol:0')}`,
+			],
+		}),
+		'build/notes.js': chunk({
+			fileName: 'build/notes.js',
+			moduleIds: [join(root, 'pages/notes.tsrx'), resolverId('pages/notes.tsrx')],
+		}),
+		'build/fragment.js': chunk({
+			fileName: 'build/fragment.js',
+			imports: ['build/helper.js'],
+			moduleIds: ['/repo/packages/router/src/vite/entries/fragment-entry.ts'],
+		}),
+		'build/helper.js': chunk({ fileName: 'build/helper.js' }),
+	};
+
+	try {
+		await mkdir(join(root, 'pages'), { recursive: true });
+		const plugins = flattenPlugins([router()]);
+		const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+		configPlugin?.configResolved?.(resolvedConfig as never);
+		const context = { environment: { config: resolvedConfig.environments.browser } };
+		await hookHandler(configPlugin?.buildStart)?.call(context);
+		await hookHandler(configPlugin?.generateBundle)?.call(context, {}, bundle);
+		for (const fileName of Object.keys(bundle)) {
+			await mkdir(join(clientOutDir, fileName, '..'), { recursive: true });
+			await writeFile(join(clientOutDir, fileName), 'export {};');
+		}
+		await hookHandler(configPlugin?.writeBundle)?.call(context, {}, bundle);
+		const persisted = JSON.parse(
+			await readFile(clientAssetsManifestPath(clientOutDir), 'utf8'),
+		) as {
+			readonly entries: { readonly fragment?: string; readonly fragmentImports?: string[] };
+			readonly routes: { readonly ssr: Record<string, readonly string[]> };
+		};
+
+		expect(persisted.entries.fragment).toBe('/build/fragment.js');
+		expect(persisted.entries.fragmentImports).toEqual(['/build/helper.js']);
+		expect(persisted.routes.ssr['pages/notes.tsrx']).toEqual([]);
+		expect(persisted.routes.ssr['pages/index.tsrx']).toEqual([
+			'/build/resume.js',
+			'/build/runtime.js',
+			'/build/home.js',
+			'/build/home-handler.js',
+		]);
+	} finally {
+		await rm(workspace, { force: true, recursive: true });
+	}
+});
+
 test('rejects invalid persisted client-assets manifests and writes only the v1 schema', async () => {
 	const clientOutDir = await mkdtemp(join(tmpdir(), 'markless-router-invalid-assets-'));
 	const manifestPath = clientAssetsManifestPath(clientOutDir);
@@ -1223,6 +1310,7 @@ function planIntentFixture(
 	deferredName: string,
 	runtimeLoadsCapability: boolean | 'lazy-sibling' = false,
 	planned?: { readonly firstUse: readonly string[]; readonly fallback?: string },
+	warmsWiring = false,
 ) {
 	const lazySibling = runtimeLoadsCapability === 'lazy-sibling';
 	const plugins = flattenPlugins([router(options)]);
@@ -1258,7 +1346,7 @@ function planIntentFixture(
 				moduleIds: ['/project/pages/landing.tsrx'],
 			}),
 			'build/landing-resume.js': chunk({
-				code: 'export const wake = () => import("./capability.js"); export const log = () => import("./dev-log.js");',
+				code: `export const wake = () => import("./capability.js"); export const log = () => import("./dev-log.js");${warmsWiring ? warmPacksSuffix(['./wiring.js']) : ''}`,
 				dynamicImports: [
 					'build/capability.js',
 					'build/wiring.js',
@@ -1427,6 +1515,18 @@ test('a planned landing preloads its first-use files and what they statically im
 			}).ssr,
 		).toEqual(unplanned.ssr);
 	}
+});
+
+test('a planned landing also preloads the packs its code evaluates a task after the first event', () => {
+	const plan = planIntentFixture(
+		{},
+		'rest',
+		false,
+		{ firstUse: ['build/landing-resume.js', 'build/landing.js'] },
+		true,
+	);
+	expect(plan.ssr).toContain('/app/build/wiring.js');
+	expect(plan.ssr).not.toContain('/app/build/capability.js');
 });
 
 test('a route-set deferred pack is reached on demand, never preloaded', () => {
