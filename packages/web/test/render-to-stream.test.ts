@@ -3,7 +3,7 @@ import {
 	ASYNC_PROTOCOL_VERSION,
 	createProtocolStatePayload,
 } from '@markless/serializer';
-import { expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '../src/fns/ssr.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
 
@@ -144,6 +144,30 @@ function relayArtifact(input: {
 		},
 	};
 }
+
+// Fake timers fire one at a time, each only after every promise the previous one woke has settled,
+// so the first-flush deadline and the runners' delays keep their scheduled order on a loaded machine.
+let timerDriver: { running: boolean; done: Promise<void> } | undefined;
+
+beforeEach(() => {
+	vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+	const driver = { running: true, done: Promise.resolve() };
+	driver.done = (async () => {
+		while (driver.running) {
+			await new Promise((resolve) => setImmediate(resolve));
+			if (driver.running) await vi.advanceTimersToNextTimerAsync();
+		}
+	})();
+	timerDriver = driver;
+});
+
+afterEach(async () => {
+	if (timerDriver) {
+		timerDriver.running = false;
+		await timerDriver.done;
+	}
+	vi.useRealTimers();
+});
 
 async function collect(appends: AsyncGenerator<string>): Promise<string[]> {
 	const chunks: string[] = [];
