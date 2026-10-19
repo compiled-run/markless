@@ -420,7 +420,7 @@ export function runFragmentNavigation(
 		}, config.prefetchTtlMs);
 		if (code) preloadCode(url, false);
 	};
-	// Idle tier, fast unmetered connections only: fetch the HTML of a few links in view, one round; code waits for intent.
+	// Idle tier, fast unmetered connections only: fetch the HTML of a few links in view and preload their code, one round.
 	let scanning = false;
 	let idleQueue: URL[] = [];
 	// Idle fetches wait for a free connection rather than cancel one another.
@@ -430,7 +430,10 @@ export function runFragmentNavigation(
 			for (const entry of state.prefetches.values()) if (entry.open) open += 1;
 			if (open >= config.prefetchConnections) return;
 			const url = idleQueue.shift()!;
-			if (!state.prefetches.has(pageKey(url))) prefetch(url, false);
+			if (state.prefetches.has(pageKey(url))) continue;
+			prefetch(url, false);
+			// Low priority and never evaluated: a modulepreload only fills the cache before a press.
+			preloadCode(url, true);
 		}
 	};
 	const rescan = () => {

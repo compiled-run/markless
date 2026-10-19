@@ -25,11 +25,15 @@ const packagesRoot = resolve(import.meta.dirname, '../../..');
 type ServedFixture = {
 	readonly origin: string;
 	readonly navigationEntry: string;
+	readonly fragmentEntry: string;
+	readonly landing: Record<string, readonly string[]>;
 	readonly close: () => Promise<void>;
 };
 
 let origin = '';
 let navigationEntry = '';
+let fragmentEntry = '';
+let landing: Record<string, readonly string[]> = {};
 let docOrigin = '';
 let productionOrigin = '';
 const served: ServedFixture[] = [];
@@ -56,11 +60,11 @@ async function serveFixture(name: string, production = false): Promise<ServedFix
 		else process.env.NODE_ENV = nodeEnv;
 	}
 	const manifest = JSON.parse(
-		await readFile(
-			clientAssetsManifestPath(join(root, '.output/public')),
-			'utf8',
-		),
-	) as { entries: { navigation: string } };
+		await readFile(clientAssetsManifestPath(join(root, '.output/public')), 'utf8'),
+	) as {
+		entries: { navigation: string; fragment: string };
+		routes: { ssr: Record<string, readonly string[]> };
+	};
 	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	}).catch(async (error: unknown) => {
@@ -71,7 +75,13 @@ async function serveFixture(name: string, production = false): Promise<ServedFix
 		server.close();
 		await rm(root, { recursive: true, force: true });
 	};
-	return { origin: server.origin, navigationEntry: manifest.entries.navigation, close };
+	return {
+		origin: server.origin,
+		navigationEntry: manifest.entries.navigation,
+		fragmentEntry: manifest.entries.fragment,
+		landing: manifest.routes.ssr,
+		close,
+	};
 }
 
 beforeAll(async () => {
@@ -79,6 +89,8 @@ beforeAll(async () => {
 	served.push(app);
 	origin = app.origin;
 	navigationEntry = app.navigationEntry;
+	fragmentEntry = app.fragmentEntry;
+	landing = app.landing;
 	const doc = await serveFixture('fragment-doc-app');
 	served.push(doc);
 	docOrigin = doc.origin;
@@ -219,7 +231,9 @@ for (const [name, browserType] of [
 					new Promise<string | null | undefined>((resolve) => {
 						(document.querySelector('[data-nav="form"]') as HTMLElement).click();
 						setTimeout(() =>
-							resolve(document.querySelector('[data-page]')?.getAttribute('data-page')),
+							resolve(
+								document.querySelector('[data-page]')?.getAttribute('data-page'),
+							),
 						);
 					}),
 			);
@@ -274,14 +288,18 @@ for (const [name, browserType] of [
 				(window as { requestIdleCallback?: unknown }).requestIdleCallback = () => 0;
 			});
 			await page.goto(productionOrigin + '/other');
-			await page.evaluate(() => (document.querySelector('[data-plain-home]') as HTMLElement).click());
+			await page.evaluate(() =>
+				(document.querySelector('[data-plain-home]') as HTMLElement).click(),
+			);
 			await landedOn(page, 'home');
 			expect(requests).toContain('/ fragment');
 			expect(requests).not.toContain('/');
 			await page.goto(productionOrigin + '/other');
 			await Promise.all([
 				page.waitForURL(`${productionOrigin}/nowhere`),
-				page.evaluate(() => (document.querySelector('[data-plain-unknown]') as HTMLElement).click()),
+				page.evaluate(() =>
+					(document.querySelector('[data-plain-unknown]') as HTMLElement).click(),
+				),
 			]);
 			expect(requests).not.toContain('/nowhere fragment');
 			expect(errors).toEqual([]);
@@ -503,7 +521,9 @@ for (const [name, browserType] of [
 			await page.locator('[data-nav="missing"]').click();
 			await page.waitForURL(`${origin}/missing`);
 			await page.waitForLoadState('load');
-			expect(requests.filter((request) => request.startsWith('/missing'))).toEqual(['/missing']);
+			expect(requests.filter((request) => request.startsWith('/missing'))).toEqual([
+				'/missing',
+			]);
 			expect(await page.locator('main').count()).toBe(0);
 			await page.close();
 		});
@@ -731,6 +751,28 @@ for (const [name, browserType] of [
 				'/slow fragment',
 			]);
 			expect(cancelled).toEqual([]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('at idle on a fast connection, the swap module and the code of each page in view download', async () => {
+			const { page, errors } = await open(browser);
+			const scripts: string[] = [];
+			page.on('request', (request) => {
+				if (request.resourceType() === 'script')
+					scripts.push(new URL(request.url()).pathname);
+			});
+			await page.waitForTimeout(3500);
+			const destinations = ['pages/other.tsrx', 'pages/form.tsrx', 'pages/slow.tsrx'];
+			const own = new Set(landing['pages/index.tsrx'] ?? []);
+			const expected = [
+				fragmentEntry,
+				...destinations
+					.flatMap((route) => landing[route] ?? [])
+					.filter((href) => !own.has(href)),
+			];
+			expect(expected.length).toBeGreaterThan(1);
+			for (const href of expected) expect(scripts).toContain(new URL(href, origin).pathname);
 			expect(errors).toEqual([]);
 			await page.close();
 		});

@@ -26,6 +26,8 @@ const STATIC_ROUTER_EXECUTED_AT_LOAD_CAP = 1_024;
 const STATIC_ROUTER_FIRST_CLICK_DOWNLOAD_CAP = 16_384;
 // Measured 364 ms (runs 356-366); unmet target 212 ms, the time before static pages stopped preloading code (252 ms here).
 const STATIC_ROUTER_NAVIGATION_MS_CAP = 384;
+// Measured 8 ms (runs 7-9) with idle preloading the next pages' code; 9 ms is what the page took when it preloaded everything at load.
+const STATIC_ROUTER_FAST_NAVIGATION_MS_CAP = 9;
 const NAVIGATION_SAMPLES = 5;
 // 150 ms latency, 1.6 Mbps down: the network profile the navigation regression was reported under.
 const THROTTLED_NETWORK = {
@@ -234,6 +236,13 @@ async function gateStaticRouter() {
 			failed.push(
 				`static-router: navigating after idle (${navigation.afterIdle.median} ms) was slower than without idle (${navigation.cold.median} ms).`,
 			);
+		console.log(
+			`-- static-router "/" -> "/counter/" unthrottled after idle: median ${navigation.fastAfterIdle.median} ms (${navigation.fastAfterIdle.samples.join(', ')}).`,
+		);
+		if (navigation.fastAfterIdle.median > STATIC_ROUTER_FAST_NAVIGATION_MS_CAP)
+			failed.push(
+				`static-router: after idle on a fast connection, navigating from "/" to "/counter/" took a median ${navigation.fastAfterIdle.median} ms; it must stay within ${STATIC_ROUTER_FAST_NAVIGATION_MS_CAP}.`,
+			);
 		if (failed.length) throw new Error(failed.join('\n'));
 	} finally {
 		try {
@@ -318,9 +327,9 @@ async function measureStaticRouter(combo) {
 		const idleRan = afterIdle.scripts.filter(
 			(script) => script.url !== '/' && !script.url.startsWith('/_markless/links/'),
 		);
-		if (idleModules.length > 0 || idleRan.length > 0)
+		if (idleModules.length === 0 || idleRan.length > 0)
 			throw new Error(
-				`static-router "/": idle may fetch next-page HTML, never framework modules; downloaded ${JSON.stringify(idleModules)}, ran ${JSON.stringify(idleRan)}.`,
+				`static-router "/": idle preloads the next pages' code without running it; downloaded ${JSON.stringify(idleModules)}, ran ${JSON.stringify(idleRan)}.`,
 			);
 
 		// In-place navigation still swaps on a click, and the swapped-in page resumes.
@@ -447,14 +456,14 @@ async function measureStaticRouter(combo) {
 async function measureStaticNavigation(combo) {
 	const browser = await chromium.launch();
 	try {
-		const sample = async (afterIdle) => {
+		const sample = async (afterIdle, network) => {
 			const context = await browser.newContext();
 			try {
 				const page = await context.newPage();
 				const failures = capturePageFailures(page);
 				const cdp = await context.newCDPSession(page);
 				await cdp.send('Network.enable');
-				await cdp.send('Network.emulateNetworkConditions', THROTTLED_NETWORK);
+				if (network) await cdp.send('Network.emulateNetworkConditions', network);
 				await page.addInitScript((holdIdle) => {
 					if (holdIdle) globalThis.requestIdleCallback = () => 0;
 					addEventListener(
@@ -500,14 +509,18 @@ async function measureStaticNavigation(combo) {
 				await context.close();
 			}
 		};
-		const series = async (afterIdle) => {
+		const series = async (afterIdle, network = THROTTLED_NETWORK) => {
 			const samples = [];
 			for (let index = 0; index < NAVIGATION_SAMPLES; index++)
-				samples.push(await sample(afterIdle));
+				samples.push(await sample(afterIdle, network));
 			const sorted = [...samples].sort((a, b) => a - b);
 			return { median: sorted[sorted.length >> 1], samples };
 		};
-		return { cold: await series(false), afterIdle: await series(true) };
+		return {
+			cold: await series(false),
+			afterIdle: await series(true),
+			fastAfterIdle: await series(true, null),
+		};
 	} finally {
 		await browser.close();
 	}
