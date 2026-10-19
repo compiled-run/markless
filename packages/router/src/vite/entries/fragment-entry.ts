@@ -202,13 +202,157 @@ function reportAsync(error: unknown): void {
 	});
 }
 
-function execute(d: Document, script: HTMLScriptElement): void {
-	const type = script.type;
-	if (type && type !== 'module' && type !== 'text/javascript') return;
+// The JavaScript MIME types of the HTML spec, which a browser runs as classic scripts.
+const JAVASCRIPT_TYPE =
+	/^(?:|(?:text|application)\/(?:x-)?(?:java|ecma)script|text\/(?:javascript1\.[0-5]|jscript|livescript))$/;
+
+function scriptKind(script: HTMLScriptElement): 'classic' | 'module' | undefined {
+	const type = script.getAttribute('type');
+	const language = script.getAttribute('language');
+	const essence = (type ?? (language ? `text/${language}` : ''))
+		.split(';')[0]!
+		.trim()
+		.toLowerCase();
+	if (essence === 'module') return 'module';
+	if (!JAVASCRIPT_TYPE.test(essence) || script.hasAttribute('nomodule')) return undefined;
+	return 'classic';
+}
+
+// A parsed or adopted script never runs; a fresh element with its attributes and text does.
+function runnable(d: Document, script: HTMLScriptElement): HTMLScriptElement {
 	const clone = d.createElement('script');
 	for (const attribute of script.attributes) clone.setAttribute(attribute.name, attribute.value);
 	clone.textContent = script.textContent;
-	script.replaceWith(clone);
+	return clone;
+}
+
+const settles = (script: HTMLScriptElement) =>
+	new Promise<unknown>((done) => {
+		script.addEventListener('load', done, { once: true });
+		script.addEventListener('error', done, { once: true });
+	});
+
+// External files this document already ran: a page that includes one again keeps the loaded copy.
+const ranFiles = new WeakMap<Document, Set<string>>();
+
+function filesRan(d: Document): Set<string> {
+	let files = ranFiles.get(d);
+	if (!files) ranFiles.set(d, (files = new Set()));
+	for (const script of d.scripts) if (script.src && scriptKind(script)) files.add(script.src);
+	return files;
+}
+
+type LoadListener = {
+	readonly target: EventTarget;
+	readonly type: string;
+	readonly listener: EventListenerOrEventListenerObject;
+};
+
+// The document fired DOMContentLoaded and load already: listeners the page's scripts add are called once those scripts ran.
+function captureLoadListeners(d: Document, w: Window, into: LoadListener[]): () => void {
+	const targets: Array<readonly [EventTarget, string]> = [];
+	if (d.readyState !== 'loading') targets.push([d, 'DOMContentLoaded']);
+	if (d.readyState === 'complete') targets.push([w, 'load']);
+	const restores = targets.map(([target, type]) => {
+		const own = Object.getOwnPropertyDescriptor(target, 'addEventListener');
+		const add = target.addEventListener;
+		target.addEventListener = function (
+			this: EventTarget,
+			kind: string,
+			listener: EventListenerOrEventListenerObject | null,
+			options?: boolean | AddEventListenerOptions,
+		) {
+			if (kind === type && listener && this === target) into.push({ target, type, listener });
+			return add.call(this, kind, listener, options);
+		};
+		return () => {
+			if (own) Object.defineProperty(target, 'addEventListener', own);
+			else delete (target as { addEventListener?: unknown }).addEventListener;
+		};
+	});
+	return () => {
+		for (const restore of restores) restore();
+	};
+}
+
+function callLoadListeners(listeners: readonly LoadListener[], type: string): void {
+	const event = new Event(type);
+	for (const entry of listeners) {
+		if (entry.type !== type) continue;
+		try {
+			if (typeof entry.listener === 'function') entry.listener.call(entry.target, event);
+			else entry.listener.handleEvent(event);
+		} catch (error) {
+			reportAsync(error);
+		}
+	}
+}
+
+// A landing's order: blocking classic scripts one by one, async as they arrive, then deferred and module scripts, then load listeners.
+async function runScripts(
+	d: Document,
+	scripts: readonly HTMLScriptElement[],
+	ran: Set<string>,
+	current: () => boolean,
+): Promise<void> {
+	const w = d.defaultView!;
+	const listeners: LoadListener[] = [];
+	const release = captureLoadListeners(d, w, listeners);
+	try {
+		const deferred: HTMLScriptElement[] = [];
+		for (const script of scripts) {
+			const kind = scriptKind(script);
+			if (!kind || !script.isConnected) continue;
+			const src = script.hasAttribute('src') ? script.src : '';
+			if (src && ran.has(src)) continue;
+			if (src) ran.add(src);
+			const async = script.hasAttribute('async') && (src !== '' || kind === 'module');
+			if (!async && (kind === 'module' || (src && script.hasAttribute('defer')))) {
+				deferred.push(script);
+				continue;
+			}
+			const clone = runnable(d, script);
+			if (async || !src) {
+				script.replaceWith(clone);
+				continue;
+			}
+			clone.async = false;
+			const done = settles(clone);
+			script.replaceWith(clone);
+			await done;
+			if (!current()) return;
+		}
+		let last: Promise<unknown> | undefined;
+		let tail: HTMLScriptElement | undefined;
+		for (const script of deferred) {
+			if (!script.isConnected) continue;
+			const clone = runnable(d, script);
+			clone.async = false;
+			last = clone.src ? settles(clone) : undefined;
+			tail = clone;
+			script.replaceWith(clone);
+		}
+		// An inline module fires no load event, so a marker queued after the last one says when it ran.
+		if (tail && !last) {
+			const key = `__marklessScriptsRan${Math.random().toString(36).slice(2)}`;
+			const host = w as unknown as Record<string, unknown>;
+			last = new Promise((done) => (host[key] = done));
+			const marker = d.createElement('script');
+			marker.type = 'module';
+			marker.async = false;
+			if (tail.nonce) marker.nonce = tail.nonce;
+			marker.textContent = `window.${key}();`;
+			d.head.append(marker);
+			await last;
+			delete host[key];
+			marker.remove();
+		} else await last;
+		if (!current()) return;
+		callLoadListeners(listeners, 'DOMContentLoaded');
+		callLoadListeners(listeners, 'load');
+	} finally {
+		release();
+	}
 }
 
 function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> {
@@ -246,9 +390,8 @@ async function mergeHead(d: Document, next: Document) {
 			else d.head.prepend(node);
 			if (node.localName === 'link' && (node as HTMLLinkElement).rel === 'stylesheet')
 				stylesheets.push(node as HTMLLinkElement);
-			// A kept inline script already ran on this document; only one the destination adds runs.
-			if (node.localName === 'script' && !(node as HTMLScriptElement).src)
-				scripts.push(node as HTMLScriptElement);
+			// A kept head script already ran on this document; only one the destination adds runs.
+			if (node.localName === 'script') scripts.push(node as HTMLScriptElement);
 		}
 		cursor = node;
 	}
@@ -515,13 +658,13 @@ export async function navigate(
 	);
 	for (const item of state.routes[url.pathname] ?? [])
 		code.push(
-			state.arriving.get(new URL(typeof item === 'string' ? item : item.href, d.baseURI).href),
+			state.arriving.get(
+				new URL(typeof item === 'string' ? item : item.href, d.baseURI).href,
+			),
 		);
+	const ranFiles = filesRan(d);
 	const head = await mergeHead(d, next);
-	await Promise.race([
-		Promise.all(code),
-		new Promise((resolve) => w.setTimeout(resolve, 3000)),
-	]);
+	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (id !== session.navigation) return taken.abort();
 	let restore = scroll;
 	if (mode === 'traverse') {
@@ -614,8 +757,12 @@ export async function navigate(
 		sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
 	for (const element of head.stale) element.remove();
 	if (next.title && d.title !== next.title) d.title = next.title;
-	for (const script of head.scripts) execute(d, script);
-	for (const script of scripts) execute(d, script as HTMLScriptElement);
+	const ran = runScripts(
+		d,
+		[...head.scripts, ...(scripts as HTMLScriptElement[])],
+		ranFiles,
+		() => id === session.navigation,
+	);
 	const active = d.activeElement as HTMLElement | null;
 	if (active && active !== d.body && !region.contains(active)) active.blur?.();
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();
@@ -646,4 +793,5 @@ export async function navigate(
 		if (w.requestIdleCallback) w.requestIdleCallback(idle, { timeout: 2000 });
 		else w.setTimeout(idle, 200);
 	}, reportAsync);
+	await ran;
 }

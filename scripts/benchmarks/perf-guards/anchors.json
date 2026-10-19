@@ -1261,6 +1261,14 @@
 				"gzip": 17485
 			},
 			"reason": "initial anchors: resume data per list row on the rows fixture and per route, measured before per-template records"
+		},
+		{
+			"date": "2026-10-19",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 16609,
+			"to": 20390,
+			"reason": "swap module runs the destination page's scripts in landing order (head libraries, blocking/defer/module/async, load listeners); +3.8 kB rendered, loaded on link intent only, nothing at page load"
 		}
 	],
 	"runtimeModules": {
@@ -1273,7 +1281,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 16609,
+		"router/vite/entries/fragment-entry": 20390,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8906,
