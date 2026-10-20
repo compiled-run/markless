@@ -359,12 +359,12 @@ export function emitSourceModule(input: {
 			? ''
 			: canonicalRenderData
 				? emitsSsrBody
-					? `import { marklessPrerenderData, marklessRenderData } from '${input.renderDataId}';`
-					: `import { marklessPrerenderData } from '${input.renderDataId}';`
-				: `import { marklessRenderData } from '${input.renderDataId}';`,
+					? `import { marklessPrerenderData, marklessRenderData } from ${singleQuoted(input.renderDataId)};`
+					: `import { marklessPrerenderData } from ${singleQuoted(input.renderDataId)};`
+				: `import { marklessRenderData } from ${singleQuoted(input.renderDataId)};`,
 		symbolsOnly
 			? ''
-			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
+			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from ${singleQuoted(input.payloadId)};`,
 		// A CSR mount builds its graph from this module, never from a resume
 		// module, so a computed-using CSR app installs the plane here instead.
 		// Server-rendered apps install it in their resume module: putting it here
@@ -444,7 +444,7 @@ export function emitSourceModule(input: {
 		// (emitted in every client variant incl. symbols-only — the inline resumer's
 		// dev resumeModuleUrl points here and expects the resume entry.)
 		input.devResumeReexport && input.environment === 'client'
-			? `export { resumeContainerEvent } from '${resumeVirtualModuleId(input.filename)}';`
+			? `export { resumeContainerEvent } from ${singleQuoted(resumeVirtualModuleId(input.filename))};`
 			: '',
 		'',
 		input.environment === 'server' || symbolsOnly || input.prerenderRecords
@@ -856,12 +856,12 @@ export function emitResumeModule(input: {
 		input.prerenderDataId &&
 		!stagedPrerender &&
 		resumeContainerEvent.includes('marklessPrerenderData')
-			? `import { marklessPrerenderData } from '${input.prerenderDataId}';`
+			? `import { marklessPrerenderData } from ${singleQuoted(input.prerenderDataId)};`
 			: null,
 		stagedPrerender && input.prerenderDataId
-			? `async function marklessLoadPrerenderData() { const module = await import('${input.lazyRenderDataId ?? input.prerenderDataId}'); return module.marklessPrerenderData; }`
+			? `async function marklessLoadPrerenderData() { const module = await import(${singleQuoted(input.lazyRenderDataId ?? input.prerenderDataId)}); return module.marklessPrerenderData; }`
 			: null,
-		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
+		`import { runtimeDemandMap as payloadRuntimeDemandMap } from ${singleQuoted(input.payloadId)};`,
 		// Derived reconciliation is pay-per-use. Only a payload that carries
 		// computed nodes emits the plane module, and it installs at module
 		// evaluation so the plane is in place before any resume entry builds the
@@ -1412,14 +1412,14 @@ function emitResumeContainerEvent(
 						'async function marklessFullResumeHandoff(handoff) {',
 						'	handoff.root.__asyncResumeRuntimeStarted = true;',
 						...armsOpen('\t'),
-						`	const { resumeFromPayloadDocument } = await import('${resumeEntry}');`,
+						`	const { resumeFromPayloadDocument } = await import(${singleQuoted(resumeEntry)});`,
 						'	const { runtime } = await resumeFromPayloadDocument({',
 						'		document: handoff.document,',
 						'		root: handoff.root,',
 						`		loadSymbol: ${wakeLoadSymbol},`,
 						...renderDataEntry(
 							'\t\t',
-							`import('${componentRowRenderDataId}').then((data) => data.marklessPrerenderData)`,
+							`import(${singleQuoted(componentRowRenderDataId)}).then((data) => data.marklessPrerenderData)`,
 						),
 						'	});',
 						...armsStarted('\t'),
@@ -2117,7 +2117,7 @@ function emitLoadSymbol(
 		const direct = emitDirectSourceSymbolLoader(input.symbols, sourceReaderName);
 		if (!input.hasBoundSymbols) return direct;
 		return [
-			`const marklessSymbolResolverModule = () => import('${input.resolverId}');`,
+			`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,
 			direct.replace(
 				'\treturn Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 				'\treturn marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
@@ -2126,7 +2126,7 @@ function emitLoadSymbol(
 	}
 
 	return [
-		`const marklessSymbolResolverModule = () => import('${input.resolverId}');`,
+		`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,
 		'function loadSymbol(symbolId) {',
 		'	return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
 		'}',
@@ -2140,7 +2140,7 @@ function emitDirectSourceSymbolLoader(
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import('${symbol.lazyChunk ?? symbol.chunk}')`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import(${singleQuoted(symbol.lazyChunk ?? symbol.chunk)})`,
 			`		.then((mod) => ${readerName}(mod, ${JSON.stringify(symbol.exportName)}));`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
@@ -2165,4 +2165,9 @@ function stringHash(value: string): string {
 		hash = Math.imul(hash, 0x01000193);
 	}
 	return (hash >>> 0).toString(36);
+}
+
+// A module id can hold any file-name character, an apostrophe included; ordinary ids keep their exact bytes.
+function singleQuoted(value: string | undefined): string {
+	return `'${String(value).replace(/[\\']/g, '\\$&').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
 }
