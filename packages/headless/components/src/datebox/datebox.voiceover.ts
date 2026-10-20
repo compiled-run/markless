@@ -1,6 +1,6 @@
 import { voiceOverTest } from '@guidepup/playwright';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
-import { realDriver } from '../../test-support/page-driver.ts';
+import { realDriver, voiceOverToAnchoredSection } from '../../test-support/page-driver.ts';
 import { voiceOverSpec } from '../../test-support/vocabularies.ts';
 import { readDateBoxTranscript } from './datebox-transcript.ts';
 
@@ -10,7 +10,7 @@ voiceOverTest('VoiceOver conveys the group of three date boxes, each box\'s own 
 }) => {
 	await page.goto(`${PREVIEW_ORIGIN}${FAMILY_ANCHORS.datebox}`);
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
-	await voiceOver.navigateToWebContent();
+	await voiceOverToAnchoredSection(voiceOver, page);
 
 	await readDateBoxTranscript(realDriver(voiceOver, voiceOverSpec), page);
 });
