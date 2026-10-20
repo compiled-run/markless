@@ -177,7 +177,8 @@ For the event-only v1 path, the resumer owns only:
 - walking from `event.target` to the container root, reading each element's
   `m:on` attribute
 - applying the sync policy that attribute names
-- pinning the element census at the first forwarded event
+- pinning the element census once the loaded page is idle, or at the first
+  forwarded event if that comes sooner
 - importing the resume module and handing it the event, the host and the
   host's record reference
 

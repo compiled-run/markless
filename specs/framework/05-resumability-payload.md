@@ -172,7 +172,8 @@ That measured scope includes only:
 - installing the delegated listener set for the baked event-name list
 - walking `event.target` back to the container root, reading the `m:on`
   attribute of each element on the way
-- pinning the container's element census at the first forwarded event
+- pinning the container's element census once the loaded page is idle, or at
+  the first forwarded event if that comes sooner
 - importing the resume module and handing it the event, the matched host and
   that host's event record reference
 
@@ -305,9 +306,13 @@ for that reason. The container carries one `data-markless-paths` attribute
 (`PROTOCOL_LOCATOR_PATHS_ATTRIBUTE`), written by the server from the html it
 served: the served element count, then for every located host and each of its
 ancestors its parent, its parent's served element-child count, its place among
-those children and its tag. The inline boot walks the container once, at the
-first event it forwards (or the first deferred trigger), not at load: that is the
-moment the census is pinned, before the woken runtime commits any arm. When the
+those children and its tag. The inline boot walks the container once, when the
+loaded page is first idle, or at the first event it forwards (or the first
+deferred trigger) if that comes sooner, never during load: that is the moment
+the census is pinned, before the woken runtime commits any arm. The census holds
+element references, so a script that inserts elements after the pin moves no
+pinned element; one that removes or replaces a pinned element leaves that slot
+pointing at the detached element. When the
 count matches, the census is the walk. When it does not, each located element is
 matched by tag among its parent's children, scanning only as far as that
 parent's child count grew or shrank, so a change moves nothing outside the
