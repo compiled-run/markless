@@ -3,7 +3,7 @@ import { createCommand, type ManagerId } from '../../docs/walkthrough/facts.ts';
 import { completion, isInvalid, NO_WAIT, ranWith, waitsOf } from './managers.ts';
 
 export type Starter = 'minimal' | 'app' | 'docs' | 'full-stack';
-export type Format = 'node' | 'deno' | 'bun';
+export type Format = 'node' | 'bun';
 export type Editor = 'vscode' | 'zed' | 'none';
 
 export interface Option {
@@ -25,7 +25,6 @@ export const STARTERS: readonly Option[] = [
 ];
 export const FORMATS: readonly Option[] = [
 	{ value: 'node', label: 'Node', hint: 'Creates a package.json project for pnpm, npm, or yarn.' },
-	{ value: 'deno', label: 'Deno', hint: 'If you love its security model. Any deno-compatible runtime works.' },
 	{ value: 'bun', label: 'Bun', hint: 'Creates a package.json project tuned for Bun.' },
 ];
 export const EDITORS: readonly Option[] = [
@@ -68,7 +67,7 @@ const stepOf = (key: Prompt['key']) => PROMPTS.findIndex((p) => p.key === key);
 
 /** The files `create-markless` writes, by template folder, after `gitignore` becomes `.gitignore`. */
 export const COMMON_FILES = ['.gitignore', '.vscode/extensions.json', '.vscode/settings.json', '.zed/settings.json', 'README.md', 'public/.gitkeep', 'scripts/markless-doctor.mjs', 'tsconfig.json', 'vite.config.ts'];
-const FORMAT_FILE: Record<Format, string> = { node: 'package.json', deno: 'deno.json', bun: 'package.json' };
+const FORMAT_FILE: Record<Format, string> = { node: 'package.json', bun: 'package.json' };
 const MINIMAL = ['pages/index.tsrx', 'document.tsrx'];
 const APP = ['pages/404.tsrx', 'pages/500.tsrx'];
 const FULL_STACK = ['api/health.ts', 'middleware/request.ts'];
@@ -135,7 +134,6 @@ export const NOTES: Record<string, string> = {
 	'components/layouts/DocsLayout.tsrx': 'The frame around each docs page: the sidebar beside the text.',
 	'components/docs/Sidebar.tsrx': 'The list of links down the side of the docs.',
 	'package.json': 'Lists the packages your app uses and its commands, like npm run dev.',
-	'deno.json': 'Lists the packages your app uses and its tasks, like deno task dev.',
 	'vite.config.ts': 'Sets up Vite, which serves and builds your app. Markless plugs in here.',
 	'tsconfig.json': 'Tells your editor how to read .tsrx files, for autocomplete and errors.',
 	'README.md': 'How to start the app and set up your editor.',
@@ -213,8 +211,8 @@ export const enter = (run: Run, saved: ManagerId = 'npm') => submit(run, '', sav
 /** A click on an option picks and submits it, as clack allows; a click anywhere else changes nothing. */
 export const choose = (run: Run, option: number): Run => (run.outcome === 'asking' && option >= 0 && option < optionsAt(run).length ? submit({ ...run, cursor: option }) : run);
 
-/** The CLI's next-steps dev command: a Deno app runs its task, any other app the launching manager's script. */
-export const devCommand = (format: Format, manager: ManagerId) => (format === 'deno' ? 'deno task dev' : `${manager} run dev`);
+/** The CLI's next-steps dev command: the launching manager's script. */
+export const devCommand = (manager: ManagerId) => `${manager} run dev`;
 
 export interface Row {
 	readonly mark: string;
@@ -232,7 +230,6 @@ export interface Row {
 	readonly wait1: string;
 	readonly wait2: string;
 	readonly wait3: string;
-	readonly wait4: string;
 	/** The option index a click on this row picks, or -1. */
 	readonly option: number;
 	/** On the line being typed: the caret, the text after it, and the faint suggestion. */
@@ -297,8 +294,7 @@ export function transcript(run: Run): Row[] {
 		rows.push(row('◇', PROMPTS[step]!.message, 'done'), row('│', answer(run, step), 'value'), row('│'));
 	}
 	if (run.outcome === 'created') {
-		const format = formatOf(run);
-		rows.push(row('◇', `Created ${run.name}`, 'note'), row('│', 'Next steps:', 'value'), row('│', `  cd ${run.name}`, 'value'), row('│', `  ${devCommand(format, run.manager)}`, 'value'), row('│', 'Then open:', 'value'), row('│', '  http://localhost:3000', 'value'), row('└', 'Markless app ready.', 'done'));
+		rows.push(row('◇', `Created ${run.name}`, 'note'), row('│', 'Next steps:', 'value'), row('│', `  cd ${run.name}`, 'value'), row('│', `  ${devCommand(run.manager)}`, 'value'), row('│', 'Then open:', 'value'), row('│', '  http://localhost:3000', 'value'), row('└', 'Markless app ready.', 'done'));
 		return [...rows, ...shell(run)];
 	}
 	if (run.outcome === 'cancelled') {
@@ -380,7 +376,7 @@ export function frontAt(run: Run, slot: number) {
 /** The terminal input's label: what the open line expects. */
 export function labelOf(run: Run): string {
 	const kind = typing(run);
-	if (kind === 'shell') return "Terminal. Type the create command of npm, pnpm, yarn, Bun or Deno and press Enter; Enter on an empty line runs the suggested one.";
+	if (kind === 'shell') return "Terminal. Type the create command of npm, pnpm, yarn or Bun and press Enter; Enter on an empty line runs the suggested one.";
 	if (kind === 'name') return `What should we call it? Type a name, or press Enter to keep ${TARGET}.`;
 	return `${PROMPTS[run.step]!.message} Arrow keys move, Enter picks, Escape starts over.`;
 }

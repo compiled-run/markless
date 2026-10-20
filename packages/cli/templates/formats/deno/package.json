@@ -1,5 +1,0 @@
-{
-	"name": "{{packageName}}",
-	"private": true,
-	"type": "module"
-}

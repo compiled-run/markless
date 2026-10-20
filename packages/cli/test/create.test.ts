@@ -60,8 +60,8 @@ const exists = async (path: string) =>
 		.catch(() => false);
 
 test('keeps supported project choices and package shape visible', async () => {
-	expect(PROJECT_FORMAT_CHOICES.map((choice) => choice.value)).toEqual(['node', 'deno', 'bun']);
-	expect(PROJECT_FORMAT_CHOICES.map((choice) => choice.label)).toEqual(['Node', 'Deno', 'Bun']);
+	expect(PROJECT_FORMAT_CHOICES.map((choice) => choice.value)).toEqual(['node', 'bun']);
+	expect(PROJECT_FORMAT_CHOICES.map((choice) => choice.label)).toEqual(['Node', 'Bun']);
 	expect(STARTER_CHOICES.map(({ label, value }) => ({ label, value }))).toEqual([
 		{ label: 'Learn Markless', value: 'minimal' },
 		{ label: 'Build an app', value: 'app' },
@@ -209,7 +209,7 @@ test('prompts interactively when a TTY run has no target', async () => {
 	);
 	expect(events).toContain('text:What should we call it?:my-markless-app:my-markless-app');
 	expect(events).toContain(
-		'select:Where should it run?:node:Node|Creates a package.json project for pnpm, npm, or yarn.,Deno|If you love its security model. Any deno-compatible runtime works.,Bun|Creates a package.json project tuned for Bun.',
+		'select:Where should it run?:node:Node|Creates a package.json project for pnpm, npm, or yarn.,Bun|Creates a package.json project tuned for Bun.',
 	);
 	expect(events).toContain(
 		'select:Which editor do you use?:vscode:VS Code|Also Cursor and Windsurf.,Zed|,Other|Writes no editor settings.',
@@ -539,61 +539,6 @@ test('generates app and full-stack status pages under pages', async () => {
 	);
 });
 
-test('generates Deno format imports with Nitro available', async () => {
-	const root = await makeWorkspace();
-	const program = new CreateProgram();
-
-	await program.run(['deno-app', '--format', 'deno', '--no-install', '--no-git'], runtime(root));
-
-	const appRoot = join(root, 'deno-app');
-	const denoJson = JSON.parse(await readFile(join(appRoot, 'deno.json'), 'utf-8')) as {
-		imports: Record<string, string>;
-		nodeModulesDir?: string;
-		tasks: Record<string, string>;
-	};
-	const tsconfig = JSON.parse(await readFile(join(appRoot, 'tsconfig.json'), 'utf-8')) as {
-		tsrx?: { compiler?: string };
-		compilerOptions: { plugins: Array<{ name: string }> };
-	};
-	const readme = await readFile(join(appRoot, 'README.md'), 'utf-8');
-
-	expect(denoJson.nodeModulesDir).toBe('auto');
-	expect(denoJson.imports).toMatchObject({
-		'@markless/core': expect.stringMatching(/^npm:@markless\/core@\^/),
-		'@markless/router': expect.stringMatching(/^npm:@markless\/router@\^/),
-		nitro: expect.stringMatching(/^npm:nitro@/),
-	});
-	// tsconfig.json is shared by all three formats, so a Deno app gets the same editor
-	// wiring the Node and Bun apps get. Deno's own language server ignores it — it reads
-	// deno.json and reports `plugins` as an unsupported compiler option — but tsserver-based
-	// editors read it, and they resolve both the plugin and the declared compiler from the
-	// app's node_modules, which `deno install` populates from these imports. Without the
-	// import the app declares an editor toolchain it never installs, and .tsrx files are read
-	// as plain TypeScript: no intrinsic tag completions, and `count` types as any.
-	expect(denoJson.imports['@markless/typescript-plugin']).toMatch(
-		/^npm:@markless\/typescript-plugin@\^/,
-	);
-	expect(tsconfig.tsrx?.compiler).toBe('@markless/typescript-plugin/volar');
-	expect(tsconfig.compilerOptions.plugins.map((plugin) => plugin.name)).toEqual([
-		'@markless/typescript-plugin',
-		'@markless/router/typescript-plugin',
-	]);
-	// No doctor task, deliberately: scripts/markless-doctor.mjs reads package.json, which the
-	// Deno format does not create, so the task would crash on its first line. Make the doctor
-	// read deno.json before adding one here.
-	expect(denoJson.tasks.doctor).toBeUndefined();
-	expect(Object.keys(denoJson.tasks)).toEqual([
-		'dev',
-		'build',
-		'preview',
-		'check',
-		'fmt',
-		'test',
-	]);
-	// The limitation is recorded for the app author, not just for us.
-	expect(readme).toContain("Deno's language server does not");
-});
-
 test('generates docs with MDX routes and component layouts only', async () => {
 	const root = await makeWorkspace();
 	const program = new CreateProgram();
@@ -661,20 +606,6 @@ test('scaffolded manifests pin @markless deps to the publishing cli version, nev
 		}),
 	);
 
-	const denoRoot = await makeWorkspace();
-	await new CreateProgram().run(
-		['deno-pin-app', '--format', 'deno', '--no-install', '--no-git'],
-		runtime(denoRoot),
-	);
-	const denoJson = JSON.parse(
-		await readFile(join(denoRoot, 'deno-pin-app/deno.json'), 'utf-8'),
-	) as { imports: Record<string, string> };
-
-	expect(denoJson.imports['@markless/core']).toBe(`npm:@markless/core@${expectedRange}`);
-	expect(denoJson.imports['@markless/router']).toBe(`npm:@markless/router@${expectedRange}`);
-	expect(denoJson.imports['@markless/typescript-plugin']).toBe(
-		`npm:@markless/typescript-plugin@${expectedRange}`,
-	);
 });
 
 test('a node-format manifest lets npm and pnpm install the vite-plus vite alias', async () => {
@@ -700,7 +631,6 @@ test('tells every package manager a dev command it accepts, in the output and th
 		['pnpm/10.33.2', 'node', 'pnpm run dev'],
 		['yarn/4.17.1', 'node', 'yarn run dev'],
 		['bun/1.3.14', 'bun', 'bun run dev'],
-		['pnpm/10.33.2', 'deno', 'deno task dev'],
 	] as const;
 	for (const [userAgent, format, command] of cases) {
 		const root = await makeWorkspace();
@@ -762,25 +692,13 @@ const hostManifest = (workspaces: unknown) =>
 
 /**
  * The host workspace shape every lane is scaffolded into: a root declaring
- * `packages/*` (or the deno equivalent) plus one real member. Passing
- * `memberPath` adds the new app to the declaration, which is the already-a-member
- * case deno needs spelled out because it lists explicit paths.
+ * `packages/*` plus one real member.
  */
-const hostWorkspaceFiles = (flavor: ManagerFlavor, memberPath?: string): Record<string, string> => {
+const hostWorkspaceFiles = (flavor: ManagerFlavor): Record<string, string> => {
 	const member = {
 		'packages/member/package.json': `${JSON.stringify({ name: 'member', version: '1.0.0' }, null, 2)}\n`,
 	};
 
-	if (flavor === 'deno') {
-		return {
-			...member,
-			'deno.json': `${JSON.stringify(
-				{ workspace: ['./packages/member', ...(memberPath ? [`./${memberPath}`] : [])] },
-				null,
-				2,
-			)}\n`,
-		};
-	}
 	if (flavor === 'pnpm') {
 		return { ...member, 'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n" };
 	}
@@ -844,16 +762,9 @@ const MANAGER_LANES = [
 		standaloneArgs: ['install'],
 		userAgent: 'bun/1.3.14 npm/? node/v24.15.0',
 	},
-	{
-		flavor: 'deno',
-		format: 'deno',
-		manager: 'deno',
-		standaloneArgs: ['install'],
-		userAgent: 'deno/2.8.3 npm/? deno/2.8.3',
-	},
 ] as const satisfies readonly {
 	flavor: ManagerFlavor;
-	format: 'node' | 'deno';
+	format: 'node';
 	manager: PackageManager;
 	standaloneArgs: readonly string[];
 	userAgent: string;
@@ -981,13 +892,6 @@ const JOIN_CASES = [
 		flavor: 'bun',
 		what: 'the object form of workspaces, written into its packages key',
 	},
-	{
-		after: '{\n\t// the members of this workspace\n\t"workspace": ["./packages/member", "./nested/newapp"],\n}\n',
-		before: '{\n\t// the members of this workspace\n\t"workspace": ["./packages/member"],\n}\n',
-		configFile: 'deno.jsonc',
-		flavor: 'deno',
-		what: 'a commented deno.jsonc with a trailing comma',
-	},
 ] as const satisfies readonly {
 	after: string;
 	before: string;
@@ -1072,12 +976,11 @@ test('tells a default run that joining was an option, and a chosen run nothing o
 });
 
 test('refuses, explains, and still succeeds when a declared member cannot install on its own', async () => {
-	// bun swallows --ignore-workspace and hoists anyway, yarn classic has no
-	// equivalent flag, and deno only isolates directories its workspace does not
-	// declare. Installing nothing is the honest outcome.
-	for (const flavor of ['yarn-classic', 'bun', 'deno'] as const) {
+	// bun swallows --ignore-workspace and hoists anyway, and yarn classic has no
+	// equivalent flag. Installing nothing is the honest outcome.
+	for (const flavor of ['yarn-classic', 'bun'] as const) {
 		const root = await makeWorkspace();
-		await writeFiles(root, hostWorkspaceFiles(flavor, 'packages/newapp'));
+		await writeFiles(root, hostWorkspaceFiles(flavor));
 
 		const { spawnCalls, stdoutWrites } = await runThroughCli(
 			root,
@@ -1097,8 +1000,7 @@ test('refuses, explains, and still succeeds when a declared member cannot instal
 			`To install: run \`${manager} install\` at ${root}, or move packages/newapp outside that workspace.`,
 		);
 		// A skipped install is not a failed one: the app is still scaffolded.
-		const manifest = lane(flavor).format === 'deno' ? 'deno.json' : 'package.json';
-		await expect(exists(join(root, 'packages/newapp', manifest)), flavor).resolves.toBe(true);
+		await expect(exists(join(root, 'packages/newapp', 'package.json')), flavor).resolves.toBe(true);
 	}
 });
 
@@ -1111,7 +1013,7 @@ test('installs a declared member on its own when the manager offers a way to', a
 
 	for (const flavor of ['npm', 'pnpm', 'yarn-berry'] as const) {
 		const root = await makeWorkspace();
-		await writeFiles(root, hostWorkspaceFiles(flavor, 'packages/newapp'));
+		await writeFiles(root, hostWorkspaceFiles(flavor));
 
 		const { spawnCalls, stdoutWrites, targetDir } = await runThroughCli(
 			root,
@@ -1314,7 +1216,7 @@ test('never hands bun the workspace flag it accepts and ignores', async () => {
 test('stays completely silent when the app already matches a member declaration', async () => {
 	for (const lane of MANAGER_LANES) {
 		const root = await makeWorkspace();
-		await writeFiles(root, hostWorkspaceFiles(lane.flavor, 'packages/newapp'));
+		await writeFiles(root, hostWorkspaceFiles(lane.flavor));
 
 		const { created, spawnCalls, stdoutWrites, targetDir } = await installThroughCli(
 			root,
@@ -1371,29 +1273,6 @@ test('scaffolding the frameless shape installs only the new app', async () => {
 	expect(stdoutWrites.join('')).toContain('is not one of its members');
 });
 
-test('a deno-format app installs with deno and is told to run deno task dev', async () => {
-	const root = await makeWorkspace();
-	const spawnCalls: SpawnCall[] = [];
-	const stdoutWrites: string[] = [];
-
-	// The inferred manager is pnpm, but a deno-format app writes no
-	// package.json at all, so pnpm would have nothing to install.
-	await new CreateProgram().run(
-		['deno-app', '--format', 'deno', '--yes', '--agents', 'none', '--no-git'],
-		runtime(root, {
-			env: { npm_config_user_agent: 'pnpm/10.33.2' },
-			spawnCalls,
-			stdoutWrites,
-		}),
-	);
-
-	expect(spawnCalls).toEqual([
-		{ args: ['install'], command: 'deno', cwd: join(root, 'deno-app') },
-	]);
-	expect(stdoutWrites.join('')).toContain('  deno task dev');
-	expect(stdoutWrites.join('')).not.toContain('deno dev');
-});
-
 test('leaves the install command alone when there is no enclosing workspace', () => {
 	const plain = {
 		args: ['install'],
@@ -1422,7 +1301,7 @@ test('reports no enclosing workspace when nothing in the tree declares one', asy
 		'nested/package.json': `${JSON.stringify({ name: 'plain' }, null, 2)}\n`,
 	});
 
-	for (const manager of ['npm', 'pnpm', 'yarn', 'bun', 'deno'] as const) {
+	for (const manager of ['npm', 'pnpm', 'yarn', 'bun'] as const) {
 		const found = await detect(root, manager, join(root, 'nested/newapp'));
 		expect(insideFixture(found, root), manager).toBe(null);
 	}
@@ -1482,29 +1361,6 @@ test('reads the object form of the workspaces field', async () => {
 	await expect(
 		detect(root, 'npm', join(root, 'nested/newapp')).then((found) => found?.isMember),
 	).resolves.toBe(false);
-});
-
-test('reads deno workspace members from explicit paths in a commented jsonc config', async () => {
-	const root = await makeWorkspace();
-	await writeFiles(root, {
-		'deno.jsonc':
-			'{\n\t// the members of this workspace\n\t"workspace": ["./packages/member"],\n}\n',
-	});
-
-	const member = await detect(root, 'deno', join(root, 'packages/member'));
-	expect(member?.isMember).toBe(true);
-	expect(member?.configFile).toBe(join(root, 'deno.jsonc'));
-
-	const away = await detect(root, 'deno', join(root, 'nested/newapp'));
-	expect(away?.isMember).toBe(false);
-	expect(away?.uncertain).toBe(false);
-
-	// Deno's own glob resolution inside `workspace` was never confirmed, and
-	// "member" is the silent, no-write answer.
-	await writeFiles(root, { 'deno.jsonc': '{ "workspace": ["./packages/*"] }\n' });
-	const globbed = await detect(root, 'deno', join(root, 'nested/newapp'));
-	expect(globbed?.isMember).toBe(true);
-	expect(globbed?.uncertain).toBe(true);
 });
 
 test('falls to the safe side for member patterns it cannot claim parity on', async () => {

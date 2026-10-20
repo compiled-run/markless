@@ -1,6 +1,5 @@
 // The dev server run as the figure plays it: the command the reader types, the lines the dev script really prints for the 0.5.0 starter, and the starter's first page.
 import { type ManagerId, scriptCommand } from '../../docs/walkthrough/facts.ts';
-import { devCommand } from '../create/model.ts';
 import { completion, isInvalid, NO_WAIT, ranWith, tidy, waitsOf } from '../create/managers.ts';
 import starterManifest from '../../../../packages/cli/templates/formats/node/package.json' with { type: 'json' };
 
@@ -13,8 +12,8 @@ export const PORT = 3000;
 export const BANNER = `VITE+ v${starterManifest.dependencies['vite-plus']}`;
 export const HOST = `localhost:${PORT}`;
 export const URL_LINE = `http://${HOST}/`;
-/** The commands that run the dev script with each manager; Deno also takes the `deno run dev` the create figure prints for a Node app it launched. */
-export const devCommands = (manager: ManagerId): readonly string[] => [...new Set([scriptCommand(manager, 'dev'), devCommand('node', manager)])];
+/** The commands that run the dev script with each manager. */
+export const devCommands = (manager: ManagerId): readonly string[] => [scriptCommand(manager, 'dev')];
 
 /** The starter page from packages/cli/templates/starters/minimal/pages/index.tsrx. */
 export const HEADING = 'Markless Router';
@@ -32,7 +31,6 @@ export interface Row {
 	readonly wait1: string;
 	readonly wait2: string;
 	readonly wait3: string;
-	readonly wait4: string;
 	/** On the prompt line: the caret, the text after it, and the faint suggestion. */
 	readonly caret: string;
 	readonly after: string;

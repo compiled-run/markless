@@ -232,7 +232,6 @@ export default function CreateAnatomy() @{
 							<tspan class="ghost wait-ghost" data-pm="pnpm">{slot.wait1}</tspan>
 							<tspan class="ghost wait-ghost" data-pm="yarn">{slot.wait2}</tspan>
 							<tspan class="ghost wait-ghost" data-pm="bun">{slot.wait3}</tspan>
-							<tspan class="ghost wait-ghost" data-pm="deno">{slot.wait4}</tspan>
 							<tspan class="value" x="104">{slot.value}</tspan>
 							<tspan class="hint" x="46">{slot.hint}</tspan>
 						</text>
@@ -432,7 +431,7 @@ export default function CreateAnatomy() @{
 		</label>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal waits at a shell prompt that takes the create command of
-			npm, pnpm, yarn, Bun or Deno, the other managers named at the foot of the sheet: type one and press Enter, or press Enter on the
+			npm, pnpm, yarn or Bun, the other managers named at the foot of the sheet: type one and press Enter, or press Enter on the
 			empty line to take the suggestion.
 			The commands on this page then follow the package manager you ran. It then asks the real questions one at a time: what you are
 			building, the app's name, where it runs, whether to install dependencies and initialize git, and whether to create the app. Arrow keys
@@ -496,8 +495,7 @@ export default function CreateAnatomy() @{
 			html[data-package-manager='npm'] :is(.wait-ghost, .others)[data-pm='npm'],
 			html[data-package-manager='pnpm'] :is(.wait-ghost, .others)[data-pm='pnpm'],
 			html[data-package-manager='yarn'] :is(.wait-ghost, .others)[data-pm='yarn'],
-			html[data-package-manager='bun'] :is(.wait-ghost, .others)[data-pm='bun'],
-			html[data-package-manager='deno'] :is(.wait-ghost, .others)[data-pm='deno'] {
+			html[data-package-manager='bun'] :is(.wait-ghost, .others)[data-pm='bun'] {
 				display: inline;
 			}
 

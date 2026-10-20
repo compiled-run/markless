@@ -1095,7 +1095,7 @@ jobs:
                   fi
 
     # Separate from `test` on purpose. The CLI workspace matrix needs npm, pnpm,
-    # yarn (via corepack), bun and deno all on PATH and runs real installs, so it
+    # yarn (via corepack) and bun all on PATH and runs real installs, so it
     # gets its own toolchain and its own 20 minutes instead of slowing the main
     # suite. It is blocking, because the whole point of the workspace-detection
     # work is the behavior only a real install can show.
@@ -1124,8 +1124,6 @@ jobs:
                   cache: pnpm
 
             - uses: oven-sh/setup-bun@v2
-
-            - uses: denoland/setup-deno@v2
 
             - name: Enable corepack for the yarn lanes
               run: corepack enable

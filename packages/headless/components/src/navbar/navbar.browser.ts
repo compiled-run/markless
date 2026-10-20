@@ -642,10 +642,10 @@ test('CSR: moving to the next entry while one is showing opens it at once', asyn
 	await userEvent.hover(el(DocsTrigger));
 	// No delay this time: the switch is what QDS's model makes instant, and the
 	// assertion is that the second panel is showing before the cold-start delay
-	// could have elapsed.
-	await expect.poll(() => el(DocsTrigger).getAttribute('aria-expanded'), { timeout: 50 }).toBe(
-		'true',
-	);
+	// could have elapsed. Vitest 5 stops polling at the timeout, so the checks must come faster than it.
+	await expect
+		.poll(() => el(DocsTrigger).getAttribute('aria-expanded'), { timeout: 50, interval: 5 })
+		.toBe('true');
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
 });
 

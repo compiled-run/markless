@@ -18,7 +18,6 @@ import {
 import {
 	addWorkspaceMember,
 	detectEnclosingWorkspace,
-	installManagerFor,
 	joinsWorkspace,
 	planInstall,
 	workspaceJoinNote,
@@ -29,16 +28,15 @@ export type { EnclosingWorkspace, InstallPlan, ManagerFlavor, PreparedFile } fro
 export {
 	addWorkspaceMember,
 	detectEnclosingWorkspace,
-	installManagerFor,
 	joinsWorkspace,
 	planInstall,
 } from './workspace.ts';
 
 declare const __VERSION__: string | undefined;
 
-export type ProjectFormat = 'node' | 'bun' | 'deno';
+export type ProjectFormat = 'node' | 'bun';
 export type Starter = 'minimal' | 'app' | 'docs' | 'full-stack';
-export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun' | 'deno';
+export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 export type Editor = 'vscode' | 'zed' | 'none';
 
 export type Choice<T extends string> = {
@@ -54,7 +52,6 @@ export const PROJECT_FORMAT_CHOICES = [
 		label: 'Node',
 		hint: 'Creates a package.json project for pnpm, npm, or yarn.',
 	},
-	{ value: 'deno', label: 'Deno', hint: 'If you love its security model. Any deno-compatible runtime works.' },
 	{ value: 'bun', label: 'Bun', hint: 'Creates a package.json project tuned for Bun.' },
 ] as const satisfies readonly Choice<ProjectFormat>[];
 
@@ -755,9 +752,9 @@ function creationSummary(options: CreateOptions): string {
 	].join('\n');
 }
 
-// A deno app declares `tasks`, not `scripts`, and npm rejects a bare `npm dev`.
-function devCommand(options: Pick<CreateOptions, 'format' | 'packageManager'>): string {
-	return options.format === 'deno' ? 'deno task dev' : `${options.packageManager} run dev`;
+// npm rejects a bare `npm dev`.
+function devCommand(options: Pick<CreateOptions, 'packageManager'>): string {
+	return `${options.packageManager} run dev`;
 }
 
 /** The port each starter's `dev` script serves on; every starter is a Router app on Nitro, whose dev server defaults to 3000. */
@@ -952,7 +949,6 @@ function inferPackageManager(env: ProgramRuntime['env']): PackageManager {
 	if (userAgent.startsWith('pnpm/')) return 'pnpm';
 	if (userAgent.startsWith('yarn/')) return 'yarn';
 	if (userAgent.startsWith('bun/')) return 'bun';
-	if (userAgent.startsWith('deno/')) return 'deno';
 	return 'npm';
 }
 
@@ -968,7 +964,7 @@ async function findEnclosingWorkspace(
 	return await detectEnclosingWorkspace({
 		env: runtime.env,
 		fs: runtime.fs,
-		manager: installManagerFor(options),
+		manager: options.packageManager,
 		targetDir: resolve(options.cwd, options.target),
 	});
 }
@@ -1045,7 +1041,7 @@ export async function installDependencies(
 ): Promise<void> {
 	const plan = planInstall({
 		enclosing: options.enclosingWorkspace,
-		manager: installManagerFor(options),
+		manager: options.packageManager,
 		target: options.target,
 		workspace: options.workspace,
 	});
@@ -1100,7 +1096,7 @@ Usage:
 
 Options:
   --yes, -y          Use defaults
-  --format <name>   node, deno, or bun
+  --format <name>   node or bun
   --starter <name>  minimal, app, docs, or full-stack
   --editor <name>   vscode, zed, or none
   --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none

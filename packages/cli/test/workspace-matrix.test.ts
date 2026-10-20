@@ -25,7 +25,7 @@ import {
 } from '../src/index.ts';
 
 // Real package-manager binaries, real installs, real host workspaces. Opt-in
-// because it needs npm, pnpm, bun, deno and corepack on PATH and a network (or
+// because it needs npm, pnpm, bun and corepack on PATH and a network (or
 // warm caches) to fetch one tiny dependency per lane.
 const enabled = process.env.MARKLESS_PM_MATRIX === '1';
 
@@ -120,16 +120,6 @@ const LANES: readonly MatrixLane[] = [
 		standaloneArgs: ['install'],
 		userAgent: 'bun/1.3.14 npm/? node/v24.15.0',
 	},
-	{
-		appArtifact: `node_modules/${DEPENDENCY}/package.json`,
-		format: 'deno',
-		hostMemberArtifact: 'deno.lock',
-		hostStandaloneForbidden: ['node_modules', 'deno.lock'],
-		manager: 'deno',
-		name: 'deno',
-		standaloneArgs: ['install'],
-		userAgent: 'deno/2.8.3 npm/? deno/2.8.3',
-	},
 ];
 
 const cleanupRoots: string[] = [];
@@ -178,35 +168,6 @@ const writeHostWorkspace = async (
 	options: { readonly memberPath?: string; readonly extraProjects?: readonly string[] } = {},
 ) => {
 	const extraProjects = options.extraProjects ?? [];
-
-	if (lane.manager === 'deno') {
-		await writeFiles(root, {
-			'deno.json': asJson({
-				workspace: [
-					'./packages/member',
-					...extraProjects.map((path) => `./${path}`),
-					...(options.memberPath ? [`./${options.memberPath}`] : []),
-				],
-			}),
-			'packages/member/deno.json': asJson({
-				exports: './mod.ts',
-				name: '@host/member',
-				version: '1.0.0',
-			}),
-			'packages/member/mod.ts': 'export const member = 1;\n',
-		});
-		for (const path of extraProjects) {
-			await writeFiles(root, {
-				[`${path}/deno.json`]: asJson({
-					exports: './mod.ts',
-					name: `@host/${path.replaceAll('/', '-')}`,
-					version: '1.0.0',
-				}),
-				[`${path}/mod.ts`]: 'export const project = 1;\n',
-			});
-		}
-		return;
-	}
 
 	const projectManifests = Object.fromEntries(
 		['packages/member', ...extraProjects].map((path) => [
@@ -369,8 +330,6 @@ const scaffoldAndInstall = async (
 		readonly extraArgs?: readonly string[];
 		/** 'slim' swaps in one tiny dependency; 'template' installs what ships. */
 		readonly manifest?: 'slim' | 'template';
-		/** Runs on the scaffolded app just before the install. */
-		readonly beforeInstall?: (appDir: string) => Promise<void>;
 	} = {},
 ) => {
 	const extraArgs = scaffoldOptions.extraArgs ?? [];
@@ -405,8 +364,7 @@ const scaffoldAndInstall = async (
 	await program.execute(options, runtime);
 
 	const appDir = join(root, appPath);
-	if (scaffoldOptions.manifest !== 'template') await slimManifest(appDir, lane);
-	await scaffoldOptions.beforeInstall?.(appDir);
+	if (scaffoldOptions.manifest !== 'template') await slimManifest(appDir);
 	await installDependencies(options, appDir, runtime).catch((error: unknown) => {
 		throw new Error(`${lane.name} install failed:\n${commands.at(-1)?.output ?? ''}`, {
 			cause: error,
@@ -420,22 +378,7 @@ const scaffoldAndInstall = async (
 	return { appDir, binDir, commands, install: install!, options, stdoutWrites };
 };
 
-const slimManifest = async (appDir: string, lane: MatrixLane) => {
-	if (lane.format === 'deno') {
-		const manifest = JSON.parse(await readFile(join(appDir, 'deno.json'), 'utf-8')) as Record<
-			string,
-			unknown
-		>;
-		await writeFile(
-			join(appDir, 'deno.json'),
-			asJson({
-				...manifest,
-				imports: { [DEPENDENCY]: `npm:${DEPENDENCY}@${DEPENDENCY_VERSION}` },
-			}),
-		);
-		return;
-	}
-
+const slimManifest = async (appDir: string) => {
 	const manifest = JSON.parse(await readFile(join(appDir, 'package.json'), 'utf-8')) as {
 		name: string;
 	};
@@ -451,16 +394,14 @@ const slimManifest = async (appDir: string, lane: MatrixLane) => {
 };
 
 const hostConfigPath = (root: string, lane: MatrixLane) => {
-	if (lane.manager === 'deno') return join(root, 'deno.json');
 	if (lane.manager === 'pnpm') return join(root, 'pnpm-workspace.yaml');
 	return join(root, 'package.json');
 };
 
 /**
  * Asks the manager itself whether the app can reach its dependency from the app
- * directory, rather than guessing from a path: berry links through Plug'n'Play
- * and deno through its own module graph, so neither has a node_modules entry to
- * look for.
+ * directory, rather than guessing from a path: berry links through Plug'n'Play,
+ * so it has no node_modules entry to look for.
  */
 const resolveFromApp = (lane: MatrixLane, appDir: string, binDir?: string) => {
 	const env = {
@@ -469,13 +410,6 @@ const resolveFromApp = (lane: MatrixLane, appDir: string, binDir?: string) => {
 		PATH: [binDir, process.env.PATH].filter(Boolean).join(':'),
 	};
 
-	if (lane.manager === 'deno') {
-		return spawnSync('deno', ['eval', `import ${JSON.stringify(DEPENDENCY)};`], {
-			cwd: appDir,
-			encoding: 'utf-8',
-			env,
-		});
-	}
 	if (lane.yarnVersion?.startsWith('4')) {
 		return spawnSync('yarn', ['node', '-e', `require.resolve('${DEPENDENCY}')`], {
 			cwd: appDir,
@@ -497,12 +431,6 @@ const resolveFromApp = (lane: MatrixLane, appDir: string, binDir?: string) => {
  */
 const joinedConfig = (before: string, lane: MatrixLane) => {
 	if (lane.manager === 'pnpm') return `${before}  - 'nested/newapp'\n`;
-	if (lane.manager === 'deno') {
-		return before.replace(
-			'    "./packages/member"\n',
-			'    "./packages/member",\n    "./nested/newapp"\n',
-		);
-	}
 	return before.replace('    "packages/*"\n', '    "packages/*",\n    "nested/newapp"\n');
 };
 
@@ -711,82 +639,6 @@ describe.skipIf(!enabled || !fullEnabled)('full template smoke', () => {
 			await expect(exists(join(appDir, 'node_modules/.bin/vp'))).resolves.toBe(true);
 
 			expect(stdoutWrites.join('')).toContain('is not one of its members');
-		},
-		FULL_TEST_TIMEOUT,
-	);
-});
-
-const registryPackument = async (name: string) => {
-	const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}`);
-	if (!response.ok) throw new Error(`registry lookup for ${name} failed: ${response.status}`);
-	return (await response.json()) as {
-		'dist-tags': { latest: string };
-		versions: Record<string, unknown>;
-	};
-};
-
-const versionParts = (version: string) => version.split('.').map(Number);
-const isNewerVersion = (a: string, b: string) => {
-	const [left, right] = [versionParts(a), versionParts(b)];
-	const index = left.findIndex((part, i) => part !== right[i]);
-	return index !== -1 && left[index]! > right[index]!;
-};
-
-// A release commit's starter names the version that release is about to publish, which npm
-// cannot serve until the release job runs, so until then it installs the newest published one.
-const installableMarklessImports = async (imports: Record<string, string>) => {
-	const pinned = /^npm:@markless\/core@\^(\d+\.\d+\.\d+)$/.exec(imports['@markless/core'] ?? '');
-	if (!pinned) throw new Error(`unexpected @markless/core import: ${imports['@markless/core']}`);
-	const wanted = pinned[1]!;
-	const packument = await registryPackument('@markless/core');
-	if (wanted in packument.versions) return imports;
-	const latest = packument['dist-tags'].latest;
-	if (!isNewerVersion(wanted, latest))
-		throw new Error(
-			`the starter pins @markless/* ^${wanted}, which is unpublished and not newer than ${latest}`,
-		);
-	return Object.fromEntries(
-		Object.entries(imports).map(([name, specifier]) => [
-			name,
-			name.startsWith('@markless/')
-				? specifier.replace(`@^${wanted}`, `@^${latest}`)
-				: specifier,
-		]),
-	);
-};
-
-// The shipped Deno starter, installed by deno itself, builds with its own `deno task build`.
-describe.skipIf(!enabled)('deno starter build', () => {
-	test(
-		'deno: the shipped starter installs and builds with its own build task',
-		async () => {
-			const lane = LANES.find((entry) => entry.manager === 'deno')!;
-			const root = await makeTempDir('markless-pm-deno-build-');
-			const { appDir } = await scaffoldAndInstall(root, lane, 'app', {
-				manifest: 'template',
-				// Deno 2.9 refuses packages published in the last 24 hours, and this lane installs the Markless release cut today.
-				beforeInstall: async (appDir) => {
-					const manifest = JSON.parse(
-						await readFile(join(appDir, 'deno.json'), 'utf-8'),
-					) as { imports: Record<string, string> };
-					await writeFile(
-						join(appDir, 'deno.json'),
-						asJson({
-							...manifest,
-							imports: await installableMarklessImports(manifest.imports),
-							minimumDependencyAge: 0,
-						}),
-					);
-				},
-			});
-
-			const build = spawnSync('deno', ['task', 'build'], {
-				cwd: appDir,
-				encoding: 'utf-8',
-				env: { ...process.env, NO_COLOR: '1' },
-			});
-			expect(build.status, `deno task build failed:\n${build.stdout}${build.stderr}`).toBe(0);
-			await expect(exists(join(appDir, '.output/server/index.mjs'))).resolves.toBe(true);
 		},
 		FULL_TEST_TIMEOUT,
 	);

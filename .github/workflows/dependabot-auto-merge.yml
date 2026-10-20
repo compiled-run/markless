@@ -37,7 +37,7 @@ jobs:
                   set -euo pipefail
 
                   case "$PACKAGE_ECOSYSTEM" in
-                    github-actions|npm|deno) ;;
+                    github-actions|npm) ;;
                     *)
                       echo "::error::Unsupported Dependabot ecosystem: $PACKAGE_ECOSYSTEM"
                       exit 1

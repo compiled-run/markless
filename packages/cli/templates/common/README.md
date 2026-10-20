@@ -10,8 +10,6 @@ Run Vite commands through `vp` (Vite+), as the scripts in `package.json` do: `vp
 `vite build`. The app aliases `vite` to `@voidzero-dev/vite-plus-core`, so that plugins get
 Vite+, and that package has no `vite` command.
 
-The Deno format pins vite-plus 0.3.1: vite-plus 1.x runs Vite in a child Deno process without permissions, so its builds fail under Deno.
-
 ## Editor support
 
 `tsconfig.json` carries the editor wiring: the `plugins` entries load the Markless
@@ -22,13 +20,5 @@ completions, hover, and go-to-definition work in `.tsrx` files.
 
 {{editorNote}}
 
-Deno's language server does not read `tsconfig.json`. It reads `deno.json` instead, and it
-reports `plugins` as an unsupported compiler option and ignores it. In a Deno project it
-therefore reads `.tsrx` files as if they were plain TypeScript, which produces wrong types
-and spurious errors. If you run this app on Deno, edit it in a `tsserver`-based editor
-(`deno install` puts `@markless/typescript-plugin` where that editor can find it), and keep
-Deno's own editor integration turned off for this workspace.
-
-`scripts/markless-doctor.mjs` checks the same wiring from the command line. It reads
-`package.json`, so it runs as a `doctor` script in the Node and Bun formats; the Deno format
-has no `doctor` task.
+`scripts/markless-doctor.mjs` checks the same wiring from the command line, as the `doctor`
+script.

@@ -42,7 +42,7 @@ const JOB_POLICY = {
 		'boxes-music-player-ssr': { mode: 'full', needsBrowser: true },
 		receipts: { mode: 'full' },
 		'website-boxes': { mode: 'full', needsBrowser: true },
-		'package-manager-matrix': { mode: 'full', tools: ['bun', 'deno', 'corepack'] },
+		'package-manager-matrix': { mode: 'full', tools: ['bun', 'corepack'] },
 		benchmark: {
 			mode: 'ci-only',
 			reason: 'clones js-framework-benchmark, builds a baseline worktree and runs 30 minutes of interleaved Chrome pairs; run `pnpm bench:jsfb:prepare` and the JSFB runner by hand when a diff can reach the benchmark bundles',

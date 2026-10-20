@@ -245,7 +245,8 @@ export function docsData(): Plugin {
 		configResolved(config) {
 			root = config.root;
 		},
-		async handleHotUpdate({ file, server }) {
+		async hotUpdate({ type, file, server }) {
+			if (type !== 'update' || this.environment.name !== 'client') return;
 			if (
 				file === manifestFile ||
 				file.includes('/components/docs/ui-meta/') ||

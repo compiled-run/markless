@@ -33,10 +33,10 @@ export const FOOTERS = MANAGERS.map((saved) => ({
 }));
 
 /** The wait fields of every row but an empty prompt's. */
-export const NO_WAIT = { wait0: '', wait1: '', wait2: '', wait3: '', wait4: '' };
+export const NO_WAIT = { wait0: '', wait1: '', wait2: '', wait3: '' };
 
 /** An empty prompt's wait fields: each manager's main command in MANAGERS order, flat since the drawn rows read them inside a keyed loop. */
 export function waitsOf(commandsOf: CommandsOf) {
-	const [wait0, wait1, wait2, wait3, wait4] = MANAGERS.map((m) => commandsOf(m.id)[0]!);
-	return { wait0: wait0!, wait1: wait1!, wait2: wait2!, wait3: wait3!, wait4: wait4! };
+	const [wait0, wait1, wait2, wait3] = MANAGERS.map((m) => commandsOf(m.id)[0]!);
+	return { wait0: wait0!, wait1: wait1!, wait2: wait2!, wait3: wait3! };
 }

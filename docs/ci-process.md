@@ -54,7 +54,7 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 | screen-reader `nvda`                                                  | Needs Windows with NVDA.                                                                                                                                    | CI only.                                                                                                                                              |
 | screen-reader `voiceover`                                             | Needs a macOS runner with VoiceOver automation granted.                                                                                                     | `pnpm test:sr-real` by hand on a prepared Mac.                                                                                                        |
 
-`package-manager-matrix` runs when `bun`, `deno` and `corepack` are on `PATH` (they are on this Mac) and is skipped with a message otherwise. Browser jobs are skipped with a message when Playwright's Chromium is not installed; `--install` fixes that.
+`package-manager-matrix` runs when `bun` and `corepack` are on `PATH` (they are on this Mac) and is skipped with a message otherwise. Browser jobs are skipped with a message when Playwright's Chromium is not installed; `--install` fixes that.
 
 Side effect to know about: the `agent-files` job runs `pnpm dlx @intellectronica/ruler apply`, which rewrites the generated agent files, including the committed `.agents/` directory. That is what CI does on its throwaway checkout; locally, a change it leaves in `.agents/` means a generated file is stale and belongs in the commit (do not delete `.agents/`, it is tracked), or run with `--clean`.
 

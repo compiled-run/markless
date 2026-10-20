@@ -20,9 +20,8 @@ test('names the versions to install and where', () => {
 	);
 });
 
-test('lets Bun and Deno through whatever Node.js version they report', () => {
+test('lets Bun through whatever Node.js version it reports', () => {
 	expect(unsupportedNode({ node: '24.3.0', bun: '1.3.14' })).toBeNull();
-	expect(unsupportedNode({ node: '20.11.1', deno: '2.8.3' })).toBeNull();
 });
 
 test('matches vite-plus engines and the package engines', () => {

@@ -195,13 +195,17 @@ describe('static docs data', () => {
 	it('restarts for manifest, family metadata and anatomy inputs to refresh the module graph', async () => {
 		const plugin = docsData();
 		const restart = vi.fn(async () => {});
-		const hook = plugin.handleHotUpdate as (ctx: unknown) => Promise<unknown>;
-		for (const file of [
+		const hook = plugin.hotUpdate as (this: unknown, options: unknown) => Promise<unknown>;
+		const inputs = [
 			resolve('../packages/headless/components/api/manifest.json'),
 			resolve('components/docs/ui-meta/accordion.ts'),
 			resolve('components/docs/anatomy/scenes.ts'),
-		])
-			await hook({ file, server: { restart } });
+		];
+		// Vite calls hotUpdate once per environment; one restart is enough.
+		for (const name of ['client', 'ssr'])
+			for (const file of inputs)
+				await hook.call({ environment: { name } }, { type: 'update', file, server: { restart } });
+		await hook.call({ environment: { name: 'client' } }, { type: 'create', file: inputs[0], server: { restart } });
 		expect(restart).toHaveBeenCalledTimes(3);
 	});
 });
