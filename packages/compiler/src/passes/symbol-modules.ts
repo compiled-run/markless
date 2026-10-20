@@ -2445,15 +2445,14 @@ export function buildBehaviorEmission(input: BehaviorEmissionInput): EmissionPri
 	const inputCount = input.symbol.inputSources.length;
 	const carried = behaviorModuleScopeCarry(input);
 	const projection = carried.projection;
-	// A carried declaration can name an import the factory never did — a
-	// module-scope class extending an imported base needs that import here.
+	const factoryReferences = deriveReferencedIdentifierNames(projection.functionExpression);
 	const imports = dedupeModuleImports([
 		...(input.symbol.moduleImport ? [input.symbol.moduleImport] : []),
-		...(carried.declarationStatements.length === 0
-			? []
-			: (input.moduleImports ?? []).filter((moduleImport) =>
-					carried.declarationReferences.has(moduleImport.localName),
-				)),
+		...(input.moduleImports ?? []).filter(
+			(moduleImport) =>
+				factoryReferences.has(moduleImport.localName) ||
+				carried.declarationReferences.has(moduleImport.localName),
+		),
 	]);
 
 	const body: EmissionNode[] = [
