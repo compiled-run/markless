@@ -492,3 +492,12 @@ test('a page file with a space in its name answers at its percent-encoded path',
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a page file with an apostrophe in its name builds, serves and resumes', async () => {
+	const { page, errors } = await open("/o'k");
+	expect(await text(page, '[data-apostrophe]')).toBe('0');
+	await page.click('[data-apostrophe]');
+	await expect.poll(() => text(page, '[data-apostrophe]')).toBe('1');
+	expect(errors).toEqual([]);
+	await page.close();
+});
