@@ -661,3 +661,53 @@ test.each([['before the page wakes', false], ['after the page woke', true]])(
 		await page.close();
 	},
 );
+
+test.each([
+	['/hash-target', '[data-section]', '[data-plain]', ''],
+	['/hash-target#second', '[data-plain]', '[data-section]', '#second'],
+])('a navigation lands on the clicked link (%s), not the one whose prefetch it reused', async (_name, prefetched, clicked, hash) => {
+	const { page, errors } = await open('/hash-links');
+	const fragments: string[] = [];
+	page.on('request', (request) => {
+		if (new URL(request.url()).pathname.startsWith('/_markless/fragment/')) fragments.push(request.url());
+	});
+	await page.evaluate(() => ((globalThis as { __stayed?: boolean }).__stayed = true));
+	await page.focus(prefetched);
+	await expect.poll(() => fragments.length, wake).toBe(1);
+	await page.click(clicked);
+	await page.waitForSelector('[data-hash-target]');
+	const url = new URL(page.url());
+	expect(url.pathname + url.hash).toBe(`/hash-target${hash}`);
+	expect(await page.evaluate(() => (globalThis as { __stayed?: boolean }).__stayed)).toBe(true);
+	expect(fragments).toHaveLength(1);
+	if (hash) await expect.poll(() => page.evaluate(() => scrollY > 0)).toBe(true);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test.each([
+	['an input of the leaving page', false],
+	['an input a page script added after the page', true],
+])('following a link while %s has focus logs no unmatched dispatch', async (_name, foreign) => {
+	const { page, errors } = await open('/search-nav');
+	const logged: string[] = [];
+	page.on('console', (message) => logged.push(message.text()));
+	await page.fill('[data-search]', 'abc');
+	await expect.poll(() => text(page, '[data-to-target]'), wake).toBe('abc');
+	if (foreign)
+		await page.evaluate(() => {
+			const box = document.createElement('input');
+			box.setAttribute('data-foreign-search', '');
+			document.querySelector('[data-async-container]')!.append(box);
+		});
+	await page.focus(foreign ? '[data-foreign-search]' : '[data-search]');
+	await page.waitForTimeout(300);
+	logged.length = 0;
+	await page.evaluate(() => (document.querySelector('[data-to-target]') as HTMLElement).click());
+	await page.waitForSelector('[data-hash-target]');
+	await page.waitForTimeout(500);
+	expect(new URL(page.url()).pathname).toBe('/hash-target');
+	expect(logged.filter((line) => line.includes('MARKLESS_'))).toEqual([]);
+	expect(errors).toEqual([]);
+	await page.close();
+});
