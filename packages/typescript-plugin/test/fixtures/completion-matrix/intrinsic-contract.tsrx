@@ -6,80 +6,82 @@ export function IntrinsicContract() @{
 		host.disabled = false;
 		return () => {};
 	};
-	<div
-		class="accepted"
-		style={{ color: 'rebeccapurple', '--panel-offset': 4 }}
-		data-state="ready"
-		aria-label="contract"
-	>
-		text {1} {null} {[<span>nested</span>]}
-	</div>
-	<svg opacity={0.75}><g opacity="0.5"><path opacity={1} d="M0 0" /><circle opacity="1" r={2} /></g></svg>
-	<img src="cover.jpg" alt="Cover" />
-	<input value="query" type="search" />
-	<a href="/library">Library</a>
-	<button
-		el={button}
-		attach={installButton}
-		onClick={(event) => {
-			const nativeEvent: MouseEvent = event;
-			const concreteTarget: HTMLButtonElement = event.currentTarget;
-			concreteTarget.disabled = nativeEvent.clientX < 0;
-		}}
-	>
-		Press
-	</button>
-	<button attach={[installButton]} onClick={(event) => event.currentTarget.focus()}>
-		Array attach, single handler
-	</button>
-	<table>
-		<thead>
-			<tr>
-				<th id="h1" scope="col" colspan={2} abbr="Name">
-					Name
-				</th>
-			</tr>
-		</thead>
-		<tbody>
-			<tr>
-				<td headers="h1" rowspan={2}>Cell</td>
-			</tr>
-		</tbody>
-	</table>
-	<div
-		tabindex="0"
-		onKeyDown={(event) => {
-			const keyboardEvent: KeyboardEvent = event;
-			event.currentTarget.hidden = keyboardEvent.key === 'Escape';
-		}}
-		onPointerDown={(event) => event.pointerType}
-	>
-		Standard event casing
-	</div>
-	<table>
-		<tbody>
-			<tr>
-				<td colspan="2" rowspan="1">Numeric strings</td>
-			</tr>
-		</tbody>
-	</table>
-	<div
-		overlay
-		onDismiss={(event) => {
-			const reason = event.detail.reason;
-			const concreteTarget: HTMLDivElement = event.currentTarget;
-			concreteTarget.hidden = reason === 'escape';
-		}}
-	>
-		Overlay dismissal
-	</div>
-	<section
-		onIdle={(event) => {
-			const kind: 'idle' = event.type;
-			const host: HTMLElement = event.currentTarget;
-			host.dataset.trigger = kind;
-		}}
-	>
-		Idle
-	</section>
+	<>
+		<div
+			class="accepted"
+			style={{ color: 'rebeccapurple', '--panel-offset': 4 }}
+			data-state="ready"
+			aria-label="contract"
+		>
+			text {1} {null} {[<span>nested</span>]}
+		</div>
+		<svg opacity={0.75}><g opacity="0.5"><path opacity={1} d="M0 0" /><circle opacity="1" r={2} /></g></svg>
+		<img src="cover.jpg" alt="Cover" />
+		<input value="query" type="search" />
+		<a href="/library">Library</a>
+		<button
+			el={button}
+			attach={installButton}
+			onClick={(event) => {
+				const nativeEvent: MouseEvent = event;
+				const concreteTarget: HTMLButtonElement = event.currentTarget;
+				concreteTarget.disabled = nativeEvent.clientX < 0;
+			}}
+		>
+			Press
+		</button>
+		<button attach={[installButton]} onClick={(event) => event.currentTarget.focus()}>
+			Array attach, single handler
+		</button>
+		<table>
+			<thead>
+				<tr>
+					<th id="h1" scope="col" colspan={2} abbr="Name">
+						Name
+					</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td headers="h1" rowspan={2}>Cell</td>
+				</tr>
+			</tbody>
+		</table>
+		<div
+			tabindex="0"
+			onKeyDown={(event) => {
+				const keyboardEvent: KeyboardEvent = event;
+				event.currentTarget.hidden = keyboardEvent.key === 'Escape';
+			}}
+			onPointerDown={(event) => event.pointerType}
+		>
+			Standard event casing
+		</div>
+		<table>
+			<tbody>
+				<tr>
+					<td colspan="2" rowspan="1">Numeric strings</td>
+				</tr>
+			</tbody>
+		</table>
+		<div
+			overlay
+			onDismiss={(event) => {
+				const reason = event.detail.reason;
+				const concreteTarget: HTMLDivElement = event.currentTarget;
+				concreteTarget.hidden = reason === 'escape';
+			}}
+		>
+			Overlay dismissal
+		</div>
+		<section
+			onIdle={(event) => {
+				const kind: 'idle' = event.type;
+				const host: HTMLElement = event.currentTarget;
+				host.dataset.trigger = kind;
+			}}
+		>
+			Idle
+		</section>
+	</>
 }

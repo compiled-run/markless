@@ -7,6 +7,7 @@ export { DEBUGGING_PLAYBOOK_HINT } from './debugging-playbook.ts';
 export { compileTsrxModule } from './compile-module.ts';
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
 export { parseJavaScriptModule, type JavaScriptAstNode } from './js-ast.ts';
+export { isEventAttribute, normalizeEventName } from './ast/events.ts';
 export { callsImportedOrFreeName } from './module-free-calls.ts';
 export { LEAN_DISPATCH_MARKER_MODULES } from './lean-dispatch-modules.ts';
 export { CompilerPassGraphError, validateCompilerPassGraph } from './pass-graph.ts';

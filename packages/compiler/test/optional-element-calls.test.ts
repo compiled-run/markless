@@ -55,8 +55,10 @@ export function Preference() @{
  let choice = storage('preference', 'first');
  let distance = state(8);
  let viewport = element<HTMLElement>();
- <div el={viewport} />
- <button onClick={(event) => { const offset = 3; choice = 'next'; viewport?.scrollTo({ top: event.mark('top') + distance + offset, behavior: 'auto', left: event.mark('left') }); }}>Move</button>
+ <>
+  <div el={viewport} />
+  <button onClick={(event) => { const offset = 3; choice = 'next'; viewport?.scrollTo({ top: event.mark('top') + distance + offset, behavior: 'auto', left: event.mark('left') }); }}>Move</button>
+ </>
 }
 `);
 	for (const mounted of [true, false]) {

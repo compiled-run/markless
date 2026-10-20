@@ -50,7 +50,7 @@ export function getDynamicTagExpression(node: AnyNode): AnyNode | undefined {
 		| undefined;
 	// Only true expression containers are dynamic tags; member-expression
 	// names (<ui.Row />) are component references, not runtime tag values.
-	if (name?.type === 'JSXExpressionContainer' || name?.type === 'TSRXExpression') {
+	if (name?.type === 'JSXExpressionContainer') {
 		return name.expression as AnyNode | undefined;
 	}
 	return undefined;
@@ -64,16 +64,10 @@ export function isPlainHostTemplateNode(node: AnyNode): boolean {
 	if (isStaticTextNode(node)) return true;
 	if (
 		node.type === 'JSXExpressionContainer' ||
-		node.type === 'TSRXExpression' ||
 		node.type === 'JSXStyleElement'
 	)
 		return true;
-	if (
-		node.type !== 'Element' &&
-		node.type !== 'JSXElement' &&
-		node.type !== 'JSXScriptElement'
-	)
-		return false;
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
 	const tagName = getElementTagName(node);
 	if (!tagName || !isHostTagName(tagName)) return false;
 	return asNodes(node.children).every(
@@ -132,7 +126,7 @@ export function getElementAttributes(node: AnyNode): AnyNode[] {
 }
 
 export function unwrapExpressionContainer(node: AnyNode | undefined): AnyNode | undefined {
-	if (node?.type === 'JSXExpressionContainer' || node?.type === 'TSRXExpression') {
+	if (node?.type === 'JSXExpressionContainer') {
 		return node.expression as AnyNode | undefined;
 	}
 
@@ -152,7 +146,7 @@ export function isStaticTextNode(node: AnyNode): boolean {
 // Text a fragment root can hold directly: static text, or a {...} whose value is a literal and never changes.
 export function isConstantTextNode(node: AnyNode): boolean {
 	if (isStaticTextNode(node)) return true;
-	if (node.type !== 'JSXExpressionContainer' && node.type !== 'TSRXExpression') return false;
+	if (node.type !== 'JSXExpressionContainer') return false;
 	const expression = node.expression as AnyNode | undefined;
 	if (expression?.type === 'Literal') return typeof expression.value === 'string' || typeof expression.value === 'number';
 	return expression?.type === 'TemplateLiteral' && asNodes(expression.expressions).length === 0;
@@ -160,7 +154,7 @@ export function isConstantTextNode(node: AnyNode): boolean {
 
 /** The text a `{"literal"}` child always renders, or null when the child is not a literal container. */
 export function literalContainerText(node: AnyNode): string | null {
-	if (node.type !== 'JSXExpressionContainer' && node.type !== 'TSRXExpression') return null;
+	if (node.type !== 'JSXExpressionContainer') return null;
 	const expression = node.expression as AnyNode | undefined;
 	if (expression?.type === 'Literal')
 		return typeof expression.value === 'string' || typeof expression.value === 'number'

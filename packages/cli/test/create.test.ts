@@ -928,7 +928,7 @@ const lane = (flavor: ManagerFlavor) => MANAGER_LANES.find((entry) => entry.flav
 const JOIN_CASES = [
 	{
 		after: [
-			'# @tsrx/yuku is consumed through its generated self-contained host.',
+			'# workspace packages and the shared catalog',
 			'packages:',
 			"    - 'packages/*'",
 			"    - 'nested/newapp'",
@@ -939,7 +939,7 @@ const JOIN_CASES = [
 			'',
 		].join('\n'),
 		before: [
-			'# @tsrx/yuku is consumed through its generated self-contained host.',
+			'# workspace packages and the shared catalog',
 			'packages:',
 			"    - 'packages/*'",
 			'',

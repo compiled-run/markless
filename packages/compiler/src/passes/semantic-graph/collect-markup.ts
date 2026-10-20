@@ -1,4 +1,4 @@
-import { isEventAttribute } from '@tsrx/yuku';
+import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -47,6 +47,7 @@ import { collectStyleScopes } from '../public-render/style-scopes.ts';
 import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
+import { rawElementText } from '../../ast/raw-text.ts';
 
 // HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
 const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
@@ -281,7 +282,7 @@ function emitNode(
 		return 1;
 	}
 
-	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+	if (node.type === 'JSXExpressionContainer') {
 		return emitTextSlot(node.expression as AnyNode | undefined, path, builder, context, repeat);
 	}
 
@@ -385,12 +386,7 @@ function emitNode(
 		return 1;
 	}
 
-	if (
-		node.type !== 'Element' &&
-		node.type !== 'JSXElement' &&
-		node.type !== 'JSXScriptElement'
-	)
-		return 0;
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return 0;
 	const dynamicTag = getDynamicTagExpression(node);
 	if (dynamicTag) {
 		emitDynamicHost(node, dynamicTag, path, builder, context, repeat);
@@ -612,13 +608,13 @@ function emitNode(
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
 	append(builder, '>');
-	if (node.type === 'JSXScriptElement') emitScriptBody(node, path, builder, context, repeat);
+	if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);
 	else emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	if (!VOID_TAG_NAMES.has(tagName.toLowerCase())) append(builder, `</${tagName}>`);
 	return 1;
 }
 
-// The parser hands a script body over as one raw JSXText, braces and all: literal
+// The parser hands a script body over as raw JSXText, braces and all: literal
 // runs go out verbatim (escaping would corrupt the JS), each `{...}` run interpolates.
 function emitScriptBody(
 	node: AnyNode,
@@ -627,7 +623,7 @@ function emitScriptBody(
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string } | null,
 ): void {
-	const raw = typeof node.raw === 'string' ? node.raw : null;
+	const raw = rawElementText(node);
 	const span = scriptBodySpan(node);
 	// Offsets that do not reproduce `raw` cannot be trusted to slice expressions out.
 	if (!span || (raw !== null && context.source.slice(span.start, span.end) !== raw)) {
@@ -1172,16 +1168,10 @@ function isPlainStaticHostSubtree(node: AnyNode): boolean {
 	if (isStaticTextNode(node)) return true;
 	if (
 		node.type === 'JSXExpressionContainer' ||
-		node.type === 'TSRXExpression' ||
 		node.type === 'JSXStyleElement'
 	)
 		return true;
-	if (
-		node.type !== 'Element' &&
-		node.type !== 'JSXElement' &&
-		node.type !== 'JSXScriptElement'
-	)
-		return false;
+	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
 	const tagName = getElementTagName(node);
 	return (
 		!!tagName &&

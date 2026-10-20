@@ -1,4 +1,4 @@
-import { analyze } from 'yuku-analyzer';
+import { analyze } from '@tsrx/yuku';
 
 type FragmentKind = 'expression' | 'declaration';
 type Dependencies = {

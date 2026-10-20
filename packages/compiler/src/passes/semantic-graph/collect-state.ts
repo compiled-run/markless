@@ -48,8 +48,7 @@ import {
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
 import { inlineRenderLocals } from './render-local-inline.ts';
-import { ownedModuleAst } from './shared-ast.ts';
-import type { SemanticView } from '@tsrx/yuku';
+import { ownedModuleAst, type ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
 import { collectStorageBinding } from './collect-storage.ts';
@@ -1008,10 +1007,10 @@ function readsOwnBinding(body: AnyNode | undefined, id: AnyNode, state: WalkStat
 	const symbolId = declaredSymbolAt(semantic, id.start);
 	if (symbolId === null) return false;
 
-	for (let reference = 0; reference < semantic.reference.count; reference += 1) {
-		if (semantic.reference.symbolId(reference) !== symbolId) continue;
-		if (semantic.reference.inTypePosition(reference)) continue;
-		const start = semantic.reference.start(reference);
+	for (let reference = 0; reference < semantic.references.length; reference += 1) {
+		if ((semantic.references[reference]!.binding?.id ?? null) !== symbolId) continue;
+		if (semantic.references[reference]!.inTypePosition) continue;
+		const start = semantic.references[reference]!.node.start;
 		if (start >= body.start && start < body.end) return true;
 	}
 
@@ -1019,10 +1018,10 @@ function readsOwnBinding(body: AnyNode | undefined, id: AnyNode, state: WalkStat
 }
 
 /** The binding a declaration site introduces, found by where its name starts. */
-function declaredSymbolAt(semantic: SemanticView, offset: number): number | null {
-	for (let symbolId = 0; symbolId < semantic.symbol.count; symbolId += 1) {
-		for (let declIndex = 0; declIndex < semantic.symbol.declCount(symbolId); declIndex += 1) {
-			if (semantic.symbol.declNode(symbolId, declIndex).start === offset) return symbolId;
+function declaredSymbolAt(semantic: ModuleSemantics, offset: number): number | null {
+	for (let symbolId = 0; symbolId < semantic.bindings.length; symbolId += 1) {
+		for (let declIndex = 0; declIndex < semantic.bindings[symbolId]!.declarations.length; declIndex += 1) {
+			if (semantic.bindings[symbolId]!.declarations[declIndex]!.start === offset) return symbolId;
 		}
 	}
 

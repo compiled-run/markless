@@ -59,8 +59,10 @@ import { element, state } from '@markless/core';
 export function Records() @{
  const nameInput = element<HTMLInputElement>();
  let draft = state('');
- <input el={nameInput} onInput={() => { draft = nameInput?.value ?? ''; }} />
- <p>{draft}</p>
+ <>
+  <input el={nameInput} onInput={() => { draft = nameInput?.value ?? ''; }} />
+  <p>{draft}</p>
+ </>
 }
 `);
 	const handler = result.symbolModules.modules.find((module) => module.kind === 'event-handler')!;
@@ -84,9 +86,11 @@ export function Records() @{
  let rows = state([{ title: 'first' }]);
  const field = computed(() => order?.field ?? 'none');
  const first = computed(() => rows[0]!.title);
- <p>{field}</p>
- <p>{first}</p>
- <button onClick={() => { order = null; }}>Clear</button>
+ <>
+  <p>{field}</p>
+  <p>{first}</p>
+  <button onClick={() => { order = null; }}>Clear</button>
+ </>
 }
 `);
 	const bindings = result.semanticGraph.graphBindings;

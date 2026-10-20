@@ -213,7 +213,7 @@ export function App() @{
 		}),
 	]);
 	expect(result.semanticGraph.diagnostics[0]?.message).toContain(
-		'TSRX dynamic tag expression must resolve to an element name',
+		'TSRX2014: A dynamic tag expression must be an identifier',
 	);
 	expect(result.semanticGraph.diagnostics[0]?.why).toContain(
 		'@tsrx/yuku parser failed at phase parse',
@@ -223,37 +223,45 @@ export function App() @{
 	);
 });
 
-test('a parse error from sibling elements written back to back names the separator that fixes it', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/Siblings.tsrx',
-		source: `
+test('sibling elements on one line name the fragment that holds them', async () => {
+	const source = `
 export function App() @{
 	const label = 'x';
 	<header>top</header><main>{label}</main>
 }
-`,
-		symbols: [],
-	});
+`;
+	const result = await compileTsrxModule({ filename: 'src/Siblings.tsrx', source, symbols: [] });
 
 	const [diagnostic] = result.semanticGraph.diagnostics;
 	expect(diagnostic?.code).toBe('MARKLESS_PARSE_ERROR');
-	expect(diagnostic?.message).toContain('`</header>` and `<main>`');
-	expect(diagnostic?.suggestions[0]?.message).toContain(
-		'Put `;` after `</header>` (line 4), or start `<main>` on its own line',
-	);
-	const offset = result.semanticGraph.diagnostics[0]?.primarySpan?.start;
-	expect(offset).toBe(
-		`\nexport function App() @{\n\tconst label = 'x';\n\t<header>top</header>`.length,
-	);
+	expect(diagnostic?.title).toBe('A code block renders a single node');
+	expect(diagnostic?.message).toContain('`<main>` on line 4 follows another node');
+	expect(diagnostic?.suggestions[0]?.message).toContain('put `<>` before the first and `</>` after the last');
+	expect(diagnostic?.primarySpan?.start).toBe(source.indexOf('<main>'));
 });
 
-test('a parse error with no sibling separator to blame keeps the parser message alone', async () => {
+test('a statement after the rendered markup names the reorder that fixes it', async () => {
+	const source = `
+export function App() @{
+	<p>hello</p>
+	const label = 'x';
+}
+`;
+	const result = await compileTsrxModule({ filename: 'src/Late.tsrx', source, symbols: [] });
+
+	const [diagnostic] = result.semanticGraph.diagnostics;
+	expect(diagnostic?.code).toBe('MARKLESS_PARSE_ERROR');
+	expect(diagnostic?.title).toBe('Code must come before the rendered output');
+	expect(diagnostic?.suggestions[0]?.message).toContain('Move the statement above the markup');
+});
+
+test('a parse error outside the template rules keeps the parser message alone', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Broken.tsrx',
 		source: `
 export function App() @{
-	<ul><li>a</li><li>b</li></ul>
 	const = 1;
+	<ul><li>a</li><li>b</li></ul>
 }
 `,
 		symbols: [],
@@ -261,8 +269,8 @@ export function App() @{
 
 	const [diagnostic] = result.semanticGraph.diagnostics;
 	expect(diagnostic?.code).toBe('MARKLESS_PARSE_ERROR');
+	expect(diagnostic?.title).toBe('TSRX parser rejected this source');
 	expect(diagnostic?.suggestions[0]?.message).toContain('https://tsrx.dev/specification');
-	expect(diagnostic?.message).not.toContain('back to back');
 });
 
 test('compileTsrxModule does not swallow non-parser compiler bugs', async () => {
@@ -2787,30 +2795,32 @@ async function renderAndResumeSiblingRoots(source: string) {
 	};
 }
 
-test('compileTsrxModule renders sibling top-level elements as an implicit fragment root', async () => {
+test('compileTsrxModule renders sibling top-level elements held in a fragment root', async () => {
 	const explicit = await renderAndResumeSiblingRoots(siblingRootsBody('<>', '</>'));
-	const implicit = await renderAndResumeSiblingRoots(siblingRootsBody('  ', '   '));
 
-	expect(implicit.result.diagnostics ?? []).toEqual([]);
-	expect(implicit.result.publicRenderModule.ssrModuleSource).not.toContain('<h1');
-	expect(implicit.result.publicRenderModule.ssrModuleSource).not.toContain('<button');
-	expect(implicit.html).toBe('<h1>Tally</h1><button>Add</button><output>0</output>');
-	expect(implicit.count).toBe(2);
-	expect(implicit.outputText).toBe('2');
+	expect(explicit.result.diagnostics ?? []).toEqual([]);
+	expect(explicit.result.publicRenderModule.ssrModuleSource).not.toContain('<h1');
+	expect(explicit.result.publicRenderModule.ssrModuleSource).not.toContain('<button');
+	expect(explicit.html).toBe('<h1>Tally</h1><button>Add</button><output>0</output>');
+	expect(explicit.count).toBe(2);
+	expect(explicit.outputText).toBe('2');
+});
 
-	expect(implicit.html).toBe(explicit.html);
-	expect(implicit.state).toEqual(explicit.state);
-	expect(implicit.view).toEqual(explicit.view);
-	expect(implicit.count).toBe(explicit.count);
-	expect(implicit.outputText).toBe(explicit.outputText);
-	expect(implicit.result.renderData).toEqual(explicit.result.renderData);
-	expect(implicit.result.protocolView).toEqual(explicit.result.protocolView);
-	expect(implicit.result.publicRenderModule.ssrModuleSource).toBe(
-		explicit.result.publicRenderModule.ssrModuleSource,
-	);
-	expect(implicit.result.symbolModules.modules.map((module) => module.source)).toEqual(
-		explicit.result.symbolModules.modules.map((module) => module.source),
-	);
+test('sibling top-level elements without a fragment are refused with the fragment that fixes them', async () => {
+	const source = siblingRootsBody('  ', '   ');
+	const result = await compileTsrxModule({ filename: 'src/Tally.tsrx', source, symbols: [] });
+
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PARSE_ERROR',
+			title: 'A code block renders a single node',
+			primarySpan: expect.objectContaining({ start: source.indexOf('<button') }),
+		}),
+	]);
+	const [diagnostic] = result.semanticGraph.diagnostics;
+	expect(diagnostic?.message).toContain('`<button>` on line 9 follows another node');
+	expect(diagnostic?.suggestions[0]?.message).toContain('put `<>` before the first and `</>` after the last');
+	expect(result.publicRenderModule.ssrModuleSource).toBe('');
 });
 
 test('compileTsrxModule renders a fragment root holding only text', async () => {
@@ -2939,67 +2949,52 @@ export default function Accepted() @{
 	}
 });
 
-test('compileTsrxModule gives implicit sibling roots the explicit fragment diagnostics', async () => {
-	const withComponent = (open: string, close: string) => `
+test('compileTsrxModule refuses a component placed beside an element in a fragment root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `
 import { Widget } from './widget.tsrx';
 
 export function App() @{
-	${open}
+	<>
 		<h1>Title</h1>
 		<Widget />
-	${close}
+	</>
 }
-`;
-	const explicit = await compileTsrxModule({
-		filename: 'src/App.tsrx',
-		source: withComponent('<>', '</>'),
+`,
 		symbols: [],
 	});
-	const implicit = await compileTsrxModule({
-		filename: 'src/App.tsrx',
-		source: withComponent('  ', '   '),
-		symbols: [],
-	});
-	const rootDiagnostic = (result: typeof explicit) =>
-		result.publicRenderModule.diagnostics.find(
-			(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
-		);
 
-	expect(rootDiagnostic(explicit)?.message).toContain('the <Widget> component');
-	const { primarySpan: explicitSpan, ...explicitRest } = rootDiagnostic(explicit)!;
-	const { primarySpan: implicitSpan, ...implicitRest } = rootDiagnostic(implicit)!;
-	expect(implicitRest).toEqual(explicitRest);
-	expect(implicitSpan?.start).toBeGreaterThan(explicitSpan!.start);
-	expect(implicitSpan?.end).toBeLessThan(explicitSpan!.end);
+	const rootDiagnostic = result.publicRenderModule.diagnostics.find(
+		(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+	);
+	expect(rootDiagnostic?.message).toContain('the <Widget> component');
 });
 
-test('compileTsrxModule renders a top-level @if beside sibling elements as an implicit fragment', async () => {
-	const withBranch = (open: string, close: string) => `
+test('compileTsrxModule renders a top-level @if beside sibling elements in a fragment', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Panel.tsrx',
+		source: `
 import { state } from '@markless/core';
 
 export function Panel() @{
 	let open = state(true);
 
-	${open}
+	<>
 		<h1>Panel</h1>
 		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
-	${close}
+	</>
 }
-`;
-	const render = async (source: string) => {
-		const result = await compileTsrxModule({ filename: 'src/Panel.tsrx', source, symbols: [] });
-		const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
-		const output = await (
-			ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>
-		)();
-		return { result, html: output.html };
-	};
-	const explicit = await render(withBranch('<>', '</>'));
-	const implicit = await render(withBranch('  ', '   '));
+`,
+		symbols: [],
+	});
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
 
-	expect(implicit.result.diagnostics ?? []).toEqual([]);
-	expect(implicit.html).toBe(explicit.html);
-	expect(implicit.result.renderData).toEqual(explicit.result.renderData);
+	expect(result.diagnostics ?? []).toEqual([]);
+	expect(output.html).toContain('<h1>Panel</h1>');
+	expect(output.html).toContain('<p>Shown</p>');
+	expect(output.html).not.toContain('Hidden');
 });
 
 test('compileTsrxModule places children as raw template projection', async () => {
@@ -6469,4 +6464,35 @@ export function App() @{
 	expect(Object.fromEntries(cleanupCounts)).toEqual({ a: 1, b: 1, c: 1, d: 1 });
 	for (const key of ['a', 'b', 'c', 'd'])
 		expect(hostsByKey.get(key)).not.toBe(mountedHosts.get(key));
+});
+
+// Arm text is template text, so a quote, an apostrophe or a backtick in it is a character, not
+// the start of a string; `//` after a space starts a comment, as TSRX specifies.
+test('an @if arm renders quotes, apostrophes and backticks in its text as written', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Quoted.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function Quoted() @{
+	let open = state(true);
+
+	<p>
+		@if (open) {
+			<span>
+				it's "quoted" \`ticked\` at http://example.com
+				// a note
+			</span>
+		}
+	</p>
+}
+`,
+		symbols: [],
+	});
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => Promise<{ readonly html: string }>)();
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(output.html).toContain('<span>it\'s "quoted" `ticked` at http://example.com</span>');
+	expect(output.html).not.toContain('a note');
 });

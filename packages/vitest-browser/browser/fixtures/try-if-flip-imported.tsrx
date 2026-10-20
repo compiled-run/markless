@@ -12,8 +12,10 @@ export function Shelf() @{
 
 	<section>
 		@try {
-			@if (shown) { <Counter unit="boxes" /> }
-			<h3 data-stock-name>{stock.name}</h3>
+			<>
+				@if (shown) { <Counter unit="boxes" /> }
+				<h3 data-stock-name>{stock.name}</h3>
+			</>
 		} @pending {
 			<span data-stock-wait>Stocking</span>
 		}

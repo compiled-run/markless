@@ -16,8 +16,10 @@ export function App() @{
 		<button type="button" data-open onClick={() => open = !open}>Open</button>
 		<button type="button" data-tap onClick={() => taps = taps + 1}>Tap</button>
 		@if (open) {
-			<Chip />
-			<span data-chip>chip {taps}/{doubled}</span>
+			<>
+				<Chip />
+				<span data-chip>chip {taps}/{doubled}</span>
+			</>
 		}
 	</main>
 }

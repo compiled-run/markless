@@ -39,20 +39,22 @@ const sharedParentSource = `import { state } from '@markless/core';
 export function Page() @{
 	let crew = state([{ name: 'Ana' }]);
 	let compact = state(false);
-	<ul>
-		@if (compact) {
-			@for (const member of crew; key member.name) {
-				<li>{member.name}</li>
+	<>
+		<ul>
+			@if (compact) {
+				@for (const member of crew; key member.name) {
+					<li>{member.name}</li>
+				}
+			} @else {
+				@for (const member of crew; key member.name) {
+					<li><b>{member.name}</b></li>
+				} @empty {
+					<li>Nobody</li>
+				}
 			}
-		} @else {
-			@for (const member of crew; key member.name) {
-				<li><b>{member.name}</b></li>
-			} @empty {
-				<li>Nobody</li>
-			}
-		}
-	</ul>
-	<button onClick={() => (compact = !compact)}>toggle</button>
+		</ul>
+		<button onClick={() => (compact = !compact)}>toggle</button>
+	</>
 }`;
 
 test('rows written straight into a branch arm name the arm they belong to', async () => {

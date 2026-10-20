@@ -15,13 +15,15 @@ export function App() @{
 	<article>
 		<button type="button" data-next-round onClick={() => round = round + 1}>Next</button>
 		@try {
-			<h2 data-ledger-value>{ledger.value}</h2>
-			<em data-ledger-status>{ledger.status}</em>
-			<ul>
-				@for (const entry of ledger.entries; key entry.sku) {
-					<li data-ledger-entry>{entry.sku}</li>
-				}
-			</ul>
+			<>
+				<h2 data-ledger-value>{ledger.value}</h2>
+				<em data-ledger-status>{ledger.status}</em>
+				<ul>
+					@for (const entry of ledger.entries; key entry.sku) {
+						<li data-ledger-entry>{entry.sku}</li>
+					}
+				</ul>
+			</>
 		} @pending {
 			<p data-ledger-wait>Counting</p>
 		}

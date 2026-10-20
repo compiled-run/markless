@@ -870,8 +870,7 @@ function classifyIdentifierUse(
 		return 'computed-key-read';
 	}
 	if (
-		effectiveParent.type === 'JSXExpressionContainer' ||
-		effectiveParent.type === 'TSRXExpression'
+		effectiveParent.type === 'JSXExpressionContainer'
 	) {
 		const attribute = parents[parentIndex - 1];
 		if (

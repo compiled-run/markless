@@ -356,8 +356,10 @@ test('an unclosed CSS rule keeps the file compiling with its authored style text
 // a document TypeScript could not parse.
 test('a style element beside sibling markup leaves the sibling tags unescaped', () => {
 	const source = `export function App() @{
-	<style>.counter { color: red; }</style>
-	<section>hello</section>
+	<>
+		<style>.counter { color: red; }</style>
+		<section>hello</section>
+	</>
 }`;
 	const result = compileToVolarMappings(source, 'Style.tsrx', { loose: true });
 
@@ -370,8 +372,10 @@ test('a style element beside sibling markup leaves the sibling tags unescaped', 
 
 test('a half-typed CSS declaration beside sibling markup keeps both usable', () => {
 	const source = `export function App() @{
-	<style>.counter { colo</style>
-	<section>hello</section>
+	<>
+		<style>.counter { colo</style>
+		<section>hello</section>
+	</>
 }`;
 	const result = compileToVolarMappings(source, 'Half.tsrx', { loose: true });
 	const styleStart = source.indexOf('<style>') + '<style>'.length;

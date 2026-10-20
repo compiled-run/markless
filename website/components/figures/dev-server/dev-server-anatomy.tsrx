@@ -95,8 +95,10 @@ export default function DevServer() @{
 					@for (const footer of FOOTERS; key footer.saved) {
 						<tspan class="others" data-pm={footer.saved}>
 							@for (const other of footer.others; key other.id) {
-								<tspan class="gap">{other.gap}</tspan>
-								<tspan class="pick" data-pick={other.id}>{other.id}</tspan>
+								<>
+									<tspan class="gap">{other.gap}</tspan>
+									<tspan class="pick" data-pick={other.id}>{other.id}</tspan>
+								</>
 							}
 						</tspan>
 					}

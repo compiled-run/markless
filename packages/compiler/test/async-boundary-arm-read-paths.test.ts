@@ -45,7 +45,7 @@ test('boundary arm reads keep authored fields named like snapshot keys', async (
 	const { arms } = await boundaryModule(
 		dock(
 			`{ error: 'e' + level, version: 'v2' }`,
-			`<b>{harbor.error}</b>\n\t\t\t<i>{harbor.version}</i>`,
+			`<><b>{harbor.error}</b><i>{harbor.version}</i></>`,
 		),
 	);
 	expect(reads(arms[0])).toEqual([

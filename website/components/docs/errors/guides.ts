@@ -180,7 +180,7 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	},
 	MARKLESS_BRANCH_ELSE_SPELLING: {
 		summary: 'An @if branch uses else without the @ sign.',
-		what: 'Without the `@`, Markless does not see a branch. The page shows the word "else" and the code after it as text.',
+		what: 'Without the `@`, Markless does not see a branch. A braced `} else {` stops the build. An unbraced one shows the word "else" and the code after it as text.',
 		how: 'Write `@else`, with the `@` sign.',
 		example: ['@if (open) {', '\t<p>Open</p>', '} @else {', '\t<p>Closed</p>', '}'],
 	},

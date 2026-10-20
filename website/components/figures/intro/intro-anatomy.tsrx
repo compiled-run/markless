@@ -74,8 +74,10 @@ export default function IntroAnatomy() @{
 						}
 						<path class="jar-ink thin" d={art.shots.rule} />
 						@for (const box of art.shots.boxes; key box.key) {
-							<path class="jar-ink" d={box.ink} />
-							<path class="tick" d={box.d} style={'--i:' + box.key} />
+							<>
+								<path class="jar-ink" d={box.ink} />
+								<path class="tick" d={box.d} style={'--i:' + box.key} />
+							</>
 						}
 					</g>
 					<path class="tick ticking" d={tick} style={tickLength} />

@@ -1,14 +1,10 @@
-import {
-	duplicateBindingDiagnostics,
-	normalizeProgram,
-	parseModule as parseYukuModule,
-	sourceLocation,
-	type BaseNode,
-	type Comment,
-	type Diagnostic,
-	type ParseModuleOptions,
-	type Program,
-} from '@tsrx/yuku';
+import { parse } from '@tsrx/yuku';
+
+type ParseResult = ReturnType<typeof parse>;
+export type Program = ParseResult['program'];
+export type Comment = ParseResult['comments'][number];
+export type Diagnostic = ParseResult['diagnostics'][number];
+export type BaseNode = { type: string; start: number; end: number };
 
 export type MarklessSourcePosition = {
 	readonly line: number;
@@ -34,7 +30,14 @@ export type MarklessParserComment = Comment & {
 	readonly loc: MarklessSourceLocation;
 };
 
-export type MarklessParseOptions = Omit<ParseModuleOptions, 'errors' | 'comments'> & {
+export type MarklessParseOptions = {
+	/** The language to read, instead of the one the filename implies. */
+	lang?: 'tsrx' | 'js' | 'jsx' | 'ts' | 'tsx' | 'd.ts';
+	preserveParens?: boolean;
+	attachComments?: boolean;
+	/** Keep a fatal parse error a value in `errors` rather than a throw. */
+	collect?: boolean;
+	loose?: boolean;
 	errors?: MarklessCompileError[];
 	comments?: MarklessParserComment[];
 };
@@ -82,6 +85,37 @@ export function parseModule(
 	return parseModuleWith(source, filename, options, Object.keys(options).length === 0);
 }
 
+// The language a filename implies; a name with no standard extension, such as a virtual id, is JavaScript.
+function languageOf(filename: string): NonNullable<MarklessParseOptions['lang']> {
+	const path = filename.split(/[?#]/, 1)[0]!.toLowerCase();
+	if (path.endsWith('.tsrx') || path.endsWith('.tsx')) return 'tsrx';
+	if (path.endsWith('.jsx')) return 'jsx';
+	if (path.endsWith('.d.ts')) return 'd.ts';
+	if (path.endsWith('.ts')) return 'ts';
+	return 'js';
+}
+
+// A mismatched closing tag is reported on its name; the author wrote the tag from its `</`.
+function authoredSpan(diagnostic: Diagnostic, source: string): Diagnostic {
+	const { start } = diagnostic;
+	if (!diagnostic.message.startsWith('Expected closing tag') || source.slice(start - 2, start) !== '</')
+		return diagnostic;
+	return { ...diagnostic, start: start - 2 };
+}
+
+/** The parser options that read `filename`'s language, for a parse or an analysis of it. */
+export function parserLanguageFor(filename: string): { readonly path?: string } {
+	return languageOptions(languageOf(filename));
+}
+
+// Without a path the parser reads TSRX, which is TSX with the TSRX syntax; a standard extension selects that language.
+function languageOptions(lang: NonNullable<MarklessParseOptions['lang']>): { readonly path?: string } {
+	return lang === 'tsrx' || lang === 'tsx' ? {} : { path: `module.${lang}` };
+}
+
+// Redeclarations come from the parser's scope pass and leave a usable tree, so they are usage errors, not fatal ones.
+const REDECLARATION = /has already been declared$/;
+
 function parseModuleWith(
 	source: string,
 	filename: string,
@@ -99,49 +133,49 @@ function parseModuleWith(
 		}
 		parseCacheMisses += 1;
 	}
-	const diagnostics: Diagnostic[] = [];
-	const comments: Comment[] = [];
 	const {
 		errors,
 		comments: outputComments,
 		collect = false,
 		loose = false,
-		...parserOptions
+		lang = languageOf(filename),
+		preserveParens = true,
+		attachComments = outputComments !== undefined,
 	} = options;
-	const program = parseYukuModule(source, filename, {
-		...parserOptions,
-		collect: true,
-		loose,
-		errors: diagnostics,
-		comments,
+	const result = parse(source, {
+		...languageOptions(lang),
+		preserveParens,
+		attachComments,
+		// Scope checking costs as much as the parse itself, so it runs only for a caller that collects errors.
+		semanticErrors: errors !== undefined,
 	});
-	const compileErrors = [
-		...diagnostics.map((diagnostic) =>
-			toMarklessCompileError(diagnostic, source, filename, 'fatal'),
-		),
-		...duplicateBindingDiagnostics(program, source).map((diagnostic) =>
-			toMarklessCompileError(diagnostic, source, filename, 'usage'),
-		),
-	];
+	const program = result.program;
+	let lines: number[] | undefined;
+	const locate = (start: number, end: number): MarklessSourceLocation =>
+		sourceLocation((lines ??= lineStarts(source)), source.length, start, end);
+	const compileErrors = result.diagnostics
+		.filter((diagnostic) => diagnostic.severity === 'error')
+		.map((diagnostic) =>
+			toMarklessCompileError(
+				authoredSpan(diagnostic, source),
+				locate,
+				filename,
+				REDECLARATION.test(diagnostic.message) ? 'usage' : 'fatal',
+			),
+		);
 	errors?.push(...compileErrors);
-	outputComments?.push(
-		...comments.map((comment) => ({
-			...comment,
-			loc: sourceLocation(source, comment.start, comment.end),
-		})),
-	);
+	if (outputComments) {
+		for (const comment of result.comments) {
+			outputComments.push({ ...comment, loc: locate(comment.start, comment.end) });
+		}
+	}
 	if (!collect && !loose) {
 		const fatal = compileErrors.find((error) => error.type === 'fatal');
 		if (fatal) throw fatal;
 	}
-	const normalized = normalizeProgram(program, {
-		onNode: (node) => {
-			blankMarklessAllowDirective(node);
-			dropCommentContainers(node);
-		},
-	});
-	if (cacheKey === null) return normalized;
-	const shared = freezeParsedTrees ? deepFreeze(normalized) : normalized;
+	settleTemplateShapes(program, source, result.comments);
+	if (cacheKey === null) return program;
+	const shared = freezeParsedTrees ? deepFreeze(program) : program;
 	parseCache.set(cacheKey, shared);
 	if (parseCache.size > PARSE_CACHE_LIMIT) {
 		const oldest = parseCache.keys().next();
@@ -173,65 +207,122 @@ function deepFreeze<T>(root: T): T {
 	return root;
 }
 
-/**
- * `{/* … *\/}` is a comment, not a child. The parser reports it as a
- * `JSXExpressionContainer` wrapping a `JSXEmptyExpression`, and every collector
- * that walks children would otherwise read it as a dynamic child and carry the
- * comment text through as an authored expression — emitted as `return (/* … *\/)`,
- * an empty parenthesized expression that fails to parse. Removing it from its
- * parent's children is the JSX-standard lowering, and doing it once here spares
- * every downstream pass from having to know the shape.
- *
- * Only the array entry goes; no other node's offsets move, so spans and source
- * mapping stay exactly where the author wrote them.
- */
-function dropCommentContainers(node: BaseNode): void {
-	const children = (node as BaseNode & { children?: unknown }).children;
-	if (!Array.isArray(children)) return;
-	for (let index = children.length - 1; index >= 0; index -= 1) {
-		if (isCommentContainer(children[index])) children.splice(index, 1);
-	}
-}
+type SpanNode = { type?: unknown; start?: unknown; end?: unknown; [key: string]: unknown };
 
-function isCommentContainer(node: unknown): boolean {
-	if (!node || typeof node !== 'object') return false;
-	const candidate = node as {
-		type?: unknown;
-		expression?: { type?: unknown } | null;
+/**
+ * Three spots where the compiler reads TSRX in the shape it was written against, settled once
+ * here by visiting only the nodes on the path to each spot, never the whole tree:
+ * a `{/* … *\/}` or `//` comment among JSX children is a comment, not a child; an `@else if`
+ * is the same construct as the `@if` it continues; and an `@case` body is its template's
+ * nodes. No node's offsets move.
+ */
+function settleTemplateShapes(program: Program, source: string, comments: readonly Comment[]): void {
+	const elseIfStarts = new Set<number>();
+	const switchStarts = new Set<number>();
+	const targets: number[] = [];
+	for (const comment of comments) {
+		targets.push(comment.start);
+	}
+	for (const match of source.matchAll(/@else\s+if\b/g)) {
+		const keyword = match.index + match[0].length - 2;
+		elseIfStarts.add(match.index).add(keyword);
+		targets.push(keyword);
+	}
+	// An empty `{}` among children is dropped like a comment; extra targets only widen the descent.
+	for (const match of source.matchAll(/\{\s*\}/g)) targets.push(match.index);
+	for (const match of source.matchAll(/@switch\b/g)) {
+		switchStarts.add(match.index);
+		targets.push(match.index);
+	}
+	if (targets.length === 0) return;
+	targets.sort((left, right) => left - right);
+
+	const settle = (node: SpanNode): void => {
+		const children = node.children;
+		if (Array.isArray(children)) {
+			for (let index = children.length - 1; index >= 0; index -= 1) {
+				const child = children[index] as SpanNode | undefined;
+				const expression = child?.expression as SpanNode | null | undefined;
+				if (child?.type === 'JSXExpressionContainer' && expression?.type === 'JSXEmptyExpression')
+					children.splice(index, 1);
+			}
+		}
+		if (node.type === 'IfStatement' && elseIfStarts.has(node.start as number)) {
+			node.type = 'JSXIfExpression';
+		}
+		if (node.type === 'JSXSwitchExpression' && switchStarts.has(node.start as number)) {
+			for (const switchCase of node.cases as SpanNode[]) {
+				const [block, ...rest] = switchCase.consequent as SpanNode[];
+				if (block?.type === 'BlockStatement' && rest.length === 0) switchCase.consequent = block.body;
+			}
+		}
 	};
-	if (candidate.type !== 'JSXExpressionContainer' && candidate.type !== 'TSRXExpression') {
-		return false;
-	}
-	return candidate.expression?.type === 'JSXEmptyExpression';
+	const visit = (node: SpanNode, from: number, to: number): void => {
+		settle(node);
+		for (const key in node) {
+			const value = node[key];
+			if (!value || typeof value !== 'object') continue;
+			if (Array.isArray(value)) {
+				for (const item of value) descend(item as SpanNode, from, to);
+			} else {
+				descend(value as SpanNode, from, to);
+			}
+		}
+	};
+	const descend = (node: SpanNode, from: number, to: number): void => {
+		if (!node || typeof node.type !== 'string' || typeof node.start !== 'number') return;
+		const start = node.start;
+		const end = node.end as number;
+		let first = from;
+		while (first < to && targets[first]! < start) first += 1;
+		let last = first;
+		while (last < to && targets[last]! < end) last += 1;
+		if (first < last) visit(node, first, last);
+	};
+	visit(program as unknown as SpanNode, 0, targets.length);
 }
 
-const marklessAllowDirective = /^\/\/\s*markless-allow\s+[A-Z0-9_]+:\s*\S(?:.*\S)?$/;
+function lineStarts(source: string): number[] {
+	const starts = [0];
+	for (let index = source.indexOf('\n'); index !== -1; index = source.indexOf('\n', index + 1)) {
+		starts.push(index + 1);
+	}
+	return starts;
+}
 
-/**
- * A `markless-allow` directive is authored as JSX text, so the child text it
- * sits in would otherwise render into the output. Overwrite it with spaces —
- * newlines kept — so the directive disappears from the rendered text without
- * moving any offset that later passes report against.
- */
-function blankMarklessAllowDirective(node: BaseNode): void {
-	if (node.type !== 'JSXText') return;
-	const text = node as BaseNode & { value?: unknown };
-	if (typeof text.value !== 'string') return;
-	if (!marklessAllowDirective.test(text.value.trim())) return;
-	text.value = text.value.replace(/[^\r\n]/g, ' ');
+function sourcePosition(lines: readonly number[], length: number, offset: number): MarklessSourcePosition {
+	const at = Math.min(Math.max(offset, 0), length);
+	let low = 0;
+	let high = lines.length - 1;
+	while (low < high) {
+		const middle = (low + high + 1) >> 1;
+		if (lines[middle]! <= at) low = middle;
+		else high = middle - 1;
+	}
+	return { line: low + 1, column: at - lines[low]! };
+}
+
+function sourceLocation(
+	lines: readonly number[],
+	length: number,
+	start: number,
+	end: number,
+): MarklessSourceLocation {
+	return {
+		start: sourcePosition(lines, length, start),
+		end: sourcePosition(lines, length, end),
+	};
 }
 
 /**
  * Markless reports parse failures as `SyntaxError`s carrying the offsets, the
  * `loc`, and the filename a caller needs to place the failure, plus a `type`
  * separating a module that cannot be compiled at all (`fatal`) from one whose
- * authoring mistake is recoverable (`usage`). The spans come from @tsrx/yuku as
- * given: `parseModule` there already re-anchors the malformed-markup shapes
- * onto the markup the author wrote.
+ * authoring mistake is recoverable (`usage`).
  */
 function toMarklessCompileError(
 	diagnostic: Diagnostic,
-	source: string,
+	locate: (start: number, end: number) => MarklessSourceLocation,
 	filename: string,
 	type: MarklessCompileError['type'],
 ): MarklessCompileError {
@@ -241,7 +332,7 @@ function toMarklessCompileError(
 	error.pos = start;
 	error.raisedAt = end;
 	error.end = end;
-	error.loc = sourceLocation(source, start, end);
+	error.loc = locate(start, end);
 	error.fileName = filename;
 	error.type = type;
 	return error;

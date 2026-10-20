@@ -1,6 +1,5 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
-import type { SemanticView } from '@tsrx/yuku';
 import type {
 	SemanticComponent,
 	SemanticComponentPropDeclaration,
@@ -35,7 +34,7 @@ import type {
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
-import { moduleSemantics } from './shared-ast.ts';
+import { moduleSemantics, type ModuleSemantics } from './shared-ast.ts';
 
 export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
@@ -108,7 +107,7 @@ export type WalkState = {
 	 * Analysis is a second pass over the source, so it is deferred: a walk that
 	 * never asks never pays for it, and a walk that asks twice pays once.
 	 */
-	readonly semantic: () => SemanticView;
+	readonly semantic: () => ModuleSemantics;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
@@ -247,10 +246,10 @@ export function createWalkState(input: {
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	/** Overridable so a test can observe when analysis is requested. */
-	readonly analyzeSemantics?: (source: string, filename: string) => SemanticView;
+	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
 	const analyzeSemantics = input.analyzeSemantics ?? moduleSemantics;
-	let semanticView: SemanticView | undefined;
+	let semanticView: ModuleSemantics | undefined;
 	return {
 		filename: input.filename,
 		moduleId: input.moduleId,

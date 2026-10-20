@@ -271,9 +271,11 @@ import { state } from '@markless/core';
 export default function SiblingRootsPage() @{
 	let count = state(0);
 
-	<h1>Count</h1>
-	<button onClick={() => count++}>Add</button>
-	<output>{count}</output>
+	<>
+		<h1>Count</h1>
+		<button onClick={() => count++}>Add</button>
+		<output>{count}</output>
+	</>
 }
 `;
 

@@ -76,7 +76,6 @@ function scanRowNode(node: AnyNode | undefined, rowNames: ReadonlySet<string>, s
 			for (const child of asNodes(node.children)) scanRowNode(child, rowNames, scan);
 			return;
 		}
-		case 'TSRXExpression':
 		case 'JSXExpressionContainer':
 			scanRowNode(node.expression as AnyNode | undefined, rowNames, scan);
 			return;

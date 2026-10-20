@@ -106,16 +106,18 @@ test('client templates carry the same text as the server render', async () => {
 const ROWS = `import { state } from '@markless/core';
 export default function List() @{
 	let rows = state([{ id: 1, name: 'a' }]);
-	<ul>
-		@for (const row of rows; key row.id) {
-			<li>
-				item
-				<strong>{row.name}</strong>
-				done
-			</li>
-		}
-	</ul>
-	<button type="button" onClick={() => { rows = [...rows, { id: 2, name: 'b' }]; }}>add</button>
+	<>
+		<ul>
+			@for (const row of rows; key row.id) {
+				<li>
+					item
+					<strong>{row.name}</strong>
+					done
+				</li>
+			}
+		</ul>
+		<button type="button" onClick={() => { rows = [...rows, { id: 2, name: 'b' }]; }}>add</button>
+	</>
 }`;
 
 test('row templates drop line-break whitespace too', async () => {

@@ -17,8 +17,10 @@ export function App() @{
 	<div>
 		<button type="button" data-toggle onClick={() => open = !open}>Toggle</button>
 		@try {
-			<p data-report-title>{report.title}</p>
-			@if (open) { <Badge caption="badge" /> }
+			<>
+				<p data-report-title>{report.title}</p>
+				@if (open) { <Badge caption="badge" /> }
+			</>
 		} @pending {
 			<p data-report-wait>Loading</p>
 		}

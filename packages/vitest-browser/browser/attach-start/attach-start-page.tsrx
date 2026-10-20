@@ -33,12 +33,14 @@ export default function AttachStartPage() @{
 			show
 		</button>
 		@if (shown) {
-			<div data-shown-plain attach={mark}>
-				plain arm
-			</div>;
-			<div data-shown-visible attach={mark} onVisible={() => {}}>
-				visible arm
-			</div>;
+			<>
+				<div data-shown-plain attach={mark}>
+					plain arm
+				</div>
+				<div data-shown-visible attach={mark} onVisible={() => {}}>
+					visible arm
+				</div>
+			</>;
 		}
 	</main>;
 }

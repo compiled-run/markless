@@ -395,16 +395,16 @@ function callbackInitializer(
 function resolveComponentLocalReferences(state: WalkState, bodySpan: SourceSpan): void {
 	const semantic = state.semantic();
 
-	for (let referenceId = 0; referenceId < semantic.reference.count; referenceId += 1) {
-		const start = semantic.reference.start(referenceId);
-		const end = semantic.reference.end(referenceId);
+	for (let referenceId = 0; referenceId < semantic.references.length; referenceId += 1) {
+		const start = semantic.references[referenceId]!.node.start;
+		const end = semantic.references[referenceId]!.node.end;
 		if (start < bodySpan.start || end > bodySpan.end) continue;
 		// A type-position use never reads or writes the value beside it.
-		if (semantic.reference.inTypePosition(referenceId)) continue;
+		if (semantic.references[referenceId]!.inTypePosition) continue;
 
-		const symbolId = semantic.reference.symbolId(referenceId);
+		const symbolId = (semantic.references[referenceId]!.binding?.id ?? null);
 		if (symbolId === null) continue;
-		const declaration = semantic.symbol.declNode(symbolId, 0);
+		const declaration = semantic.bindings[symbolId]!.declarations[0]!;
 		const binding = state.componentLocalBindings.get(
 			`binding:${declaration.start}:${declaration.end}`,
 		);
@@ -414,7 +414,7 @@ function resolveComponentLocalReferences(state: WalkState, bodySpan: SourceSpan)
 			`${start}:${end}`,
 			binding.declaration.bindingId!,
 		);
-		if (semantic.reference.isWrite(referenceId)) {
+		if (semantic.references[referenceId]!.isWrite) {
 			Object.assign(binding.declaration, {
 				writeCount: (binding.declaration.writeCount ?? 0) + 1,
 			});
@@ -446,10 +446,8 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 	switch (node.type) {
 		case 'Element':
 		case 'JSXElement':
-		case 'JSXScriptElement':
 			collectElement(node, state, walk);
 			return;
-		case 'TSRXExpression':
 		case 'JSXExpressionContainer':
 			if (literalContainerText(node) === null)
 				collectTemplateExpression(node.expression as AnyNode | undefined, state);

@@ -14,8 +14,10 @@ export function App() @{
 	<main data-multi-child>
 		<button type="button" data-open onClick={() => open = !open}>Open</button>
 		@try {
-			<h4>{title.heading}</h4>
-			@if (open) { <Chip /> }
+			<>
+				<h4>{title.heading}</h4>
+				@if (open) { <Chip /> }
+			</>
 		} @pending {
 			<em>Waiting</em>
 		}

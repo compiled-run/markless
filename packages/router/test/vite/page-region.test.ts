@@ -42,8 +42,10 @@ const leadingFiles = {
 		"import { state } from '@markless/core';",
 		'export default function Home() @{',
 		'\tlet count = state(0);',
-		'\t<main data-page="home"><button type="button" data-bump onClick={() => count++}>Bump</button><output data-count>{count}</output></main>',
-		'\t<aside data-page-aside>home aside</aside>',
+		'\t<>',
+		'\t\t<main data-page="home"><button type="button" data-bump onClick={() => count++}>Bump</button><output data-count>{count}</output></main>',
+		'\t\t<aside data-page-aside>home aside</aside>',
+		'\t</>',
 		'}',
 	].join('\n'),
 	'pages/other.tsrx': [

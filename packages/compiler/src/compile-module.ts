@@ -51,8 +51,8 @@ import {
 import { checkServerOnlyProps } from './passes/server-only-props.ts';
 import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
+import { branchElseSpellingParseDiagnostic } from './passes/semantic-graph/diagnostics.ts';
 import { createMutableSemanticGraphArtifact } from './passes/semantic-graph/types.ts';
-import { parseJavaScriptModule } from './js-ast.ts';
 import { moduleIdOf } from './module-id.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
 import { emitSymbolModules } from './passes/symbol-modules.ts';
@@ -580,63 +580,57 @@ function parseErrorDiagnostic(
 	source: CompileTsrxModuleInput,
 ): SemanticGraphArtifact['diagnostics'][number] {
 	const message = error.message;
-	const separator = missingSiblingSeparator(error, source);
+	if (message.startsWith('TSRX1009'))
+		return branchElseSpellingParseDiagnostic({
+			span: parserErrorSpan(error, source),
+			parserMessage: message,
+		});
+	const rule = templateRuleBroken(message, error, source);
 	return {
 		code: 'MARKLESS_PARSE_ERROR',
 		severity: 'error',
 		phase: 'parse',
-		title: separator
-			? 'Sibling elements on one line need a separator'
-			: 'TSRX parser rejected this source',
-		message: separator
-			? `\`${separator.closing}\` and \`${separator.opening}\` are sibling elements written back to back, so the parser reads the second \`<\` as a less-than operator (@tsrx/yuku reported: ${message}).`
-			: `@tsrx/yuku reported: ${message}`,
+		title: rule?.title ?? 'TSRX parser rejected this source',
+		message: rule ? `${rule.message} (@tsrx/yuku reported: ${message})` : `@tsrx/yuku reported: ${message}`,
 		why: 'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
-		primarySpan: separator
-			? { filename: source.filename, start: separator.offset, end: separator.offset + 1 }
-			: parserErrorSpan(error, source),
+		primarySpan: parserErrorSpan(error, source),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
-				message: separator
-					? `Put \`;\` after \`${separator.closing}\` (line ${separator.line}), or start \`${separator.opening}\` on its own line. In a component body each top-level element is a statement, and two statements on one line need \`;\` between them.`
-					: 'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
+				message:
+					rule?.fix ??
+					'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
 	};
 }
 
-const ELEMENT_ADJACENCY = /(<\/[A-Za-z][\w.:-]*\s*>|\/>)[ \t]*(<[A-Za-z][\w.:-]*)/g;
-
-// Blamed only when inserting the `;` lets the parser get further than it did.
-function missingSiblingSeparator(
+// A code block and every control-flow arm render one node, after their statements (TSRX2011 and TSRX2012).
+function templateRuleBroken(
+	message: string,
 	error: SyntaxError,
 	source: CompileTsrxModuleInput,
-): { offset: number; line: number; closing: string; opening: string } | null {
+): { title: string; message: string; fix: string } | null {
 	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
-	if (typeof position !== 'number') return null;
-	const text = source.source;
-	const candidates = [...text.slice(0, position + 1).matchAll(ELEMENT_ADJACENCY)].reverse();
-	for (const match of candidates.slice(0, 8)) {
-		const offset = match.index + match[1]!.length;
-		const patched = `${text.slice(0, offset)};${text.slice(offset)}`;
-		let progressed = false;
-		try {
-			parseJavaScriptModule(patched, source.filename);
-			progressed = true;
-		} catch (retry) {
-			const next = (retry as { readonly pos?: unknown }).pos;
-			progressed = typeof next === 'number' && next - 1 > position;
-		}
-		if (progressed)
-			return {
-				offset,
-				line: text.slice(0, offset).split('\n').length,
-				closing: match[1]!.replace(/\s+/g, ''),
-				opening: `${match[2]}>`,
-			};
+	const line = typeof position === 'number' ? source.source.slice(0, position).split('\n').length : null;
+	const at = line === null ? '' : ` on line ${line}`;
+	if (message.startsWith('TSRX2011')) {
+		const tag = typeof position === 'number' ? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(position))?.[0] : undefined;
+		const subject = tag ? `\`${tag}>\`${at}` : `The node${at}`;
+		return {
+			title: 'A code block renders a single node',
+			message: `${subject} follows another node in the same code block or arm, and each one renders exactly one node.`,
+			fix: 'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><header>top</header><main>body</main></>`. A fragment adds no element to the page.',
+		};
+	}
+	if (message.startsWith('TSRX2012')) {
+		return {
+			title: 'Code must come before the rendered output',
+			message: `The statement${at} follows the node this code block renders, and a code block runs all of its statements before it renders.`,
+			fix: 'Move the statement above the markup, or into an event handler if it should run later.',
+		};
 	}
 	return null;
 }

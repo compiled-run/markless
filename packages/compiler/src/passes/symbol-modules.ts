@@ -4290,7 +4290,7 @@ function emitModuleImport(moduleImport: SemanticModuleImport): string {
 //     the map's `sourcesContent` should therefore hold.
 //
 // The non-null-map guard (invariant 3) still runs, and still passes, but at
-// these two sites it proves less than it reads as: `yuku-codegen@0.9.1` returns
+// these two sites it proves less than it reads as: the `@tsrx/yuku` printer returns
 // a non-null map for an empty `source` too, so the guard cannot distinguish a
 // module whose source was threaded through from one whose source is absent. The
 // guard is kept because invariant 3 requires it and because it does catch a
@@ -5597,7 +5597,7 @@ function rewriteGraphReadsAndLocals(
 // **Comment migration across a move is settled, and the answer is yes.** The
 // spec lists it as an open question because probe `p5c` has no recorded output
 // and the acceptance case printed without `attachComments`. Re-probed against
-// the installed `yuku-codegen@0.9.1` while writing this band, and asserted in
+// the installed the `@tsrx/yuku` printer while writing this band, and asserted in
 // `test/emit-event-handler.test.ts`: with `EMISSION_PARSE_OPTIONS`'
 // `attachComments: true`, the parser hangs each comment off the *node* it
 // belongs to, in that node's own `comments` array. Moving the node into a

@@ -41,12 +41,14 @@ test('rows over a prop path carry their handler on the repeat record', async () 
 type Group = { readonly entries?: ReadonlyArray<{ readonly key: string; readonly text: string }> };
 export function Menu({ group }: { readonly group: Group }) @{
 	let chosen = state('');
-	<ul>
-		@for (const entry of group.entries!; key entry.key) {
-			<li><button onClick={() => (chosen = entry.text)}>{entry.text}</button></li>
-		}
-	</ul>
-	<p>{chosen}</p>
+	<>
+		<ul>
+			@for (const entry of group.entries!; key entry.key) {
+				<li><button onClick={() => (chosen = entry.text)}>{entry.text}</button></li>
+			}
+		</ul>
+		<p>{chosen}</p>
+	</>
 }
 `);
 	const [repeat] = result.protocolView.keyedRepeats ?? [];
@@ -180,12 +182,14 @@ test('rows whose collection reads a non-recomputable body local fail the compile
 export function Queue({ seed }: { readonly seed: ReadonlyArray<{ readonly id: string }> }) @{
 	let pending = seed.slice();
 	let picked = state('');
-	<ol>
-		@for (const job of pending; key job.id) {
-			<li><button onClick={() => (picked = job.id)}>{job.id}</button></li>
-		}
-	</ol>
-	<p>{picked}</p>
+	<>
+		<ol>
+			@for (const job of pending; key job.id) {
+				<li><button onClick={() => (picked = job.id)}>{job.id}</button></li>
+			}
+		</ol>
+		<p>{picked}</p>
+	</>
 }
 `);
 	expect(result.semanticGraph.diagnostics).toEqual([

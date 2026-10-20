@@ -20,8 +20,10 @@ export function App() @{
 			<em>Waiting</em>
 		}
 		@try {
-			<h5>{detail.heading}</h5>
-			@if (open) { <Chip /> }
+			<>
+				<h5>{detail.heading}</h5>
+				@if (open) { <Chip /> }
+			</>
 		} @pending {
 			<em>Waiting</em>
 		}

@@ -640,11 +640,7 @@ export function assignSsrHostIds(
 	const visit = (node: AnyNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
 
-		if (
-			node.type === 'Element' ||
-			node.type === 'JSXElement' ||
-			node.type === 'JSXScriptElement'
-		) {
+		if (node.type === 'Element' || node.type === 'JSXElement') {
 			const tagName = getElementTagName(node);
 			const isHost = tagName ? isHostTagName(tagName) : !!getDynamicTagExpression(node);
 			if (isHost) {

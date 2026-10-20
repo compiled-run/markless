@@ -78,16 +78,16 @@ function inlineWithin(
 			const name = getIdentifierName(candidate);
 			const symbolId = name ? resolvedSymbolAt(semantic, candidate.start) : null;
 			if (name && symbolId !== null) {
-				const scopeId = semantic.symbol.scopeId(symbolId);
+				const scopeId = semantic.bindings[symbolId]!.scope.id;
 				if (
-					semantic.scope.start(scopeId) >= region.start &&
-					semantic.scope.end(scopeId) <= region.end
+					semantic.scopes[scopeId]!.node.start >= region.start &&
+					semantic.scopes[scopeId]!.node.end <= region.end
 				) {
 					boundInside.add(name);
 				} else if (repeatRowBindsName(name, state)) {
 					if (options.leaveRowItems) freeNames.add(name);
 					else refusal = { kind: 'row-item', name };
-				} else if (semantic.scope.kind(scopeId) === 'module' || readsGraph(name, state)) {
+				} else if (semantic.scopes[scopeId]!.kind === 'module' || readsGraph(name, state)) {
 					freeNames.add(name);
 				} else {
 					const local = classifyLocal(symbolId, name, state);
@@ -228,10 +228,10 @@ type LocalKind =
 // or none of these.
 function classifyLocal(symbolId: number, name: string, state: WalkState): LocalKind {
 	const semantic = state.semantic();
-	if (semantic.symbol.declCount(symbolId) !== 1) return { kind: 'opaque' };
+	if (semantic.bindings[symbolId]!.declarations.length !== 1) return { kind: 'opaque' };
 	if (state.graph.localBindings.some((binding) => binding.name === name))
 		return { kind: 'capture-owned' };
-	const declarationStart = semantic.symbol.declNode(symbolId, 0).start;
+	const declarationStart = semantic.bindings[symbolId]!.declarations[0]!.start;
 	let found: LocalKind | null = null;
 	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
 		if (found) return;

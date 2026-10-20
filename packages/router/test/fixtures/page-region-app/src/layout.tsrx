@@ -8,10 +8,12 @@ export default function Layout({
 	readonly name: string;
 	readonly children?: Children;
 }) @{
-	<header data-page={name}>
-		<Link href="/" data-nav="home">Home</Link>
-		<Link href="/other" data-nav="other">Other</Link>
-	</header>
-	<main>{children}</main>
-	<footer data-footer>{`${name} footer`}</footer>
+	<>
+		<header data-page={name}>
+			<Link href="/" data-nav="home">Home</Link>
+			<Link href="/other" data-nav="other">Other</Link>
+		</header>
+		<main>{children}</main>
+		<footer data-footer>{`${name} footer`}</footer>
+	</>
 }

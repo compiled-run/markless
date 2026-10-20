@@ -8,13 +8,15 @@ export default function LedgerPage() @{
 
 	<main data-ledger-page>
 		@try {
-			<h2 data-ledger-value>{ledger.value}</h2>
-			<em data-ledger-status>{ledger.status}</em>
-			<ul>
-				@for (const entry of ledger.entries; key entry.sku) {
-					<li data-ledger-entry>{entry.sku}</li>
-				}
-			</ul>
+			<>
+				<h2 data-ledger-value>{ledger.value}</h2>
+				<em data-ledger-status>{ledger.status}</em>
+				<ul>
+					@for (const entry of ledger.entries; key entry.sku) {
+						<li data-ledger-entry>{entry.sku}</li>
+					}
+				</ul>
+			</>
 		} @pending {
 			<p data-ledger-wait>Counting</p>
 		}

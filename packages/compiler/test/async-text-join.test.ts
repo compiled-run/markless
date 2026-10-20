@@ -55,7 +55,7 @@ test('two async values joined with state in one @try are refused like two direct
 	expect((await compile(`<p>{folder}/{data.title}: {count}</p>`)).codes).toEqual([
 		'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
 	]);
-	expect((await compile(`<p>{folder}</p>; <p>{data.title}</p>`)).codes).toEqual([
+	expect((await compile(`<><p>{folder}</p><p>{data.title}</p></>`)).codes).toEqual([
 		'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
 	]);
 });

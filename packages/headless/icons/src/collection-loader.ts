@@ -57,7 +57,7 @@ export class CollectionLoader {
 				`@markless/icons: ${file}: sanitized unsupported SVG source in ${pack}.${property} (${iconName})`,
 			);
 		}
-		const parsed = parse(`<svg>${sanitized.body}</svg>`, { lang: 'tsx' });
+		const parsed = parse(`<svg>${sanitized.body}</svg>`);
 		const fatal = parsed.diagnostics.find((item) => item.severity === 'error');
 		if (fatal) {
 			throw new Error(

@@ -1,4 +1,4 @@
-import { parse, type BaseNode } from '@tsrx/yuku';
+import { parse } from '@tsrx/yuku';
 import MagicString from 'magic-string';
 import type { CollectionLoader } from '../collection-loader.ts';
 import type { ResolvedIconsOptions } from '../options.ts';
@@ -11,7 +11,7 @@ import {
 	type Range,
 } from './shared.ts';
 
-type Node = BaseNode & Record<string, unknown>;
+type Node = { type: string; start: number; end: number } & Record<string, unknown>;
 
 const GAP = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\n]*\n)*`;
 const MEMBER_TAG = new RegExp(
@@ -48,7 +48,7 @@ export async function transformTsrx(
 	diagnostic?: (message: string) => void,
 ): Promise<string | undefined> {
 	if (!mayContainIconTags(source, options)) return undefined;
-	const result = parse(source, { lang: 'tsx', sourceType: 'module' });
+	const result = parse(source);
 	const fatal = result.diagnostics.find((diagnostic) => diagnostic.severity === 'error');
 	if (fatal) throw new Error(`@markless/icons: ${file}: ${fatal.message}`);
 	const program = result.program as unknown as Node;

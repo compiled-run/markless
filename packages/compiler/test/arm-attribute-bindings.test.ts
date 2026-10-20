@@ -11,11 +11,13 @@ export default function Note() @{
 	<section>
 		<button onClick={${onOpen}}>Toggle</button>
 		@if (open) {
-			<label>
-				Your message
-				<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} />
-			</label>
-			${afterField}
+			<>
+				<label>
+					Your message
+					<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} />
+				</label>
+				${afterField}
+			</>
 		}
 	</section>
 }`;
@@ -41,8 +43,10 @@ export function Pair() @{
 	<div>
 		<button onClick={() => (shown = !shown)}>Flip</button>
 		@if (shown) {
-			<em>first</em>
-			<strong>second</strong>
+			<>
+				<em>first</em>
+				<strong>second</strong>
+			</>
 		}
 	</div>
 }`,
@@ -155,8 +159,10 @@ export function Menu() @{
 	<div>
 		<button onClick={() => (open = !open)}>Flip</button>
 		@if (open) {
-			<a href={ROUTES.home} title={'go' + SUFFIX}>{ROUTES.label}</a>
-			<Badge src={mark} />
+			<>
+				<a href={ROUTES.home} title={'go' + SUFFIX}>{ROUTES.label}</a>
+				<Badge src={mark} />
+			</>
 		}
 	</div>
 }`,

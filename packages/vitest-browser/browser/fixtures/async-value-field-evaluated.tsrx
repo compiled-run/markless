@@ -17,9 +17,11 @@ export function App() @{
 	<section>
 		<button type="button" data-arm onClick={() => armed = !armed}>Arm</button>
 		@try {
-			<h2 data-ledger-value>{ledger.value}</h2>
-			<em data-ledger-status>{ledger.status}</em>
-			@if (armed) { <Stamp label="stamp" /> }
+			<>
+				<h2 data-ledger-value>{ledger.value}</h2>
+				<em data-ledger-status>{ledger.status}</em>
+				@if (armed) { <Stamp label="stamp" /> }
+			</>
 		} @pending {
 			<p data-ledger-wait>Counting</p>
 		}

@@ -11,6 +11,8 @@ type ConstructContext =
 	| 'after-if'
 	| 'after-for'
 	| 'after-try'
+	| 'else-clause'
+	| 'empty-clause'
 	| 'switch'
 	| 'none';
 
@@ -152,13 +154,13 @@ export const snippetCatalog: readonly CatalogItem[] = [
 		insertText: '@try {\n\t$1\n} @pending {\n\t$2\n} @catch (${3:e}) {\n\t$0\n}',
 		context: baseConstructContexts,
 	},
-	{ name: '@else', insertText: '@else {\n\t$0\n}', context: 'after-if' },
+	{ name: '@else', insertText: '@else {\n\t$0\n}', context: ['after-if', 'else-clause'] },
 	{
 		name: '@else if',
 		insertText: '@else if (${1:condition}) {\n\t$0\n}',
-		context: 'after-if',
+		context: ['after-if', 'else-clause'],
 	},
-	{ name: '@empty', insertText: '@empty {\n\t$0\n}', context: 'after-for' },
+	{ name: '@empty', insertText: '@empty {\n\t$0\n}', context: ['after-for', 'empty-clause'] },
 	{ name: '@case', insertText: '@case $1: {\n\t$0\n}', context: 'switch' },
 	{ name: '@default', insertText: '@default: {\n\t$0\n}', context: 'switch' },
 	{ name: '@pending', insertText: '@pending {\n\t$0\n}', context: 'after-try' },
@@ -521,7 +523,10 @@ function classifyConstructContext(
 		placeholderName,
 		`{${placeholderName}}`,
 		`@case ${placeholderName}: {}`,
-		`@pending {} ${placeholderName};`,
+		// A code block renders one node, so after a construct there only its own clauses can follow.
+		`@pending { ${placeholderName} }`,
+		`@else { ${placeholderName} }`,
+		`@empty { ${placeholderName} }`,
 	];
 	for (const replacement of replacements) {
 		const candidate = buildClassifierCandidate(source, prefixStart, position, replacement);
@@ -589,6 +594,12 @@ function classifyPlaceholder(
 	if (parent.type !== 'ExpressionStatement' || parent.expression !== node) return 'none';
 
 	const block = ancestors.at(-2);
+	const construct = ancestors.at(-3);
+	if (block?.type === 'BlockStatement' && construct) {
+		if (construct.type === 'JSXTryExpression' && construct.pending === block) return 'after-try';
+		if (construct.type === 'JSXIfExpression' && construct.alternate === block) return 'else-clause';
+		if (construct.type === 'JSXForExpression' && construct.empty === block) return 'empty-clause';
+	}
 	if (block?.type === 'Program' && Array.isArray(block.body)) {
 		return block.body.includes(parent) ? 'module' : 'none';
 	}

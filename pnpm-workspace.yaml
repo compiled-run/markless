@@ -7,7 +7,6 @@ packages:
   - website
   - demos/interaction-benchmark/apps/markless
   - demos/interaction-benchmark/apps/markless-viewport
-  # @tsrx/yuku is consumed through its generated self-contained host.
 
 catalogs:
   default:
@@ -38,6 +37,10 @@ catalogs:
     zimmerframe: ^1.1.2
 
 overrides:
+  # Local builds until @tsrx/yuku 0.8.0 and yuku-css are on npm; this branch must not merge with these links.
+  "@tsrx/yuku": link:/Users/jacksm5pro/dev/open-source/yuku-tsrx-arshad
+  yuku: link:/Users/jacksm5pro/dev/open-source/yuku/packages/yuku
+  yuku-css: link:/Users/jacksm5pro/dev/open-source/yuku-css
   "@types/node": 24.12.2
   vite: npm:@voidzero-dev/vite-plus-core@0.3.1
   vitest: 4.1.11

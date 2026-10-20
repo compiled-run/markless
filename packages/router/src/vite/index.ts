@@ -1037,7 +1037,7 @@ async function routerOptionsSource(
 	if (handlerError) throw new Error(handlerError);
 	return [
 		'export const routerMode = "path";',
-		`export const documentNavigation = ${JSON.stringify(documentNavigationFor(documentSource, documentFile))};`,
+		`export const documentNavigation = ${JSON.stringify(documentNavigationFor(documentSource))};`,
 		linkIntentEnabled(options)
 			? `export const startLinkIntentPreloading = (root, preload) => (${listenForLinkIntent.toString()})(root, ${JSON.stringify(LINK_ATTRIBUTE)}, preload, ${JSON.stringify(PREFETCH_ATTRIBUTE)});`
 			: 'export const startLinkIntentPreloading = () => () => {};',
@@ -1111,7 +1111,7 @@ function linkBridgeFilesPlugin(
 					fragmentNavigationRunSource:
 						minifiedFragmentNavigationSource(runFragmentNavigation),
 					prefetch: options.prefetch,
-					documentNavigation: documentNavigationFor(documentSource, documentFile),
+					documentNavigation: documentNavigationFor(documentSource),
 					routeFileIds: bundledPageFileIds(chunks, root),
 					debug,
 				})!;

@@ -30,8 +30,10 @@ function Badge({ value }: { value: number }) @{
 
 export default function BadgeCounter() @{
 	let count = state(0);
-	<button onClick={() => count++}>Add</button>
-	<Badge value={count} />
+	<>
+		<button onClick={() => count++}>Add</button>
+		<Badge value={count} />
+	</>
 }
 `;
 // A run-shared global (`??=`) caching an import of the runtime, as the list and computed starters emit.

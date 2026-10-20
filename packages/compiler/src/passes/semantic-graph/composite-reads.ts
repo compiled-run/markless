@@ -190,7 +190,7 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 	if (offset === null) return false;
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, offset);
-	if (symbolId !== null && semantic.scope.kind(semantic.symbol.scopeId(symbolId)) !== 'module')
+	if (symbolId !== null && semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module')
 		return false;
 	if (repeatRowBindsName(source, state)) return false;
 	return (

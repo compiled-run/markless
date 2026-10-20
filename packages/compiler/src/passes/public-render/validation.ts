@@ -1,4 +1,4 @@
-import { isEventAttribute } from '@tsrx/yuku';
+import { isEventAttribute } from '../../ast/events.ts';
 import { GLOBAL_CONVERSION_FUNCTIONS } from '../../ast/globals.ts';
 import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
@@ -343,14 +343,10 @@ export function collectRepeatBindingConflictDiagnostics(input: {
 		// Only `@for` heads: a plain JS for-of in module code declares no index and
 		// contributes no row binding to the emitted readers.
 		if (node.type !== 'JSXForExpression') return;
-		const statement = node.statement as AnyNode | undefined;
-		if (!statement) return;
 		const itemName = getIdentifierName(
-			asNodes((statement.left as AnyNode | undefined)?.declarations)[0]?.id as
-				| AnyNode
-				| undefined,
+			asNodes((node.left as AnyNode | undefined)?.declarations)[0]?.id as AnyNode | undefined,
 		);
-		const indexName = getIdentifierName(statement.index as AnyNode | undefined);
+		const indexName = getIdentifierName(node.index as AnyNode | undefined);
 		if (itemName) {
 			if (asIndex.has(itemName)) conflicts.push({ name: itemName, node });
 			asItem.add(itemName);
@@ -421,14 +417,9 @@ function unresolvedValueReferences(
 	const view = moduleSemantics(source, filename);
 	const references: Array<{ readonly name: string; readonly start: number; readonly end: number }> =
 		[];
-	for (let id = 0; id < view.reference.count; id++) {
-		if (view.reference.symbolId(id) !== null) continue;
-		if (view.reference.inTypePosition(id)) continue;
-		references.push({
-			name: view.reference.name(id),
-			start: view.reference.start(id),
-			end: view.reference.end(id),
-		});
+	for (const reference of view.unresolvedReferences) {
+		if (reference.inTypePosition) continue;
+		references.push({ name: reference.name, start: reference.node.start, end: reference.node.end });
 	}
 	return references.sort((left, right) => left.start - right.start);
 }
@@ -447,7 +438,7 @@ function emittedTemplateReads(
 	};
 	const visitTemplate = (node: AnyNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
-		if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+		if (node.type === 'JSXExpressionContainer') {
 			add(node.expression as AnyNode | undefined);
 			return;
 		}

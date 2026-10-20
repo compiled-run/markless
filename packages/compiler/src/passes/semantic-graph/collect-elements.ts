@@ -1,4 +1,4 @@
-import { isEventAttribute, normalizeEventName } from '@tsrx/yuku';
+import { isEventAttribute, normalizeEventName } from '../../ast/events.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -421,7 +421,7 @@ function refuseUnroutedExpression(expression: AnyNode, target: string, state: Wa
 
 function isTemplateExpressionChild(node: AnyNode): boolean {
 	return (
-		(node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') &&
+		(node.type === 'JSXExpressionContainer') &&
 		literalContainerText(node) === null
 	);
 }
@@ -1822,9 +1822,9 @@ function resolvedDeclarationStart(node: AnyNode | undefined, state: WalkState): 
 
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, node.start);
-	if (symbolId === null || semantic.symbol.declCount(symbolId) === 0) return null;
+	if (symbolId === null || semantic.bindings[symbolId]!.declarations.length === 0) return null;
 
-	const declaration = semantic.symbol.declNode(symbolId, 0);
+	const declaration = semantic.bindings[symbolId]!.declarations[0]!;
 	return typeof declaration.start === 'number' ? declaration.start : null;
 }
 

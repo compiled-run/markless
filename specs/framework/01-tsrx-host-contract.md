@@ -30,6 +30,29 @@ syntax remains valid TSRX, but this framework's host profile preserves live
 reads for known-reactive sources without requiring authors to use lazy
 destructuring markers.
 
+### One rendered node per template
+
+Markless follows the TSRX specification here (checked against
+https://tsrx.dev/specification, sections 4.3 to 4.6, because the TSRX MCP server
+was unavailable):
+
+- A code block (`@{ }`) and every control-flow body (`@if`, `@else`, `@for`,
+  `@empty`, an `@switch` case, `@try`, `@pending`, `@catch`) runs its
+  setup statements first and then renders exactly one node: an element, a
+  fragment, or a control-flow construct. Several nodes go in a fragment
+  `<>…</>`, which adds no element to the page. A second node is TSRX2011 and a
+  statement after the node is TSRX2012. Markless reports both as
+  `MARKLESS_PARSE_ERROR`, titled "A code block renders a single node" and "Code
+  must come before the rendered output", with the fix as the suggestion.
+- A plain `} else {` after an `@if` body is a parse error (TSRX1009), which
+  Markless reports as `MARKLESS_BRANCH_ELSE_SPELLING`.
+- Among template children, `//` starts a line comment after whitespace, at the
+  start of a line, or right after a tag, container or block, and `/*` starts a
+  comment anywhere. `http://example.com` stays text. Comments are not children.
+- Character references in text decode: `&nbsp;` is U+00A0 in the text value,
+  and the raw text keeps what was written.
+- `<style>` and `<script>` bodies are raw text, kept as written.
+
 ### Loop identity
 
 TSRX already gives `@for` optional `index` and `key` clauses:
@@ -128,10 +151,14 @@ dynamic, spread, and dynamic-tag attribute paths. A `class` prop written on a
 component call-site gains the calling module's scope class too, static and
 dynamic alike, so a scoped selector matches the element the child spreads
 that class onto; a call-site that writes no `class` prop gets none
-synthesized. The compiled CSS ships as a bundler-owned virtual `.css` module
+synthesized. The CSS is parsed with `yuku-css` into css-tree's tree and the
+scope class is spliced in by offset: before the subject compound's first pseudo,
+or after the compound when it has none. Rules nested in rules and in conditional
+at-rules are scoped too. The compiled CSS ships as a bundler-owned virtual `.css` module
 imported by the transformed module, so Vite/Rolldown's CSS pipeline owns
 bundling and delivery; no JavaScript runs to apply styles. Style blocks that
-cannot be scope-compiled keep a fail-loud
+cannot be scope-compiled (a selector that does not parse, a sheet with parse
+errors, or a block the end of the sheet closes) keep a fail-loud
 `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT` diagnostic. Style composition
 metadata and `:global(...)`-style escapes remain unspecified.
 

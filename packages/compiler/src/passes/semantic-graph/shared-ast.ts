@@ -1,5 +1,8 @@
-import { parseJavaScriptModule, parseModule } from '../../js-ast.ts';
-import { analyze, type SemanticView } from '@tsrx/yuku';
+import { parseJavaScriptModule, parseModule, parserLanguageFor } from '../../js-ast.ts';
+import { analyze } from '@tsrx/yuku';
+
+/** Scopes, bindings and references for one TSRX module, as the analyzer reports them. */
+export type ModuleSemantics = ReturnType<typeof analyze>;
 import type { AnyNode } from '../../ast/nodes.ts';
 
 type OwnedAst = { readonly source: string; readonly filename: string; readonly ast: AnyNode };
@@ -86,9 +89,9 @@ export function createSourceMemo<Value>(
 	};
 }
 
-const moduleSemanticsMemo = createSourceMemo<SemanticView>(256);
+const moduleSemanticsMemo = createSourceMemo<ModuleSemantics>(256);
 
 /** The analyzer's scope tables for a whole module. Callers only read the view. */
-export function moduleSemantics(source: string, filename: string): SemanticView {
-	return moduleSemanticsMemo(filename, source, () => analyze(source, filename).semantic);
+export function moduleSemantics(source: string, filename: string): ModuleSemantics {
+	return moduleSemanticsMemo(filename, source, () => analyze(source, parserLanguageFor(filename)));
 }

@@ -15,10 +15,12 @@ export default function TextInEscalatedArm() @{
 		<button type="button" data-open onClick={() => open = !open}>Open</button>
 		<button type="button" data-tap onClick={() => taps = taps + 1}>Tap</button>
 		@if (open) {
-			<Chip />
-			<span data-one>{taps}</span>
-			<span data-two>chip {taps}/{doubled}</span>
-			<button type="button" data-inner onClick={() => taps = taps + 10}>Inner</button>
+			<>
+				<Chip />
+				<span data-one>{taps}</span>
+				<span data-two>chip {taps}/{doubled}</span>
+				<button type="button" data-inner onClick={() => taps = taps + 10}>Inner</button>
+			</>
 		}
 	</main>
 }

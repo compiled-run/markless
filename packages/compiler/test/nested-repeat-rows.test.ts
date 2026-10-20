@@ -24,19 +24,21 @@ export function Library() @{
 	let shelves = state([{ id: 's', opened: 0, books: [{ isbn: '1', reads: 0 }] }]);
 	const tags = state([{ isbn: 't', reads: 0 }]);
 	let opened = state('');
-	<section>
-		@for (const shelf of shelves; key shelf.id) {
-			<article>
-				<h2>{shelf.id}</h2>
-				<ul>
-					@for (const book of ${inner}; key book.isbn) {
-						<li><button onClick={() => { opened = book.isbn;${extra} }}>{book.isbn}</button></li>
-					}
-				</ul>
-			</article>
-		}
-	</section>
-	<p>{opened}</p>
+	<>
+		<section>
+			@for (const shelf of shelves; key shelf.id) {
+				<article>
+					<h2>{shelf.id}</h2>
+					<ul>
+						@for (const book of ${inner}; key book.isbn) {
+							<li><button onClick={() => { opened = book.isbn;${extra} }}>{book.isbn}</button></li>
+						}
+					</ul>
+				</article>
+			}
+		</section>
+		<p>{opened}</p>
+	</>
 }
 `;
 
@@ -115,12 +117,14 @@ test('a @for inside no other repeat carries no enclosing row', async () => {
 export function List() @{
 	const rows = state([{ id: 'a' }]);
 	let picked = state('');
-	<ul>
-		@for (const row of rows; key row.id) {
-			<li><button onClick={() => (picked = row.id)}>{row.id}</button></li>
-		}
-	</ul>
-	<p>{picked}</p>
+	<>
+		<ul>
+			@for (const row of rows; key row.id) {
+				<li><button onClick={() => (picked = row.id)}>{row.id}</button></li>
+			}
+		</ul>
+		<p>{picked}</p>
+	</>
 }
 `);
 	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('enclosingRow');

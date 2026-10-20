@@ -81,8 +81,10 @@ function Chooser({ onChoose }: { readonly onChoose: (value: string) => void }) @
 export function Shelf({ taleKey }: { readonly taleKey: string }) @{
 	const tale = TALES.find((candidate) => candidate.key === taleKey)!;
 	let picked = state('');
-	<Chooser onChoose={(mark) => (picked = tale.title + mark)} />
-	<p>{picked}</p>
+	<>
+		<Chooser onChoose={(mark) => (picked = tale.title + mark)} />
+		<p>{picked}</p>
+	</>
 }
 `);
 	expect(result.semanticGraph.diagnostics).toEqual([]);
@@ -108,12 +110,14 @@ export function Cast({ taleKey }: { readonly taleKey: string }) @{
 	const tale = TALES.find((candidate) => candidate.key === taleKey)!;
 	const people = state([{ id: 'p' }, { id: 'q' }]);
 	let said = state('');
-	<ul>
-		@for (const person of people; key person.id) {
-			<li><button onClick={() => (said = tale.title + person.id)}>{person.id}</button></li>
-		}
-	</ul>
-	<p>{said}</p>
+	<>
+		<ul>
+			@for (const person of people; key person.id) {
+				<li><button onClick={() => (said = tale.title + person.id)}>{person.id}</button></li>
+			}
+		</ul>
+		<p>{said}</p>
+	</>
 }
 `);
 	expect(result.semanticGraph.diagnostics).toEqual([]);
@@ -153,8 +157,10 @@ function Chooser({ onChoose }: { readonly onChoose: () => void }) @{
 export function Shelf({ seed }: { readonly seed: number }) @{
 	let bump = seed + 1;
 	let total = state(0);
-	<Chooser onChoose={() => (total = total + bump)} />
-	<p>{total}</p>
+	<>
+		<Chooser onChoose={() => (total = total + bump)} />
+		<p>{total}</p>
+	</>
 }
 `);
 	expect(result.semanticGraph.diagnostics).toEqual([

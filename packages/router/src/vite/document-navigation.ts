@@ -1,4 +1,5 @@
-import { isEventAttribute, parseModule } from '@tsrx/yuku';
+import { isEventAttribute } from '@markless/compiler';
+import { parseTsrxModule } from './tsrx-ast.ts';
 import { documentHandlersMessage } from './runtime/document-handlers.ts';
 
 // 'document' = route changes need a fresh server document because the shell
@@ -13,11 +14,11 @@ type Node = {
 // Props the router passes Document that never vary by route.
 const ROUTE_INVARIANT_DOCUMENT_PROPS = new Set(['children']);
 
-export function documentNavigationFor(source: string | undefined, id: string): DocumentNavigation {
+export function documentNavigationFor(source: string | undefined): DocumentNavigation {
 	if (source === undefined) return 'client';
 	let program: Node;
 	try {
-		program = parseModule(source, id) as unknown as Node;
+		program = parseTsrxModule(source);
 	} catch {
 		return 'document';
 	}
@@ -33,7 +34,7 @@ export function documentHandlerError(source: string | undefined, id: string): st
 	if (source === undefined) return undefined;
 	let program: Node;
 	try {
-		program = parseModule(source, id) as unknown as Node;
+		program = parseTsrxModule(source);
 	} catch {
 		return undefined;
 	}

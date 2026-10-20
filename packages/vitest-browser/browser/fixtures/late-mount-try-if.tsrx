@@ -17,8 +17,10 @@ export function Panel() @{
 	<article>
 		<button type="button" data-open onClick={() => open = !open}>Open</button>
 		@try {
-			<h4 data-summary>{summary.heading}</h4>
-			@if (open) { <Chip label="chip" /> }
+			<>
+				<h4 data-summary>{summary.heading}</h4>
+				@if (open) { <Chip label="chip" /> }
+			</>
 		} @pending {
 			<em>Waiting</em>
 		}

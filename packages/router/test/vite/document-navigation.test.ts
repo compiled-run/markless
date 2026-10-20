@@ -57,7 +57,7 @@ describe('document navigation detection', () => {
 
 	for (const [name, source, expected] of cases) {
 		test(name, () => {
-			expect(documentNavigationFor(source, '/app/document.tsrx')).toBe(expected);
+			expect(documentNavigationFor(source)).toBe(expected);
 		});
 	}
 
