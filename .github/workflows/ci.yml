@@ -5,7 +5,7 @@ on:
     push:
         branches:
             - main
-    # The release cut runs CI on its release commit before main moves to it (release.yml, mode=cut).
+    # Manual runs only: main's ruleset does not count required checks from a dispatched run.
     workflow_dispatch:
 
 concurrency:

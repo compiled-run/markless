@@ -16,7 +16,8 @@
 //
 // Resumable: a package already on the registry at this version is skipped, so a
 // rerun after a partial failure finishes the release instead of erroring on
-// EPUBLISHCONFLICT.
+// EPUBLISHCONFLICT. A package npm took but is still processing (E409 "previously
+// staged version") is not published again; the run waits, bounded, until npm shows it.
 //
 // Usage:
 //   node scripts/release/publish-workspace.mjs --version <v> [--tag <dist-tag>] [--dry-run]
@@ -80,11 +81,72 @@ for (const variable of ['NODE_AUTH_TOKEN', 'NPM_TOKEN']) {
 	}
 }
 
+// npm answers a large upload with "Your package is being processed" and shows it only once
+// processing ends: @markless/core@0.6.0 and @markless/compiler@0.7.0 took 13 to 14 minutes.
+const REGISTRY_DEADLINE_MS = Number(process.env.MARKLESS_REGISTRY_DEADLINE_MS ?? 1_200_000);
+const REGISTRY_FIRST_DELAY_MS = Number(process.env.MARKLESS_REGISTRY_FIRST_DELAY_MS ?? 5_000);
+const REGISTRY_MAX_DELAY_MS = Number(process.env.MARKLESS_REGISTRY_MAX_DELAY_MS ?? 30_000);
+
+function sleep(ms) {
+	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function isPublished(name) {
 	const result = spawnSync('npm', ['view', `${name}@${version}`, 'version'], {
 		encoding: 'utf-8',
 	});
 	return result.status === 0;
+}
+
+/** What one `pnpm publish` attempt's exit status and output say happened on the registry. */
+function publishOutcome(status, output) {
+	if (status === 0) return 'published';
+	if (/\bE409\b/u.test(output) && /previously staged version/iu.test(output)) return 'staged';
+	if (/\bE403\b/u.test(output) && /cannot publish over the previously published/iu.test(output))
+		return 'exists';
+	if (/\bE401\b/u.test(output)) return 'unauthorized';
+	return 'failed';
+}
+
+function publishOnce(entry, args) {
+	console.log(`publish-workspace: pnpm ${args.join(' ')}`);
+	const result = spawnSync('pnpm', args, {
+		cwd: repoRoot,
+		encoding: 'utf-8',
+		stdio: ['inherit', 'pipe', 'pipe'],
+	});
+	if (result.error) {
+		fail(`${entry.name}@${version} could not be spawned: ${result.error.message}`);
+	}
+	process.stdout.write(result.stdout ?? '');
+	process.stderr.write(result.stderr ?? '');
+	return {
+		status: result.status,
+		outcome: publishOutcome(result.status, `${result.stdout ?? ''}\n${result.stderr ?? ''}`),
+	};
+}
+
+/** Packages npm took but does not show yet, waited for until one shared deadline. */
+function waitUntilVisible(names) {
+	const started = Date.now();
+	const pending = new Set(names);
+	let delay = REGISTRY_FIRST_DELAY_MS;
+	for (;;) {
+		for (const name of pending) {
+			if (isPublished(name)) {
+				console.log(`publish-workspace: ${name}@${version} is now visible on the registry.`);
+				pending.delete(name);
+			}
+		}
+		const elapsed = Date.now() - started;
+		if (pending.size === 0 || elapsed >= REGISTRY_DEADLINE_MS) return [...pending];
+		const wait = Math.min(delay, REGISTRY_DEADLINE_MS - elapsed);
+		console.log(
+			`publish-workspace: waiting ${(wait / 1000).toFixed(1)} s for npm to finish processing ${[...pending].join(', ')} (${Math.round(elapsed / 1000)} of ${Math.round(REGISTRY_DEADLINE_MS / 1000)} s used)`,
+		);
+		sleep(wait);
+		delay = Math.min(delay * 2, REGISTRY_MAX_DELAY_MS);
+	}
 }
 
 const packages = releasePackages();
@@ -101,6 +163,7 @@ if (dryRun) {
 
 let published = 0;
 let skipped = 0;
+const processing = [];
 
 for (const entry of packages) {
 	if (!dryRun && isPublished(entry.name)) {
@@ -124,17 +187,38 @@ for (const entry of packages) {
 		args.push('--dry-run', '--force');
 	}
 
-	console.log(`publish-workspace: pnpm ${args.join(' ')}`);
-	const result = spawnSync('pnpm', args, { stdio: 'inherit', cwd: repoRoot });
-	if (result.error) {
-		fail(`${entry.name}@${version} could not be spawned: ${result.error.message}`);
+	let attempt = publishOnce(entry, args);
+	// One retry, never more. On 0.6.0 the registry answered one package's publish with
+	// "E401 token is invalid" between packages that published with the same trusted publisher,
+	// so the token it refused was valid. Each npm run mints a new GitHub OIDC token and trades
+	// it again, so the retry is a fresh exchange; a real trust misconfiguration fails both.
+	if (!dryRun && attempt.outcome === 'unauthorized') {
+		console.log(
+			`publish-workspace: ${entry.name}@${version} got E401 from the registry; retrying once with a fresh OIDC exchange.`,
+		);
+		attempt = publishOnce(entry, args);
 	}
-	if (result.status !== 0) {
+	if (!dryRun && (attempt.outcome === 'staged' || attempt.outcome === 'exists')) {
+		console.log(
+			`publish-workspace: ${entry.name}@${version} is already uploaded and npm is still processing it — not publishing it again.`,
+		);
+		processing.push(entry.name);
+		skipped += 1;
+		continue;
+	}
+	if (attempt.status !== 0) {
 		fail(
-			`${entry.name}@${version} failed with exit code ${result.status}. Stopping here: ${published} package(s) published, ${packages.length - published - skipped - 1} not attempted. Already-published packages stay published; rerunning resumes ${version}.`,
+			`${entry.name}@${version} failed with exit code ${attempt.status}. Stopping here: ${published} package(s) published, ${packages.length - published - skipped - 1} not attempted. Already-published packages stay published; rerunning resumes ${version}.`,
 		);
 	}
 	published += 1;
+}
+
+const stillProcessing = processing.length === 0 ? [] : waitUntilVisible(processing);
+if (stillProcessing.length > 0) {
+	fail(
+		`npm took ${stillProcessing.join(', ')} at ${version} but still does not show ${stillProcessing.length === 1 ? 'it' : 'them'} after ${Math.round(REGISTRY_DEADLINE_MS / 1000)} s. Nothing is lost: rerun the release once npm shows ${stillProcessing.length === 1 ? 'it' : 'them'}, and the rerun skips ${stillProcessing.length === 1 ? 'it' : 'them'}.`,
+	);
 }
 
 console.log(

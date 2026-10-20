@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Reads the checks branch protection requires on main from the GitHub API (never a copied list)
 // and either proves ci.yml produces each of them (--names) or that each passed on --sha <commit>.
+// Only check runs from a pull_request-event CI run count: GitHub ignored the same checks green from
+// a workflow_dispatch run when the 0.6.0 and 0.7.0 cuts tried to move main.
 //
 // Usage: node scripts/release/required-checks.mjs --names
 //        node scripts/release/required-checks.mjs --sha <commit>
@@ -11,15 +13,25 @@ import { pathToFileURL } from 'node:url';
 import { parse } from 'yaml';
 import { repoRoot } from './release-packages.mjs';
 
-/** Why `checkRuns` do not satisfy `required`; empty when every required check passed. */
-export function checkRunProblems(required, checkRuns) {
+/**
+ * Why `checkRuns` do not satisfy `required`; empty when every required check passed.
+ * With `countedSuites`, a check run outside those check suites does not count.
+ */
+export function checkRunProblems(required, checkRuns, countedSuites) {
 	const problems = [];
 	for (const { context, app_id: appId } of required) {
-		const named = checkRuns.filter((run) => run.name === context);
+		const anywhere = checkRuns.filter((run) => run.name === context);
+		const named = countedSuites
+			? anywhere.filter((run) => countedSuites.has(run.check_suite?.id))
+			: anywhere;
 		const fromApp = appId ? named.filter((run) => run.app?.id === appId) : named;
 		if (fromApp.some((run) => run.status === 'completed' && run.conclusion === 'success'))
 			continue;
-		if (named.length === 0) problems.push(`${context}: no check run on this commit`);
+		if (named.length === 0 && anywhere.length > 0)
+			problems.push(
+				`${context}: only from a CI run main's rules do not count, such as a workflow_dispatch run`,
+			);
+		else if (named.length === 0) problems.push(`${context}: no check run on this commit`);
 		else if (fromApp.length === 0)
 			problems.push(`${context}: no check run on this commit from app ${appId}`);
 		else {
@@ -94,7 +106,12 @@ function main(argv) {
 			runs.push(...batch);
 			if (batch.length < 100) break;
 		}
-		const problems = checkRunProblems(required, runs);
+		const pullRequestSuites = new Set(
+			gh(
+				`repos/${repository}/actions/runs?head_sha=${argv[1]}&event=pull_request&per_page=100`,
+			).workflow_runs.map((run) => run.check_suite_id),
+		);
+		const problems = checkRunProblems(required, runs, pullRequestSuites);
 		if (problems.length > 0) {
 			console.error(
 				`required checks have not passed on ${argv[1]}:\n${problems.map((line) => `  - ${line}`).join('\n')}`,

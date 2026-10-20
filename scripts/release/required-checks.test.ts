@@ -45,6 +45,27 @@ test('every required context needs a successful check run from the required app'
 	).toEqual(['test: no check run on this commit from app 15368']);
 });
 
+test('green checks from a CI run main does not count are reported, not accepted', () => {
+	const inSuite = (name: string, suite: number) => ({ ...run(name), check_suite: { id: suite } });
+	const pullRequestSuite = new Set([2]);
+	expect(
+		checkRunProblems(
+			required,
+			[inSuite('test', 1), inSuite('typecheck', 2), inSuite('agent-files', 2)],
+			pullRequestSuite,
+		),
+	).toEqual([
+		"test: only from a CI run main's rules do not count, such as a workflow_dispatch run",
+	]);
+	expect(
+		checkRunProblems(
+			required,
+			[inSuite('test', 1), inSuite('test', 2), inSuite('typecheck', 2), inSuite('agent-files', 2)],
+			pullRequestSuite,
+		),
+	).toEqual([]);
+});
+
 test('a later successful rerun of a failed check counts', () => {
 	expect(
 		checkRunProblems(required, [

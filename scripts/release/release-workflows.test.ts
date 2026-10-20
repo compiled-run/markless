@@ -63,12 +63,12 @@ describe('release.yml mode=cut', () => {
 		expect(run).toContain('node scripts/release/cut.mjs\n');
 	});
 
-	test('merges into main only after CI passed every required check on the release commit itself', () => {
+	test('moves main only after pull request CI passed every required check on the release commit itself', () => {
 		const order = [
 			'Push the release commit to its release branch',
-			'Run CI on the release commit',
+			'Run CI on the release pull request',
 			"Require every check main's protection names on the release commit",
-			'Merge the release pull request into main',
+			'Move main to the release commit',
 		];
 		for (const name of order) {
 			expect(step(cut, name).if).toBe(
@@ -78,15 +78,24 @@ describe('release.yml mode=cut', () => {
 		const positions = order.map((name) => names(cut).indexOf(name));
 		expect(positions).toEqual(positions.toSorted((left, right) => left - right));
 		expect(step(cut, order[0]!).run).toBe('git push origin "HEAD:refs/heads/release/${TAG}"');
-		expect(step(cut, order[1]!).run).toContain('gh workflow run ci.yml --ref "release/${TAG}"');
-		expect(step(cut, order[1]!).run).toContain('gh run watch "$run_id" --exit-status');
+		const ci = step(cut, order[1]!).run!;
+		expect(ci).toContain('gh pr create --base main --head "release/${TAG}"');
+		expect(ci).toContain('--event pull_request --commit "$SHA"');
+		expect(ci).not.toContain('gh workflow run');
+		expect(ci).toContain('"pull_request ${SHA} release/${TAG}"');
+		expect(ci.indexOf('"pull_request ${SHA} release/${TAG}"')).toBeLessThan(
+			ci.indexOf('/approve"'),
+		);
+		expect(ci).toContain('gh run watch "$run_id" --exit-status');
 		expect(step(cut, order[2]!).run).toBe(
 			'node scripts/release/required-checks.mjs --sha "$SHA"',
 		);
-		const merge = step(cut, order[3]!).run!;
-		expect(merge).toContain('gh pr merge "$pr" --merge --match-head-commit "$SHA"');
-		expect(merge).not.toContain('--admin');
-		expect(merge).not.toMatch(/refs\/heads\/main"?\s*$/mu);
+		const move = step(cut, order[3]!).run!;
+		expect(move).toContain('if [ "$main" != "$base" ]; then');
+		expect(move.trimEnd().split('\n').at(-1)!.trim()).toBe(
+			'git push origin "${SHA}:refs/heads/main"',
+		);
+		expect(move).not.toMatch(/--force|\+\$\{SHA\}|--admin/u);
 		const pushTag = step(cut, 'Push the tag');
 		expect(pushTag.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'");
 		expect(names(cut).indexOf('Push the tag')).toBeGreaterThan(names(cut).indexOf(order[3]!));

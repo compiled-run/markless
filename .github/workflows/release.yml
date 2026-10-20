@@ -21,8 +21,8 @@
 # Modes:
 #   cut          One click (`gh workflow run release.yml -f mode=cut` on main):
 #                the `cut` job bumps to the next minor, writes the CHANGELOG
-#                section, commits and tags vX.Y.0, runs CI on that commit, and
-#                merges it into main and pushes the tag once main's required checks pass;
+#                section, commits and tags vX.Y.0, runs CI on that commit as a pull
+#                request, and moves main to it and pushes the tag once main's required checks pass;
 #                the `release` job publishes that tag; the `announce` job creates
 #                the GitHub Release. See docs/ci-process.md, "Cutting a release".
 #   cut-dry-run  The cut's bump, changelog, hooked commit and pack checks, with no
@@ -79,9 +79,9 @@ jobs:
         permissions:
             # Push the release branch and the tag.
             contents: write
-            # Open and merge the release pull request into main.
+            # Open the release pull request into main.
             pull-requests: write
-            # Dispatch and watch CI on the release commit.
+            # Approve and watch the release pull request's CI run.
             actions: write
             # Read the release commit's check runs.
             checks: read
@@ -170,32 +170,46 @@ jobs:
                   path: ${{ runner.temp }}/release-notes.md
                   if-no-files-found: error
 
-            # main's protection requires checks on the pushed commit itself, so the release
-            # commit gets a full CI run on an unprotected branch before main moves to it.
+            # main's ruleset counts required checks only from a pull_request CI run on the commit:
+            # the same checks green from a workflow_dispatch run were refused for a push and a merge.
             - name: Push the release commit to its release branch
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
               run: git push origin "HEAD:refs/heads/release/${TAG}"
 
-            - name: Run CI on the release commit
+            # A pull request opened with this token gets a pull_request run that waits for approval
+            # (action_required); approve exactly that run, for this commit and branch, then watch it.
+            - name: Run CI on the release pull request
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
                   SHA: ${{ steps.cut.outputs.sha }}
               run: |
                   set -euo pipefail
-                  gh workflow run ci.yml --ref "release/${TAG}"
+                  pr="$(gh pr create --base main --head "release/${TAG}" --title "chore(release): ${TAG}" \
+                    --body "The release cut's commit for ${TAG}. The cut moves main to ${SHA} once this pull request's CI passes main's required checks.")"
+                  echo "Opened ${pr}"
                   run_id=''
                   for _ in $(seq 1 24); do
-                    run_id="$(gh run list --workflow ci.yml --event workflow_dispatch --commit "$SHA" \
+                    run_id="$(gh run list --workflow ci.yml --event pull_request --commit "$SHA" \
                       --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
                     [ -n "$run_id" ] && break
                     sleep 5
                   done
                   if [ -z "$run_id" ]; then
-                    echo "::error::CI was dispatched on release/${TAG} but its run did not appear within 2 minutes."
+                    echo "::error::${pr} got no pull_request CI run on ${SHA} within 2 minutes."
                     exit 1
+                  fi
+                  run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" \
+                    --jq '[.event, .head_sha, .head_branch] | join(" ")')"
+                  if [ "$run" != "pull_request ${SHA} release/${TAG}" ]; then
+                    echo "::error::CI run ${run_id} is '${run}', not the release pull request's CI on ${SHA}."
+                    exit 1
+                  fi
+                  if [ "$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.conclusion // ""')" = action_required ]; then
+                    gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/approve" >/dev/null
+                    echo "Approved CI run ${run_id}: it waited for approval because this workflow's token opened ${pr}"
                   fi
                   echo "Watching CI run ${run_id} on ${SHA}"
                   gh run watch "$run_id" --exit-status --interval 30
@@ -206,12 +220,11 @@ jobs:
                   SHA: ${{ steps.cut.outputs.sha }}
               run: node scripts/release/required-checks.mjs --sha "$SHA"
 
-            # main's ruleset refuses a direct push from this token even with every check green,
-            # but it accepts a pull request merge, so main gets a merge commit with the same tree.
-            - name: Merge the release pull request into main
+            # A fast-forward to exactly the commit CI checked, which marks the pull request merged;
+            # the pull request's green CI run on that commit is what the next cut finds for main.
+            - name: Move main to the release commit
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
-                  TAG: ${{ steps.cut.outputs.tag }}
                   SHA: ${{ steps.cut.outputs.sha }}
               run: |
                   set -euo pipefail
@@ -221,23 +234,7 @@ jobs:
                     echo "::error::main moved from ${base} to ${main} during the cut; nothing was released, run the cut again."
                     exit 1
                   fi
-                  pr="$(gh pr create --base main --head "release/${TAG}" --title "chore(release): ${TAG}" \
-                    --body "The release cut's commit for ${TAG}. CI passed on ${SHA} before this pull request was opened.")"
-                  state=UNKNOWN
-                  for _ in $(seq 1 24); do
-                    state="$(gh pr view "$pr" --json mergeStateStatus --jq .mergeStateStatus)"
-                    [ "$state" != UNKNOWN ] && break
-                    sleep 5
-                  done
-                  echo "${pr} merge state: ${state}"
-                  gh pr merge "$pr" --merge --match-head-commit "$SHA" --subject "Merge release ${TAG}"
-                  merged="$(gh pr view "$pr" --json mergeCommit --jq .mergeCommit.oid)"
-                  if [ "$(gh api "repos/${GITHUB_REPOSITORY}/commits/${merged}" --jq .commit.tree.sha)" != "$(git rev-parse "${SHA}^{tree}")" ]; then
-                    echo "::error::main's merge commit ${merged} does not have the release commit's tree."
-                    exit 1
-                  fi
-                  # A merge made with this token starts no workflow, and the next cut needs main's CI.
-                  gh workflow run ci.yml --ref main
+                  git push origin "${SHA}:refs/heads/main"
 
             - name: Push the tag
               if: inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'
@@ -292,7 +289,8 @@ jobs:
             (inputs.mode == 'dry-run' || inputs.mode == 'publish' ||
             (inputs.mode == 'cut' && needs.cut.result == 'success'))
         runs-on: ubuntu-latest
-        timeout-minutes: 45
+        # About 5 minutes of build and upload, plus two 20-minute bounded waits for npm processing.
+        timeout-minutes: 60
         permissions:
             contents: read
             # The whole mechanism. Lets GitHub mint the OIDC token npm trades

@@ -40,8 +40,9 @@ try {
 // The registry's read replicas lag its write path: on 0.2.0 a package read back 4 s after
 // publishing returned E404, and on 0.5.0 six reads 5 s apart were not enough. A package that
 // is not visible yet, or visible without its attestation yet, is waited for until one shared
-// deadline; only what is still missing then counts as a failure.
-const DEADLINE_MS = Number(process.env.MARKLESS_PROVENANCE_DEADLINE_MS ?? 180_000);
+// deadline; only what is still missing then counts as a failure. 3 minutes failed 0.6.0 and
+// 0.7.0: npm took 13 to 14 minutes to show @markless/core@0.6.0 and @markless/compiler@0.7.0.
+const DEADLINE_MS = Number(process.env.MARKLESS_PROVENANCE_DEADLINE_MS ?? 1_200_000);
 const FIRST_DELAY_MS = Number(process.env.MARKLESS_PROVENANCE_FIRST_DELAY_MS ?? 5_000);
 const MAX_DELAY_MS = Number(process.env.MARKLESS_PROVENANCE_MAX_DELAY_MS ?? 30_000);
 
