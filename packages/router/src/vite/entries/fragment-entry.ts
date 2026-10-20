@@ -621,6 +621,53 @@ async function streamAppends(
 	return signal.aborted ? undefined : all;
 }
 
+// Inserting a big page whole lays it out in one long frame; the HTML parser yields while it streams a document, and the swap does the same.
+const FRAME_ELEMENTS = 800;
+
+type HeldPage = [parent: Node, before: Node | null, nodes: ChildNode[]][];
+
+function holdPage(parent: Element, after: Node | undefined, before: Node | null): HeldPage {
+	const nodes: ChildNode[] = [];
+	for (let node = after ? after.nextSibling : parent.firstChild; node && node !== before; ) {
+		const next: ChildNode | null = node.nextSibling;
+		nodes.push(node);
+		node.remove();
+		node = next;
+	}
+	return [[parent, before, nodes]];
+}
+
+const elementsIn = (node: Node) =>
+	node.nodeType === 1 ? (node as Element).getElementsByTagName('*').length + 1 : 0;
+
+// Places a frame's worth synchronously, so the first paint shows the top of the page; true when everything is in.
+function fillPage(
+	w: Window,
+	held: HeldPage,
+	budget: number,
+	current: () => boolean,
+): true | Promise<boolean> {
+	let used = 0;
+	while (held.length) {
+		const [parent, before, nodes] = held[0]!;
+		const node = nodes.shift()!;
+		if (!nodes.length) held.shift();
+		const size = elementsIn(node);
+		if (used + size > budget && node.firstChild) {
+			const children = [...node.childNodes];
+			(node as Element).replaceChildren();
+			held.unshift([node, null, children]);
+			used += 1;
+		} else used += size;
+		parent.insertBefore(node, before);
+		if (used >= budget && held.length)
+			return new Promise<void>((resolve) =>
+				w.requestAnimationFrame(() => w.setTimeout(resolve, 0)),
+			).then(() => current() && fillPage(w, held, budget, current));
+	}
+	return true;
+}
+
 export async function navigate(
 	d: Document,
 	url: URL,
@@ -709,7 +756,9 @@ export async function navigate(
 	if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
 	let region: Element;
 	let end: Comment;
+	let start: Comment | undefined;
 	let scripts: Element[];
+	let held: HeldPage | undefined;
 	if (documentLoads && !isContainer(d.body)) {
 		const fresh: Element[] = [];
 		region = d.body;
@@ -731,7 +780,7 @@ export async function navigate(
 			const fresh: Element[] = [];
 			if (documentLoads) morphChildren(d, kept, arriving, fresh);
 			const leavingStart = pageStart(outgoing, state.config.pageStartComment);
-			let start = pageStart(region, state.config.pageStartComment);
+			start = pageStart(region, state.config.pageStartComment);
 			if (leavingStart || start) {
 				start ??= region.insertBefore(
 					d.createComment(state.config.pageStartComment),
@@ -746,15 +795,24 @@ export async function navigate(
 			}
 			scripts = [...scriptsIn(region), ...fresh.flatMap(scriptsIn)];
 			region.append(kept);
+			held = holdPage(region, start, end);
 			outgoing.replaceWith(region);
 			// The document's own nodes moved to the new element; focus inside them stays put.
 			if (focused && focused !== d.activeElement && region.contains(focused))
 				focused.focus({ preventScroll: true });
 		} else {
 			scripts = scriptsIn(region);
+			held = holdPage(region, undefined, null);
 			outgoing.replaceWith(region);
 			region.after((end = d.createComment('')));
 		}
+	}
+	// A scroll target or a restored position needs the whole page in place before it is applied.
+	const progressive = restore === 'reset' && !url.hash && d.visibilityState !== 'hidden';
+	const filled = held && fillPage(w, held, progressive ? FRAME_ELEMENTS : Infinity, () => id === session.navigation);
+	if (filled instanceof Promise) {
+		w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+		if (!(await filled)) return;
 	}
 	// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
 	for (const box of offsets)
@@ -773,7 +831,7 @@ export async function navigate(
 	if (restore === 'reset') {
 		const target = url.hash ? d.getElementById(decodeURIComponent(url.hash.slice(1))) : null;
 		if (target) target.scrollIntoView({ behavior: 'instant' });
-		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+		else if (!(filled instanceof Promise)) w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
 	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));

@@ -747,8 +747,18 @@ for (const [name, browserType] of [
 				.locator('[data-side-link="gamma"]')
 				.evaluate((link) => (link as HTMLElement).click());
 			await landedOn(page, 'gamma');
+			// A long page fills in over frames; the rendered event marks the whole page in place.
+			const rendered = (count: number) =>
+				page.waitForFunction(
+					(expected) =>
+						((window as unknown as Record<string, unknown[]>).__landed ?? []).length ===
+						expected,
+					count,
+				);
+			await rendered(1);
 			await page.goBack();
 			await landedOn(page, 'index');
+			await rendered(2);
 			expect(
 				await page.evaluate(() => (window as unknown as Record<string, unknown>).__landed),
 			).toEqual([

@@ -539,3 +539,27 @@ test('a page whose body is only text renders it', async () => {
 	expect(response.status).toBe(200);
 	expect(await response.text()).toContain('only text');
 });
+
+test('a long page navigated to in place paints its top before the rest, then resumes', async () => {
+	const { page, errors } = await open('/long-link');
+	await page.evaluate(() => {
+		const seen: number[] = [];
+		(globalThis as { __framesSeen?: number[] }).__framesSeen = seen;
+		const tick = () => {
+			seen.push(document.querySelectorAll('[data-long-section]').length);
+			requestAnimationFrame(tick);
+		};
+		requestAnimationFrame(tick);
+		(globalThis as { __stayed?: boolean }).__stayed = true;
+	});
+	await page.click('[data-to-long]');
+	await page.waitForSelector('[data-long-tap]');
+	await page.click('[data-long-tap]');
+	await expect.poll(() => text(page, '[data-long-tap]')).toBe('1');
+	const seen = await page.evaluate(() => (globalThis as { __framesSeen?: number[] }).__framesSeen!);
+	expect(seen.some((count) => count > 0 && count < 300)).toBe(true);
+	expect(seen.at(-1)).toBe(300);
+	expect(await page.evaluate(() => (globalThis as { __stayed?: boolean }).__stayed)).toBe(true);
+	expect(errors).toEqual([]);
+	await page.close();
+});
