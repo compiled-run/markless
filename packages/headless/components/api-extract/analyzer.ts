@@ -1,4 +1,4 @@
-import { Analyzer, type Binding, type Module } from 'yuku/analyzer';
+import { Analyzer, type Binding, type Module } from '@tsrx/yuku';
 import { compileTsrxForTypeService } from '../../../compiler/src/type-service.ts';
 
 export type AstNode = {
