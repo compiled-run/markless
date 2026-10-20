@@ -158,6 +158,21 @@ export function isConstantTextNode(node: AnyNode): boolean {
 	return expression?.type === 'TemplateLiteral' && asNodes(expression.expressions).length === 0;
 }
 
+/** The text a `{"literal"}` child always renders, or null when the child is not a literal container. */
+export function literalContainerText(node: AnyNode): string | null {
+	if (node.type !== 'JSXExpressionContainer' && node.type !== 'TSRXExpression') return null;
+	const expression = node.expression as AnyNode | undefined;
+	if (expression?.type === 'Literal')
+		return typeof expression.value === 'string' || typeof expression.value === 'number'
+			? String(expression.value)
+			: null;
+	if (expression?.type !== 'TemplateLiteral' || asNodes(expression.expressions).length > 0)
+		return null;
+	const cooked = (asNodes(expression.quasis)[0]?.value as { cooked?: unknown } | undefined)
+		?.cooked;
+	return typeof cooked === 'string' ? cooked : null;
+}
+
 // JSX text rule, as Babel's cleanJSXElementLiteralChild: whitespace holding a line break is layout, same-line whitespace is content.
 export function jsxTextValue(value: string): string {
 	const lines = value.split(/\r\n|\n|\r/);

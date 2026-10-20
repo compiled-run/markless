@@ -28,7 +28,11 @@ import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach } from '../construct-reach.ts';
 import { chunkElementCount, projectionPlacementFields } from './projection-placement.ts';
-import { getComponentFunction, markupInterpolationExpression } from '../../ast/tsrx.ts';
+import {
+	getComponentFunction,
+	literalContainerText,
+	markupInterpolationExpression,
+} from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
 	collectElement,
@@ -447,7 +451,8 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			return;
 		case 'TSRXExpression':
 		case 'JSXExpressionContainer':
-			collectTemplateExpression(node.expression as AnyNode | undefined, state);
+			if (literalContainerText(node) === null)
+				collectTemplateExpression(node.expression as AnyNode | undefined, state);
 			break;
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);

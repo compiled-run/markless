@@ -135,7 +135,7 @@ test('an expression inside an imported part\'s projection is still refused', asy
 export function Page() @{
 	<MeterRoot>
 		<MeterBar value={30} />
-		<MeterLabel><em>{30}</em> of 100 rows</MeterLabel>
+		<MeterLabel><em>{String(30)}</em> of 100 rows</MeterLabel>
 	</MeterRoot>
 }`,
 	);

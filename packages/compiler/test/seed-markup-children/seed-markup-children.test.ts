@@ -70,7 +70,7 @@ test('markup with no expression in it is fully spelled in the projection chunk',
 });
 
 test('an expression inside the markup leaves the projection with a slot to render', async () => {
-	const chunk = await projectionChunk('<em>{30}</em> of 100 rows');
+	const chunk = await projectionChunk('<em>{String(30)}</em> of 100 rows');
 
 	expect(chunk.slots.map((slot) => slot.kind)).toEqual(['text']);
 	expect(chunk.statics.join('')).toBe('<em><!--markless-slot:0--></em> of 100 rows');
@@ -106,8 +106,20 @@ test('markup children seed their text content instead of being refused', async (
 	expect(result.publicRenderModule.ssrModuleSource).toContain('children:"50 of 100 rows"');
 });
 
-test('an expression inside the markup is still refused: it has no value this early', async () => {
+test('a literal inside the markup is static text, spelled in the chunk and seeded', async () => {
+	const chunk = await projectionChunk('<em>{30}</em> of 100 rows');
 	const result = await compilePage('<em>{30}</em> of 100 rows');
+
+	expect(chunk.slots).toEqual([]);
+	expect(chunk.statics.join('')).toBe('<em>30</em> of 100 rows');
+	expect(result.publicRenderModule.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+		SEED_CHILDREN_UNAVAILABLE_CODE,
+	);
+	expect(result.publicRenderModule.ssrModuleSource).toContain('children:"30 of 100 rows"');
+});
+
+test('an expression inside the markup is still refused: it has no value this early', async () => {
+	const result = await compilePage('<em>{String(30)}</em> of 100 rows');
 
 	expect(result.publicRenderModule.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
 		SEED_CHILDREN_UNAVAILABLE_CODE,

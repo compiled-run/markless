@@ -167,7 +167,7 @@ test('a projection with an expression in it is refused rather than seeding undef
 		`export function Page() @{
 	<MeterRoot>
 		<MeterBar value={30} />
-		<MeterLabel><em>{30}</em> of 100 rows</MeterLabel>
+		<MeterLabel><em>{String(30)}</em> of 100 rows</MeterLabel>
 	</MeterRoot>
 }`,
 	);

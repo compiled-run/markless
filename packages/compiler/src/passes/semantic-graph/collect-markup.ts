@@ -13,6 +13,7 @@ import {
 	isIgnorableStaticTextNode,
 	isSpreadAttribute,
 	isStaticTextNode,
+	literalContainerText,
 	markupInterpolationExpression,
 	staticTextValue,
 	unwrapExpressionContainer,
@@ -270,6 +271,13 @@ function emitNode(
 		const text = staticTextValue(node);
 		if (!text) return 0;
 		append(builder, escapeHtml(text));
+		return 1;
+	}
+
+	const literal = literalContainerText(node);
+	if (literal !== null) {
+		if (!literal) return 0;
+		append(builder, escapeHtml(literal));
 		return 1;
 	}
 

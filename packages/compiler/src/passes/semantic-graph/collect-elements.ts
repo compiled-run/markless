@@ -9,6 +9,7 @@ import {
 	isHostTagName,
 	isIgnorableJsxTextNode,
 	isSpreadAttribute,
+	literalContainerText,
 	staticTextValue,
 	trimmedStaticTextValue,
 	unwrapExpressionContainer,
@@ -337,7 +338,7 @@ function joinTextParts(
 	const parts = children.map((child) =>
 		isTemplateExpressionChild(child)
 			? `\${(${inlined.get(child.expression as AnyNode)!.source}) ?? ''}`
-			: staticTextValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
+			: textPartValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
 	);
 	const source = `\`${parts.join('')}\``;
 	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state, true);
@@ -403,7 +404,14 @@ function refuseUnroutedExpression(expression: AnyNode, target: string, state: Wa
 }
 
 function isTemplateExpressionChild(node: AnyNode): boolean {
-	return node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression';
+	return (
+		(node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') &&
+		literalContainerText(node) === null
+	);
+}
+
+function textPartValue(node: AnyNode): string {
+	return literalContainerText(node) ?? staticTextValue(node);
 }
 
 function textExpressionTarget(
@@ -428,11 +436,11 @@ function textExpressionTarget(
 	let suffix = '';
 	for (const child of children.slice(0, expressionIndex)) {
 		if (!isStaticTextPart(child)) return { kind: 'text' };
-		prefix += staticTextValue(child);
+		prefix += textPartValue(child);
 	}
 	for (const child of children.slice(expressionIndex + 1)) {
 		if (!isStaticTextPart(child)) return { kind: 'text' };
-		suffix += staticTextValue(child);
+		suffix += textPartValue(child);
 	}
 
 	return {
@@ -446,7 +454,7 @@ function textExpressionTarget(
 type HostChildShape = 'text' | 'hole' | 'none' | 'node' | 'dynamic';
 
 function hostChildShape(child: AnyNode): HostChildShape {
-	if (isStaticTextPart(child)) return staticTextValue(child) ? 'text' : 'none';
+	if (isStaticTextPart(child)) return textPartValue(child) ? 'text' : 'none';
 	if (isTemplateExpressionChild(child)) {
 		const expression = child.expression as AnyNode | undefined;
 		if (!expression || expression.type === 'JSXEmptyExpression') return 'none';
@@ -494,8 +502,8 @@ function textNodeTarget(
 	let suffix = '';
 	for (let at = start; at < end; at++) {
 		if (shapes[at] !== 'text') continue;
-		if (at < index) prefix += staticTextValue(children[at]!);
-		else suffix += staticTextValue(children[at]!);
+		if (at < index) prefix += textPartValue(children[at]!);
+		else suffix += textPartValue(children[at]!);
 	}
 	return {
 		kind: 'text',
@@ -534,7 +542,9 @@ function runPosition(shapes: ReadonlyArray<HostChildShape>, run: TextRun): numbe
 }
 
 function isStaticTextPart(node: AnyNode): boolean {
-	return node.type === 'JSXText' || node.type === 'Literal';
+	return (
+		node.type === 'JSXText' || node.type === 'Literal' || literalContainerText(node) !== null
+	);
 }
 
 export function collectConditionalBranchText(node: AnyNode, state: WalkState): void {
