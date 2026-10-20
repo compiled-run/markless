@@ -27,7 +27,16 @@ describe('voiceOverSegments', () => {
 		expect(spoken).not.toContain('button 1');
 	});
 
-	it('matches case exactly, so a heading word is not a role', () => {
-		expect(voiceOverSegments('heading level 2 Checkbox')).not.toContain('checkbox');
+	it('reads a heading text as a name, never as the role words inside it', () => {
+		const spoken = voiceOverSegments('heading level 2 Radio group');
+		expect(spoken).toContain('Radio group');
+		expect(spoken).toContain('heading');
+		expect(spoken).not.toContain('group');
+	});
+
+	it('hears leaving a container as no announcement of it', () => {
+		const spoken = voiceOverSegments('end of Topics group');
+		expect(spoken).not.toContain('group');
+		expect(spoken).not.toContain('Topics');
 	});
 });

@@ -75,7 +75,8 @@ export async function hasColorpickerSection(page: Page): Promise<boolean> {
 
 export async function readColorpickerTranscript(sr: ScreenReaderDriver, page: Page) {
 	const section = page.locator('#colorpicker');
-	const area = section.getByRole('group').first();
+	// The plane, not the inline surface group that holds the plane and the hue rail together.
+	const area = section.locator('[ui-plane][role="group"]');
 	const axes = area.getByRole('slider');
 	const hueThumb = section.locator('[ui-channel="hue"][role="slider"]');
 

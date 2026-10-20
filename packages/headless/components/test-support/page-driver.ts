@@ -13,12 +13,16 @@ import type { Keys, ScreenReaderDriver, Vocabulary } from './driver.ts';
  */
 export type RealReader = NVDAPlaywright | VoiceOverPlaywright;
 
-export type RealDriverSpec = {
+export type RealDriverSpec<R extends RealReader = RealReader> = {
 	readonly name: string;
 	readonly vocabulary: Vocabulary;
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
+	/** Bring the reading cursor to the element the page focused, for a reader that does not follow focus on its own. */
+	cursorToFocus?: (reader: R) => Promise<void>;
+	/** Bring the page's focus to the item the reading cursor is on, so a key lands on the item the reader just read. */
+	focusToCursor?: (reader: R) => Promise<void>;
 };
 
 /**
@@ -28,7 +32,10 @@ export type RealDriverSpec = {
  * owns the reader's lifetime, and a suite that started or stopped it itself
  * would fight the fixture. Everything else forwards to the real reader.
  */
-export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenReaderDriver {
+export function realDriver<R extends RealReader>(
+	reader: R,
+	spec: RealDriverSpec<R>,
+): ScreenReaderDriver {
 	// Printed as it is heard: a walk cut short by the test timeout loses the transcript its own error would carry.
 	const heard = async (phrase: Promise<string>) => {
 		const spoken = await phrase;
@@ -44,7 +51,10 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 		stop: async () => {},
 		next: () => reader.next(),
 		previous: () => reader.previous(),
-		press: (key) => reader.press(key),
+		async press(key) {
+			await spec.focusToCursor?.(reader);
+			await reader.press(key);
+		},
 		async reannounce() {
 			// Neither reader has a "read the current item again" command that is
 			// guaranteed to re-read from the live DOM, so this steps off the item
@@ -53,12 +63,10 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 			await reader.next();
 			return heard(reader.lastSpokenPhrase());
 		},
-		// Nothing to drain over this seam: NVDA and VoiceOver follow the focus
-		// themselves and speak it in their own process, and guidepup's
-		// `lastSpokenPhrase()` reads the speech that came out. The virtual lane
-		// needs a wait here because its reader announces from a listener inside the
-		// page, one task-queue turn behind the gesture.
-		settleOnFocus: () => heard(reader.lastSpokenPhrase()),
+		async settleOnFocus() {
+			await spec.cursorToFocus?.(reader);
+			return heard(reader.lastSpokenPhrase());
+		},
 		lastSpokenPhrase: () => heard(reader.lastSpokenPhrase()),
 		// The reader hands back its own log array, which keeps growing under the
 		// caller's feet; a copy is what a test can hold on to.
@@ -125,6 +133,11 @@ export function commaSegments(phrase: string): string[] {
  * never conveys "selected".
  */
 export function voiceOverSegments(phrase: string): string[] {
+	// "heading level 2 Radio group" names a heading; the words of its text are not a role.
+	const heading = /^(heading level \d+) (.+)$/.exec(phrase);
+	if (heading) return ['heading', heading[1], heading[2]];
+	// "end of Topics group" is the cursor leaving a container, not an announcement of it.
+	if (phrase.startsWith('end of ')) return [phrase];
 	const runs = new Set<string>();
 	for (const segment of commaSegments(phrase)) {
 		runs.add(segment);

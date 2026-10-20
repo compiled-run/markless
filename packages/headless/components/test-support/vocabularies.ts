@@ -1,4 +1,5 @@
 import type { Keys, Vocabulary } from './driver.ts';
+import type { VoiceOverPlaywright } from '@guidepup/playwright';
 import { commaSegments, voiceOverSegments, type RealDriverSpec } from './page-driver.ts';
 
 /**
@@ -127,8 +128,8 @@ export const voiceOverVocabulary: Vocabulary = {
 	button: 'button',
 	// unverified against our markup
 	progressbar: 'progress indicator',
-	// unverified against our markup
-	textbox: 'text field',
+	// observed on a macos-26 runner: "Type your name required edit text"
+	textbox: 'edit text',
 	// unverified against our markup
 	navigation: 'navigation',
 	// unverified against our markup
@@ -173,9 +174,14 @@ export const nvdaSpec: RealDriverSpec = {
 	segments: commaSegments,
 };
 
-export const voiceOverSpec: RealDriverSpec = {
+// VoiceOver's cursor and the page's focus are two positions; these are VoiceOver's own commands for joining them.
+export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	name: 'VoiceOver',
 	vocabulary: voiceOverVocabulary,
 	keys,
 	segments: voiceOverSegments,
+	cursorToFocus: (voiceOver) =>
+		voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus),
+	focusToCursor: (voiceOver) =>
+		voiceOver.perform(voiceOver.keyboardCommands.moveKeyboardFocusToCursor),
 };

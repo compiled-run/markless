@@ -54,6 +54,10 @@ export async function readButtonGroupTranscript(sr: ScreenReaderDriver, page: Pa
 	});
 	await expect(itemFor('Center')).toHaveAttribute('aria-pressed', 'false');
 
+	// From the group's one tab stop, where Tab lands: the walk above left the reading cursor on the last item.
+	await itemFor('Left').focus();
+	await sr.settleOnFocus();
+
 	// An arrow moves the reading position and presses nothing. This is the row the
 	// real lanes exist to carry for this family.
 	await sr.press(sr.keys.arrowRight);

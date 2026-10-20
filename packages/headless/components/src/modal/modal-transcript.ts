@@ -27,6 +27,9 @@ export async function readModalTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	await sr.press(sr.keys.enter);
 	await expect(dialog).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
+	// Opening moves focus onto the dialog, so the reader starts from there.
+	await expect(dialog).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	await sr.settleOnFocus();
 
 	await readUntil(sr, { role: 'dialog' }, WALK_LIMIT);
 	await readUntil(sr, { name: TITLE }, WALK_LIMIT);

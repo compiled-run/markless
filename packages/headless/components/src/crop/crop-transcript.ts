@@ -24,7 +24,8 @@ const CHANGE_TIMEOUT_MS = 15_000;
 const NAME = 'Crop';
 const ROLE_DESCRIPTION = 'crop area';
 const AT_REST = '40, 30, 200×150';
-const AFTER_NUDGE = '50, 30, 200×150';
+// The End edge step below widened the rectangle by one before the nudge moved it.
+const AFTER_NUDGE = '50, 30, 201×150';
 
 /** Where the crop sits on the gallery page. */
 export const CROP_ANCHOR = FAMILY_ANCHORS.crop;

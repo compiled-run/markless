@@ -26,6 +26,7 @@ export async function readEditableTranscript(sr: ScreenReaderDriver, page: Page)
 	const field = section.getByRole('textbox', { name: LABEL });
 	await expect(field).toBeVisible();
 	await expect(field).toBeFocused();
+	await sr.settleOnFocus();
 
 	await readUntil(sr, { role: 'textbox', name: LABEL }, GALLERY_WALK_LIMIT);
 

@@ -340,12 +340,16 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
+            # Not guidepup/setup-action: 0.21.0 bundles @guidepup/setup 0.23, whose
+            # row-by-row user TCC.db writes lose the race with tccd on macos-26 images
+            # ("Unable to write to the user TCC.db"). 0.29 writes every grant in one
+            # root transaction with backoff, and --ci fails this step, not the read,
+            # when a grant does not take. guidepup's own VoiceOver CI runs it this way.
             - name: Grant VoiceOver automation permission
-              uses: guidepup/setup-action@0.21.0
+              run: pnpm dlx @guidepup/setup@0.29.3 setup --ci
 
-            # The action configures the OS; the reader build guidepup drives is a per-project asset.
             - name: Install the screen reader assets guidepup drives
-              run: pnpm dlx @guidepup/setup@0.28.0 install
+              run: pnpm dlx @guidepup/setup@0.29.3 install
 
             - name: Install the browser the reader reads through
               run: pnpm exec playwright install --with-deps chromium
