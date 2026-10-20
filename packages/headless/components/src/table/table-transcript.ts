@@ -62,27 +62,27 @@ export async function readTableTranscript(sr: ScreenReaderDriver, page: Page) {
 	const resting = await readForPhrase(sr, [NAME], GALLERY_WALK_LIMIT);
 	expect(missing(resting, [NAME]), `${sr.name} announced "${resting}"`).toEqual([]);
 
-	// The row header is what names a row for a reader, which is why it is a part
-	// rather than the consumer's own markup.
-	const named = await readForPhrase(sr, [FIRST], GALLERY_WALK_LIMIT);
-	expect(missing(named, [FIRST]), `${sr.name} announced "${named}"`).toEqual([]);
-
-	// Focus rather than the reading cursor: the space bar only picks a row once a
-	// cell of that row is the focused element.
+	// Focus rather than the reading cursor: cells are read the way a grid is used, one
+	// focused cell at a time (VoiceOver's next-item command stays inside a row), and the
+	// space bar only picks a row once a cell of that row is the focused element. The row
+	// header is what names a row for a reader, which is why it is a part rather than the
+	// consumer's own markup.
 	await firstCell.focus();
-	await sr.settleOnFocus();
+	const named = await sr.settleOnFocus();
+	expect(missing(named, [FIRST]), `${sr.name} announced "${named}"`).toEqual([]);
 	await expect(grid).toHaveAttribute('tabindex', '-1', { timeout: CHANGE_TIMEOUT_MS });
 	await expect(firstCell).toHaveAttribute('tabindex', '0', { timeout: CHANGE_TIMEOUT_MS });
 
 	await sr.press(sr.keys.space);
 	await expect(firstRow).toHaveAttribute('aria-selected', 'true', { timeout: CHANGE_TIMEOUT_MS });
 
-	const picked = await readForPhrase(sr, [FIRST], GALLERY_WALK_LIMIT);
+	const picked = await sr.settleOnFocus();
 	expect(missing(picked, [FIRST]), `${sr.name} announced "${picked}"`).toEqual([]);
 
 	// The second axis, heard: an arrow down stays in its column and arrives in the
 	// next row, which is the move a reader's own table navigation has to agree with.
 	await sr.press(sr.keys.arrowDown);
-	const walked = await readForPhrase(sr, [SECOND], GALLERY_WALK_LIMIT);
+	await expect(section.getByRole('rowheader').nth(1)).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	const walked = await sr.settleOnFocus();
 	expect(missing(walked, [SECOND]), `${sr.name} announced "${walked}"`).toEqual([]);
 }

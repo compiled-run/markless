@@ -36,11 +36,11 @@ export async function readRatingTranscript(sr: ScreenReaderDriver, page: Page) {
 	// The row the real lanes exist to carry: three marks are filled on screen and
 	// only the third is the checked radio.
 	const checkedMarks: ReadonlyArray<Conveys> = [
-		{ role: 'radio', name: '1 of 5', state: ['notChecked'] },
-		{ role: 'radio', name: '2 of 5', state: ['notChecked'] },
-		{ role: 'radio', name: '3 of 5', state: ['checked'] },
-		{ role: 'radio', name: '4 of 5', state: ['notChecked'] },
-		{ role: 'radio', name: '5 of 5', state: ['notChecked'] },
+		{ role: 'radio', name: '1 of 5', state: ['radioNotChecked'] },
+		{ role: 'radio', name: '2 of 5', state: ['radioNotChecked'] },
+		{ role: 'radio', name: '3 of 5', state: ['radioChecked'] },
+		{ role: 'radio', name: '4 of 5', state: ['radioNotChecked'] },
+		{ role: 'radio', name: '5 of 5', state: ['radioNotChecked'] },
 	];
 	for (const conveys of checkedMarks) {
 		const mark = await readUntil(sr, { role: 'radio', name: conveys.name }, GALLERY_WALK_LIMIT);
@@ -60,7 +60,7 @@ export async function readRatingTranscript(sr: ScreenReaderDriver, page: Page) {
 				missingFacts(sr, await sr.reannounce(), {
 					role: 'radio',
 					name: '4 of 5',
-					state: ['checked'],
+					state: ['radioChecked'],
 				}),
 			{ timeout: CHANGE_TIMEOUT_MS },
 		)

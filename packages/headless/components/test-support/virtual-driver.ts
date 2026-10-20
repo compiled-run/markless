@@ -50,6 +50,8 @@ export const virtualDriver: ScreenReaderDriver = {
 		switch: 'switch',
 		radiogroup: 'radiogroup',
 		radio: 'radio',
+		radioChecked: 'checked',
+		radioNotChecked: 'not checked',
 		tablist: 'tablist',
 		tab: 'tab',
 		tabpanel: 'tabpanel',

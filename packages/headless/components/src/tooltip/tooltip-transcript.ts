@@ -41,5 +41,11 @@ export async function readTooltipTranscript(sr: ScreenReaderDriver, page: Page) 
 	expectConveys(sr, phrase, describedTrigger);
 	expectConveys(sr, phrase, { name: TIP });
 
-	await expect(tip).toBeHidden();
+	// VoiceOver moves keyboard focus onto the item its cursor reaches, and a focused trigger shows its tip by design.
+	const trigger = section.getByRole('button', { name: TRIGGER });
+	if (await trigger.evaluate((element) => element === document.activeElement)) {
+		await expect(tip).toBeVisible();
+	} else {
+		await expect(tip).toBeHidden();
+	}
 }

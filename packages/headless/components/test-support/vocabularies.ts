@@ -45,6 +45,10 @@ export const nvdaVocabulary: Vocabulary = {
 	radiogroup: 'grouping',
 	// unverified against our markup; aria-at's radiogroup plan says "radio button"
 	radio: 'radio button',
+	// unverified against our markup
+	radioChecked: 'checked',
+	// unverified against our markup
+	radioNotChecked: 'not checked',
 	// unverified against our markup; aria-at's tabs plan says "tab list"
 	tablist: 'tab list',
 	// unverified against our markup
@@ -112,6 +116,10 @@ export const voiceOverVocabulary: Vocabulary = {
 	radiogroup: 'group',
 	// unverified against our markup; aria-at's radiogroup plan says "radio button"
 	radio: 'radio button',
+	// observed on a macos-26 runner: "3 of 5 selected radio button, 3 of 5"
+	radioChecked: 'selected',
+	// observed on a macos-26 runner: "Monthly radio button, 1 of 3", no state word at all
+	radioNotChecked: '',
 	// unverified against our markup; aria-at's tabs plan says "tab list"
 	tablist: 'tab list',
 	// unverified against our markup
@@ -180,8 +188,18 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	vocabulary: voiceOverVocabulary,
 	keys,
 	segments: voiceOverSegments,
-	cursorToFocus: (voiceOver) =>
-		voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus),
+	async cursorToFocus(voiceOver) {
+		// Asked before it has seen the page's focus change, VoiceOver lands on the document itself ("... web content").
+		for (let attempt = 0; attempt < 10; attempt++) {
+			await voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
+			// Silent when its cursor had already followed the focus; describing the item makes it say where it is.
+			if ((await voiceOver.lastSpokenPhrase()) === '') {
+				await voiceOver.perform(voiceOver.keyboardCommands.describeItem);
+			}
+			const phrase = await voiceOver.lastSpokenPhrase();
+			if (phrase !== '' && !phrase.endsWith(' web content')) return;
+		}
+	},
 	focusToCursor: (voiceOver) =>
 		voiceOver.perform(voiceOver.keyboardCommands.moveKeyboardFocusToCursor),
 };
