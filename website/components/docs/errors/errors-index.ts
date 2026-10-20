@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 282,
+	total: 283,
 	guided: 41,
 	groups: [
 		{
@@ -945,6 +945,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_MDX_RENDER_DATA_ROOT_MISSING',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED',
 					kind: 'runtime error',
 					guided: false,
 				},
