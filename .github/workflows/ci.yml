@@ -1134,7 +1134,7 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Run the package-manager workspace matrix
-              run: pnpm exec vitest run packages/cli/test/workspace-matrix.test.ts --project=node
+              run: pnpm exec vp test run packages/cli/test/workspace-matrix.test.ts --project node
 
     changes:
         runs-on: ubuntu-latest

@@ -10,6 +10,8 @@ Run Vite commands through `vp` (Vite+), as the scripts in `package.json` do: `vp
 `vite build`. The app aliases `vite` to `@voidzero-dev/vite-plus-core`, so that plugins get
 Vite+, and that package has no `vite` command.
 
+The Deno format pins vite-plus 0.3.1: vite-plus 1.x runs Vite in a child Deno process without permissions, so its builds fail under Deno.
+
 ## Editor support
 
 `tsconfig.json` carries the editor wiring: the `plugins` entries load the Markless

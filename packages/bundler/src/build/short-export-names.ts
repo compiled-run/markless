@@ -281,7 +281,7 @@ export function planShortExportNames(chunks: readonly ShortNameChunk[]): ShortNa
 }
 
 // Searching every string once per chunk took 20 s on a 4,518-chunk build; only strings holding a chunk's extension can name it.
-function namedInStrings(strings: readonly string[], fileNames: readonly string[]): string[] {
+export function namedInStrings(strings: readonly string[], fileNames: readonly string[]): string[] {
 	const texts = new Map<string, string>();
 	return fileNames.filter((fileName) => {
 		const base = fileName.slice(fileName.lastIndexOf('/') + 1);

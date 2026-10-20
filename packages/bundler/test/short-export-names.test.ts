@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { rolldown, type OutputChunk } from 'rolldown';
 import { expect, test } from 'vitest';
-import { planShortExportNames, shortNames } from '../src/build/short-export-names.ts';
+import {
+	namedInStrings,
+	planShortExportNames,
+	shortNames,
+} from '../src/build/short-export-names.ts';
 import { nativePackingPlugins } from '../src/build/native-packing.ts';
 
 async function buildPacked(sources: Record<string, string>) {
@@ -247,4 +251,25 @@ test('exports no surviving chunk imports leave the pack once facades collapse', 
 	const [clause] = plan.edits.get('pack.js')!;
 	expect(clause!.source).toBe(`export{n as ${names.get('usedName')}};`);
 	expect(plan.exports.get('pack.js')).toEqual([names.get('usedName')]);
+});
+
+test('a chunk named in any string escapes, whatever its extension', () => {
+	expect(
+		namedInStrings(
+			['load("./assets/pack-a.js")', 'url: pack-b.mjs', 'noextension-c', 'unrelated'],
+			['assets/pack-a.js', 'pack-b.mjs', 'noextension-c', 'pack-d.js'],
+		),
+	).toEqual(['assets/pack-a.js', 'pack-b.mjs', 'noextension-c']);
+});
+
+test('finding the chunks named in strings stays linear in the strings on a docs-sized build', () => {
+	// The docs site emits about 4,500 chunks and 1.5 million strings; searching every string once per chunk took 20 s there.
+	const strings = Array.from({ length: 1_000_000 }, (_, index) => `chunk-named label ${index}`);
+	strings.push('./chunk-named-1234.js');
+	const fileNames = Array.from({ length: 4_000 }, (_, index) => `build/chunk-named-${index}.js`);
+	const started = performance.now();
+	const named = namedInStrings(strings, fileNames);
+	const elapsed = performance.now() - started;
+	expect(named).toEqual(['build/chunk-named-1234.js']);
+	expect(elapsed).toBeLessThan(2_000);
 });
