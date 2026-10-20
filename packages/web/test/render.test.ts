@@ -2699,7 +2699,7 @@ test('renderToString keeps fragment sibling roots as direct container children a
 	// keep both siblings as its direct children with no extra wrapper element,
 	// so container-scoped locator indexes stay aligned to the element walk.
 	expect(html).toContain(
-		'<div data-async-container data-markless-paths="6header,button|01001111|5"><header>Site</header><button m:on="click:0" type="button">0</button>',
+		'<div data-async-container data-markless-paths="6header,button|01001111|5|4o2t21"><header>Site</header><button m:on="click:0" type="button">0</button>',
 	);
 
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;

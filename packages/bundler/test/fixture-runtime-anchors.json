@@ -174,7 +174,7 @@
 		"serializer/protocol-page-markers": 365,
 		"web/fns/dom-order": 621,
 		"web/fns/scalar-specialized": 1414,
-		"web/fns/served-census-repair": 2896,
+		"web/fns/served-census-repair": 3976,
 		"web/fns/update-text": 519,
 		"web/fns/write-scalar": 971,
 		"web/resume-anchor-census": 506

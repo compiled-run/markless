@@ -188,7 +188,14 @@ export function servedLocatorPaths(
 		stack.push(index);
 		previous = index;
 	}
-	return `${elements.length}${tags.join(',')}|${entries}|${parents.map((parent) => pathNumber(childCounts[parent]!)).join('')}`;
+	return `${elements.length}${tags.join(',')}|${entries}|${parents.map((parent) => pathNumber(childCounts[parent]!)).join('')}|${tagOrderSignature(elements.slice(1).map((element) => element.tag))}`;
+}
+
+/** The order the served elements' tags came in, which a script moving one changes without changing the count. */
+export function tagOrderSignature(tags: ReadonlyArray<string>): string {
+	let signature = 0;
+	for (const tag of tags) signature = (signature * 31 + tag.length * 32 + (tag.charCodeAt(0) | 32)) | 0;
+	return (signature >>> 0).toString(36);
 }
 
 function pathNumber(value: number): string {
