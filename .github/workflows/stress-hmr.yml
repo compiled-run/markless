@@ -1,0 +1,42 @@
+name: stress ssr-browser-hmr (temporary)
+
+on:
+    push:
+        branches: [stress/ssr-browser-hmr]
+
+jobs:
+    stress:
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        strategy:
+            fail-fast: false
+            matrix:
+                side: [before, after]
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+                  fetch-depth: 0
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - name: Use main's copy of the test (before)
+              if: matrix.side == 'before'
+              run: git checkout origin/main -- packages/bundler/test/ssr-browser-hmr.test.ts
+            - name: Run the test 40 times under CPU load
+              run: |
+                  for core in $(seq "$(nproc)"); do (while :; do :; done) & done
+                  fail=0
+                  for run in $(seq 40); do
+                    if ! pnpm exec vp test run packages/bundler/test/ssr-browser-hmr.test.ts -t "nothing loaded imports" > "run-$run.log" 2>&1; then
+                      fail=$((fail + 1))
+                      grep -E "×|AssertionError|Expected|Received|^\s+[-+] " "run-$run.log" | head -12
+                    fi
+                  done
+                  kill $(jobs -p) 2>/dev/null || true
+                  echo "${{ matrix.side }}: $fail of 40 runs failed" | tee -a "$GITHUB_STEP_SUMMARY"

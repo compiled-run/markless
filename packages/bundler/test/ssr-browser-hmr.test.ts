@@ -185,9 +185,9 @@ describe('SSR browser HMR', () => {
 					},
 				],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				// No OS watcher: linux delivers the fixture's index.html write late and Vite page-reloads it; the test emits every event itself.
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-			server.watcher.unwatch(fixture.root);
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			expect(await requestHtml(server)).toContain('<span>hello</span>');
