@@ -84,6 +84,8 @@ export class TsserverHarness {
 			'--pluginProbeLocations',
 			probeLocations.join(','),
 			'--allowLocalPluginLoads',
+			// The typings installer is a forked child close() cannot await; it outlives the server and writes into the project.
+			'--disableAutomaticTypingAcquisition',
 			'--logVerbosity',
 			'verbose',
 			'--logFile',
@@ -237,12 +239,7 @@ export class TsserverHarness {
 		if (this.server.exitCode === null && this.server.signalCode === null) {
 			this.server.kill();
 			await new Promise<void>((resolve) => {
-				const timer = setTimeout(() => {
-					if (this.server.exitCode === null && this.server.signalCode === null) {
-						this.server.kill('SIGKILL');
-					}
-					resolve();
-				}, 1_000);
+				const timer = setTimeout(() => this.server.kill('SIGKILL'), 1_000);
 				this.server.once('exit', () => {
 					clearTimeout(timer);
 					resolve();
@@ -337,9 +334,7 @@ export function copyFixtureProject(
 }
 
 export function removeFixtureProject(project: string): void {
-	// tsserver flushes its verbose log asynchronously after kill; retry so teardown
-	// does not race the final append and mask the test's real failure.
-	rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	rmSync(project, { recursive: true, force: true });
 }
 
 export function fixturePath(project: string, relativePath: string): string {

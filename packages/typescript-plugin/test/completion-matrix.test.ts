@@ -1,6 +1,7 @@
 import {
 	existsSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
@@ -1037,6 +1038,31 @@ test('M10 plugin does not add the Markless declaration to a project without TSRX
 	} finally {
 		await plainServer.close();
 		rmSync(plainProject, { recursive: true, force: true });
+	}
+}, 20_000);
+
+// A forked typings installer outlives the server's exit and appends its own log beside
+// the server's, which is what made removing a project fail with ENOTEMPTY.
+test('a closed tsserver harness leaves nothing writing into its project', async () => {
+	const project = mkdtempSync(join(tmpdir(), 'markless-teardown-'));
+	writeFileSync(
+		join(project, 'tsconfig.json'),
+		JSON.stringify({ compilerOptions: { jsx: 'preserve', noEmit: true }, include: ['*.tsx'] }),
+	);
+	const file = join(project, 'Plain.tsx');
+	const source = 'export const plain = <div />;\n';
+	writeFileSync(file, source);
+	const harness = new TsserverHarness({ project, workspaceRoot, globalPlugins: [corePlugin] });
+	try {
+		harness.open(file, source);
+		await harness.semanticDiagnosticsSync(file);
+		await harness.close();
+		const closed = readdirSync(project).sort();
+		await new Promise((done) => setTimeout(done, 500));
+		expect(readdirSync(project).sort()).toEqual(closed);
+	} finally {
+		await harness.close();
+		rmSync(project, { recursive: true, force: true });
 	}
 }, 20_000);
 
