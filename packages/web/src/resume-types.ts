@@ -353,7 +353,10 @@ export type ResumeRuntimeInput = {
 	readonly view: ResumeViewRecord;
 	readonly liveHostNodes?: ReadonlyMap<string, ResumeDomElement>;
 	readonly loadSymbol: (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>;
-	readonly renderBranchHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
+	readonly renderBranchHtml?: (
+		html: string,
+		parent?: ResumeDomNode | null,
+	) => ReadonlyArray<ResumeDomNode>;
 	readonly renderAsyncBoundary?: (
 		boundaryId: string,
 		status: 'fulfilled' | 'rejected',

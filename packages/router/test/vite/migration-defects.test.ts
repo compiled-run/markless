@@ -501,3 +501,35 @@ test('a page file with an apostrophe in its name builds, serves and resumes', as
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('xlink: and xml: attributes survive server rendering and client updates', async () => {
+	const html = await (await fetch(`${server!.origin}/xlink`)).text();
+	expect(html).toMatch(/<use[^>]*\sxlink:href="#dot"/);
+	expect(html).toMatch(/<svg[^>]*\sxmlns:xlink="http:\/\/www\.w3\.org\/1999\/xlink"/);
+	expect(html).toMatch(/<text[^>]*\sxml:space="preserve"/);
+	const { page, errors } = await open('/xlink');
+	const xlinkHref = (selector: string) =>
+		page.evaluate(
+			(selector) =>
+				document
+					.querySelector(selector)
+					?.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ?? null,
+			selector,
+		);
+	expect(await xlinkHref('[data-use]')).toBe('#dot');
+	expect(await xlinkHref('[data-moving]')).toBe('#dot');
+	await page.click('[data-retarget]');
+	await expect.poll(() => xlinkHref('[data-moving]')).toBe('#ring');
+	expect(
+		await page.evaluate(() =>
+			[...document.querySelector('[data-moving]')!.attributes].map((attribute) => [
+				attribute.name,
+				attribute.namespaceURI,
+			]),
+		),
+	).toContainEqual(['xlink:href', 'http://www.w3.org/1999/xlink']);
+	await page.click('[data-show]');
+	await expect.poll(() => xlinkHref('[data-arm]')).toBe('#ring');
+	expect(errors).toEqual([]);
+	await page.close();
+});

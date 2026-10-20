@@ -1,3 +1,4 @@
+import { markupNodes } from './markup-nodes.ts';
 import {
 	RuntimePayloadError,
 	type EncodedPayloadScripts,
@@ -113,11 +114,6 @@ export function documentTemplateBranchHtml(
 	};
 	const host = documentLike.createElement ? documentLike : documentLike.ownerDocument;
 	if (!host?.createElement) return undefined;
-	return (html) => {
-		const template = host.createElement!('template');
-		template.innerHTML = html;
-		return Array.from(template.content?.childNodes ?? []) as ReturnType<
-			NonNullable<ResumeRuntimeInput['renderBranchHtml']>
-		>;
-	};
+	return (html, parent) =>
+		markupNodes(host.createElement!('template'), html, parent as Parameters<typeof markupNodes>[2]);
 }

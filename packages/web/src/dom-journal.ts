@@ -1,6 +1,6 @@
 import type { DomJournalEntry } from '@markless/runtime';
 import type { ResumeDomComment, ResumeDomElement, ResumeDomNode } from './resume-types.ts';
-import { marklessAttributeValue } from './dom-attribute.ts';
+import { marklessAttributeValue, marklessWriteAttribute } from './dom-attribute.ts';
 import { marklessControlWriteHeld } from './control-edit-hold.ts';
 import { spliceCensus } from './resume-census.ts';
 
@@ -162,13 +162,8 @@ function setText(target: unknown, value: unknown): void {
 function setAttr(target: unknown, name: string, value: unknown): void {
 	const element = target as DomJournalApplyTarget;
 	const text = marklessAttributeValue(name, value);
-	if (text === null) {
-		element.removeAttribute?.(name);
-		return;
-	}
-
-	if (readAttribute(element, name) === text) return;
-	element.setAttribute?.(name, text);
+	if (text !== null && readAttribute(element, name) === text) return;
+	marklessWriteAttribute(element, name, text);
 }
 
 function readAttribute(element: DomJournalApplyTarget, name: string): string | null | undefined {

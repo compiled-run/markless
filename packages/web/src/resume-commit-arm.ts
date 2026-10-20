@@ -79,7 +79,7 @@ type CapturedFocusScroll = {
 export function createArmCommitter(
 	deps: {
 		readonly root: ResumeDomElement;
-		readonly renderHtml?: (html: string) => ReadonlyArray<ResumeDomNode>;
+		readonly renderHtml?: (html: string, parent?: ResumeDomNode | null) => ReadonlyArray<ResumeDomNode>;
 		readonly elementsByHostId: Map<string, ResumeDomElement>;
 		readonly disposedHosts: Set<string>;
 		readonly disposeHost: (hostNodeId: string) => void;
@@ -123,7 +123,12 @@ export function createArmCommitter(
 	): Promise<void> {
 		if (!update.nodes && (!deps.renderHtml || update.html === undefined))
 			throw armCommitRendererMissingError(boundary);
-		const fresh = update.nodes ?? deps.renderHtml!(update.html!);
+		const fresh =
+			update.nodes ??
+			deps.renderHtml!(
+				update.html!,
+				(boundary.startAnchor as { readonly parentNode?: ResumeDomNode | null }).parentNode,
+			);
 		const outgoing = elementsBetweenAnchors(
 			deps.root,
 			boundary.startAnchor,

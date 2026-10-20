@@ -1,5 +1,5 @@
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
-import { marklessAttributeValue } from '../dom-attribute.ts';
+import { marklessAttributeValue, marklessWriteAttribute } from '../dom-attribute.ts';
 import { marklessDecodeScalarCell, marklessScalarSpecializedError } from './scalar-specialized.ts';
 import { marklessScalarLocate, marklessServedDomUpdate } from './scalar-served.ts';
 
@@ -263,8 +263,8 @@ export async function marklessRunClosureAction(
 				}
 				const name = String(entry.name);
 				const text = marklessAttributeValue(name, entry.value);
-				if (text === null) element.removeAttribute(name);
-				else if (element.getAttribute(name) !== text) element.setAttribute(name, text);
+				if (text === null || element.getAttribute(name) !== text)
+					marklessWriteAttribute(element, name, text);
 			}
 		}
 		if (failure) throw failure.error;

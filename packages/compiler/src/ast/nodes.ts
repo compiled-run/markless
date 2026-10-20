@@ -60,6 +60,11 @@ export function isNode(value: unknown): value is AnyNode {
 }
 
 export function getIdentifierName(node: AnyNode | undefined | null): string | null {
+	if (node?.type === 'JSXNamespacedName') {
+		const namespace = getIdentifierName(node.namespace as AnyNode | undefined);
+		const name = getIdentifierName(node.name as AnyNode | undefined);
+		return namespace && name ? `${namespace}:${name}` : null;
+	}
 	return typeof node?.name === 'string' ? node.name : null;
 }
 

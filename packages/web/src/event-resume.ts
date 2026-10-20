@@ -7,7 +7,7 @@ import {
 	decodeProtocolPayloadLists,
 	type RuntimePayloadType,
 } from '@markless/serializer/record-templates';
-import { marklessAttributeValue } from './dom-attribute.ts';
+import { marklessAttributeValue, marklessWriteAttribute } from './dom-attribute.ts';
 import { pageNodes } from './resume-anchor-census.ts';
 import { marklessControlWriteHeld, marklessNoteControlEdits } from './control-edit-hold.ts';
 import type {
@@ -536,12 +536,7 @@ function applyDomJournalEntry(
 		return;
 	}
 	if (entry.type === 'setAttr') {
-		const text = marklessAttributeValue(entry.name, entry.value);
-		if (text === null) {
-			target.removeAttribute?.(entry.name);
-			return;
-		}
-		target.setAttribute?.(entry.name, text);
+		marklessWriteAttribute(target, entry.name, marklessAttributeValue(entry.name, entry.value));
 		return;
 	}
 	if (entry.type === 'setProp') {

@@ -1,5 +1,5 @@
 import type { DomJournalEntry } from '@markless/runtime';
-import { marklessAttributeValue } from './dom-attribute.ts';
+import { marklessAttributeValue, marklessWriteAttribute } from './dom-attribute.ts';
 import { marklessControlWriteHeld } from './control-edit-hold.ts';
 
 type DirectJournalTarget = {
@@ -35,9 +35,7 @@ export function applyDirectJournalEntries(
 			// A rewrite with the value already there is still a mutation, and an aria-live region announces on it.
 			if (node.textContent !== text) node.textContent = text;
 		} else if (entry.type === 'setAttr') {
-			const text = marklessAttributeValue(entry.name, entry.value);
-			if (text === null) target.removeAttribute?.(entry.name);
-			else target.setAttribute?.(entry.name, text);
+			marklessWriteAttribute(target, entry.name, marklessAttributeValue(entry.name, entry.value));
 		} else if (!marklessControlWriteHeld(target, entry.name, entry.value)) {
 			(target as Record<string, unknown>)[entry.name] = entry.value;
 		}

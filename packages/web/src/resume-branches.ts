@@ -163,7 +163,12 @@ function createBranchRegistration(
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
 			if (update.armRecords) return input.commitArm(branch, { ...update, html });
-			const fragment = input.renderBranchHtml ? input.renderBranchHtml(html) : html;
+			const fragment = input.renderBranchHtml
+				? input.renderBranchHtml(
+						html,
+						(branch.startAnchor as { readonly parentNode?: ResumeDomNode | null }).parentNode,
+					)
+				: html;
 			// `resolved` means the module found this arm's parts, so empty text is a value.
 			if (
 				branchFragmentEmpty(fragment) &&
