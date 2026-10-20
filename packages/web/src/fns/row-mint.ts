@@ -1,6 +1,7 @@
+import { markupNodes, type MarkupParent } from '../markup-nodes.ts';
 import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
 import type { RuntimeGraph } from '@markless/runtime';
-import { marklessAttributeValue } from '../dom-attribute.ts';
+import { marklessAttributeValue, marklessWriteAttribute } from '../dom-attribute.ts';
 import { pageNodes } from '../resume-anchor-census.ts';
 import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '../resume-types.ts';
 
@@ -43,8 +44,7 @@ export function renderEmptyArm(
 			'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
 			'has no document to render its @empty arm markup with.',
 		);
-	template.innerHTML = repeat.emptyArm!.html;
-	const nodes = Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+	const nodes = markupNodes<ResumeDomNode>(template, repeat.emptyArm!.html, parent as MarkupParent);
 	if (nodes.length === 0)
 		throw repeatRuntimeError(
 			repeat,
@@ -134,8 +134,7 @@ export function mintRowNodes(
 			'MARKLESS_REPEAT_ROW_MINT_RENDERER_MISSING',
 			'has no document to build a row for an unserved key with.',
 		);
-	template.innerHTML = rowTemplate.html;
-	const nodes = Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+	const nodes = markupNodes<ResumeDomNode>(template, rowTemplate.html, parent as MarkupParent);
 	// Every path is walked before any fill: replacing a marker rewrites the
 	// childNodes a later path would have counted through.
 	const rowRoot = nodes.find((node) => node.nodeType === 1) as ResumeDomElement | undefined,
@@ -183,8 +182,11 @@ export function patchRow(
 	if (!targets) {
 		const host = row.ownerDocument?.createElement?.('template');
 		if (!host) return false;
-		host.innerHTML = template.html;
-		const nodes = Array.from(host.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+		const nodes = markupNodes<ResumeDomNode>(
+			host,
+			template.html,
+			(row as { readonly parentNode?: MarkupParent }).parentNode,
+		);
 		targets = [...texts, ...(template.attributeSlots ?? [])].map((slot, at) =>
 			slotTarget(nodes, slot.path, at < texts.length),
 		);
@@ -244,12 +246,15 @@ function writeAttribute(
 	rest: string | null | undefined,
 ): void {
 	const text = marklessAttributeValue(name, value);
-	if (rest == null && text === null) element.removeAttribute?.(name);
-	else
-		element.setAttribute?.(
-			name,
-			rest?.endsWith(' ') ? rest + (text ?? '') : (text ?? '') + (rest ?? ''),
-		);
+	marklessWriteAttribute(
+		element,
+		name,
+		rest == null && text === null
+			? null
+			: rest?.endsWith(' ')
+				? rest + (text ?? '')
+				: (text ?? '') + (rest ?? ''),
+	);
 	if ((name === 'checked' || name === 'selected' || name === 'value') && name in element)
 		element[name] = name === 'value' ? (text ?? '') : text !== null;
 }

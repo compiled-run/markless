@@ -1,3 +1,4 @@
+import { markupNodes } from './markup-nodes.ts';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_VISIBLE_EVENT_NAME,
@@ -760,7 +761,10 @@ async function createFullRuntimeGraph(input: {
 // CSR runs where the compiled module already used the document global to
 // build its root, so the same document parses branch flip fragments.
 function globalDocumentBranchHtml():
-	| ((html: string) => ReadonlyArray<import('./resume.ts').ResumeDomNode>)
+	| ((
+			html: string,
+			parent?: import('./resume.ts').ResumeDomNode | null,
+	  ) => ReadonlyArray<import('./resume.ts').ResumeDomNode>)
 	| undefined {
 	const documentHost = (
 		globalThis as {
@@ -773,11 +777,10 @@ function globalDocumentBranchHtml():
 		}
 	).document;
 	if (typeof documentHost?.createElement !== 'function') return undefined;
-	return (html) => {
-		const template = documentHost.createElement!('template');
-		template.innerHTML = html;
-		return Array.from(template.content?.childNodes ?? []) as ReadonlyArray<
-			import('./resume.ts').ResumeDomNode
-		>;
-	};
+	return (html, parent) =>
+		markupNodes(
+			documentHost.createElement!('template'),
+			html,
+			parent as Parameters<typeof markupNodes>[2],
+		);
 }

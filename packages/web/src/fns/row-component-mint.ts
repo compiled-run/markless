@@ -1,3 +1,4 @@
+import { markupNodes, type MarkupParent } from '../markup-nodes.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
@@ -1153,8 +1154,7 @@ function parseRowNodes(
 			'MARKLESS_REPEAT_ROW_COMPONENT_RENDERER_MISSING',
 			'has no document to build a component row with.',
 		);
-	template.innerHTML = html;
-	return Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+	return markupNodes<ResumeDomNode>(template, html, parent as MarkupParent);
 }
 
 /**
