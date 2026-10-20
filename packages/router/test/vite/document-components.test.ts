@@ -118,3 +118,40 @@ test('document.tsrx renders child components and @for, @if and @switch on the re
 	expect(guide).toContain('<p data-section="">guide section</p>');
 	expect(guide).toContain('guide page');
 });
+
+test('a handler written on the document stops the build instead of being dropped', async () => {
+	const app = await mkdtemp(join(tmpdir(), 'markless-router-document-handler-'));
+	try {
+		await mkdir(join(app, 'node_modules/@markless'), { recursive: true });
+		for (const name of ['core', 'router'])
+			await symlink(join(packagesRoot, name), join(app, 'node_modules/@markless', name), 'dir');
+		await mkdir(join(app, 'pages'));
+		await writeFile(
+			join(app, 'document.tsrx'),
+			`import type { Children } from '@markless/core';
+import { Html } from '@markless/router';
+export default function Document({ children }: { readonly children?: Children }) @{
+	<Html>
+		<head><meta charset="utf-8" /></head>
+		<body onClick={(event) => (event.target as HTMLElement).setAttribute('data-clicked', 'yes')}>{children}</body>
+	</Html>
+}
+`,
+		);
+		await writeFile(
+			join(app, 'pages/index.tsrx'),
+			`export default function Page() @{\n\t<main><button id="b">press</button></main>\n}\n`,
+		);
+		const builder = await createBuilder({
+			root: app,
+			configFile: false,
+			logLevel: 'silent',
+			plugins: [markless(), router()],
+		});
+		await expect(builder.buildApp()).rejects.toThrow(
+			/MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED: .*document\.tsrx sets onClick on <body>/,
+		);
+	} finally {
+		await rm(app, { recursive: true, force: true });
+	}
+});

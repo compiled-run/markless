@@ -1,4 +1,5 @@
-import { parseModule } from '@tsrx/yuku';
+import { isEventAttribute, parseModule } from '@tsrx/yuku';
+import { documentHandlersMessage } from './runtime/document-handlers.ts';
 
 // 'document' = route changes need a fresh server document because the shell
 // renders from the request URL; 'client' = the shell is the same on every route.
@@ -25,6 +26,50 @@ export function documentNavigationFor(source: string | undefined, id: string): D
 	const component = defaultExportedFunction(body);
 	if (!component) return 'document';
 	return readsOnlyRouteInvariantProps(nodes(component.params)) ? 'client' : 'document';
+}
+
+// The router serves only the Document's HTML, so a handler written on it would never run.
+export function documentHandlerError(source: string | undefined, id: string): string | undefined {
+	if (source === undefined) return undefined;
+	let program: Node;
+	try {
+		program = parseModule(source, id) as unknown as Node;
+	} catch {
+		return undefined;
+	}
+	const found = firstHandlerAttribute(program);
+	if (!found) return undefined;
+	return documentHandlersMessage(`${id} sets ${found.attribute} on <${found.tag}>`);
+}
+
+function firstHandlerAttribute(
+	value: unknown,
+	tag = '',
+): { readonly attribute: string; readonly tag: string } | undefined {
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			const found = firstHandlerAttribute(item, tag);
+			if (found) return found;
+		}
+		return undefined;
+	}
+	const current = node(value);
+	if (!current) return undefined;
+	if (current.type === 'JSXAttribute') {
+		const name = node(current.name)?.name;
+		return typeof name === 'string' && (isEventAttribute(name) || name === 'attach')
+			? { attribute: name, tag }
+			: undefined;
+	}
+	const opening = node(current.openingElement);
+	const elementName = node(opening?.name)?.name;
+	const nextTag = typeof elementName === 'string' ? elementName : tag;
+	for (const [key, child] of Object.entries(current)) {
+		if (key === 'loc' || key === 'range' || key === 'metadata') continue;
+		const found = firstHandlerAttribute(child, nextTag);
+		if (found) return found;
+	}
+	return undefined;
 }
 
 function readsOnlyRouteInvariantProps(params: readonly Node[]): boolean {

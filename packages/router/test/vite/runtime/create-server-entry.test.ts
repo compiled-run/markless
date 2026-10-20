@@ -924,6 +924,31 @@ describe('server entry rendering', () => {
 		expect(html).toContain('theme');
 	});
 
+	it('refuses a document whose render output wires event handlers', async () => {
+		const entry = createServerEntry({
+			dev: true,
+			documentModuleLoader: async () => ({
+				default: {
+					renderSsr: () => ({
+						html: '<head></head><body><button>Menu</button>__markless_router_document_children__</body>',
+						view: { events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }] },
+					}),
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(response.status).toBe(500);
+		expect(html).toContain('MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED');
+		expect(html).toContain('click');
+	});
+
 	it('serves a document whose render output carries no storage records', async () => {
 		const entry = createServerEntry({
 			documentModuleLoader: async () => ({

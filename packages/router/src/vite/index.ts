@@ -63,7 +63,7 @@ import { routeTypegenPlugin } from './route-typegen.ts';
 import { LINK_ATTRIBUTE, PREFETCH_ATTRIBUTE } from '../link-attributes.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
 import { listenForLinkIntent } from './link-intent.ts';
-import { documentNavigationFor } from './document-navigation.ts';
+import { documentHandlerError, documentNavigationFor } from './document-navigation.ts';
 import { runFragmentNavigation, startFragmentNavigation } from './fragment-navigation.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
@@ -1033,6 +1033,8 @@ async function routerOptionsSource(
 	documentFile: string,
 ): Promise<string> {
 	const documentSource = await readFile(documentFile, 'utf8').catch(() => undefined);
+	const handlerError = documentHandlerError(documentSource, documentFile);
+	if (handlerError) throw new Error(handlerError);
 	return [
 		'export const routerMode = "path";',
 		`export const documentNavigation = ${JSON.stringify(documentNavigationFor(documentSource, documentFile))};`,
