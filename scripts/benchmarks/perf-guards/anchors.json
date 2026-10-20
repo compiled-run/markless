@@ -1409,6 +1409,38 @@
 			"from": 20269,
 			"to": 20618,
 			"reason": "counts the elements render data no longer lists one by one; each static element drops a ~70 B host record from served render data (12000-element page: client chunk 3.4 MB to 135 KB)"
+		},
+		{
+			"date": "2026-10-20",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 20390,
+			"to": 22185,
+			"reason": "In-place navigation inserts a long page a frame at a time (93/65 ms long tasks on the Docusaurus port, 77-82 -> 28-31 ms measured) and lands on the clicked link's hash; loaded on navigation, not at load"
+		},
+		{
+			"date": "2026-10-20",
+			"guard": "runtime",
+			"subject": "web/dom-attribute",
+			"from": 352,
+			"to": 874,
+			"reason": "Bound xlink: and xml: attributes are written with setAttributeNS; setAttribute made an attribute SVG never reads (Docusaurus port)"
+		},
+		{
+			"date": "2026-10-20",
+			"guard": "runtime",
+			"subject": "web/fns/served-census-repair",
+			"from": 2908,
+			"to": 3988,
+			"reason": "The census repair finds elements a script moved before the page woke, within and across parents (Radix dialog portal); loads only on a page a script changed first"
+		},
+		{
+			"date": "2026-10-20",
+			"guard": "runtime",
+			"subject": "web/markup-nodes",
+			"from": null,
+			"to": 472,
+			"reason": "Arms and rows inserted under an svg are parsed in SVG context, so their elements and xlink: attributes land in their namespaces"
 		}
 	],
 	"runtimeModules": {
@@ -1421,7 +1453,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 20390,
+		"router/vite/entries/fragment-entry": 22185,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8906,
@@ -1453,7 +1485,7 @@
 		"serializer/value-decode-extensions": 1720,
 		"web/coded-error": 368,
 		"web/control-edit-hold": 1479,
-		"web/dom-attribute": 352,
+		"web/dom-attribute": 874,
 		"web/dom-journal": 7373,
 		"web/dom-journal-direct": 1223,
 		"web/fns/bound-symbol": 1497,
@@ -1471,7 +1503,7 @@
 		"web/fns/row-slot-mint": 2633,
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
-		"web/fns/served-census-repair": 2908,
+		"web/fns/served-census-repair": 3988,
 		"web/fns/ssr": 30297,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
@@ -1480,6 +1512,7 @@
 		"web/inline/resume-errors": 1437,
 		"web/inline/sync-policy-core": 1255,
 		"web/inline/sync-policy-core-lazy": 234,
+		"web/markup-nodes": 472,
 		"web/payload-document-common": 2608,
 		"web/payload-full-storage-free": 773,
 		"web/payload-graph-construct": 4384,
