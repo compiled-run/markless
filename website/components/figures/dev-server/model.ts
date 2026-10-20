@@ -2,12 +2,15 @@
 import { type ManagerId, scriptCommand } from '../../docs/walkthrough/facts.ts';
 import { devCommand } from '../create/model.ts';
 import { completion, isInvalid, NO_WAIT, ranWith, tidy, waitsOf } from '../create/managers.ts';
+import starterManifest from '../../../../packages/cli/templates/formats/node/package.json' with { type: 'json' };
 
 export { tidy };
 export const TARGET = 'my-markless-app';
 export const PAGE_FILE = 'pages/index.tsrx';
-/** Nitro's dev server takes port 3000 unless it is busy; the Vite+ banner is from the starter's pinned vite-plus 0.3.1. */
+/** Nitro's dev server takes port 3000 unless it is busy. */
 export const PORT = 3000;
+/** The Vite+ banner names the vite-plus version the starter pins. */
+export const BANNER = `VITE+ v${starterManifest.dependencies['vite-plus']}`;
 export const HOST = `localhost:${PORT}`;
 export const URL_LINE = `http://${HOST}/`;
 /** The commands that run the dev script with each manager; Deno also takes the `deno run dev` the create figure prints for a Node app it launched. */
@@ -42,7 +45,7 @@ const BLANK = row('', '', 'blank');
 /** The line already run when the figure opens. */
 export const DONE = row('$', `cd ${TARGET}`, 'cmd');
 /** The server's output, trimmed to the lines that matter. */
-export const OUTPUT: readonly Row[] = [BLANK, row('', 'VITE+ v0.3.1', 'banner'), BLANK, row('➜', `Local:   ${URL_LINE}`, 'local'), row('➜', 'Network: use --host to expose', 'note')];
+export const OUTPUT: readonly Row[] = [BLANK, row('', BANNER, 'banner'), BLANK, row('➜', `Local:   ${URL_LINE}`, 'local'), row('➜', 'Network: use --host to expose', 'note')];
 /** The longest line the reader can type. */
 export const MAX_TYPED = 32;
 /** Lines the terminal sheet holds; older lines scroll off the top. */

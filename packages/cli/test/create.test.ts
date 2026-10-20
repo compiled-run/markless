@@ -561,7 +561,7 @@ test('generates Deno format imports with Nitro available', async () => {
 	expect(denoJson.imports).toMatchObject({
 		'@markless/core': expect.stringMatching(/^npm:@markless\/core@\^/),
 		'@markless/router': expect.stringMatching(/^npm:@markless\/router@\^/),
-		nitro: 'npm:nitro@3.0.260429-beta',
+		nitro: expect.stringMatching(/^npm:nitro@/),
 	});
 	// tsconfig.json is shared by all three formats, so a Deno app gets the same editor
 	// wiring the Node and Bun apps get. Deno's own language server ignores it — it reads
@@ -687,7 +687,7 @@ test('a node-format manifest lets npm and pnpm install the vite-plus vite alias'
 		pnpm?: { peerDependencyRules?: { allowAny?: string[] } };
 	};
 
-	// The alias installs as vite 0.3.1, outside the exact vite peer the router and bundler declare:
+	// The alias installs under vite-plus-core's own version, outside the exact vite peer the router and bundler declare:
 	// npm refuses the install unless the override names it, and pnpm warns unless told to allow it.
 	expect(manifest.devDependencies.vite).toMatch(/^npm:@voidzero-dev\/vite-plus-core@/);
 	expect(manifest.overrides).toEqual({ vite: '$vite' });

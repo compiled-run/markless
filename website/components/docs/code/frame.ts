@@ -53,11 +53,16 @@ async function run(
 			runtimeImportCall(specifier) ?? `globalThis.${RUNS}.get(${id}).load(${expression})`,
 	});
 	runs.set(id, {
-		load: async (specifier) => import(/* @vite-ignore */ await linker.url(specifier)),
+		// Vite 8.3 wraps import() in a non-async preload arrow, so its argument must not await.
+		load: async (specifier) => {
+			const moduleUrl = await linker.url(specifier);
+			return import(/* @vite-ignore */ moduleUrl);
+		},
 	});
 	const mount = document.createElement('div');
 	try {
-		const entry = (await import(/* @vite-ignore */ await linker.url(entryId))) as {
+		const entryUrl = await linker.url(entryId);
+		const entry = (await import(/* @vite-ignore */ entryUrl)) as {
 			default?: unknown;
 		};
 		if (id !== latest) return;

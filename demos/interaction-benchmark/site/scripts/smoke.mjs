@@ -10,8 +10,7 @@ const siteDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const repoDir = path.resolve(siteDir, '..', '..', '..');
 const dist = path.join(siteDir, 'dist');
 const port = Number(process.env.PORT ?? 4497);
-const require = createRequire(import.meta.url);
-const { chromium } = require(path.join(repoDir, 'node_modules/.pnpm/playwright@1.58.2/node_modules/playwright'));
+const { chromium } = createRequire(path.join(repoDir, 'packages/vitest-browser/package.json'))('playwright');
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.jsonl': 'application/x-ndjson', '.md': 'text/markdown' };
 const server = http.createServer((req, res) => {

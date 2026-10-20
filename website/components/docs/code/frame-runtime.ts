@@ -76,6 +76,9 @@ export function runtimeImportCall(specifier: string | undefined): string | undef
 
 /** Answers `runtimeImportCall` expressions, with shim URLs `url` makes and never revokes. */
 export function installRuntimeImport(url: (code: string) => string): void {
-	(globalThis as Record<string, unknown>)[RUNTIME_IMPORT] = async (specifier: string) =>
-		import(/* @vite-ignore */ await runtimeModuleUrl(specifier, url)!);
+	(globalThis as Record<string, unknown>)[RUNTIME_IMPORT] = async (specifier: string) => {
+		// Vite 8.3 wraps import() in a non-async preload arrow, so its argument must not await.
+		const moduleUrl = (await runtimeModuleUrl(specifier, url))!;
+		return import(/* @vite-ignore */ moduleUrl);
+	};
 }

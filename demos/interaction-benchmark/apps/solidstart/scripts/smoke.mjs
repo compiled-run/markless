@@ -17,7 +17,7 @@ async function loadChromium() {
   try {
     candidates.push(createRequire(join(repoRoot, "package.json")).resolve("playwright"));
   } catch {}
-  candidates.push(join(repoRoot, "node_modules/.pnpm/playwright@1.58.2/node_modules/playwright/index.js"));
+  candidates.push(join(repoRoot, "node_modules/.pnpm/playwright@1.64.1/node_modules/playwright/index.js"));
   for (const file of candidates) {
     if (existsSync(file)) return createRequire(import.meta.url)(file).chromium;
   }
