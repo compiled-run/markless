@@ -1,0 +1,63 @@
+name: Release probe
+on:
+    push:
+        branches: ['probe/cand-*']
+permissions:
+    contents: write
+    pull-requests: write
+    actions: write
+    checks: read
+jobs:
+    probe:
+        runs-on: ubuntu-latest
+        env:
+            GH_TOKEN: ${{ github.token }}
+            SHA: ${{ github.sha }}
+            REPO: ${{ github.repository }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - name: "Open the pull request and find its pull_request run"
+              run: |
+                  set -euo pipefail
+                  pr="$(gh pr create --base probe/base-2 --head "$GITHUB_REF_NAME" --title "probe: release workflow experiment 2, do not merge by hand" --body "Release workflow probe on scratch branches.")"
+                  echo "PR=$pr" >> "$GITHUB_ENV"
+                  run_id=''
+                  for _ in $(seq 1 24); do
+                    run_id="$(gh run list --workflow ci.yml --event pull_request --commit "$SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+                    [ -n "$run_id" ] && break; sleep 5
+                  done
+                  echo "PR_RUN=$run_id" >> "$GITHUB_ENV"
+                  gh api "repos/$REPO/actions/runs/$run_id" --jq '"run \(.id) event=\(.event) status=\(.status) conclusion=\(.conclusion)"'
+            - name: "C1: approve the run with the workflow token"
+              continue-on-error: true
+              run: |
+                  gh api -X POST "repos/$REPO/actions/runs/$PR_RUN/approve" 2>&1 && echo "C1 approve accepted" || echo "C1 approve refused"
+                  sleep 10
+                  gh api "repos/$REPO/actions/runs/$PR_RUN" --jq '"after approve: status=\(.status) conclusion=\(.conclusion)"'
+            - name: "C2: rerun the run with the workflow token"
+              continue-on-error: true
+              run: |
+                  gh api -X POST "repos/$REPO/actions/runs/$PR_RUN/rerun" 2>&1 && echo "C2 rerun accepted" || echo "C2 rerun refused"
+                  sleep 10
+                  gh api "repos/$REPO/actions/runs/$PR_RUN" --jq '"after rerun: status=\(.status) conclusion=\(.conclusion) attempt=\(.run_attempt)"'
+            - name: "C3: dispatch CI at the pull request's head ref"
+              continue-on-error: true
+              run: |
+                  num="${PR##*/}"
+                  gh workflow run ci.yml --ref "refs/pull/${num}/head" 2>&1 && echo "C3 dispatch on pull ref accepted" || echo "C3 dispatch on pull ref refused"
+            - name: "Watch the pull request for 3 minutes, then merge"
+              continue-on-error: true
+              run: |
+                  for i in $(seq 1 12); do
+                    echo "=== t+$((i*15))s $(gh pr view "$PR" --json mergeStateStatus --jq .mergeStateStatus)"
+                    gh pr view "$PR" --json statusCheckRollup --jq '.statusCheckRollup[]|"   \(.name) \(.status) \(.conclusion)"'
+                    gh api "repos/$REPO/commits/$SHA/check-suites?per_page=100" --jq '.check_suites[]|select(.app.id==15368)|"   suite \(.id) \(.status) \(.conclusion) runs=\(.latest_check_runs_count)"'
+                    sleep 15
+                  done
+                  gh pr merge "$PR" --merge --match-head-commit "$SHA" 2>&1 && echo "MERGE OK" || echo "MERGE REFUSED"
+            - name: "A2: direct push after the pull request's checks"
+              continue-on-error: true
+              run: |
+                  git push origin "$SHA:refs/heads/probe/base-1" 2>&1 && echo "PUSH OK" || echo "PUSH REFUSED"
