@@ -694,13 +694,16 @@ export async function navigate(
 		return;
 	}
 	if (id !== session.navigation) return taken.abort();
+	// A prefetch is shared by every link to the page, so the address takes the clicked link's #fragment.
+	const landed = new URL(fetched.url);
+	landed.hash = url.hash;
 	const next = fetched.doc;
 	const documentLoads = state.config.documentLoads;
 	const incoming = documentLoads ? next.body : regionOf(state, next);
 	const outgoing = documentLoads ? d.body : regionOf(state, d);
 	const scope = documentLoads && !isContainer(d.body) ? d.body : outgoing?.parentElement;
 	if (!incoming || !outgoing || !scope) {
-		fallback(fetched.url);
+		fallback(landed.href);
 		return;
 	}
 	// The destination shows once its own code has arrived, so its first interaction never waits on a fetch.
@@ -733,8 +736,8 @@ export async function navigate(
 		w.history.scrollRestoration = 'manual';
 		session.current = entryId();
 		const entry = { __marklessFragment: { id: session.current, x: 0, y: 0 } };
-		if (mode === 'push') w.history.pushState(entry, '', fetched.url);
-		else w.history.replaceState(entry, '', fetched.url);
+		if (mode === 'push') w.history.pushState(entry, '', landed.href);
+		else w.history.replaceState(entry, '', landed.href);
 	}
 	const offsets: ScrolledBox[] = [];
 	for (const element of state.scrolled) {
