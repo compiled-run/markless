@@ -1,5 +1,5 @@
 import { extname, join, normalize, relative } from 'pathe';
-import { joinURL, withLeadingSlash, withoutLeadingSlash, withoutTrailingSlash } from 'ufo';
+import { decode, joinURL, withLeadingSlash, withoutLeadingSlash, withoutTrailingSlash } from 'ufo';
 import { parseRequestFile } from './request-files.ts';
 
 const PAGES_DIR = 'pages';
@@ -350,7 +350,7 @@ function matchRoutePathname(
 			continue;
 		}
 
-		if (routeSegment !== requestSegment) {
+		if (routeSegment !== decode(requestSegment)) {
 			return undefined;
 		}
 	}
