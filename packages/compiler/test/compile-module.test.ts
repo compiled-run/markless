@@ -1143,12 +1143,10 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 	});
 
 	expect(result.semanticGraph.components).toEqual([{ name: 'Home', exportName: 'default' }]);
-	expect(result.protocolView.locators).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({ hostNodeId: 'h0', tagName: 'main' }),
-			expect.objectContaining({ hostNodeId: 'h2', tagName: 'button' }),
-		]),
-	);
+	// Only the button a record names is located; the static main and heading are not.
+	expect(result.protocolView.locators).toEqual([
+		expect.objectContaining({ hostNodeId: 'h2', tagName: 'button' }),
+	]);
 	expect(result.publicRenderModule.ssrExportName).toBe('marklessRenderSsr');
 	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
@@ -1525,7 +1523,7 @@ export function App() @{
 		expect.arrayContaining(['MARKLESS_TEMPLATE_AS_VALUE']),
 	);
 	expect(result.semanticGraph.hostNodes.map((host) => host.tagName)).toEqual(['section']);
-	expect(result.protocolView.locators.map((locator) => locator.tagName)).toEqual(['section']);
+	expect(result.protocolView.locators.map((locator) => locator.tagName)).toEqual([]);
 	expect(result.protocolState.cells.map((cell) => cell.graphNodeId)).not.toContain('state:view');
 	expect(result.publicRenderModule.moduleSource).not.toContain('marklessSsrText(banner)');
 	expect(result.publicRenderModule.moduleSource).not.toContain('marklessSsrText(rows)');
@@ -1818,7 +1816,7 @@ export function App() @{
 
 	<section>
 		<{tag} class="card" onClick={() => count++}>Hi</{tag}>
-		<footer>Done</footer>
+		<footer onClick={() => count--}>Done</footer>
 	</section>
 }
 `,
@@ -1843,9 +1841,8 @@ export function App() @{
 	expect(output.html).toBe(
 		'<section><article class="card">Hi</article><footer>Done</footer></section>',
 	);
-	// The dynamic element claims a real locator carrying its rendered tag.
+	// The dynamic element claims a real locator carrying its rendered tag; the static section takes none.
 	expect(output.view.locators).toEqual([
-		expect.objectContaining({ tagName: 'section', index: 0 }),
 		expect.objectContaining({ tagName: 'article', index: 1 }),
 		expect.objectContaining({ tagName: 'footer', index: 2 }),
 	]);
@@ -2071,7 +2068,6 @@ export function App() @{
 	// (2 rows x article/h2/button) so browser resume locates the right node.
 	expect(output.view.locators).toEqual(
 		expect.arrayContaining([
-			expect.objectContaining({ tagName: 'main', index: 0 }),
 			expect.objectContaining({ tagName: 'section', index: 1 }),
 			expect.objectContaining({ tagName: 'button', index: 8 }),
 		]),
@@ -2287,10 +2283,7 @@ export function App() @{
 	expect(output.html).toBe('<main><ul><li>No items yet</li></ul><button>Add</button></main>');
 	// The taken @empty branch occupies a real dom-order slot; later hosts shift.
 	expect(output.view.locators).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({ tagName: 'li', index: 2 }),
-			expect.objectContaining({ tagName: 'button', index: 3 }),
-		]),
+		expect.arrayContaining([expect.objectContaining({ tagName: 'button', index: 3 })]),
 	);
 });
 
@@ -2697,7 +2690,7 @@ export function App() @{
 	let count = state(0);
 
 	<>
-		<header>Site</header>
+		<header onClick={() => count--}>Site</header>
 		<button onClick={() => count++}>{count}</button>
 	</>
 }
@@ -2725,7 +2718,10 @@ export function App() @{
 		expect.objectContaining({ tagName: 'header', index: 0 }),
 		expect.objectContaining({ tagName: 'button', index: 1 }),
 	]);
-	expect(output.view.events).toEqual([expect.objectContaining({ eventName: 'click' })]);
+	expect(output.view.events).toEqual([
+		expect.objectContaining({ eventName: 'click' }),
+		expect.objectContaining({ eventName: 'click' }),
+	]);
 });
 
 // The implicit source blanks `<>`/`</>` to spaces so every source offset matches.
@@ -3375,7 +3371,7 @@ export function App() @{
 
 	<section>
 		@try { <p>{value}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
-		<footer>Done</footer>
+		<footer onClick={() => (value = 'done')}>Done</footer>
 	</section>
 }
 `,
@@ -3555,12 +3551,9 @@ export function App() @{
 	expect(output.html).toBe(
 		'<section><!--markless:branch:branch-site:0--><p>B</p><!--/markless:branch:branch-site:0--></section>',
 	);
-	// Only the rendered case's element may claim a dom-order locator slot.
-	// Arm hosts ride armRecords since L4 (single convention for all arms);
-	// only the section remains in the flat locator stream.
-	expect(output.view.locators).toEqual([
-		expect.objectContaining({ tagName: 'section', index: 0 }),
-	]);
+	// Arm hosts ride armRecords, and the static section is addressed by no record:
+	// the flat locator stream is empty.
+	expect(output.view.locators).toEqual([]);
 });
 
 test('compileTsrxModule renders the @switch default case when no test matches', async () => {
@@ -5046,7 +5039,7 @@ export function Shell() @{
 	<main>
 		<button onClick={() => streaming = !streaming}>Toggle</button>
 		<StatusBadge active={streaming} />
-		<footer>Tail</footer>
+		<footer onClick={() => streaming = false}>Tail</footer>
 	</main>
 }
 `,

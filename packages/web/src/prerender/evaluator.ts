@@ -1239,7 +1239,9 @@ function placeMaterializedChild<
 		...output,
 		structureTokens: output.structureTokens.map((token) =>
 			token.kind === 'element'
-				? { ...token, hostNodeId: idPrefix + token.hostNodeId }
+				? token.hostNodeId
+					? { ...token, hostNodeId: idPrefix + token.hostNodeId }
+					: token
 				: { ...token, anchorId: idPrefix + token.anchorId },
 		),
 	};

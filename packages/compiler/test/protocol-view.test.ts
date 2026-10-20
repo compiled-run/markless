@@ -344,8 +344,8 @@ export function App() @{
 		publicRenderPlan: allSupportedPlan(payloadArena),
 	});
 
-	// Flat streams carry only page-coordinate records (h0 section, h1 button).
-	expect(view.locators.map((locator) => locator.hostNodeId)).toEqual(['h0', 'h1']);
+	// Flat streams carry only page-coordinate records: the h1 button; the static h0 section is not located.
+	expect(view.locators.map((locator) => locator.hostNodeId)).toEqual(['h1']);
 	expect(view.events).toEqual([
 		expect.objectContaining({ hostNodeId: 'h1', eventName: 'click' }),
 	]);

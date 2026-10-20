@@ -9,7 +9,7 @@
 		"runtime/graph-shared": 3646,
 		"runtime/index": 140,
 		"serializer/async-boundary-arm": 291,
-		"serializer/payload-scripts": 599,
+		"serializer/payload-scripts": 718,
 		"serializer/protocol": 558,
 		"serializer/protocol-constants": 530,
 		"serializer/protocol-event-names": 315,
@@ -44,7 +44,7 @@
 		"web/inline/sync-policy-core-lazy": 222,
 		"web/payload-graph-construct": 4372,
 		"web/pending-timing": 509,
-		"web/prerender/evaluator": 21300,
+		"web/prerender/evaluator": 21327,
 		"web/prerender/shared-seed-slot": 2824,
 		"web/prerender/staged-graph": 399,
 		"web/reconcile-plane-slot": 254,
@@ -80,7 +80,7 @@
 		"web/runtime-error-reporting": 1864,
 		"web/ssr-data/awaitable": 844,
 		"web/ssr-data/branch-arm-idrefs": 1847,
-		"web/ssr-data/renderer": 20257,
+		"web/ssr-data/renderer": 20606,
 		"web/storage-plane": 1920
 	},
 	"@fixtures/vite-plus": {
@@ -93,7 +93,7 @@
 		"runtime/graph-shared": 3646,
 		"runtime/index": 140,
 		"serializer/async-boundary-arm": 291,
-		"serializer/payload-scripts": 599,
+		"serializer/payload-scripts": 718,
 		"serializer/protocol": 558,
 		"serializer/protocol-constants": 530,
 		"serializer/protocol-event-names": 315,
@@ -127,7 +127,7 @@
 		"web/inline/sync-policy-core-lazy": 222,
 		"web/payload-graph-construct": 4372,
 		"web/pending-timing": 509,
-		"web/prerender/evaluator": 21300,
+		"web/prerender/evaluator": 21327,
 		"web/prerender/shared-seed-slot": 2824,
 		"web/prerender/staged-graph": 399,
 		"web/reconcile-plane-slot": 254,
@@ -163,7 +163,7 @@
 		"web/runtime-error-reporting": 1864,
 		"web/ssr-data/awaitable": 844,
 		"web/ssr-data/branch-arm-idrefs": 1847,
-		"web/ssr-data/renderer": 20257,
+		"web/ssr-data/renderer": 20606,
 		"web/storage-plane": 1920
 	},
 	"@fixtures/vite-ssr": {

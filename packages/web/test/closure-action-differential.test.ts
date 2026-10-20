@@ -105,9 +105,9 @@ function mountPage(board: Board) {
 	const elements = new Map(
 		view.locators.map((locator) => [locator.hostNodeId, element(locator.tagName)]),
 	);
-	const census = [...view.locators]
-		.sort((left, right) => left.index - right.index)
-		.map((locator) => elements.get(locator.hostNodeId)!);
+	// Only addressed hosts are located; the census keeps every one at its served position.
+	const census: FakeElement[] = [element('main')];
+	for (const locator of view.locators) census[locator.index] = elements.get(locator.hostNodeId)!;
 	const scripts: Record<string, { textContent: string }> = {
 		'script[type="markless/state"]': { textContent: JSON.stringify(compiled.protocolState) },
 		'script[type="markless/view"]': { textContent: JSON.stringify(view) },

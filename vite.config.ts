@@ -106,6 +106,7 @@ const buildOrder: PackUserConfig[] = [
 			protocol: './src/protocol.ts',
 			'protocol-validation': './src/protocol-validation-storage.ts',
 			'record-templates': './src/protocol-record-templates.ts',
+			'render-data-hosts': './src/render-data-hosts.ts',
 		},
 	}),
 	marklessPack({

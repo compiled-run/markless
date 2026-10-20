@@ -1401,6 +1401,14 @@
 			"from": null,
 			"to": 437,
 			"reason": "the templated list names, moved out of protocol-record-templates so the key-table generator reads them without the reader"
+		},
+		{
+			"date": "2026-10-20",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 20269,
+			"to": 20618,
+			"reason": "counts the elements render data no longer lists one by one; each static element drops a ~70 B host record from served render data (12000-element page: client chunk 3.4 MB to 135 KB)"
 		}
 	],
 	"runtimeModules": {
@@ -1516,7 +1524,7 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20269,
+		"web/ssr-data/renderer": 20618,
 		"web/storage-plane": 1810
 	},
 	"constructGlue": {

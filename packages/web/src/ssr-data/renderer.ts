@@ -5,12 +5,7 @@ import {
 	MARKLESS_DEFERRED_COUNT_NAME,
 	MARKLESS_DEFERRED_COUNT_OPEN,
 } from './deferred-count.ts';
-import {
-	marklessIsThenable,
-	marklessSettled,
-	marklessThen,
-	type Awaitable,
-} from './awaitable.ts';
+import { marklessIsThenable, marklessSettled, marklessThen, type Awaitable } from './awaitable.ts';
 import {
 	MARKLESS_WIDGET_INSTANCE_KEY,
 	marklessRosterPositions,
@@ -24,8 +19,16 @@ import {
 } from '@markless/serializer';
 
 export type SsrDataResidue =
-	| { readonly kind: 'graph-read'; readonly graphNodeId: string; readonly path: ReadonlyArray<string> }
-	| { readonly kind: 'repeat-item'; readonly repeatId: string; readonly path: ReadonlyArray<string> }
+	| {
+			readonly kind: 'graph-read';
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'repeat-item';
+			readonly repeatId: string;
+			readonly path: ReadonlyArray<string>;
+	  }
 	| { readonly kind: 'authored-expression'; readonly source: string }
 	// `idref` marks the REFERENCING side: the one side that can find no element to
 	// name in this widget, and then writes no attribute rather than a dangling id.
@@ -83,7 +86,11 @@ export type SsrDataSlot = LocatedSlot &
 		| {
 				readonly kind: 'async';
 				readonly boundaryId: string;
-				readonly armTemplateIds: Readonly<{ readonly try: string; readonly pending?: string; readonly catch?: string }>;
+				readonly armTemplateIds: Readonly<{
+					readonly try: string;
+					readonly pending?: string;
+					readonly catch?: string;
+				}>;
 		  }
 		| {
 				readonly kind: 'dynamic-host';
@@ -93,8 +100,16 @@ export type SsrDataSlot = LocatedSlot &
 				readonly tag: SsrDataResidue;
 				readonly staticAttributes: Readonly<Record<string, string>>;
 				readonly attributeSlots: ReadonlyArray<
-					| { readonly kind: 'attribute'; readonly name: string; readonly residue: SsrDataResidue }
-					| { readonly kind: 'spread'; readonly residue: SsrDataResidue; readonly excludeNames?: ReadonlyArray<string> }
+					| {
+							readonly kind: 'attribute';
+							readonly name: string;
+							readonly residue: SsrDataResidue;
+					  }
+					| {
+							readonly kind: 'spread';
+							readonly residue: SsrDataResidue;
+							readonly excludeNames?: ReadonlyArray<string>;
+					  }
 				>;
 				readonly childChunkId: string;
 		  }
@@ -102,7 +117,13 @@ export type SsrDataSlot = LocatedSlot &
 
 export type SsrDataChunk = {
 	readonly id: string;
-	readonly kind: 'template' | 'branch-arm' | 'async-arm' | 'repeat-row' | 'repeat-empty' | 'dynamic-host-children';
+	readonly kind:
+		| 'template'
+		| 'branch-arm'
+		| 'async-arm'
+		| 'repeat-row'
+		| 'repeat-empty'
+		| 'dynamic-host-children';
 	readonly componentName: string;
 	readonly statics: ReadonlyArray<string>;
 	readonly hosts: ReadonlyArray<{
@@ -111,6 +132,8 @@ export type SsrDataChunk = {
 		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
 	}>;
 	readonly slots: ReadonlyArray<SsrDataSlot>;
+	/** Elements no record addresses, counted between hosts and slots in coordinate order. */
+	readonly inertElements?: ReadonlyArray<number>;
 };
 
 export type SsrRenderData = {
@@ -131,7 +154,11 @@ export type SsrRenderData = {
 		readonly boundaryId: string;
 		readonly runnerGraphNodeId: string | null;
 		readonly initiallyServedArm: number;
-		readonly armChunkIds: Readonly<{ readonly try: string; readonly pending?: string; readonly catch?: string }>;
+		readonly armChunkIds: Readonly<{
+			readonly try: string;
+			readonly pending?: string;
+			readonly catch?: string;
+		}>;
 	}>;
 	readonly branches?: ReadonlyArray<{
 		readonly branchSiteId: string;
@@ -302,7 +329,12 @@ let nextProjectionKey = 0;
 
 function openProjectionSpan(tokens: ReadonlyArray<StructureToken>): ProjectionSpan {
 	const key = String(nextProjectionKey++);
-	const span: ProjectionSpan = { key, mark: `${PROJECTION_MARK_PREFIX}${key}-->`, tokens, consumed: false };
+	const span: ProjectionSpan = {
+		key,
+		mark: `${PROJECTION_MARK_PREFIX}${key}-->`,
+		tokens,
+		consumed: false,
+	};
 	projectionSpans.set(key, span);
 	return span;
 }
@@ -333,7 +365,9 @@ function claimProjectionSpans(
 
 /** Belt and braces: a mark must never reach the served bytes. */
 function withoutProjectionMarks(html: string): string {
-	return html.includes(PROJECTION_MARK_PREFIX) ? html.replaceAll(PROJECTION_MARK_PATTERN, '') : html;
+	return html.includes(PROJECTION_MARK_PREFIX)
+		? html.replaceAll(PROJECTION_MARK_PATTERN, '')
+		: html;
 }
 
 /**
@@ -410,9 +444,10 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			? renderChunk(rootId, { ...input.rootContext, sharedSeeds: input.sharedSeeds })
 			: ({ html: '', tokens: [] } as RenderedPart),
 		(rendered): RenderSsrDataOutput => {
-			const payloadScripts = input.state && input.view
-				? renderPayloadScripts({ state: input.state, view: input.view })
-				: undefined;
+			const payloadScripts =
+				input.state && input.view
+					? renderPayloadScripts({ state: input.state, view: input.view })
+					: undefined;
 
 			return {
 				html: rendered.html,
@@ -435,16 +470,21 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 		chunkId: string,
 		// The async-arm path forwards the caller's read context; only item/index
 		// are read here.
-		repeat: { readonly item?: unknown; readonly index?: number; readonly key?: unknown } & Partial<SsrDataReadContext>,
+		repeat: {
+			readonly item?: unknown;
+			readonly index?: number;
+			readonly key?: unknown;
+		} & Partial<SsrDataReadContext>,
 	): Awaitable<RenderedPart> {
 		const chunk = chunks.get(chunkId);
 		if (!chunk) throw new Error(`MARKLESS_SSR_DATA_CHUNK_MISSING: ${chunkId}`);
 		const hostPrefix = idPrefix + (repeat.hostSegment ?? '');
-		for (const host of chunk.hosts) locators.push({
-			chunkId: `${idPrefix}${chunkId}`,
-			...host,
-			hostNodeId: `${hostPrefix}${host.hostNodeId}`,
-		});
+		for (const host of chunk.hosts)
+			locators.push({
+				chunkId: `${idPrefix}${chunkId}`,
+				...host,
+				hostNodeId: `${hostPrefix}${host.hostNodeId}`,
+			});
 
 		const slotsByStatic = new Map<number, SsrDataSlot[]>();
 		for (const slot of chunk.slots) {
@@ -498,18 +538,32 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 		};
 
 		return marklessThen(walk(0), (): RenderedPart => {
+			const inert = chunk.inertElements;
 			const ordered = [
 				...chunk.hosts.map((host) => ({
 					path: host.coordinate.path,
 					order: 0,
-					tokens: [{ kind: 'element', hostNodeId: `${hostPrefix}${host.hostNodeId}`, tagName: host.tagName }] as StructureToken[],
+					tokens: [
+						{
+							kind: 'element',
+							hostNodeId: `${hostPrefix}${host.hostNodeId}`,
+							tagName: host.tagName,
+						},
+					] as StructureToken[],
 				})),
-				...chunk.slots.flatMap((slot, order) => {
-					const tokens = renderedSlots.get(slot)?.tokens ?? [];
-					return tokens.length > 0 ? [{ path: slot.coordinate.path, order: order + 1, tokens }] : [];
-				}),
+				...chunk.slots.map((slot, order) => ({
+					path: slot.coordinate.path,
+					order: order + 1,
+					tokens: renderedSlots.get(slot)?.tokens ?? [],
+				})),
 			].sort((left, right) => comparePath(left.path, right.path) || left.order - right.order);
-			return { html, tokens: ordered.flatMap((entry) => entry.tokens) };
+			const tokens: StructureToken[] = [];
+			for (let index = 0; index <= ordered.length; index++) {
+				for (let count = inert?.[index] ?? 0; count > 0; count--)
+					tokens.push(INERT_ELEMENT_TOKEN);
+				for (const token of ordered[index]?.tokens ?? []) tokens.push(token);
+			}
+			return { html, tokens };
 		});
 	}
 
@@ -522,16 +576,20 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			for (const slot of (chunkId && chunks.get(chunkId)?.slots) || []) {
 				if (slot.kind === 'text') {
 					const value =
-						slot.raw && slot.residue.kind === 'graph-read' ? input.read(slot.residue, context) : 0;
+						slot.raw && slot.residue.kind === 'graph-read'
+							? input.read(slot.residue, context)
+							: 0;
 					if (typeof value === 'string') claimProjectionSpans(value, false);
-				} else if (slot.kind === 'branch') releaseSkippedProjections(slot.armTemplateIds, context);
+				} else if (slot.kind === 'branch')
+					releaseSkippedProjections(slot.armTemplateIds, context);
 				else if (slot.kind === 'async')
 					releaseSkippedProjections(Object.values(slot.armTemplateIds), context);
 				else if (slot.kind === 'repeat')
 					releaseSkippedProjections([slot.rowTemplateId, slot.emptyTemplateId], context);
 				else if (slot.kind === 'child-component')
 					releaseSkippedProjections([slot.projectionChunkId], context);
-				else if (slot.kind === 'dynamic-host') releaseSkippedProjections([slot.childChunkId], context);
+				else if (slot.kind === 'dynamic-host')
+					releaseSkippedProjections([slot.childChunkId], context);
 			}
 	}
 
@@ -566,9 +624,8 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				// pass runs once and its answer travels the root edge as well as the projection.
 				// It runs with no projection too: a childless widget root still has to learn
 				// which instance it is before anything inside it mints an id.
-				return marklessThen(
-					input.seedChild?.(slot, context),
-					(childSeeds) => marklessThen(
+				return marklessThen(input.seedChild?.(slot, context), (childSeeds) =>
+					marklessThen(
 						// A projection renders inside the row that placed it, so the row travels with it.
 						slot.projectionChunkId
 							? renderChunk(slot.projectionChunkId, {
@@ -583,12 +640,15 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							: undefined,
 						(projection): Awaitable<RenderedPart> => {
 							if (!input.renderChild)
-								throw new Error(`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`);
+								throw new Error(
+									`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`,
+								);
 							// Nothing to splice when the projection contributes no structure, so the
 							// mark is spent only where it buys something.
-							const span = projection && projection.tokens.length > 0
-								? openProjectionSpan(projection.tokens)
-								: undefined;
+							const span =
+								projection && projection.tokens.length > 0
+									? openProjectionSpan(projection.tokens)
+									: undefined;
 							const release = () => {
 								if (span) projectionSpans.delete(span.key);
 							};
@@ -596,8 +656,17 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							try {
 								const childContext = {
 									...context,
-									...(childSeeds ? { sharedSeeds: rootEdgeSeeds(childSeeds, context.sharedSeeds) } : {}),
-									...(projection ? { projectionHtml: (span?.mark ?? '') + projection.html } : {}),
+									...(childSeeds
+										? {
+												sharedSeeds: rootEdgeSeeds(
+													childSeeds,
+													context.sharedSeeds,
+												),
+											}
+										: {}),
+									...(projection
+										? { projectionHtml: (span?.mark ?? '') + projection.html }
+										: {}),
 								};
 								// A derive-time roster position is asked with two ids and no context,
 								// so the seeds it counts within are published here — one statement
@@ -611,24 +680,38 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							}
 							return marklessSettled(pending, release, (child): RenderedPart => {
 								if (!child || typeof child !== 'object')
-									throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
+									throw new Error(
+										`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`,
+									);
 								if (child.coordinates) {
 									locators.push(...child.coordinates.locators);
 									anchors.push(...child.coordinates.anchors);
 								}
-								const childTokens = 'structureTokens' in child
-									? (child as { readonly structureTokens?: ReadonlyArray<StructureToken> }).structureTokens
-									: undefined;
-								const childElementCount = 'elementCount' in child && typeof child.elementCount === 'number'
-									? child.elementCount
-									: undefined;
+								const childTokens =
+									'structureTokens' in child
+										? (
+												child as {
+													readonly structureTokens?: ReadonlyArray<StructureToken>;
+												}
+											).structureTokens
+										: undefined;
+								const childElementCount =
+									'elementCount' in child &&
+									typeof child.elementCount === 'number'
+										? child.elementCount
+										: undefined;
 								if (!childTokens && childElementCount === undefined)
-									throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
-								const countTokens = Array.from({ length: childElementCount ?? 0 }, (_, index) => ({
-									kind: 'element' as const,
-									hostNodeId: `${idPrefix}__child:${slot.componentEdgeId}:${index}`,
-									tagName: '*',
-								}));
+									throw new Error(
+										`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`,
+									);
+								const countTokens = Array.from(
+									{ length: childElementCount ?? 0 },
+									(_, index) => ({
+										kind: 'element' as const,
+										hostNodeId: `${idPrefix}__child:${slot.componentEdgeId}:${index}`,
+										tagName: '*',
+									}),
+								);
 								const baseTokens = childTokens ?? countTokens;
 								const html = withoutProjectionMarks(child.html);
 								// Spliced: the child's own `{children}` slot already placed the projection
@@ -637,13 +720,23 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								if (span) {
 									const markAt = child.html.indexOf(span.mark);
 									if (markAt < 0)
-										throw projectionNotRenderedError(slot.childComponentName, slot.componentEdgeId);
+										throw projectionNotRenderedError(
+											slot.childComponentName,
+											slot.componentEdgeId,
+										);
 									return {
 										html,
-										tokens: spliceTokensAtMark(baseTokens, child.html.slice(0, markAt), span.tokens),
+										tokens: spliceTokensAtMark(
+											baseTokens,
+											child.html.slice(0, markAt),
+											span.tokens,
+										),
 									};
 								}
-								return { html, tokens: [...baseTokens, ...(projection?.tokens ?? [])] };
+								return {
+									html,
+									tokens: [...baseTokens, ...(projection?.tokens ?? [])],
+								};
 							});
 						},
 					),
@@ -652,7 +745,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			case 'branch': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.branchSiteId));
 				if (!input.selectBranchArm)
-					throw new Error(`MARKLESS_SSR_DATA_BRANCH_SELECTOR_MISSING: ${slot.branchSiteId}`);
+					throw new Error(
+						`MARKLESS_SSR_DATA_BRANCH_SELECTOR_MISSING: ${slot.branchSiteId}`,
+					);
 				return marklessThen(input.selectBranchArm(slot, context), (arm) => {
 					const armChunkId = slot.armTemplateIds[arm];
 					// An arm decides WHETHER its body renders, never which row it is inside.
@@ -663,7 +758,8 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									item: context.repeatItem,
 									index: context.repeatIndex,
 									key: context.repeatKey,
-									...(context.freshInstances || slot.branchSiteId === input.freshBranchSiteId
+									...(context.freshInstances ||
+									slot.branchSiteId === input.freshBranchSiteId
 										? { freshInstances: true as const }
 										: {}),
 								})
@@ -676,13 +772,18 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							const id = `${idPrefix}${slot.branchSiteId}`;
 							const marker = input.renderData.branches?.some(
 								(branch) =>
-									branch.branchSiteId === slot.branchSiteId && branch.asyncBoundaryId !== undefined,
+									branch.branchSiteId === slot.branchSiteId &&
+									branch.asyncBoundaryId !== undefined,
 							)
 								? 'arm-branch'
 								: 'branch';
 							return {
 								html: `<!--markless:${marker}:${id}-->${body.html}<!--/markless:${marker}:${id}-->`,
-								tokens: [commentToken(marker, id, 'start', body.html), ...body.tokens, commentToken(marker, id, 'end')],
+								tokens: [
+									commentToken(marker, id, 'start', body.html),
+									...body.tokens,
+									commentToken(marker, id, 'end'),
+								],
 							};
 						},
 					);
@@ -690,22 +791,35 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			}
 			case 'repeat': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.repeatId));
-				const record = input.renderData.repeats.find((candidate) => candidate.repeatId === slot.repeatId);
+				const record = input.renderData.repeats.find(
+					(candidate) => candidate.repeatId === slot.repeatId,
+				);
 				return marklessThen(
 					input.repeatItems
 						? input.repeatItems(slot, context)
 						: record?.collectionGraphNodeId
-							? input.read({
-									kind: 'graph-read',
-									graphNodeId: record.collectionGraphNodeId,
-									path: record.collectionPath ?? [],
-								}, context)
+							? input.read(
+									{
+										kind: 'graph-read',
+										graphNodeId: record.collectionGraphNodeId,
+										path: record.collectionPath ?? [],
+									},
+									context,
+								)
 							: record?.collectionSource
-								? input.read({ kind: 'authored-expression', source: record.collectionSource }, context)
+								? input.read(
+										{
+											kind: 'authored-expression',
+											source: record.collectionSource,
+										},
+										context,
+									)
 								: [],
 					(items): Awaitable<RenderedPart> => {
 						if (!Array.isArray(items) || items.length === 0)
-							return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : { html: '', tokens: [] };
+							return slot.emptyTemplateId
+								? renderChunk(slot.emptyTemplateId, {})
+								: { html: '', tokens: [] };
 						const keyPath = record?.keyPath;
 						// `key row` reads the item itself, so an empty path is still a key.
 						const keyed = record?.itemKey === true || (keyPath?.length ?? 0) > 0;
@@ -740,29 +854,36 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				const boundary = input.renderData.boundaries.find(
 					(candidate) => candidate.boundaryId === slot.boundaryId,
 				);
-				if (!boundary) throw new Error(`MARKLESS_SSR_DATA_BOUNDARY_MISSING: ${slot.boundaryId}`);
+				if (!boundary)
+					throw new Error(`MARKLESS_SSR_DATA_BOUNDARY_MISSING: ${slot.boundaryId}`);
 				const protocolBoundary = input.view?.asyncBoundaries.find(
 					(candidate) => candidate.id === slot.boundaryId,
 				);
 				return marklessThen(
 					input.selectAsyncArm
 						? input.selectAsyncArm(slot, context)
-						: protocolBoundary?.initiallyServedArm ?? boundary.initiallyServedArm,
+						: (protocolBoundary?.initiallyServedArm ?? boundary.initiallyServedArm),
 					(selected) => {
 						const arm = typeof selected === 'number' ? selected : selected.arm;
-						const armChunkId = servedArmChunk(
-							arm,
-							slot.armTemplateIds,
-						);
+						const armChunkId = servedArmChunk(arm, slot.armTemplateIds);
 						return marklessThen(
 							armChunkId
-								? renderChunk(armChunkId, { ...context, ...(typeof selected === 'number' ? {} : { asyncError: selected.error }) })
+								? renderChunk(armChunkId, {
+										...context,
+										...(typeof selected === 'number'
+											? {}
+											: { asyncError: selected.error }),
+									})
 								: ({ html: '', tokens: [] } as RenderedPart),
 							(body): RenderedPart => {
 								const id = `${idPrefix}${slot.boundaryId}`;
 								return {
 									html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,
-									tokens: [commentToken('async', id, 'start', body.html), ...body.tokens, commentToken('async', id, 'end')],
+									tokens: [
+										commentToken('async', id, 'start', body.html),
+										...body.tokens,
+										commentToken('async', id, 'end'),
+									],
 								};
 							},
 						);
@@ -771,56 +892,65 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			}
 			case 'dynamic-host': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.hostNodeId));
-				return marklessThen(input.read(slot.tag, context), (tagValue): Awaitable<RenderedPart> => {
-					const tag = dynamicTag(tagValue);
-					if (tag === null) return { html: '', tokens: [] };
-					const hostNodeId = `${idPrefix}${context.hostSegment ?? ''}${slot.hostNodeId}`;
-					locators.push({
-						chunkId: `${idPrefix}${context.chunkId}`,
-						hostNodeId,
-						tagName: tag,
-						coordinate: slot.coordinate,
-					});
-					let attributes = '';
-					for (const [name, value] of Object.entries(slot.staticAttributes))
-						attributes += renderAttribute(name, value);
-					const place = (attribute: (typeof slot.attributeSlots)[number], value: unknown) => {
-						attributes += attribute.kind === 'attribute'
-							? renderAttribute(attribute.name, value)
-							: renderSpreadAttributes(value, attribute.excludeNames);
-					};
-					const walkAttributes = (from: number): Awaitable<void> => {
-						for (let index = from; index < slot.attributeSlots.length; index++) {
-							const attribute = slot.attributeSlots[index]!;
-							const value = input.read(attribute.residue, context);
-							if (marklessIsThenable(value)) {
-								const next = index + 1;
-								return value.then((settled) => {
-									place(attribute, settled);
-									return walkAttributes(next);
-								});
+				return marklessThen(
+					input.read(slot.tag, context),
+					(tagValue): Awaitable<RenderedPart> => {
+						const tag = dynamicTag(tagValue);
+						if (tag === null) return { html: '', tokens: [] };
+						const hostNodeId = `${idPrefix}${context.hostSegment ?? ''}${slot.hostNodeId}`;
+						locators.push({
+							chunkId: `${idPrefix}${context.chunkId}`,
+							hostNodeId,
+							tagName: tag,
+							coordinate: slot.coordinate,
+						});
+						let attributes = '';
+						for (const [name, value] of Object.entries(slot.staticAttributes))
+							attributes += renderAttribute(name, value);
+						const place = (
+							attribute: (typeof slot.attributeSlots)[number],
+							value: unknown,
+						) => {
+							attributes +=
+								attribute.kind === 'attribute'
+									? renderAttribute(attribute.name, value)
+									: renderSpreadAttributes(value, attribute.excludeNames);
+						};
+						const walkAttributes = (from: number): Awaitable<void> => {
+							for (let index = from; index < slot.attributeSlots.length; index++) {
+								const attribute = slot.attributeSlots[index]!;
+								const value = input.read(attribute.residue, context);
+								if (marklessIsThenable(value)) {
+									const next = index + 1;
+									return value.then((settled) => {
+										place(attribute, settled);
+										return walkAttributes(next);
+									});
+								}
+								place(attribute, value);
 							}
-							place(attribute, value);
-						}
-						return undefined;
-					};
-					return marklessThen(walkAttributes(0), () => marklessThen(
-						// A dynamic host picks the tag around its children, never their row.
-						renderChunk(slot.childChunkId, {
-							...context,
-							item: context.repeatItem,
-							index: context.repeatIndex,
-							key: context.repeatKey,
-						}),
-						(body): RenderedPart => ({
-							html: `<${tag}${attributes}>${body.html}</${tag}>`,
-							tokens: [
-								{ kind: 'element', hostNodeId, tagName: tag },
-								...body.tokens,
-							],
-						}),
-					));
-				});
+							return undefined;
+						};
+						return marklessThen(walkAttributes(0), () =>
+							marklessThen(
+								// A dynamic host picks the tag around its children, never their row.
+								renderChunk(slot.childChunkId, {
+									...context,
+									item: context.repeatItem,
+									index: context.repeatIndex,
+									key: context.repeatKey,
+								}),
+								(body): RenderedPart => ({
+									html: `<${tag}${attributes}>${body.html}</${tag}>`,
+									tokens: [
+										{ kind: 'element', hostNodeId, tagName: tag },
+										...body.tokens,
+									],
+								}),
+							),
+						);
+					},
+				);
 			}
 		}
 	}
@@ -853,7 +983,13 @@ function commentToken(
 	edge: 'start' | 'end',
 	anchorHtml?: string,
 ): StructureToken {
-	return { kind: 'comment', anchorKind, anchorId, edge, ...(anchorHtml === undefined ? {} : { anchorHtml }) };
+	return {
+		kind: 'comment',
+		anchorKind,
+		anchorId,
+		edge,
+		...(anchorHtml === undefined ? {} : { anchorHtml }),
+	};
 }
 
 function readValuePath(value: unknown, path: ReadonlyArray<string>): unknown {
@@ -865,22 +1001,27 @@ function readValuePath(value: unknown, path: ReadonlyArray<string>): unknown {
 	return current;
 }
 
-function comparePath(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
-	for (let index = 0; index < Math.min(left.length, right.length); index++) {
-		const difference = left[index]! - right[index]!;
-		if (difference !== 0) return difference;
-	}
-	return left.length - right.length;
-}
+// An element no record addresses: counted for DOM order, never located.
+const INERT_ELEMENT_TOKEN: StructureToken = { kind: 'element', hostNodeId: '', tagName: '' };
 
 function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStructure {
 	const locators: Array<SsrDataStructure['locators'][number]> = [];
-	const starts = new Map<string, { readonly comment: number; readonly element: number; readonly html: string }>();
+	let elementCount = 0;
+	const starts = new Map<
+		string,
+		{ readonly comment: number; readonly element: number; readonly html: string }
+	>();
 	const anchors: Array<SsrDataStructure['anchors'][number]> = [];
 	let commentIndex = 0;
 	for (const token of tokens) {
 		if (token.kind === 'element') {
-			locators.push({ hostNodeId: token.hostNodeId, tagName: token.tagName, index: locators.length });
+			if (token.hostNodeId)
+				locators.push({
+					hostNodeId: token.hostNodeId,
+					tagName: token.tagName,
+					index: elementCount,
+				});
+			elementCount++;
 			continue;
 		}
 		// Arm-branch comments live in their owning boundary's local census.
@@ -889,30 +1030,36 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 		if (token.edge === 'start')
 			starts.set(token.anchorId, {
 				comment: commentIndex,
-				element: locators.length,
+				element: elementCount,
 				html: token.anchorHtml ?? '',
 			});
 		else {
 			const start = starts.get(token.anchorId);
-			if (!start) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_START_MISSING: ${token.anchorId}`);
+			if (!start)
+				throw new Error(`MARKLESS_SSR_DATA_ANCHOR_START_MISSING: ${token.anchorId}`);
 			anchors.push({
 				kind: token.anchorKind,
 				id: token.anchorId,
 				startIndex: start.comment,
 				endIndex: commentIndex,
 				elementStart: start.element,
-				elementEnd: locators.length,
+				elementEnd: elementCount,
 				html: start.html,
 			});
 		}
 		commentIndex++;
 	}
-	return { locators, anchors, elementCount: locators.length };
+	return { locators, anchors, elementCount };
 }
 
 export type SsrHtmlComparison =
 	| { readonly equal: true }
-	| { readonly equal: false; readonly expected: string; readonly actual: string; readonly firstDifference: number };
+	| {
+			readonly equal: false;
+			readonly expected: string;
+			readonly actual: string;
+			readonly firstDifference: number;
+	  };
 
 export function compareSsrHtml(expected: string, actual: string): SsrHtmlComparison {
 	if (expected === actual) return { equal: true };
@@ -921,14 +1068,18 @@ export function compareSsrHtml(expected: string, actual: string): SsrHtmlCompari
 		firstDifference < expected.length &&
 		firstDifference < actual.length &&
 		expected[firstDifference] === actual[firstDifference]
-	) firstDifference++;
+	)
+		firstDifference++;
 	return { equal: false, expected, actual, firstDifference };
 }
 
 function anchorRecord(
 	idPrefix: string,
 	chunkId: string,
-	slot: Extract<SsrDataSlot, { readonly kind: 'branch' | 'repeat' | 'async' | 'child-component' | 'dynamic-host' }>,
+	slot: Extract<
+		SsrDataSlot,
+		{ readonly kind: 'branch' | 'repeat' | 'async' | 'child-component' | 'dynamic-host' }
+	>,
 	id: string,
 ): SsrDataCoordinates['anchors'][number] {
 	return {
@@ -939,7 +1090,11 @@ function anchorRecord(
 	};
 }
 
-function withoutSlotMarker(staticText: string, staticIndex: number, slots: ReadonlyArray<SsrDataSlot>): string {
+function withoutSlotMarker(
+	staticText: string,
+	staticIndex: number,
+	slots: ReadonlyArray<SsrDataSlot>,
+): string {
 	if (slots.every((slot) => slot.kind === 'attribute')) return staticText;
 	const marker = `<!--markless-slot:${staticIndex}-->`;
 	return staticText.endsWith(marker) ? staticText.slice(0, -marker.length) : staticText;
@@ -967,7 +1122,9 @@ function dynamicTag(value: unknown): string | null {
 // standing on one defers WHOLE: for a boolean, presence is the value.
 function renderAttribute(name: string, value: unknown): string {
 	if (typeof value === 'string' && value.startsWith(MARKLESS_DEFERRED_COUNT_OPEN))
-		return value.slice(0, -1) + MARKLESS_DEFERRED_COUNT_NAME + name + MARKLESS_DEFERRED_COUNT_CLOSE;
+		return (
+			value.slice(0, -1) + MARKLESS_DEFERRED_COUNT_NAME + name + MARKLESS_DEFERRED_COUNT_CLOSE
+		);
 	const text = marklessAttributeValue(name, value);
 	return text === null ? '' : ` ${name}="${escapeHtml(text)}"`;
 }
@@ -979,7 +1136,15 @@ function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<stri
 		if (excludeNames.includes(name)) continue;
 		// `__markless` is the framework's own reserved prefix for the channels a
 		// parent arranges with a child; none of them is an attribute anyone wrote.
-		if (!/^[A-Za-z_][\w.:-]*$/.test(name) || /^on[A-Z]/.test(name) || name.startsWith('__markless') || name === 'attach' || name === 'el' || name === 'children') continue;
+		if (
+			!/^[A-Za-z_][\w.:-]*$/.test(name) ||
+			/^on[A-Z]/.test(name) ||
+			name.startsWith('__markless') ||
+			name === 'attach' ||
+			name === 'el' ||
+			name === 'children'
+		)
+			continue;
 		html += renderAttribute(name, attribute);
 	}
 	return html;
@@ -991,4 +1156,12 @@ function escapeHtml(value: unknown): string {
 		.replaceAll('<', '&lt;')
 		.replaceAll('>', '&gt;')
 		.replaceAll('"', '&quot;');
+}
+
+function comparePath(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
+	for (let index = 0; index < Math.min(left.length, right.length); index++) {
+		const difference = left[index]! - right[index]!;
+		if (difference !== 0) return difference;
+	}
+	return left.length - right.length;
 }

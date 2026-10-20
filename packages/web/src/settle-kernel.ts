@@ -49,7 +49,10 @@ type ViewLike = {
 };
 
 type ComponentLike = {
-	readonly state: { readonly cells?: ReadonlyArray<RecordLike>; readonly computed?: ReadonlyArray<RecordLike> };
+	readonly state: {
+		readonly cells?: ReadonlyArray<RecordLike>;
+		readonly computed?: ReadonlyArray<RecordLike>;
+	};
 	readonly view: ViewLike;
 	readonly rootChunkId: string;
 	readonly stateGraphNodeIds?: ReadonlyArray<string>;
@@ -61,7 +64,11 @@ type ComponentLike = {
 	readonly boundaries?: ReadonlyArray<{
 		readonly boundaryId: string;
 		readonly runnerGraphNodeId: string | null;
-		readonly armChunkIds: Readonly<{ readonly try: string; readonly pending?: string; readonly catch?: string }>;
+		readonly armChunkIds: Readonly<{
+			readonly try: string;
+			readonly pending?: string;
+			readonly catch?: string;
+		}>;
 	}>;
 	readonly edges?: ReadonlyArray<{
 		readonly id: string;
@@ -138,10 +145,16 @@ export type SettleKernelOutput = {
 	readonly armRecords: RecordLike;
 	readonly computed: ReadonlyArray<RecordLike>;
 	/** Ordered host occurrences of the rendered arm, first occurrence per id first. */
-	readonly nodes: ReadonlyArray<{ readonly hostNodeId: string; readonly tagName: string; readonly index: number }>;
+	readonly nodes: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly tagName: string;
+		readonly index: number;
+	}>;
 };
 
 const SUPPORTED_SLOT_KINDS = new Set(['text', 'attribute', 'repeat', 'child-component']);
+// An element no record addresses: it takes a DOM-order index and is never located.
+const INERT_HOST = { hostNodeId: '', tagName: '' } as const;
 
 export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	const surface = input.surface;
@@ -152,7 +165,9 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	if (definition.propCellId) throw new SettleKernelUnsupportedError('root component takes props');
 	for (const initial of definition.initialValues ?? [])
 		if (initial.value?.kind !== 'constant')
-			throw new SettleKernelUnsupportedError(`initial value needs a symbol loader: ${initial.graphNodeId}`);
+			throw new SettleKernelUnsupportedError(
+				`initial value needs a symbol loader: ${initial.graphNodeId}`,
+			);
 
 	const boundary = (definition.boundaries ?? []).find(
 		(candidate) => candidate.boundaryId === input.boundaryId,
@@ -209,9 +224,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			tagName: rendered.tagName,
 		});
 	}
-	movedLocators.sort(
-		(left, right) => (left.index as number) - (right.index as number),
-	);
+	movedLocators.sort((left, right) => (left.index as number) - (right.index as number));
 	const movedHostIds = new Set(movedLocators.map((locator) => locator.hostNodeId as string));
 	const armLocators: Array<RecordLike> = [...movedLocators];
 	for (const locator of (planned.locators ?? []) as ReadonlyArray<LocatorRecord>) {
@@ -238,10 +251,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			(record) =>
 				localHostIds.has(record.hostNodeId) && completeArmHostIds.has(record.hostNodeId),
 		);
-	for (const record of [
-		...(view.events ?? []),
-		...(view.domUpdates ?? []),
-	])
+	for (const record of [...(view.events ?? []), ...(view.domUpdates ?? [])])
 		assertUnbound(record);
 
 	const movedKeyedRepeats = (view.keyedRepeats ?? []).filter(
@@ -256,7 +266,10 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 
 	const armRecords: RecordLike = {
 		locators: armLocators,
-		events: [...((planned.events ?? []) as ReadonlyArray<RecordLike>), ...moveHosted(view.events)],
+		events: [
+			...((planned.events ?? []) as ReadonlyArray<RecordLike>),
+			...moveHosted(view.events),
+		],
 		domUpdates: [
 			...((planned.domUpdates ?? []) as ReadonlyArray<RecordLike>),
 			...moveHosted(view.domUpdates),
@@ -295,7 +308,12 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 		// The full renderer emits host tokens in coordinate order across hosts and
 		// slot-produced elements; reproduce that ordering before recursing.
 		const entries = [
-			...chunk.hosts.map((host) => ({ path: host.coordinate.path, order: 0, host, slot: undefined })),
+			...chunk.hosts.map((host) => ({
+				path: host.coordinate.path,
+				order: 0,
+				host,
+				slot: undefined,
+			})),
 			...chunk.slots.map((slot, order) => ({
 				path: slot.coordinate.path,
 				order: order + 1,
@@ -306,12 +324,13 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 
 		let markup = '';
 		const bodies = new Map<SsrDataSlot, string>();
-		for (const entry of entries) {
-			if (entry.host) {
+		for (let index = 0; index <= entries.length; index++) {
+			for (let count = chunk.inertElements?.[index] ?? 0; count > 0; count--)
+				hosts.push(INERT_HOST);
+			const entry = entries[index];
+			if (entry?.host)
 				hosts.push({ hostNodeId: entry.host.hostNodeId, tagName: entry.host.tagName });
-				continue;
-			}
-			bodies.set(entry.slot!, renderSlot(entry.slot!, item));
+			else if (entry) bodies.set(entry.slot!, renderSlot(entry.slot!, item));
 		}
 		for (let index = 0; index < chunk.statics.length; index++) {
 			const slots = slotsByStatic.get(index) ?? [];
@@ -338,7 +357,9 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 				(candidate) => candidate.repeatId === slot.repeatId,
 			);
 			if (!record?.collectionGraphNodeId)
-				throw new SettleKernelUnsupportedError(`repeat collection missing: ${slot.repeatId}`);
+				throw new SettleKernelUnsupportedError(
+					`repeat collection missing: ${slot.repeatId}`,
+				);
 			const items = readAuthored(record.collectionGraphNodeId, record.collectionPath ?? []);
 			if (!Array.isArray(items) || items.length === 0)
 				return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, undefined) : '';
@@ -351,7 +372,9 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 		if (!edge?.materialized)
 			throw new SettleKernelUnsupportedError(`live child edge: ${childSlot.componentEdgeId}`);
 		if (childSlot.projectionChunkId)
-			throw new SettleKernelUnsupportedError(`projected child edge: ${childSlot.componentEdgeId}`);
+			throw new SettleKernelUnsupportedError(
+				`projected child edge: ${childSlot.componentEdgeId}`,
+			);
 		const childView = edge.materialized.view;
 		if (
 			(childView?.locators?.length ?? 0) > 0 ||
@@ -361,23 +384,35 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			(childView?.elementHandles?.length ?? 0) > 0 ||
 			(childView?.asyncBoundaries?.length ?? 0) > 0
 		)
-			throw new SettleKernelUnsupportedError(`interactive child edge: ${childSlot.componentEdgeId}`);
+			throw new SettleKernelUnsupportedError(
+				`interactive child edge: ${childSlot.componentEdgeId}`,
+			);
 		const tokens = edge.materialized.structureTokens ?? [];
 		for (const token of tokens)
 			if (token.kind === 'element')
-				hosts.push({
-					hostNodeId: edge.hostPrefix + String(token.hostNodeId),
-					tagName: String(token.tagName),
-				});
+				hosts.push(
+					token.hostNodeId
+						? {
+								hostNodeId: edge.hostPrefix + String(token.hostNodeId),
+								tagName: String(token.tagName),
+							}
+						: INERT_HOST,
+				);
 		if (tokens.length === 0)
 			for (let index = 0; index < (edge.materialized.elementCount ?? 0); index++)
-				hosts.push({ hostNodeId: `__child:${childSlot.componentEdgeId}:${index}`, tagName: '*' });
+				hosts.push({
+					hostNodeId: `__child:${childSlot.componentEdgeId}:${index}`,
+					tagName: '*',
+				});
 		const holes = edge.materialized.holes ?? [];
 		if (holes.length === 0) return edge.materialized.html;
 		return fillMaterializedHoles(edge.materialized.html, holes, input.fillHole, read);
 	}
 
-	function readResidue(residue: SsrDataResidue, item: { readonly value: unknown } | undefined): unknown {
+	function readResidue(
+		residue: SsrDataResidue,
+		item: { readonly value: unknown } | undefined,
+	): unknown {
 		if (residue.kind === 'repeat-item') {
 			if (!item) throw new SettleKernelUnsupportedError('repeat residue outside a row');
 			return readPath(item.value, residue.path);
@@ -402,7 +437,9 @@ function fillMaterializedHoles(
 		const anchor = `<!--mh:${hole.coordinate}-->`;
 		const index = filled.indexOf(anchor);
 		if (index < 0)
-			throw new SettleKernelUnsupportedError(`materialized hole anchor missing: ${hole.coordinate}`);
+			throw new SettleKernelUnsupportedError(
+				`materialized hole anchor missing: ${hole.coordinate}`,
+			);
 		const value = escapeHtml(fillHole(hole, read));
 		if (hole.kind === 'text') {
 			filled = `${filled.slice(0, index)}${value}${filled.slice(index + anchor.length)}`;
@@ -431,7 +468,8 @@ function plannedArmRecords(
 	if (!Array.isArray(records)) {
 		// A composed boundary already carries one armized set; the kernel cannot
 		// re-derive it from the arm chunk alone.
-		if (records) throw new SettleKernelUnsupportedError(`composed boundary records: ${boundaryId}`);
+		if (records)
+			throw new SettleKernelUnsupportedError(`composed boundary records: ${boundaryId}`);
 		return {};
 	}
 	// Arm order is the protocol's (try, pending, catch); select by name, not by a
@@ -478,14 +516,6 @@ function withoutSlotMarker(
 	return staticText.endsWith(marker) ? staticText.slice(0, -marker.length) : staticText;
 }
 
-function comparePath(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
-	for (let index = 0; index < Math.min(left.length, right.length); index++) {
-		const difference = left[index]! - right[index]!;
-		if (difference !== 0) return difference;
-	}
-	return left.length - right.length;
-}
-
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	let current = value;
 	for (const segment of path) {
@@ -501,4 +531,12 @@ function escapeHtml(value: unknown): string {
 		.replaceAll('<', '&lt;')
 		.replaceAll('>', '&gt;')
 		.replaceAll('"', '&quot;');
+}
+
+function comparePath(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
+	for (let index = 0; index < Math.min(left.length, right.length); index++) {
+		const difference = left[index]! - right[index]!;
+		if (difference !== 0) return difference;
+	}
+	return left.length - right.length;
 }

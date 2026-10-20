@@ -1,3 +1,7 @@
+import {
+	addressedHostNodeIds,
+	foldInertHosts,
+} from '../../artifact-helpers/addressed-hosts.ts';
 import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
@@ -66,6 +70,7 @@ export function collectPublicRenderComponentDefinitions(
 		),
 	);
 
+	const addressedHosts = addressedHostNodeIds(input.protocolView);
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
 		const componentRoot = componentNode ? firstComponentRoot(componentNode) : null;
@@ -251,7 +256,7 @@ export function collectPublicRenderComponentDefinitions(
 			}),
 		);
 		const nativeChunks = chunks.map(({ statics: _statics, ...chunk }) => ({
-			...chunk,
+			...foldInertHosts(chunk, addressedHosts),
 			nativeTemplateId: `markless-render-data:${encodeURIComponent(moduleIdOf(input.source))}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
 		}));
 		const initializerResidues = componentInitializerResidues(input, componentName);
@@ -293,7 +298,7 @@ export function collectPublicRenderComponentDefinitions(
 				view: input.protocolView,
 				rootChunkId: rootChunk.id,
 				chunks: nativeChunks,
-				hostNodeIds: [...hostNodeIds],
+				hostNodeIds: [...hostNodeIds].filter((hostNodeId) => addressedHosts.has(hostNodeId)),
 				branchIds: [...branchIds],
 				boundaryIds: [...boundaryIds],
 				repeatIds: [...repeatIds],

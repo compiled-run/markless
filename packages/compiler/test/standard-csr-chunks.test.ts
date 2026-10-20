@@ -1,3 +1,7 @@
+import {
+	addressedHostNodeIds,
+	foldInertHosts,
+} from '../src/artifact-helpers/addressed-hosts.ts';
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
 
@@ -51,11 +55,13 @@ export default function InteractiveCounter() @{
 	};
 	expect(definitionData.name).toBe('InteractiveCounter');
 	expect(definitionData.rootChunkId).toBe(result.renderData.root?.templateId);
+	const addressed = addressedHostNodeIds(result.protocolView);
 	for (const [index, renderChunk] of result.renderData.chunks.entries()) {
 		const definitionChunk = definitionData.chunks[index];
 		const { statics: _statics, ...nativeChunkShape } = renderChunk;
+		// The definition serves the chunk with its unaddressed elements folded into counts.
 		expect(definitionChunk).toEqual({
-			...nativeChunkShape,
+			...foldInertHosts(nativeChunkShape, addressed),
 			nativeTemplateId: `markless-render-data:src%2FInteractiveCounter.tsrx:InteractiveCounter:template:${encodeURIComponent(renderChunk.id)}`,
 		});
 		expect(definitionChunk).not.toHaveProperty('statics');

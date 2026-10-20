@@ -23,6 +23,7 @@ import {
 	type RowComponentMint,
 } from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
+import { addressedHostNodeIds } from '../artifact-helpers/addressed-hosts.ts';
 import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
@@ -70,7 +71,7 @@ export function createProtocolViewPayload(
 	// The consumer props a composed child's `{...rest}` carries onto its own
 	// elements. Joined here, at build time, they are ordinary view records.
 	const forwarded = forwardedSpreadViewRecords(input);
-	return {
+	return withAddressedLocators({
 		version: ASYNC_PROTOCOL_VERSION,
 		...optionalAsyncRunnerRegistry(input, asyncRunnerSymbols),
 		locators: [
@@ -141,7 +142,15 @@ export function createProtocolViewPayload(
 				})),
 			}),
 		),
-	};
+	});
+}
+
+// A host no record names is static markup: the browser never looks it up, so it gets no locator.
+function withAddressedLocators<View extends { readonly locators: ReadonlyArray<{ readonly hostNodeId: string }> }>(
+	view: View,
+): View {
+	const addressed = addressedHostNodeIds(view);
+	return { ...view, locators: view.locators.filter((locator) => addressed.has(locator.hostNodeId)) };
 }
 
 function protocolAsyncBoundaryReads(

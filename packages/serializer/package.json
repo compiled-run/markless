@@ -22,6 +22,7 @@
 		"./decode-client": "./src/value-decode-client.ts",
 		"./protocol": "./src/protocol.ts",
 		"./record-templates": "./src/protocol-record-templates.ts",
+		"./render-data-hosts": "./src/render-data-hosts.ts",
 		"./protocol-validation": "./src/protocol-validation-storage.ts"
 	},
 	"publishConfig": {
@@ -58,6 +59,10 @@
 			"./record-templates": {
 				"types": "./dist/record-templates.d.ts",
 				"default": "./dist/record-templates.js"
+			},
+			"./render-data-hosts": {
+				"types": "./dist/render-data-hosts.d.ts",
+				"default": "./dist/render-data-hosts.js"
 			},
 			"./protocol-validation": {
 				"types": "./dist/protocol-validation.d.ts",

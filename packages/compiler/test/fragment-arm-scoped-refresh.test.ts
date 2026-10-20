@@ -37,7 +37,7 @@ test('the fragment arm binds no update to the element around the branch', async 
 	const payload = await view();
 
 	expect(payload.domUpdates).toEqual([]);
-	expect(payload.locators.map((locator) => locator.tagName)).toEqual(['div']);
+	expect(payload.locators.map((locator) => locator.tagName)).toEqual([]);
 });
 
 test('the fragment arm read arrives as a branch content read', async () => {
