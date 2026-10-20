@@ -29,11 +29,8 @@ describe('SSR module runner program reload', () => {
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost()],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
 
 			const fetches = watchModuleFetches(server);
 			const send = vi.spyOn(server.environments.client.hot, 'send');
@@ -67,11 +64,8 @@ describe('SSR module runner program reload', () => {
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost()],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
 
 			const fetches = watchModuleFetches(server);
 			const send = vi.spyOn(server.environments.client.hot, 'send');
@@ -109,11 +103,8 @@ describe('SSR module runner program reload', () => {
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [...plugins, fixtureSsrHost()],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
 
 			expect(await requestHtml(server)).toContain('child original');
 
@@ -252,7 +243,7 @@ async function editFile(server: ViteDevServer, file: string, source: string, hot
 }
 
 // Vite core page-reloads a changed index.html as `{ path: '*' }` with no `triggeredBy`,
-// and `unwatch` does not reliably suppress that on linux. Only the markless plugin's
+// and a real watcher delivers the fixture's setup writes late on linux. Only the markless plugin's
 // edit-driven reload names the file that triggered it, so only that one may be counted.
 function isEditDrivenReload(payload: unknown, fixtureRoot: string) {
 	const message = payload as HotPayload | undefined;

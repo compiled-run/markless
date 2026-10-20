@@ -114,11 +114,8 @@ describe('SSR browser HMR', () => {
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost()],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			const html = await requestHtml(server);
@@ -185,9 +182,9 @@ describe('SSR browser HMR', () => {
 					},
 				],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				// Chokidar's unwatch ignores a root's children only once its async initial scan registered the root.
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-			server.watcher.unwatch(fixture.root);
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			expect(await requestHtml(server)).toContain('<span>hello</span>');
@@ -289,11 +286,8 @@ describe('SSR browser HMR', () => {
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost()],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			const first = await requestHtml(server);
@@ -338,11 +332,8 @@ describe('SSR browser HMR', () => {
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost(), slowServerHotUpdate(200)],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			expect(await requestHtml(server)).toContain('child original');
@@ -398,11 +389,8 @@ describe('SSR browser HMR', () => {
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost(), slowServerHotUpdate(200)],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			expect(await requestHtml(server)).toContain('child original');
@@ -589,7 +577,7 @@ function sendSpuriousPageReload(server: ViteDevServer) {
 }
 
 // Vite core page-reloads a changed index.html as `{ path: '*' }` with no `triggeredBy`,
-// and `unwatch` does not reliably suppress that on linux. Only the markless plugin's
+// and a real watcher delivers the fixture's setup writes late on linux. Only the markless plugin's
 // edit-driven reload names the file that triggered it, so only that one may be counted.
 function isEditDrivenReload(payload: unknown, fixtureRoot: string) {
 	const message = payload as HotPayload | undefined;
