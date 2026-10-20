@@ -139,15 +139,19 @@ export function voiceOverSegments(phrase: string): string[] {
 	// "end of Topics group" is the cursor leaving a container, not an announcement of it.
 	if (phrase.startsWith('end of ')) return [phrase];
 	const runs = new Set<string>();
-	for (const segment of commaSegments(phrase)) {
-		runs.add(segment);
-		const words = segment.split(/\s+/);
+	const addRuns = (words: string[]) => {
 		for (let start = 0; start < words.length; start++) {
 			if (start > 0 && words[start - 1].toLowerCase() === 'not') continue;
 			for (let end = start + 1; end <= words.length; end++) {
 				runs.add(words.slice(start, end).join(' '));
 			}
 		}
+	};
+	for (const segment of commaSegments(phrase)) {
+		runs.add(segment);
+		addRuns(segment.split(/\s+/));
 	}
+	// Words with their commas kept, so a name that holds commas ("Monday, August 3, 2026") is still one run.
+	addRuns(phrase.trim().split(/\s+/));
 	return [...runs];
 }

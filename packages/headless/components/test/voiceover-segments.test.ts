@@ -27,6 +27,13 @@ describe('voiceOverSegments', () => {
 		expect(spoken).not.toContain('button 1');
 	});
 
+	it('keeps a name that holds commas whole', () => {
+		const spoken = voiceOverSegments('Monday, August 3, 2026 toggle button');
+		expect(spoken).toContain('Monday, August 3, 2026');
+		expect(spoken).toContain('button');
+		expect(spoken).not.toContain('button,');
+	});
+
 	it('reads a heading text as a name, never as the role words inside it', () => {
 		const spoken = voiceOverSegments('heading level 2 Radio group');
 		expect(spoken).toContain('Radio group');
