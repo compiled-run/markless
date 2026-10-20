@@ -1,0 +1,58 @@
+name: Release probe
+on:
+    push:
+        branches: ['probe/cand-*']
+permissions:
+    contents: write
+    pull-requests: write
+    actions: write
+    checks: read
+jobs:
+    probe:
+        runs-on: ubuntu-latest
+        env:
+            GH_TOKEN: ${{ github.token }}
+            SHA: ${{ github.sha }}
+            REPO: ${{ github.repository }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - name: suites helper
+              run: |
+                  cat > /tmp/suites.sh <<'S'
+                  echo "--- check suites on $SHA (app 15368) at $(date -u +%T)"
+                  gh api "repos/$REPO/commits/$SHA/check-suites?per_page=100" --jq '.check_suites[]|select(.app.id==15368)|[.id,.head_branch,.status,.conclusion,.latest_check_runs_count]|@tsv'
+                  echo "--- check runs (filter=latest)"
+                  gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100&filter=latest" --jq '.check_runs[]|[.name,.status,.conclusion,.check_suite.id]|@tsv'
+                  S
+                  chmod +x /tmp/suites.sh
+            - name: Dispatch CI on the candidate and wait
+              run: |
+                  set -euo pipefail
+                  gh workflow run ci.yml --ref "$GITHUB_REF_NAME"
+                  run_id=''
+                  for _ in $(seq 1 24); do
+                    run_id="$(gh run list --workflow ci.yml --event workflow_dispatch --commit "$SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+                    [ -n "$run_id" ] && break; sleep 5
+                  done
+                  gh run watch "$run_id" --exit-status --interval 10
+                  /tmp/suites.sh
+            - name: "A: direct push of the green commit with GITHUB_TOKEN"
+              continue-on-error: true
+              run: |
+                  git push origin "$SHA:refs/heads/probe/base-1" 2>&1 || echo "A RESULT: push refused"
+                  echo "base-1 now: $(git ls-remote origin refs/heads/probe/base-1)"
+            - name: "B: pull request with GITHUB_TOKEN, watched for 4 minutes"
+              continue-on-error: true
+              run: |
+                  pr="$(gh pr create --base probe/base-2 --head "$GITHUB_REF_NAME" --title "probe: release workflow experiment, do not merge by hand" --body "Release workflow probe on scratch branches; closed automatically.")"
+                  echo "PR $pr"
+                  for i in $(seq 1 16); do
+                    echo "=== t+$((i*15))s mergeStateStatus=$(gh pr view "$pr" --json mergeStateStatus,mergeable --jq '.mergeStateStatus+" "+.mergeable')"
+                    if [ "$i" = 1 ] || [ "$i" = 4 ] || [ "$i" = 16 ]; then /tmp/suites.sh; fi
+                    gh run list --commit "$SHA" --json databaseId,event,status,conclusion,workflowName --jq '.[]|[.databaseId,.workflowName,.event,.status,.conclusion]|@tsv'
+                    sleep 15
+                  done
+                  gh pr merge "$pr" --merge --match-head-commit "$SHA" 2>&1 || echo "B RESULT: merge refused"
+                  echo "base-2 now: $(git ls-remote origin refs/heads/probe/base-2)"
