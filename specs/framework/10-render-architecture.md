@@ -131,8 +131,9 @@ means the container root, which is the mount target for fragment-rooted
 components and the created root element otherwise. Fragment-relative
 dom-order locators shift +1 when the target joins the walk, mirroring the
 SSR container offset. A fragment's top-level children may be plain host
-elements, text, expressions and `@if`/`@for`/`@switch`/`@try` blocks; components
-still need a single root element. A keyed `@for` at the top level names the
+elements, static text, literal `{...}` values and `@if`/`@for`/`@switch`/`@try`
+blocks; text whose value can change and components still need a single root
+element. A keyed `@for` at the top level names the
 container as its rows' parent (`PROTOCOL_CONTAINER_HOST_NODE_ID`, located at
 index 0), and its rows count only the container's page nodes between the
 page-start and page-end comments, growing before the page-end comment. A

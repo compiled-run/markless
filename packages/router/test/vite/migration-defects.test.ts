@@ -533,3 +533,9 @@ test('xlink: and xml: attributes survive server rendering and client updates', a
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a page whose body is only text renders it', async () => {
+	const response = await fetch(`${server!.origin}/only-text`);
+	expect(response.status).toBe(200);
+	expect(await response.text()).toContain('only text');
+});

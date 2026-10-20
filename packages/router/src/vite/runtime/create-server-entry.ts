@@ -320,7 +320,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
 		if (!renderSsr) {
 			const shell = await renderDocumentShell(documentModule, pageProps, '');
-			const message = `Page module must export an Markless compiled artifact: ${escapeHtml(file)}`;
+			const message = `Page module must export a Markless compiled artifact: ${escapeHtml(file)}`;
 			return new Response(fillDocumentChildren(shell, message), http.commit(status, headers));
 		}
 		const documentLoads = options.documentNavigation === 'document';

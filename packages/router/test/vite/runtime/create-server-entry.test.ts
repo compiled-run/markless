@@ -996,7 +996,7 @@ describe('server entry rendering', () => {
 		errorSpy.mockRestore();
 	});
 
-	it('returns a useful 500 body when a matched page is not an Markless artifact', async () => {
+	it('returns a useful 500 body when a matched page is not a Markless artifact', async () => {
 		const entry = createServerEntry({
 			documentModuleLoader: undefined,
 			pageModuleLoaders: {
@@ -1010,7 +1010,7 @@ describe('server entry rendering', () => {
 
 		expect(response.status).toBe(200);
 		expect(html).toContain(
-			'Page module must export an Markless compiled artifact: pages/index.tsrx',
+			'Page module must export a Markless compiled artifact: pages/index.tsrx',
 		);
 	});
 });

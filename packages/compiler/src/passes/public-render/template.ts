@@ -6,6 +6,7 @@ import {
 	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
+	isConstantTextNode,
 	isStaticTextNode,
 } from '../../ast/tsrx.ts';
 
@@ -142,6 +143,7 @@ export function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
 	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
 	const supported = children.length > 0 && children.every((child) =>
 		((child.type === 'Element' || child.type === 'JSXElement') && isPlainHostTemplateNode(child)) ||
+		isConstantTextNode(child) ||
 		child.type === 'JSXStyleElement' ||
 		child.type === 'JSXIfExpression' ||
 		child.type === 'JSXSwitchExpression' ||
@@ -170,11 +172,9 @@ export function describeUnsupportedFragmentContent(fragment: AnyNode): string | 
 		// Control-flow blocks are supported as direct fragment children; the
 		// offender is whatever comes after them.
 		if (child.type !== undefined && controlFlowBlockLabels[child.type]) continue;
+		if (isConstantTextNode(child)) continue;
 		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
-			return 'a {expression} placed directly inside the fragment';
-		}
-		if (isStaticTextNode(child)) {
-			return 'text placed directly inside the fragment';
+			return 'a {expression} that can change, placed directly inside the fragment';
 		}
 		const offender = describeUnsupportedTemplateNode(child, null);
 		if (offender) return offender;
