@@ -9,6 +9,7 @@ import {
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
+	isConstantTextNode,
 	isIgnorableStaticTextNode,
 	isSpreadAttribute,
 	isStaticTextNode,
@@ -1147,6 +1148,7 @@ function isPublicRoot(node: AnyNode): boolean {
 		children.length > 0 &&
 		children.every(
 			(child) =>
+				isConstantTextNode(child) ||
 				child.type === 'JSXIfExpression' ||
 				child.type === 'JSXSwitchExpression' ||
 				child.type === 'JSXForExpression' ||

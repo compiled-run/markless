@@ -2813,6 +2813,58 @@ test('compileTsrxModule renders sibling top-level elements as an implicit fragme
 	);
 });
 
+test('compileTsrxModule renders a fragment root holding only text', async () => {
+	for (const [body, html] of [
+		[`<>{'only text'}</>`, 'only text'],
+		['<>Plain words</>', 'Plain words'],
+		[`<>Hello, {'reader'}</>`, 'Hello, reader'],
+	] as const) {
+		const result = await compileTsrxModule({
+			filename: 'pages/TextOnly.tsrx',
+			source: `export default function TextOnly() @{\n\t${body}\n}\n`,
+			symbols: [],
+		});
+		expect(result.publicRenderModule.diagnostics).toEqual([]);
+		const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+		const output = await (ssrModule.marklessRenderSsr as () => Promise<{ html: string }>)();
+		expect(output.html).toBe(html);
+	}
+});
+
+test('compileTsrxModule refuses text that can change placed directly in a fragment root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/ChangingText.tsrx',
+		source: `import { state } from '@markless/core';\nexport default function ChangingText() @{\n\tlet taps = state(0);\n\t<>Tapped {taps}</>\n}\n`,
+		symbols: [],
+	});
+	expect(result.publicRenderModule.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+				severity: 'error',
+				message: expect.stringContaining('a {expression} that can change'),
+			}),
+		]),
+	);
+});
+
+test('compileTsrxModule refuses a component whose only output is a statement-level {...} block', async () => {
+	const result = await compileTsrxModule({
+		filename: 'pages/BareBraces.tsrx',
+		source: `export default function BareBraces() @{\n\t{'only text'}\n}\n`,
+		symbols: [],
+	});
+	expect(result.publicRenderModule.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+				severity: 'error',
+				message: expect.stringContaining('a JavaScript block, not output'),
+			}),
+		]),
+	);
+});
+
 test('compileTsrxModule refuses a component whose whole template is a bare @for', async () => {
 	const loopOnly = `
 	@for (const item of items; key item.id) {

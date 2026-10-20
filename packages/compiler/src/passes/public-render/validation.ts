@@ -74,6 +74,11 @@ export function sameModuleChildBoundaryDiagnostics(
 	return diagnostics;
 }
 
+const isBareExpressionBlock = (node: AnyNode) =>
+	node.type === 'BlockStatement' &&
+	asNodes(node.body).length === 1 &&
+	asNodes(node.body)[0]!.type === 'ExpressionStatement';
+
 function firstBoundaryNode(node: AnyNode): AnyNode | null {
 	if (node.type === 'JSXTryExpression') return node;
 	for (const child of childNodes(node)) {
@@ -212,6 +217,22 @@ export function componentRootDiagnostics(ast: AnyNode, filename: string) {
 				}),
 			];
 		}
+	}
+
+	for (const statement of asNodes(ast.body)) {
+		const body = getComponentFunction(statement)?.node.body as AnyNode | undefined;
+		const block = body ? childNodes(body).find(isBareExpressionBlock) : undefined;
+		if (!block) continue;
+		return [
+			unsupportedRenderRootDiagnostic({
+				message:
+					'This component renders nothing: a {...} written as a statement is a JavaScript block, not output, so its value is thrown away.',
+				node: block,
+				filename,
+				suggestion:
+					'Render the value inside a fragment or an element, for example <>{value}</> or <p>{value}</p>.',
+			}),
+		];
 	}
 
 	return [noRenderableRootDiagnostic({ node: ast, filename })];

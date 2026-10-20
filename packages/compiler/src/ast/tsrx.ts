@@ -149,6 +149,15 @@ export function isStaticTextNode(node: AnyNode): boolean {
 	return node.type === 'JSXText' || node.type === 'Literal';
 }
 
+// Text a fragment root can hold directly: static text, or a {...} whose value is a literal and never changes.
+export function isConstantTextNode(node: AnyNode): boolean {
+	if (isStaticTextNode(node)) return true;
+	if (node.type !== 'JSXExpressionContainer' && node.type !== 'TSRXExpression') return false;
+	const expression = node.expression as AnyNode | undefined;
+	if (expression?.type === 'Literal') return typeof expression.value === 'string' || typeof expression.value === 'number';
+	return expression?.type === 'TemplateLiteral' && asNodes(expression.expressions).length === 0;
+}
+
 // JSX text rule, as Babel's cleanJSXElementLiteralChild: whitespace holding a line break is layout, same-line whitespace is content.
 export function jsxTextValue(value: string): string {
 	const lines = value.split(/\r\n|\n|\r/);

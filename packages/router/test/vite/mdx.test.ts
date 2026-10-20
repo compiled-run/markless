@@ -104,7 +104,7 @@ describe('Markless Router MDX transform', () => {
 		).toBeUndefined();
 	});
 
-	it('turns static markdown route content into an Markless SSR artifact', async () => {
+	it('turns static markdown route content into a Markless SSR artifact', async () => {
 		const code = await transformMdxRoute(
 			`# Docs
 
