@@ -12,8 +12,8 @@ import {
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { getFrameworkApiForCall } from './imports.ts';
-import type { SemanticView } from '@tsrx/yuku';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
+import type { ModuleSemantics } from './shared-ast.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {
 	const target = unwrapChainExpression(node.left as AnyNode | undefined);
@@ -510,14 +510,14 @@ function enclosingFunctionRegion(node: AnyNode, state: WalkState): ReadRegion | 
 
 	const semantic = state.semantic();
 	let innermost: ReadRegion | null = null;
-	for (let scopeId = 0; scopeId < semantic.scope.count; scopeId += 1) {
-		if (semantic.scope.kind(scopeId) !== 'function') continue;
-		const start = semantic.scope.start(scopeId);
+	for (let scopeId = 0; scopeId < semantic.scopes.length; scopeId += 1) {
+		if (semantic.scopes[scopeId]!.kind !== 'function') continue;
+		const start = semantic.scopes[scopeId]!.node.start;
 		// yuku scope ranges use an exclusive end, so a scope ending exactly at
 		// the node's start does not contain it.
-		if (start > node.start || semantic.scope.end(scopeId) <= node.start) continue;
+		if (start > node.start || semantic.scopes[scopeId]!.node.end <= node.start) continue;
 		if (!innermost || start > innermost.start) {
-			innermost = { start, end: semantic.scope.end(scopeId) };
+			innermost = { start, end: semantic.scopes[scopeId]!.node.end };
 		}
 	}
 
@@ -628,9 +628,9 @@ export function rootBindsInsideRegion(
 	const symbolId = resolvedSymbolAt(semantic, offset);
 	if (symbolId === null) return false;
 
-	const scopeId = semantic.symbol.scopeId(symbolId);
+	const scopeId = semantic.bindings[symbolId]!.scope.id;
 	return (
-		semantic.scope.start(scopeId) >= region.start && semantic.scope.end(scopeId) <= region.end
+		semantic.scopes[scopeId]!.node.start >= region.start && semantic.scopes[scopeId]!.node.end <= region.end
 	);
 }
 
@@ -651,18 +651,18 @@ export function rootIdentifierOffset(node: AnyNode, source: string): number | nu
  * Type-position uses are skipped: they never contribute a runtime read, and
  * indexing them would let a type annotation answer for the value beside it.
  */
-const valueReferenceSymbolsByOffset = new WeakMap<SemanticView, Map<number, number>>();
+const valueReferenceSymbolsByOffset = new WeakMap<ModuleSemantics, Map<number, number>>();
 
 /** The binding an identifier use at `offset` resolves to, if it resolves. */
-export function resolvedSymbolAt(semantic: SemanticView, offset: number): number | null {
+export function resolvedSymbolAt(semantic: ModuleSemantics, offset: number): number | null {
 	let symbolsByOffset = valueReferenceSymbolsByOffset.get(semantic);
 	if (!symbolsByOffset) {
 		symbolsByOffset = new Map<number, number>();
-		for (let referenceId = 0; referenceId < semantic.reference.count; referenceId += 1) {
-			if (semantic.reference.inTypePosition(referenceId)) continue;
-			const symbolId = semantic.reference.symbolId(referenceId);
+		for (let referenceId = 0; referenceId < semantic.references.length; referenceId += 1) {
+			if (semantic.references[referenceId]!.inTypePosition) continue;
+			const symbolId = (semantic.references[referenceId]!.binding?.id ?? null);
 			if (symbolId === null) continue;
-			const start = semantic.reference.start(referenceId);
+			const start = semantic.references[referenceId]!.node.start;
 			if (!symbolsByOffset.has(start)) symbolsByOffset.set(start, symbolId);
 		}
 		valueReferenceSymbolsByOffset.set(semantic, symbolsByOffset);
@@ -690,7 +690,7 @@ function rowWriteScope(target: AnyNode, state: WalkState): { readonly rowRepeatI
 		const semantic = state.semantic();
 		const symbolId = resolvedSymbolAt(semantic, root.start);
 		if (!span || symbolId === null) return {};
-		const declaration = semantic.symbol.declNode(symbolId, 0);
+		const declaration = semantic.bindings[symbolId]!.declarations[0]!;
 		return declaration.start >= span.start && declaration.end <= span.end
 			? { rowRepeatId: repeatId }
 			: {};

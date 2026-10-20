@@ -9,9 +9,11 @@ import { compileTsrxModulesWithInterfaces } from './multi-module-compile-support
 const topLevelRows = (loop: string) => `import { state } from '@markless/core';
 export default function Board() @{
 	let cards = state([{ id: 'a', title: 'A' }]);
-	<h2>Cards</h2>
-	${loop}
-	<p>after</p>
+	<>
+		<h2>Cards</h2>
+		${loop}
+		<p>after</p>
+	</>
 }`;
 
 const keyed = '@for (const card of cards; key card.id) { <article>{card.title}</article> }';
@@ -59,8 +61,10 @@ test('a top-level @for without a key is refused the way one inside an element is
 });
 
 const childRows = `export function Cards({ cards }) @{
-	<li>head</li>
-	@for (const card of cards; key card.id) { <li>{card.title}</li> }
+	<>
+		<li>head</li>
+		@for (const card of cards; key card.id) { <li>{card.title}</li> }
+	</>
 }`;
 
 const consumer = (imports: string, cards: string) => `import { state } from '@markless/core';

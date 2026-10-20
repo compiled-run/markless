@@ -193,75 +193,83 @@ export default function StateAnatomy({
 				<path class="shadow-ink" d={art.wires.thin.shadow} />
 				<path class="hatch deep" d={art.wires.thin.shadowHatch} />
 				@if (plugged) {
-					<path class="shadow-ink" d={art.wires.main.shadow} />
-					<path class="hatch deep" d={art.wires.main.shadowHatch} />
-					<path class="shadow-ink" d={art.wires.branch.shadow} />
-					<path class="hatch deep" d={art.wires.branch.shadowHatch} />
-					<path class="shadow-wash" d={art.wires.clips.badge.cast} />
-					<path class="shadow-wash" d={art.wires.clips.line.cast} />
+					<>
+						<path class="shadow-ink" d={art.wires.main.shadow} />
+						<path class="hatch deep" d={art.wires.main.shadowHatch} />
+						<path class="shadow-ink" d={art.wires.branch.shadow} />
+						<path class="hatch deep" d={art.wires.branch.shadowHatch} />
+						<path class="shadow-wash" d={art.wires.clips.badge.cast} />
+						<path class="shadow-wash" d={art.wires.clips.line.cast} />
+					</>
 				} @else {
-					<path class="shadow-ink" d={art.loose.main.shadow} />
-					<path class="hatch deep" d={art.loose.main.shadowHatch} />
-					<path class="shadow-ink" d={art.loose.branch.shadow} />
-					<path class="hatch deep" d={art.loose.branch.shadowHatch} />
-					<path class="shadow-wash" d={art.loose.clips.badge.cast} />
-					<path class="shadow-wash" d={art.loose.clips.line.cast} />
+					<>
+						<path class="shadow-ink" d={art.loose.main.shadow} />
+						<path class="hatch deep" d={art.loose.main.shadowHatch} />
+						<path class="shadow-ink" d={art.loose.branch.shadow} />
+						<path class="hatch deep" d={art.loose.branch.shadowHatch} />
+						<path class="shadow-wash" d={art.loose.clips.badge.cast} />
+						<path class="shadow-wash" d={art.loose.clips.line.cast} />
+					</>
 				}
 				<path class="cord" d={art.wires.thin.paper} />
 				<path class="jar-ink" d={art.wires.thin.tone} />
 				<path class="jar-ink" d={art.wires.thin.ink} />
 				@if (plugged) {
-					<path class="cord" d={art.wires.branch.paper} />
-					<path class="jar-ink" d={art.wires.branch.tone} />
-					<path class="jar-ink" d={art.wires.branch.ink} />
-					<path class="cord" d={art.wires.main.paper} />
-					<path class="jar-ink" d={art.wires.main.tone} />
-					<path class="jar-ink" d={art.wires.main.ink} />
-					<path class="boot" d={art.wires.splice.paper} />
-					<path class="jar-ink" d={art.wires.splice.ink} />
-					<path class="boot" d={art.wires.clips.badge.boot} />
-					<path class="hatch" d={art.wires.clips.badge.bootTone} />
-					<path class="brass" d={art.wires.clips.badge.paper} />
-					<path class="wash brass-wash" d={art.wires.clips.badge.wash} />
-					<path class="hatch" d={art.wires.clips.badge.side} />
-					<path class="jar-ink" d={art.wires.clips.badge.ink} />
-					<path class="boot" d={art.wires.clips.line.boot} />
-					<path class="hatch" d={art.wires.clips.line.bootTone} />
-					<path class="brass" d={art.wires.clips.line.paper} />
-					<path class="wash brass-wash" d={art.wires.clips.line.wash} />
-					<path class="hatch" d={art.wires.clips.line.side} />
-					<path class="jar-ink" d={art.wires.clips.line.ink} />
+					<>
+						<path class="cord" d={art.wires.branch.paper} />
+						<path class="jar-ink" d={art.wires.branch.tone} />
+						<path class="jar-ink" d={art.wires.branch.ink} />
+						<path class="cord" d={art.wires.main.paper} />
+						<path class="jar-ink" d={art.wires.main.tone} />
+						<path class="jar-ink" d={art.wires.main.ink} />
+						<path class="boot" d={art.wires.splice.paper} />
+						<path class="jar-ink" d={art.wires.splice.ink} />
+						<path class="boot" d={art.wires.clips.badge.boot} />
+						<path class="hatch" d={art.wires.clips.badge.bootTone} />
+						<path class="brass" d={art.wires.clips.badge.paper} />
+						<path class="wash brass-wash" d={art.wires.clips.badge.wash} />
+						<path class="hatch" d={art.wires.clips.badge.side} />
+						<path class="jar-ink" d={art.wires.clips.badge.ink} />
+						<path class="boot" d={art.wires.clips.line.boot} />
+						<path class="hatch" d={art.wires.clips.line.bootTone} />
+						<path class="brass" d={art.wires.clips.line.paper} />
+						<path class="wash brass-wash" d={art.wires.clips.line.wash} />
+						<path class="hatch" d={art.wires.clips.line.side} />
+						<path class="jar-ink" d={art.wires.clips.line.ink} />
 
-					<g class="run">
-						<path class="pulse to-jar" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
-						<path class="pulse to-page" d={art.wires.main.centre} style={'--len:' + art.wires.main.length} />
-						<path class="pulse to-page" d={art.wires.toLine.d} style={'--len:' + art.wires.toLine.length} />
-					</g>
+						<g class="run">
+							<path class="pulse to-jar" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
+							<path class="pulse to-page" d={art.wires.main.centre} style={'--len:' + art.wires.main.length} />
+							<path class="pulse to-page" d={art.wires.toLine.d} style={'--len:' + art.wires.toLine.length} />
+						</g>
+					</>
 				} @else {
-					<path class="cord" d={art.loose.branch.paper} />
-					<path class="jar-ink" d={art.loose.branch.tone} />
-					<path class="jar-ink" d={art.loose.branch.ink} />
-					<path class="cord" d={art.loose.main.paper} />
-					<path class="jar-ink" d={art.loose.main.tone} />
-					<path class="jar-ink" d={art.loose.main.ink} />
-					<path class="boot" d={art.loose.splice.paper} />
-					<path class="jar-ink" d={art.loose.splice.ink} />
-					<path class="boot" d={art.loose.clips.badge.boot} />
-					<path class="hatch" d={art.loose.clips.badge.bootTone} />
-					<path class="brass" d={art.loose.clips.badge.paper} />
-					<path class="wash brass-wash" d={art.loose.clips.badge.wash} />
-					<path class="hatch" d={art.loose.clips.badge.side} />
-					<path class="jar-ink" d={art.loose.clips.badge.ink} />
-					<path class="boot" d={art.loose.clips.line.boot} />
-					<path class="hatch" d={art.loose.clips.line.bootTone} />
-					<path class="brass" d={art.loose.clips.line.paper} />
-					<path class="wash brass-wash" d={art.loose.clips.line.wash} />
-					<path class="hatch" d={art.loose.clips.line.side} />
-					<path class="jar-ink" d={art.loose.clips.line.ink} />
+					<>
+						<path class="cord" d={art.loose.branch.paper} />
+						<path class="jar-ink" d={art.loose.branch.tone} />
+						<path class="jar-ink" d={art.loose.branch.ink} />
+						<path class="cord" d={art.loose.main.paper} />
+						<path class="jar-ink" d={art.loose.main.tone} />
+						<path class="jar-ink" d={art.loose.main.ink} />
+						<path class="boot" d={art.loose.splice.paper} />
+						<path class="jar-ink" d={art.loose.splice.ink} />
+						<path class="boot" d={art.loose.clips.badge.boot} />
+						<path class="hatch" d={art.loose.clips.badge.bootTone} />
+						<path class="brass" d={art.loose.clips.badge.paper} />
+						<path class="wash brass-wash" d={art.loose.clips.badge.wash} />
+						<path class="hatch" d={art.loose.clips.badge.side} />
+						<path class="jar-ink" d={art.loose.clips.badge.ink} />
+						<path class="boot" d={art.loose.clips.line.boot} />
+						<path class="hatch" d={art.loose.clips.line.bootTone} />
+						<path class="brass" d={art.loose.clips.line.paper} />
+						<path class="wash brass-wash" d={art.loose.clips.line.wash} />
+						<path class="hatch" d={art.loose.clips.line.side} />
+						<path class="jar-ink" d={art.loose.clips.line.ink} />
 
-					<g class="run">
-						<path class="pulse to-jar" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
-					</g>
+						<g class="run">
+							<path class="pulse to-jar" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
+						</g>
+					</>
 				}
 
 				<path class="pencil" d={art.jar.pencil} />

@@ -452,8 +452,10 @@ export function App() @{
 		<aside attach={stamp}>root</aside>
 		<button onClick={() => (open = !open)}>toggle</button>
 		@if (open) {
-			<p attach={[stamp, tint('red')]}>one</p>
-			<em attach={tint('blue')}>two</em>
+			<>
+				<p attach={[stamp, tint('red')]}>one</p>
+				<em attach={tint('blue')}>two</em>
+			</>
 		}
 		@try {
 			<b attach={stamp}>{details.title}</b>

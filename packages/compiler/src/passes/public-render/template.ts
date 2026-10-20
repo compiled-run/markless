@@ -19,7 +19,6 @@ export type PublicRenderRootSelection = {
 const templateNodeTypes = new Set([
 	'Element',
 	'JSXElement',
-	'JSXScriptElement',
 	'JSXStyleElement',
 	'Fragment',
 	'JSXFragment',
@@ -173,7 +172,7 @@ export function describeUnsupportedFragmentContent(fragment: AnyNode): string | 
 		// offender is whatever comes after them.
 		if (child.type !== undefined && controlFlowBlockLabels[child.type]) continue;
 		if (isConstantTextNode(child)) continue;
-		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
+		if (child.type === 'JSXExpressionContainer') {
 			return 'a {expression} that can change, placed directly inside the fragment';
 		}
 		const offender = describeUnsupportedTemplateNode(child, null);
@@ -187,13 +186,9 @@ function describeUnsupportedTemplateNode(
 	enclosingTag: string | null,
 ): string | null {
 	const inside = enclosingTag ? ` inside <${enclosingTag}>` : '';
-	if (
-		node.type !== 'Element' &&
-		node.type !== 'JSXElement' &&
-		node.type !== 'JSXScriptElement'
-	) {
+	if (node.type !== 'Element' && node.type !== 'JSXElement') {
 		if (isStaticTextNode(node)) return null;
-		if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return null;
+		if (node.type === 'JSXExpressionContainer') return null;
 		const block = node.type !== undefined ? controlFlowBlockLabels[node.type] : undefined;
 		if (block) return `${block}${inside}`;
 		return `unsupported content${inside}`;

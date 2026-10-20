@@ -1,6 +1,6 @@
 // The two calls the bundler makes on rolldown/experimental, answered by yuku in the browser.
 import { parseJavaScriptModule } from '../../../../packages/compiler/src/index.ts';
-import { generate } from './yuku-codegen.ts';
+import { generate } from '@tsrx/yuku';
 
 type Diagnostic = { readonly message: string };
 

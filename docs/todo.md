@@ -54,11 +54,11 @@ the held packages" in `docs/ci-process.md`.
   and bundler work; needs its own goal.
 - **The evaluator grew about 2.7 KB** from correctness fixes. Reduce it.
 - **Report upstream bugs** (public, needs a go-ahead): srvx/Nitro EPIPE busy
-  loop; `@tsrx/ripple` text whitespace differs from Babel; `@tsrx/yuku` 0.2.0
-  fails on sibling elements on one line like `<b/><i/>`. Repros are in the goal
-  notes.
-- **Accessibility lanes:** NVDA reads are blocked because `@tsrx/yuku` has no
-  Windows binary (upstream); the VoiceOver lane fails on the macOS runner image.
+  loop; `@tsrx/ripple` text whitespace differs from Babel. Repros are in the
+  goal notes.
+- **Accessibility lanes:** NVDA reads were blocked because `@tsrx/yuku` had no
+  Windows binary. 0.8.0 is a WebAssembly build, so re-run the NVDA lane. The
+  VoiceOver lane fails on the macOS runner image.
 
 Lower priority or parked:
 

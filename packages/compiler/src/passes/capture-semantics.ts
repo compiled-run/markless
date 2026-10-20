@@ -1,4 +1,6 @@
-import { analyze, type Module } from 'yuku-analyzer';
+import { analyze } from '@tsrx/yuku';
+
+type Module = ReturnType<typeof analyze>;
 
 // Capture analysis asks two factual questions about an emitted symbol source:
 // which names it reads without binding them itself, and which expressions it

@@ -1,5 +1,5 @@
 export function BrokenToolbar() @{
 	<section>
-		<button>Save</button>>
+		<button>Save</button></div>
 	</section>
 }

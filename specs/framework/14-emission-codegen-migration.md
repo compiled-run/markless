@@ -49,9 +49,22 @@ ephemeral. Probe scripts and their `OUTPUT-*.txt` transcripts should be re-run
 and re-recorded by the first unit of any stage that depends on them.
 
 Probes were run against `yuku-codegen@0.9.0`, `yuku-analyzer@0.9.0`, and the
-pre-rename TSRX host at version 0.1.1 — the same analyzer and TSRX versions
-`packages/compiler` already depends on. `yuku-codegen` is not yet a dependency
-of any package in this repository.
+pre-rename TSRX host at version 0.1.1, the versions `packages/compiler` then
+depended on.
+
+**Since `@tsrx/yuku` 0.8.0.** The parser, analyzer and printer are now one
+package: `parse`, `analyze` and `generate` from `@tsrx/yuku`, a WebAssembly
+build on yuku 0.19 that replaces `yuku-codegen`, `yuku-analyzer` and the native
+TSRX host. Where this specification names `yuku-codegen` it now means
+`@tsrx/yuku`'s `generate`. Three recorded facts changed, and
+`packages/compiler/test/emission-foundation.test.ts` asserts each of them:
+
+- `generate` prints TSRX node types back as TSRX syntax instead of throwing, so
+  a TSRX node that reaches it yields TSRX text rather than JavaScript. Invariant
+  4 still holds for that reason.
+- A `sourceMap` option without `source` throws instead of returning a null map;
+  with no `sourceMap` option the map is null.
+- Printer problems are reported in `diagnostics`, not `errors`.
 
 Recorded probes, and what each one licenses:
 
@@ -177,8 +190,9 @@ Known upstream limits, recorded:
   layout a formatter would produce.
 - Unknown printer options are accepted silently with no error, so a misspelled
   option is a silent no-op.
-- `yuku-codegen` throws `unsupported ESTree node type: JSXCodeBlock` on a TSRX
-  tree, and its `strip: true` path throws the same way.
+- `yuku-codegen` threw `unsupported ESTree node type: JSXCodeBlock` on a TSRX
+  tree, on its `strip: true` path too. `@tsrx/yuku`'s `generate` prints the
+  tree as TSRX instead, which is still not JavaScript.
 - `tsrx.generate` prints TSRX and reaches a reparse fixpoint, but emits no
   source map, and its output collapses template structure onto shared lines.
 - The analyzer infers `lang: "js"` from a `.tsrx` path, which mis-parses both
@@ -202,8 +216,8 @@ proved printable, with source maps, through `yuku-codegen`.
 
 Stage 1 must deliver:
 
-- `yuku-codegen` added as a `packages/compiler` dependency, pinned to an exact
-  version as its sibling `yuku-*` dependencies are
+- the printer as a `packages/compiler` dependency, pinned to an exact version
+  (now `@tsrx/yuku`'s `generate`)
 - one module owning printer options and the graph-call AST builders, so option
   choices are stated once and asserted rather than spread across emitters
 - migration of each emitter to build nodes and print, one emitter per unit
@@ -220,8 +234,9 @@ Gated. `publicRenderModule.renderDataModuleSource` and `ssrModuleSource` are
 built from trees that still contain TSRX nodes, which the generic printer
 refuses. Stage 2 may not start until one of the following exists upstream:
 
-- `yuku-codegen` prints TSRX node types, or
 - a documented TSRX-to-TypeScript lowering the compiler can run before printing
+  (`@tsrx/yuku`'s `generate` prints TSRX node types, but as TSRX syntax, which
+  does not clear this gate)
 
 and, independently, until `tsrx.generate` emits source maps — otherwise stage 2
 would regress the source-map invariant relative to stage 1 for any site that
@@ -262,9 +277,9 @@ These hold for every unit in every stage.
 4. **No TSRX nodes reach the printer in stage 1, and this is asserted.** Before
    printing, the tree is scanned for TSRX node types and emission fails with a
    compiler diagnostic if any are found. An assertion is required because the
-   failure mode without it is a thrown upstream error
-   (`unsupported ESTree node type: JSXCodeBlock`) surfacing as a crash rather
-   than a diagnostic.
+   failure mode without it was a thrown upstream error
+   (`unsupported ESTree node type: JSXCodeBlock`) surfacing as a crash, and is
+   now TSRX syntax printed into a `.js` module, rather than a diagnostic.
 5. **The scanner band deletes last.** Lines 2109-2731 —
    `topLevelBinaryOperators` through `sourceReferencesIdentifier` — are removed
    in stage 1's final unit, after parity is proven for every emission site that
@@ -314,8 +329,7 @@ These hold for every unit in every stage.
 
 ### Stage 2 gate
 
-- an upstream release prints TSRX node types, or a TSRX-to-TypeScript lowering
-  exists and is documented, and
+- a TSRX-to-TypeScript lowering exists and is documented, and
 - `tsrx.generate` emits source maps, and
 - a re-run of the `p5d` and `p5e` probes against that release is recorded as
   evidence before any stage 2 unit is cut
@@ -359,7 +373,8 @@ evidence arrives.
 
 - Do not introduce a second emission API, a compatibility shim, or a flag that
   selects between emission strategies.
-- Do not add Babel, SWC, Prettier, or another printer alongside `yuku-codegen`.
+- Do not add Babel, SWC, Prettier, or another printer alongside `@tsrx/yuku`'s
+  `generate`.
 - Do not change artifact contracts, pass IDs, `consumes`/`produces`, or which
   symbols are extracted while migrating emission.
 - Do not re-walk source in an emitter to recover information an upstream pass
@@ -384,9 +399,9 @@ evidence arrives.
 
 Asks that block a stage, with the evidence that establishes each:
 
-- **TSRX node printing in `yuku-codegen`** (or a documented TSRX-to-TypeScript
-  lowering). Blocks stage 2. Evidence: `OUTPUT-p5d-tsrx.txt` — the generic
-  printer throws on `JSXCodeBlock`, on both the normal and `strip: true` paths.
+- **A TSRX-to-TypeScript lowering.** Blocks stage 2. Evidence:
+  `OUTPUT-p5d-tsrx.txt` showed the generic printer throwing on `JSXCodeBlock`;
+  `@tsrx/yuku` 0.8.0 prints it, but as TSRX syntax.
 - **Source maps from `tsrx.generate`.** Blocks stage 2. Evidence:
   `OUTPUT-p5d-tsrx.txt` — map present: false, 0 segments over TSRX source.
 - **Blank-line preservation.** Blocks stage 3. Evidence:

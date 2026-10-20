@@ -1,4 +1,4 @@
-import { isEventAttribute } from '@tsrx/yuku';
+import { isEventAttribute } from '../../ast/events.ts';
 import {
 	PROTOCOL_DECLARATIVE_SHADOW_ROOT_ATTRIBUTE,
 	PROTOCOL_RAW_TEXT_TAGS,

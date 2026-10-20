@@ -333,11 +333,10 @@ export async function analyzeDemo(
 	const walk = (node: AstNode, rows: ReadonlyMap<string, AstNode>) => {
 		let scope = rows;
 		if (node.type === 'JSXForExpression') {
-			const loop = node.statement as AstNode;
-			const row = ((loop.left as AstNode).declarations as AstNode[])?.[0]?.id as
+			const row = ((node.left as AstNode).declarations as AstNode[])?.[0]?.id as
 				| AstNode
 				| undefined;
-			const over = loop.right as AstNode;
+			const over = node.right as AstNode;
 			const array = over.type === 'Identifier' ? arrays.get(String(over.name)) : undefined;
 			if (row?.type === 'Identifier' && array)
 				scope = new Map([...rows, [String(row.name), array]]);

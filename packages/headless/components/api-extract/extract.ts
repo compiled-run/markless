@@ -78,7 +78,7 @@ const familyNames = (analyzer: YukuAnalyzer, directories: readonly string[]) => 
 	const byDirectory = new Map<string, string>();
 	const index = analyzer.module('index.ts');
 	for (const entry of index?.exports ?? []) {
-		if (!entry.isNamespaceReexport || !entry.name || !entry.specifier) continue;
+		if (entry.kind !== 'namespace' || !entry.name || !entry.specifier) continue;
 		const directory = entry.specifier.replace(/^\.\//, '').replace(/\/index\.ts$/, '');
 		byDirectory.set(directory, entry.name);
 	}
@@ -99,9 +99,9 @@ const resolveSymbol = (
 	module: YukuModule,
 	symbol: YukuSymbol,
 ): Resolved | null => {
-	const definition = analyzer.definitionOf(symbol);
+	const definition = symbol.definition();
 	const owner = definition?.module ?? module;
-	const target = definition?.symbol ?? symbol;
+	const target = definition?.binding ?? symbol;
 	const node = declarationOf(owner, target);
 
 	return node ? { module: owner, node } : null;
@@ -118,7 +118,7 @@ const exportedSymbol = (
 
 		return local ? resolveSymbol(analyzer, module, local) : null;
 	}
-	const symbol = module.resolve(name);
+	const symbol = module.lookup(name);
 
 	return symbol ? resolveSymbol(analyzer, module, symbol) : null;
 };
@@ -148,7 +148,7 @@ const displayedPropType = (
 	if (annotation['typeArguments'] || typeName?.type !== 'Identifier' || !typeName.name) {
 		return typeText(module, annotation);
 	}
-	const symbol = module.resolve(typeName.name, undefined, 'type');
+	const symbol = module.lookup(typeName.name, { space: 'type' });
 	const resolved = symbol ? resolveSymbol(analyzer, module, symbol) : null;
 	if (!resolved || resolved.node.type !== 'TSTypeAliasDeclaration') {
 		return typeText(module, annotation);
@@ -207,7 +207,7 @@ const collectProps = (
 		const typeName = typeNode['typeName'] as AstNode & { name?: string };
 		if (typeNode['typeArguments'] || typeName?.type !== 'Identifier' || !typeName.name)
 			return [];
-		const symbol = module.resolve(typeName.name, undefined, 'type');
+		const symbol = module.lookup(typeName.name, { space: 'type' });
 		const resolved = symbol ? resolveSymbol(analyzer, module, symbol) : null;
 		if (!resolved || resolved.node.type !== 'TSTypeAliasDeclaration') return [];
 
@@ -286,7 +286,7 @@ const partDoc = (
 	if (!inner || inner.type !== 'TSTypeReference') return undefined;
 	const typeName = inner['typeName'] as AstNode & { name?: string };
 	if (typeName?.type !== 'Identifier' || !typeName.name) return undefined;
-	const symbol = module.resolve(typeName.name, undefined, 'type');
+	const symbol = module.lookup(typeName.name, { space: 'type' });
 	const resolved = symbol ? resolveSymbol(analyzer, module, symbol) : null;
 	if (!resolved) return undefined;
 
@@ -303,7 +303,7 @@ const familyParts = (analyzer: YukuAnalyzer, familyDir: string): PartEntry[] => 
 	const parts: PartEntry[] = [];
 	const seenComponents = new Set<AstNode>();
 	for (const entry of [...index.exports].sort((a, b) => a.node.start - b.node.start)) {
-		if (entry.typeOnly || entry.isStar || !entry.name || !entry.fromName) continue;
+		if (entry.typeOnly || entry.kind === 'star' || !entry.name || !entry.fromName) continue;
 		const target = entry.resolvedModule;
 		// A part is a component, and a component is authored in TSRX. The plain
 		// `.ts` helpers a family also re-exports are not parts.

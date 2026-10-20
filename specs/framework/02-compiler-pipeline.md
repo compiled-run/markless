@@ -132,10 +132,14 @@ target and migration order.
 
 ### Initial compiler substrate
 
-The first implementation uses JavaScript/TypeScript with `@tsrx/core` as the
-parser, semantic, and codegen-plugin substrate. This is an initial
-implementation strategy, not a permanent architectural limit: prove the
-framework behavior first, then replace compiler internals later if needed.
+The implementation uses JavaScript/TypeScript on `@tsrx/yuku`: its `parse`
+returns the ESTree program with TSRX's own nodes, `analyze` returns scopes,
+bindings and references, and `generate` prints emitted modules. `<style>` CSS
+is parsed with `yuku-css`. The compiler reads the parser's tree directly; it
+does not re-walk or copy it into another shape. Markless owns diagnostics,
+source locations and editor mappings. This is an implementation strategy, not a
+permanent architectural limit: prove the framework behavior first, then replace
+compiler internals later if needed.
 
 The compiler package is runtime-agnostic ESM. It should not import Node modules
 for paths, files, URL handling, crypto, or process state. Path/URL normalization

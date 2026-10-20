@@ -24,27 +24,22 @@ function walkStateFor(filename: string): ReturnType<typeof createWalkState> {
 	});
 }
 
-test('the walk carries yuku semantic tables for the module being walked', () => {
+test('the walk carries the analyzed module for the source being walked', () => {
 	const semantic = walkStateFor('counter.tsrx').semantic();
 
 	// Populated, and describing this module rather than an empty placeholder.
-	expect(semantic.symbol.count).toBeGreaterThan(0);
-	expect(semantic.reference.count).toBeGreaterThan(0);
-	const symbolNames = Array.from({ length: semantic.symbol.count }, (_, id) =>
-		semantic.symbol.name(id),
+	expect(semantic.bindings.length).toBeGreaterThan(0);
+	expect(semantic.references.length).toBeGreaterThan(0);
+	expect(semantic.bindings.map((binding) => binding.name)).toEqual(
+		expect.arrayContaining(['state', 'Counter', 'total']),
 	);
-	expect(symbolNames).toEqual(expect.arrayContaining(['state', 'Counter', 'total']));
 
 	// A collector can go from a use to the binding it resolves to, and back to
 	// the span that use occupies in the authored source.
-	const totalSymbol = symbolNames.indexOf('total');
-	const [firstUse] = Array.from({ length: semantic.reference.count }, (_, id) => id).filter(
-		(id) => semantic.reference.symbolId(id) === totalSymbol,
-	);
+	const total = semantic.bindings.find((binding) => binding.name === 'total');
+	const firstUse = semantic.references.find((reference) => reference.binding === total);
 	expect(firstUse).toBeDefined();
-	expect(source.slice(semantic.reference.start(firstUse!), semantic.reference.end(firstUse!))).toBe(
-		'total',
-	);
+	expect(source.slice(firstUse!.node.start, firstUse!.node.end)).toBe('total');
 });
 
 test('analysis is deferred until asked for, then reused within one walk', () => {
@@ -58,14 +53,14 @@ test('analysis is deferred until asked for, then reused within one walk', () => 
 			analyses += 1;
 			expect(analyzedSource).toBe(source);
 			expect(filename).toBe('counter.tsrx');
-			return { symbol: { count: 7 } } as never;
+			return { bindings: { length: 7 } } as never;
 		},
 	});
 
 	// A walk that never asks never pays for a second pass over the source.
 	expect(analyses).toBe(0);
-	expect(state.semantic().symbol.count).toBe(7);
-	expect(state.semantic().symbol.count).toBe(7);
+	expect(state.semantic().bindings.length).toBe(7);
+	expect(state.semantic().bindings.length).toBe(7);
 	expect(analyses).toBe(1);
 });
 

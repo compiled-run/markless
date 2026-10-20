@@ -1,11 +1,5 @@
-import { createRequire } from 'node:module';
+import { Analyzer, type Binding, type Module } from '@tsrx/yuku';
 import { compileTsrxForTypeService } from '../../../compiler/src/type-service.ts';
-
-// yuku is the compiler's declared dependency, not @markless/ui's, so the house
-// analyzer is resolved from the package that owns it rather than re-declared.
-const requireFromCompiler = createRequire(
-	new URL('../../../compiler/package.json', import.meta.url),
-);
 
 export type AstNode = {
 	type: string;
@@ -21,45 +15,9 @@ export type YukuComment = {
 	end: number;
 };
 
-export type YukuSymbol = {
-	name: string;
-	declarations: AstNode[];
-};
-
-export type YukuExport = {
-	name: string | null;
-	fromName: string | null;
-	specifier: string | null;
-	typeOnly: boolean;
-	isStar: boolean;
-	isNamespaceReexport: boolean;
-	local: YukuSymbol | null;
-	resolvedModule: YukuModule | null;
-	node: AstNode;
-};
-
-export type YukuModule = {
-	path: string;
-	source: string;
-	ast: AstNode & { body: AstNode[] };
-	comments: YukuComment[];
-	exports: YukuExport[];
-	resolve(name: string, from?: unknown, space?: string): YukuSymbol | null;
-	parentOf(node: AstNode): AstNode | null;
-};
-
-export type YukuAnalyzer = {
-	addFile(path: string, source: string, options?: { lang?: string }): YukuModule;
-	module(path: string): YukuModule | undefined;
-	link(): void;
-	definitionOf(symbol: YukuSymbol): { module: YukuModule; symbol: YukuSymbol | null } | null;
-};
-
-type AnalyzerConstructor = new (options?: {
-	resolve?: (specifier: string, importerPath: string) => string | null;
-}) => YukuAnalyzer;
-
-const { Analyzer } = requireFromCompiler('yuku-analyzer') as { Analyzer: AnalyzerConstructor };
+export type YukuModule = Module;
+export type YukuSymbol = Binding;
+export type YukuAnalyzer = Analyzer;
 
 const joinModulePath = (importerPath: string, specifier: string): string => {
 	const base = importerPath.slice(0, importerPath.lastIndexOf('/'));
@@ -79,7 +37,7 @@ const joinModulePath = (importerPath: string, specifier: string): string => {
  * editor type-checks, so the analyzer sees one language across the graph.
  */
 export function analyzeSources(sources: ReadonlyMap<string, string>): YukuAnalyzer {
-	const prepared = new Map<string, { source: string; lang: string }>();
+	const prepared = new Map<string, { source: string; lang: 'ts' | 'tsx' }>();
 	for (const [path, source] of sources) {
 		if (path.endsWith('.tsrx')) {
 			prepared.set(path, {
@@ -99,7 +57,7 @@ export function analyzeSources(sources: ReadonlyMap<string, string>): YukuAnalyz
 			return prepared.has(resolved) ? resolved : null;
 		},
 	});
-	for (const [path, file] of prepared) analyzer.addFile(path, file.source, { lang: file.lang });
+	for (const [path, file] of prepared) analyzer.setFile(path, file.source, { lang: file.lang });
 	analyzer.link();
 
 	return analyzer;
@@ -113,13 +71,13 @@ export function declarationOf(module: YukuModule, symbol: YukuSymbol): AstNode |
 	const declaration = symbol.declarations[0];
 	if (!declaration) return null;
 
-	return module.parentOf(declaration) ?? declaration;
+	return (module.parentOf(declaration) ?? declaration) as unknown as AstNode;
 }
 
 /** The doc comment immediately above `node`, unwrapped, or undefined. */
 export function docCommentAbove(module: YukuModule, node: AstNode): string | undefined {
 	let best: YukuComment | undefined;
-	for (const comment of module.comments) {
+	for (const comment of module.comments as YukuComment[]) {
 		if (comment.type !== 'Block' || !comment.value.startsWith('*')) continue;
 		if (comment.end > node.start) continue;
 		if (module.source.slice(comment.end, node.start).trim() !== '') continue;

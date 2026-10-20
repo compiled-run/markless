@@ -1,4 +1,4 @@
-import { isEventAttribute } from '@tsrx/yuku';
+import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import {
 	getElementAttributes,
@@ -32,7 +32,7 @@ function mayStartAttach(root: AnyNode): boolean {
 	let starts = false;
 	walkNode(root, (node) => {
 		if (starts) return;
-		if (node.type === 'TSRXExpression' || node.type === 'JSXExpressionContainer') {
+		if (node.type === 'JSXExpressionContainer') {
 			starts = isProjectedChildren(node.expression as AnyNode | undefined);
 			return;
 		}

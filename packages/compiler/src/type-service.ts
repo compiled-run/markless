@@ -1,10 +1,11 @@
-import type { Program } from '@tsrx/yuku';
 import {
+	type Program,
 	parseModule,
 	type MarklessCompileError,
 	type MarklessParseOptions,
 	type MarklessParserComment,
 } from './js-ast.ts';
+import { rawElementText } from './ast/raw-text.ts';
 
 export interface MarklessMappingData {
 	verification: boolean;
@@ -123,7 +124,7 @@ export function compileTsrxForTypeService(
 	return {
 		code: generated.code,
 		mappings: generated.mappings,
-		cssMappings: collectCssMappings(sourceAst, source),
+		cssMappings: collectCssMappings(sourceAst),
 		scriptMappings: [],
 		errors,
 		sourceAst,
@@ -233,7 +234,6 @@ function emitTemplateNode(node: unknown, source: string): string {
 		case 'Fragment':
 			return emitFragment(node, source);
 		case 'JSXExpressionContainer':
-		case 'TSRXExpression':
 			return emitExpressionContainer(node, source);
 		case 'JSXIfExpression':
 		case 'JSXForExpression':
@@ -257,7 +257,7 @@ function emitElement(node: TsrxAstNode, source: string): string {
 	const opening = isNode(node.openingElement) ? node.openingElement : undefined;
 	if (!opening) return '';
 	const openingName = isNode(opening.name) ? opening.name : undefined;
-	if (openingName?.type === 'JSXExpressionContainer' || openingName?.type === 'TSRXExpression') {
+	if (openingName?.type === 'JSXExpressionContainer') {
 		return emitDynamicElement(node, opening, openingName, source);
 	}
 	let output = emitOpeningElement(opening, source);
@@ -322,8 +322,7 @@ function emitAttribute(attribute: TsrxAstNode, source: string): string {
 		return output;
 	}
 	if (
-		attribute.value.type === 'JSXExpressionContainer' ||
-		attribute.value.type === 'TSRXExpression'
+		attribute.value.type === 'JSXExpressionContainer'
 	) {
 		output += emitExpressionContainer(attribute.value, source);
 		return output;
@@ -550,8 +549,7 @@ function emitArmParts(
 function isTemplateChildNode(node: TsrxAstNode): boolean {
 	return (
 		isTsrxTemplateSyntaxNode(node) ||
-		node.type === 'JSXExpressionContainer' ||
-		node.type === 'TSRXExpression'
+		node.type === 'JSXExpressionContainer'
 	);
 }
 
@@ -637,7 +635,7 @@ function elementTagReference(node: TsrxAstNode, source: string): string | null {
 	if (name.type === 'JSXIdentifier' || name.type === 'Identifier') {
 		return typeof name.name === 'string' && /^[A-Z]/.test(name.name) ? name.name : null;
 	}
-	if (name.type === 'JSXExpressionContainer' || name.type === 'TSRXExpression') {
+	if (name.type === 'JSXExpressionContainer') {
 		return sourceSlice(name.expression, source);
 	}
 	if (name.type === 'JSXMemberExpression' || name.type === 'MemberExpression') {
@@ -646,23 +644,20 @@ function elementTagReference(node: TsrxAstNode, source: string): string | null {
 	return null;
 }
 
-function collectCssMappings(ast: unknown, source: string): TsrxCodeMapping[] {
+function collectCssMappings(ast: unknown): TsrxCodeMapping[] {
 	const mappings: TsrxCodeMapping[] = [];
 	walkNode(ast, (node) => {
-		if (node.type !== 'JSXStyleElement' || typeof node.css !== 'string') return;
-		// A body that starts with `{` is an interpolation container, not CSS text -
-		// no valid stylesheet opens with a bare block, and handing the expression
-		// to the CSS service reports "at-rule or selector expected" on real code.
-		if (node.css.trimStart().startsWith('{')) return;
-		const span = sourceSpan(node);
-		const cssStart = source.indexOf(node.css, span?.start ?? 0);
-		const sourceOffset = cssStart === -1 ? (span?.start ?? 0) : cssStart;
+		if (node.type !== 'JSXStyleElement') return;
+		// An interpolated body is an expression, not CSS text for the CSS service.
+		const css = rawElementText(node);
+		if (css === null) return;
+		const sourceOffset = (node.children as TsrxAstNode[] | undefined)?.[0]?.start ?? sourceSpan(node)?.start ?? 0;
 		mappings.push({
-			...createMapping(sourceOffset, node.css.length, 0, node.css.length),
+			...createMapping(sourceOffset, css.length, 0, css.length),
 			data: {
 				...fullMappingData,
 				customData: {
-					content: node.css,
+					content: css,
 				},
 			},
 		});
@@ -788,7 +783,7 @@ function collectTemplateExpressionSources(
 	expressions: string[],
 ): void {
 	if (!isNode(node)) return;
-	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+	if (node.type === 'JSXExpressionContainer') {
 		if (isNode(node.expression) && node.expression.type !== 'JSXEmptyExpression') {
 			expressions.push(sourceSlice(node.expression, source));
 		}
@@ -826,7 +821,7 @@ function getElementAttributes(node: TsrxAstNode): TsrxAstNode[] {
 
 function unwrapExpressionContainer(node: unknown): unknown {
 	if (!isNode(node)) return undefined;
-	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
+	if (node.type === 'JSXExpressionContainer') {
 		return node.expression;
 	}
 	return node;

@@ -1234,7 +1234,16 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's2',
-					text: ', Markless does not see a branch. The page shows the word "else" and the code after it as text.',
+					text: ', Markless does not see a branch. A braced ',
+				},
+				{
+					id: 's3',
+					text: '} else {',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' stops the build. An unbraced one shows the word "else" and the code after it as text.',
 				},
 			],
 			how: [
@@ -4263,9 +4272,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'Markless could not read a .tsrx file.',
 		printed: [
-			'MARKLESS_PARSE_ERROR: `<closing>` and `<opening>` are sibling elements written back to back, so the parser reads the second `<` as a less-than operator (@tsrx/yuku reported: <message>).',
+			'MARKLESS_PARSE_ERROR: <message> (@tsrx/yuku reported: <message>)',
 			'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
-			'Put `;` after `<closing>` (line <line>), or start `<opening>` on its own line. In a component body each top-level element is a statement, and two statements on one line need `;` between them.',
+			'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
 			'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
 		],
 		structured: true,

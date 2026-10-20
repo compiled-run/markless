@@ -14,7 +14,7 @@
  * Not a regex: a `as` inside a string or a template literal is text, and only a
  * parse can tell the two apart.
  */
-import { generate } from 'yuku-codegen';
+import { generate } from '@tsrx/yuku';
 import { parseModule } from '../../js-ast.ts';
 import { createSourceMemo } from '../semantic-graph/shared-ast.ts';
 import { EMISSION_PARSE_OPTIONS, EMISSION_PRINT_OPTIONS } from '../emit-codegen.ts';
@@ -98,9 +98,9 @@ function printStrippedUncached(wrapped: string, site: StripSite, span: string): 
 	if (!carriesTypeScript(program)) return null;
 
 	const result = generate(program as never, EMISSION_PRINT_OPTIONS);
-	if (result.errors.length > 0) {
+	if (result.diagnostics.length > 0) {
 		throw new SsrStripError(
-			`Cannot emit the SSR module because ${site.what} uses TypeScript with no JavaScript form: ${result.errors
+			`Cannot emit the SSR module because ${site.what} uses TypeScript with no JavaScript form: ${result.diagnostics
 				.map((diagnostic) => diagnostic.message)
 				.join('; ')}. Authored text: ${span.length > 120 ? `${span.slice(0, 120)}…` : span}`,
 		);

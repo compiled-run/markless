@@ -95,5 +95,5 @@ test('module semantics are analyzed once per exact source', () => {
 	const view = moduleSemantics('const a = 1; a;', 'memo.ts');
 	expect(moduleSemantics('const a = 1; a;', 'memo.ts')).toBe(view);
 	expect(moduleSemantics('const b = 1; b;', 'memo.ts')).not.toBe(view);
-	expect(view.reference.count).toBeGreaterThan(0);
+	expect(view.references.length).toBeGreaterThan(0);
 });

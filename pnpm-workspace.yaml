@@ -7,7 +7,6 @@ packages:
   - website
   - demos/interaction-benchmark/apps/markless
   - demos/interaction-benchmark/apps/markless-viewport
-  # @tsrx/yuku is consumed through its generated self-contained host.
 
 catalogs:
   default:

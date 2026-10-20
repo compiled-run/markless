@@ -1597,8 +1597,10 @@ export function App() @{
 	<main>
 		<button onClick={() => shift = shift + 1}>Next</button>
 		@try {
-			<h2>{roster.caption}</h2>
-			<Plaque caption="plaque" tone={roster.detail.tone} />
+			<>
+				<h2>{roster.caption}</h2>
+				<Plaque caption="plaque" tone={roster.detail.tone} />
+			</>
 		} @pending {
 			<p>Waiting</p>
 		}

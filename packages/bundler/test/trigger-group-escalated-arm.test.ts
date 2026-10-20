@@ -99,8 +99,10 @@ export function Panel() @{
 	<article>
 		<a href="#" onClick={() => expanded = !expanded}>Expand</a>
 		@if (expanded) {
-			<Tally />
-			<p>{steps} and {half}</p>
+			<>
+				<Tally />
+				<p>{steps} and {half}</p>
+			</>
 		}
 	</article>
 }

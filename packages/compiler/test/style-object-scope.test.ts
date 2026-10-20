@@ -31,9 +31,10 @@ function offsetOf(source: string, needle: string, occurrence = 1): number {
 test('a `let` read above its own declaration resolves to that `let`, not the outer const', () => {
 	const source = `${HEADER}const box = { color: 'red' };
 export function App() @{
-	<div style={{ ...box }} />
+	const early = () => ({ ...box });
 	let box = { color: 'blue' };
 	box = { color: 'green' };
+	<div style={early()} />
 }
 `;
 	const resolver = resolverFor(source);
@@ -49,12 +50,14 @@ export function App() @{
 
 test('a `var` declared inside a block stays visible after the block, a `const` does not', () => {
 	const source = `${HEADER}export function App() @{
-	@if (true) {
-		var box = { color: 'blue' };
-		const inner = { color: 'green' };
-		<span style={{ ...inner }} />
-	}
-	<div style={{ ...box }} />
+	<>
+		@if (true) {
+			var box = { color: 'blue' };
+			const inner = { color: 'green' };
+			<span style={{ ...inner }} />
+		}
+		<div style={{ ...box }} />
+	</>
 }
 `;
 	const resolver = resolverFor(source);
@@ -125,11 +128,13 @@ export function App() @{
 test('a branch code block gets its own scope, so a branch-local const shadows the module one', () => {
 	const source = `${HEADER}const box = { color: 'red' };
 export function App() @{
-	<div style={{ ...box }} />
-	@if (true) {
-		const box = { color: 'blue' };
-		<span style={{ ...box }} />
-	}
+	<>
+		<div style={{ ...box }} />
+		@if (true) {
+			const box = { color: 'blue' };
+			<span style={{ ...box }} />
+		}
+	</>
 }
 `;
 	const resolver = resolverFor(source);
@@ -260,11 +265,13 @@ export { box };
 test('resolveString reads the innermost visible string const', () => {
 	const source = `${HEADER}const KEY = 'font-size';
 export function App() @{
-	<div style={{ [KEY]: '2rem' }} />
-	@if (true) {
-		const KEY = 'line-height';
-		<span style={{ [KEY]: 2 }} />
-	}
+	<>
+		<div style={{ [KEY]: '2rem' }} />
+		@if (true) {
+			const KEY = 'line-height';
+			<span style={{ [KEY]: 2 }} />
+		}
+	</>
 }
 `;
 	const resolver = resolverFor(source);

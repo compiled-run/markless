@@ -1,5 +1,5 @@
 import { componentExportPath, linkedComponentTarget } from '../link/component-target.ts';
-import { isEventAttribute } from '@tsrx/yuku';
+import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';

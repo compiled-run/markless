@@ -1887,6 +1887,19 @@ export function branchElseSpellingDiagnostic(input: {
 	};
 }
 
+// A braced plain `else` after an @if arm stops the parser (TSRX1009), so it is named at the parse.
+export function branchElseSpellingParseDiagnostic(input: {
+	readonly span: SourceSpan | undefined;
+	readonly parserMessage: string;
+}): SemanticGraphDiagnostic {
+	return {
+		...branchElseSpellingDiagnostic({ node: {}, filename: input.span?.filename ?? '' }),
+		phase: 'parse',
+		message: `This \`else\` follows an @if arm but is not written as \`@else\`, so the parser cannot read it as the branch's alternative (@tsrx/yuku reported: ${input.parserMessage}).`,
+		primarySpan: input.span,
+	};
+}
+
 // Owner-adjustable: the spec is unambiguous that a bare container is not a
 // template output node, but the in-repo @markless/ui families still spell arms
 // that way. `warning` until that migration lands, then `error`.

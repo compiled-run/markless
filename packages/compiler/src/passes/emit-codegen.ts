@@ -20,7 +20,7 @@
  *   is a named compiler diagnostic instead of an upstream crash
  * - the determinism helper (invariant 7), which every migrated site's test uses
  *
- * Evidence, re-run against the installed `yuku-codegen@0.9.1` while writing
+ * Evidence, re-run against the installed `@tsrx/yuku` printer while writing
  * this module and asserted in `test/emission-foundation.test.ts`:
  * `preserveParens: false` removes `ParenthesizedExpression` nodes and the
  * printer still derives correct parentheses; comments survive only when
@@ -29,19 +29,14 @@
  * TSRX node types with `unsupported ESTree node type: JSXCodeBlock` on both the
  * normal and `strip: true` paths.
  */
-import { generate, type GenerateOptions, type SourceMap } from 'yuku-codegen';
+import { generate } from '@tsrx/yuku';
 import type { CompilerDiagnostic } from '../diagnostics.ts';
-import type { Program } from '@tsrx/yuku';
-import { parseModule, type MarklessCompileError } from '../js-ast.ts';
+import { parseModule, type MarklessCompileError, type Program } from '../js-ast.ts';
 
-/**
- * `yuku-codegen` types its input against `@yuku-toolchain/types`, which models
- * the same ESTree shapes as `@tsrx/yuku` but is a separate declaration. The two
- * `Program` interfaces are structurally distinct (`hashbang`, and the body
- * element union), so the compiler's tree needs one cast to cross the boundary.
- * It is taken here, once, rather than at every print site.
- */
+// Emitters build plain node objects the printer's node union cannot see, so the one cast to it is taken here.
 type CodegenProgram = Parameters<typeof generate>[0];
+type GenerateOptions = NonNullable<Parameters<typeof generate>[1]>;
+type SourceMap = NonNullable<ReturnType<typeof generate>['map']>;
 
 /** A node under construction. Emitters build these; the printer consumes them. */
 export type EmissionNode = {
@@ -129,7 +124,7 @@ export const EMISSION_PRINT_OPTIONS = Object.freeze({
  * invariant 4 requires that premise be asserted rather than assumed.
  *
  * Plain JSX (`JSXElement`, `JSXExpressionContainer`, ...) is deliberately not
- * in this set: `yuku-codegen@0.9.1` prints those without error, so refusing
+ * in this set: the `@tsrx/yuku` printer prints those without error, so refusing
  * them would be a false positive. `TSModuleDeclaration` and `TSModuleBlock`
  * also print without error today; they are kept because the specification
  * enumerates them, and no stage-1 extracted symbol contains a namespace.
@@ -203,7 +198,7 @@ export function assertTsrxFreeForEmission(root: unknown, site: EmissionSite): vo
 		emissionDiagnostic(EMISSION_TSRX_NODE_CODE, site, {
 			title: 'This symbol still contains TSRX syntax at emission',
 			message: `Cannot emit${symbolLabel(site)} because the tree reaching the printer contains a TSRX-only node (${nodeType}).`,
-			why: 'Stage 1 emission prints through yuku-codegen, which supports ESTree and TypeScript nodes only. TSRX syntax must be lowered by extraction before emission; without this check the printer throws "unsupported ESTree node type" and the failure surfaces as a crash instead of a diagnostic.',
+			why: 'Stage 1 emission prints JavaScript modules, and TSRX syntax must be lowered by extraction before emission; without this check the printer writes the TSRX syntax back out and the emitted module fails when it loads instead of the compile reporting it.',
 			suggestions: [
 				{
 					message:
@@ -269,11 +264,11 @@ export function printEmittedModule(input: EmissionPrintInput): EmittedModule {
 		);
 	}
 
-	if (result.errors.length > 0) {
+	if (result.diagnostics.length > 0) {
 		throw new EmissionDiagnosticError(
 			emissionDiagnostic(EMISSION_CODEGEN_FAILED_CODE, input.site, {
 				title: 'The emitted module could not be printed cleanly',
-				message: `Cannot emit${symbolLabel(input.site)} because the printer reported ${result.errors.length} problem(s): ${result.errors.map((diagnostic) => diagnostic.message).join('; ')}`,
+				message: `Cannot emit${symbolLabel(input.site)} because the printer reported ${result.diagnostics.length} problem(s): ${result.diagnostics.map((diagnostic) => diagnostic.message).join('; ')}`,
 				why: 'The printer reports constructs it elided rather than rendered. Emitting the result anyway would ship a module missing the elided code.',
 				suggestions: [
 					{
@@ -329,9 +324,9 @@ export function printEmissionExpression(node: EmissionNode): string {
 		],
 	};
 	const result = generate(program as unknown as CodegenProgram, EMISSION_PRINT_OPTIONS);
-	if (result.errors.length > 0) {
+	if (result.diagnostics.length > 0) {
 		throw new Error(
-			`emission: printing an expression reported ${result.errors.length} problem(s): ${result.errors.map((diagnostic) => diagnostic.message).join('; ')}`,
+			`emission: printing an expression reported ${result.diagnostics.length} problem(s): ${result.diagnostics.map((diagnostic) => diagnostic.message).join('; ')}`,
 		);
 	}
 	if (!result.code.startsWith(EXPRESSION_WRAPPER_PREFIX) || !result.code.endsWith(';')) {
@@ -612,7 +607,7 @@ export function optionalMemberNode(object: EmissionNode, property: string): Emis
  *
  * The printer takes comments from a node's own `comments` array, in the shape
  * the parser attaches — `leadingComments` is ignored, which was checked against
- * the installed `yuku-codegen@0.9.1` while writing this. `value` is the text
+ * the installed the `@tsrx/yuku` printer while writing this. `value` is the text
  * between the delimiters and excludes them: passing `" marker "` prints a block
  * comment whose body is `" marker "`, with the printer supplying `slash-star`
  * and `star-slash` itself.

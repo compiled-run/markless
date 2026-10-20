@@ -35,7 +35,7 @@ export function constantPropValue(expression: AnyNode, state: WalkState): Consta
 		const symbolId = resolvedSymbolAt(semantic, identifier.start);
 		if (symbolId === null) return NOT_CONSTANT;
 		// A `const` in a component body is as fixed as a module one when its initializer is constant data.
-		if (semantic.scope.kind(semantic.symbol.scopeId(symbolId)) !== 'module') {
+		if (semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module') {
 			if (mutatedModuleNames(state).has(name)) return NOT_CONSTANT;
 			const local = localConstantInitializer(name, symbolId, state);
 			if (!local) return NOT_CONSTANT;

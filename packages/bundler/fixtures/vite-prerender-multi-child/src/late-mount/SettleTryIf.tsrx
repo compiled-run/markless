@@ -16,8 +16,10 @@ export function App() @{
 			<em>Waiting</em>
 		}
 		@try {
-			<h5>{detail.heading}</h5>
-			@if (open) { <i data-chip onClick={() => taps = taps + 1} onDblClick={() => holds = holds + 1}>chip {taps}/{holds}</i> }
+			<>
+				<h5>{detail.heading}</h5>
+				@if (open) { <i data-chip onClick={() => taps = taps + 1} onDblClick={() => holds = holds + 1}>chip {taps}/{holds}</i> }
+			</>
 		} @pending {
 			<em>Waiting</em>
 		}

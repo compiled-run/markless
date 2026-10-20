@@ -1,7 +1,6 @@
 // Compiles every <Code> block of the docs page off the main thread, one compile at a time.
 import { createBlockCompiler, type BlockCompiler } from './compile.ts';
 import type { WorkerReply, WorkerRequest } from './protocol.ts';
-import { loadCodeWasm } from './wasm.ts';
 import { workerSourceHost } from './worker-sources.ts';
 
 const scope = self as unknown as {
@@ -29,7 +28,6 @@ async function compile({ id, block, files }: WorkerRequest): Promise<void> {
 			(compiler = createBlockCompiler(workerSourceHost(block), `code-${block}`)),
 		);
 	try {
-		await loadCodeWasm();
 		scope.postMessage({ id, outcome: await compiler.compile(files) });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);

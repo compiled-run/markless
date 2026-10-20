@@ -613,7 +613,7 @@ function thunkable(parent: AnyNode, child: AnyNode): boolean {
 
 // A markup slot: the value the renderer prints, verbatim, wherever it stands.
 function isPrintedPosition(parent: AnyNode, child: AnyNode): boolean {
-	if (parent.type === 'JSXExpressionContainer' || parent.type === 'TSRXExpression')
+	if (parent.type === 'JSXExpressionContainer')
 		return parent.expression === child;
 	// The block-with-one-expression form a bare arm interpolation parses as.
 	if (parent.type === 'ExpressionStatement') return parent.expression === child;
@@ -753,9 +753,9 @@ function declaredSymbolAt(
 	let byOffset = declaredSymbols.get(semantic);
 	if (!byOffset) {
 		const index = new Map<number, number>();
-		for (let symbolId = 0; symbolId < semantic.symbol.count; symbolId += 1) {
-			for (let declIndex = 0; declIndex < semantic.symbol.declCount(symbolId); declIndex += 1) {
-				const start = semantic.symbol.declNode(symbolId, declIndex).start;
+		for (let symbolId = 0; symbolId < semantic.bindings.length; symbolId += 1) {
+			for (let declIndex = 0; declIndex < semantic.bindings[symbolId]!.declarations.length; declIndex += 1) {
+				const start = semantic.bindings[symbolId]!.declarations[declIndex]!.start;
 				if (typeof start === 'number' && !index.has(start)) index.set(start, symbolId);
 			}
 		}

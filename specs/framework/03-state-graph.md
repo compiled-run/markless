@@ -968,20 +968,22 @@ boundary is local ownership, so ordinary `state()` is enough.
 export function Select({ options }) @{
   const s = state({ open: false, value: null });
 
-  <button onClick={() => s.open = !s.open}>{s.value ?? "Select"}</button>
+  <>
+    <button onClick={() => s.open = !s.open}>{s.value ?? "Select"}</button>
 
-  @if (s.open) {
-    <ul>
-      @for (const option of options; key option.value) {
-        <li onClick={() => {
-          s.value = option.value;
-          s.open = false;
-        }}>
-          {option.label}
-        </li>
-      }
-    </ul>
-  }
+    @if (s.open) {
+      <ul>
+        @for (const option of options; key option.value) {
+          <li onClick={() => {
+            s.value = option.value;
+            s.open = false;
+          }}>
+            {option.label}
+          </li>
+        }
+      </ul>
+    }
+  </>
 }
 ```
 

@@ -29,7 +29,7 @@ Here is the counter again. Click a line of the file to see which part of the but
 
 **`let count = state(0)`** makes a value the page follows. It is still a `let`, and it starts at `0`.
 
-**`<button ...>`** is an element. It works like HTML, with a few extras: `{count}` shows a value, and `onClick` runs code on a click. You do not `return` it. You write it in the body as a statement, like the `let` line above it.
+**`<button ...>`** is an element. It works like HTML, with a few extras: `{count}` shows a value, and `onClick` runs code on a click. You do not `return` it. You write it after the statements: a body runs its statements first, then shows the one element at its end.
 
 **`onClick={() => count++}`** handles a click. An event prop is `on` plus the event name, so `onInput` and `onKeyDown` work the same way.
 
@@ -37,7 +37,7 @@ Here is the counter again. Click a line of the file to see which part of the but
 
 ## More than one element
 
-A body can make more than one element. Write them one after the other, the same way you write two statements.
+A body shows one element. To show several, put them inside `<>` and `</>`. That pair is a fragment: it holds elements together and adds nothing to the page. The same goes for the body of each `@if`, `@for`, `@switch` and `@try` block below.
 
 <Code note="Add a third line that shows count times two, with {count * 2}. Then move the paragraph below the button.">
 ```tsrx title="labelled-counter.tsrx"
@@ -46,15 +46,17 @@ import { state } from '@markless/core';
 export default function LabelledCounter() @{
 	let count = state(0);
 
-	<p>You clicked {count} times.</p>
-	<button onClick={() => count++}>
-		Click me
-	</button>
+	<>
+		<p>You clicked {count} times.</p>
+		<button onClick={() => count++}>
+			Click me
+		</button>
+	</>
 }
 ```
 </Code>
 
-The paragraph reads `count`. Click the button, and only the number in the paragraph changes.
+The paragraph reads `count`. Click the button, and only the number in the paragraph changes. Without the fragment, Markless stops with an error that shows where to add it.
 
 ## Lines that start with @ control the elements
 

@@ -175,8 +175,7 @@ test('real tsserver reports the current TSRX parse failure and no parse error fo
 	const clean = openFixture('framework.tsrx');
 	const brokenDiagnostics = await server.syntacticDiagnosticsSync(broken.file);
 	const cleanDiagnostics = await server.syntacticDiagnosticsSync(clean.file);
-	const expectedStart = positionAtSearch(broken.source, '</button>>');
-	expectedStart.offset += '</button>'.length;
+	const expectedStart = positionAtSearch(broken.source, '</div>');
 	const parseDiagnostics = brokenDiagnostics.filter(
 		(diagnostic) =>
 			diagnostic.source === 'markless' && diagnostic.code === MARKLESS_TSRX_PARSE_ERROR_CODE,
@@ -245,17 +244,20 @@ test('M4 real tsserver returns only context-valid TSRX @ construct completions',
 			excluded: [...branchEntries, ...removedCatalogEntries],
 		},
 		{
+			// A code block renders one node, so after its @if only the @if's own clauses can follow.
 			marker: '/*M4_AFTER_IF*/',
-			included: [...baseConstructEntries, '@else'],
+			included: ['@else', '@else if'],
 			excluded: [
+				...baseConstructEntries,
 				...branchEntries.filter((name) => name !== '@else'),
 				...removedCatalogEntries,
 			],
 		},
 		{
 			marker: '/*M4_AFTER_FOR*/',
-			included: [...baseConstructEntries, '@empty'],
+			included: ['@empty'],
 			excluded: [
+				...baseConstructEntries,
 				...branchEntries.filter((name) => name !== '@empty'),
 				...removedCatalogEntries,
 			],
@@ -567,7 +569,7 @@ test.each([
 	{
 		name: 'statement sibling after @if',
 		marker: '/*M4C_STATEMENT_AFTER_IF*/',
-		expected: [...catalogBaseEntries, '@else', '@else if'],
+		expected: ['@else', '@else if'],
 	},
 	{
 		name: 'JSX-children sibling after @if',
@@ -577,7 +579,7 @@ test.each([
 	{
 		name: 'statement sibling after @for',
 		marker: '/*M4C_STATEMENT_AFTER_FOR*/',
-		expected: [...catalogBaseEntries, '@empty'],
+		expected: ['@empty'],
 	},
 	{
 		name: 'JSX-children sibling after @for',

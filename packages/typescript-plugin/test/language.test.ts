@@ -510,8 +510,10 @@ export function App() @{
 		{
 			name: 'Style.tsrx',
 			source: `export function App() @{
-	<style>.counter { color: red; }</style>
-	<section>hello</section>
+	<>
+		<style>.counter { color: red; }</style>
+		<section>hello</section>
+	</>
 }`,
 		},
 		{

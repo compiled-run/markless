@@ -26,178 +26,190 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 		<Sidebar pathname="/start/migrate" />
 		<ThemeToggle />
 		@if (view && app) {
-			<p class="crumb">
-				<Link href="/start/migrate">Apps being moved</Link>
-				<span aria-hidden="true">/</span>
-				<span>{app.name}</span>
-			</p>
-			<div class="head">
-				<div class="title">
-					<h1>{app.name}</h1>
-					<span class={inProgress ? 'sticker' : 'sticker is-done'}>{inProgress ? 'In progress' : 'Done'}</span>
-				</div>
-				<ul class="facts">
-					@for (const fact of facts; key fact.id) {
-						<li>{fact.text}</li>
-					}
-				</ul>
-			</div>
-
-			<div class="hero">
-				<BrowserFrame address={view.hostName}>
-					<img
-						class="shot"
-						src={asset(app.shot)}
-						alt={'The ' + app.name + ' home page, served by Markless'}
-						width="800"
-						height="500"
-						decoding="async"
-					/>
-				</BrowserFrame>
-				<div class="stat">
-					<span class="tally">
-						<span>Pages moved: <b>{view.pagesMoved}</b></span>
-						<span>Checks passed: <b>{view.checksPassed}</b></span>
-					</span>
-					<span class="stat-label">JavaScript run at load, home page</span>
-					<span class="stat-value">{view.headline}</span>
-					<span class="stat-note">{view.summary}, checked {view.checkedOn}.</span>
-					<span class={inProgress ? 'status is-progress' : 'status'}>{view.status}</span>
-				</div>
-			</div>
-
-			<ul class="links">
-				@for (const link of links; key link.id) {
-					<li>
-						<a class={link.main ? 'pill main' : 'pill'} href={link.href}>{link.label}</a>
-					</li>
-				}
-			</ul>
-
-			@if (missing.length) {
-				<h2 id="not-moved-yet">Pages not moved yet</h2>
-				<ul class="plain-list note">
-					@for (const route of missing; key route) {
-						<li class="path">{route}</li>
-					}
-				</ul>
-				@if (view.missingMore) {
-					<p class="note">And {view.missingMore} more in the full report.</p>
-				}
-			}
-
-			<h2 id="before-and-after">Before and after, per route</h2>
-			<p class="lede">
-				{'Left of the arrow is the old app, right is Markless. Run at load is the JavaScript the browser executes while the page loads. Downloaded is what it fetches, whether or not it runs.'}
-			</p>
-			<div class="table-wrap">
-				<table class="metrics">
-					<thead>
-						<tr>
-							<th scope="col">Route</th>
-							<th scope="col">Checks passed</th>
-							<th scope="col">JavaScript downloaded</th>
-							<th scope="col">JavaScript run at load</th>
-						</tr>
-					</thead>
-					<tbody>
-						@for (const row of rows; key row.id) {
-							<tr>
-								<th scope="row">
-									<span class={row.routeClass}>{row.route}</span>
-									<span class="row-note">{row.note}</span>
-								</th>
-								<td data-label="Checks passed">
-									<span>{row.checks}</span>
-									<span class="row-note">{row.green}</span>
-								</td>
-								<td class="num" data-label="JavaScript downloaded">{row.downloaded}</td>
-								<td class="num run" data-label="JavaScript run at load">{row.runAtLoad}</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
-			<p class="note">{view.redirects}</p>
-			<p class="note">
-				<span>Downloaded: </span>
-				<span>{app.downloadedBasis}.</span>
-				<span>{" Run at load: measured by Chrome's code coverage, uncompressed."}</span>
-				@if (roles) {
-					<span> A page someone may not open sends them elsewhere, so its numbers are the page they land on.</span>
-				}
-			</p>
-			@if (extra.length) {
-				<p class="note">Also sent to the new app, with no page to compare:</p>
-				<ul class="plain-list note">
-					@for (const item of extra; key item.id) {
-						<li>
-							<code>{item.route}</code>
-							<span>: {item.reason}</span>
-						</li>
-					}
-				</ul>
-			}
-
-			@if (gaps.length || red.length) {
-				<h2 id="known-gaps">{inProgress ? 'Known gaps' : 'Still red in the report'}</h2>
-				@if (gaps.length) {
-					<p class="lede">{"Each of these keeps a check red. The reason given is the porting agent's, waiting for a person to accept it or fix it."}</p>
-					<ul class="cards-list">
-						@for (const gap of gaps; key gap.id) {
-							<li class="gap">
-								<strong>{gap.title}</strong>
-								<span>{gap.detail}</span>
-							</li>
+			<>
+				<p class="crumb">
+					<Link href="/start/migrate">Apps being moved</Link>
+					<span aria-hidden="true">/</span>
+					<span>{app.name}</span>
+				</p>
+				<div class="head">
+					<div class="title">
+						<h1>{app.name}</h1>
+						<span class={inProgress ? 'sticker' : 'sticker is-done'}>{inProgress ? 'In progress' : 'Done'}</span>
+					</div>
+					<ul class="facts">
+						@for (const fact of facts; key fact.id) {
+							<li>{fact.text}</li>
 						}
 					</ul>
-				}
-				<p class="note">What the published report still shows red, per route and check. The full report has every failure.</p>
-				<ul class="plain-list note">
-					@for (const item of red; key item.id) {
-						<li>
-							<span class="path">{item.route}</span>
-							<span>{' ' + item.text}</span>
-						</li>
-					}
-				</ul>
-			}
+				</div>
 
-			<h2 id="what-was-checked">What was checked</h2>
-			<p class="lede">Every page was loaded in the old app and in Markless, at desktop and phone widths, and compared on each of these. Counts are pages that passed. Animations are not compared yet.</p>
-			<ul class="checks">
-				@for (const check of checks; key check.id) {
-					<li>
-						<span class="check-mark">
-							<Sprite name={check.mark} size="1.25em" />
+				<div class="hero">
+					<BrowserFrame address={view.hostName}>
+						<img
+							class="shot"
+							src={asset(app.shot)}
+							alt={'The ' + app.name + ' home page, served by Markless'}
+							width="800"
+							height="500"
+							decoding="async"
+						/>
+					</BrowserFrame>
+					<div class="stat">
+						<span class="tally">
+							<span>Pages moved: <b>{view.pagesMoved}</b></span>
+							<span>Checks passed: <b>{view.checksPassed}</b></span>
 						</span>
-						<span class="check-name">{check.name}</span>
-						<span class="check-count">{check.passed}</span>
-					</li>
-				}
-			</ul>
+						<span class="stat-label">JavaScript run at load, home page</span>
+						<span class="stat-value">{view.headline}</span>
+						<span class="stat-note">{view.summary}, checked {view.checkedOn}.</span>
+						<span class={inProgress ? 'status is-progress' : 'status'}>{view.status}</span>
+					</div>
+				</div>
 
-			@if (accepted.length) {
-				<h2 id="accepted-differences">Accepted differences</h2>
-				<p class="lede">Places the two apps differ on purpose, each with the reason it was accepted.</p>
-				<ul class="cards-list">
-					@for (const entry of accepted; key entry.id) {
-						<li class="accepted">
-							<span class="where">{entry.where}</span>
-							<span>{entry.reason}</span>
+				<ul class="links">
+					@for (const link of links; key link.id) {
+						<li>
+							<a class={link.main ? 'pill main' : 'pill'} href={link.href}>{link.label}</a>
 						</li>
 					}
 				</ul>
-			}
 
-			<h2 id="licence">Original project</h2>
-			<p>
-				<span>{app.links.originalRepo ? 'Source: ' : 'Moved from the live site at '}</span>
-				<a href={app.links.originalRepo ?? app.links.originalSite ?? app.links.old}>
-					{app.links.originalRepo ?? app.links.originalSite ?? app.links.old}
-				</a>
-				<span>. Licence: {app.links.licence ?? 'not recorded in the migration log'}.</span>
-			</p>
+				@if (missing.length) {
+					<>
+					<h2 id="not-moved-yet">Pages not moved yet</h2>
+						<ul class="plain-list note">
+							@for (const route of missing; key route) {
+								<li class="path">{route}</li>
+							}
+						</ul>
+						@if (view.missingMore) {
+							<p class="note">And {view.missingMore} more in the full report.</p>
+						}
+				</>
+				}
+
+				<h2 id="before-and-after">Before and after, per route</h2>
+				<p class="lede">
+					{'Left of the arrow is the old app, right is Markless. Run at load is the JavaScript the browser executes while the page loads. Downloaded is what it fetches, whether or not it runs.'}
+				</p>
+				<div class="table-wrap">
+					<table class="metrics">
+						<thead>
+							<tr>
+								<th scope="col">Route</th>
+								<th scope="col">Checks passed</th>
+								<th scope="col">JavaScript downloaded</th>
+								<th scope="col">JavaScript run at load</th>
+							</tr>
+						</thead>
+						<tbody>
+							@for (const row of rows; key row.id) {
+								<tr>
+									<th scope="row">
+										<span class={row.routeClass}>{row.route}</span>
+										<span class="row-note">{row.note}</span>
+									</th>
+									<td data-label="Checks passed">
+										<span>{row.checks}</span>
+										<span class="row-note">{row.green}</span>
+									</td>
+									<td class="num" data-label="JavaScript downloaded">{row.downloaded}</td>
+									<td class="num run" data-label="JavaScript run at load">{row.runAtLoad}</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+				<p class="note">{view.redirects}</p>
+				<p class="note">
+					<span>Downloaded: </span>
+					<span>{app.downloadedBasis}.</span>
+					<span>{" Run at load: measured by Chrome's code coverage, uncompressed."}</span>
+					@if (roles) {
+						<span> A page someone may not open sends them elsewhere, so its numbers are the page they land on.</span>
+					}
+				</p>
+				@if (extra.length) {
+					<>
+					<p class="note">Also sent to the new app, with no page to compare:</p>
+						<ul class="plain-list note">
+							@for (const item of extra; key item.id) {
+								<li>
+									<code>{item.route}</code>
+									<span>: {item.reason}</span>
+								</li>
+							}
+						</ul>
+				</>
+				}
+
+				@if (gaps.length || red.length) {
+					<>
+					<h2 id="known-gaps">{inProgress ? 'Known gaps' : 'Still red in the report'}</h2>
+						@if (gaps.length) {
+							<>
+						<p class="lede">{"Each of these keeps a check red. The reason given is the porting agent's, waiting for a person to accept it or fix it."}</p>
+								<ul class="cards-list">
+									@for (const gap of gaps; key gap.id) {
+										<li class="gap">
+											<strong>{gap.title}</strong>
+											<span>{gap.detail}</span>
+										</li>
+									}
+								</ul>
+					</>
+						}
+						<p class="note">What the published report still shows red, per route and check. The full report has every failure.</p>
+						<ul class="plain-list note">
+							@for (const item of red; key item.id) {
+								<li>
+									<span class="path">{item.route}</span>
+									<span>{' ' + item.text}</span>
+								</li>
+							}
+						</ul>
+				</>
+				}
+
+				<h2 id="what-was-checked">What was checked</h2>
+				<p class="lede">Every page was loaded in the old app and in Markless, at desktop and phone widths, and compared on each of these. Counts are pages that passed. Animations are not compared yet.</p>
+				<ul class="checks">
+					@for (const check of checks; key check.id) {
+						<li>
+							<span class="check-mark">
+								<Sprite name={check.mark} size="1.25em" />
+							</span>
+							<span class="check-name">{check.name}</span>
+							<span class="check-count">{check.passed}</span>
+						</li>
+					}
+				</ul>
+
+				@if (accepted.length) {
+					<>
+					<h2 id="accepted-differences">Accepted differences</h2>
+						<p class="lede">Places the two apps differ on purpose, each with the reason it was accepted.</p>
+						<ul class="cards-list">
+							@for (const entry of accepted; key entry.id) {
+								<li class="accepted">
+									<span class="where">{entry.where}</span>
+									<span>{entry.reason}</span>
+								</li>
+							}
+						</ul>
+				</>
+				}
+
+				<h2 id="licence">Original project</h2>
+				<p>
+					<span>{app.links.originalRepo ? 'Source: ' : 'Moved from the live site at '}</span>
+					<a href={app.links.originalRepo ?? app.links.originalSite ?? app.links.old}>
+						{app.links.originalRepo ?? app.links.originalSite ?? app.links.old}
+					</a>
+					<span>. Licence: {app.links.licence ?? 'not recorded in the migration log'}.</span>
+				</p>
+			</>
 		} @else {
 			<div class="missing">
 				<h1>No app with that name</h1>

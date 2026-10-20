@@ -21,7 +21,9 @@ export default function Page() @{
 	<section>
 		<button onClick={() => visible = !visible}>toggle</button>
 		@if (visible) {
+			<>
 			${arm}
+			</>
 		}
 	</section>
 }

@@ -357,9 +357,14 @@ function replaceIncompleteConstructs(
 		const lineBefore = candidate.source.slice(lineStart, offset);
 		const trimmedBefore = candidate.source.slice(Math.max(0, offset - 96), offset).trimEnd();
 		let replacement = '@{}';
+		const after = candidate.source.slice(offset + 1).trimStart();
 		if (lineStart === offset) replacement = '0';
+		// A lone `@` before the node a block renders holds no construct; a code block there would be a second node.
+		else if (/^\s*$/.test(lineBefore) && (after.startsWith('<') || after.startsWith('@'))) replacement = ' ';
 		else if ('=+-*/%?:,('.includes(trimmedBefore.at(-1) ?? '')) replacement = '0';
 		else if (/@try\b/.test(lineBefore)) replacement = '@pending {}';
+		// After an @if or @for only its own clause can follow, so a code block there would be a second node.
+		else if (/@(?:if|for)\b/.test(lineBefore) && trimmedBefore.endsWith('}')) replacement = ' ';
 		else if (/@switch\b/.test(lineBefore)) replacement = '@default: {}';
 		edits.push({
 			offset: selectedOffsetToOriginal(offset, candidate.edits),

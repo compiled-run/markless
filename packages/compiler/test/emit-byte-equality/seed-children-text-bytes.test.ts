@@ -74,14 +74,13 @@ test('text carrying an escaped character moves, and moves only to what it render
 	expect(page.diagnostics).toEqual([]);
 });
 
-// One left-to-right pass. An entity the compiler's escaper does not produce is
-// text, so it survives as the text the label shows - chaining the replacements
-// would turn this into a non-breaking space the consumer never wrote.
-test('an entity the escaper never produced stays the text the label shows', async () => {
+// TSRX text decodes HTML entities, so `&nbsp;` is the character itself; the escaper
+// leaves it as written and does not turn it back into the entity text.
+test('an entity in text is the character it names, in the markup and in the seed prop', async () => {
 	const page = await compiled('a &nbsp; b');
 
-	expect(page.statics).toBe('a &amp;nbsp; b');
-	expect(page.seedProp).toBe('children:"a &nbsp; b"');
+	expect(page.statics).toBe('a \u00a0 b');
+	expect(page.seedProp).toBe('children:"a \u00a0 b"');
 	expect(page.diagnostics).toEqual([]);
 });
 

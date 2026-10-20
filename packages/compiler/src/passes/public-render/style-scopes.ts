@@ -1,4 +1,6 @@
+import { parse as parseCss } from 'yuku-css';
 import { asNodes, type AnyNode } from '../../ast/nodes.ts';
+import { rawElementText } from '../../ast/raw-text.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
 import { componentMarkupRoot } from './component-markup-root.ts';
@@ -110,14 +112,13 @@ function compileStyleNodes(
 	const cssParts: string[] = [];
 
 	for (const styleNode of styleNodes) {
-		const css = typeof styleNode.css === 'string' ? styleNode.css : null;
-		const scoped = css === null ? null : scopeSelectors(styleNode, scopeId);
+		const scoped = scopeStyleElement(styleNode, scopeId);
 		if (scoped === null) {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
 					label: '<style>',
 					message:
-						'This <style> block could not be scope-compiled (selector offsets unavailable), so it is dropped from the build.',
+						'This <style> block could not be scope-compiled (its selectors did not parse), so it is dropped from the build.',
 					node: styleNode,
 					filename,
 					suggestion:
@@ -135,69 +136,81 @@ function compileStyleNodes(
 	};
 }
 
-// The scanner already located each insertion point (`CssSelector.scopeInsert`); an unscanned sheet fails closed.
-function scopeSelectors(styleNode: AnyNode, scopeId: string): string | null {
-	const scoped: string[] = [];
-	for (const sheet of asNodes(styleNode.children)) {
-		if (sheet.type !== 'StyleSheet') continue;
-		if (sheet.scanned !== true || typeof sheet.source !== 'string') return null;
-		const offsets: number[] = [];
-		collectScopeInserts(asNodes(sheet.children), offsets);
-		scoped.push(spliceScopeClass(sheet.source, offsets, `.${scopeId}`));
-	}
-	// No sheet at all (a self-closing `<style/>`) is empty CSS, not a bail-out.
-	return scoped.join('');
+// Until @tsrx/yuku returns each `<style>` with its parsed sheet, the sheet is parsed here, once per block.
+function scopeStyleElement(styleNode: AnyNode, scopeId: string): string | null {
+	const css = rawElementText(styleNode);
+	if (css === null) return null;
+	const { ast, diagnostics } = parseCss(css, { parseValue: false, parseAtrulePrelude: false });
+	if (diagnostics.length > 0) return null;
+	const offsets: number[] = [];
+	if (!collectScopeInserts(css, ast.children, offsets)) return null;
+	return spliceScopeClass(css, offsets, `.${scopeId}`);
 }
 
-function collectScopeInserts(nodes: readonly AnyNode[], offsets: number[]): void {
-	for (const node of nodes) {
-		if (node.type === 'CssRule') {
-			for (const selector of asNodes(node.prelude)) {
-				if (typeof selector.scopeInsert === 'number') offsets.push(selector.scopeInsert);
+type CssNode = { readonly type: string; readonly start: number; readonly end: number };
+type CssParent = CssNode & { readonly children?: readonly CssNode[] | null };
+type CssRule = CssNode & { readonly prelude: CssParent; readonly block: CssParent | null };
+type CssAtrule = CssNode & { readonly name: string; readonly block: CssParent | null };
+
+// Every rule's selectors gain the class, nested rules and those under conditional at-rules included.
+// A block the end of the sheet closes would swallow the next module's rules once sheets are joined, so it fails closed.
+function collectScopeInserts(
+	css: string,
+	nodes: readonly CssNode[] | null | undefined,
+	offsets: number[],
+): boolean {
+	for (const node of nodes ?? []) {
+		if (node.type === 'Rule') {
+			const rule = node as CssRule;
+			if (rule.prelude.type !== 'SelectorList' || !closed(css, rule.block)) return false;
+			for (const selector of rule.prelude.children ?? []) {
+				const insert = selectorScopeInsert(selector as CssParent);
+				if (insert === null) return false;
+				offsets.push(insert);
 			}
-			collectScopeInserts(asNodes(node.block), offsets);
+			if (!collectScopeInserts(css, rule.block?.children, offsets)) return false;
 			continue;
 		}
-		// Keyframe selectors ("from", "50%") name timeline stops, not elements.
-		if (node.type === 'CssAtrule' && node.keyframes !== true) {
-			collectScopeInserts(asNodes(node.block), offsets);
+		if (node.type === 'Atrule') {
+			const atrule = node as CssAtrule;
+			if (atrule.block && !closed(css, atrule.block)) return false;
+			// Keyframe selectors ("from", "50%") name timeline stops, not elements.
+			if (/keyframes$/i.test(atrule.name)) continue;
+			if (!collectScopeInserts(css, atrule.block?.children, offsets)) return false;
 		}
 	}
+	return true;
 }
 
-const utf8Encoder = new TextEncoder();
-const utf8Decoder = new TextDecoder();
+function closed(css: string, block: CssNode | null): boolean {
+	return block !== null && css[block.end - 1] === '}';
+}
 
-// `scopeInsert` counts UTF-8 bytes, so the splice runs on bytes: a string index drifts past any non-ASCII byte.
+// The subject is the compound after the last combinator; the class goes before its first pseudo, else after it.
+function selectorScopeInsert(selector: CssParent): number | null {
+	const parts = selector.children ?? [];
+	if (parts.length === 0) return null;
+	let compound = 0;
+	for (let index = 0; index < parts.length; index += 1) {
+		if (parts[index]!.type === 'Combinator') compound = index + 1;
+	}
+	for (let index = compound; index < parts.length; index += 1) {
+		const type = parts[index]!.type;
+		if (type === 'PseudoClassSelector' || type === 'PseudoElementSelector') return parts[index]!.start;
+	}
+	return parts[parts.length - 1]!.end;
+}
+
 function spliceScopeClass(source: string, offsets: readonly number[], scopeClass: string): string {
 	if (offsets.length === 0) return source;
-	const insert = utf8Encoder.encode(scopeClass);
-	let bytes = utf8Encoder.encode(source);
-	const length = bytes.length;
-	if (offsets.every((offset) => offset >= 0 && offset <= length)) {
-		const ascending = [...offsets].sort((left, right) => left - right);
-		const spliced = new Uint8Array(length + insert.length * ascending.length);
-		let from = 0;
-		let to = 0;
-		for (const at of ascending) {
-			spliced.set(bytes.subarray(from, at), to);
-			to += at - from;
-			spliced.set(insert, to);
-			to += insert.length;
-			from = at;
-		}
-		spliced.set(bytes.subarray(from), to);
-		return utf8Decoder.decode(spliced);
+	const ascending = [...offsets].sort((left, right) => left - right);
+	let output = '';
+	let from = 0;
+	for (const at of ascending) {
+		output += source.slice(from, at) + scopeClass;
+		from = at;
 	}
-	for (const offset of [...offsets].sort((left, right) => right - left)) {
-		const at = Math.min(Math.max(offset, 0), bytes.length);
-		const spliced = new Uint8Array(bytes.length + insert.length);
-		spliced.set(bytes.subarray(0, at), 0);
-		spliced.set(insert, at);
-		spliced.set(bytes.subarray(at), at + insert.length);
-		bytes = spliced;
-	}
-	return utf8Decoder.decode(bytes);
+	return output + source.slice(from);
 }
 
 // FNV-1a over the module id: stable per component module, runtime-agnostic.

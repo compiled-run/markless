@@ -12,11 +12,13 @@ export function App() @{
 		<button id="peek" onClick={() => (open = !open)}>Peek</button>
 		<button id="fill" onClick={() => (draft = 'from "fill" & <co>')}>Fill</button>
 		@if (open) {
-			<label>
-				Note
-				<input id="draft" value={draft} title={draft} onInput={(event) => (draft = event.currentTarget.value)} />
-			</label>
-			<p id="echo">Draft: {draft}</p>
+			<>
+				<label>
+					Note
+					<input id="draft" value={draft} title={draft} onInput={(event) => (draft = event.currentTarget.value)} />
+				</label>
+				<p id="echo">Draft: {draft}</p>
+			</>
 		}
 	</main>
 }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { parseAst } from 'vite';
-import { parseModule } from '@tsrx/yuku';
 import { __marklessRouteHref } from '../../src/vite/entries/route-href.ts';
 import { anchorTransformPlugin, transformAnchorSource } from '../../src/vite/anchor-transform.ts';
 import type { RouteTypegenFileSystem } from '../../src/vite/route-typegen.ts';
@@ -24,7 +23,7 @@ export default function Menu({ pages, replace, scroll }) @{
 			const handler = (plugin.transform as { handler: Function }).handler;
 			(plugin.configResolved as Function)({ root: '/project' });
 			const result = await handler.call(
-				{ fs: routeTypegenFs(), parse: parseModule },
+				{ fs: routeTypegenFs(), parse: parseAst },
 				source,
 				'/project/menu.tsrx',
 			);
@@ -56,7 +55,7 @@ export default function Nav({ mode }) @{
 		const handler = (plugin.transform as { handler: Function }).handler;
 		(plugin.configResolved as Function)({ root: '/project' });
 		const result = await handler.call(
-			{ fs: routeTypegenFs(), parse: parseModule },
+			{ fs: routeTypegenFs(), parse: parseAst },
 			source,
 			'/project/nav.tsrx',
 		);
@@ -79,7 +78,7 @@ export default function Tag({ tag }) @{
 		const handler = (plugin.transform as { handler: Function }).handler;
 		(plugin.configResolved as Function)({ root: '/project' });
 		const result = await handler.call(
-			{ fs: routeTypegenFs(), parse: parseModule },
+			{ fs: routeTypegenFs(), parse: parseAst },
 			source,
 			'/project/tag.tsrx',
 		);

@@ -19,8 +19,10 @@ const { fallback: { label: fallbackLabel = 'none' } } = { fallback: {} };
 export function Overview() @{
  let pane = state('');
  const isFirst = computed(() => pane === firstPane.id);
- <button onClick={() => { pane = laterPanes[0].id + ':' + fallbackLabel; }}>{pane}</button>
- <p>{isFirst ? 'first' : 'other'}</p>
+ <>
+  <button onClick={() => { pane = laterPanes[0].id + ':' + fallbackLabel; }}>{pane}</button>
+  <p>{isFirst ? 'first' : 'other'}</p>
+ </>
 }
 `,
 		symbols: [],

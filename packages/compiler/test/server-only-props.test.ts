@@ -77,12 +77,14 @@ export default function Invoice({ http }: { http: { url: URL } }) @{
 export default function Invoice({ http }: { http: { url: URL } }) @{
 	let count = state(0);
 	const later = computed(async () => (await fetch(http.url.href)).status);
-	<button onClick={() => count++}>{count}</button>
-	@try {
-		<p>{later}</p>
-	} @pending {
-		<p>loading</p>
-	}
+	<>
+		<button onClick={() => count++}>{count}</button>
+		@try {
+			<p>{later}</p>
+		} @pending {
+			<p>loading</p>
+		}
+	</>
 }`,
 	],
 	[
@@ -103,10 +105,12 @@ export default function Invoice({ http }: { http: { url: URL } }) @{
 		`import { state } from '@markless/core';
 export default function Invoice(props: { http: { url: URL } }) @{
 	let open = state(false);
-	<button onClick={() => (open = !open)}>toggle</button>
-	@if (open) {
-		<p>{props.http.url.pathname}</p>
-	}
+	<>
+		<button onClick={() => (open = !open)}>toggle</button>
+		@if (open) {
+			<p>{props.http.url.pathname}</p>
+		}
+	</>
 }`,
 	],
 	[
@@ -132,8 +136,10 @@ export default function Invoice({ http, params }: { http: { url: URL; response: 
 	if (params.id === 'missing') http.response.status = 404;
 	let path = state(http.url.pathname);
 	const shown = http.url.search;
-	<p>{shown}</p>
-	<button onClick={() => console.log(path, params.id)}>{path}</button>
+	<>
+		<p>{shown}</p>
+		<button onClick={() => console.log(path, params.id)}>{path}</button>
+	</>
 }
 `);
 

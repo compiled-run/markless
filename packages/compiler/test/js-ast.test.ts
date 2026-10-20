@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { analyze, isEventAttribute, normalizeEventName } from '@tsrx/yuku';
+import { analyze } from '@tsrx/yuku';
+import { isEventAttribute, normalizeEventName } from '../src/ast/events.ts';
 import {
 	parseModule,
 	type MarklessCompileError,
@@ -27,7 +28,7 @@ function findNode(root: unknown, type: string): AstNode {
 	return found;
 }
 
-test('reshapes @tsrx/yuku recovery channels into Markless-owned error and comment shapes', () => {
+test('reshapes parser recovery channels into Markless-owned error and comment shapes', () => {
 	const source = '/* lead */ const = ;';
 	const errors: MarklessCompileError[] = [];
 	const comments: MarklessParserComment[] = [];
@@ -57,7 +58,7 @@ test('reshapes @tsrx/yuku recovery channels into Markless-owned error and commen
 	expect(() => parseModule(source, 'broken.tsrx')).toThrow(SyntaxError);
 });
 
-test('reports parser diagnostics on the authored tokens @tsrx/yuku anchors them to', () => {
+test('reports parser diagnostics on the authored tokens', () => {
 	const cases = [
 		{
 			source: 'export function Controls() @{ <button>Save</button>> }',
@@ -98,7 +99,7 @@ test('classifies recoverable duplicate bindings as usage diagnostics', () => {
 	]);
 });
 
-test('uses @tsrx/yuku parser-owned loose recovery and event naming', () => {
+test('keeps loose recovery and comments, and names events the way the compiler does', () => {
 	const comments: MarklessParserComment[] = [];
 	const program = parseModule(
 		'export function App() @{ <div>{/* kept */}<span>text</div> }',
@@ -113,9 +114,10 @@ test('uses @tsrx/yuku parser-owned loose recovery and event naming', () => {
 	expect(isEventAttribute('onClick')).toBe(true);
 	expect(isEventAttribute('onclick')).toBe(false);
 	expect(normalizeEventName('onPointerDownCapture')).toBe('pointerdown');
+	expect(normalizeEventName('onGotPointerCapture')).toBe('gotpointercapture');
 });
 
-test('decorates wrapper-owned control flow with non-enumerable shared-reference aliases', () => {
+test('reads control-flow fields on the wrapper itself, an @else if as an @if, and an @case body as its nodes', () => {
 	const program = parseModule(`export function Constructs({ value, items, load }) @{
 	<section>
 		@switch (value.kind) {
@@ -124,64 +126,43 @@ test('decorates wrapper-owned control flow with non-enumerable shared-reference 
 		}
 		@try { <span>{load()}</span> } @pending { <span>pending</span> } @catch (error) { <span>{error.message}</span> }
 		@for (const item of items; index i; key item.id) { <span>{i} {item.id}</span> } @empty { <span>empty</span> }
+		@if (value.a) { <b>a</b> } @else if (value.b) { <b>b</b> } @else { <b>c</b> }
 	</section>
 }`);
 
-	for (const [type, aliases] of [
-		['JSXForExpression', ['left', 'right', 'body', 'index', 'key', 'await']],
-		['JSXSwitchExpression', ['discriminant', 'cases']],
-		['JSXTryExpression', ['block', 'handler', 'finalizer']],
-	] as const) {
-		const wrapper = findNode(program, type);
-		const statement = wrapper.statement as AstNode;
-		for (const alias of aliases) {
-			expect(wrapper[alias]).toBe(statement[alias]);
-			expect(Object.getOwnPropertyDescriptor(wrapper, alias)).toMatchObject({
-				enumerable: false,
-			});
-			expect(Object.keys(wrapper)).not.toContain(alias);
-		}
-	}
-
 	const repeat = findNode(program, 'JSXForExpression');
+	for (const field of ['left', 'right', 'body', 'index', 'key', 'empty']) {
+		expect(repeat[field]).toBeTruthy();
+	}
 	const boundary = findNode(program, 'JSXTryExpression');
-	expect(Object.keys(repeat)).toContain('statement');
-	expect(Object.keys(repeat)).toContain('empty');
-	expect(Object.keys(boundary)).toContain('pending');
+	for (const field of ['block', 'pending', 'handler']) expect(boundary[field]).toBeTruthy();
+
+	const choice = findNode(program, 'JSXSwitchExpression');
+	const [first] = choice.cases as AstNode[];
+	expect((first!.consequent as AstNode[]).map((node) => node.type)).toEqual(['JSXElement']);
+
+	const branch = findNode(program, 'JSXIfExpression');
+	expect((branch.alternate as AstNode).type).toBe('JSXIfExpression');
+	expect(((branch.alternate as AstNode).alternate as AstNode).type).toBe('BlockStatement');
 });
 
-test('blanks exact markless-allow JSX text without changing spans or ordinary text', () => {
-	const parseText = (text: string): { node: AstNode; sourceText: string } => {
+test('drops comment lines and empty containers among JSX children, and keeps `//` that is text', () => {
+	const childrenOf = (text: string): AstNode[] => {
 		const source = `export function App() @{ <section>${text}</section> }`;
-		const node = findNode(parseModule(source), 'JSXText');
-		return {
-			node,
-			sourceText: source.slice(node.start as number, node.end as number),
-		};
+		return findNode(parseModule(source), 'JSXElement').children as AstNode[];
 	};
 
-	const valid = parseText(
+	const directive = childrenOf(
 		'\n// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: static list, order never changes\n',
 	);
-	const blanked = valid.node.value as string;
-	expect(blanked).toHaveLength(valid.sourceText.length);
-	expect(blanked).toMatch(/^\s+$/);
-	expect([...blanked.matchAll(/[\r\n]/g)].map((match) => match.index)).toEqual(
-		[...valid.sourceText.matchAll(/[\r\n]/g)].map((match) => match.index),
-	);
+	expect(directive.map((child) => child.type)).toEqual(['JSXText', 'JSXText']);
+	expect(directive.every((child) => (child.value as string).trim() === '')).toBe(true);
 
-	for (const text of [
-		'// ordinary slash text',
-		'prefix // markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: mixed text',
-		'// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX',
-		'// markless-allow lowercase_code: reason',
-	]) {
-		const ordinary = parseText(text);
-		expect(ordinary.node.value).toBe(ordinary.sourceText);
-	}
+	expect(childrenOf('{/* note */}{}<b />').map((child) => child.type)).toEqual(['JSXElement']);
+
+	const [url] = childrenOf('see http://example.com');
+	expect(url?.value).toBe('see http://example.com');
 });
-
-const ids = (count: number): number[] => Array.from({ length: count }, (_, id) => id);
 
 test('resolves TSRX identifiers to their bindings, with the node and span of each use', () => {
 	const source = [
@@ -195,48 +176,36 @@ test('resolves TSRX identifiers to their bindings, with the node and span of eac
 		'',
 	].join('\n');
 
-	const semantic = analyze(source, 'counter.tsrx').semantic;
+	const module = analyze(source);
 
-	// Every binding the module declares is present, imported one included.
-	const symbolNames = ids(semantic.symbol.count).map((id) => semantic.symbol.name(id));
-	expect(symbolNames).toEqual(expect.arrayContaining(['state', 'Counter', 'total', 'bump']));
-
-	// The point of the view: a use of `total` resolves to the declaration of
-	// `total`, rather than the walk having to match on the name itself.
-	const totalSymbol = symbolNames.indexOf('total');
-	const totalUses = ids(semantic.reference.count).filter(
-		(id) => semantic.reference.symbolId(id) === totalSymbol,
+	expect(module.bindings.map((binding) => binding.name)).toEqual(
+		expect.arrayContaining(['state', 'Counter', 'total', 'bump']),
 	);
+
+	// A use of `total` resolves to the declaration of `total`, not to a name match.
+	const total = module.bindings.find((binding) => binding.name === 'total')!;
+	const totalUses = module.references.filter((reference) => reference.binding === total);
 	// The assignment target, the addend it reads, and the interpolation.
 	expect(totalUses).toHaveLength(3);
-	for (const id of totalUses) {
-		expect(semantic.reference.name(id)).toBe('total');
-		expect(semantic.reference.node(id).type).toBe('Identifier');
-		// The span is a real authored span, not a placeholder.
-		expect(source.slice(semantic.reference.start(id), semantic.reference.end(id))).toBe('total');
+	for (const reference of totalUses) {
+		expect(reference.name).toBe('total');
+		expect(reference.node.type).toBe('Identifier');
+		expect(source.slice(reference.node.start, reference.node.end)).toBe('total');
 	}
-	// Only the assignment target is a write.
-	expect(totalUses.filter((id) => semantic.reference.isWrite(id))).toHaveLength(1);
+	expect(totalUses.filter((reference) => reference.isWrite)).toHaveLength(1);
 
-	// The declaration site is reachable from the symbol.
-	const declaration = semantic.symbol.declNode(totalSymbol, 0);
-	expect(semantic.symbol.declCount(totalSymbol)).toBe(1);
-	expect(source.slice(declaration.start, declaration.end)).toBe('total');
+	const [declaration] = total.declarations;
+	expect(total.declarations).toHaveLength(1);
+	expect(source.slice(declaration!.start, declaration!.end)).toBe('total');
 
 	// `total` belongs to the component body, not to module scope.
-	const totalScope = semantic.symbol.scopeId(totalSymbol);
-	expect(semantic.scope.kind(totalScope)).toBe('block');
-	expect(semantic.scope.parentId(totalScope)).not.toBeNull();
+	expect(total.scope.kind).toBe('block');
+	expect(total.scope.parent).not.toBeNull();
 
-	// Module edges carry their specifiers, so an import can be attributed to the
-	// package it came from without re-reading the import statement.
 	expect(
-		ids(semantic.import.count).map((id) => ({
-			name: semantic.import.name(id),
-			specifier: semantic.import.specifier(id),
-		})),
+		module.imports.map((record) => ({ name: record.name, specifier: record.specifier })),
 	).toContainEqual({ name: 'state', specifier: '@markless/core' });
-	expect(ids(semantic.export.count).map((id) => semantic.export.name(id))).toContain('Counter');
+	expect(module.exports.map((record) => record.name)).toContain('Counter');
 });
 
 test('analyzes a module whose names and shape differ from the counter fixture', () => {
@@ -254,29 +223,24 @@ test('analyzes a module whose names and shape differ from the counter fixture', 
 		'',
 	].join('\n');
 
-	const semantic = analyze(source, 'panel.tsrx').semantic;
-	const symbolNames = ids(semantic.symbol.count).map((id) => semantic.symbol.name(id));
-	expect(symbolNames).toEqual(
+	const module = analyze(source);
+	expect(module.bindings.map((binding) => binding.name)).toEqual(
 		expect.arrayContaining(['computed', 'state', 'Panel', 'label', 'upper', 'event']),
 	);
 
 	// Resolution follows the binding, not the name: the handler parameter and
-	// the component local are different symbols even though both are read here.
-	const labelSymbol = symbolNames.indexOf('label');
-	const labelUses = ids(semantic.reference.count).filter(
-		(id) => semantic.reference.symbolId(id) === labelSymbol,
-	);
+	// the component local are different bindings even though both are read here.
+	const label = module.bindings.find((binding) => binding.name === 'label')!;
+	const labelUses = module.references.filter((reference) => reference.binding === label);
 	expect(labelUses).toHaveLength(3);
-	for (const id of labelUses) {
-		expect(source.slice(semantic.reference.start(id), semantic.reference.end(id))).toBe('label');
+	for (const reference of labelUses) {
+		expect(source.slice(reference.node.start, reference.node.end)).toBe('label');
 	}
-	// Only the assignment inside the event handler writes.
-	expect(labelUses.filter((id) => semantic.reference.isWrite(id))).toHaveLength(1);
+	expect(labelUses.filter((reference) => reference.isWrite)).toHaveLength(1);
 
-	// Both named imports resolve to the same specifier.
-	expect(ids(semantic.import.count).map((id) => semantic.import.specifier(id))).toEqual([
+	expect(module.imports.map((record) => record.specifier)).toEqual([
 		'@markless/core',
 		'@markless/core',
 	]);
-	expect(ids(semantic.export.count).map((id) => semantic.export.name(id))).toContain('Panel');
+	expect(module.exports.map((record) => record.name)).toContain('Panel');
 });

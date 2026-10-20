@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/yuku';
+import { parseTsrxModule } from './tsrx-ast.ts';
 import type { RouteManifestRoute } from '../route-manifest.ts';
 import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
 import type { Plugin } from 'vite';
@@ -162,7 +162,7 @@ function parseTransformAst(
 	parse: (source: string, options: Record<string, unknown>) => unknown,
 ): Node {
 	if (id.includes('.tsrx')) {
-		return parseModule(code, id) as unknown as Node;
+		return parseTsrxModule(code) as unknown as Node;
 	}
 
 	return parse(code, {

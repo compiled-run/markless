@@ -2,13 +2,13 @@
  * Foundation tests for the emission codegen module
  * (`specs/framework/14-emission-codegen-migration.md`, stage 1 unit 1).
  *
- * These re-run, in-repo and against the installed `yuku-codegen@0.9.1`, the
+ * These re-run, in-repo and against the installed `@tsrx/yuku` printer, the
  * printer capabilities the campaign's audit recorded in an ephemeral
  * scratchpad, and they hold invariants 3, 4, 7, and 8 for the module the
  * per-site migrations build on. No emitter is migrated here.
  */
 import { expect, test } from 'vitest';
-import { generate } from 'yuku-codegen';
+import { generate } from '@tsrx/yuku';
 import {
 	EMISSION_CODEGEN_FAILED_CODE,
 	EMISSION_NONDETERMINISTIC_CODE,
@@ -249,7 +249,7 @@ test.each([
 	],
 ])('the printer reports %s rather than eliding it quietly', (_label, source, message) => {
 	const { program } = parseEmissionSource(source, 'a.ts');
-	expect(generate(program, EMISSION_PRINT_OPTIONS).errors.map((one) => one.message)).toEqual([
+	expect(generate(program, EMISSION_PRINT_OPTIONS).diagnostics.map((one) => one.message)).toEqual([
 		message,
 	]);
 });
@@ -278,14 +278,15 @@ test('every printed module carries a non-null source map naming the authored fil
 	expect(emitted.map.mappings.length).toBeGreaterThan(0);
 });
 
-test('the printer returns a null map when no source is threaded, which is why the guard exists', () => {
+test('the printer returns a null map unless the source is threaded, which is why the guard exists', () => {
 	const source = 'export const a = 1;';
 	const { program } = parseEmissionSource(source, 'a.ts');
 	expect(generate(program, EMISSION_PRINT_OPTIONS).map).toBeNull();
-	// Passing the option without the source text is the silent-failure shape
-	// invariant 3 names; printEmittedModule always threads the source.
+	// The option without the source text is refused outright; printEmittedModule always threads it.
 	const noSource = { source: undefined } as unknown as { source: string };
-	expect(generate(program, { ...EMISSION_PRINT_OPTIONS, sourceMap: noSource }).map).toBeNull();
+	expect(() => generate(program, { ...EMISSION_PRINT_OPTIONS, sourceMap: noSource })).toThrow(
+		/sourceMap\.source/,
+	);
 });
 
 // --- Graph call builders ----------------------------------------------------
@@ -454,8 +455,8 @@ test('each write builder denotes the same call the current emitter text denotes'
 const TSRX_SOURCE =
 	'export function App({ value }: { value: string }) @{\n' +
 	"  let label = state('Hi');\n" +
-	"  @if (value === 'a') { <span>{label}</span> } @else { <span>b</span> }\n" +
-	'  <section><style>.card { color: red; }</style><h2>{label}</h2></section>\n' +
+	"  <>@if (value === 'a') { <span>{label}</span> } @else { <span>b</span> }\n" +
+	'  <section><style>.card { color: red; }</style><h2>{label}</h2></section></>\n' +
 	'}';
 
 test('the TSRX assertion fires on a TSRX node and names it in a diagnostic', () => {
@@ -480,12 +481,11 @@ test('the TSRX assertion fires on a TSRX node and names it in a diagnostic', () 
 	expect(diagnostic.docsUrl).toBe(`https://markless.dev/errors/${EMISSION_TSRX_NODE_CODE}`);
 });
 
-test('printing a TSRX tree is a diagnostic here, where upstream it is a crash', () => {
+test('printing a TSRX tree is a diagnostic here, where the printer would emit TSRX instead of JavaScript', () => {
 	const program = parseModule(TSRX_SOURCE, 'App.tsrx', { collect: true });
 
-	// Why the assertion exists: without it this is the failure the compiler gets.
-	expect(() => generate(program)).toThrow(/unsupported ESTree node type/);
-	expect(() => generate(program, { strip: true })).toThrow(/unsupported ESTree node type/);
+	// Why the assertion exists: the printer prints TSRX syntax back out, even when stripping types.
+	expect(generate(program, { strip: true }).code).toMatch(/@\{|@if/);
 
 	expect(() =>
 		printEmittedModule({
@@ -504,14 +504,14 @@ test('the assertion does not fire on plain TypeScript or on plain JSX', () => {
 	);
 	expect(findTsrxOnlyNodeType(plain)).toBeNull();
 
-	// Plain JSX prints without error in yuku-codegen@0.9.1, so refusing it would
+	// Plain JSX prints without error in the @tsrx/yuku printer, so refusing it would
 	// be a false positive. Only the TSRX-exclusive node types are refused.
 	const jsx = parseModule('const a = <div className="x">{y}</div>;', 'a.tsx', {
 		...EMISSION_PARSE_OPTIONS,
 	});
 	expect(collectNodeTypes(jsx).has('JSXElement')).toBe(true);
 	expect(findTsrxOnlyNodeType(jsx)).toBeNull();
-	expect(generate(jsx, EMISSION_PRINT_OPTIONS).errors).toEqual([]);
+	expect(generate(jsx, EMISSION_PRINT_OPTIONS).diagnostics).toEqual([]);
 });
 
 // --- Determinism helper (invariant 7) --------------------------------------

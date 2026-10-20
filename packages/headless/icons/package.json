@@ -68,7 +68,7 @@
 	"dependencies": {
 		"@iconify/json": "^2.2.382",
 		"@iconify/utils": "^3.0.1",
-		"@tsrx/yuku": "0.2.0",
+		"@tsrx/yuku": "0.8.0",
 		"magic-string": "^0.30.17"
 	},
 	"devDependencies": {
