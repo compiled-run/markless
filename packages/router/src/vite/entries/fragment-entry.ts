@@ -401,7 +401,7 @@ async function mergeHead(d: Document, next: Document) {
 		const rel = element.localName === 'link' ? (element as HTMLLinkElement).rel : '';
 		if (rel === 'modulepreload' || rel === 'preload') continue;
 		if (rel === 'stylesheet' || element.localName === 'style') stale.push(element);
-		else element.remove();
+		else if ((element as HTMLScriptElement).type !== 'importmap') element.remove();
 	}
 	await loaded(d.defaultView!, stylesheets);
 	return { stale, scripts };
