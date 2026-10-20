@@ -53,10 +53,11 @@ export function decodeLocatorPaths(value: string): {
 
 /**
  * Renumbers the census the inline boot took when a script outside Markless
- * added, removed or swapped elements first: each located element and its
- * ancestors are matched by tag among their parent's children, so a change
- * moves nothing outside the parent it happened in; served slots the live page
- * lacks stay null. Runs before any locator is read.
+ * added, removed, swapped or moved elements first: each located element and
+ * its ancestors are matched by tag, and by the children served under them,
+ * among their parent's children, then anywhere on the page for one a script
+ * moved to another parent; served slots the live page lacks stay null. Runs
+ * before any locator is read.
  */
 export function marklessRepairCensus(root: ShiftedRoot): void {
 	if (!root.__marklessShifted) return;
@@ -70,20 +71,48 @@ export function marklessRepairCensus(root: ShiftedRoot): void {
 	const pageChildren = servedPageChildren(root);
 	const served = new Map<Element | null, number>([[root, 0]]);
 	const reserved = new Set<number>();
+	const kids = new Map<number, ServedLocatorPath[]>();
+	for (const entry of entries) kids.set(entry.parent, [...(kids.get(entry.parent) ?? []), entry]);
+	// How well an element's children fit the ones served under this entry; 0 when they share nothing, so a same-tag stranger is not taken for it.
+	const fit = (candidate: Element, index: number) => {
+		const served = kids.get(index);
+		if (!served) return 1;
+		return (
+			served.filter((kid) => candidate.children[kid.child]?.localName === kid.tag).length +
+			(candidate.children.length === served[0]!.siblings ? 1 : 0)
+		);
+	};
+	const free = (candidate: Element | undefined, tag: string): candidate is Element =>
+		!!candidate && taken.has(candidate) && !served.has(candidate) && candidate.localName === tag;
 	for (const { index, parent, siblings, child, tag } of entries) {
 		const children = parent ? (located.get(parent)?.children ?? []) : pageChildren;
-		// More children than served means insertions, so the match can only sit further right; fewer, further left.
+		// More children than served means insertions, so the match sits further right, fewer further left; a script that also moved it put it anywhere, nearest first.
 		const extra = children.length - siblings;
+		const step = extra < 0 ? -1 : 1;
 		reserved.add(index);
-		for (let at = child; extra < 0 ? at >= child + extra : at <= child + extra;) {
-			const candidate = children[at];
-			if (!candidate) break;
-			if (taken.has(candidate) && !served.has(candidate) && candidate.localName === tag) {
-				located.set(index, candidate);
-				served.set(candidate, index);
-				break;
+		const order: number[] = [];
+		for (let at = child; at !== child + extra + step; at += step) order.push(at);
+		for (let distance = 1; distance <= children.length; distance++)
+			order.push(child - step * distance, child + step * distance);
+		const nearby = order.map((at) => children[at]).filter((candidate) => free(candidate, tag));
+		let found = nearby.find((candidate) => fit(candidate, index) > 0);
+		// Moved to another parent, as a portal does: the one element on the page whose children fit best, never a guess between equals.
+		if (!found && kids.has(index)) {
+			let best = 0;
+			let tie = false;
+			for (const candidate of live) {
+				if (!free(candidate ?? undefined, tag)) continue;
+				const score = fit(candidate!, index);
+				if (score > best) [best, found, tie] = [score, candidate!, false];
+				else if (score === best && score > 0) tie = true;
 			}
-			at += extra < 0 ? -1 : 1;
+			if (tie) found = undefined;
+		}
+		// Its own children changed too: the nearest element with its tag, as before any of this.
+		found ??= nearby[0];
+		if (found) {
+			located.set(index, found);
+			served.set(found, index);
 		}
 	}
 	const census: Array<Element | null> = Array(count).fill(null);

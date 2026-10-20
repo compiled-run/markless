@@ -5,8 +5,8 @@ declare const __MARKLESS_PAGE_END__: string;
 /**
  * Pins the container's elements in DOM order as its census and returns them,
  * between the page start and end markers an author's element carries. When the
- * count differs from the one the server measured, a script outside Markless
- * changed the page first: the root is flagged for the resume module to renumber
+ * count or the order of their tags differs from what the server measured, a
+ * script outside Markless changed the page first: the root is flagged for the resume module to renumber
  * the census, and no elements are returned, so nothing is matched by a shifted index.
  */
 export function marklessServedCensus(
@@ -21,5 +21,15 @@ export function marklessServedCensus(
 		else if ((next as Comment).data === __MARKLESS_PAGE_END__) break;
 	root.__marklessCensus ||= live;
 	const value = root.getAttribute?.(attribute);
-	return value && parseInt(value) !== live.length ? ((root.__marklessShifted = 1), []) : live;
+	const order = value?.split('|')[3];
+	let signature = 0;
+	if (order)
+		for (const element of live.slice(1)) {
+			const name = element.localName ?? element.tagName ?? '';
+			signature = (signature * 31 + name.length * 32 + (name.charCodeAt(0) | 32)) | 0;
+		}
+	return value &&
+		(parseInt(value) !== live.length || (order && order !== (signature >>> 0).toString(36)))
+		? ((root.__marklessShifted = 1), [])
+		: live;
 }

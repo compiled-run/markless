@@ -92,7 +92,15 @@ export function createMarklessDefer(
 			else if ((next as Comment).data === pageStart) live.length = 1;
 			else if ((next as Comment).data === pageEnd) break;
 		const paths = pathsAttribute && root.getAttribute?.(pathsAttribute);
-		if (paths && parseInt(paths) !== live.length) root.__marklessShifted = 1;
+		const order = paths && paths.split('|')[3];
+		let signature = 0;
+		if (order)
+			for (const element of live.slice(1)) {
+				const name = element.localName ?? element.tagName ?? '';
+				signature = (signature * 31 + name.length * 32 + (name.charCodeAt(0) | 32)) | 0;
+			}
+		if (paths && (parseInt(paths) !== live.length || (order && order !== (signature >>> 0).toString(36))))
+			root.__marklessShifted = 1;
 		return live;
 	};
 	const idle = (root: DeferRoot, run: () => void) => {

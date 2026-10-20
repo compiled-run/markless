@@ -563,3 +563,101 @@ test('a long page navigated to in place paints its top before the rest, then res
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+// The first poll waits for the onVisible wake, which loads the resume module; a busy machine takes longer than a click.
+const wake = { timeout: 10_000 };
+
+test('an element a script moved within its container keeps its bindings after onVisible wakes it', async () => {
+	const { page, errors } = await open('/moved-visible');
+	await page.evaluate(() => {
+		const list = document.querySelector('[data-list]')!;
+		list.insertBefore(document.querySelector('[data-watched]')!, list.firstChild);
+	});
+	await expect.poll(() => text(page, '[data-seen]'), wake).toBe('1');
+	await page.click('[data-more]');
+	await expect.poll(() => text(page, '[data-count-text]')).toBe('1');
+	expect(await page.getAttribute('[data-watched]', 'data-count')).toBe('1');
+	expect(await text(page, '[data-first]')).toBe('first');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test.each([
+	['moved first', 'first', false],
+	['moved last', 'last', false],
+	['moved first, a node added', 'first', true],
+	['moved last, a node added', 'last', true],
+])('a bound element a script moved keeps its bindings after onVisible (%s)', async (_name, where, added) => {
+	const { page, errors } = await open('/moved-visible-only');
+	await page.evaluate(
+		([where, added]) => {
+			const list = document.querySelector('[data-list]')!;
+			const watched = document.querySelector('[data-watched]')!;
+			if (where === 'first') list.insertBefore(watched, list.firstChild);
+			else list.append(watched);
+			if (added) list.insertBefore(document.createElement('span'), list.firstChild);
+			watched.scrollIntoView();
+		},
+		[where, added] as const,
+	);
+	await expect.poll(() => text(page, '[data-seen]'), wake).toBe('2');
+	await expect.poll(() => text(page, '[data-above]')).toBe('20');
+	expect(await page.getAttribute('[data-watched]', 'data-seen-attr')).toBe('2');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a dialog part a handler moved to the end of its container keeps its bindings once onVisible fires on it', async () => {
+	const { page, errors } = await open('/dialog-move');
+	await page.click('[data-open]');
+	await expect.poll(() => text(page, '[data-shown]'), wake).toBe('1');
+	await expect.poll(() => page.getAttribute('[data-content]', 'data-state')).toBe('open');
+	expect(await text(page, '[data-after]')).toBe('after open');
+	await page.click('[data-close]');
+	await expect.poll(() => page.getAttribute('[data-content]', 'data-state')).toBe('closed');
+	await expect.poll(() => text(page, '[data-after]')).toBe('after closed');
+	await page.click('[data-open]');
+	await expect.poll(() => page.getAttribute('[data-content]', 'data-state')).toBe('open');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test.each([['before the page wakes', false], ['after the page woke', true]])(
+	'a part a library portals to the end of its container keeps its handlers and bindings, and so do its old siblings (%s)',
+	async (_name, wakeFirst) => {
+		const { page, errors } = await open('/portal-move');
+		if (wakeFirst) {
+			await page.click('[data-toggle]');
+			await expect.poll(() => text(page, '[data-toggle]'), wake).toBe('on');
+			await page.click('[data-toggle]');
+			await expect.poll(() => text(page, '[data-toggle]')).toBe('off');
+		}
+		await page.evaluate(() => {
+			const dialog = document.querySelector<HTMLElement>('[data-dialog]')!;
+			const host = dialog.closest('[data-async-container]')!;
+			let end: ChildNode | null = null;
+			for (let node = host.lastChild; node; node = node.previousSibling)
+				if (node.nodeType === Node.COMMENT_NODE && (node as Comment).data === 'markless:page-end') {
+					end = node;
+					break;
+				}
+			const guard = document.createElement('span');
+			guard.setAttribute('data-focus-guard', '');
+			host.insertBefore(guard, host.firstChild);
+			host.insertBefore(dialog, end);
+		});
+		await page.click('[data-dialog-press]');
+		await expect.poll(() => text(page, '[data-dialog-press]'), wake).toBe('1');
+		expect(await text(page, '[data-before]')).toBe('1');
+		await page.click('[data-after-press]');
+		await expect.poll(() => text(page, '[data-after-press]')).toBe('1');
+		await page.click('[data-toggle]');
+		await expect.poll(() => page.getAttribute('[data-dialog]', 'data-state')).toBe('open');
+		expect(await text(page, '[data-title]')).toBe('Open dialog');
+		await page.click('[data-dialog-press]');
+		await expect.poll(() => text(page, '[data-before]')).toBe('2');
+		expect(await page.evaluate(() => document.querySelector('[data-dialog]')!.parentElement === document.body)).toBe(true);
+		expect(errors).toEqual([]);
+		await page.close();
+	},
+);
