@@ -46,6 +46,19 @@ test('each page-level comment anchor records the index the next element takes', 
 	expect(servedElementTree(html).commentElementIndexes).toEqual([2, 6, 7]);
 });
 
+test('the served tree counts only elements the parser leaves in document order', () => {
+	const html =
+		'<template><div><span>a</span></div></template>' +
+		'<noscript><div>b</div></noscript>' +
+		'<div><template shadowrootmode="open"><slot></slot><em>c</em></template><i>d</i></div>' +
+		'<svg><foreignObject><p>e</p></foreignObject></svg><button>f</button>';
+	expect(
+		servedElementTree(html)
+			.elements.slice(1)
+			.map((element) => element.tag),
+	).toEqual(['template', 'noscript', 'div', 'i', 'svg', 'foreignObject', 'p', 'button']);
+});
+
 test('each event host is marked with its record and policy, in the shell, a repeat scope and an arm', () => {
 	const html =
 		'<h1>t</h1><form><input></form><ul></ul><!--markless:async:b0--><form><button>go</button></form><!--/markless:async:b0-->';

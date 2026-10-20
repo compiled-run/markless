@@ -1850,7 +1850,11 @@ function emitSpecializedScalarDispatcher(
 		'function marklessScalarEventMatches(input, host, tagName, eventName, hostNodeId) {',
 		'	const eventTypeMatches = input.event?.type === eventName;',
 		'	if (!eventTypeMatches) return false;',
-		'	if (!host || (tagName !== "*" && host.tagName.toLowerCase() !== tagName)) return false;',
+		'	if (!host || (tagName !== "*" && host.tagName.toLowerCase() !== tagName)) {',
+		// Dev only, and compiled out of a build: a host this locator cannot find reads as "not our event" otherwise.
+		'		if (typeof __MARKLESS_DEV_ENABLED__ === "undefined" || __MARKLESS_DEV_ENABLED__) void import("@markless/web/fns/locator-miss").then((m) => m.marklessReportLocatorMiss(input.root, { hostNodeId, tagName }, host));',
+		'		return false;',
+		'	}',
 		'	const eventTarget = input.event?.target;',
 		'	return host === eventTarget || (!!eventTarget?.nodeType && typeof host.contains === "function" && host.contains(eventTarget));',
 		'}',

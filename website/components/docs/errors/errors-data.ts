@@ -2404,6 +2404,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_DETACHED_CONTENT_DYNAMIC',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'Content inside a <template> or a raw-text element must be static: a Markless build error.',
+		printed: [
+			'MARKLESS_DETACHED_CONTENT_DYNAMIC: `<source>` inside <<ownerTagName>> needs the page to find it again in the browser, but <where>, so no handler, binding, or component there can ever run or update.',
+			'The browser resumes a server-rendered page by counting its elements in document order. The HTML parser keeps what a <template> or a raw-text element such as <noscript> holds out of that order, so nothing inside one can be located, and a handler or binding there would be silently dead.',
+			'Keep the <<ownerTagName>> content to plain elements, text, and literal attribute values. Move anything interactive outside it, and clone the template content from a handler or attach if it must become live.',
+			'https://markless.dev/errors/MARKLESS_DETACHED_CONTENT_DYNAMIC',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_DEV_DEFINE_CONFLICT',
 		packageName: '@markless/bundler',
 		stage: 'build',
@@ -5812,6 +5835,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 		sources: [
 			{
 				id: 'f0',
+				file: 'packages/web/src/fns/locator-miss.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/locator-miss.ts',
+			},
+			{
+				id: 'f1',
 				file: 'packages/web/src/inline/resume-errors.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/inline/resume-errors.ts',
 			},
@@ -5831,26 +5859,31 @@ export const errorEntries: readonly ErrorEntry[] = [
 		sources: [
 			{
 				id: 'f0',
+				file: 'packages/web/src/fns/locator-miss.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/locator-miss.ts',
+			},
+			{
+				id: 'f1',
 				file: 'packages/web/src/inline/resume-errors.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/inline/resume-errors.ts',
 			},
 			{
-				id: 'f1',
+				id: 'f2',
 				file: 'packages/web/src/resume-arm-records.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/resume-arm-records.ts',
 			},
 			{
-				id: 'f2',
+				id: 'f3',
 				file: 'packages/web/src/resume-async-boundaries.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/resume-async-boundaries.ts',
 			},
 			{
-				id: 'f3',
+				id: 'f4',
 				file: 'packages/web/src/resume-branches.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/resume-branches.ts',
 			},
 			{
-				id: 'f4',
+				id: 'f5',
 				file: 'packages/web/src/resume.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/resume.ts',
 			},

@@ -32,6 +32,11 @@ export {
 } from './protocol-constants.ts';
 export { PROTOCOL_CONTAINER_HOST_NODE_ID } from './protocol-page-markers.ts';
 export {
+	PROTOCOL_DECLARATIVE_SHADOW_ROOT_ATTRIBUTE,
+	PROTOCOL_RAW_TEXT_TAGS,
+	PROTOCOL_TEMPLATE_CONTENT_TAG,
+} from './protocol-detached-content.ts';
+export {
 	constantSyncPolicyCode,
 	formatEventHostEntries,
 	parseEventHostEntries,

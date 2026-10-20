@@ -1,5 +1,10 @@
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import { PROTOCOL_LOCATOR_PATHS_DIGITS } from '../../serializer/src/protocol-locator-paths-format.ts';
+import {
+	PROTOCOL_DECLARATIVE_SHADOW_ROOT_ATTRIBUTE,
+	PROTOCOL_RAW_TEXT_TAGS,
+	PROTOCOL_TEMPLATE_CONTENT_TAG,
+} from '../../serializer/src/protocol-detached-content.ts';
 
 // Server side of PROTOCOL_LOCATOR_PATHS_ATTRIBUTE: reads the element tree the
 // browser will build from the container's html, the way its parser does.
@@ -18,18 +23,11 @@ const VOID_TAGS = new Set([
 	'track',
 	'wbr',
 ]);
-const RAW_TEXT_TAGS = new Set([
-	'script',
-	'style',
-	'textarea',
-	'title',
-	'xmp',
-	'iframe',
-	'noembed',
-	'noframes',
-	'noscript',
-]);
 const FOREIGN_ROOTS = new Set(['svg', 'math']);
+const DECLARATIVE_SHADOW_ROOT = new RegExp(
+	`\\s${PROTOCOL_DECLARATIVE_SHADOW_ROOT_ATTRIBUTE}(?:[\\s=/>]|$)`,
+	'i',
+);
 
 type ServedElement = {
 	readonly tag: string;
@@ -92,7 +90,7 @@ export function servedElementTree(html: string): ServedTree {
 			const match = stack.findLastIndex((entry) => entry.tag.toLowerCase() === lower);
 			if (match < 0) continue;
 			for (const popped of stack.splice(match)) {
-				if (popped.tag.toLowerCase() === 'template') templateDepth--;
+				if (popped.tag.toLowerCase() === PROTOCOL_TEMPLATE_CONTENT_TAG) templateDepth--;
 				if (FOREIGN_ROOTS.has(popped.tag.toLowerCase())) foreignDepth--;
 			}
 			continue;
@@ -100,18 +98,21 @@ export function servedElementTree(html: string): ServedTree {
 		const selfClosing = foreignDepth > 0 && html[tagEnd - 1] === '/';
 		const parent = stack.length ? stack[stack.length - 1]!.index : 0;
 		let index = parent;
-		if (templateDepth === 0) {
+		const shadowRoot =
+			lower === PROTOCOL_TEMPLATE_CONTENT_TAG &&
+			DECLARATIVE_SHADOW_ROOT.test(html.slice(nameStart + name.length, tagEnd));
+		if (templateDepth === 0 && !shadowRoot) {
 			index = elements.push({ tag, parent, child: childCounts[parent]!++ }) - 1;
 			childCounts.push(0);
 			nameEnds.push(nameStart + name.length);
 		}
 		if (VOID_TAGS.has(lower) || selfClosing) continue;
-		if (RAW_TEXT_TAGS.has(lower)) {
+		if (PROTOCOL_RAW_TEXT_TAGS.has(lower)) {
 			const close = (lowerHtml ??= html.toLowerCase()).indexOf(`</${lower}`, at);
 			at = close < 0 ? html.length : endOfTag(html, close + 2 + lower.length) + 1;
 			continue;
 		}
-		if (lower === 'template') templateDepth++;
+		if (lower === PROTOCOL_TEMPLATE_CONTENT_TAG) templateDepth++;
 		if (FOREIGN_ROOTS.has(lower)) foreignDepth++;
 		stack.push({ tag, index });
 	}

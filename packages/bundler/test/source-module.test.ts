@@ -346,6 +346,9 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	);
 	expect(resumeCode).toContain('const eventTarget = input.event?.target;');
 	expect(resumeCode).toContain('input.event?.type === eventName');
+	expect(resumeCode).toContain(
+		'if (typeof __MARKLESS_DEV_ENABLED__ === "undefined" || __MARKLESS_DEV_ENABLED__) void import("@markless/web/fns/locator-miss")',
+	);
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 3)');
 	expect(resumeCode).toContain('marklessFindElementAtDomOrderIndex(input.root, 5)');
 	expect(resumeCode).not.toContain('?? input.element ?? input.event.target');

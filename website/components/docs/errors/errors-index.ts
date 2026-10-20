@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 283,
+	total: 284,
 	guided: 41,
 	groups: [
 		{
@@ -196,6 +196,11 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_DELEGATE_ARTIFACT_MISSING',
 					kind: 'compile info',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_DETACHED_CONTENT_DYNAMIC',
+					kind: 'compile error',
 					guided: false,
 				},
 				{

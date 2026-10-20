@@ -1,8 +1,11 @@
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { marklessFindElementAtDomOrderIndex } from './dom-order.ts';
 
+declare const __MARKLESS_DEV_ENABLED__: boolean;
+
 // Served-view ownership for per-action scalar dispatch on pages that also need full resume.
 type ServedLocator = {
+	readonly hostNodeId: string;
 	readonly strategy?: string;
 	readonly index: number;
 	readonly tagName: string;
@@ -50,7 +53,7 @@ const servedView = (r: ServedRoot): ServedView | undefined => {
 			'markless/view',
 			JSON.parse(s.textContent || 'null'),
 		) as {
-			readonly locators: ReadonlyArray<ServedLocator & { readonly hostNodeId: string }>;
+			readonly locators: ReadonlyArray<ServedLocator>;
 			readonly events: ReadonlyArray<ServedEvent>;
 			readonly domUpdates?: ReadonlyArray<MarklessServedDomUpdate>;
 			readonly behaviors?: ReadonlyArray<{ readonly hostNodeId: string }>;
@@ -90,11 +93,15 @@ const servedView = (r: ServedRoot): ServedView | undefined => {
 };
 const at = (r: ServedRoot, l: ServedLocator | undefined): Element | null => {
 	if (!l || (l.strategy !== undefined && l.strategy !== 'dom-order')) return null;
-	const el = marklessFindElementAtDomOrderIndex(r, l.index) as Element | undefined;
-	return el?.nodeType === 1 &&
+	const el = marklessFindElementAtDomOrderIndex(r, l.index) as Element | null | undefined;
+	if (
+		el?.nodeType === 1 &&
 		(l.tagName === '*' || el.tagName.toLowerCase() === l.tagName.toLowerCase())
-		? el
-		: null;
+	)
+		return el;
+	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
+		void import('./locator-miss.ts').then((m) => m.marklessReportLocatorMiss(r, l, el));
+	return null;
 };
 const ownerOf = (record: ServedEvent, owners: ReadonlyArray<MarklessScalarOwner>): number =>
 	record.action || record.symbolIds?.length !== 1
@@ -114,7 +121,7 @@ export const marklessScalarLocate = (
 	tagName: string,
 ): Element | null => {
 	const v = servedView(r);
-	return at(r, v ? v.l.get(hostNodeId) : index < 0 ? undefined : { index, tagName });
+	return at(r, v ? v.l.get(hostNodeId) : index < 0 ? undefined : { hostNodeId, index, tagName });
 };
 
 // Which lean action alone owns this event's markless path: -1 hands the event to full resume, undefined means no served view.

@@ -31,6 +31,12 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectAttachStartDiagnostic, isProjectedChildren } from './attach-start.ts';
 import { collectComponentEdge } from './collect-components.ts';
+import {
+	detachedContentMode,
+	isDeclarativeShadowRoot,
+	isDetachedChild,
+	refuseDynamicDetachedContent,
+} from './detached-content.ts';
 import { constantPropValue } from './constant-props.ts';
 import { overlayLiteralValue } from './overlay-attribute.ts';
 import {
@@ -118,6 +124,11 @@ import type {
 const TEMPLATE_READ_OPTIONS: CompositeReadOptions = { methodCalls: true, unaryOperators: true };
 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
+	const elementTagName = getElementTagName(node);
+	if (elementTagName && isDeclarativeShadowRoot(node, elementTagName)) {
+		refuseDynamicDetachedContent(node, elementTagName, state);
+		return;
+	}
 	const componentEdgeId = collectComponentEdge(node, state, walk);
 	if (componentEdgeId) routeProjectedText(node, componentEdgeId, state);
 
@@ -164,7 +175,12 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	const previousProjectionScope = state.currentProjectionScope;
 	if (componentEdgeId)
 		state.currentProjectionScope = { componentEdgeId, hostNodeId: previousHost };
+	const detached = isHostElement && tagName ? detachedContentMode(tagName) : null;
 	for (const child of asNodes(node.children)) {
+		if (detached && isDetachedChild(detached, child)) {
+			refuseDynamicDetachedContent(child, tagName!, state);
+			continue;
+		}
 		state.currentTextTarget =
 			isHostElement && isTemplateExpressionChild(child)
 				? textExpressionTarget(node, child)

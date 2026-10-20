@@ -1569,6 +1569,35 @@ export function repeatKeyUnstableDiagnostic(input: {
 	} as SemanticGraphDiagnostic;
 }
 
+export function detachedContentDynamicDiagnostic(
+	node: AnyNode,
+	ownerTagName: string,
+	state: Pick<WalkState, 'filename' | 'source'>,
+): SemanticGraphDiagnostic {
+	const source = expressionSource(node, state.source);
+	const where =
+		ownerTagName.toLowerCase() === 'template'
+			? `<template> content is parsed into template.content, outside the page`
+			: `the content of <${ownerTagName}> is parsed as text, not as elements`;
+	return {
+		code: 'MARKLESS_DETACHED_CONTENT_DYNAMIC',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'Content inside a <template> or a raw-text element must be static',
+		message: `\`${source}\` inside <${ownerTagName}> needs the page to find it again in the browser, but ${where}, so no handler, binding, or component there can ever run or update.`,
+		why: 'The browser resumes a server-rendered page by counting its elements in document order. The HTML parser keeps what a <template> or a raw-text element such as <noscript> holds out of that order, so nothing inside one can be located, and a handler or binding there would be silently dead.',
+		primarySpan: sourceSpan(node, state.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `Keep the <${ownerTagName}> content to plain elements, text, and literal attribute values. Move anything interactive outside it, and clone the template content from a handler or attach if it must become live.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_DETACHED_CONTENT_DYNAMIC',
+	};
+}
+
 export function attachHostElementRequiredDiagnostic(
 	ownerTagName: string | null,
 	value: AnyNode,
