@@ -19,8 +19,14 @@ import {
 	protocolEventDispatchesMarkless,
 	PROTOCOL_IDLE_EVENT_NAME,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
-	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_EVENT_HOST_DELEGATED_REF,
+	PROTOCOL_SYNC_POLICY_TABLE_TYPE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
+	constantSyncPolicyCode,
+	formatEventHostEntries,
+	syncPolicyNeverActs,
+	type ProtocolEventHostEntry,
 } from '@markless/serializer/protocol';
 import {
 	classifyResumeRecordDelta,
@@ -36,6 +42,10 @@ import {
 	createInlineResumerSource,
 	createInlineResumerStorageWakeSource,
 	renderPrerenderInlineResumerSource,
+	renderInlineResumerPageSource,
+	INLINE_PAGE_FORWARDS_UNKNOWN,
+	INLINE_PAGE_SCOPED,
+	type InlineResumerPage,
 	type InlineResumerSourceVariants,
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
@@ -192,7 +202,9 @@ export async function assembleSsrContainer(
 	const payloadScripts =
 		hasPayload && browserTriggers && classification?.kind !== 'empty'
 			? renderPayloadScripts(
-					payloadRecords === requestRecords ? { state, view: servedView } : payloadRecords,
+					payloadRecords === requestRecords
+						? { state, view: servedView }
+						: payloadRecords,
 					encodeProtocolPayloadLists,
 				)
 			: undefined;
@@ -246,7 +258,11 @@ export async function assembleSsrContainer(
 									executionLog,
 								},
 							)
-						: (options.resumerSource ?? defaultSource),
+						: (options.resumerSource ??
+								renderInlineResumerPageSource(
+									defaultSource,
+									inlineResumerPage(view),
+								)),
 					options.nonce,
 					selectedResumeModuleUrl,
 					selfWake,
@@ -258,6 +274,10 @@ export async function assembleSsrContainer(
 					artifactSources?.defer,
 				)
 			: '';
+	const policyTable = createSyncPolicyTable();
+	const pageHtml = resumerScript
+		? withEventHostMarks(view, output.html, policyTable)
+		: output.html;
 	const storageSeedScript = renderStorageSeedScript(
 		artifactStorageSeeds(component),
 		options.nonce,
@@ -273,8 +293,12 @@ export async function assembleSsrContainer(
 		renderContainer(
 			options.containerId,
 			[
-				resumerScript && syncPolicy ? withSyncPolicyHostMarks(view, output.html) : output.html,
-				payloadScripts?.stateScript, payloadScripts?.viewScript, resumerScript],
+				pageHtml,
+				payloadScripts?.stateScript,
+				payloadScripts?.viewScript,
+				renderSyncPolicyTableScript(policyTable.policies),
+				resumerScript,
+			],
 			resumerScript ? servedView.locators : [],
 		),
 	]
@@ -350,9 +374,15 @@ export async function assemblePrerenderPageParts(
 	]
 		.filter(Boolean)
 		.join('');
+	const policyTable = createSyncPolicyTable();
 	const container = renderContainer(
 		options.containerId,
-		[output.html, options.armEmission, resumerScript],
+		[
+			resumerScript ? withEventHostMarks(view, output.html, policyTable) : output.html,
+			options.armEmission,
+			renderSyncPolicyTableScript(policyTable.policies),
+			resumerScript,
+		],
 		resumerScript ? view.locators : [],
 	);
 	return { head, container };
@@ -716,81 +746,181 @@ export function withNamedHostLocators(view: ProtocolViewPayload): ProtocolViewPa
 	return locators.length === view.locators.length ? view : { ...view, locators };
 }
 
-// Each element whose event carries a sync policy names its record, so the boot reaches the policy from the event target alone.
-export function withSyncPolicyHostMarks(
-	view: Pick<ProtocolViewPayload, 'locators' | 'events' | 'asyncBoundaries' | 'branches'>,
-	html: string,
-): string {
-	const policyHosts = (events: ReadonlyArray<{ hostNodeId: string; syncPolicy?: unknown }>) =>
-		new Set(events.filter((event) => event.syncPolicy).map((event) => event.hostNodeId));
-	const tree = servedElementTree(html);
-	const marks = new Map<number, string>();
-	const mark = (
-		locators: ReadonlyArray<{ hostNodeId: string; index: number }>,
-		hosts: ReadonlySet<string>,
-		offset = 0,
-	) => {
-		for (const locator of locators)
-			if (hosts.has(locator.hostNodeId)) marks.set(offset + locator.index, locator.hostNodeId);
+type EventHostMarks = Map<number, ProtocolEventHostEntry[]>;
+const DEFERRED_EVENT_NAMES: ReadonlyArray<string> = [
+	PROTOCOL_VISIBLE_EVENT_NAME,
+	PROTOCOL_IDLE_EVENT_NAME,
+];
+
+/** Collects a container's conditional sync policies into its table, one row per distinct policy. */
+export function createSyncPolicyTable(): {
+	readonly policies: ProtocolSyncPolicy[];
+	readonly entry: (policy: ProtocolSyncPolicy | undefined) => ProtocolEventHostEntry['policy'];
+} {
+	const policies: ProtocolSyncPolicy[] = [];
+	const rows = new Map<string, number>();
+	return {
+		policies,
+		entry(policy) {
+			if (!policy || syncPolicyNeverActs(policy)) return undefined;
+			const constant = constantSyncPolicyCode(policy);
+			if (constant) return constant;
+			const key = JSON.stringify(policy);
+			let row = rows.get(key);
+			if (row === undefined) rows.set(key, (row = policies.push(policy) - 1));
+			return row;
+		},
 	};
-	mark(view.locators, policyHosts(view.events));
-	for (const arm of [
-		...view.asyncBoundaries.map((boundary) => [boundary.startAnchor, boundary.armRecords] as const),
-		...(view.branches ?? []).map((branch) => [branch.startAnchor, branch.servedArmRecords] as const),
-	]) {
-		const [anchor, records] = arm;
-		if (!records || Array.isArray(records)) continue;
-		const set = records as ProtocolArmRecordSet;
-		const offset = tree.commentElementIndexes[anchor.index];
-		if (offset !== undefined) mark(set.locators, policyHosts(set.events ?? []), offset);
-	}
-	return marks.size
-		? withElementAttributes(html, tree.nameEnds, PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE, marks)
-		: html;
 }
 
-/** The same marks for one arm's html streamed on its own; its locators count from the arm's first element. */
-export function withArmSyncPolicyHostMarks(armRecords: ProtocolArmRecordSet, html: string): string {
-	const hosts = new Set(
-		(armRecords.events ?? []).filter((event) => event.syncPolicy).map((event) => event.hostNodeId),
-	);
-	const marks = new Map<number, string>();
-	for (const locator of armRecords.locators)
-		if (hosts.has(locator.hostNodeId)) marks.set(locator.index + 1, locator.hostNodeId);
+function addEventHostEntry(marks: EventHostMarks, index: number, entry: ProtocolEventHostEntry) {
+	const entries = marks.get(index);
+	if (!entries) return void marks.set(index, [entry]);
+	const same = entries.findIndex((candidate) => candidate.name === entry.name);
+	// One entry per event name: the element's own record outranks a scope it also is.
+	if (same < 0) entries.push(entry);
+	else if (entries[same]!.ref === undefined && entry.ref !== undefined) entries[same] = entry;
+}
+
+function writeEventHostMarks(html: string, nameEnds: ReadonlyArray<number>, marks: EventHostMarks) {
 	return marks.size
 		? withElementAttributes(
 				html,
-				servedElementTree(html).nameEnds,
-				PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
-				marks,
+				nameEnds,
+				PROTOCOL_EVENT_HOST_ATTRIBUTE,
+				new Map(
+					[...marks].map(([index, entries]) => [index, formatEventHostEntries(entries)]),
+				),
 			)
 		: html;
 }
 
-function eventHostIndexes(view: ProtocolViewPayload, eventName: string): number[] {
-	const hosts = new Set(
-		view.events.filter((event) => event.eventName === eventName).map((event) => event.hostNodeId),
-	);
-	return view.locators
-		.filter((locator) => hosts.has(locator.hostNodeId))
-		.map((locator) => locator.index);
+/**
+ * Writes the `m:on` attribute on every served event host: a top-level record by
+ * its index in `events`, a keyed repeat parent as the scope of its rows' events,
+ * and a host in a served arm by the policy its record carries.
+ */
+export function withEventHostMarks(
+	view: Pick<
+		ProtocolViewPayload,
+		'locators' | 'events' | 'asyncBoundaries' | 'branches' | 'keyedRepeats'
+	>,
+	html: string,
+	policyTable: ReturnType<typeof createSyncPolicyTable>,
+): string {
+	const tree = servedElementTree(html);
+	const marks: EventHostMarks = new Map();
+	const indexes = (locators: ReadonlyArray<{ hostNodeId: string; index: number }>) =>
+		new Map(locators.map((locator) => [locator.hostNodeId, locator.index]));
+	const shell = indexes(view.locators);
+	view.events.forEach((event, ref) => {
+		const index = shell.get(event.hostNodeId);
+		if (index === undefined) return;
+		const dispatches = protocolEventDispatchesMarkless(event);
+		// A deferred trigger no listener raises is claimed by its ref alone, so a delegated one is not written.
+		if (!dispatches && DEFERRED_EVENT_NAMES.includes(event.eventName)) return;
+		const policy = policyTable.entry(event.syncPolicy);
+		addEventHostEntry(marks, index, {
+			name: event.eventName,
+			ref: dispatches ? ref : PROTOCOL_EVENT_HOST_DELEGATED_REF,
+			...(policy === undefined ? {} : { policy }),
+		});
+	});
+	for (const repeat of view.keyedRepeats ?? []) {
+		const index = shell.get(repeat.parentHostNodeId);
+		if (index === undefined) continue;
+		for (const event of repeat.rowEvents)
+			addEventHostEntry(marks, index, { name: event.eventName });
+	}
+	for (const [anchor, records] of [
+		...view.asyncBoundaries.map(
+			(boundary) => [boundary.startAnchor, boundary.armRecords] as const,
+		),
+		...(view.branches ?? []).map(
+			(branch) => [branch.startAnchor, branch.servedArmRecords] as const,
+		),
+	]) {
+		if (!records || Array.isArray(records)) continue;
+		const set = records as ProtocolArmRecordSet;
+		const offset = tree.commentElementIndexes[anchor.index];
+		if (offset === undefined) continue;
+		const arm = indexes(set.locators);
+		for (const event of set.events ?? []) {
+			const policy = policyTable.entry(event.syncPolicy);
+			const index = arm.get(event.hostNodeId);
+			if (policy === undefined || index === undefined) continue;
+			addEventHostEntry(marks, offset + index, { name: event.eventName, policy });
+		}
+	}
+	return writeEventHostMarks(html, tree.nameEnds, marks);
 }
 
-// Each deferred lane ships only when the page's records name its event; a visible or idle record in an arm or row adds index 0, the container, so the runtime takes it.
-function deferredTriggerSource(view: ProtocolViewPayload): string {
-	const visible = eventHostIndexes(view, PROTOCOL_VISIBLE_EVENT_NAME);
-	const idle = eventHostIndexes(view, PROTOCOL_IDLE_EVENT_NAME);
-	const nested = deferredEventNames({ ...view, events: [] });
-	if (nested.includes(PROTOCOL_VISIBLE_EVENT_NAME)) visible.push(0);
-	if (nested.includes(PROTOCOL_IDLE_EVENT_NAME)) idle.push(0);
-	return (
-		(visible.length > 0 ? createInlineDeferTriggerSource('visible', visible) : '') +
-		(idle.length > 0 ? createInlineDeferTriggerSource('idle', idle) : '')
+/**
+ * The same marks for one arm's html streamed on its own: its locators count from
+ * the arm's first element and each ref indexes the arm's own events, whose
+ * records its executor reads policies from.
+ */
+export function withArmEventHostMarks(armRecords: ProtocolArmRecordSet, html: string): string {
+	const marks: EventHostMarks = new Map();
+	const indexes = new Map(
+		armRecords.locators.map((locator) => [locator.hostNodeId, locator.index]),
 	);
+	(armRecords.events ?? []).forEach((event, ref) => {
+		const index = indexes.get(event.hostNodeId);
+		if (index === undefined) return;
+		addEventHostEntry(marks, index + 1, {
+			name: event.eventName,
+			ref: protocolEventDispatchesMarkless(event) ? ref : PROTOCOL_EVENT_HOST_DELEGATED_REF,
+		});
+	});
+	return writeEventHostMarks(html, servedElementTree(html).nameEnds, marks);
+}
+
+function renderSyncPolicyTableScript(policies: ReadonlyArray<ProtocolSyncPolicy>): string {
+	return policies.length
+		? `<script type="${PROTOCOL_SYNC_POLICY_TABLE_TYPE}">${escapeScriptJson(JSON.stringify(policies))}</script>`
+		: '';
+}
+
+function hasEvent(view: ProtocolViewPayload, eventName: string): boolean {
+	return view.events.some((event) => event.eventName === eventName);
+}
+
+// Each deferred lane ships only when the page's records name its event; a visible or idle record in an arm or row hands the container to the runtime.
+function deferredTriggerSource(view: ProtocolViewPayload): string {
+	const nested = deferredEventNames({ ...view, events: [] });
+	const lane = (name: 'visible' | 'idle', eventName: string) => {
+		const ownsRoot = nested.includes(eventName);
+		return hasEvent(view, eventName) || ownsRoot
+			? createInlineDeferTriggerSource(name, ownsRoot)
+			: '';
+	};
+	return lane('visible', PROTOCOL_VISIBLE_EVENT_NAME) + lane('idle', PROTOCOL_IDLE_EVENT_NAME);
+}
+
+/**
+ * What the classic boot needs to know about this page before any event: the event
+ * names it listens for, the ones nested records (rows, arms) use, and whether a
+ * press no host claims may still need the runtime.
+ */
+export function inlineResumerPage(view: ProtocolViewPayload): InlineResumerPage {
+	const nested = deferredEventNames({ ...view, events: [] });
+	const forwardsUnknownElements =
+		(view.keyedRepeats ?? []).some((repeat) => repeat.rowComponent !== undefined) ||
+		(view.branches ?? []).some((branch) => branch.escalates);
+	const scoped = (view.branches ?? []).length > 0 || view.asyncBoundaries.length > 0;
+	return [
+		browserEventNames(view),
+		nested.filter((eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME),
+		(forwardsUnknownElements ? INLINE_PAGE_FORWARDS_UNKNOWN : 0) |
+			(scoped ? INLINE_PAGE_SCOPED : 0),
+	];
 }
 
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
-	return deferredEventNames(view).filter((eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME);
+	return deferredEventNames(view).filter(
+		(eventName) => eventName !== PROTOCOL_VISIBLE_EVENT_NAME,
+	);
 }
 
 function deferredEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {

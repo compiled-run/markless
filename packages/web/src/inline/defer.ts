@@ -3,6 +3,10 @@ import {
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '../../../serializer/src/protocol-event-names.ts';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../../serializer/src/protocol-locator-paths.ts';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '../../../serializer/src/protocol-event-host.ts';
+
+// The attribute name as a CSS attribute selector spells it: its `:` escaped.
+const PROTOCOL_EVENT_HOST_SELECTOR = PROTOCOL_EVENT_HOST_ATTRIBUTE.replace(':', '\\:');
 import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
@@ -43,7 +47,7 @@ type DeferModule = {
 export type MarklessDefer = ((
 	root: Element | null | undefined,
 	lane: MarklessDeferLane,
-	hostIndexes: ReadonlyArray<number>,
+	ownsRoot: 0 | 1,
 	eventName: string,
 ) => void) & {
 	/** Runs `run` once the page has loaded, streamed arms have landed, and the browser is idle. */
@@ -52,15 +56,18 @@ export type MarklessDefer = ((
 
 /**
  * The one startup helper deferred triggers share. Serialized whole into a served
- * page that has one; a client mount and the runtime call it directly. Hosts come
- * from compiler-emitted DOM-order indexes, index 0 being the container itself,
- * which hands records the runtime owns (arms, rows) to the runtime.
+ * page that has one; a client mount and the runtime call it directly. Hosts are
+ * the elements whose event host attribute (`hostSelector`, escaped for a CSS
+ * attribute selector) names the lane's event with a record;
+ * `ownsRoot` adds the container itself, which hands records the runtime owns
+ * (arms, rows) to the runtime.
  */
 export function createMarklessDefer(
 	loadModule: (url: string) => Promise<DeferModule>,
 	pageStart: string,
 	pageEnd: string,
-	pathsAttribute?: string,
+	pathsAttribute: string,
+	hostSelector: string,
 ): MarklessDefer {
 	const scope = globalThis as typeof globalThis & {
 		scheduler?: { postTask?: (run: () => void, options: { priority: string }) => unknown };
@@ -84,6 +91,8 @@ export function createMarklessDefer(
 			if (next.nodeType !== 8) live.push(next as Element);
 			else if ((next as Comment).data === pageStart) live.length = 1;
 			else if ((next as Comment).data === pageEnd) break;
+		const paths = pathsAttribute && root.getAttribute?.(pathsAttribute);
+		if (paths && parseInt(paths) !== live.length) root.__marklessShifted = 1;
 		return live;
 	};
 	const idle = (root: DeferRoot, run: () => void) => {
@@ -98,7 +107,7 @@ export function createMarklessDefer(
 	const trigger = (
 		target: Element | null | undefined,
 		lane: MarklessDeferLane,
-		hostIndexes: ReadonlyArray<number>,
+		ownsRoot: 0 | 1,
 		eventName: string,
 	) => {
 		const root = target as DeferRoot | null | undefined;
@@ -136,16 +145,12 @@ export function createMarklessDefer(
 					root.__marklessDelegatedDispatch = undefined;
 			});
 		};
-		const all = (root.__marklessCensus as Element[] | undefined) ?? census(root);
-		const paths = pathsAttribute && root.getAttribute?.(pathsAttribute);
-		if (paths && parseInt(paths) !== all.length) root.__marklessShifted = 1;
-		// A page a script outside Markless changed hands the container to the runtime, which finds each host by its record.
-		const hosts = root.__marklessShifted
-			? [root]
-			: hostIndexes.flatMap((index) => {
-					const host = all[index];
-					return host ? [host] : [];
-				});
+		const hosts: Element[] = ownsRoot ? [root] : [];
+		hosts.push(
+			...root.querySelectorAll(
+				`[${hostSelector}^="${eventName}:"],[${hostSelector}*=";${eventName}:"]`,
+			),
+		);
 		if (lane === 'idle') return idle(root, () => hosts.forEach(claim));
 		const observer = new IntersectionObserver((entries) => {
 			for (const entry of entries)
@@ -163,16 +168,13 @@ export const INLINE_DEFER_LOADER_SOURCE = '(url) => import(/* @vite-ignore */ ur
 
 /** An expression that installs the helper once per document and evaluates to it; a build passes the factory minified. */
 export function inlineDeferSource(factory = createMarklessDefer.toString()): string {
-	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE},${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)},${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)}))`;
+	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE},${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)},${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)},${JSON.stringify(PROTOCOL_EVENT_HOST_SELECTOR)}))`;
 }
 
 /** One lane's registration, appended only to a served page whose records name that lane's event. */
-export function createInlineDeferTriggerSource(
-	lane: MarklessDeferLane,
-	hostIndexes: ReadonlyArray<number>,
-): string {
+export function createInlineDeferTriggerSource(lane: MarklessDeferLane, ownsRoot: boolean): string {
 	const eventName = lane === 'idle' ? PROTOCOL_IDLE_EVENT_NAME : PROTOCOL_VISIBLE_EVENT_NAME;
-	return `;${inlineDeferSource()}(document.currentScript?.closest('[data-async-container]'),${JSON.stringify(lane)},${JSON.stringify(hostIndexes)},${JSON.stringify(eventName)});`;
+	return `;${inlineDeferSource()}(document.currentScript?.closest('[data-async-container]'),${JSON.stringify(lane)},${ownsRoot ? 1 : 0},${JSON.stringify(eventName)});`;
 }
 
 let moduleDefer: MarklessDefer | undefined;
@@ -185,6 +187,8 @@ export function marklessDefer(): MarklessDefer {
 			(url) => import(/* @vite-ignore */ url),
 			PROTOCOL_CONTAINER_START_COMMENT,
 			PROTOCOL_CONTAINER_END_COMMENT,
+			PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+			PROTOCOL_EVENT_HOST_SELECTOR,
 		))
 	);
 }

@@ -4,6 +4,8 @@ import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/re
 import {
 	createInlineResumerSelfWakeSource,
 	createPrerenderInlineResumerSource,
+	INLINE_RESUMER_PAGE_TOKEN,
+	renderInlineResumerPageSource,
 } from '../../web/src/inline/resumer.ts';
 import {
 	PRERENDER_INLINE_EVENT_NAMES_TOKEN,
@@ -20,14 +22,17 @@ test('Rolldown OXC deterministically minifies the typed event-only resumer', asy
 	const second = await compileInlineResumerSources(options);
 
 	expect(first).toEqual(second);
-	expect(first.event).not.toContain('runInlineResumer');
-	expect(first.event).not.toContain('__MARKLESS_INLINE_');
-	expect(first.event).not.toContain('preventDefault');
-	expect(first.event).not.toContain('__mxLog');
-	expect(first.event).not.toContain('inline-resumer');
-	expect(first.event).not.toContain('router-delegation');
-	expect(first.event).not.toContain('MARKLESS_DEBUG_');
-	expect(gzipSync(first.event, { level: 9 }).length).toBeLessThanOrEqual(
+	// The page facts stay one free identifier until a page substitutes them.
+	expect(first.event.split(INLINE_RESUMER_PAGE_TOKEN)).toHaveLength(2);
+	const served = renderInlineResumerPageSource(first.event, [['click'], [], 0]);
+	expect(served).not.toContain('runInlineResumer');
+	expect(served).not.toContain('__MARKLESS_INLINE_');
+	expect(served).not.toContain('preventDefault');
+	expect(served).not.toContain('__mxLog');
+	expect(served).not.toContain('inline-resumer');
+	expect(served).not.toContain('router-delegation');
+	expect(served).not.toContain('MARKLESS_DEBUG_');
+	expect(gzipSync(served, { level: 9 }).length).toBeLessThanOrEqual(
 		EVENT_ONLY_RESUMER_TARGET_BYTES,
 	);
 });
@@ -175,9 +180,9 @@ test('the prerender boot compiles deterministically and costs far less than its 
 		createPrerenderInlineResumerSource(eventNames, url) +
 		createInlineResumerSelfWakeSource(url);
 	const minified = renderPrerenderInlineResumerSource(first.prerenderSelfWake, eventNames);
-	// Reported as INLINE_MIN_BYTES in the T012 checkpoint.
+	// The authored boot lost its load-time census and locator lookup, so it shrank faster than the minified one.
 	expect(Buffer.byteLength(minified, 'utf8')).toBeLessThan(
-		Buffer.byteLength(authored, 'utf8') / 2,
+		Buffer.byteLength(authored, 'utf8') * 0.51,
 	);
 	expect(minified).not.toContain(PRERENDER_INLINE_EVENT_NAMES_TOKEN);
 });

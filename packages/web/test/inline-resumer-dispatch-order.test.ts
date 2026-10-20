@@ -1,7 +1,18 @@
 import { expect, test } from 'vitest';
-import { createInlineResumerSource } from '../src/inline/resumer.ts';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '@markless/serializer/protocol';
+import {
+	createInlineResumerSource,
+	INLINE_MODULE_LOADER_SOURCE,
+	INLINE_RESUMER_PAGE_TOKEN,
+	renderInlineResumerPageSource,
+} from '../src/inline/resumer.ts';
+import {
+	createSyncPolicyTable,
+	inlineResumerPage,
+	withEventHostMarks,
+} from '../src/render-to-string.ts';
 
-// Defect 94. The inline resumer used to call loadModule(url) fresh for every
+// The inline resumer used to call loadModule(url) fresh for every
 // event, then `.then` the resulting promise. Resolution order across SEPARATE
 // promises is not FIFO: the promise the first gesture created has to walk the
 // real import (several microtask hops), while a gesture arriving after the
@@ -15,7 +26,7 @@ import { createInlineResumerSource } from '../src/inline/resumer.ts';
 // order, and the capture listener registers them synchronously as each event
 // fires, so arrival order is fire order.
 
-const LOADER_TAIL = '((url) => import(/* @vite-ignore */ url));';
+const BOOT_TAIL = `(${INLINE_MODULE_LOADER_SOURCE},${INLINE_RESUMER_PAGE_TOKEN});`;
 
 // How many microtask hops the "cold" load costs. Any value above the number of
 // events in the burst is enough to sort a scrambled run from an ordered one.
@@ -24,9 +35,15 @@ const COLD_HOPS = 12;
 type FakeElement = {
 	readonly tagName: string;
 	parentElement: FakeElement | null;
+	getAttribute?: (name: string) => string | null;
 };
 
 type Listener = (event: { readonly type: string; readonly target: FakeElement }) => unknown;
+
+function servedHostMark(view: object, html: string): string | null {
+	const marked = withEventHostMarks(view as never, html, createSyncPolicyTable());
+	return new RegExp(`${PROTOCOL_EVENT_HOST_ATTRIBUTE}="([^"]*)"`).exec(marked)?.[1] ?? null;
+}
 
 function deferredBy<T>(hops: number, value: T): Promise<T> {
 	let promise = Promise.resolve();
@@ -49,7 +66,7 @@ function bootResumer() {
 		syncPolicy: false,
 	});
 	// Fail closed rather than silently testing a shape that no longer exists.
-	expect(source).toContain(LOADER_TAIL);
+	expect(source).toContain(BOOT_TAIL);
 
 	const arrivals: string[] = [];
 	const module = {
@@ -63,7 +80,6 @@ function bootResumer() {
 		return loads === 1 ? deferredBy(COLD_HOPS, module) : Promise.resolve(module);
 	};
 
-	const host: FakeElement = { tagName: 'INPUT', parentElement: null };
 	const listeners = new Map<string, Listener>();
 	const view = {
 		asyncBoundaries: [],
@@ -74,12 +90,15 @@ function bootResumer() {
 		],
 		locators: [{ hostNodeId: 'h1', index: 1 }],
 	};
+	const mark = servedHostMark(view, '<input>');
+	const host: FakeElement = {
+		tagName: 'INPUT',
+		parentElement: null,
+		getAttribute: (name) => (name === PROTOCOL_EVENT_HOST_ATTRIBUTE ? mark : null),
+	};
 	const root = {
 		addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
-		querySelector: (selector: string) =>
-			selector === 'script[type="markless/view"]'
-				? { textContent: JSON.stringify(view) }
-				: null,
+		querySelector: () => null,
 	};
 	host.parentElement = root as unknown as FakeElement;
 	const fakeDocument = {
@@ -87,8 +106,7 @@ function bootResumer() {
 			closest: (selector: string) => (selector === '[data-async-container]' ? root : null),
 			getAttribute: () => null,
 		},
-		// The resumer walks the container once to index locator positions. Index 0
-		// is the root itself, so the host lands at index 1.
+		// The resumer pins the container's census at its first forward; index 0 is the root.
 		createTreeWalker: () => {
 			let done = false;
 			return {
@@ -101,9 +119,14 @@ function bootResumer() {
 		},
 	};
 
+	const runnable = renderInlineResumerPageSource(
+		source.replace(BOOT_TAIL, `(__load,${INLINE_RESUMER_PAGE_TOKEN});`),
+		inlineResumerPage(view as never),
+	);
 	// eslint-disable-next-line @typescript-eslint/no-implied-eval
-	new Function('document', '__load', source.replace(LOADER_TAIL, '(__load);'))(
+	new Function('document', 'addEventListener', '__load', runnable)(
 		fakeDocument,
+		() => {},
 		loadModule,
 	);
 

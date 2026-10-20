@@ -24,7 +24,6 @@ export {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 } from './protocol-page-markers.ts';
-export { PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE } from './protocol-sync-policy-host.ts';
 
 export const ASYNC_BOUNDARY_ARM_MIN = 0;
 export const ASYNC_BOUNDARY_ARM_PENDING = 1;

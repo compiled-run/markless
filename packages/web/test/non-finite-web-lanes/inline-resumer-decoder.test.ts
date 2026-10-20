@@ -1,8 +1,14 @@
 import { afterEach, expect, test } from 'vitest';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../../serializer/src/index.ts';
-import { createInlineResumerSource } from '../../src/inline/resumer.ts';
+import {
+	createInlineResumerSource,
+	INLINE_MODULE_LOADER_SOURCE,
+	INLINE_RESUMER_PAGE_TOKEN,
+	renderInlineResumerPageSource,
+} from '../../src/inline/resumer.ts';
+import { inlineResumerPage } from '../../src/render-to-string.ts';
 
-const LOADER_TAIL = '((url) => import(/* @vite-ignore */ url));';
+const BOOT_TAIL = `(${INLINE_MODULE_LOADER_SOURCE},${INLINE_RESUMER_PAGE_TOKEN});`;
 
 type SharedGraphPolicy = {
 	read?: (container: unknown, graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
@@ -29,19 +35,18 @@ function bootSharedGraphPolicy(): SharedGraphPolicy {
 		sharedGraphPolicy: true,
 		syncPolicy: true,
 	});
-	expect(source).toContain(LOADER_TAIL);
+	expect(source).toContain(BOOT_TAIL);
 
+	const view = {
+		asyncBoundaries: [],
+		behaviors: [],
+		domUpdates: [],
+		events: [],
+		locators: [],
+	};
 	const root = {
 		addEventListener: () => {},
-		querySelector: () => ({
-			textContent: JSON.stringify({
-				asyncBoundaries: [],
-				behaviors: [],
-				domUpdates: [],
-				events: [],
-				locators: [],
-			}),
-		}),
+		querySelector: () => null,
 	};
 	const fakeDocument = {
 		currentScript: {
@@ -52,9 +57,14 @@ function bootSharedGraphPolicy(): SharedGraphPolicy {
 	};
 	const previousDocument = globalScope.document;
 	try {
+		const runnable = renderInlineResumerPageSource(
+			source.replace(BOOT_TAIL, `(__load,${INLINE_RESUMER_PAGE_TOKEN});`),
+			inlineResumerPage(view as never),
+		);
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		new Function('document', '__load', source.replace(LOADER_TAIL, '(__load);'))(
+		new Function('document', 'addEventListener', '__load', runnable)(
 			fakeDocument,
+			() => {},
 			() => Promise.resolve({}),
 		);
 	} finally {
@@ -83,9 +93,7 @@ function container(value: unknown) {
 	} as never);
 	return {
 		querySelector: () => ({
-			textContent: scripts.stateScript
-				.replace(/^<script[^>]*>/, '')
-				.replace('</script>', ''),
+			textContent: scripts.stateScript.replace(/^<script[^>]*>/, '').replace('</script>', ''),
 		}),
 	};
 }
@@ -106,7 +114,7 @@ test('the inline resumer leaves a finite cell alone', () => {
 
 test('the inline resumer decodes a non-finite object field', () => {
 	const shared = bootSharedGraphPolicy();
-	expect(shared.read!(container({ maxWidth: Number.POSITIVE_INFINITY }), 'limit', ['maxWidth'])).toBe(
-		Number.POSITIVE_INFINITY,
-	);
+	expect(
+		shared.read!(container({ maxWidth: Number.POSITIVE_INFINITY }), 'limit', ['maxWidth']),
+	).toBe(Number.POSITIVE_INFINITY);
 });

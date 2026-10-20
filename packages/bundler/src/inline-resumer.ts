@@ -1,4 +1,5 @@
 import {
+	INLINE_RESUMER_PAGE_TOKEN,
 	PRERENDER_INLINE_EVENT_NAMES_TOKEN,
 	createInlineResumerDebugRegistrationSource,
 	createInlineResumerSelfWakeSource,
@@ -120,7 +121,10 @@ export async function compileInlineResumerSource(
 		module: false,
 	});
 	assertOxcResult('minify', minified.errors);
-	return minified.code.trim();
+	const code = minified.code.trim();
+	if (!code.includes(INLINE_RESUMER_PAGE_TOKEN))
+		throw new Error('MARKLESS_INLINE_RESUMER_PAGE_TOKEN_FOLDED');
+	return code;
 }
 
 // OXC diagnostics are not Error instances; only the message is read here.

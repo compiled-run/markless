@@ -10,7 +10,7 @@ import {
 import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
-	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	type ProtocolArmRecordSet,
 } from '@markless/serializer/protocol';
 import {
@@ -25,7 +25,7 @@ import {
 	type RenderToStringOptions,
 	type SsrRenderable,
 	type SsrRenderOutput,
-	withArmSyncPolicyHostMarks,
+	withArmEventHostMarks,
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 
@@ -352,7 +352,7 @@ function renderArmAppend(
 		: JSON.stringify(arm.boundaryId);
 
 	return (
-		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmSyncPolicyHostMarks(armRecords as ProtocolArmRecordSet, armHtml)}</template>` +
+		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armRecords as ProtocolArmRecordSet, armHtml)}</template>` +
 		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
@@ -483,17 +483,20 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
 			const names = new Set((records.events || []).map((x) => x.eventName));
-			const policies = new Map();
-			for (const x of records.events || []) if (x.syncPolicy) policies.set(x.hostNodeId + ' ' + x.eventName, x);
+			const armEnd = e;
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
 			const forward = async (e) => {
 				const t = e.type;
 				let applied = false;
-				for (let el = e.target; el && !applied; el = el.parentElement) {
-					const x = policies.get(el.getAttribute(${JSON.stringify(PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE)}) + ' ' + t);
-					if (x && applyPolicy(x.syncPolicy, e, r)) applied = true;
-					if (el === r) break;
+				// A ref indexes this arm's own events, so only an element between the arm's anchors is read.
+				for (let el = e.target; el && !applied && el !== r; el = el.parentElement) {
+					if (!(s.compareDocumentPosition(el) & 4) || !(armEnd.compareDocumentPosition(el) & 2)) continue;
+					for (const entry of (el.getAttribute(${JSON.stringify(PROTOCOL_EVENT_HOST_ATTRIBUTE)}) || '').split(';')) {
+						const [name, ref] = entry.split('!')[0].split(':');
+						const x = name === t && ref && (records.events || [])[ref];
+						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r)) applied = true;
+					}
 				}
 				const input = { root: r, event: e, element: e.target, eventRecord: null, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
 				if (r.__marklessDispatch) return r.__marklessDispatch(input);

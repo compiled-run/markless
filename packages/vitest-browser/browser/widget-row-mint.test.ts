@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '../../serializer/src/protocol-event-host.ts';
 import { cleanup, renderSSR } from '../src/index.ts';
 import App, { Served } from './fixtures/widget-row-mint.tsrx';
 
@@ -110,9 +111,7 @@ test('the minted row toggles its own widget state and the served rows do not mov
 // export carries its module's page wiring.
 
 test('a page rendered from a non-root export is refused, not served inert', async () => {
-	await expect(renderSSR(Served)).rejects.toThrow(
-		/MARKLESS_COMPONENT_PART_AS_PAGE: "Served"/,
-	);
+	await expect(renderSSR(Served)).rejects.toThrow(/MARKLESS_COMPONENT_PART_AS_PAGE: "Served"/);
 });
 
 // Served markup carries resume bookkeeping attributes the client mint has no
@@ -121,7 +120,11 @@ function normalizeRow(container: Element, key: string): string {
 	const row = container.querySelector(`[data-row="${key}"]`)!.cloneNode(true) as Element;
 	for (const element of [row, ...Array.from(row.querySelectorAll('*'))])
 		for (const name of element.getAttributeNames())
-			if (name.startsWith('data-markless') || name.startsWith('markless'))
+			if (
+				name.startsWith('data-markless') ||
+				name.startsWith('markless') ||
+				name === PROTOCOL_EVENT_HOST_ATTRIBUTE
+			)
 				element.removeAttribute(name);
 	return row.outerHTML;
 }

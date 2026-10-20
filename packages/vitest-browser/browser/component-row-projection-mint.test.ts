@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '../../serializer/src/protocol-event-host.ts';
 import { cleanup, renderSSR } from '../src/index.ts';
 import App from './fixtures/component-row-projection-mint.tsrx';
 import Served from './fixtures/component-row-projection-mint-served.tsrx';
@@ -13,14 +14,15 @@ const detail = (container: Element, key: string): string =>
 	container.querySelector(`[data-toast="${key}"] span.detail`)?.textContent ?? '';
 const detailTag = (container: Element, key: string): string =>
 	(
-		container.querySelector(`[data-toast="${key}"] span.detail`)?.firstElementChild?.tagName ?? ''
+		container.querySelector(`[data-toast="${key}"] span.detail`)?.firstElementChild?.tagName ??
+		''
 	).toLowerCase();
 const click = (container: Element, selector: string): void => {
 	(container.querySelector(selector) as HTMLElement).click();
 };
 const rowSpan = (container: Element): string[] =>
-	Array.from(container.querySelector('.toasts')!.children).map((child) =>
-		child.getAttribute('data-toast') ?? child.tagName.toLowerCase(),
+	Array.from(container.querySelector('.toasts')!.children).map(
+		(child) => child.getAttribute('data-toast') ?? child.tagName.toLowerCase(),
 	);
 
 test('a minted row paints the parts the page projected into it', async () => {
@@ -135,7 +137,11 @@ function normalize(container: Element): string {
 	const rows = container.querySelector('.toasts')!.cloneNode(true) as Element;
 	for (const element of [rows, ...Array.from(rows.querySelectorAll('*'))])
 		for (const name of element.getAttributeNames())
-			if (name.startsWith('data-markless') || name.startsWith('markless'))
+			if (
+				name.startsWith('data-markless') ||
+				name.startsWith('markless') ||
+				name === PROTOCOL_EVENT_HOST_ATTRIBUTE
+			)
 				element.removeAttribute(name);
 	return rows.innerHTML;
 }

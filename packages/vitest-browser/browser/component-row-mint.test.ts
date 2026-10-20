@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '../../serializer/src/protocol-event-host.ts';
 import { cleanup, renderSSR } from '../src/index.ts';
 import App from './fixtures/component-row-mint.tsrx';
 import Served from './fixtures/component-row-mint-served.tsrx';
@@ -14,13 +15,11 @@ const wrappedKeys = (container: Element): string[] =>
 // The wrapper's own text slot plus the child's, so a half-built row shows up as
 // a missing half rather than as a missing row.
 const wrappedText = (container: Element): string[] =>
-	Array.from(container.querySelectorAll('[data-wrapped]')).map(
-		(row) => row.textContent ?? '',
-	);
+	Array.from(container.querySelectorAll('[data-wrapped]')).map((row) => row.textContent ?? '');
 // Wrapped rows keep their own span after the static sibling the compiler counted.
 const wrappedSpan = (container: Element): string[] =>
-	Array.from(container.querySelector('.wrapped')!.children).map((child) =>
-		child.getAttribute('data-wrapped') ?? child.tagName.toLowerCase(),
+	Array.from(container.querySelector('.wrapped')!.children).map(
+		(child) => child.getAttribute('data-wrapped') ?? child.tagName.toLowerCase(),
 	);
 const tags = (container: Element): string[] =>
 	Array.from(container.querySelectorAll('[data-card] em.tag')).map(
@@ -31,8 +30,8 @@ const click = (container: Element, selector: string): void => {
 };
 // Rows keep their own row span after the static sibling the compiler counted.
 const rowSpan = (container: Element): string[] =>
-	Array.from(container.querySelector('.cards')!.children).map((child) =>
-		child.getAttribute('data-card') ?? child.tagName.toLowerCase(),
+	Array.from(container.querySelector('.cards')!.children).map(
+		(child) => child.getAttribute('data-card') ?? child.tagName.toLowerCase(),
 	);
 
 test('an unserved key mints a component row that renders its own markup', async () => {
@@ -181,6 +180,11 @@ function normalize(container: Element, selector = '.cards'): string {
 	const cards = container.querySelector(selector)!.cloneNode(true) as Element;
 	for (const element of [cards, ...Array.from(cards.querySelectorAll('*'))])
 		for (const name of element.getAttributeNames())
-			if (name.startsWith('data-markless') || name.startsWith('markless')) element.removeAttribute(name);
+			if (
+				name.startsWith('data-markless') ||
+				name.startsWith('markless') ||
+				name === PROTOCOL_EVENT_HOST_ATTRIBUTE
+			)
+				element.removeAttribute(name);
 	return cards.outerHTML;
 }

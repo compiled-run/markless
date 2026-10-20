@@ -4,6 +4,7 @@ import { MarklessCompileError, serializeMarklessDevError } from '@markless/bundl
 import { ASYNC_BOUNDARY_ARM } from '../../../../serializer/src/index.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
+import { INLINE_RESUMER_PAGE_TOKEN } from '@markless/web/inline/resumer';
 
 describe('server entry rendering', () => {
 	it('renders matched Markless page artifacts inside an HTML document', async () => {
@@ -217,7 +218,7 @@ describe('server entry rendering', () => {
 	});
 
 	it('forwards the compiled inline resumer through the routed page artifact', async () => {
-		const compiledEventSource = 'globalThis.__routedCompiledResumer = true;';
+		const compiledEventSource = `globalThis.__routedCompiledResumer = ${INLINE_RESUMER_PAGE_TOKEN};`;
 		const artifact = page('<main><button>Count 0</button></main>', {
 			state: { version: 1, cells: [], computed: [] },
 			view: {
@@ -258,7 +259,7 @@ describe('server entry rendering', () => {
 		const response = await entry.fetch(new Request('http://markless-router.test/'));
 		const html = await response.text();
 
-		expect(html).toContain(compiledEventSource);
+		expect(html).toContain('globalThis.__routedCompiledResumer = [["click"],[],0];');
 		expect(html).not.toContain('__MARKLESS_INLINE_');
 		expect(html).not.toContain('runInlineResumer');
 	});
@@ -731,7 +732,7 @@ describe('server entry rendering', () => {
 			'<!doctype html><html lang="en" data-status="200"><head><title>/docs</title><link rel="modulepreload" href="/build/docs-current.js"',
 		);
 		expect(html).toContain('</head><body class="docs" data-async-container');
-		expect(html).toContain('<main><button>Docs</button></main>');
+		expect(html).toContain('<main><button m:on="click:0">Docs</button></main>');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).toContain('</body></html>');
 	});

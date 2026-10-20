@@ -21,7 +21,6 @@ export {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
-	PROTOCOL_SYNC_POLICY_HOST_ATTRIBUTE,
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolInstancePath,
@@ -32,6 +31,20 @@ export {
 	protocolRowSegment,
 } from './protocol-constants.ts';
 export { PROTOCOL_CONTAINER_HOST_NODE_ID } from './protocol-page-markers.ts';
+export {
+	constantSyncPolicyCode,
+	formatEventHostEntries,
+	parseEventHostEntries,
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_EVENT_HOST_DELEGATED_REF,
+	PROTOCOL_EVENT_HOST_ENTRY_SEPARATOR,
+	PROTOCOL_EVENT_HOST_POLICY_SEPARATOR,
+	PROTOCOL_EVENT_HOST_REF_SEPARATOR,
+	PROTOCOL_SYNC_POLICY_TABLE_TYPE,
+	syncPolicyNeverActs,
+	type ProtocolConstantSyncPolicyCode,
+	type ProtocolEventHostEntry,
+} from './protocol-event-host.ts';
 
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 

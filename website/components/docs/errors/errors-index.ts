@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 279,
+	total: 281,
 	guided: 41,
 	groups: [
 		{
@@ -829,6 +829,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_INLINE_RESUMER_PAGE_TOKEN_FOLDED',
+					kind: 'build error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_INLINE_RESUMER_TRANSFORM_FAILED',
 					kind: 'build error',
 					guided: false,
@@ -1095,6 +1100,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_INLINE_RESUMER_DEBUG_SOURCE_REQUIRED',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_INLINE_RESUMER_PAGE_TOKEN_MISSING',
 					kind: 'runtime error',
 					guided: false,
 				},

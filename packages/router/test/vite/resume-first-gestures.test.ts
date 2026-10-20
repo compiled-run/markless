@@ -335,6 +335,12 @@ test('a script that swaps an element Markless updates breaks only that element',
 	await page.waitForFunction(
 		() => document.querySelector('[data-other-count]')?.textContent === '1',
 	);
-	expect(errors).toEqual([]);
+	// The census is pinned after load, so after the swap: only the swapped element and its child are reported.
+	expect(
+		errors.map((error) => /Resume locator (\w+) expected <(\w+)>/.exec(error)?.slice(1)),
+	).toEqual([
+		['h1', 'p'],
+		['h2', 'span'],
+	]);
 	await page.close();
 }, 30_000);

@@ -2,6 +2,7 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	createProtocolStatePayload,
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 } from '@markless/serializer';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '../src/fns/ssr.ts';
@@ -875,10 +876,11 @@ test('a composed child-owned boundary streams under its instance-prefixed id wit
 	expect(stream.shell).not.toContain('m:arm');
 
 	// The child boundary streams keyed by the COMPOSED id everywhere: the
-	// inert template, the arm-record script, and the reveal-train call.
+	// inert template, the arm-record script, and the reveal-train call; the
+	// host's mark indexes that arm's own events.
 	const appended = (await collect(stream.appends())).join('');
 	expect(appended).toContain(
-		'<template m:arm="c0:boundary:0"><p data-settled>Rhubarb ready</p></template>',
+		`<template m:arm="c0:boundary:0"><p ${PROTOCOL_EVENT_HOST_ATTRIBUTE}="click:0" data-settled>Rhubarb ready</p></template>`,
 	);
 	expect(appended).toContain('<script type="markless/arm" data-boundary="c0:boundary:0">');
 	expect(appended).toContain('__mArm("c0:boundary:0")');

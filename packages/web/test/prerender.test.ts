@@ -266,7 +266,7 @@ test('wake-channel divergent request carries only its keyed delta records', asyn
 	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
 
 	expect(html).toBe(
-		'<div data-async-container data-markless-paths="5button|0100|4"><button>Request</button>' +
+		'<div data-async-container data-markless-paths="5button|0100|4"><button m:on="click:0">Request</button>' +
 			payload.stateScript +
 			payload.viewScript +
 			'<script data-async-resumer data-markless-resume-module="/build/prerender-wake-A1b2.js">' +
@@ -309,7 +309,7 @@ test('gated-off divergent request preserves the existing full-payload container 
 	const html = await assembleSsrContainer(artifact, request, { resumerSource: 'wake();' });
 
 	expect(html).toBe(
-		'<div data-async-container data-markless-paths="5button|0100|4"><button>Request</button>' +
+		'<div data-async-container data-markless-paths="5button|0100|4"><button m:on="click:0">Request</button>' +
 			payload.stateScript +
 			payload.viewScript +
 			'<script data-async-resumer data-markless-resume-module="/build/resume.js">wake();</script></div>',
@@ -474,12 +474,17 @@ test('a prerendered page with a visible event ships the visible lane for its hos
 	});
 	const withVisible = await assemblePrerenderContainer(artifact, container(true), {});
 	const clickOnly = await assemblePrerenderContainer(artifact, container(false), {});
-	const lane = createInlineDeferTriggerSource('visible', [2]);
+	const lane = createInlineDeferTriggerSource('visible', false);
 
 	expect(withVisible).not.toContain('type="markless/view"');
 	expect(withVisible).toContain(lane);
+	// The lane finds its host by the host's own visible entry.
+	expect(withVisible).toContain('<main><h1 m:on="visible:0">Top</h1><button m:on="click:1">');
+	expect(clickOnly).toContain('<main><h1>Top</h1><button m:on="click:0">');
 	// The lane forwards to the wake module itself, so the boot delegates only gesture events.
-	expect(withVisible).toContain(createPrerenderInlineResumerSource(['click'], '/build/resume.js'));
+	expect(withVisible).toContain(
+		createPrerenderInlineResumerSource(['click'], '/build/resume.js'),
+	);
 	expect(clickOnly).toContain(createPrerenderInlineResumerSource(['click'], '/build/resume.js'));
 	expect(clickOnly).not.toContain('IntersectionObserver');
 });
@@ -581,7 +586,9 @@ test('a storage page carries the values it was rendered with to the idle wake ch
 		[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((match) => match[1]!);
 
 	const page = await assemblePrerenderContainer(artifact, container('light'), {});
-	expect(page).toContain(`${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)},[["src/App.tsrx#theme","light"]]`);
+	expect(page).toContain(
+		`${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)},[["src/App.tsrx#theme","light"]]`,
+	);
 
 	const escaped = await assemblePrerenderContainer(artifact, container(hostile), {});
 	expect(scriptBodies(escaped).join('')).not.toContain('</script');
@@ -818,8 +825,9 @@ test('registers newly discovered settled computeds while rendering their local v
 		'boundary:feed',
 		'fulfilled',
 		graph as never,
-		async () => ({ read }: { readonly read: (id: string) => unknown }) =>
-			Number(read('state:weight')) * 3,
+		async () =>
+			({ read }: { readonly read: (id: string) => unknown }) =>
+				Number(read('state:weight')) * 3,
 	);
 
 	expect(rendered.html).toContain('Weighted count 6');
@@ -969,7 +977,8 @@ test('linked boundary evaluation carries a composed child computed into settled 
 	};
 	childDefinition.stateGraphNodeIds.push('computed:weightedCount');
 
-	const registered: Array<{ readonly graphNodeId: string; readonly deriveSymbolId?: string }> = [];
+	const registered: Array<{ readonly graphNodeId: string; readonly deriveSymbolId?: string }> =
+		[];
 	const graph = {
 		read(graphNodeId: string, path: ReadonlyArray<string> = []) {
 			if (graphNodeId === 'state:weight') return 2;
@@ -1052,9 +1061,7 @@ function linkedBoundaryWithComposedBranch(
 	};
 	const childView = {
 		version: 1,
-		locators: [
-			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
-		],
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' }],
 		events: [],
 		domUpdates: [],
 		behaviors: [],

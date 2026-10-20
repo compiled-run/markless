@@ -1,21 +1,38 @@
 import { expect, test } from 'vitest';
-import { createInlineResumerSource } from '../src/inline/resumer.ts';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '@markless/serializer/protocol';
+import {
+	createInlineResumerSource,
+	INLINE_MODULE_LOADER_SOURCE,
+	INLINE_RESUMER_PAGE_TOKEN,
+	renderInlineResumerPageSource,
+} from '../src/inline/resumer.ts';
+import {
+	createSyncPolicyTable,
+	inlineResumerPage,
+	withEventHostMarks,
+} from '../src/render-to-string.ts';
 
 // A key event can only reach an element that already holds focus, and focus
 // lands first. These pin that the served boot spends the focus, not the first
 // keystroke, on the import - without the focus becoming a second dispatcher.
 
-const LOADER_TAIL = '((url) => import(/* @vite-ignore */ url));';
+const BOOT_TAIL = `(${INLINE_MODULE_LOADER_SOURCE},${INLINE_RESUMER_PAGE_TOKEN});`;
 
 type FakeElement = {
 	readonly tagName: string;
 	isContentEditable?: boolean;
 	parentElement: FakeElement | null;
+	getAttribute?: (name: string) => string | null;
 };
 
 type Listener = (event: { readonly type: string; readonly target: FakeElement }) => unknown;
 
 type ViewEventRecord = { readonly hostNodeId: string; readonly eventName: string };
+
+function servedHostMark(view: object, html: string): string | null {
+	const marked = withEventHostMarks(view as never, html, createSyncPolicyTable());
+	return new RegExp(`${PROTOCOL_EVENT_HOST_ATTRIBUTE}="([^"]*)"`).exec(marked)?.[1] ?? null;
+}
 
 function bootResumer(options: {
 	readonly events: ReadonlyArray<ViewEventRecord>;
@@ -30,7 +47,7 @@ function bootResumer(options: {
 		sharedGraphPolicy: false,
 		syncPolicy: false,
 	});
-	expect(source).toContain(LOADER_TAIL);
+	expect(source).toContain(BOOT_TAIL);
 
 	const arrivals: Array<string | 'wake'> = [];
 	const module = {
@@ -47,24 +64,25 @@ function bootResumer(options: {
 		});
 	};
 
-	const host: FakeElement = {
-		tagName: options.hostTagName ?? 'DIV',
-		isContentEditable: options.contentEditable,
-		parentElement: null,
-	};
 	const listeners = new Map<string, Listener>();
 	const view = {
 		asyncBoundaries: [],
 		events: options.events,
 		locators: [{ hostNodeId: 'h1', index: 1 }],
 	};
+	const tagName = options.hostTagName ?? 'DIV';
+	const tag = tagName.toLowerCase();
+	const mark = servedHostMark(view, `<${tag}></${tag}>`);
+	const host: FakeElement = {
+		tagName,
+		isContentEditable: options.contentEditable,
+		parentElement: null,
+		getAttribute: (name) => (name === PROTOCOL_EVENT_HOST_ATTRIBUTE ? mark : null),
+	};
 	const root = {
 		addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
 		removeEventListener: (type: string) => listeners.delete(type),
-		querySelector: (selector: string) =>
-			selector === 'script[type="markless/view"]'
-				? { textContent: JSON.stringify(view) }
-				: null,
+		querySelector: () => null,
 	};
 	host.parentElement = root as unknown as FakeElement;
 	const fakeDocument = {
@@ -84,17 +102,21 @@ function bootResumer(options: {
 		},
 	};
 
+	const runnable = renderInlineResumerPageSource(
+		source.replace(BOOT_TAIL, `(__load,${INLINE_RESUMER_PAGE_TOKEN});`),
+		inlineResumerPage(view as never),
+	);
 	// eslint-disable-next-line @typescript-eslint/no-implied-eval
-	new Function('document', '__load', source.replace(LOADER_TAIL, '(__load);'))(
+	new Function('document', 'addEventListener', '__load', runnable)(
 		fakeDocument,
+		() => {},
 		loadModule,
 	);
 
 	return {
 		arrivals,
 		host,
-		fire: (type: string, target: FakeElement = host) =>
-			listeners.get(type)?.({ type, target }),
+		fire: (type: string, target: FakeElement = host) => listeners.get(type)?.({ type, target }),
 		hasListener: (type: string) => listeners.has(type),
 		loadCount: () => loads,
 		finishLoad: () => resolveLoad?.(),

@@ -3986,6 +3986,40 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_INLINE_RESUMER_PAGE_TOKEN_FOLDED',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/inline-resumer.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/inline-resumer.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_INLINE_RESUMER_PAGE_TOKEN_MISSING',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/inline/resumer.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/inline/resumer.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_INLINE_RESUMER_TRANSFORM_FAILED',
 		packageName: '@markless/bundler',
 		stage: 'build',

@@ -5,6 +5,10 @@ import {
 	type ProtocolViewPayload,
 } from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
+import {
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_SYNC_POLICY_TABLE_TYPE,
+} from '@markless/serializer/protocol';
 import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../../bundler/src/transform.ts';
 import { emitQueuedResumeContainerEvent } from '../../bundler/src/source-module.ts';
@@ -12,6 +16,7 @@ import { compileTsrxModule } from '../../compiler/src/index.ts';
 import { render, renderToString } from '../src/index.ts';
 import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
 import { renderCsrRuntime } from '../src/render-csr.ts';
+import { INLINE_RESUMER_PAGE_TOKEN } from '../src/inline/resumer.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -88,6 +93,29 @@ function element(tagName: string, childNodes: FakeElement[] = []): FakeElement {
 function event(type: string, target: FakeElement): FakeEvent {
 	return { type, target };
 }
+
+// The served html's first event host attribute, on the fake host that stands for it.
+function serveHost(host: FakeElement, html: string): void {
+	const value = new RegExp(` ${PROTOCOL_EVENT_HOST_ATTRIBUTE}="([^"]*)"`).exec(html)?.[1] ?? null;
+	(host as FakeElement & { getAttribute(name: string): string | null }).getAttribute = (name) =>
+		name === PROTOCOL_EVENT_HOST_ATTRIBUTE ? value : null;
+}
+
+function servePolicyScript(root: FakeElement, html: string): void {
+	const table = new RegExp(
+		`<script type="${PROTOCOL_SYNC_POLICY_TABLE_TYPE}">([\\s\\S]*?)</script>`,
+	).exec(html)?.[1];
+	const read = root.querySelector;
+	root.querySelector = (selector) =>
+		selector === `script[type="${PROTOCOL_SYNC_POLICY_TABLE_TYPE}"]`
+			? table === undefined
+				? null
+				: { textContent: table }
+			: (read?.(selector) ?? null);
+}
+
+// The boot pins its census after the window's load event; node has no window to raise one.
+(globalThis as { addEventListener?: unknown }).addEventListener ??= () => {};
 
 function captureDispatchDocument(
 	nativePayloads: ReadonlyArray<{
@@ -2671,7 +2699,7 @@ test('renderToString keeps fragment sibling roots as direct container children a
 	// keep both siblings as its direct children with no extra wrapper element,
 	// so container-scoped locator indexes stay aligned to the element walk.
 	expect(html).toContain(
-		'<div data-async-container data-markless-paths="6header,button|01001111|5"><header>Site</header><button type="button">0</button>',
+		'<div data-async-container data-markless-paths="6header,button|01001111|5"><header>Site</header><button m:on="click:0" type="button">0</button>',
 	);
 
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
@@ -3074,9 +3102,9 @@ test('renderToString emits the resumer for keyed-repeat row events', async () =>
 	// resumer, and the inline delegation must forward unmatched clicks of row
 	// event types so the full runtime can resolve the row.
 	expect(html).toContain('data-async-resumer');
-	// The inline source collects row event types from the payload and forwards
-	// unmatched events of those types without a record.
-	expect(html).toContain('keyedRepeats ?? []');
+	// The page facts name the row event types, so the boot forwards unmatched
+	// events of those types without a record.
+	expect(html).toContain('[["click"],["click"],0]');
 	expect(html).toContain('eventRecord: null');
 });
 
@@ -3233,7 +3261,8 @@ test('renderToString emits the resumer for keyed-repeat row events in a served a
 	);
 
 	expect(html).toContain('data-async-resumer');
-	expect(html).toContain('armRecords.keyedRepeats ?? []');
+	// Rows inside a served arm name their event types in the page facts, scoped to the arm.
+	expect(html).toContain('[["click"],["click"],2]');
 });
 
 test('renderToString emits ordered modulepreload links before interactive payload startup', async () => {
@@ -3421,7 +3450,7 @@ test('renderToString uses the compiled resumer mode when logging metadata is omi
 		inlineResumerSources: {
 			debug: false,
 			executionLog: 'never',
-			event: 'globalThis.__compiledEventResumer = true;',
+			event: `globalThis.__compiledEventResumer = ${INLINE_RESUMER_PAGE_TOKEN};`,
 			syncPolicy: 'globalThis.__compiledSyncResumer = true;',
 			graphSyncPolicyOwner: 'globalThis.__compiledGraphOwner = true;',
 			graphSyncPolicyConsumer: 'globalThis.__compiledGraphConsumer = true;',
@@ -3433,7 +3462,9 @@ test('renderToString uses the compiled resumer mode when logging metadata is omi
 		}),
 	});
 
-	expect(extractResumerSource(html)).toBe('globalThis.__compiledEventResumer = true;');
+	expect(extractResumerSource(html)).toBe(
+		'globalThis.__compiledEventResumer = [["click"],[],0];',
+	);
 });
 
 test('renderToString inline event resumer imports the resume module only after interaction', async () => {
@@ -3451,6 +3482,7 @@ test('renderToString inline event resumer imports the resume module only after i
 	expect(resumerSource).not.toContain('queueMicrotask');
 	expect(resumerSource).not.toContain('__mDefer');
 	const button = element('BUTTON');
+	serveHost(button, html);
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
@@ -3485,6 +3517,7 @@ test('renderToString inline event resumer imports the resume module only after i
 	const previousDocument = globalScope.document;
 	const previousTestState = globalScope.__asyncResumerTest;
 	globalScope.document = document;
+	servePolicyScript(root, html);
 	globalScope.__asyncResumerTest = { imports: 0, events: [] };
 
 	try {
@@ -3533,6 +3566,7 @@ test('renderToString inline event resumer serializes a cold interaction storm th
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
+	serveHost(button, html);
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
@@ -3560,6 +3594,7 @@ test('renderToString inline event resumer serializes a cold interaction storm th
 	const previousDocument = globalScope.document;
 	const previousState = globalScope.__marklessQueueTest;
 	globalScope.document = document;
+	servePolicyScript(root, html);
 	globalScope.__marklessQueueTest = { order: [] };
 
 	try {
@@ -3666,6 +3701,7 @@ test('renderToString inline event resumer remains the sole authority after runti
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
+	serveHost(button, html);
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
@@ -3700,6 +3736,7 @@ test('renderToString inline event resumer remains the sole authority after runti
 	const previousDocument = globalScope.document;
 	const previousTestState = globalScope.__asyncResumerTest;
 	globalScope.document = document;
+	servePolicyScript(root, html);
 	globalScope.__asyncResumerTest = { imports: 0, events: [] };
 
 	try {
@@ -3754,6 +3791,7 @@ test('renderToString inline event resumer runs sync policy before importing resu
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
+	serveHost(button, html);
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
@@ -3788,6 +3826,7 @@ test('renderToString inline event resumer runs sync policy before importing resu
 	const previousDocument = globalScope.document;
 	const previousTestState = globalScope.__asyncResumerTest;
 	globalScope.document = document;
+	servePolicyScript(root, html);
 	globalScope.__asyncResumerTest = { imports: 0, events: [] };
 
 	try {
@@ -3866,6 +3905,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
+	serveHost(button, html);
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) =>
@@ -3899,6 +3939,7 @@ test('renderToString inline event resumer evaluates sync policy before importing
 	const previousDocument = globalScope.document;
 	const previousTestState = globalScope.__asyncResumerSyncPolicyTest;
 	globalScope.document = document;
+	servePolicyScript(root, html);
 	globalScope.__asyncResumerSyncPolicyTest = { order: [] };
 
 	try {
@@ -3978,6 +4019,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 	const resumerSource = extractResumerSource(html);
 	expect(resumerSource).toContain('__marklessEventOnlyGraph');
 	const button = element('BUTTON');
+	serveHost(button, html);
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) => {
@@ -4015,6 +4057,7 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 	const previousDocument = globalScope.document;
 	const previousTestState = globalScope.__asyncResumerSyncPolicyTest;
 	globalScope.document = document;
+	servePolicyScript(root, html);
 	globalScope.__asyncResumerSyncPolicyTest = { order: [] };
 
 	try {
@@ -4142,6 +4185,7 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
+	serveHost(button, html);
 	const root = element('DIV', [button]);
 	const listeners: Array<(event: FakeEvent) => Promise<void>> = [];
 	root.querySelector = (selector) => {
@@ -4179,6 +4223,7 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 	const previousDocument = globalScope.document;
 	const previousTestState = globalScope.__asyncResumerSyncPolicyTest;
 	globalScope.document = document;
+	servePolicyScript(root, html);
 	globalScope.__asyncResumerSyncPolicyTest = { order: [] };
 
 	try {

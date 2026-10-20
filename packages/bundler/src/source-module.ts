@@ -970,6 +970,8 @@ export function emitQueuedResumeContainerEvent(
 		implementation,
 		'export function resumeContainerEvent(input) {',
 		'\tconst root = input.root;',
+		// The boot names a host's record by its index in the served events; this module reads the record.
+		"\tif (input.eventIndex >= 0) input = { ...input, eventRecord: (root.__mE ||= JSON.parse(root.querySelector('script[type=\"markless/view\"]').textContent).events)[input.eventIndex] };",
 		// Only a page a foreign script changed evaluates the repair; the packer keeps it beside this module.
 		censusRepair
 			? "\tif (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));"

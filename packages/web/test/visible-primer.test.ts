@@ -1,9 +1,32 @@
-import { ASYNC_PROTOCOL_VERSION, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
+import {
+	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+	PROTOCOL_VISIBLE_EVENT_NAME,
+} from '@markless/serializer';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createInlineDeferTriggerSource, INLINE_DEFER_LOADER_SOURCE } from '../src/inline/defer.ts';
 import { renderToString } from '../src/render-to-string.ts';
 
-type Host = { readonly name: string };
+type Host = { readonly name: string; readonly getAttribute: (name: string) => string | null };
+
+const host = (name: string, entries: string | null): Host => ({
+	name,
+	getAttribute: (attribute) => (attribute === PROTOCOL_EVENT_HOST_ATTRIBUTE ? entries : null),
+});
+
+// The attribute selectors the helper queries, matched against fake hosts in DOM order.
+const queryHosts = (hosts: readonly Host[], selector: string) =>
+	hosts.filter((candidate) =>
+		selector.split(',').some((part) => {
+			const [, attribute, operator, value] = /^\[(.+?)(\^=|\*=|=)?(?:"(.*)")?\]$/.exec(part)!;
+			const actual = candidate.getAttribute(attribute!.replaceAll('\\', ''));
+			if (actual === null) return false;
+			if (operator === '^=') return actual.startsWith(value!);
+			if (operator === '*=') return actual.includes(value!);
+			return operator ? actual === value : true;
+		}),
+	);
 
 // The page's elements in DOM order, the way a tree walker over the container yields them.
 const elementWalker = (root: { getElementsByTagName?: (name: string) => ArrayLike<unknown> }) => {
@@ -17,13 +40,20 @@ afterEach(() => {
 	delete (globalThis as { __mDefer?: unknown }).__mDefer;
 });
 
-// The visible lane of the shared deferred-trigger helper, booted with the host indexes a page with
-// visible hosts at DOM-order indexes 1 and 3 ships.
-function boot(options: { readonly startsRuntime?: boolean } = {}) {
-	const [top, press, bottom] = [{ name: 'top' }, { name: 'press' }, { name: 'bottom' }];
+// The visible lane of the shared deferred-trigger helper over a page whose first and last elements
+// host a visible record, the last one after another entry.
+function boot(options: { readonly startsRuntime?: boolean; readonly servedCount?: number } = {}) {
+	const top = host('top', `${PROTOCOL_VISIBLE_EVENT_NAME}:0`);
+	const press = host('press', 'click:1');
+	const bottom = host('bottom', `click:2;${PROTOCOL_VISIBLE_EVENT_NAME}:3`);
 	const root: Record<string, unknown> & { name: string } = {
 		name: 'root',
 		getElementsByTagName: () => [top, press, bottom],
+		querySelectorAll: (selector: string) => queryHosts([top, press, bottom], selector),
+		getAttribute: (name: string) =>
+			name === PROTOCOL_LOCATOR_PATHS_ATTRIBUTE && options.servedCount !== undefined
+				? String(options.servedCount)
+				: null,
 	};
 	let callback: ((entries: Entry[]) => void) | undefined;
 	const observed = new Set<Host>();
@@ -42,7 +72,7 @@ function boot(options: { readonly startsRuntime?: boolean } = {}) {
 		if (options.startsRuntime) input.root.__asyncResumeRuntimeStarted = true;
 	});
 	const load = vi.fn(async () => ({ resumeContainerEvent }));
-	const source = createInlineDeferTriggerSource('visible', [1, 3])
+	const source = createInlineDeferTriggerSource('visible', false)
 		.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
 		.slice(1);
 	new Function('document', 'IntersectionObserver', 'load', source)(
@@ -61,6 +91,7 @@ function boot(options: { readonly startsRuntime?: boolean } = {}) {
 	return {
 		root,
 		top,
+		press,
 		bottom,
 		observed,
 		load,
@@ -94,6 +125,16 @@ test('the first intersection forwards the visible host once, with no gesture', a
 	expect(f.root.__marklessDelegatedDispatch).toBeUndefined();
 	expect([...f.observed]).toEqual([f.bottom]);
 	expect((f.root.__mFired as WeakSet<Host>).has(f.top)).toBe(true);
+	expect(f.root.__marklessCensus).toEqual([f.root, f.top, f.press, f.bottom]);
+	expect(f.root.__marklessShifted).toBeUndefined();
+});
+
+test('the first claim marks the census shifted when it no longer matches the served count', async () => {
+	const f = boot({ servedCount: 3 });
+	f.intersect(f.top);
+	await f.settle();
+	expect(f.root.__marklessCensus).toHaveLength(4);
+	expect(f.root.__marklessShifted).toBe(1);
 });
 
 // A wake-channel page starts one trigger group's runtime per host, so later hosts still forward; a full runtime ignores them and fires its own.
@@ -126,7 +167,7 @@ function page(eventName: string) {
 				html: '<p>reveal</p>',
 				view: {
 					version: ASYNC_PROTOCOL_VERSION,
-					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 1, tagName: 'p' }],
+					locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'p' }],
 					events: [{ hostNodeId: 'h0', eventName, symbolIds: ['s'] }],
 					domUpdates: [],
 					behaviors: [],
@@ -142,14 +183,21 @@ function page(eventName: string) {
 }
 
 test('only a page with a visible event ships the helper and its lane', async () => {
-	// The served container shifts every locator by one: the page's index 1 is the container's 2.
-	const lane = createInlineDeferTriggerSource('visible', [2]);
+	const lane = createInlineDeferTriggerSource('visible', false);
 	const withVisible = await page(PROTOCOL_VISIBLE_EVENT_NAME);
 	const clickOnly = await page('click');
 	const resumer = (html: string) =>
 		/<script data-async-resumer[^>]*>[\s\S]*?<\/script>/.exec(html)?.[0];
+	const listened = (eventNames: string[]) => JSON.stringify([eventNames, [], 0]);
+	expect(withVisible).toContain(
+		`<p ${PROTOCOL_EVENT_HOST_ATTRIBUTE}="${PROTOCOL_VISIBLE_EVENT_NAME}:0">`,
+	);
+	expect(clickOnly).toContain(`<p ${PROTOCOL_EVENT_HOST_ATTRIBUTE}="click:0">`);
 	expect(resumer(withVisible)).toContain(lane);
-	expect(resumer(withVisible)?.replace(lane, '')).toBe(resumer(clickOnly));
+	// The visible record is the lane's alone: the boot listens for no event on its behalf.
+	expect(resumer(withVisible)?.replace(lane, '')).toBe(
+		resumer(clickOnly)?.replace(listened(['click']), listened([])),
+	);
 	expect(clickOnly).not.toContain('IntersectionObserver');
 	expect(clickOnly).not.toContain('__mDefer');
 });

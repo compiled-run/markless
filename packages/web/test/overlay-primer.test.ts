@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE, PROTOCOL_VISIBLE_EVENT_NAME } from '@markless/serializer';
 import { createInlineDeferTriggerSource, INLINE_DEFER_LOADER_SOURCE } from '../src/inline/defer.ts';
 import { createInlineResumerOverlayPrimerSource } from '../src/inline/resumer.ts';
 
@@ -129,14 +129,23 @@ test('a visible forward does not claim the Escape an open overlay needs', async 
 
 test('a visible forward from the deferred-trigger helper leaves the overlay primer armed for Escape', async () => {
 	const f = boot(true);
-	const host = { name: 'host' };
+	const entries = `${PROTOCOL_VISIBLE_EVENT_NAME}:0`;
+	const host = {
+		name: 'host',
+		getAttribute: (name: string) => (name === PROTOCOL_EVENT_HOST_ATTRIBUTE ? entries : null),
+	};
 	(f.root as Record<string, unknown>).getElementsByTagName = () => [host];
+	(f.root as Record<string, unknown>).querySelectorAll = (selector: string) =>
+		selector.includes(`^="${PROTOCOL_VISIBLE_EVENT_NAME}:"`) ? [host] : [];
 	let intersect: ((entries: ReadonlyArray<unknown>) => void) | undefined;
+	const observed: unknown[] = [];
 	class FakeIntersectionObserver {
 		constructor(callback: (entries: ReadonlyArray<unknown>) => void) {
 			intersect = callback;
 		}
-		observe() {}
+		observe(target: unknown) {
+			observed.push(target);
+		}
 		unobserve() {}
 	}
 	try {
@@ -144,7 +153,7 @@ test('a visible forward from the deferred-trigger helper leaves the overlay prim
 			'document',
 			'IntersectionObserver',
 			'load',
-			createInlineDeferTriggerSource('visible', [1])
+			createInlineDeferTriggerSource('visible', false)
 				.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
 				.slice(1),
 		)(
@@ -155,6 +164,7 @@ test('a visible forward from the deferred-trigger helper leaves the overlay prim
 			FakeIntersectionObserver,
 			f.load,
 		);
+		expect(observed).toEqual([host]);
 		intersect!([{ isIntersecting: true, target: host }]);
 		expect(f.root.__marklessDelegatedDispatch).toBe(PROTOCOL_VISIBLE_EVENT_NAME);
 

@@ -1,22 +1,52 @@
 import { expect, test } from 'vitest';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '@markless/serializer/protocol';
 import { createInlineDeferTriggerSource, INLINE_DEFER_LOADER_SOURCE } from '../src/inline/defer.ts';
-import { createInlineResumerSource } from '../src/inline/resumer.ts';
+import {
+	createInlineResumerSource,
+	INLINE_MODULE_LOADER_SOURCE,
+	INLINE_RESUMER_PAGE_TOKEN,
+	renderInlineResumerPageSource,
+} from '../src/inline/resumer.ts';
+import {
+	createSyncPolicyTable,
+	inlineResumerPage,
+	withEventHostMarks,
+} from '../src/render-to-string.ts';
 
 // The served boot is the only layer that can spend a crossing on the import,
 // because on a cold page nothing else is running yet. These pin that a hover
 // over a control wakes the runtime, that a hover over anything else does not,
 // and that the wake never turns into a second dispatcher.
 
-const LOADER_TAIL = '((url) => import(/* @vite-ignore */ url));';
+const BOOT_TAIL = `(${INLINE_MODULE_LOADER_SOURCE},${INLINE_RESUMER_PAGE_TOKEN});`;
 
 type FakeElement = {
 	readonly tagName: string;
 	parentElement: FakeElement | null;
+	getAttribute?: (name: string) => string | null;
 };
 
 type Listener = (event: { readonly type: string; readonly target: FakeElement }) => unknown;
 
 type ViewEventRecord = { readonly hostNodeId: string; readonly eventName: string };
+
+function servedHostMark(view: object, html: string): string | null {
+	const marked = withEventHostMarks(view as never, html, createSyncPolicyTable());
+	return new RegExp(`${PROTOCOL_EVENT_HOST_ATTRIBUTE}="([^"]*)"`).exec(marked)?.[1] ?? null;
+}
+
+// Answers the attribute prefix and substring selectors the deferred trigger finds its hosts with.
+function matchesSelector(element: FakeElement, selector: string): boolean {
+	return selector.split(',').some((part) => {
+		const match = /^\[(.+?)([\^*])="(.*)"\]$/.exec(part);
+		if (!match) throw new Error(`unsupported selector ${part}`);
+		const value = element.getAttribute?.(match[1]!.replace('\\:', ':'));
+		return (
+			value != null &&
+			(match[2] === '^' ? value.startsWith(match[3]!) : value.includes(match[3]!))
+		);
+	});
+}
 
 function bootResumer(options: {
 	readonly events: ReadonlyArray<ViewEventRecord>;
@@ -30,7 +60,7 @@ function bootResumer(options: {
 		sharedGraphPolicy: false,
 		syncPolicy: false,
 	});
-	expect(source).toContain(LOADER_TAIL);
+	expect(source).toContain(BOOT_TAIL);
 
 	const arrivals: Array<string | 'wake'> = [];
 	const primingElements: Array<unknown> = [];
@@ -52,20 +82,24 @@ function bootResumer(options: {
 		});
 	};
 
-	const host: FakeElement = { tagName: 'BUTTON', parentElement: null };
 	const listeners = new Map<string, Listener>();
 	const view = {
 		asyncBoundaries: [],
 		events: options.events,
 		locators: options.locators ?? [{ hostNodeId: 'h1', index: 1 }],
 	};
+	const mark = servedHostMark(view, '<button></button>');
+	const host: FakeElement = {
+		tagName: 'BUTTON',
+		parentElement: null,
+		getAttribute: (name) => (name === PROTOCOL_EVENT_HOST_ATTRIBUTE ? mark : null),
+	};
 	const root: Record<string, unknown> = {
 		addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
 		removeEventListener: (type: string) => listeners.delete(type),
-		querySelector: (selector: string) =>
-			selector === 'script[type="markless/view"]'
-				? { textContent: JSON.stringify(view) }
-				: null,
+		querySelector: () => null,
+		querySelectorAll: (selector: string) =>
+			[host].filter((element) => matchesSelector(element, selector)),
 	};
 	host.parentElement = root as unknown as FakeElement;
 	const fakeDocument = {
@@ -85,9 +119,14 @@ function bootResumer(options: {
 		},
 	};
 
+	const runnable = renderInlineResumerPageSource(
+		source.replace(BOOT_TAIL, `(__load,${INLINE_RESUMER_PAGE_TOKEN});`),
+		inlineResumerPage(view as never),
+	);
 	// eslint-disable-next-line @typescript-eslint/no-implied-eval
-	new Function('document', '__load', source.replace(LOADER_TAIL, '(__load);'))(
+	new Function('document', 'addEventListener', '__load', runnable)(
 		fakeDocument,
+		() => {},
 		loadModule,
 	);
 
@@ -242,7 +281,7 @@ test('a visibility forward leaves the crossing primer armed, and both share one 
 			},
 		};
 	};
-	const primer = createInlineDeferTriggerSource('visible', [1])
+	const primer = createInlineDeferTriggerSource('visible', false)
 		.replace(INLINE_DEFER_LOADER_SOURCE, 'load')
 		.slice(1);
 	// eslint-disable-next-line @typescript-eslint/no-implied-eval

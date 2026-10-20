@@ -187,7 +187,9 @@ test.each([
 	async (path, title) => {
 		const { page, errors } = await open(path);
 		expect(await page.locator('main > aside').count()).toBe(1);
-		expect(await page.locator('[data-note-form][data-markless-sync]').count()).toBe(1);
+		expect(await page.locator('[data-note-form]').getAttribute('m:on')).toMatch(
+			/(^|;)submit(:\d+)?!/,
+		);
 		await page.click('[data-save]');
 		await page.waitForFunction(
 			(text) => document.querySelector('[data-saved]')?.textContent === text,

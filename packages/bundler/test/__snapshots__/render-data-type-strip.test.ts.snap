@@ -209,6 +209,7 @@ async function marklessResumeContainerEvent(input) {
 }
 export function resumeContainerEvent(input) {
 	const root = input.root;
+	if (input.eventIndex >= 0) input = { ...input, eventRecord: (root.__mE ||= JSON.parse(root.querySelector('script[type="markless/view"]').textContent).events)[input.eventIndex] };
 	if (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));
 	if (!root.__marklessDispatch) {
 		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined, seen = new WeakMap();

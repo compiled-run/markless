@@ -37,7 +37,8 @@ test('trusted clicks during HTML delivery reach the resumer once, in order', asy
 			response.setHeader('content-type', 'text/javascript');
 			response.end(`export function resumeContainerEvent(input) {
 				if (!input.event) return;
-				(globalThis.arrivals ??= []).push({ trusted: input.event.isTrusted, type: input.event.type, time: input.event.timeStamp, host: input.eventRecord.hostNodeId });
+				const record = JSON.parse(input.root.querySelector('script[type="markless/view"]').textContent).events[input.eventIndex];
+				(globalThis.arrivals ??= []).push({ trusted: input.event.isTrusted, type: input.event.type, time: input.event.timeStamp, host: record.hostNodeId });
 				document.querySelector('output').textContent = String(globalThis.arrivals.length);
 			}`);
 		} else {

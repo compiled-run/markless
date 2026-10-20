@@ -1,9 +1,23 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
 import { createResumeRuntime } from '../src/index.ts';
-import { createInlineResumerSource } from '../src/inline/resumer.ts';
+import {
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_SYNC_POLICY_TABLE_TYPE,
+} from '@markless/serializer/protocol';
+import {
+	createInlineResumerSource,
+	INLINE_MODULE_LOADER_SOURCE,
+	INLINE_RESUMER_PAGE_TOKEN,
+	renderInlineResumerPageSource,
+} from '../src/inline/resumer.ts';
+import {
+	createSyncPolicyTable,
+	inlineResumerPage,
+	withEventHostMarks,
+} from '../src/render-to-string.ts';
 
-const loaderTail = '((url) => import(/* @vite-ignore */ url));';
+const bootTail = `(${INLINE_MODULE_LOADER_SOURCE},${INLINE_RESUMER_PAGE_TOKEN});`;
 
 test.each(['click', 'keydown'])(
 	'inline capture retains a %s stop across module loading',
@@ -28,36 +42,43 @@ test.each(['click', 'keydown'])(
 					});
 			});
 		const listeners = new Map<string, (event: unknown) => void>();
+		const view = {
+			asyncBoundaries: [],
+			locators: [{ hostNodeId: 'h0', index: 1 }],
+			events: [
+				{
+					hostNodeId: 'h0',
+					eventName: type,
+					symbolIds: ['run'],
+					syncPolicy: {
+						branches: [
+							{
+								when: { type: 'constant-truthy', value: true },
+								actions: ['stopPropagation'],
+							},
+						],
+					},
+				},
+			],
+		};
+		const policyTable = createSyncPolicyTable();
+		const served = withEventHostMarks(view as never, '<button></button>', policyTable);
+		const mark =
+			new RegExp(`${PROTOCOL_EVENT_HOST_ATTRIBUTE}="([^"]*)"`).exec(served)?.[1] ?? null;
 		const root = {
 			addEventListener: (name: string, listener: (event: unknown) => void) =>
 				listeners.set(name, listener),
 			removeEventListener: () => {},
 			querySelector: (selector: string) =>
-				selector === 'script[type="markless/view"]'
-					? {
-							textContent: JSON.stringify({
-								asyncBoundaries: [],
-								locators: [{ hostNodeId: 'h0', index: 1 }],
-								events: [
-									{
-										hostNodeId: 'h0',
-										eventName: type,
-										symbolIds: ['run'],
-										syncPolicy: {
-											branches: [
-												{
-													when: { type: 'constant-truthy', value: true },
-													actions: ['stopPropagation'],
-												},
-											],
-										},
-									},
-								],
-							}),
-						}
+				selector === `script[type="${PROTOCOL_SYNC_POLICY_TABLE_TYPE}"]`
+					? { textContent: JSON.stringify(policyTable.policies) }
 					: null,
 		};
-		const host = { tagName: 'BUTTON', parentElement: root };
+		const host = {
+			tagName: 'BUTTON',
+			parentElement: root,
+			getAttribute: (name: string) => (name === PROTOCOL_EVENT_HOST_ATTRIBUTE ? mark : null),
+		};
 		const document = {
 			currentScript: { closest: () => root, getAttribute: () => null },
 			createTreeWalker: () => {
@@ -71,8 +92,12 @@ test.each(['click', 'keydown'])(
 				};
 			},
 		};
-		expect(source).toContain(loaderTail);
-		new Function('document', '__load', source.replace(loaderTail, '(__load);'))(document, load);
+		expect(source).toContain(bootTail);
+		const runnable = renderInlineResumerPageSource(
+			source.replace(bootTail, `(__load,${INLINE_RESUMER_PAGE_TOKEN});`),
+			inlineResumerPage(view as never),
+		);
+		new Function('document', 'addEventListener', '__load', runnable)(document, () => {}, load);
 		const event = {
 			type,
 			target: host,

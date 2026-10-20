@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import {
 	ASYNC_BOUNDARY_ARM,
 	createProtocolStatePayload,
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	renderPayloadScripts,
 } from '../../serializer/src/index.ts';
 import {
@@ -89,7 +90,9 @@ const inlineHtml = () =>
 		} as never,
 		{ executionLog: 'never' },
 	);
-function executeInline(html: string, root: FakeElement, nodes: FakeElement[]) {
+
+// Gives `hosts`, in order, the event host marks the served html carries, so a host left out is one the page did not serve.
+function executeInline(html: string, root: FakeElement, hosts: FakeElement[]) {
 	const source = requiredScriptContent(
 		html,
 		/<script data-async-resumer\b[^>]*>([\s\S]*?)<\/script>/,
@@ -98,17 +101,37 @@ function executeInline(html: string, root: FakeElement, nodes: FakeElement[]) {
 		html,
 		/<script type="markless\/view">([\s\S]*?)<\/script>/,
 	);
-	(root as any).querySelector = () => ({ textContent: payload });
-	const prior = (globalThis as any).document;
-	let index = 0;
-	(globalThis as any).document = {
-		currentScript: { closest: () => root },
-		createTreeWalker: () => ({ nextNode: () => nodes[index++] }),
+	const marks = [
+		...html
+			.slice(0, html.indexOf('<script type="markless/'))
+			.matchAll(new RegExp(`\\s${PROTOCOL_EVENT_HOST_ATTRIBUTE}="([^"]*)"`, 'g')),
+	].map((match) => match[1]!);
+	const marked = hosts.slice(0, marks.length).map((host, index) =>
+		Object.assign(host, {
+			getAttribute: (name: string) =>
+				name === PROTOCOL_EVENT_HOST_ATTRIBUTE ? marks[index]! : null,
+		}),
+	);
+	(root as any).querySelector = (selector: string) =>
+		selector === 'script[type="markless/view"]' ? { textContent: payload } : null;
+	(root as any).querySelectorAll = (selector: string) =>
+		selector === `[${PROTOCOL_EVENT_HOST_ATTRIBUTE.replace(':', '\\:')}]` ? marked : [];
+	const scope = globalThis as any;
+	const globals = {
+		document: { currentScript: { closest: () => root } },
+		addEventListener: () => {},
+		CSS: { escape: (value: string) => value.replace(/[^\w-]/g, '\\$&') },
 	};
+	const prior = Object.keys(globals).map(
+		(key) => [key, Object.getOwnPropertyDescriptor(scope, key)] as const,
+	);
+	Object.assign(scope, globals);
 	try {
 		new Function(source)();
 	} finally {
-		(globalThis as any).document = prior;
+		for (const [key, descriptor] of prior)
+			if (descriptor) Object.defineProperty(scope, key, descriptor);
+			else delete scope[key];
 	}
 }
 function streamArtifact() {
@@ -154,13 +177,15 @@ function streamArtifact() {
 			return {
 				html: `<main><!--markless:async:stream-->${settled ? '<article><span>quiet</span><button>Wake</button></article>' : '<p>Waiting</p>'}<!--/markless:async:stream--></main>`,
 				structure: {
-					anchors: [{
-						kind: 'async',
-						id: 'stream',
-						html: settled
-							? '<article><span>quiet</span><button>Wake</button></article>'
-							: '<p>Waiting</p>',
-					}],
+					anchors: [
+						{
+							kind: 'async',
+							id: 'stream',
+							html: settled
+								? '<article><span>quiet</span><button>Wake</button></article>'
+								: '<p>Waiting</p>',
+						},
+					],
 				},
 				state: {
 					version: 1,

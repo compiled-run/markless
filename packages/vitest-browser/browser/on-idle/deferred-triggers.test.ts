@@ -23,7 +23,7 @@ afterEach(() => {
 	delete host.__deferLog;
 });
 
-// The base resumer walks the container once; a deferred lane must add no walk of its own at load.
+// The boot walks nothing at load; a deferred lane finds its hosts by attribute and must add no walk either.
 async function nodesVisitedAtLoad(mount: () => Promise<unknown>): Promise<number> {
 	const nextNode = TreeWalker.prototype.nextNode;
 	let visits = 0;
@@ -44,9 +44,9 @@ test('visible and idle lanes visit no nodes at load', async () => {
 	const plain = await nodesVisitedAtLoad(() => renderSSR(ClickOnly));
 	const idle = await nodesVisitedAtLoad(() => renderSSR(IdleGesture));
 	const visible = await nodesVisitedAtLoad(() => renderSSR(VisibleGesture));
-	expect(plain).toBeGreaterThan(0);
-	expect(idle).toBe(plain);
-	expect(visible).toBe(plain);
+	expect(plain).toBe(0);
+	expect(idle).toBe(0);
+	expect(visible).toBe(0);
 });
 
 test('once an idle handler has started the page, a click reaches its dispatch queue before the next task', async () => {

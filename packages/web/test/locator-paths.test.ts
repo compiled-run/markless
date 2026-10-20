@@ -1,7 +1,11 @@
 import { expect, test } from 'vitest';
 import { decodeLocatorPaths } from '../src/fns/served-census-repair.ts';
 import { servedElementTree, servedLocatorPaths } from '../src/locator-paths.ts';
-import { withArmSyncPolicyHostMarks, withSyncPolicyHostMarks } from '../src/render-to-string.ts';
+import {
+	createSyncPolicyTable,
+	withArmEventHostMarks,
+	withEventHostMarks,
+} from '../src/render-to-string.ts';
 
 function expectedEntries(html: string, indexes: ReadonlyArray<number>) {
 	const { elements, childCounts } = servedElementTree(html);
@@ -42,13 +46,17 @@ test('each page-level comment anchor records the index the next element takes', 
 	expect(servedElementTree(html).commentElementIndexes).toEqual([2, 6, 7]);
 });
 
-test('each element whose event carries a sync policy is marked with its record, in the shell and in an arm', () => {
+test('each event host is marked with its record and policy, in the shell, a repeat scope and an arm', () => {
 	const html =
-		'<h1>t</h1><form><input></form><!--markless:async:b0--><form><button>go</button></form><!--/markless:async:b0-->';
-	const policy = { when: { type: 'constant-truthy', value: true }, actions: ['preventDefault'] };
-	const submit = (hostNodeId: string, syncPolicy?: unknown) => ({
+		'<h1>t</h1><form><input></form><ul></ul><!--markless:async:b0--><form><button>go</button></form><!--/markless:async:b0-->';
+	const always = { when: { type: 'constant-truthy', value: true }, actions: ['preventDefault'] };
+	const onEnter = {
+		when: { type: 'event-equals', field: 'key', value: 'Enter' },
+		actions: ['preventDefault'],
+	};
+	const event = (hostNodeId: string, eventName: string, syncPolicy?: unknown) => ({
 		hostNodeId,
-		eventName: 'submit',
+		eventName,
 		symbolIds: [],
 		...(syncPolicy ? { syncPolicy } : {}),
 	});
@@ -56,22 +64,36 @@ test('each element whose event carries a sync policy is marked with its record, 
 		locators: [
 			{ hostNodeId: 'h0', index: 2 },
 			{ hostNodeId: 'h9', index: 1 },
+			{ hostNodeId: 'list', index: 4 },
 		],
-		events: [submit('h0', policy), submit('h9')],
+		events: [
+			event('h0', 'submit', always),
+			event('h9', 'keydown', onEnter),
+			event('h9', 'click'),
+		],
+		keyedRepeats: [{ parentHostNodeId: 'list', rowEvents: [event('row', 'click')] }],
 		asyncBoundaries: [
 			{
-				armRecords: { locators: [{ hostNodeId: 'a0', index: 0 }], events: [submit('a0', policy)] },
+				armRecords: {
+					locators: [{ hostNodeId: 'a0', index: 0 }],
+					events: [event('a0', 'submit', always), event('a0', 'click')],
+				},
 				startAnchor: { strategy: 'dom-order-comment', index: 0 },
 			},
 		],
 	} as never;
-	expect(withSyncPolicyHostMarks(view, html)).toBe(
-		'<h1>t</h1><form data-markless-sync="h0"><input></form><!--markless:async:b0--><form data-markless-sync="a0"><button>go</button></form><!--/markless:async:b0-->',
+	const table = createSyncPolicyTable();
+	expect(withEventHostMarks(view, html, table)).toBe(
+		'<h1 m:on="keydown:1!0;click:2">t</h1><form m:on="submit:0!p"><input></form><ul m:on="click"></ul><!--markless:async:b0--><form m:on="submit!p"><button>go</button></form><!--/markless:async:b0-->',
 	);
+	expect(table.policies).toEqual([onEnter]);
 	expect(
-		withArmSyncPolicyHostMarks(
-			{ locators: [{ hostNodeId: 'a0', index: 1 }], events: [submit('a0', policy)] } as never,
+		withArmEventHostMarks(
+			{
+				locators: [{ hostNodeId: 'a0', index: 1 }],
+				events: [event('a0', 'submit', always)],
+			} as never,
 			'<p>x</p><form><b></b></form>',
 		),
-	).toBe('<p>x</p><form data-markless-sync="a0"><b></b></form>');
+	).toBe('<p>x</p><form m:on="submit:0"><b></b></form>');
 });

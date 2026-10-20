@@ -62,6 +62,10 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		"The deferred-trigger helper censuses the container in DOM order to reach its compiler-emitted host indexes, counting the page's elements between the start and end comments an author's element carries.",
 	'packages/web/src/inline/defer.ts :: if (next.nodeType !== 8) live.push(next as Element);':
 		'The deferred-trigger census tells the page start and end comments from the elements it counts.',
+	'packages/web/src/inline/defer.ts :: ...root.querySelectorAll(':
+		'The deferred-trigger helper finds the hosts of its lane by the m:on event host attribute the server wrote, one native attribute query in place of a census walk.',
+	'packages/web/src/inline/resumer.ts :: for (const element of input.root.querySelectorAll(':
+		'Debug builds only: the inline debug registration finds event hosts by their m:on attribute to record them for explainInteraction.',
 	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 129);':
 		"The overlay primer pins the container's DOM-order census before a dismissal moves it, counting the page's elements between the start and end comments an author's element carries.",
 	'packages/web/src/inline/resumer.ts :: if (next.nodeType !== 8) census.push(next as Element);':
