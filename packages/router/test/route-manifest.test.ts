@@ -61,6 +61,20 @@ test('matches static routes before dynamic routes and extracts params', () => {
 	expect(matchRouteManifest('/missing', manifest)).toBeUndefined();
 });
 
+test('matches a page whose file name a URL percent-encodes', () => {
+	const manifest = buildRouteManifestFromFileIds([
+		'/pages/a b.tsrx',
+		'/pages/folder with space/æøå.tsrx',
+		'/pages/[slug].tsrx',
+	]);
+
+	expect(matchRouteManifest('/a%20b', manifest)?.route.file).toBe('pages/a b.tsrx');
+	expect(matchRouteManifest('/folder%20with%20space/%C3%A6%C3%B8%C3%A5', manifest)?.route.file).toBe(
+		'pages/folder with space/æøå.tsrx',
+	);
+	expect(matchRouteManifest('/a%2', manifest)?.route.file).toBe('pages/[slug].tsrx');
+});
+
 test('reserves root status pages without adding normal status routes', () => {
 	const manifest = buildRouteManifestFromFileIds([
 		'/pages/index.tsrx',

@@ -233,9 +233,14 @@ export function runFragmentNavigation(
 			if (endpoint && !under) return false;
 			const rest = page.indexOf('**');
 			if (rest === -1 ? page.length !== parts.length : parts.length <= rest) return false;
-			return page.every(
-				(segment, index) => segment === '**' || segment === ':' || segment === parts[index],
-			);
+			return page.every((segment, index) => {
+				if (segment === '**' || segment === ':') return true;
+				try {
+					return segment === decodeURIComponent(parts[index]!);
+				} catch {
+					return segment === parts[index];
+				}
+			});
 		});
 	};
 	const eligible = (anchor: Element | null | undefined, forClick = false): URL | undefined => {

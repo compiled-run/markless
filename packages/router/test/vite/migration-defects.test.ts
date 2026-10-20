@@ -478,3 +478,17 @@ test('an imported keyed list fed a filtered computed inserts rows between server
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a page file with a space in its name answers at its percent-encoded path', async () => {
+	const response = await fetch(`${server!.origin}/a%20b`);
+	expect(response.status).toBe(200);
+	expect(await response.text()).toContain('data-spaced');
+	const { page, errors } = await open('/spaced-link');
+	await page.evaluate(() => ((globalThis as { __stayed?: boolean }).__stayed = true));
+	await page.click('[data-to-spaced]');
+	await page.waitForSelector('[data-spaced]');
+	expect(new URL(page.url()).pathname).toBe('/a%20b');
+	expect(await page.evaluate(() => (globalThis as { __stayed?: boolean }).__stayed)).toBe(true);
+	expect(errors).toEqual([]);
+	await page.close();
+});
