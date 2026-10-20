@@ -6043,6 +6043,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED',
+		packageName: '@markless/router',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/router.',
+		printed: [
+			"MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED: <what>, but the router serves only the document's HTML and never wires it in the browser, so the handler would never run. Put the handler on an element a page renders, for example in a layout component each page wraps its content in.",
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/vite/runtime/document-handlers.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/runtime/document-handlers.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED',
 		packageName: '@markless/router',
 		stage: 'runtime',
