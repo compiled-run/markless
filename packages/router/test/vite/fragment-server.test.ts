@@ -51,6 +51,18 @@ test('a fragment fetch of a client-navigation app answers the shell head and the
 	expect(html).not.toContain('class="chrome"');
 });
 
+test('a fragment fetch leaves out the import map the landing document already carries', async () => {
+	const importMap = '<script type="importmap">{"imports":{"@markless/c/a":"/build/a.js"}}</script>';
+	for (const documentNavigation of ['client', 'document'] as const) {
+		const app = entry({ importMap, documentNavigation });
+		const fragment = await (await app.fetch(fragmentRequest('https://app.test/next'))).text();
+		const document = await (await app.fetch(new Request('https://app.test/next'))).text();
+		expect(fragment).toContain('<h1>Next</h1>');
+		expect(fragment).not.toContain('type="importmap"');
+		expect(document).toContain(importMap);
+	}
+});
+
 test('a fragment fetch of a document-navigation app answers the whole document', async () => {
 	const response = await entry({ documentNavigation: 'document' }).fetch(
 		fragmentRequest('https://app.test/next'),

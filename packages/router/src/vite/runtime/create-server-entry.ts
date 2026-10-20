@@ -383,9 +383,10 @@ export function createServerEntry(options: ServerEntryOptions) {
 		};
 
 		// A landing the router swaps away from needs its served <html> attribute names: scripts may add others before it runs.
+		// A navigation lands in a document whose import map already resolves every chunk, and a later map could not change it.
 		const headStart =
 			(documentLoads && fragmentNavigation && !fragment ? servedHtmlAttributesScript() : '') +
-			(options.importMap ?? '');
+			(fragment ? '' : (options.importMap ?? ''));
 
 		// Blocking opt-out: the pre-T107 whole-page await.
 		if (options.render === 'blocking') {
