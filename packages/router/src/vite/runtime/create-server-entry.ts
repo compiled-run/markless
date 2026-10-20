@@ -41,6 +41,7 @@ import {
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
 import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
+import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
 import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-region.ts';
 import {
@@ -787,7 +788,18 @@ async function renderDocumentModule(
 		[HTML_ATTRIBUTES_SLOT]: htmlAttributes,
 	});
 	assertDocumentStorageFree(output);
+	assertDocumentHandlerFree(output);
 	return output?.html;
+}
+
+// A component the document renders can carry handlers its file never shows, and they would be dropped with the payload.
+function assertDocumentHandlerFree(output: RenderOutput | undefined): void {
+	const view = output?.view as
+		| { readonly events?: ReadonlyArray<{ readonly eventName?: string }> }
+		| undefined;
+	const names = [...new Set((view?.events ?? []).map((event) => event.eventName))];
+	if (names.length === 0) return;
+	throw new Error(documentHandlersMessage(`the document renders ${names.join(', ')} handlers`));
 }
 
 // The shell takes the document's html and nothing else: its state payload is

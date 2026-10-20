@@ -129,6 +129,10 @@ export default function Document({ children }: { readonly children?: Children })
 For a header and footer that some pages share, write a component that takes `children`. Each page
 wraps its content in it. See [components](/build/components).
 
+The router sends only the document's HTML to the browser, so the document cannot hold event
+handlers. An `onClick` there stops the build with `MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED`.
+Put interactive parts in that shared component instead.
+
 ## Try it yourself
 
 In a new app, add `pages/team/[name].tsrx` that shows `Hello, {params.name}`. Visit `/team/ada`.

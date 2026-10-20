@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { chromium } from '@playwright/test';
 import type { Plugin } from 'vite';
 import { describe, expect, test } from 'vitest';
-import { documentNavigationFor } from '../../src/vite/document-navigation.ts';
+import { documentHandlerError, documentNavigationFor } from '../../src/vite/document-navigation.ts';
 import { router } from '../../src/vite/index.ts';
 import { createServerEntry } from '../../src/vite/runtime/create-server-entry.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -72,6 +72,34 @@ describe('document navigation detection', () => {
 		const optionsSource = await load.call({} as never, '\0virtual:markless-router/options');
 		expect(serverSource).toContain('documentNavigation,');
 		expect(optionsSource).toContain('export const documentNavigation = "client";');
+	});
+});
+
+describe('document handler detection', () => {
+	test('names a handler written on the document', () => {
+		const source = `import { Html } from '@markless/router';
+export default function Document({ children }) @{
+	<Html><head></head><body onClick={(event) => event.target.setAttribute('data-clicked', 'yes')}>{children}</body></Html>
+}`;
+		expect(documentHandlerError(source, '/app/document.tsrx')).toMatch(
+			/^MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED: \/app\/document\.tsrx sets onClick on <body>/,
+		);
+		expect(
+			documentHandlerError(
+				source.replace('<body onClick', '<body><div onKeyDown').replace('{children}</body>', '{children}</div></body>'),
+				'/app/document.tsrx',
+			),
+		).toContain('sets onKeyDown on <div>');
+	});
+
+	test('passes a document without handlers', () => {
+		expect(
+			documentHandlerError(
+				'export default function Document({ children }) @{ <html><body class="x">{children}</body></html> }',
+				'/app/document.tsrx',
+			),
+		).toBeUndefined();
+		expect(documentHandlerError(undefined, '/app/document.tsrx')).toBeUndefined();
 	});
 });
 
