@@ -10,11 +10,13 @@ export const ROUTE_SCRIPT_TYPE = '@markless/core/route';
 // Render-context slot where <Html> leaves its attributes for the router's <html> tag.
 export const HTML_ATTRIBUTES_SLOT = '__marklessRouterHtmlAttributes';
 
-// Property on a landing page's <html> holding the [name, value] pairs the served document gave it, read before any page script runs.
+// Properties on a landing page's <html> holding the [name, value] pairs the served document gave <html> and <body>, read before any page script runs.
 export const SERVED_HTML_ATTRIBUTES_PROPERTY = '__marklessServedHtmlAttributes';
+export const SERVED_BODY_ATTRIBUTES_PROPERTY = '__marklessServedBodyAttributes';
 
+// <body> is not parsed yet in <head>; the parser inserts it with its attributes, and the observer reads them before any body script runs.
 export function servedHtmlAttributesScript(): string {
-	return `<script>document.documentElement.${SERVED_HTML_ATTRIBUTES_PROPERTY}=Array.from(document.documentElement.attributes,(a)=>[a.name,a.value])</script>`;
+	return `<script>(()=>{const r=document.documentElement,p=(e)=>Array.from(e.attributes,(a)=>[a.name,a.value]),b=()=>!!document.body&&!!(r.${SERVED_BODY_ATTRIBUTES_PROPERTY}=p(document.body));r.${SERVED_HTML_ATTRIBUTES_PROPERTY}=p(r);b()||new MutationObserver((_,o)=>{b()&&o.disconnect()}).observe(r,{childList:true})})()</script>`;
 }
 
 export function routeMountTarget(document: Document, currentRoot?: Element) {
