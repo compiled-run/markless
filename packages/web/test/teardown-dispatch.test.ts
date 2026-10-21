@@ -248,3 +248,34 @@ test('a live container still fails closed on an unmatched dispatch', async () =>
 		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
 	});
 });
+
+test('a broad forward of foreign markup a script already took out passes through a live container', async () => {
+	const button = element('BUTTON');
+	const root = element('SECTION', [button]);
+	let symbolRuns = 0;
+	const runtime = createResumeRuntime({
+		root: root as never,
+		graph: createRuntimeGraph({ cells: [{ graphNodeId: 'state:count', value: 0 }] }),
+		view: resumeView(),
+		loadSymbol: () => () => {
+			symbolRuns++;
+		},
+	});
+	await runtime.start();
+
+	// A copy fallback's textarea: appended, focused, removed before the queued dispatch runs.
+	const textarea = element('TEXTAREA');
+	root.childNodes.push(textarea);
+	textarea.parentElement = root;
+	detach(textarea);
+	await expect(
+		runtime.dispatch(event('click', textarea) as never, { ignoreUnmatched: true }),
+	).resolves.toBeUndefined();
+
+	// The container's own control taken out is still a lost event.
+	detach(button);
+	await expect(
+		runtime.dispatch(event('click', button) as never, { ignoreUnmatched: true }),
+	).rejects.toMatchObject({ code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED' });
+	expect(symbolRuns).toBe(0);
+});

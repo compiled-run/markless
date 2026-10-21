@@ -489,8 +489,6 @@ export function createEventWiring(input: {
 				: undefined;
 		// The host itself went with the redraw: nothing on the page is left to run.
 		if (!attached && !rowAnchor && pressHost && !pressAnchor) return;
-		if (!attached && !ignoredDisposed && !rowAnchor && !pressAnchor)
-			throw unmatchedDispatchError(event, selector);
 		const bubbles = event.bubbles !== false;
 		const path = collectDispatchPath(
 			pressAnchor ?? target,
@@ -499,6 +497,15 @@ export function createEventWiring(input: {
 			rowEventRecords,
 			bubbles,
 		);
+		// A broad forward of markup no record owns may find it already removed by a script (a copy fallback's textarea).
+		if (
+			!attached &&
+			!ignoredDisposed &&
+			!rowAnchor &&
+			!pressAnchor &&
+			(path[0] || !options.ignoreUnmatched)
+		)
+			throw unmatchedDispatchError(event, selector);
 		if (path.length === 0) {
 			if (ignoredDisposed) return;
 			// A capture listener on the container receives a non-bubbling DOM event from
