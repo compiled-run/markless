@@ -72,7 +72,12 @@ export function createRosterPositionReader(input: {
 	);
 	// The member handle's own id names no instance, so the host path this
 	// derivation stands in separates its element from every sibling part's.
-	const scope = input.computed.hostScope ?? hostScopePath(instancePath);
+	// Composition inside an island never sees the island's own segment, which leads both spaces.
+	const hostScope = input.computed.hostScope;
+	const scope =
+		hostScope === undefined
+			? hostScopePath(instancePath)
+			: (/^(?:m\d+:)*/.exec(instancePath)?.[0] ?? '') + hostScope;
 	return (rosterGraphNodeId, handleGraphNodeId) => {
 		const roster = rosterOf?.(rosterGraphNodeId);
 		const member =
