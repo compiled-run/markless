@@ -1490,6 +1490,14 @@
 			"from": 22185,
 			"to": 23773,
 			"reason": "in-place navigation applies only the class tokens and style declarations the server changed, so a class a theme script set survives the swap, bc3361863, +1588 B rendered"
+		},
+		{
+			"date": "2026-10-21",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 23773,
+			"to": 25274,
+			"reason": "in-place navigation merges body attributes per class token and style declaration like html, so a class a script set on body survives the swap, 2e7152cdf, +1501 B rendered"
 		}
 	],
 	"runtimeModules": {
@@ -1502,7 +1510,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 23773,
+		"router/vite/entries/fragment-entry": 25274,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8906,
