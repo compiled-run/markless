@@ -64,10 +64,11 @@ Side effect to know about: the `agent-files` job runs `pnpm dlx @intellectronica
 
 ### Suites no CI job runs
 
-Each of these was checked on 2026-10-21. `demos/live-feed`, `demos/live-feed-ssr` and `demos/same-module-branch` boxes now run in `demo-boxes`, the `@markless/ui` `api:check` in `browser`, and the `demos/executed-at-load` fixture tests in `demo-boxes`. The rest stay outside CI:
+Each of these was checked on 2026-10-21. `demos/live-feed` and `demos/same-module-branch` boxes now run in `demo-boxes`, the `@markless/ui` `api:check` in `browser`, and the `demos/executed-at-load` fixture tests in `demo-boxes`. The rest stay outside CI:
 
 | Suite | Why it is not in CI |
 | --- | --- |
+| `demos/live-feed-ssr` boxes | Red on the Linux runner, green on macOS, the same on two runs: the settled SSR page runs 174.8 KB at load (1,101 app bytes) where macOS resumes with none. A pre-existing failure to fix before the suite joins `demo-boxes`. |
 | `demos/executed-at-load` `gate` | Five demo builds plus navigation caps in milliseconds (`STATIC_ROUTER_NAVIGATION_MS_CAP`); a wall-clock cap is not a merge gate (flake policy). Its music-player byte budgets are covered by `packages/bundler/test/music-player-*-budget.test.ts`. |
 | `docs:errors:check` | Red and stale: it compares against `docs/pages/errors/`, but the error pages moved to `website/pages/errors/`. Fix the script's paths before wiring it in. |
 | `website` `witness` | Writes screenshots to a developer-machine path and carries its own known-failing list; the website boxes are the CI form. |
