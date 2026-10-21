@@ -208,6 +208,8 @@ Markless's own suite passing does not show that real apps still work. The chunke
 - **Nightly:** the ecosystem repository runs every route of every site on `main` each night, opens an issue labelled `ecosystem-regression` there on new reds, and stores the night's results as the baseline pull requests compare with.
 - **Locally:** `node scripts/ci/ecosystem-ci.mjs run shadcn-admin` fetches the ecosystem repository into `.ecosystem-ci/` and runs one suite against this checkout (`--route /users` for one route).
 
+A sampled run builds Markless once and checks 22 routes of 8 sites in 18 parallel jobs: 20 to 25 minutes to the table, about 150 runner minutes (measured 2026-10-21; per-suite times are in the ecosystem repository's README). htmx-org and the migrate demo are not run until their ports move to Markless 0.8, whose TSRX changes they do not build with.
+
 No secret, GitHub App or personal token is involved. The ecosystem repository is public, so the workflows check it out without a token; the jobs that build pull request code get a read-only token; only the jobs that run no pull request code may comment. The release cut's own token may dispatch a workflow in this repository (GitHub lets a `GITHUB_TOKEN` start `workflow_dispatch` runs), which is how it starts the gate.
 
 ## Should we adopt `async/pipeline`?
