@@ -673,6 +673,53 @@ describe('server entry rendering', () => {
 		expect(html).not.toContain('/build/index.js');
 	});
 
+	it.each(['blocking', 'streaming'] as const)(
+		'%s render preloads the landing plan and link bridge at low fetch priority',
+		async (render) => {
+			const entry = createServerEntry({
+				render,
+				documentNavigation: 'document',
+				resumeEntryPath: '/assets/wake.js',
+				navigationEntryPath: '/assets/visit.js',
+				routeSsrModulePreloads: {
+					'pages/shop/[item].tsrx': [
+						'/assets/wake.js',
+						'/assets/item-cart.js',
+						{ href: '/assets/hero-zoom.js', fetchPriority: 'high' },
+					],
+					'pages/checkout.tsrx': ['/assets/checkout-form.js'],
+				},
+				documentModuleLoader: undefined,
+				pageModuleLoaders: {
+					'pages/shop/[item].tsrx': async () => ({
+						default: page(
+							'<main><button>Add</button><a href="/checkout" data-markless-router-link>Pay</a></main>',
+							clickPayload(),
+						),
+					}),
+				},
+				routeFileIds: ['/pages/checkout.tsrx', '/pages/shop/[item].tsrx'],
+			});
+
+			const html = await (
+				await entry.fetch(new Request('http://markless-router.test/shop/lamp'))
+			).text();
+			const head = html.slice(0, html.indexOf('</head>'));
+
+			expect(
+				[...head.matchAll(/<link rel="modulepreload"[^>]*>/g)].map(([tag]) => tag),
+			).toEqual([
+				'<link rel="modulepreload" href="/assets/wake.js" crossorigin="anonymous" fetchpriority="low">',
+				'<link rel="modulepreload" href="/assets/item-cart.js" crossorigin="anonymous" fetchpriority="low">',
+				'<link rel="modulepreload" href="/assets/hero-zoom.js" crossorigin="anonymous" fetchpriority="high">',
+				expect.stringMatching(
+					/^<link rel="modulepreload" href="\/_markless\/links\/[0-9a-z]+\.js" crossorigin="anonymous" fetchpriority="low">$/,
+				),
+			]);
+			expect(html).toContain('(0,["/assets/checkout-form.js"],{"/checkout":[0]})');
+		},
+	);
+
 	it('a page with nothing to resume preloads none of its landing plan', async () => {
 		const entry = createServerEntry({
 			navigationEntryPath: '/build/navigation.js',
