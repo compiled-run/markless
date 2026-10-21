@@ -2,12 +2,13 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { firstUseSweep } from '../../../demos/interaction-benchmark/runner/lib/controls.mjs';
+import { firstUseSweep, openPage } from '../../../demos/interaction-benchmark/runner/lib/controls.mjs';
 
 const require = createRequire(new URL('../../../demos/news/package.json', import.meta.url));
 const { chromium } = require('playwright');
 
-// Like the router's idle tier: one idle period prefetches the worker into the HTTP cache, a chained one fetches a file no control needs.
+// Like the router's idle tier: one idle period prefetches the worker into the HTTP cache and a page's HTML,
+// and only once that HTML arrives, a chained idle period fetches code no control needs.
 const PAGE = `<!doctype html><html><body>
 <button id="cached" type="button">cached</button>
 <button id="network" type="button">network</button>
@@ -16,9 +17,11 @@ requestIdleCallback(() => {
 	const link = document.createElement('link');
 	link.rel = 'prefetch';
 	link.href = '/worker.js';
-	link.onload = () => requestIdleCallback(() => import('/idle-only.js'));
 	document.head.append(link);
+	fetch('/slow.html').then(() => requestIdleCallback(() => import('/idle-only.js')));
 });
+// A busy main thread after load defers that idle period past the moment the network first goes quiet, as on a slow runner.
+addEventListener('load', () => setTimeout(() => { const end = performance.now() + 1500; while (performance.now() < end); }));
 document.getElementById('cached').addEventListener('click', () => new Worker('/worker.js', { type: 'module' }));
 document.getElementById('network').addEventListener('click', () => import('/uncached.js'));
 </script>
@@ -33,6 +36,10 @@ beforeAll(async () => {
 		if (request.url === '/') {
 			response.setHeader('content-type', 'text/html');
 			return response.end(PAGE);
+		}
+		if (request.url === '/slow.html') {
+			response.setHeader('content-type', 'text/html');
+			return void setTimeout(() => response.end('<p>next page</p>'), 1000);
 		}
 		response.setHeader('content-type', 'text/javascript');
 		response.setHeader('cache-control', 'public, max-age=31536000, immutable');
@@ -56,5 +63,19 @@ test('a first use counts the JS it fetches from the network, after the page went
 			control.inputJs.map((url) => new URL(url).pathname),
 		]),
 	);
-	expect(fetched).toEqual({ 'button:cached': [], 'button:network': ['/uncached.js'] });
+	expect(fetched).toEqual({
+		'button:cached': [],
+		'button:network': ['/uncached.js'],
+	});
+}, 60_000);
+
+test('a page counts as idle only once the work its idle periods start has finished', async () => {
+	const visit = await openPage(browser);
+	try {
+		await visit.goto(`${origin}/`);
+		await visit.idle();
+		expect(visit.state.js.load.map((url: string) => new URL(url).pathname)).toContain('/idle-only.js');
+	} finally {
+		await visit.close();
+	}
 }, 60_000);
