@@ -33,7 +33,7 @@ The script owns one small table that puts each job in a mode. A new job with che
 
 ## The jobs
 
-- `agent-files` (fast): `pnpm dlx @intellectronica/ruler apply`, then fails on drift.
+- `agent-files` (fast): `pnpm dlx @intellectronica/ruler@0.3.44 apply`, then fails on drift.
 - `typecheck` (fast): `node scripts/ci/check-workflow.mjs .github/workflows/ci.yml`, `pnpm typecheck`, `pnpm exec vp check --no-fmt`.
 - `unit` (fast): `pnpm exec vp test --project node`.
 - `browser` (full): `pnpm exec vp test --project browser`, `pnpm exec vp test --project ui`.
