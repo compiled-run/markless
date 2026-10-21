@@ -109,7 +109,7 @@ export function graphPathSource(
 	binding: SemanticGraphBinding,
 	path: ReadonlyArray<string>,
 ): string {
-	return [binding.name, ...path].join('.');
+	return path.reduce(graphMemberSource, binding.name);
 }
 
 export function uniqueBy<T>(values: T[], keyOf: (value: T) => string): T[] {
@@ -179,19 +179,36 @@ function aliasExcludesPath(alias: SemanticGraphAlias, path: ReadonlyArray<string
 	});
 }
 
-// A member path segment: a plain property name or an array index. Anything else
-// (a call, an operator, a space) means the source was never a static path.
 const STATIC_GRAPH_PATH_SEGMENT = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+)$/;
+const QUOTED_MEMBER = /^\[\s*(?:'([^'\\]*)'|"([^"\\]*)")\s*\]/;
+const INDEX_MEMBER = /^\[\s*(\d+)\s*\]/;
+const DOTTED_MEMBER = /^\.\s*([A-Za-z_$][A-Za-z0-9_$]*|\d+)/;
+
+// The source form of one member step: dotted when it can be, quoted otherwise, so
+// `splitStaticGraphPath` reads a hyphenated key such as `aria-label` back intact.
+export function graphMemberSource(base: string, key: string): string {
+	return STATIC_GRAPH_PATH_SEGMENT.test(key)
+		? `${base}.${key}`
+		: `${base}[${JSON.stringify(key)}]`;
+}
 
 // Graph/member path parsing for compiler artifacts, not filesystem or URL path handling.
+// Fails closed: anything but names, indexes and quoted keys (a call, an operator)
+// was never a static path, and a partial split would read a key no object has.
 export function splitStaticGraphPath(source: string): string[] {
-	const segments = source
-		.replace(/\[['"]([^'"]+)['"]\]/g, '.$1')
-		.replace(/\[(\d+)\]/g, '.$1')
-		.split('.')
-		.map((segment) => segment.trim())
-		.filter(Boolean);
-	// Fail closed: a split that produced `includes(item` would otherwise become a
-	// path no runtime object can answer, and the read silently returns undefined.
-	return segments.every((segment) => STATIC_GRAPH_PATH_SEGMENT.test(segment)) ? segments : [];
+	let rest = source.trim();
+	const head = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(rest);
+	if (!head) return [];
+	const segments = [head[0]];
+	rest = rest.slice(head[0].length).trimStart();
+	while (rest.length > 0) {
+		const quoted = QUOTED_MEMBER.exec(rest);
+		const step = quoted ?? INDEX_MEMBER.exec(rest) ?? DOTTED_MEMBER.exec(rest);
+		if (!step) return [];
+		const segment = quoted ? (quoted[1] ?? quoted[2]!) : step[1]!;
+		if (segment.length === 0) return [];
+		segments.push(segment);
+		rest = rest.slice(step[0].length).trimStart();
+	}
+	return segments;
 }
