@@ -64,6 +64,10 @@ async function readBarOpened(itemId: string, panelId: string) {
 	el(itemId).focus();
 	el(itemId).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
 	await expect.poll(() => el(panelId).hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
+	// Focus lands tasks after the menu shows; a reader started between follows it into the menu.
+	await expect
+		.poll(() => el(panelId).contains(document.activeElement), { timeout: 5000 })
+		.toBe(true);
 	await sr.start(container as unknown as HTMLElement);
 }
 
