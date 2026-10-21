@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
+import Nested from './scenarios/nested.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 
 // Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
@@ -56,6 +57,22 @@ afterEach(async () => {
 test('the step card announces as a dialog named by its title', async () => {
 	await open(Basic);
 	await startTour();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Save your work' }), {
+		role: 'dialog',
+		name: 'Save your work',
+	});
+});
+
+// The gallery's shape: the tour one component down, opened from that component's own state.
+test('a tour inside a child component opens and announces its first card as a named dialog', async () => {
+	await open(Nested);
+	const start = document.querySelector('[data-testid="nested-start"]') as HTMLElement;
+	start.focus();
+	await sr.settleOnFocus();
+	start.click();
+	await expect
+		.poll(() => document.querySelector('[data-testid="nested-first"]')?.hasAttribute('hidden'))
+		.toBe(false);
 	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Save your work' }), {
 		role: 'dialog',
 		name: 'Save your work',

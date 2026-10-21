@@ -5,6 +5,7 @@ import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
+import Nested from './scenarios/nested.tsrx';
 import Placed from './scenarios/placed.tsrx';
 
 const Root = page.getByTestId('root');
@@ -37,6 +38,10 @@ const StepStart = page.getByTestId('step-start');
 const StepEnd = page.getByTestId('step-end');
 const StepDefault = page.getByTestId('step-default');
 const TopForward = page.getByTestId('top-forward');
+const NestedStart = page.getByTestId('nested-start');
+const NestedFirst = page.getByTestId('nested-first');
+const NestedSecond = page.getByTestId('nested-second');
+const NestedForward = page.getByTestId('nested-forward');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so each test branches
 // on the mode rather than taking the mount by reference.
@@ -282,6 +287,20 @@ for (const mode of MODES) {
 		// write to `open`, so there is nothing for it to report back.
 		expect(el(Closes).textContent).toBe('0');
 		expect(el(Opens).textContent).toBe('0');
+	});
+
+	test(`${mode}: a tour inside a child component opens on the child's own state and walks its steps`, async () => {
+		const { container } = mode === 'CSR' ? await render(Nested) : await renderSSR(Nested);
+		void container;
+
+		expect(el(NestedFirst).hasAttribute('hidden')).toBe(true);
+		el(NestedStart).click();
+		await shown(NestedFirst);
+		expect(el(NestedSecond).hasAttribute('hidden')).toBe(true);
+
+		el(NestedForward).click();
+		await shown(NestedSecond);
+		expect(el(NestedFirst).hasAttribute('hidden')).toBe(true);
 	});
 
 	test(`${mode}: one set of step controls outside the cards walks every step`, async () => {
