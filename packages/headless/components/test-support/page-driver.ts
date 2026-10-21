@@ -193,7 +193,11 @@ export function realDriver<R extends RealReader>(
  * Bring VoiceOver into the web content and, heading by heading, onto the gallery section the URL fragment names.
  * `navigateToWebContent()` starts at the top whatever the fragment says, and a walk from there outlasts a test.
  */
-export function voiceOverToAnchoredSection(voiceOver: VoiceOverPlaywright, page: Page) {
+export async function voiceOverToAnchoredSection(voiceOver: VoiceOverPlaywright, page: Page) {
+	// Playwright emulates page focus by default; the real window focus is what reaches VoiceOver.
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
+	await cdp.detach();
 	return toAnchoredSection(page, {
 		name: 'VoiceOver',
 		enter: () => voiceOver.navigateToWebContent(),

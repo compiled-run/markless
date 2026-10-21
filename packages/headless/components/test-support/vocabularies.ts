@@ -230,10 +230,11 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	},
 	async cursorToFocus(voiceOver, focusedName, refocus) {
 		// VoiceOver learns of a page focus change late, landing on the old focus or the document until then.
+		// The name alone is the label text beside the control ("Volume"), not the control ("40 Volume slider").
 		const arrived = (phrase: string) =>
 			focusedName === ''
 				? phrase !== '' && !phrase.endsWith(' web content')
-				: phrase.includes(focusedName);
+				: phrase.includes(focusedName) && phrase.trim() !== focusedName.trim();
 		const describeFocus = () =>
 			voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
 		// Asked first, because asking moves nothing: moving its cursor while it still believes the old element has
