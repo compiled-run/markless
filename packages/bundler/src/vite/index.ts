@@ -28,7 +28,12 @@ import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../pack
 import { excludeSourceShippedDeps, includeOptimizedDeps } from '../optimized-deps.ts';
 import { RESUME_ENTRY_SPECIFIER, STORAGE_FREE_RESUME_ENTRY_SPECIFIER } from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
-import { sharedReachedRenderDataRequest } from '../virtual-ids.ts';
+import { isCompilerStatefulModuleId, sharedReachedRenderDataRequest } from '../virtual-ids.ts';
+
+// The slice of Vitest's `configureVitest` context this plugin uses; vitest stays out of the bundler's dependencies.
+type VitestCacheKeyContext = {
+	readonly defineCacheKeyGenerator: (generator: (context: { readonly id: string }) => false | undefined) => void;
+};
 import {
 	type BundleGraphAdder,
 	type GlobalInjections,
@@ -312,6 +317,9 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				}
 			},
 		},
+		configureVitest({ defineCacheKeyGenerator }: VitestCacheKeyContext) {
+			defineCacheKeyGenerator(({ id }) => (isCompilerStatefulModuleId(id) ? false : undefined));
+		},
 		configureServer(server: ViteDevServer) {
 			server.config.logger?.info(
 				`markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; ${DEBUGGING_PLAYBOOK_HINT}.`,
@@ -400,7 +408,10 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			}
 			return hmr.hotUpdate(this.environment, ctx);
 		},
-	} satisfies Plugin & { api: MarklessVitePluginApi };
+	} satisfies Plugin & {
+		api: MarklessVitePluginApi;
+		configureVitest(context: VitestCacheKeyContext): void;
+	};
 
 	return [
 		marklessPlugin,

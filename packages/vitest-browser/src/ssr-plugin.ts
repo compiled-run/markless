@@ -3,7 +3,6 @@ import { renderToStream } from '@markless/web/render-to-stream';
 import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import type { Plugin, ViteDevServer } from 'vite';
-import type { ModuleRunner } from 'vite/module-runner';
 import type { BrowserCommand } from 'vitest/node';
 // The production island merge itself. Reached by path because @markless/router
 // is not a dependency of this test-only package; emulating it here would make
@@ -19,6 +18,7 @@ import {
 import { protocolIslandSegment } from '../../serializer/src/protocol-constants.ts';
 // The per-root FIFO a composed route's resume entry dispatches through.
 import { emitQueuedResumeContainerEvent } from '../../bundler/src/source-module.ts';
+import { serverModuleRunner } from '../../bundler/src/vite/environment.ts';
 
 // Node-side vitest plugin for SSR/resume browser tests. It rewrites
 // renderSSR(Component), renderSSRIslands([Component, ...]),
@@ -97,10 +97,12 @@ function islandResumeModuleSource(modulePaths: ReadonlyArray<string>): string {
 	].join('\n');
 }
 
+// The framework's own dev runner, not the `ssr.runner` Vitest installs: that one serves `.tsrx` from
+// Vitest's cross-run module cache, which skips the compile whose registrations renderToString waits on.
 function ssrImport(vite: ViteDevServer, path: string): Promise<unknown> {
-	const runner = (vite.environments.ssr as { runner?: ModuleRunner } | undefined)?.runner;
-	if (!runner) throw new Error('renderSSR: the test server has no ssr environment that runs modules.');
-	return runner.import(path);
+	if (!vite.environments.ssr)
+		throw new Error('renderSSR: the test server has no ssr environment that runs modules.');
+	return serverModuleRunner(vite, 'ssr').import(path);
 }
 
 const renderSsrCommand: BrowserCommand<
