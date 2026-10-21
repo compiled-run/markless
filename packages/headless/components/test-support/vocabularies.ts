@@ -190,6 +190,12 @@ async function nvdaMode(nvda: NVDAPlaywright, mode: 'focus mode' | 'browse mode'
 	}
 }
 
+// Asked twice in a row NVDA spells the answer letter by letter, so another key goes between two askings.
+async function reportNvdaFocus(nvda: NVDAPlaywright) {
+	await nvda.press('Shift');
+	await nvda.perform(nvda.keyboardCommands.reportCurrentFocus);
+}
+
 export const nvdaSpec: RealDriverSpec<NVDAPlaywright> = {
 	name: 'NVDA',
 	vocabulary: nvdaVocabulary,
@@ -200,10 +206,9 @@ export const nvdaSpec: RealDriverSpec<NVDAPlaywright> = {
 	// A focus move can switch NVDA to focus mode, where its next-item keys are arrows into the widget.
 	keysToReader: (nvda) => nvdaMode(nvda, 'browse mode'),
 	// NVDA speaks a focus change on its own, but the phrase is only captured on a command, so it is asked for.
-	// Once: asking twice in quick succession makes NVDA spell the answer letter by letter.
-	cursorToFocus: (nvda) => nvda.perform(nvda.keyboardCommands.reportCurrentFocus),
+	cursorToFocus: reportNvdaFocus,
 	// In focus mode NVDA's next and previous items are the arrow keys, which would move the focused widget.
-	reannounceFocus: (nvda) => nvda.perform(nvda.keyboardCommands.reportCurrentFocus),
+	reannounceFocus: reportNvdaFocus,
 	spoken: nvdaSymbols,
 };
 

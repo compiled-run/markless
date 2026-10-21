@@ -81,6 +81,10 @@ export async function readResizableTranscript(sr: ScreenReaderDriver, page: Page
 	await expect(divider).toHaveAttribute('aria-valuenow', AFTER_STEP, {
 		timeout: CHANGE_TIMEOUT_MS,
 	});
-	const afterStep = await readForPhrase(sr, [AFTER_STEP], WALK_LIMIT);
-	expect(missing(afterStep, [AFTER_STEP]), `${sr.name} announced "${afterStep}"`).toEqual([]);
+	// Asked of the focused divider: a walk from here would step the reading cursor off it.
+	await expect
+		.poll(async () => missing(await sr.reannounce(), [AFTER_STEP]), {
+			timeout: CHANGE_TIMEOUT_MS,
+		})
+		.toEqual([]);
 }

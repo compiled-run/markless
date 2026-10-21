@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nvdaSegments, voiceOverSegments } from '../test-support/page-driver.ts';
+import { nvdaSegments, nvdaSymbols, voiceOverSegments } from '../test-support/page-driver.ts';
 
 // Phrases as guidepup captured them from VoiceOver on a macos-26 runner.
 describe('voiceOverSegments', () => {
@@ -60,6 +60,14 @@ describe('nvdaSegments', () => {
 		expect(spoken).toContain('grouping');
 	});
 
+	it('keeps a name that holds commas whole, even with more facts after it', () => {
+		expect(
+			nvdaSegments(
+				'Wednesday, August 19, 2026, toggle button, unavailable, focused, not pressed',
+			),
+		).toContain('Wednesday, August 19, 2026');
+	});
+
 	it('keeps a name that holds commas whole', () => {
 		expect(nvdaSegments('toggle button, Monday, August 3, 2026')).toContain(
 			'Monday, August 3, 2026',
@@ -68,6 +76,15 @@ describe('nvdaSegments', () => {
 
 	it('never lets a negated state stand in for the state', () => {
 		expect(nvdaSegments('check box, not checked, , Lettuce')).not.toContain('checked');
+	});
+
+	it('reads the symbols NVDA speaks as words back as the symbols', () => {
+		expect(nvdaSymbols('README dot md, row header, focused')).toBe(
+			'README.md, row header, focused',
+		);
+		expect(nvdaSymbols('Saturation: 80 percent , Brightness: 100 percent')).toBe(
+			'Saturation: 80%, Brightness: 100%',
+		);
 	});
 
 	it('hears leaving a grouping as no announcement of one', () => {

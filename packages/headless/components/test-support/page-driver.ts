@@ -99,6 +99,9 @@ export function realDriver<R extends RealReader>(
 	const deadline = timeout > 0 ? Date.now() + timeout - WALK_HEADROOM_MS : Infinity;
 	// Whether a focus move may have switched the reader to handing its keys to the page.
 	let keysMayBeWithPage = false;
+	// Whether the reader was last placed by the page's focus rather than walked. A walked reader's item is not the
+	// focused element under NVDA's browse mode, so a key then belongs to the reader, which acts on its own item.
+	let placedByFocus = false;
 	const keysBackToReader = async () => {
 		if (!keysMayBeWithPage || !spec.keysToReader) return;
 		await spec.keysToReader(reader);
@@ -118,15 +121,17 @@ export function realDriver<R extends RealReader>(
 				);
 			}
 			await keysBackToReader();
+			placedByFocus = false;
 			await reader.next();
 		},
 		async previous() {
 			await keysBackToReader();
+			placedByFocus = false;
 			await reader.previous();
 		},
 		async press(key) {
 			await page?.evaluate(recordPageKeys);
-			if (spec.keysThroughPage && page && (await pageHasFocus())) {
+			if (spec.keysThroughPage && placedByFocus && page && (await pageHasFocus())) {
 				await page.keyboard.press(key);
 			} else {
 				await reader.press(key);
@@ -141,7 +146,7 @@ export function realDriver<R extends RealReader>(
 			}
 		},
 		async reannounce() {
-			if (spec.reannounceFocus && (await pageHasFocus())) {
+			if (spec.reannounceFocus && placedByFocus && (await pageHasFocus())) {
 				await spec.reannounceFocus(reader);
 				return heard(reader.lastSpokenPhrase());
 			}
@@ -155,6 +160,7 @@ export function realDriver<R extends RealReader>(
 		},
 		async settleOnFocus() {
 			keysMayBeWithPage = true;
+			placedByFocus = true;
 			if (spec.cursorToFocus && page) {
 				const focused = await page.evaluateHandle(() => document.activeElement);
 				const refocus = () =>
@@ -272,9 +278,9 @@ export function nvdaSegments(phrase: string): string[] {
 	return wordRuns(segments, segments.join(', '));
 }
 
-/** NVDA speaks a full stop inside a word as "dot" ("README dot md"); this puts the name's own spelling back. */
+/** NVDA speaks symbols as words ("README dot md", "80 percent"); this puts the page's own spelling back. */
 export function nvdaSymbols(phrase: string): string {
-	return phrase.replace(/(\S) dot (?=\S)/g, '$1.');
+	return phrase.replace(/(\S) dot (?=\S)/g, '$1.').replace(/(\d) percent\b ?/g, '$1%');
 }
 
 function wordRuns(segments: string[], phrase: string): string[] {
@@ -283,7 +289,8 @@ function wordRuns(segments: string[], phrase: string): string[] {
 		for (let start = 0; start < words.length; start++) {
 			if (start > 0 && words[start - 1].toLowerCase() === 'not') continue;
 			for (let end = start + 1; end <= words.length; end++) {
-				runs.add(words.slice(start, end).join(' '));
+				// A run that ends where a comma separated the next fact: "2026," in "…August 19, 2026, toggle button".
+				runs.add(words.slice(start, end).join(' ').replace(/,$/, ''));
 			}
 		}
 	};
