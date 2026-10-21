@@ -1,3 +1,4 @@
+import type { Children } from '@markless/core';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
 import { labelPieces, type CodeStep } from './playground/checklist.ts';
@@ -59,7 +60,7 @@ export default function Code({
 	/** URLs of the block's own .css files, linked so the starter's render wears them before the first run. */
 	readonly stylesheets?: readonly string[];
 	/** The starter's own render, shown in the Result pane until the first run. */
-	readonly children?: unknown;
+	readonly children?: Children;
 }) @{
 	const live = showUpdates === true || (steps?.length ?? 0) > 0;
 	const stepRows = (steps ?? []).map((step, id) => ({

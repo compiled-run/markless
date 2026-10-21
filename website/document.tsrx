@@ -1,3 +1,4 @@
+import type { Children } from '@markless/core';
 import { headFor, siteOrigin } from './nav.ts';
 import { findError } from './components/docs/errors/lookup.ts';
 import { findApp } from './components/docs/showcase/view.ts';
@@ -12,7 +13,7 @@ export default function Document({
 	children,
 }: {
 	readonly url?: { readonly pathname: string };
-	readonly children?: unknown;
+	readonly children?: Children;
 }) @{
 	const pathname = (url?.pathname ?? '/').replace(/\/+$/, '') || '/';
 	const head = headFor(pathname, findError, findApp);
