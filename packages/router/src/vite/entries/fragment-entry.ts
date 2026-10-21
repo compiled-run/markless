@@ -407,21 +407,71 @@ async function mergeHead(d: Document, next: Document) {
 	return { stale, scripts };
 }
 
-// Only attributes a server document set are the server's to remove: scripts own the rest (a theme class).
-const serverHtmlAttributes = new WeakMap<Document, Set<string>>();
+// A swap applies only what the server changed between its documents; a script's own changes (a theme class) stay.
+const serverHtmlAttributes = new WeakMap<Document, ReadonlyMap<string, string>>();
 
 function syncHtmlAttributes(d: Document, next: Document, servedProperty: string): void {
 	const root = d.documentElement;
-	const incoming = next.documentElement;
 	const served =
 		serverHtmlAttributes.get(d) ??
-		((root as unknown as Record<string, readonly string[] | undefined>)[servedProperty] || []);
-	for (const name of served)
-		if (!incoming.hasAttribute(name)) root.removeAttribute(name);
-	for (const attribute of incoming.attributes)
-		if (root.getAttribute(attribute.name) !== attribute.value)
-			root.setAttribute(attribute.name, attribute.value);
-	serverHtmlAttributes.set(d, new Set(incoming.getAttributeNames()));
+		new Map(
+			(root as unknown as Record<string, readonly [string, string][] | undefined>)[
+				servedProperty
+			],
+		);
+	const incoming = new Map(
+		Array.from(next.documentElement.attributes, (attribute) => [attribute.name, attribute.value]),
+	);
+	for (const name of new Set([...served.keys(), ...incoming.keys()])) {
+		const before = served.get(name) ?? null;
+		const after = incoming.get(name) ?? null;
+		if (before !== after) applyServedChange(d, root, name, before, after);
+	}
+	serverHtmlAttributes.set(d, incoming);
+}
+
+// class and style are merged a token and a declaration at a time, so a script's own tokens are never dropped.
+function applyServedChange(
+	d: Document,
+	root: HTMLElement,
+	name: string,
+	before: string | null,
+	after: string | null,
+): void {
+	if (name === 'class') {
+		const was = classTokens(before);
+		const will = classTokens(after);
+		const removed = [...was].filter((token) => !will.has(token));
+		const added = [...will].filter((token) => !was.has(token));
+		if (removed.length) root.classList.remove(...removed);
+		if (added.length) root.classList.add(...added);
+	} else if (name === 'style') {
+		const was = declarations(d, before);
+		const will = declarations(d, after);
+		for (const property of was.keys())
+			if (!will.has(property)) root.style.removeProperty(property);
+		for (const [property, [value, priority]] of will) {
+			const old = was.get(property);
+			if (old?.[0] !== value || old[1] !== priority)
+				root.style.setProperty(property, value, priority);
+		}
+	} else if (after === null) root.removeAttribute(name);
+	else root.setAttribute(name, after);
+	if (after === null && !root.getAttribute(name)?.trim()) root.removeAttribute(name);
+}
+
+const classTokens = (value: string | null): Set<string> =>
+	new Set(value?.split(/\s+/).filter(Boolean));
+
+function declarations(d: Document, value: string | null): Map<string, [string, string]> {
+	const style = d.createElement('div').style;
+	style.cssText = value ?? '';
+	const result = new Map<string, [string, string]>();
+	for (let index = 0; index < style.length; index++) {
+		const property = style.item(index);
+		result.set(property, [style.getPropertyValue(property), style.getPropertyPriority(property)]);
+	}
+	return result;
 }
 
 // Set from the page's config at the start of every swap.

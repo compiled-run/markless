@@ -11,10 +11,19 @@ export default function Document({
 	const pathname = url?.pathname ?? '/';
 	const title = titles[pathname] ?? 'Guide';
 
-	<html lang="en" data-page-shell={pathname} data-landing-only={pathname === '/' ? 'home' : undefined} style="scroll-behavior: smooth">
+	<html
+		lang="en"
+		class={pathname === '/' ? 'shell shell-home' : 'shell'}
+		data-page-shell={pathname}
+		data-landing-only={pathname === '/' ? 'home' : undefined}
+		data-mode="light"
+		style={pathname === '/' ? 'scroll-behavior: smooth; --home: 1' : 'scroll-behavior: smooth'}
+	>
 		<head>
 			<meta charset="utf-8" />
-			<script>{'document.documentElement.dataset.scripted = "yes";'}</script>
+			<script>
+				{'const root = document.documentElement; root.dataset.scripted = "yes"; root.dataset.mode = "dark"; root.classList.add("dark"); root.style.colorScheme = "dark";'}
+			</script>
 			<title>{title}</title>
 			<meta name="description" content={`About ${title}`} />
 			<link rel="canonical" href={`https://guide.test${pathname}`} />

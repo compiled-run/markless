@@ -652,6 +652,47 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a theme a script set on html survives every swap, in every frame, while the server still owns its own class tokens and declarations', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			await page.evaluate(() => {
+				const root = document.documentElement;
+				const lost: string[] = [];
+				(window as unknown as Record<string, unknown>).__themeLost = lost;
+				const check = (when: string) => {
+					if (!root.classList.contains('dark')) lost.push(`${when}: class ${root.className}`);
+					if (root.style.colorScheme !== 'dark') lost.push(`${when}: style ${root.style.cssText}`);
+					if (root.dataset.mode !== 'dark') lost.push(`${when}: data-mode ${root.dataset.mode}`);
+				};
+				new MutationObserver(() => check('mutation')).observe(root, { attributes: true });
+				const frame = () => {
+					check('frame');
+					requestAnimationFrame(frame);
+				};
+				requestAnimationFrame(frame);
+			});
+			const html = () =>
+				page.evaluate(() => ({
+					home: document.documentElement.classList.contains('shell-home'),
+					shell: document.documentElement.classList.contains('shell'),
+					homeVar: document.documentElement.style.getPropertyValue('--home'),
+					scroll: document.documentElement.style.scrollBehavior,
+				}));
+			expect(await html()).toEqual({ home: true, shell: true, homeVar: '1', scroll: 'smooth' });
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'alpha');
+			expect(await html()).toEqual({ home: false, shell: true, homeVar: '', scroll: 'smooth' });
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'beta');
+			await page.locator('[data-crumb-home]').click();
+			await landedOn(page, 'index');
+			expect(await html()).toEqual({ home: true, shell: true, homeVar: '1', scroll: 'smooth' });
+			expect(
+				await page.evaluate(() => (window as unknown as Record<string, unknown>).__themeLost),
+			).toEqual([]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('a URL-dependent document keeps its chrome, updates its head, and never reloads', async () => {
 			const { page, errors, requests } = await open(browser, '/', docOrigin);
 			await page.evaluate(() => {
