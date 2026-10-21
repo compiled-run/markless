@@ -1,6 +1,11 @@
 import type { Keys, Vocabulary } from './driver.ts';
 import type { NVDAPlaywright, VoiceOverPlaywright } from '@guidepup/playwright';
-import { commaSegments, voiceOverSegments, type RealDriverSpec } from './page-driver.ts';
+import {
+	nvdaSegments,
+	nvdaSymbols,
+	voiceOverSegments,
+	type RealDriverSpec,
+} from './page-driver.ts';
 
 /**
  * What NVDA and VoiceOver call the facts a checkbox announcement has to convey.
@@ -179,15 +184,19 @@ export const nvdaSpec: RealDriverSpec<NVDAPlaywright> = {
 	name: 'NVDA',
 	vocabulary: nvdaVocabulary,
 	keys,
-	segments: commaSegments,
-	// NVDA speaks a focus change on its own, but the phrase is only captured on a command, so it is asked for.
-	async cursorToFocus(nvda, focusedName) {
-		for (let attempt = 0; attempt < 10; attempt++) {
-			await nvda.perform(nvda.keyboardCommands.reportCurrentFocus);
-			const phrase = await nvda.lastSpokenPhrase();
-			if (focusedName === '' ? phrase !== '' : phrase.includes(focusedName)) return;
+	segments: nvdaSegments,
+	// Browse mode keeps arrows and page keys to move its own cursor; a widget's keys are passed through, as a user would.
+	async beforeKey(nvda, key) {
+		if (/^(Arrow|Home$|End$|Page)/.test(key)) {
+			await nvda.perform(nvda.keyboardCommands.ignoreNextKeyCombination);
 		}
 	},
+	// NVDA speaks a focus change on its own, but the phrase is only captured on a command, so it is asked for.
+	// Once: asking twice in quick succession makes NVDA spell the answer letter by letter.
+	cursorToFocus: (nvda) => nvda.perform(nvda.keyboardCommands.reportCurrentFocus),
+	// In focus mode NVDA's next and previous items are the arrow keys, which would move the focused widget.
+	reannounceFocus: (nvda) => nvda.perform(nvda.keyboardCommands.reportCurrentFocus),
+	spoken: nvdaSymbols,
 };
 
 // VoiceOver's cursor and the page's focus are two positions; settling joins them with VoiceOver's own command.

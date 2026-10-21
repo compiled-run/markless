@@ -24,6 +24,12 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	 * `refocus` puts the page's focus back on that element if the reader moved it.
 	 */
 	cursorToFocus?: (reader: R, focusedName: string, refocus: () => Promise<void>) => Promise<void>;
+	/** Run before a key goes to the page, for a reader that would otherwise keep that key for itself. */
+	beforeKey?: (reader: R, key: string) => Promise<void>;
+	/** Say the focused element again, for a reader whose next-item keys would reach a focused widget instead. */
+	reannounceFocus?: (reader: R) => Promise<void>;
+	/** Undo the reader's own spelling-out of symbols, so a phrase can be compared with the name it read. */
+	spoken?: (phrase: string) => string;
 };
 
 async function focusedAccessibleName(page: Page): Promise<string> {
@@ -60,10 +66,15 @@ export function realDriver<R extends RealReader>(
 ): ScreenReaderDriver {
 	// Printed as it is heard: a walk cut short by the test timeout loses the transcript its own error would carry.
 	const heard = async (phrase: Promise<string>) => {
-		const spoken = await phrase;
-		console.log(`${spec.name} said: ${JSON.stringify(spoken)}`);
-		return spoken;
+		const raw = await phrase;
+		console.log(`${spec.name} said: ${JSON.stringify(raw)}`);
+		return spec.spoken ? spec.spoken(raw) : raw;
 	};
+	const pageHasFocus = async () =>
+		page !== undefined &&
+		(await page.evaluate(
+			() => document.activeElement !== null && document.activeElement !== document.body,
+		));
 	const timeout = test.info().timeout;
 	const deadline = timeout > 0 ? Date.now() + timeout - WALK_HEADROOM_MS : Infinity;
 	return {
@@ -82,8 +93,15 @@ export function realDriver<R extends RealReader>(
 			await reader.next();
 		},
 		previous: () => reader.previous(),
-		press: (key) => reader.press(key),
+		async press(key) {
+			await spec.beforeKey?.(reader, key);
+			await reader.press(key);
+		},
 		async reannounce() {
+			if (spec.reannounceFocus && (await pageHasFocus())) {
+				await spec.reannounceFocus(reader);
+				return heard(reader.lastSpokenPhrase());
+			}
 			// Neither reader has a "read the current item again" command that is
 			// guaranteed to re-read from the live DOM, so this steps off the item
 			// and back onto it - the same move the virtual driver makes.
@@ -196,6 +214,25 @@ export function voiceOverSegments(phrase: string): string[] {
 	if (heading) return ['heading', heading[1], heading[2]];
 	// "end of Topics group" is the cursor leaving a container, not an announcement of it.
 	if (phrase.startsWith('end of ')) return [phrase];
+	return wordRuns(commaSegments(phrase), phrase);
+}
+
+/**
+ * NVDA's browse mode reads a whole line, so one phrase can hold several items, and a role is often the tail
+ * of a longer word ("toggle button"). A fact is a whole-word run inside one comma segment, as for VoiceOver.
+ */
+export function nvdaSegments(phrase: string): string[] {
+	// "out of grouping, heading, level 2, Rating" leaves a container; it does not announce one.
+	const segments = commaSegments(phrase).filter((segment) => !segment.startsWith('out of '));
+	return wordRuns(segments, segments.join(', '));
+}
+
+/** NVDA speaks a full stop inside a word as "dot" ("README dot md"); this puts the name's own spelling back. */
+export function nvdaSymbols(phrase: string): string {
+	return phrase.replace(/(\S) dot (?=\S)/g, '$1.');
+}
+
+function wordRuns(segments: string[], phrase: string): string[] {
 	const runs = new Set<string>();
 	const addRuns = (words: string[]) => {
 		for (let start = 0; start < words.length; start++) {
@@ -205,7 +242,7 @@ export function voiceOverSegments(phrase: string): string[] {
 			}
 		}
 	};
-	for (const segment of commaSegments(phrase)) {
+	for (const segment of segments) {
 		runs.add(segment);
 		addRuns(segment.split(/\s+/));
 	}
