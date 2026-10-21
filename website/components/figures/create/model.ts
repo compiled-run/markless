@@ -13,18 +13,41 @@ export interface Option {
 }
 
 /** The commands that start create-markless with each manager; npm also takes it without @latest. */
-export const createCommands = (manager: ManagerId): readonly string[] => (manager === 'npm' ? [createCommand(manager), createCommand(manager).replace('@latest', '')] : [createCommand(manager)]);
+export const createCommands = (manager: ManagerId): readonly string[] =>
+	manager === 'npm'
+		? [createCommand(manager), createCommand(manager).replace('@latest', '')]
+		: [createCommand(manager)];
 export const INTRO = 'Welcome to Markless';
 export const TARGET = 'my-markless-app';
 
 export const STARTERS: readonly Option[] = [
-	{ value: 'minimal', label: 'Learn Markless', hint: 'A small TSRX counter app. Best first project.' },
-	{ value: 'app', label: 'Build an app', hint: 'A routed app with document.tsrx plus 404 and 500 pages.' },
-	{ value: 'docs', label: 'Write docs', hint: 'An MDX docs site with a layout and sidebar components.' },
-	{ value: 'full-stack', label: 'Full-stack app', hint: 'App routes plus api/ and middleware/ files.' },
+	{
+		value: 'minimal',
+		label: 'Learn Markless',
+		hint: 'A small TSRX counter app. Best first project.',
+	},
+	{
+		value: 'app',
+		label: 'Build an app',
+		hint: 'A routed app with document.tsrx plus 404 and 500 pages.',
+	},
+	{
+		value: 'docs',
+		label: 'Write docs',
+		hint: 'An MDX docs site with a layout and sidebar components.',
+	},
+	{
+		value: 'full-stack',
+		label: 'Full-stack app',
+		hint: 'App routes plus api/ and middleware/ files.',
+	},
 ];
 export const FORMATS: readonly Option[] = [
-	{ value: 'node', label: 'Node', hint: 'Creates a package.json project for pnpm, npm, or yarn.' },
+	{
+		value: 'node',
+		label: 'Node',
+		hint: 'Creates a package.json project for pnpm, npm, or yarn.',
+	},
 	{ value: 'bun', label: 'Bun', hint: 'Creates a package.json project tuned for Bun.' },
 ];
 export const EDITORS: readonly Option[] = [
@@ -66,20 +89,48 @@ export const PROMPTS = promptsFor('npm');
 const stepOf = (key: Prompt['key']) => PROMPTS.findIndex((p) => p.key === key);
 
 /** The files `create-markless` writes, by template folder, after `gitignore` becomes `.gitignore`. */
-export const COMMON_FILES = ['.gitignore', '.vscode/extensions.json', '.vscode/settings.json', '.zed/settings.json', 'README.md', 'public/.gitkeep', 'scripts/markless-doctor.mjs', 'tsconfig.json', 'vite.config.ts'];
+export const COMMON_FILES = [
+	'.gitignore',
+	'.vscode/extensions.json',
+	'.vscode/settings.json',
+	'.zed/settings.json',
+	'README.md',
+	'public/.gitkeep',
+	'scripts/markless-doctor.mjs',
+	'tsconfig.json',
+	'vite.config.ts',
+];
 const FORMAT_FILE: Record<Format, string> = { node: 'package.json', bun: 'package.json' };
 const MINIMAL = ['pages/index.tsrx', 'document.tsrx'];
 const APP = ['pages/404.tsrx', 'pages/500.tsrx'];
 const FULL_STACK = ['api/health.ts', 'middleware/request.ts'];
-const DOCS = ['pages/index.mdx', 'document.tsrx', 'pages/docs/index.mdx', 'pages/docs/[...slug].mdx', 'components/layouts/DocsLayout.tsrx', 'components/docs/Sidebar.tsrx'];
+const DOCS = [
+	'pages/index.mdx',
+	'document.tsrx',
+	'pages/docs/index.mdx',
+	'pages/docs/[...slug].mdx',
+	'components/layouts/DocsLayout.tsrx',
+	'components/docs/Sidebar.tsrx',
+];
 
 const EDITOR_DIRECTORY: Record<Editor, string> = { vscode: '.vscode/', zed: '.zed/', none: '' };
 const isEditorFile = (path: string) => path.startsWith('.vscode/') || path.startsWith('.zed/');
 
 /** Every file the starter writes, the first page first; only the chosen editor's settings. */
 export function filesFor(starter: Starter, format: Format, editor: Editor = 'vscode'): string[] {
-	const own = starter === 'docs' ? DOCS : [...MINIMAL, ...(starter === 'minimal' ? [] : APP), ...(starter === 'full-stack' ? FULL_STACK : [])];
-	const common = COMMON_FILES.filter((path) => !isEditorFile(path) || (EDITOR_DIRECTORY[editor] !== '' && path.startsWith(EDITOR_DIRECTORY[editor])));
+	const own =
+		starter === 'docs'
+			? DOCS
+			: [
+					...MINIMAL,
+					...(starter === 'minimal' ? [] : APP),
+					...(starter === 'full-stack' ? FULL_STACK : []),
+				];
+	const common = COMMON_FILES.filter(
+		(path) =>
+			!isEditorFile(path) ||
+			(EDITOR_DIRECTORY[editor] !== '' && path.startsWith(EDITOR_DIRECTORY[editor])),
+	);
 	return [...own, FORMAT_FILE[format], ...common];
 }
 export const MOST_FILES = 16;
@@ -87,14 +138,18 @@ export const MOST_FILES = 16;
 export const PER = 8;
 export const PAGE_SLOT = PER;
 /** The files lying in the folder: none until the run creates the app. */
-export const landed = (run: Run) => (run.outcome === 'created' ? filesFor(starterOf(run), formatOf(run), editorOf(run)) : []);
+export const landed = (run: Run) =>
+	run.outcome === 'created' ? filesFor(starterOf(run), formatOf(run), editorOf(run)) : [];
 
 /** Where each file lies: the shared files fill the left column from the top, the page and the starter's own files the right. */
 export function layout(files: readonly string[]): string[] {
 	const slots: string[] = Array.from({ length: MOST_FILES }, () => '');
 	if (files.length === 0) return slots;
 	const page = files.find(isFirstPage)!;
-	const others = [...files.filter((f) => COMMON_FILES.includes(f)), ...files.filter((f) => f !== page && !COMMON_FILES.includes(f))];
+	const others = [
+		...files.filter((f) => COMMON_FILES.includes(f)),
+		...files.filter((f) => f !== page && !COMMON_FILES.includes(f)),
+	];
 	const left = Math.ceil(others.length / 2);
 	others.slice(0, left).forEach((path, i) => (slots[i] = path));
 	[page, ...others.slice(left)].forEach((path, i) => (slots[PER + i] = path));
@@ -116,9 +171,19 @@ export function slipAt(run: Run, slot: number, peek = -1) {
 	const path = slots[slot]!;
 	const cut = path.lastIndexOf('/') + 1;
 	const on = path === '' ? 'no' : 'yes';
-	return { on, dir: path.slice(0, cut), name: path.slice(cut), order: `;--i:${dropOrder(slots)[slot]}`, path, note: NOTES[path] ?? '', tab: on === 'yes' ? 0 : -1, peek: on === 'yes' && peek === slot ? 'yes' : 'no' };
+	return {
+		on,
+		dir: path.slice(0, cut),
+		name: path.slice(cut),
+		order: `;--i:${dropOrder(slots)[slot]}`,
+		path,
+		note: NOTES[path] ?? '',
+		tab: on === 'yes' ? 0 : -1,
+		peek: on === 'yes' && peek === slot ? 'yes' : 'no',
+	};
 }
-export const isFirstPage = (path: string) => path === 'pages/index.tsrx' || path === 'pages/index.mdx';
+export const isFirstPage = (path: string) =>
+	path === 'pages/index.tsrx' || path === 'pages/index.mdx';
 
 /** What each file is for, in words for someone who has never seen it; written in the margin while its sheet is hovered, tapped or focused. */
 export const NOTES: Record<string, string> = {
@@ -131,14 +196,16 @@ export const NOTES: Record<string, string> = {
 	'middleware/request.ts': 'Code that runs on the server before every request.',
 	'pages/docs/index.mdx': 'The docs home page, at /docs.',
 	'pages/docs/[...slug].mdx': 'Every other page under /docs, wrapped in the docs layout.',
-	'components/layouts/DocsLayout.tsrx': 'The frame around each docs page: the sidebar beside the text.',
+	'components/layouts/DocsLayout.tsrx':
+		'The frame around each docs page: the sidebar beside the text.',
 	'components/docs/Sidebar.tsrx': 'The list of links down the side of the docs.',
 	'package.json': 'Lists the packages your app uses and its commands, like npm run dev.',
 	'vite.config.ts': 'Sets up Vite, which serves and builds your app. Markless plugs in here.',
 	'tsconfig.json': 'Tells your editor how to read .tsrx files, for autocomplete and errors.',
 	'README.md': 'How to start the app and set up your editor.',
 	'.gitignore': 'Tells git which files not to save, like node_modules and build output.',
-	'scripts/markless-doctor.mjs': 'Run npm run doctor to check your setup and see how to fix problems.',
+	'scripts/markless-doctor.mjs':
+		'Run npm run doctor to check your setup and see how to fix problems.',
 	'public/.gitkeep': 'Files you put in public/, like images, are served as they are.',
 	'.vscode/extensions.json': 'Suggests the extension VS Code needs to read .tsrx files.',
 	'.vscode/settings.json': 'Turns on HTML shortcuts (Emmet) for .tsrx files in VS Code.',
@@ -152,7 +219,8 @@ export function noteLines(text: string): string[] {
 	const lines: string[] = [];
 	for (const word of text.split(' ')) {
 		const last = lines.at(-1);
-		if (last !== undefined && last.length + 1 + word.length <= NOTE_WIDTH) lines[lines.length - 1] = `${last} ${word}`;
+		if (last !== undefined && last.length + 1 + word.length <= NOTE_WIDTH)
+			lines[lines.length - 1] = `${last} ${word}`;
 		else lines.push(word);
 	}
 	return lines;
@@ -175,7 +243,16 @@ export interface Run {
 	/** Mistyped lines, each with the manager saved when it was typed, whose command the Try line names. */
 	readonly tries: readonly Try[];
 }
-export const START: Run = { command: '', manager: 'npm', step: 0, cursor: 0, picks: [], outcome: 'idle', name: TARGET, tries: [] };
+export const START: Run = {
+	command: '',
+	manager: 'npm',
+	step: 0,
+	cursor: 0,
+	picks: [],
+	outcome: 'idle',
+	name: TARGET,
+	tries: [],
+};
 
 const optionsAt = (run: Run, step = run.step) => promptsFor(run.manager)[step]?.options ?? [];
 const pickOf = (run: Run, key: Prompt['key']) => run.picks[stepOf(key)] ?? 0;
@@ -183,7 +260,8 @@ export const starterOf = (run: Run): Starter => STARTERS[pickOf(run, 'starter')]
 export const formatOf = (run: Run): Format => FORMATS[pickOf(run, 'format')]!.value as Format;
 export const editorOf = (run: Run): Editor => EDITORS[pickOf(run, 'editor')]!.value as Editor;
 /** Whether the line being typed is a shell command, the name prompt, or nothing (a select is open). */
-export const typing = (run: Run) => (run.outcome !== 'asking' ? 'shell' : PROMPTS[run.step]!.key === 'name' ? 'name' : 'none');
+export const typing = (run: Run) =>
+	run.outcome !== 'asking' ? 'shell' : PROMPTS[run.step]!.key === 'name' ? 'name' : 'none';
 
 /** Arrow keys move the highlight round the open select, as clack does. */
 export function move(run: Run, by: number): Run {
@@ -197,19 +275,29 @@ export function submit(run: Run, text = '', saved: ManagerId = 'npm'): Run {
 	const line = text.trim();
 	if (run.outcome !== 'asking') {
 		const manager = line === '' ? saved : ranWith(line, createCommands);
-		if (manager) return { ...START, outcome: 'asking', manager, command: line === '' ? createCommand(saved) : line.replace(/\s+/g, ' ') };
+		if (manager)
+			return {
+				...START,
+				outcome: 'asking',
+				manager,
+				command: line === '' ? createCommand(saved) : line.replace(/\s+/g, ' '),
+			};
 		return { ...run, tries: [...run.tries, { line, saved }].slice(-2) };
 	}
 	const picks = [...run.picks, run.cursor];
 	const name = PROMPTS[run.step]!.key === 'name' ? line || TARGET : run.name;
-	if (run.step === PROMPTS.length - 1) return { ...run, picks, name, outcome: run.cursor === 0 ? 'created' : 'cancelled' };
+	if (run.step === PROMPTS.length - 1)
+		return { ...run, picks, name, outcome: run.cursor === 0 ? 'created' : 'cancelled' };
 	return { ...run, step: run.step + 1, cursor: 0, picks, name };
 }
 /** Enter on an empty line. */
 export const enter = (run: Run, saved: ManagerId = 'npm') => submit(run, '', saved);
 
 /** A click on an option picks and submits it, as clack allows; a click anywhere else changes nothing. */
-export const choose = (run: Run, option: number): Run => (run.outcome === 'asking' && option >= 0 && option < optionsAt(run).length ? submit({ ...run, cursor: option }) : run);
+export const choose = (run: Run, option: number): Run =>
+	run.outcome === 'asking' && option >= 0 && option < optionsAt(run).length
+		? submit({ ...run, cursor: option })
+		: run;
 
 /** The CLI's next-steps dev command: the launching manager's script. */
 export const devCommand = (manager: ManagerId) => `${manager} run dev`;
@@ -238,14 +326,28 @@ export interface Row {
 	readonly ghost: string;
 }
 
-const row = (mark: string, text = '', kind = 'bar', value = '', option = -1, hint = ''): Row => ({ mark, text, value, hint, kind, option, caret: '', after: '', ghost: '', invalid: 'no', ...NO_WAIT });
+const row = (mark: string, text = '', kind = 'bar', value = '', option = -1, hint = ''): Row => ({
+	mark,
+	text,
+	value,
+	hint,
+	kind,
+	option,
+	caret: '',
+	after: '',
+	ghost: '',
+	invalid: 'no',
+	...NO_WAIT,
+});
 
 /** A hint longer than this wraps onto two balanced lines, as a narrow terminal would. */
 export const WRAP = 58;
 export function wrap(text: string, width = WRAP): string[] {
 	if (text.length <= width) return [text];
 	const spaces = [...text.matchAll(/ /g)].map((m) => m.index);
-	const cut = spaces.reduce((best, at) => (Math.abs(at - text.length / 2) < Math.abs(best - text.length / 2) ? at : best));
+	const cut = spaces.reduce((best, at) =>
+		Math.abs(at - text.length / 2) < Math.abs(best - text.length / 2) ? at : best,
+	);
 	return [text.slice(0, cut), text.slice(cut + 1)];
 }
 
@@ -264,7 +366,12 @@ function summary(run: Run): Row[] {
 		row('│', 'Runtime:', 'value', FORMATS[pickOf(run, 'format')]!.label),
 		row('│', 'Install:', 'value', yes('install') ? `Yes, with ${run.manager}` : 'No'),
 		row('│', 'Git:', 'value', yes('git') ? 'Yes' : 'No'),
-		row('│', 'Editor:', 'value', editor.value === 'none' ? 'Other, no editor settings' : editor.label),
+		row(
+			'│',
+			'Editor:',
+			'value',
+			editor.value === 'none' ? 'Other, no editor settings' : editor.label,
+		),
 		row('│'),
 	];
 }
@@ -272,7 +379,11 @@ function summary(run: Run): Row[] {
 const echo = (line: string): Row => ({ ...row('$', line, 'cmd'), invalid: 'yes' });
 /** The friendly answers to mistyped commands, then a fresh shell prompt. */
 const shell = (run: Run): Row[] => [
-	...run.tries.flatMap((t) => (t.line.endsWith('^C') ? [row('$', t.line, 'cmd')] : [echo(t.line), row('', `Try ${createCommand(t.saved)}`, 'note')])),
+	...run.tries.flatMap((t) =>
+		t.line.endsWith('^C')
+			? [row('$', t.line, 'cmd')]
+			: [echo(t.line), row('', `Try ${createCommand(t.saved)}`, 'note')],
+	),
 	row('$', '', 'input'),
 ];
 /** The bottom row, kept clear for the footer naming the other managers while the shell line is empty and nothing has run. */
@@ -287,14 +398,29 @@ export function interrupt(run: Run, typed: string): Run {
 
 /** The whole transcript so far, top to bottom, as the shell and clack print it. */
 export function transcript(run: Run): Row[] {
-	if (run.outcome === 'idle') return run.tries.length ? shell(run) : [...shell(run), row('', '', 'start', '', -1, '↵ Press Enter to run it')];
+	if (run.outcome === 'idle')
+		return run.tries.length
+			? shell(run)
+			: [...shell(run), row('', '', 'start', '', -1, '↵ Press Enter to run it')];
 	const rows: Row[] = [row('$', run.command, 'cmd'), row('┌', INTRO, 'done'), row('│')];
 	for (let step = 0; step < run.picks.length; step++) {
 		if (PROMPTS[step]!.key === 'ready') rows.push(...summary(run));
-		rows.push(row('◇', PROMPTS[step]!.message, 'done'), row('│', answer(run, step), 'value'), row('│'));
+		rows.push(
+			row('◇', PROMPTS[step]!.message, 'done'),
+			row('│', answer(run, step), 'value'),
+			row('│'),
+		);
 	}
 	if (run.outcome === 'created') {
-		rows.push(row('◇', `Created ${run.name}`, 'note'), row('│', 'Next steps:', 'value'), row('│', `  cd ${run.name}`, 'value'), row('│', `  ${devCommand(run.manager)}`, 'value'), row('│', 'Then open:', 'value'), row('│', '  http://localhost:3000', 'value'), row('└', 'Markless app ready.', 'done'));
+		rows.push(
+			row('◇', `Created ${run.name}`, 'note'),
+			row('│', 'Next steps:', 'value'),
+			row('│', `  cd ${run.name}`, 'value'),
+			row('│', `  ${devCommand(run.manager)}`, 'value'),
+			row('│', 'Then open:', 'value'),
+			row('│', '  http://localhost:3000', 'value'),
+			row('└', 'Markless app ready.', 'done'),
+		);
 		return [...rows, ...shell(run)];
 	}
 	if (run.outcome === 'cancelled') {
@@ -310,7 +436,9 @@ export function transcript(run: Run): Row[] {
 		prompt.options.forEach((option, i) => {
 			if (i !== run.cursor) return rows.push(row('│', `○ ${option.label}`, 'opt', '', i));
 			rows.push(row('│', `● ${option.label}`, 'pick', '', i));
-			if (option.hint) for (const line of wrap(`(${option.hint})`)) rows.push(row('│', '', 'hint', '', i, line));
+			if (option.hint)
+				for (const line of wrap(`(${option.hint})`))
+					rows.push(row('│', '', 'hint', '', i, line));
 		});
 	rows.push(row('└'));
 	return rows;
@@ -323,7 +451,6 @@ export const MAX_TYPED = 40;
 /** The longest app name; the terminal and the folder's tab are drawn for it. */
 export const MAX_NAME = 24;
 
-
 /** The suggestion shown faintly after the caret: at the shell the rest of whichever manager's create command the text starts (the saved manager's on an empty line), the default name at the name prompt. */
 export function ghostFor(run: Run, typed: string, saved: ManagerId = 'npm'): string {
 	const kind = typing(run);
@@ -333,19 +460,37 @@ export function ghostFor(run: Run, typed: string, saved: ManagerId = 'npm'): str
 }
 
 /** Whether Tab would take a suggestion: the caret is at the end of a line that has one; an empty shell line always suggests the saved manager's command. */
-export const completesAt = (run: Run, typed: string, at: number) => typing(run) !== 'none' && at === typed.length && ghostFor(run, typed) !== '';
+export const completesAt = (run: Run, typed: string, at: number) =>
+	typing(run) !== 'none' && at === typed.length && ghostFor(run, typed) !== '';
 
 /** Whether the shell line can no longer become any manager's create command. */
-export const invalidAt = (run: Run, typed: string) => typing(run) === 'shell' && isInvalid(typed, createCommands);
+export const invalidAt = (run: Run, typed: string) =>
+	typing(run) === 'shell' && isInvalid(typed, createCommands);
 
 /** What the terminal sheet shows: the last lines, like a terminal that scrolls, with the typed line, caret and suggestion filled in, and the footer on the bottom row while the shell line is empty; an empty line keeps a zero-width character so its text still starts at its column. */
 export function screen(run: Run, typed = '', at = typed.length): Row[] {
 	const foot = showsFooter(run, typed) ? [FOOTER] : [];
 	const waiting = typing(run) === 'shell' && typed === '';
 	const all = transcript(run)
-		.map((r) => (r.kind === 'input' ? { ...r, text: typed.slice(0, at) || '\u200b', caret: '|', after: typed.slice(at), ghost: at === typed.length && !waiting ? ghostFor(run, typed) : '', invalid: invalidAt(run, typed) ? 'yes' : 'no', ...(waiting ? waitsOf(createCommands) : NO_WAIT) } : r))
+		.map((r) =>
+			r.kind === 'input'
+				? {
+						...r,
+						text: typed.slice(0, at) || '\u200b',
+						caret: '|',
+						after: typed.slice(at),
+						ghost: at === typed.length && !waiting ? ghostFor(run, typed) : '',
+						invalid: invalidAt(run, typed) ? 'yes' : 'no',
+						...(waiting ? waitsOf(createCommands) : NO_WAIT),
+					}
+				: r,
+		)
 		.slice(-(ROWS - foot.length));
-	return [...all, ...Array.from({ length: ROWS - foot.length - all.length }, () => BLANK), ...foot];
+	return [
+		...all,
+		...Array.from({ length: ROWS - foot.length - all.length }, () => BLANK),
+		...foot,
+	];
 }
 
 /** The row the pink cursor wash sits on, or -1 when nothing is waiting for a pick. */
@@ -357,27 +502,37 @@ export const focusRow = (rows: readonly Row[]) => {
 };
 /** The cursor wash and focus underline are drawn for the longest label; shorter rows take a narrower share of it. */
 export const LONGEST = 17;
-export const widthOf = (row: Row) => String(Math.round(Math.min(1.15, Math.max(0.35, (row.text.length + 1) / LONGEST)) * 100) / 100);
+export const widthOf = (row: Row) =>
+	String(Math.round(Math.min(1.15, Math.max(0.35, (row.text.length + 1) / LONGEST)) * 100) / 100);
 
 /** Each finished create flips the beat, so the drop animation restarts. */
 export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
 
 /** The folder's tab: the app's name, shortened to fit. */
-export const tabOf = (run: Run) => (run.name.length > 15 ? run.name.slice(0, 14) + '…' : run.name) + '/';
+export const tabOf = (run: Run) =>
+	(run.name.length > 15 ? run.name.slice(0, 14) + '…' : run.name) + '/';
 
 /** The margin note for the hovered, tapped or focused sheet: which slot, its file name and its note in lines. */
 export function frontAt(run: Run, slot: number) {
 	const path = layout(landed(run))[slot] ?? '';
 	const cut = path.lastIndexOf('/') + 1;
 	const lines = noteLines(NOTES[path] ?? '');
-	return { on: path === '' ? 'no' : 'yes', slot: path === '' ? 0 : slot, side: slot >= 0 && slot < PER ? 'left' : 'right', name: path.slice(cut), lines: Array.from({ length: NOTE_LINES }, (_, k) => lines[k] ?? '') };
+	return {
+		on: path === '' ? 'no' : 'yes',
+		slot: path === '' ? 0 : slot,
+		side: slot >= 0 && slot < PER ? 'left' : 'right',
+		name: path.slice(cut),
+		lines: Array.from({ length: NOTE_LINES }, (_, k) => lines[k] ?? ''),
+	};
 }
 
 /** The terminal input's label: what the open line expects. */
 export function labelOf(run: Run): string {
 	const kind = typing(run);
-	if (kind === 'shell') return "Terminal. Type the create command of npm, pnpm, yarn or Bun and press Enter; Enter on an empty line runs the suggested one.";
-	if (kind === 'name') return `What should we call it? Type a name, or press Enter to keep ${TARGET}.`;
+	if (kind === 'shell')
+		return 'Terminal. Type the create command of npm, pnpm, yarn or Bun and press Enter; Enter on an empty line runs the suggested one.';
+	if (kind === 'name')
+		return `What should we call it? Type a name, or press Enter to keep ${TARGET}.`;
 	return `${PROMPTS[run.step]!.message} Arrow keys move, Enter picks, Escape starts over.`;
 }
 
@@ -389,12 +544,17 @@ export function describe(run: Run, moved = false): string {
 	if (run.outcome === 'created') {
 		const files = landed(run);
 		const page = files.find(isFirstPage)!;
-		return run.tries.length > 0 ? retry : `Created ${run.name}: ${files.length} files dropped into the folder, and ${page} is your first page.`;
+		return run.tries.length > 0
+			? retry
+			: `Created ${run.name}: ${files.length} files dropped into the folder, and ${page} is your first page.`;
 	}
-	if (run.outcome === 'cancelled') return run.tries.length > 0 ? retry : 'Create cancelled. Nothing was written.';
+	if (run.outcome === 'cancelled')
+		return run.tries.length > 0 ? retry : 'Create cancelled. Nothing was written.';
 	const prompt = promptsFor(run.manager)[run.step]!;
 	const option = prompt.options[run.cursor];
-	const said = option ? `${option.label}${option.hint ? `: ${option.hint}` : ''}` : `Type a name, or press Enter to keep ${TARGET}.`;
+	const said = option
+		? `${option.label}${option.hint ? `: ${option.hint}` : ''}`
+		: `Type a name, or press Enter to keep ${TARGET}.`;
 	if (moved) return said;
 	if (run.picks.length === 0) return `${INTRO}. ${prompt.message} ${said}`;
 	return `${answer(run, run.step - 1)}. Next: ${prompt.message} ${said}`;

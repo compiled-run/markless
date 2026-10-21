@@ -43,7 +43,10 @@ describe('workerSourceHost', () => {
 		expect(allCode(firstOutcome)).not.toContain("'Teal'");
 		expect(allCode(secondOutcome)).toContain("'Teal'");
 		expect(allCode(secondOutcome)).not.toContain("'Plum'");
-		expect(secondOutcome.ok && secondOutcome.modules.some((module) => module.id.startsWith(first.codeDir))).toBe(false);
+		expect(
+			secondOutcome.ok &&
+				secondOutcome.modules.some((module) => module.id.startsWith(first.codeDir)),
+		).toBe(false);
 		expect(readFileSync(`${second.codeDir}label.tsrx`)).toContain('Teal');
 		expect(firstAgain.ok).toBe(false);
 		expect(() => readFileSync(`${first.codeDir}label.tsrx`)).toThrow(/ENOENT/);
