@@ -144,9 +144,10 @@ const MARKLESS_RUNTIME_GROUPS = [
 	},
 ] satisfies NonNullable<CodeSplittingOptions['groups']>;
 
-// Grouped as automatic chunking would (by the entries that import them), then split at the cap.
+// Modules several entries share, grouped as automatic chunking would (by those entries), then split at the cap.
 const MARKLESS_SERVER_COMPILED_GROUP = {
 	name: 'markless-server',
+	minShareCount: 2,
 	test: /\.tsrx(?:[?#]|$)|^\0?virtual:markless:/,
 	entriesAware: true,
 	maxSize: MARKLESS_SERVER_CHUNK_MAX_BYTES,

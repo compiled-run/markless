@@ -9,7 +9,7 @@ import { marklessServer } from '../src/rolldown.ts';
 const root = '/workspace/server-chunk-size';
 const layerCount = 24;
 const layerFile = (index: number) => `${root}/layers/layer-${index}.tsrx`;
-const pageFile = `${root}/page.tsrx`;
+const pageFiles = [`${root}/home.tsrx`, `${root}/about.tsrx`];
 // Enough markup that the layers together are well past the cap, as a site's portaled layers were.
 const paragraphs = Math.ceil((MARKLESS_SERVER_CHUNK_MAX_BYTES * 2) / layerCount / 120);
 
@@ -38,20 +38,20 @@ export default function Page() @{
 const fixture: Plugin = {
 	name: 'server-chunk-size-fixture',
 	resolveId(id, importer) {
-		if (id === pageFile) return id;
+		if (pageFiles.includes(id)) return id;
 		const match = /^\.\/layers\/layer-(\d+)\.tsrx$/.exec(id);
-		if (match && importer === pageFile) return layerFile(Number(match[1]));
+		if (match && importer && pageFiles.includes(importer)) return layerFile(Number(match[1]));
 		return null;
 	},
 	load(id) {
-		if (id === pageFile) return pageSource;
+		if (pageFiles.includes(id)) return pageSource;
 		const match = /\/layers\/layer-(\d+)\.tsrx$/.exec(id);
 		return match ? layerSource(Number(match[1])) : null;
 	},
 };
 
-// ui.shadcn.com's document imported every layer, and the one 78 MB server chunk crashed V8's optimizing compiler.
-test('a server build splits compiled modules into chunks no larger than the server chunk cap', async () => {
+// Every ui.shadcn.com page shared a document importing every layer: the one 78 MB chunk crashed V8's optimizing compiler.
+test('a server build splits the compiled modules its pages share into chunks no larger than the server chunk cap', async () => {
 	const outDir = await mkdtemp(resolve(import.meta.dirname, '.server-chunk-size-'));
 	try {
 		const result = await viteBuild({
@@ -59,7 +59,14 @@ test('a server build splits compiled modules into chunks no larger than the serv
 			root: resolve(import.meta.dirname, '..'),
 			logLevel: 'silent',
 			plugins: [fixture, marklessServer({ executionLog: 'never' })],
-			build: { ssr: pageFile, outDir, emptyOutDir: false, minify: false, target: 'es2022' },
+			build: {
+				ssr: true,
+				rollupOptions: { input: pageFiles },
+				outDir,
+				emptyOutDir: false,
+				minify: false,
+				target: 'es2022',
+			},
 		});
 		const output = (Array.isArray(result) ? result : [result]).flatMap(
 			(item) => (item as Rollup.RollupOutput).output,
@@ -71,12 +78,13 @@ test('a server build splits compiled modules into chunks no larger than the serv
 			expect(chunk.code.length, chunk.fileName).toBeLessThanOrEqual(
 				MARKLESS_SERVER_CHUNK_MAX_BYTES,
 			);
-		const entry = chunks.find((chunk) => chunk.isEntry)!;
-		const page = (await import(pathToFileURL(resolve(outDir, entry.fileName)).href)) as {
-			default: { renderSsr(): Promise<{ readonly html: string }> };
-		};
-		const { html } = await page.default.renderSsr();
-		for (let i = 0; i < layerCount; i++) expect(html).toContain(`Close ${i}</button>`);
+		for (const entry of chunks.filter((chunk) => chunk.isEntry)) {
+			const page = (await import(pathToFileURL(resolve(outDir, entry.fileName)).href)) as {
+				default: { renderSsr(): Promise<{ readonly html: string }> };
+			};
+			const { html } = await page.default.renderSsr();
+			for (let i = 0; i < layerCount; i++) expect(html).toContain(`Close ${i}</button>`);
+		}
 	} finally {
 		await rm(outDir, { recursive: true, force: true });
 	}
