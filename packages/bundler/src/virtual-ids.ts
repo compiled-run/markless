@@ -221,6 +221,16 @@ export function isRelativeImport(source: string): boolean {
 	return source.startsWith('./') || source.startsWith('../');
 }
 
+// Compiling these registers state other modules' loads wait on, so their output is not a function of their text alone.
+export function isCompilerStatefulModuleId(id: string): boolean {
+	const bare = id.startsWith('\0') ? id.slice(1) : id;
+	return (
+		TSRX_SOURCE_FILE.test(bare) ||
+		bare.startsWith(MARKLESS_VIRTUAL_PREFIX) ||
+		/[?&]markless-[a-z-]+(?:[=&#]|$)/.test(bare)
+	);
+}
+
 export function isMarklessRuntimeModule(id: string): boolean {
 	const path = pathname(id);
 	return /[/\\](?:web|runtime|serializer)[/\\]src[/\\].+\.ts$/.test(path);

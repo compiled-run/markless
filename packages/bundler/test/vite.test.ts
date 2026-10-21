@@ -47,6 +47,24 @@ const styledSource = source.replace(
 );
 
 describe('Vite adapter structure', () => {
+	// A cached .tsrx skips the transform that registers its virtual modules and symbol claims,
+	// so the next run's renderSSR waits forever on loads those registrations answer.
+	test("keeps compiled modules out of Vitest's cross-run module cache", () => {
+		const plugin = getAsyncPlugin() as { configureVitest?: (context: unknown) => void };
+		const generators: Array<(context: { id: string }) => unknown> = [];
+		plugin.configureVitest?.({ defineCacheKeyGenerator: (callback: never) => generators.push(callback) });
+		expect(generators).toHaveLength(1);
+		const cacheable = (id: string) => generators[0]!({ id }) !== false;
+
+		expect(cacheable('/app/pages/index.tsrx')).toBe(false);
+		expect(cacheable('/app/pages/index.tsrx?markless-symbols')).toBe(false);
+		expect(cacheable('\0virtual:markless:render-data:pages%2Findex.tsrx')).toBe(false);
+		expect(cacheable('virtual:markless:payload:pages%2Findex.tsrx')).toBe(false);
+		expect(cacheable('/app/src/plain.ts?markless-resume')).toBe(false);
+		expect(cacheable('/app/src/plain.ts')).toBe(true);
+		expect(cacheable('/app/node_modules/@markless/web/src/fns/ssr-data.ts')).toBe(true);
+	});
+
 	test('prints the debugging playbook hint when the dev server starts', () => {
 		const plugin = getAsyncPlugin();
 		const info = vi.fn();
