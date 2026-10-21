@@ -641,29 +641,32 @@ const elementsIn = (node: Node) =>
 	node.nodeType === 1 ? (node as Element).getElementsByTagName('*').length + 1 : 0;
 
 // Places a frame's worth synchronously, so the first paint shows the top of the page; true when everything is in.
+// An element that fits in a frame goes in whole, so a script watching the page never finds it half-built.
 function fillPage(
 	w: Window,
 	held: HeldPage,
 	budget: number,
 	current: () => boolean,
 ): true | Promise<boolean> {
+	const nextFrame = () =>
+		new Promise<void>((resolve) =>
+			w.requestAnimationFrame(() => w.setTimeout(resolve, 0)),
+		).then(() => current() && fillPage(w, held, budget, current));
 	let used = 0;
 	while (held.length) {
 		const [parent, before, nodes] = held[0]!;
+		const size = elementsIn(nodes[0]!);
+		if (used > 0 && used + size > budget && size <= budget) return nextFrame();
 		const node = nodes.shift()!;
 		if (!nodes.length) held.shift();
-		const size = elementsIn(node);
-		if (used + size > budget && node.firstChild) {
+		if (size > budget && node.firstChild) {
 			const children = [...node.childNodes];
 			(node as Element).replaceChildren();
 			held.unshift([node, null, children]);
 			used += 1;
 		} else used += size;
 		parent.insertBefore(node, before);
-		if (used >= budget && held.length)
-			return new Promise<void>((resolve) =>
-				w.requestAnimationFrame(() => w.setTimeout(resolve, 0)),
-			).then(() => current() && fillPage(w, held, budget, current));
+		if (used >= budget && held.length) return nextFrame();
 	}
 	return true;
 }

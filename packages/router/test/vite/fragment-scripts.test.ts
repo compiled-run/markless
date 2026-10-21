@@ -142,6 +142,35 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		// A chart script reads the markup at the end of the page: whether it runs now or watches from an earlier visit,
+		// it never finds a figure only part of whose marks are in.
+		test('a long page swapped in over frames shows its scripts each figure whole', async () => {
+			const { page, errors } = await open(browser, '/');
+			await page.locator('[data-go="tail"]').click();
+			await landedOn(page, 'tail');
+			await expect
+				.poll(() => read(page, '__tailAtReady'))
+				.toEqual({ figures: 4, unfinished: 0 });
+			expect(await read(page, '__tailAtRun')).toEqual({ figures: 4, unfinished: 0 });
+			await page.locator('[data-go="plain"]').click();
+			await landedOn(page, 'plain');
+			await page.evaluate(
+				() => ((window as unknown as Record<string, unknown[]>).__tailSeen.length = 0),
+			);
+			await page.locator('[data-go="tail"]').click();
+			await landedOn(page, 'tail');
+			await expect.poll(() => page.locator('[data-tail]').count()).toBe(4);
+			await page.evaluate(
+				() => new Promise((done) => requestAnimationFrame(() => setTimeout(done))),
+			);
+			const seen = (await read(page, '__tailSeen')) as number[];
+			expect(seen.length).toBeGreaterThan(0);
+			expect(seen.filter((unfinished) => unfinished > 0)).toEqual([]);
+			expect(await read(page, '__tailRuns')).toBe(1);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('coming back to the page reruns its inline scripts, never a file this document already ran', async () => {
 			const { page, errors, documents } = await open(browser, '/');
 			await page.locator('[data-go="library"]').click();
