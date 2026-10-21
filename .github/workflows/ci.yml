@@ -300,7 +300,7 @@ jobs:
                   path: demo-boxes-completed.txt
                   key:
                       demo-boxes-${{ hashFiles('ci-base-key.txt', 'demos/live-feed/**/*',
-                      'demos/live-feed-ssr/**/*', 'demos/same-module-branch/**/*',
+                      'demos/same-module-branch/**/*',
                       'demos/executed-at-load/**/*',
                       '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
 
@@ -926,7 +926,7 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_website_boxes }}
                   path: website-boxes-completed.txt
 
-    # Witness boxes of three demos no other lane builds, and the compiler-only
+    # Witness boxes of two demos no other lane builds, and the compiler-only
     # half of demos/executed-at-load. The box receipts are not part of the
     # analyzer receipt set, so this lane is not a `boxes-*` lane.
     demo-boxes:
@@ -977,9 +977,6 @@ jobs:
 
             - name: Run live-feed demo boxes
               run: pnpm --dir demos/live-feed test:boxes
-
-            - name: Run live-feed-ssr demo boxes
-              run: pnpm --dir demos/live-feed-ssr test:boxes
 
             - name: Run same-module-branch demo boxes
               run: pnpm --dir demos/same-module-branch test:boxes
