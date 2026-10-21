@@ -160,6 +160,8 @@ jobs:
             run_receipts: ${{ steps.receipts.outputs.cache-hit != 'true' }}
             key_website_boxes: ${{ steps.website_boxes.outputs.cache-primary-key }}
             run_website_boxes: ${{ steps.website_boxes.outputs.cache-hit != 'true' }}
+            key_perf_guards: ${{ steps.perf_guards.outputs.cache-primary-key }}
+            run_perf_guards: ${{ steps.perf_guards.outputs.cache-hit != 'true' }}
             key_demo_boxes: ${{ steps.demo_boxes.outputs.cache-primary-key }}
             run_demo_boxes: ${{ steps.demo_boxes.outputs.cache-hit != 'true' }}
             key_build_scale: ${{ steps.build_scale.outputs.cache-primary-key }}
@@ -170,6 +172,7 @@ jobs:
                 steps.boxes_music_player.outputs.cache-hit != 'true' ||
                 steps.boxes_music_player_ssr.outputs.cache-hit != 'true' ||
                 steps.website_boxes.outputs.cache-hit != 'true' ||
+                steps.perf_guards.outputs.cache-hit != 'true' ||
                 steps.demo_boxes.outputs.cache-hit != 'true' }}
 
         steps:
@@ -294,6 +297,22 @@ jobs:
                       'packages/headless/components/api/**/*', '!**/node_modules/**', '!**/dist/**',
                       '!**/.witness/**', '!**/.output/**') }}
 
+            # The perf guards build the interaction benchmark app and the docs
+            # site, the bundler and router fixtures behind G12 to G14, and read
+            # Playwright through demos/news; the guard code and anchors are in
+            # scripts/, which the base key already hashes.
+            - name: Probe the perf-guards lane
+              id: perf_guards
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  path: perf-guards-completed.txt
+                  key:
+                      perf-guards-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'demos/**/*',
+                      'packages/headless/**/*', 'packages/*/fixtures/**/*',
+                      'packages/*/test/fixtures/**/*', 'packages/bundler/test/perf-guards/**/*',
+                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+
             - name: Probe the demo box lane
               id: demo_boxes
               uses: actions/cache/restore@v4
@@ -349,6 +368,7 @@ jobs:
                   echo "boxes-music-player-ssr=${{ steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}"
                   echo "receipts=${{ steps.receipts.outputs.cache-hit != 'true' }}"
                   echo "website-boxes=${{ steps.website_boxes.outputs.cache-hit != 'true' }}"
+                  echo "perf-guards=${{ steps.perf_guards.outputs.cache-hit != 'true' }}"
                   echo "demo-boxes=${{ steps.demo_boxes.outputs.cache-hit != 'true' }}"
                   echo "build-scale=${{ steps.build_scale.outputs.cache-hit != 'true' }}"
 
@@ -939,6 +959,69 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_website_boxes }}
                   path: website-boxes-completed.txt
 
+    # The deterministic performance guards (scripts/benchmarks/perf-guards):
+    # bytes, fetch rounds, requests and executed code on production builds of
+    # the benchmark app and the docs site, never wall-clock time, so a busy
+    # runner gives the same answer. The full set runs on every PR in parallel
+    # with the box lanes; docs/ci-process.md has the measured cost.
+    perf-guards:
+        needs: [typecheck, lanes, prepare-playwright]
+        if: needs.lanes.outputs.run_perf_guards == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        env:
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Restore the Playwright browser cache
+              id: playwright-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+
+            - name: Install Playwright system dependencies
+              run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
+
+            - name: Install Playwright browsers for the perf guards
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install chromium
+
+            - name: Run the performance guards
+              run: pnpm perf:guard
+
+            - name: Mark the perf-guards lane complete
+              run: echo ok > perf-guards-completed.txt
+
+            - name: Save the perf-guards lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_perf_guards }}
+                  path: perf-guards-completed.txt
+
     # Witness boxes of two demos no other lane builds, and the compiler-only
     # half of demos/executed-at-load. The box receipts are not part of the
     # analyzer receipt set, so this lane is not a `boxes-*` lane.
@@ -1215,6 +1298,7 @@ jobs:
                 boxes-music-player-ssr,
                 receipts,
                 website-boxes,
+                perf-guards,
                 demo-boxes,
                 build-scale,
             ]

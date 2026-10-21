@@ -3,7 +3,7 @@
 Deterministic checks that keep Markless's measured first-use and loading wins from quietly regressing. They build the interaction benchmark app (`demos/interaction-benchmark/apps/markless`) and the docs site (`website`), serve each production build locally, and inspect it with Chromium. They count bytes, fetch rounds, requests, and executed code. They never time anything, so they give the same answer on a busy CI machine.
 
 ```sh
-pnpm perf:guard          # the vitest lane that runs at the end of `pnpm test` (about 2-3 minutes)
+pnpm perf:guard          # the vitest lane CI's `perf-guards` job runs, also at the end of `pnpm test`
 pnpm perf:guard:check    # the same checks as a plain report; add --no-build to reuse existing builds
 pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"   # re-anchor after an intended cost
 pnpm bench:interaction:guard   # optional timing check against a saved baseline build (not in pnpm test)
