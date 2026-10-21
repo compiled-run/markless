@@ -118,8 +118,8 @@ test('SSR: focus on a descendant primes the record that answers the key', async 
 		resetExecutedModules();
 
 		Option0Label.element().setAttribute('tabindex', '-1');
-		await focusThenWait(Option0Label.element());
-		expect(executedModules().length).toBeGreaterThan(0);
+		(Option0Label.element() as HTMLElement).focus();
+		await expect.poll(() => executedModules().length).toBeGreaterThan(0);
 
 		(Option0.element() as HTMLElement).focus();
 		await userEvent.keyboard('{ArrowDown}');
