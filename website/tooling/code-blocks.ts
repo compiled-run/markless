@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import type { Plugin } from 'vite';
 import { editorText } from '../components/docs/code/editor.ts';
-import { ColourTable, DocRegistry, highlightHtml, paneLines } from './ui-code-runs.ts';
+import { ColourTable, DocRegistry, colourHtml, paneLines } from './ui-code-runs.ts';
 
 export const CODE_GENERATED_DIR = 'components/docs/code/generated';
 const CODE_COMPONENT = 'components/docs/code.tsrx';
@@ -130,7 +130,7 @@ export function findCodeBlocks(source: string, file: string): CodeBlock[] {
 export async function codePane(file: CodeBlockFile, index = 0): Promise<CodePane> {
 	const language = LANGUAGES[file.name.slice(file.name.lastIndexOf('.') + 1)] ?? 'ts';
 	const code = editorText(file.code);
-	const html = await highlightHtml(code, language);
+	const html = await colourHtml(code, language);
 	// The colour table hands back the style itself, so each run keeps shiki's light/dark pair.
 	const styles = { classFor: (style: string) => style || undefined } as unknown as ColourTable;
 	const lines = paneLines(html, new DocRegistry('code'), styles);
@@ -143,12 +143,11 @@ export async function codePane(file: CodeBlockFile, index = 0): Promise<CodePane
 		code,
 		lines: lines.map((line) => ({
 			id: line.id,
-			runs: line.runs.map((run) => {
-				const style = run.class?.replace(/^tsrx-hover ?/, '');
-				return style
-					? { id: run.id, text: run.text, style }
-					: { id: run.id, text: run.text };
-			}),
+			runs: line.runs.map((run) =>
+				run.class
+					? { id: run.id, text: run.text, style: run.class }
+					: { id: run.id, text: run.text },
+			),
 		})),
 	};
 }

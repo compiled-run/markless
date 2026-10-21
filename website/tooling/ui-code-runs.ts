@@ -3,7 +3,7 @@
 // distinct hover doc written once in a registry the runs point at by key. The
 // playground card and the standalone panels read from here, so a token is
 // drawn the same way wherever it appears.
-import { highlightFences } from './highlight-code.ts';
+import { colourFences, highlightFences } from './highlight-code.ts';
 
 const ENTITIES: Readonly<Record<string, string>> = {
 	amp: '&',
@@ -210,8 +210,16 @@ export function paneLines(html: string, registry: DocRegistry, colours: ColourTa
 
 /** Runs one file through the site's fence highlighter, so panels and fences are coloured by one pipeline. */
 export async function highlightHtml(code: string, language: string): Promise<string> {
-	const fence = `<pre><code class="language-${language}">${escapeHtml(code)}</code></pre>`;
-	return highlightFences(fence);
+	return highlightFences(plainFence(code, language));
+}
+
+/** The same colours with no hover docs, for a panel that draws none: it never starts the type checker. */
+export async function colourHtml(code: string, language: string): Promise<string> {
+	return colourFences(plainFence(code, language));
+}
+
+function plainFence(code: string, language: string): string {
+	return `<pre><code class="language-${language}">${escapeHtml(code)}</code></pre>`;
 }
 
 /** The repeat over a list of runs, as the generated module writes it. */

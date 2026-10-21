@@ -64,14 +64,10 @@ export function recordRead(
 	inputs.files.set(path, hash);
 }
 
-export function fenceKey(code: string, fenceLanguage: string): string {
-	return createHash('sha256')
-		.update(FORMAT)
-		.update('\0')
-		.update(fenceLanguage)
-		.update('\0')
-		.update(code)
-		.digest('hex');
+export function fenceKey(code: string, fenceLanguage: string, hovers = true): string {
+	const hash = createHash('sha256').update(FORMAT);
+	if (!hovers) hash.update('\0colours');
+	return hash.update('\0').update(fenceLanguage).update('\0').update(code).digest('hex');
 }
 
 function stat(path: string) {

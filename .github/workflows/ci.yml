@@ -943,9 +943,10 @@ jobs:
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
-            # The website tooling tests ride this lane: its key hashes website/ and the UI API manifest they read.
-            - name: Run website tooling tests
-              run: pnpm --dir website exec vp test run --config vitest.tooling.config.ts
+            # The website's tests ride this lane: its key hashes website/ and the UI API manifest they read.
+            # They run under the site's own config, whose plugins compile the .tsrx components they render.
+            - name: Run website tests
+              run: pnpm --dir website exec vp test run
 
             - name: Run website boxes
               run: pnpm --dir website test:boxes
