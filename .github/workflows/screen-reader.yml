@@ -6,23 +6,23 @@ name: Screen reader
 #
 # Three lanes, cheapest first:
 #   virtual  - a screen reader written in JavaScript, no assistive technology
-#              needed. Runs on every touched PR, required green.
-#   nvda     - the real NVDA screen reader on Windows. Required green, but its
-#              gallery does not boot on windows-latest yet, so it passes on the
-#              drivability smoke alone (docs/ci-process.md, "Screen-reader lanes").
+#              needed. One job per family on Linux, required green.
+#   nvda     - the real NVDA screen reader on Windows.
 #   voiceover- the real VoiceOver screen reader on macOS. Advisory, see below.
 #
-# The matrix key is the component family. A new family adds its name to each
-# matrix and nothing else changes.
+# The virtual matrix key is the family. The real-reader lanes run their
+# families in four shards that both lanes share: a Windows or macOS runner is
+# the scarce cost, and one family per job made a run 29 macOS jobs. A new
+# family with a real-reader spec joins one shard's list.
 #
 # The two real-reader lanes read a served page: packages/headless/sr-app renders every
 # family's Basic scenario, and each family's <family>.nvda.ts / .voiceover.ts,
 # colocated under packages/headless/components/src/<family>/, drives NVDA or
 # VoiceOver over it with the same transcript expectations the virtual lane
-# uses. The gallery is built and booted first, in its own step, because a page
-# that never rendered and a reader that never spoke look identical downstream.
-# If that step fails the lane falls back to the drivability smoke, which is the
-# proof no developer machine can reproduce and the one worth keeping either way.
+# uses. The gallery is booted first, in its own step, because a page that never
+# rendered and a reader that never spoke look identical downstream. A gallery
+# that does not render fails the job: the drivability smoke still runs, to say
+# whether the reader works, but it is never a pass on its own.
 
 on:
     pull_request:
@@ -144,45 +144,21 @@ jobs:
     # installs NVDA and the keyboard automation it needs.
     nvda:
         runs-on: windows-latest
-        timeout-minutes: 25
+        timeout-minutes: 60
         strategy:
             fail-fast: false
             matrix:
-                # Only families with a real-reader spec. A family joins this list
-                # when its src/<family>/<family>.nvda.ts exists, not before: a
-                # name with no spec file makes the run find no tests.
-                family:
-                    [
-                        buttongroup,
-                        calendar,
-                        checkbox,
-                        colorpicker,
-                        crop,
-                        datebox,
-                        drawer,
-                        editable,
-                        gridlist,
-                        hovercard,
-                        ink,
-                        menu,
-                        menubar,
-                        modal,
-                        numberbox,
-                        pad,
-                        popover,
-                        radio-group,
-                        rating,
-                        resizable,
-                        select,
-                        slider,
-                        table,
-                        tabs,
-                        taglist,
-                        timebox,
-                        toolbar,
-                        tooltip,
-                        tour,
-                    ]
+                # Only families with a real-reader spec: a name with no spec file
+                # makes the run find no tests. Same shards as the voiceover job.
+                include:
+                    - shard: 1
+                      families: buttongroup calendar checkbox colorpicker crop datebox drawer
+                    - shard: 2
+                      families: editable gridlist hovercard ink menu menubar modal
+                    - shard: 3
+                      families: numberbox pad popover radio-group rating resizable select
+                    - shard: 4
+                      families: slider table tabs taglist timebox toolbar tooltip tour
 
         steps:
             - uses: actions/checkout@v4
@@ -211,9 +187,6 @@ jobs:
             - name: Install the browser the reader reads through
               run: pnpm exec playwright install --with-deps chromium
 
-            # Its own step, and allowed to fail: this is the gate that decides
-            # whether the reader gets a page to read. It serves the gallery,
-            # loads it, and checks every family rendered.
             - name: Serve and render the screen-reader gallery
               id: gallery
               continue-on-error: true
@@ -221,58 +194,45 @@ jobs:
 
             # continue-on-error so the transcript is still uploaded and summarised
             # when the read fails; the gate step below turns that back into red.
-            - name: Read the ${{ matrix.family }} family with NVDA
+            - name: Read shard ${{ matrix.shard }} with NVDA
               id: read
               if: steps.gallery.outcome == 'success'
               continue-on-error: true
               shell: bash
-              run: |
-                  mkdir -p sr-transcripts
-                  set -o pipefail
-                  pnpm test:sr-real --project=nvda ${{ matrix.family }}/${{ matrix.family }}.nvda.ts 2>&1 \
-                      | tee sr-transcripts/nvda-${{ matrix.family }}.txt
+              env:
+                  READER_PROJECT: nvda
+                  FAMILIES: ${{ matrix.families }}
+                  TRANSCRIPT: sr-transcripts/nvda-shard-${{ matrix.shard }}.txt
+              run: node scripts/ci/screen-reader-read.mjs
 
-            - name: Upload the ${{ matrix.family }} NVDA transcript
+            - name: Upload the shard ${{ matrix.shard }} NVDA transcript
               if: always() && steps.gallery.outcome == 'success'
               uses: actions/upload-artifact@v4
               with:
-                  name: nvda-transcript-${{ matrix.family }}
+                  name: nvda-transcript-shard-${{ matrix.shard }}
                   path: |
                       sr-transcripts/
                       packages/headless/components/test-support/test-results/
                   if-no-files-found: warn
 
-            - name: Summarise the ${{ matrix.family }} NVDA read
+            - name: Summarise the shard ${{ matrix.shard }} NVDA read
               if: always()
               shell: bash
               env:
-                  FAMILY: ${{ matrix.family }}
+                  READER: NVDA
+                  FAMILIES: ${{ matrix.families }}
+                  TRANSCRIPT: sr-transcripts/nvda-shard-${{ matrix.shard }}.txt
                   GALLERY: ${{ steps.gallery.outcome }}
-                  READ: ${{ steps.read.outcome }}
-              run: |
-                  {
-                      echo "### NVDA - $FAMILY"
-                      if [ "$GALLERY" != 'success' ]; then
-                          echo 'not read: the gallery did not render, so only the drivability smoke ran.'
-                      elif [ "$READ" = 'success' ]; then
-                          echo 'pass'
-                      else
-                          echo 'FAIL - end of the transcript:'
-                          echo '```'
-                          tail -n 40 "sr-transcripts/nvda-$FAMILY.txt" 2>/dev/null || echo 'no transcript was captured.'
-                          echo '```'
-                      fi
-                  } >> "$GITHUB_STEP_SUMMARY"
+              run: node scripts/ci/screen-reader-summary.mjs >> "$GITHUB_STEP_SUMMARY"
 
-            - name: Fail when NVDA could not read the ${{ matrix.family }} family
-              if: steps.gallery.outcome == 'success' && steps.read.outcome != 'success'
-              run: exit 1
-
-            # Fallback, not a pass: the gallery did not render, so this proves
-            # only that the runner can drive the reader at all.
             - name: Prove the runner can drive NVDA
               if: steps.gallery.outcome != 'success'
+              continue-on-error: true
               run: node scripts/ci/screen-reader-smoke.mjs nvda
+
+            - name: Fail when NVDA did not read shard ${{ matrix.shard }}
+              if: steps.gallery.outcome != 'success' || steps.read.outcome != 'success'
+              run: exit 1
 
     # Real VoiceOver on macOS. Still advisory: until October 2026 this lane never
     # read a family (its "VoiceOver not running" was the fixture stopping the
@@ -287,44 +247,21 @@ jobs:
     # it is the setup step it goes in the ledger with the runner image version.
     voiceover:
         runs-on: macos-latest
-        timeout-minutes: 25
+        timeout-minutes: 60
         continue-on-error: true
         strategy:
             fail-fast: false
             matrix:
-                # See the nvda job: only families with a real-reader spec.
-                family:
-                    [
-                        buttongroup,
-                        calendar,
-                        checkbox,
-                        colorpicker,
-                        crop,
-                        datebox,
-                        drawer,
-                        editable,
-                        gridlist,
-                        hovercard,
-                        ink,
-                        menu,
-                        menubar,
-                        modal,
-                        numberbox,
-                        pad,
-                        popover,
-                        radio-group,
-                        rating,
-                        resizable,
-                        select,
-                        slider,
-                        table,
-                        tabs,
-                        taglist,
-                        timebox,
-                        toolbar,
-                        tooltip,
-                        tour,
-                    ]
+                # See the nvda job: the same shards.
+                include:
+                    - shard: 1
+                      families: buttongroup calendar checkbox colorpicker crop datebox drawer
+                    - shard: 2
+                      families: editable gridlist hovercard ink menu menubar modal
+                    - shard: 3
+                      families: numberbox pad popover radio-group rating resizable select
+                    - shard: 4
+                      families: slider table tabs taglist timebox toolbar tooltip tour
 
         steps:
             - uses: actions/checkout@v4
@@ -361,53 +298,42 @@ jobs:
 
             # See the nvda job: the read is allowed to fail so its transcript is
             # still uploaded and summarised, and the gate step below re-reds it.
-            - name: Read the ${{ matrix.family }} family with VoiceOver
+            - name: Read shard ${{ matrix.shard }} with VoiceOver
               id: read
               if: steps.gallery.outcome == 'success'
               continue-on-error: true
               shell: bash
-              run: |
-                  mkdir -p sr-transcripts
-                  set -o pipefail
-                  pnpm test:sr-real --project=voiceover ${{ matrix.family }}/${{ matrix.family }}.voiceover.ts 2>&1 \
-                      | tee sr-transcripts/voiceover-${{ matrix.family }}.txt
+              env:
+                  READER_PROJECT: voiceover
+                  FAMILIES: ${{ matrix.families }}
+                  TRANSCRIPT: sr-transcripts/voiceover-shard-${{ matrix.shard }}.txt
+              run: node scripts/ci/screen-reader-read.mjs
 
-            - name: Upload the ${{ matrix.family }} VoiceOver transcript
+            - name: Upload the shard ${{ matrix.shard }} VoiceOver transcript
               if: always() && steps.gallery.outcome == 'success'
               uses: actions/upload-artifact@v4
               with:
-                  name: voiceover-transcript-${{ matrix.family }}
+                  name: voiceover-transcript-shard-${{ matrix.shard }}
                   path: |
                       sr-transcripts/
                       packages/headless/components/test-support/test-results/
                   if-no-files-found: warn
 
-            - name: Summarise the ${{ matrix.family }} VoiceOver read
+            - name: Summarise the shard ${{ matrix.shard }} VoiceOver read
               if: always()
               shell: bash
               env:
-                  FAMILY: ${{ matrix.family }}
+                  READER: VoiceOver
+                  FAMILIES: ${{ matrix.families }}
+                  TRANSCRIPT: sr-transcripts/voiceover-shard-${{ matrix.shard }}.txt
                   GALLERY: ${{ steps.gallery.outcome }}
-                  READ: ${{ steps.read.outcome }}
-              run: |
-                  {
-                      echo "### VoiceOver - $FAMILY"
-                      if [ "$GALLERY" != 'success' ]; then
-                          echo 'not read: the gallery did not render, so only the drivability smoke ran.'
-                      elif [ "$READ" = 'success' ]; then
-                          echo 'pass'
-                      else
-                          echo 'FAIL - end of the transcript:'
-                          echo '```'
-                          tail -n 40 "sr-transcripts/voiceover-$FAMILY.txt" 2>/dev/null || echo 'no transcript was captured.'
-                          echo '```'
-                      fi
-                  } >> "$GITHUB_STEP_SUMMARY"
-
-            - name: Fail when VoiceOver could not read the ${{ matrix.family }} family
-              if: steps.gallery.outcome == 'success' && steps.read.outcome != 'success'
-              run: exit 1
+              run: node scripts/ci/screen-reader-summary.mjs >> "$GITHUB_STEP_SUMMARY"
 
             - name: Prove the runner can drive VoiceOver
               if: steps.gallery.outcome != 'success'
+              continue-on-error: true
               run: node scripts/ci/screen-reader-smoke.mjs voiceover
+
+            - name: Fail when VoiceOver did not read shard ${{ matrix.shard }}
+              if: steps.gallery.outcome != 'success' || steps.read.outcome != 'success'
+              run: exit 1
