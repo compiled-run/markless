@@ -8,18 +8,17 @@ export type ProbeReader = {
 	lastSpokenPhrase(): Promise<string>;
 };
 
+const ONLY_LATE = true;
 const TITLE = 'Vee title';
 const inner = `<h2 id="t">${TITLE}</h2><p>Body text</p><button id="c">Done</button>`;
 
 type Markup = { readonly name: string; readonly attrs: string; readonly tag?: 'dialog' };
 
-const MARKUP: readonly Markup[] = [
+const MARKUP: readonly Markup[] = ONLY_LATE ? [] : [
 	{ name: 'L labelledby only', attrs: `aria-labelledby="t"` },
 	{ name: 'A labelledby + aria-label same text', attrs: `aria-labelledby="t" aria-label="${TITLE}"` },
 	{ name: 'A2 labelledby + aria-label other text', attrs: `aria-labelledby="t" aria-label="Label text"` },
 	{ name: 'B aria-label only', attrs: `aria-label="${TITLE}"` },
-	{ name: 'C1 native dialog + labelledby', attrs: `aria-labelledby="t"`, tag: 'dialog' },
-	{ name: 'C2 native dialog + aria-label only', attrs: `aria-label="${TITLE}"`, tag: 'dialog' },
 ];
 
 const dialogMarkup = (markup: Markup) =>
@@ -61,6 +60,11 @@ function cases(): Case[] {
 			label: `A-after labelledby, label written 150ms after focus | nested | focus ${target}`,
 			body: `<div><div><div role="dialog" id="d" tabindex="-1" aria-labelledby="t" hidden>${inner}</div></div></div>`,
 			action: `d.hidden = false; ${focus}.focus(); return new Promise((done) => setTimeout(() => { d.setAttribute('aria-label', document.getElementById('t').textContent); done(); }, 150))`,
+		});
+		out.push({
+			label: `H handover labelledby removed when label written 150ms after focus | nested | focus ${target}`,
+			body: `<div><div><div role="dialog" id="d" tabindex="-1" aria-labelledby="t" hidden>${inner}</div></div></div>`,
+			action: `d.hidden = false; ${focus}.focus(); return new Promise((done) => setTimeout(() => { d.setAttribute('aria-label', document.getElementById('t').textContent); d.removeAttribute('aria-labelledby'); done(); }, 150))`,
 		});
 	}
 	return out;
