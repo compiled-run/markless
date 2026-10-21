@@ -188,16 +188,28 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	vocabulary: voiceOverVocabulary,
 	keys,
 	segments: voiceOverSegments,
-	async cursorToFocus(voiceOver) {
-		// Asked before it has seen the page's focus change, VoiceOver lands on the document itself ("... web content").
+	async cursorToFocus(voiceOver, focusedName) {
+		// VoiceOver learns of a focus change after the page makes it; until then it answers with the old
+		// focus or the document itself, so it is asked again until it names the element the page focused.
+		const arrived = (phrase: string) =>
+			focusedName === ''
+				? phrase !== '' && !phrase.endsWith(' web content')
+				: phrase.includes(focusedName);
+		const moveCursor = () =>
+			voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
+		const describeFocus = () =>
+			voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
 		for (let attempt = 0; attempt < 10; attempt++) {
-			await voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
+			await moveCursor();
+			if (arrived(await voiceOver.lastSpokenPhrase())) return;
 			// Silent when its cursor had already followed the focus, so ask it what has the focus.
-			if ((await voiceOver.lastSpokenPhrase()) === '') {
-				await voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
+			await describeFocus();
+			if (arrived(await voiceOver.lastSpokenPhrase())) {
+				// It knows the focus now; one more move puts the cursor there if it was not yet.
+				await moveCursor();
+				if (!arrived(await voiceOver.lastSpokenPhrase())) await describeFocus();
+				return;
 			}
-			const phrase = await voiceOver.lastSpokenPhrase();
-			if (phrase !== '' && !phrase.endsWith(' web content')) return;
 		}
 	},
 };

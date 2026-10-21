@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the collapsed select and reaches its options on
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readSelectTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readSelectTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

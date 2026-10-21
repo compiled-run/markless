@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the grid of rows, each row\'s own words, and th
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readGridListTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readGridListTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

@@ -11,5 +11,5 @@ voiceOverTest('VoiceOver conveys the tour opening, reads the first step, and rea
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readTourTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readTourTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

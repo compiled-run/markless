@@ -21,5 +21,5 @@ voiceOverTest('VoiceOver conveys the plane as two adjustable axis controls, the 
 	);
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readColorpickerTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readColorpickerTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the checkbox family and follows it through a to
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readCheckboxTranscript(realDriver(voiceOver, voiceOverSpec), { changeTimeoutMs: 15_000 });
+	await readCheckboxTranscript(realDriver(voiceOver, voiceOverSpec, page), { changeTimeoutMs: 15_000 });
 });

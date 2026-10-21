@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver hears one checked mark in a rating whose fill is cumula
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readRatingTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readRatingTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

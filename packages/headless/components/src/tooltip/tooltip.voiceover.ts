@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the tooltip as the trigger description, with th
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readTooltipTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readTooltipTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

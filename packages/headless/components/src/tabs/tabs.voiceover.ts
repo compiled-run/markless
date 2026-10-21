@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the tab list and follows it through a tab chang
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readTabsTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readTabsTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

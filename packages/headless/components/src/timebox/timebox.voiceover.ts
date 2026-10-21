@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the group of time boxes, each box\'s own name a
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readTimeBoxTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readTimeBoxTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

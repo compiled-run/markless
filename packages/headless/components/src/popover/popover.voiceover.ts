@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the popover trigger opening and closing, and re
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readPopoverTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readPopoverTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

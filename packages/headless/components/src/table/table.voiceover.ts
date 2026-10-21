@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the grid, the row a header cell names, and the 
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readTableTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readTableTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

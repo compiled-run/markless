@@ -1,5 +1,5 @@
 import type { NVDAPlaywright, VoiceOverPlaywright } from '@guidepup/playwright';
-import type { Page } from '@playwright/test';
+import { test, type Page } from '@playwright/test';
 import type { Keys, ScreenReaderDriver, Vocabulary } from './driver.ts';
 
 /**
@@ -19,9 +19,31 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
-	/** Bring the reading cursor to the element the page focused, for a reader that does not follow focus on its own. */
-	cursorToFocus?: (reader: R) => Promise<void>;
+	/**
+	 * Bring the reading cursor to the element the page focused, for a reader that
+	 * does not follow focus on its own. `focusedName` is the accessible name the
+	 * browser computed for that element, or '' when there is none.
+	 */
+	cursorToFocus?: (reader: R, focusedName: string) => Promise<void>;
 };
+
+async function focusedAccessibleName(page: Page): Promise<string> {
+	const cdp = await page.context().newCDPSession(page);
+	try {
+		const { result } = await cdp.send('Runtime.evaluate', { expression: 'document.activeElement' });
+		if (!result.objectId) return '';
+		const { nodes } = await cdp.send('Accessibility.getPartialAXTree', {
+			objectId: result.objectId,
+			fetchRelatives: false,
+		});
+		return String(nodes[0]?.name?.value ?? '');
+	} finally {
+		await cdp.detach();
+	}
+}
+
+// A walk that would outlast the test fails here with its own message, not as the fixture's "not running" mid-teardown.
+const WALK_HEADROOM_MS = 45_000;
 
 /**
  * Wrap a started reader in the shared driver shape.
@@ -33,6 +55,7 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 export function realDriver<R extends RealReader>(
 	reader: R,
 	spec: RealDriverSpec<R>,
+	page?: Page,
 ): ScreenReaderDriver {
 	// Printed as it is heard: a walk cut short by the test timeout loses the transcript its own error would carry.
 	const heard = async (phrase: Promise<string>) => {
@@ -40,6 +63,8 @@ export function realDriver<R extends RealReader>(
 		console.log(`${spec.name} said: ${JSON.stringify(spoken)}`);
 		return spoken;
 	};
+	const timeout = test.info().timeout;
+	const deadline = timeout > 0 ? Date.now() + timeout - WALK_HEADROOM_MS : Infinity;
 	return {
 		name: spec.name,
 		vocabulary: spec.vocabulary,
@@ -47,7 +72,14 @@ export function realDriver<R extends RealReader>(
 		segments: spec.segments,
 		start: async () => {},
 		stop: async () => {},
-		next: () => reader.next(),
+		async next() {
+			if (Date.now() > deadline) {
+				throw new Error(
+					`${spec.name} was still walking with ${WALK_HEADROOM_MS / 1000} s of the test's ${timeout / 1000} s left; the phrases it said are printed above.`,
+				);
+			}
+			await reader.next();
+		},
 		previous: () => reader.previous(),
 		press: (key) => reader.press(key),
 		async reannounce() {
@@ -59,7 +91,9 @@ export function realDriver<R extends RealReader>(
 			return heard(reader.lastSpokenPhrase());
 		},
 		async settleOnFocus() {
-			await spec.cursorToFocus?.(reader);
+			if (spec.cursorToFocus) {
+				await spec.cursorToFocus(reader, page ? await focusedAccessibleName(page) : '');
+			}
 			return heard(reader.lastSpokenPhrase());
 		},
 		lastSpokenPhrase: () => heard(reader.lastSpokenPhrase()),

@@ -11,6 +11,6 @@ voiceOverTest(
 		await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 		await voiceOverToAnchoredSection(voiceOver, page);
 
-		await readCropTranscript(realDriver(voiceOver, voiceOverSpec), page);
+		await readCropTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 	},
 );

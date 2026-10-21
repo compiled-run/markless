@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys every billing option and follows the group thro
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readRadioGroupTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readRadioGroupTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

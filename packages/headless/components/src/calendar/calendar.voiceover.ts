@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys each day as a button carrying its whole date, s
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readCalendarTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readCalendarTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

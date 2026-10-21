@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the group of three date boxes, each box\'s own 
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readDateBoxTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readDateBoxTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

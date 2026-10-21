@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver reaches the dialog only once its trigger has opened it'
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readModalTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readModalTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

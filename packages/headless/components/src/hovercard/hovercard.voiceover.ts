@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the link trigger as collapsed, then expanded on
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readHovercardTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readHovercardTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });

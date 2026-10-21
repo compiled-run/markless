@@ -12,5 +12,5 @@ voiceOverTest('VoiceOver conveys the slider thumb, its value, a range slider\'s 
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	await voiceOverToAnchoredSection(voiceOver, page);
 
-	await readSliderTranscript(realDriver(voiceOver, voiceOverSpec), page);
+	await readSliderTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 });
