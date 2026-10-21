@@ -87,6 +87,7 @@ import {
 	collectDefinitionReads,
 	inlineHandlerRenderLocals,
 	inlineRenderLocals,
+	liftArmRenderLocalValue,
 } from './render-local-inline.ts';
 import { collectGraphDependencies } from './collect-async.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
@@ -209,7 +210,8 @@ export function collectTemplateExpression(
 			...TEMPLATE_READ_OPTIONS,
 			requireWritableRead: true,
 		}) ??
-		liftArmModuleValue(expression, state);
+		liftArmModuleValue(expression, state) ??
+		liftArmRenderLocalValue(expression, state);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
 	const armScoped =
@@ -1203,7 +1205,9 @@ function collectAttribute(
 			collectCompositeTemplateExpression(expressionValue, state, {
 				...TEMPLATE_READ_OPTIONS,
 				requireWritableRead: true,
-			}) ?? liftArmModuleValue(expressionValue, state);
+			}) ??
+			liftArmModuleValue(expressionValue, state) ??
+			liftArmRenderLocalValue(expressionValue, state);
 		if (!composite && refuseUnroutedExpression(expressionValue, `Attribute \`${attributeName}\``, state)) {
 			walk(expressionValue, state);
 			return;

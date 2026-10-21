@@ -12,7 +12,9 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
+import { collectGraphDependencies } from './collect-async.ts';
 import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
+import { mintTemplateExpressionComputed } from './composite-reads.ts';
 import { handlerReadsRenderLocalDiagnostic } from './diagnostics.ts';
 import { findSharedInstance, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
@@ -191,6 +193,38 @@ export function inlineHandlerRenderLocals(
 			(definition) => sourceSpan(definition, state.filename) ?? [],
 		),
 	};
+}
+
+// A flipped arm rebuilds from graph reads alone, so a body const it shows rides a computed of its definition.
+export function liftArmRenderLocalValue(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly graphNodeId: string } | null {
+	if (
+		!state.currentArmScope ||
+		state.currentKeyedRepeatScopeIds.length > 0 ||
+		state.currentSharedDefinitionId
+	)
+		return null;
+	const inlined = inlineRenderLocals(expression, state);
+	if (inlined.kind !== 'inlined' || inlined.definitions.length === 0) return null;
+	const dependencies = [expression, ...inlined.definitions].flatMap((node) =>
+		collectGraphDependencies(node, state),
+	);
+	const asyncNodeIds = new Set(
+		state.graph.graphBindings.flatMap((binding) => (binding.asyncCapable ? [binding.id] : [])),
+	);
+	if (dependencies.some((dependency) => asyncNodeIds.has(dependency.graphNodeId))) return null;
+	const lifted = mintTemplateExpressionComputed(
+		`() => ${inlined.source}`,
+		[...new Set(dependencies.map((dependency) => dependency.source))],
+		state,
+		false,
+		undefined,
+		true,
+	);
+	if (lifted) for (const definition of inlined.definitions) collectDefinitionReads(definition, state);
+	return lifted;
 }
 
 // The spliced definition's reads are lowered at its own span, once however many handlers splice it.
