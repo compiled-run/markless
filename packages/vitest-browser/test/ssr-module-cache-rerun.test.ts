@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { promisify } from 'node:util';
+import { promisify, stripVTControlCharacters } from 'node:util';
 import { afterAll, expect, test } from 'vitest';
 
 const run = promisify(execFile);
@@ -41,5 +41,5 @@ test('a renderSSR browser test passes again on a warm Vitest module cache', asyn
 	await once();
 	expect((await readdir(cacheDir)).length).toBeGreaterThan(1);
 	const warm = await once();
-	expect(warm.stdout).toMatch(/Tests\s+1 passed/);
+	expect(stripVTControlCharacters(warm.stdout)).toMatch(/Tests\s+1 passed/);
 }, 300_000);
