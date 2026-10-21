@@ -25,6 +25,10 @@ export const BUDGETS = {
 	runtimeModuleGrowthBytes: 128,
 	constructGlueGrowthBytes: 24,
 	resumeRowGrowthBytes: 16,
+	// The two builds run the same code; V8 reports the odd character of difference between runs.
+	hiddenContentLoadChars: 512,
+	// Below this the long panel no longer ships more code, and G14 would compare two equal pages.
+	hiddenContentMinShippedGrowth: 8 * 1024,
 	executionGrowth: 0.25,
 	executionMinChars: 2048,
 	initializerMinExtra: 2,

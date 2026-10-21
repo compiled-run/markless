@@ -100,6 +100,10 @@ function measurement(): Json {
 				resumeBytes: 9_000,
 			},
 		},
+		hiddenContent: {
+			short: { shippedBytes: 330_000, executedChars: 55_000, answered: true, errors: [] },
+			long: { shippedBytes: 355_000, executedChars: 55_001, answered: true, errors: [] },
+		},
 	};
 }
 
@@ -329,6 +333,30 @@ describe('performance guards', () => {
 		);
 		expect(next.resumeRows).toEqual({ 'keyed rows': 450 });
 		expect(failures(over, next)).toEqual([]);
+	});
+
+	test('G14 fails code run at load that grows with content the page has not shown', () => {
+		const over = measurement();
+		over.hiddenContent.long.executedChars += 25_000;
+		expect(failures(over)).toEqual([
+			expect.stringContaining(
+				'[G14] an onIdle start runs 55000 chars at load with the short hidden help panel and 80001 with the long one, which ships 24.4 KB more code: +25001 chars run at load for content nobody opened (budget +512)',
+			),
+		]);
+
+		const toothless = measurement();
+		toothless.hiddenContent.long.shippedBytes = toothless.hiddenContent.short.shippedBytes;
+		expect(failures(toothless)).toEqual([
+			expect.stringContaining('the long panel must ship at least 8.0 KB more code'),
+		]);
+
+		const broken = measurement();
+		broken.hiddenContent.long.errors = ['boom'];
+		expect(failures(broken)).toEqual([
+			expect.stringContaining(
+				'[G14] the hidden-panel fixture did not answer its date panel or help button: boom',
+			),
+		]);
 	});
 
 	test('accept re-anchors one subject and records the reason', () => {

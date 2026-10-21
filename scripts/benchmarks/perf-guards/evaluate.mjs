@@ -49,6 +49,7 @@ export function evaluate(measurement, anchors) {
 		checkConstructGlue(measurement.constructGlue, anchors.constructGlue ?? {}, fail, note);
 	if (measurement.resumeRows)
 		checkResumeRows(measurement.resumeRows, anchors.resumeRows ?? {}, fail, note);
+	if (measurement.hiddenContent) checkHiddenContent(measurement.hiddenContent, fail, note);
 	for (const [site, siteResult] of Object.entries(measurement.sites))
 		for (const [route, result] of Object.entries(siteResult.routes))
 			if (result.resumeData)
@@ -410,6 +411,29 @@ function checkResumeRows(rows, anchors, fail, note) {
 			);
 		else note('G13', `${line}, anchor ${anchor} B`);
 	}
+}
+
+function checkHiddenContent({ short, long }, fail, note) {
+	const shipped = long.shippedBytes - short.shippedBytes;
+	const grown = long.executedChars - short.executedChars;
+	const line = `an onIdle start runs ${short.executedChars} chars at load with the short hidden help panel and ${long.executedChars} with the long one, which ships ${kb(shipped)} more code`;
+	const errors = [...short.errors, ...long.errors];
+	if (!short.answered || !long.answered || errors.length > 0)
+		return fail(
+			'G14',
+			`the hidden-panel fixture did not answer its date panel or help button${errors.length ? `: ${errors.join('; ')}` : ''}. ${INVARIANT}`,
+		);
+	if (shipped < BUDGETS.hiddenContentMinShippedGrowth)
+		return fail(
+			'G14',
+			`${line}: the long panel must ship at least ${kb(BUDGETS.hiddenContentMinShippedGrowth)} more code, or this guard compares two equal pages. Grow the fixture's long notes.`,
+		);
+	if (grown > BUDGETS.hiddenContentLoadChars)
+		return fail(
+			'G14',
+			`${line}: +${grown} chars run at load for content nobody opened (budget +${BUDGETS.hiddenContentLoadChars}). Code a page has not shown must not run at load: a runtime an idle or visible handler starts must leave row and render code until a reader's input. shadcn-admin /settings/account ran its whole page's render code at load this way (1.5 MB against 100 kB). ${INVARIANT}`,
+		);
+	note('G14', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
 }
 
 function noteResumeData(subject, data, anchors, note) {

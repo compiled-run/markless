@@ -1441,6 +1441,14 @@
 			"from": null,
 			"to": 472,
 			"reason": "Arms and rows inserted under an svg are parsed in SVG context, so their elements and xlink: attributes land in their namespaces"
+		},
+		{
+			"date": "2026-10-21",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 16763,
+			"to": 17266,
+			"reason": "a runtime an onIdle or onVisible handler starts waits for the reader's first input before loading its rows' code (shadcn-admin /settings/account ran 1.5 MB at load): +235 B minified, +100 B gzip"
 		}
 	],
 	"runtimeModules": {
@@ -1542,7 +1550,7 @@
 		"web/resume-events": 16645,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 16763,
+		"web/resume-keyed-repeats": 17266,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,

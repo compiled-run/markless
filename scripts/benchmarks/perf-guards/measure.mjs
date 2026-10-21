@@ -29,6 +29,7 @@ import {
 	undemandedRuntimeModules,
 } from './attribution.mjs';
 import { measureConstructGlue } from './construct-glue.mjs';
+import { measureHiddenContent } from './hidden-content.mjs';
 import { measureResumeRows } from './resume-rows.mjs';
 import { resumeDataBreakdown } from '../resume-data/breakdown.mjs';
 import { marklessBuildManifestPath } from '../../../packages/bundler/src/build/build-manifests.ts';
@@ -578,5 +579,7 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 	result.constructGlue = await measureConstructGlue();
 	log('resume data per list row on the rows fixture');
 	result.resumeRows = await measureResumeRows({ build });
+	log('load execution with a short and a long hidden panel');
+	result.hiddenContent = await measureHiddenContent(log);
 	return result;
 }
