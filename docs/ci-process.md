@@ -131,6 +131,25 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
 
+### Screen-reader lanes
+
+`.github/workflows/screen-reader.yml` has three lanes: `virtual` (a JavaScript screen reader, required), `nvda` (required) and `voiceover` (advisory, `continue-on-error`). An advisory lane shows the run green even when every job in it is red, so read the job list, not the run's badge.
+
+**What "VoiceOver not running" meant.** Until October 2026 about 27 of the 29 `voiceover` jobs failed in every run (for example runs 39491172338 and 36204470224) and the same two, `slider` and `datebox`, passed. VoiceOver had started and was speaking. Each failing spec walked the gallery from the top of the page looking for its family, and the walk could not match: VoiceOver's captured phrase has no commas ("Checkbox Label unchecked checkbox"), while the matcher split phrases on commas. A 900-step walk at VoiceOver's speed (0.3 to 7 seconds a step) outlasts the 5-minute test timeout, the fixture stops VoiceOver, and the walk's next call throws "VoiceOver not running". `slider` and `datebox` passed because they match raw substrings. Separately, `guidepup/setup-action@0.21.0` bundles `@guidepup/setup` 0.23, whose row-by-row user TCC.db writes sometimes fail on `macos-26` images ("Unable to write to the user TCC.db - SIP might not be disabled").
+
+**What the lane does now.** The setup step runs `@guidepup/setup@0.29.3 setup --ci`, which writes all grants in one root transaction with backoff, as guidepup's own VoiceOver CI does. Each spec moves VoiceOver to its family's section heading by heading before reading. `voiceOverSegments` in `test-support/page-driver.ts` matches whole-word facts in VoiceOver's phrases. `settleOnFocus` waits until VoiceOver names the element the page focused before it moves VoiceOver's cursor there. Every phrase VoiceOver says is printed to the job log as `VoiceOver said: "..."`, so a failure always shows what was heard. Vocabulary slots observed on a runner say so in `test-support/vocabularies.ts`.
+
+**The NVDA lane has not been reading either.** On `windows-latest` the gallery dev server does not boot (`Pre-transform error: Failed to load url /D:/a/markless/markless/packages/web/src/...` in run 39491172338, and `Failed to load the @tsrx/yuku native binding for win32-x64` in run 39505103233), so every `nvda` job takes the drivability-smoke fallback and passes on NVDA saying "blank". Its transcripts have never been checked against NVDA. Fixing the Windows boot is its own task.
+
+**Failures that are about what VoiceOver says, not the harness.** These were heard in dispatched runs 39505103233 and 39510078285. They are accessibility findings in `@markless/ui` and stay red until the family changes:
+
+- `tabs`: tabs carry no `aria-controls` and panels no `aria-labelledby` (the APG Tabs pattern asks for both), and the gallery's tab list has no name. Chrome gives the tab list and the panel an empty name, and VoiceOver never says "tab list" or "tab panel".
+- `timebox`, `datebox`: an empty segment has no `aria-valuenow` and no `aria-valuetext`. Chrome reports a value of 0, and VoiceOver reads it as a percentage of the range ("-9.1% hour input stepper", "-3.3% day input stepper"). The `datebox` spec passes because it does not assert the empty reading.
+- `popover`, `drawer`: VoiceOver reaches the surface as "dialog with 3 items" with no name, so the spec that asks for the dialog's role and name in one announcement fails. `modal`: once focus is on the dialog, VoiceOver reads the title heading and the Cancel button but never says "dialog".
+- `resizable`: VoiceOver says "vertical splitter 30%" with no name, where the separator is named "Resize navigation".
+
+**Cost.** One run is 29 macOS jobs. The organisation's macOS jobs share a small concurrency pool, and on 2026-10-21 a dispatched run waited hours to start behind other branches' screen-reader runs. Keep dispatches for evidence. Do not rerun a run just to get it green.
+
 ## 8. Cutting a release
 
 Markless releases **minor versions only**: 0.6.0, 0.7.0, and so on. There are no patch releases. A fix ships in the next minor, so the way to ship a fix sooner is to cut the next minor sooner. No script or workflow accepts a release type; the next version is always the current one with the middle number raised by one.

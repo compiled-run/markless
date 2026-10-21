@@ -43,9 +43,7 @@ export async function readToolbarTranscript(sr: ScreenReaderDriver, page: Page) 
 	const bar = await readUntil(sr, { name: 'Document' }, GALLERY_WALK_LIMIT);
 	expectConveys(sr, bar, { name: 'Document' });
 
-	// Into the bar the way Tab enters it, then across it by focus: the bar's one
-	// stop is its first control, and VoiceOver's next-item command steps over a
-	// toolbar's contents as a single group, so the reading cursor cannot walk them.
+	// Entered as Tab enters it and crossed by focus: VoiceOver's next-item command steps over a toolbar as one group.
 	await section.getByRole('toolbar').focus();
 	await expect(buttonFor('Left')).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
 	expectConveys(sr, await sr.settleOnFocus(), { role: 'button', name: 'Left' });
@@ -63,8 +61,8 @@ export async function readToolbarTranscript(sr: ScreenReaderDriver, page: Page) 
 	// And the control it landed on is what the reader announces next.
 	expectConveys(sr, await sr.settleOnFocus(), { role: 'button', name: 'Center' });
 
-	// Space presses the focused control: it is a real button, and the bar handles
-	// no activation key of its own.
+	// Space presses the control under the cursor: it is a real button, and the bar
+	// handles no activation key of its own.
 	await sr.press(sr.keys.space);
 	await expect(buttonFor('Center')).toHaveAttribute('aria-pressed', 'true', {
 		timeout: CHANGE_TIMEOUT_MS,

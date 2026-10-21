@@ -7,7 +7,9 @@ name: Screen reader
 # Three lanes, cheapest first:
 #   virtual  - a screen reader written in JavaScript, no assistive technology
 #              needed. Runs on every touched PR, required green.
-#   nvda     - the real NVDA screen reader on Windows. Required green.
+#   nvda     - the real NVDA screen reader on Windows. Required green, but its
+#              gallery does not boot on windows-latest yet, so it passes on the
+#              drivability smoke alone (docs/ci-process.md, "Screen-reader lanes").
 #   voiceover- the real VoiceOver screen reader on macOS. Advisory, see below.
 #
 # The matrix key is the component family. A new family adds its name to each
@@ -272,11 +274,12 @@ jobs:
               if: steps.gallery.outcome != 'success'
               run: node scripts/ci/screen-reader-smoke.mjs nvda
 
-    # Real VoiceOver on macOS. Advisory on purpose, and this is the whole
-    # reason: guidepup/setup-action grants VoiceOver automation by writing the
-    # runner's TCC permission database directly, and every macOS runner image
-    # update can break that write. A broken image would otherwise block every
-    # unrelated pull request that touches packages/headless.
+    # Real VoiceOver on macOS. Still advisory: until October 2026 this lane never
+    # read a family (its "VoiceOver not running" was the fixture stopping the
+    # reader after a 5-minute walk that could not match VoiceOver's phrases), and
+    # it stays advisory until it has run green three times in a row with real
+    # announcements asserted. The families that still fail on what VoiceOver
+    # actually says are listed in docs/ci-process.md under "Screen-reader lanes".
     #
     # continue-on-error is not permission to ignore this job, and removing the
     # job is not a fix. A red VoiceOver lane is triaged like any other red: if
@@ -340,11 +343,8 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            # Not guidepup/setup-action: 0.21.0 bundles @guidepup/setup 0.23, whose
-            # row-by-row user TCC.db writes lose the race with tccd on macos-26 images
-            # ("Unable to write to the user TCC.db"). 0.29 writes every grant in one
-            # root transaction with backoff, and --ci fails this step, not the read,
-            # when a grant does not take. guidepup's own VoiceOver CI runs it this way.
+            # Not guidepup/setup-action@0.21.0: its bundled @guidepup/setup 0.23 writes TCC.db row by row and
+            # sometimes fails on macos-26 images; 0.29 writes one root transaction with backoff, as guidepup's own CI.
             - name: Grant VoiceOver automation permission
               run: pnpm dlx @guidepup/setup@0.29.3 setup --ci
 

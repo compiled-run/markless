@@ -19,11 +19,7 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
-	/**
-	 * Bring the reading cursor to the element the page focused, for a reader that
-	 * does not follow focus on its own. `focusedName` is the accessible name the
-	 * browser computed for that element, or '' when there is none.
-	 */
+	/** Bring the reading cursor to the element the page focused; `focusedName` is its computed accessible name, or ''. */
 	cursorToFocus?: (reader: R, focusedName: string) => Promise<void>;
 };
 
@@ -105,13 +101,8 @@ export function realDriver<R extends RealReader>(
 }
 
 /**
- * Bring VoiceOver into the web content and onto the heading of the gallery
- * section the page's URL fragment names.
- *
- * `navigateToWebContent()` leaves VoiceOver at the top of the document whatever
- * the fragment says, and the gallery holds every family, so a walk from the top
- * to a late section is hundreds of VoiceOver steps, longer than a test may run.
- * This moves the way a VoiceOver user would, heading by heading.
+ * Bring VoiceOver into the web content and, heading by heading, onto the gallery section the URL fragment names.
+ * `navigateToWebContent()` starts at the top whatever the fragment says, and a walk from there outlasts a test.
  */
 export async function voiceOverToAnchoredSection(
 	voiceOver: VoiceOverPlaywright,
@@ -155,11 +146,8 @@ export function commaSegments(phrase: string): string[] {
 }
 
 /**
- * VoiceOver's captured phrase runs name, state and role together with only
- * spaces between them ("Checkbox Label unchecked checkbox"), so a fact is any
- * whole-word run inside one comma segment. Whole words keep "checked" out of
- * "unchecked", and a run directly after "not" is dropped so "not selected"
- * never conveys "selected".
+ * VoiceOver runs name, state and role together with spaces ("Checkbox Label unchecked checkbox"), so a fact is
+ * any whole-word run: "checked" never matches inside "unchecked", and a run right after "not" is dropped.
  */
 export function voiceOverSegments(phrase: string): string[] {
 	// "heading level 2 Radio group" names a heading; the words of its text are not a role.

@@ -189,8 +189,7 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	keys,
 	segments: voiceOverSegments,
 	async cursorToFocus(voiceOver, focusedName) {
-		// VoiceOver learns of a focus change after the page makes it; until then it answers with the old
-		// focus or the document itself, so it is asked again until it names the element the page focused.
+		// VoiceOver learns of a page focus change late, answering with the old focus or the document until then.
 		const arrived = (phrase: string) =>
 			focusedName === ''
 				? phrase !== '' && !phrase.endsWith(' web content')
@@ -199,8 +198,7 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 			voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
 		const describeFocus = () =>
 			voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
-		// Asking moves nothing. Moving the cursor while VoiceOver still believes the old element has focus
-		// would hand the page's focus back to that element, because its keyboard focus follows its cursor.
+		// Ask before moving: its keyboard focus follows its cursor, so moving on a stale belief refocuses the old element.
 		for (let attempt = 0; attempt < 20; attempt++) {
 			await describeFocus();
 			if (arrived(await voiceOver.lastSpokenPhrase())) break;

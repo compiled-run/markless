@@ -62,11 +62,8 @@ export async function readTableTranscript(sr: ScreenReaderDriver, page: Page) {
 	const resting = await readForPhrase(sr, [NAME], GALLERY_WALK_LIMIT);
 	expect(missing(resting, [NAME]), `${sr.name} announced "${resting}"`).toEqual([]);
 
-	// Focus rather than the reading cursor: cells are read the way a grid is used, one
-	// focused cell at a time (VoiceOver's next-item command stays inside a row), and the
-	// space bar only picks a row once a cell of that row is the focused element. The row
-	// header is what names a row for a reader, which is why it is a part rather than the
-	// consumer's own markup.
+	// By focus, as a grid is used: VoiceOver's next-item command stays inside a row, and Space picks only the focused row.
+	// The row header is what names a row for a reader, which is why it is a part rather than the consumer's own markup.
 	await firstCell.focus();
 	const named = await sr.settleOnFocus();
 	expect(missing(named, [FIRST]), `${sr.name} announced "${named}"`).toEqual([]);

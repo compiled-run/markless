@@ -60,9 +60,7 @@ export async function readGridListTranscript(sr: ScreenReaderDriver, page: Page)
 	const resting = await readForPhrase(sr, [NAME], GALLERY_WALK_LIMIT);
 	expect(missing(resting, [NAME]), `${sr.name} announced "${resting}"`).toEqual([]);
 
-	// Focus rather than the reading cursor: rows are read the way a grid is used, one
-	// focused row at a time (VoiceOver's next-item command stays inside a row), and the
-	// space bar only picks a row once that row is the focused element.
+	// By focus, as a grid is used: VoiceOver's next-item command stays inside a row, and Space picks only the focused row.
 	await first.focus();
 	const named = await sr.settleOnFocus();
 	expect(missing(named, [FIRST]), `${sr.name} announced "${named}"`).toEqual([]);
