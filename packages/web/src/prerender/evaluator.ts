@@ -125,6 +125,8 @@ export type PrerenderDataDefinition = {
 	// part of somebody else's widget, holding the cells only so a page that
 	// renders no designated root still has them.
 	readonly widgetFallbacks?: ReadonlyArray<string>;
+	// The widget families this component roots that hold no cell, so owning cells cannot show it.
+	readonly cellLessWidgetRoots?: ReadonlyArray<string>;
 	// The root's elements whose handler is a callback prop itself: composition stands its composer's callback in.
 	readonly propEvents?: ReadonlyArray<{
 		readonly hostNodeId: string;

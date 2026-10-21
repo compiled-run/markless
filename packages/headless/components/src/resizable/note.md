@@ -96,10 +96,9 @@ no `aria-label` the span is empty and the divider stays unnamed. A consumer's
 own `aria-labelledby` is replaced, because a declared attribute always beats the
 rest spread.
 
-The span's handle is a component-local `element()`, not a per-thumb `shared()`
-instance on tree's pattern. In CSR, sibling thumbs in one root resolved one
-`shared()` instance and minted the same id (`mx-c0-shared-…-labelEl`), while SSR
-gave each its own. That is a runtime defect to witness separately.
+The span's handle is a component-local `element()`: only the thumb that renders
+it names it, so a per-thumb `shared()` instance on tree's pattern would buy
+nothing. Both forms mint one id per thumb in CSR and SSR alike.
 
 ## What the reader actually says
 
