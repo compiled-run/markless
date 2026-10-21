@@ -125,11 +125,11 @@ export const voiceOverVocabulary: Vocabulary = {
 	radioChecked: 'selected',
 	// observed on a macos-26 runner: "Monthly radio button, 1 of 3", no state word at all
 	radioNotChecked: '',
-	// unverified against our markup; aria-at's tabs plan says "tab list"
-	tablist: 'tab list',
-	// unverified against our markup
+	// observed on a macos-26 runner: "Tee one label tab group" (aria-label), not aria-at's "tab list"
+	tablist: 'tab group',
+	// observed on a macos-26 runner: "Alpha selected tab, 1 of 2"
 	tab: 'tab',
-	// unverified against our markup; aria-at's tabs plan says "tab panel"
+	// observed on a macos-26 runner: "Alpha tab panel", and only for a named panel
 	tabpanel: 'tab panel',
 	// unverified against our markup
 	combobox: 'combo box',
@@ -151,8 +151,7 @@ export const voiceOverVocabulary: Vocabulary = {
 	region: 'region',
 	// unverified against our markup
 	image: 'image',
-	// unverified against our markup; aria-at's modal-dialog plan asserts this role
-	// as "dialog" at priority 1
+	// observed on a macos-26 runner: "Dee one title dialog"
 	dialog: 'dialog',
 	// unverified against our markup; ARIA defines `aria-roledescription` as the
 	// word a reader speaks in place of the role, so the author string is the

@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../sr-app/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
+import { EMPTY_VALUE_TEXT } from './datebox-math.ts';
 
 /**
  * Expectations are the facts an announcement must convey rather than any reader's
@@ -72,7 +73,11 @@ export async function readDateBoxTranscript(sr: ScreenReaderDriver, page: Page) 
 	// Focus rather than the reading cursor: an arrow only steps a box once it is
 	// the focused control.
 	await boxes.nth(0).focus();
-	await sr.settleOnFocus();
+	// An empty box is spoken as empty: a box with no value text reached VoiceOver as "-3.3% day input stepper".
+	await expect(boxes.nth(0)).not.toHaveAttribute('aria-valuenow');
+	const empty = await sr.settleOnFocus();
+	expect(missing(empty, [MONTH, EMPTY_VALUE_TEXT]), `${sr.name} announced "${empty}"`).toEqual([]);
+	expect(empty, `${sr.name} announced "${empty}"`).not.toContain('%');
 
 	await sr.press(sr.keys.arrowDown);
 	// An empty box starts from today, so the value is asserted as present rather

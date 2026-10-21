@@ -16,9 +16,9 @@ import {
 	resolvedDisplay,
 	resolvedEmpty,
 	resolvedNumber,
-	resolvedPeriodWord,
 	resolvedTexts,
 	resolvedValue,
+	resolvedValueText,
 	type SegmentType,
 } from './timebox-math.ts';
 import type {
@@ -296,21 +296,18 @@ function TimeBoxItem({
 				timebox.locale,
 			) === '',
 	);
-	// The one place this family renders `aria-valuetext` (datebox does the same for
-	// the month): the period's value is 0 or 1, and a reader speaking a bare number
-	// here has conveyed nothing. Null keeps the attribute off the numeric boxes.
+	// The period's value is 0 or 1 and an empty box has none, so both are spoken as words; a filled number stays bare.
 	const spoken = computed(() =>
-		segment.type === 'dayperiod'
-			? resolvedPeriodWord(
-					timebox.seed,
-					timebox.hourAt,
-					timebox.minuteAt,
-					timebox.secondAt,
-					timebox.periodAt,
-					localeHour12(timebox.locale, timebox.hour12Prop),
-					timebox.locale,
-				) || null
-			: null,
+		resolvedValueText(
+			segment.type,
+			timebox.seed,
+			timebox.hourAt,
+			timebox.minuteAt,
+			timebox.secondAt,
+			timebox.periodAt,
+			localeHour12(timebox.locale, timebox.hour12Prop),
+			timebox.locale,
+		),
 	);
 	const named = computed(() =>
 		segment.type === 'dayperiod' ? 'AM or PM' : `${segment.type} input`,
