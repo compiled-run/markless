@@ -30,7 +30,12 @@ export async function readTabsTranscript(sr: ScreenReaderDriver, page: Page) {
 	const section = page.locator(`#${FAMILY_ANCHORS.tabs.slice(2)}`);
 	const usageTab = section.getByRole('tab', { name: 'Usage' });
 
-	await readUntil(sr, { role: 'tablist' }, GALLERY_WALK_LIMIT);
+	// Named by the consumer, as APG asks: VoiceOver announces no tab list at all when it has no name.
+	const list = await readUntil(sr, { role: 'tablist', name: 'Account' }, GALLERY_WALK_LIMIT);
+	expect(
+		missingFacts(sr, list, { role: 'tablist', name: 'Account' }),
+		`${sr.name} announced "${list}"`,
+	).toEqual([]);
 
 	const overview = await readUntil(sr, { role: 'tab', name: 'Overview' }, GALLERY_WALK_LIMIT);
 	expect(

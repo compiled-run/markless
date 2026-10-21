@@ -231,7 +231,7 @@ export function Gallery() @{
 			<h2>Tabs</h2>
 			<div class="scenario">
 				<tabs.root value="overview">
-					<tabs.list>
+					<tabs.list aria-label="Account">
 						<tabs.trigger value="overview">Overview</tabs.trigger>
 						<tabs.trigger value="usage">Usage</tabs.trigger>
 						<tabs.trigger value="billing">Billing</tabs.trigger>
