@@ -20,6 +20,15 @@ function parsedFor(fileName: string): Map<string, ParseResult> {
 	return parsed;
 }
 
+const renderedChunkCounts = new WeakMap<object, number>();
+
+// Rolldown hands every renderChunk call of one render the same `meta.chunks`; counting its keys per call was 25 s at 18,000 chunks.
+export function renderedChunkCount(chunks: Readonly<Record<string, unknown>>): number {
+	let count = renderedChunkCounts.get(chunks);
+	if (count === undefined) renderedChunkCounts.set(chunks, (count = Object.keys(chunks).length));
+	return count;
+}
+
 function forgetSuperseded(fileName: string, code: string): void {
 	const previous = codeByFile.get(fileName);
 	if (previous === undefined || previous === code) return;

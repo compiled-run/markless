@@ -6,6 +6,7 @@ import {
 	mayContainDynamicImport,
 	parseChunkCode,
 	prefetchChunkParses,
+	renderedChunkCount,
 	spansAnyOffset,
 	textOffsets,
 } from './chunk-ast.ts';
@@ -55,7 +56,7 @@ export function lazyModuleFacadesPlugin(
 			return new Promise((resolve, reject) => {
 				pending.set(chunk.fileName, { resolve, reject });
 				// Rolldown renders chunks concurrently; collect their code before changing cross-chunk imports.
-				if (pending.size !== Object.keys(meta.chunks).length) return;
+				if (pending.size !== renderedChunkCount(meta.chunks)) return;
 				const collapse = () => {
 					try {
 						const results = new Map<string, { code: string; map: string | null }>();
@@ -79,7 +80,10 @@ export function lazyModuleFacadesPlugin(
 						);
 						const prefixes = buildPathIdentifierPrefixes(root());
 						const strip = (text: string) =>
-							prefixes.reduce((result, prefix) => result.replaceAll(prefix, ''), text);
+							prefixes.reduce(
+								(result, prefix) => result.replaceAll(prefix, ''),
+								text,
+							);
 						for (const [fileName, original] of originals) {
 							if (removed.has(fileName)) continue;
 							const edit = edits.get(fileName);
@@ -395,7 +399,8 @@ export function collapseLazyModuleFacades(
 		let targetBindings = exportBindings.get(target.fileName);
 		if (!targetBindings) {
 			targetBindings =
-				chunkLocalExportSpecifiers(target.fileName, target.code) ?? exportSpecifiersFromTree(target);
+				chunkLocalExportSpecifiers(target.fileName, target.code) ??
+				exportSpecifiersFromTree(target);
 			exportBindings.set(target.fileName, targetBindings);
 		}
 		if (
@@ -520,7 +525,10 @@ export function collapseLazyModuleFacades(
 					if (evaluator !== facade.target)
 						evaluatedByRoute.set(
 							evaluator.fileName,
-							new Set([...(evaluatedByRoute.get(evaluator.fileName) ?? []), facade.target]),
+							new Set([
+								...(evaluatedByRoute.get(evaluator.fileName) ?? []),
+								facade.target,
+							]),
 						);
 		}
 	}
@@ -542,11 +550,7 @@ export function collapseLazyModuleFacades(
 			}
 	}
 	for (const [fileName, loaders] of registered)
-		additions
-			.get(fileName)!
-			.push(
-				`${PACK_REGISTRATION}={${[...loaders].join(',')}};`,
-			);
+		additions.get(fileName)!.push(`${PACK_REGISTRATION}={${[...loaders].join(',')}};`);
 	for (const chunk of chunks.values()) {
 		if (facades.has(chunk.fileName)) continue;
 		const replacements: Replacement[] = [];
@@ -654,7 +658,9 @@ function evaluatesWith(
 		!!to &&
 		(to === 'shared' ||
 			to === from ||
-			(from !== 'shared' && !!toRoutes && !!routes(from)?.every((route) => toRoutes.includes(route)))) &&
+			(from !== 'shared' &&
+				!!toRoutes &&
+				!!routes(from)?.every((route) => toRoutes.includes(route)))) &&
 		target !== importer &&
 		!awaiting.has(target.fileName)
 	);
@@ -668,7 +674,9 @@ function chunkPack(
 ): string | undefined {
 	const names = new Set(chunk.moduleIds.map((id) => startupPackOfLazy(packOf?.(id) ?? '')));
 	const [name] = names;
-	return names.size === 1 ? /^(route:.+?|shared(?::[0-9a-z]+)?)(?:~\d+)?$/.exec(name ?? '')?.[1] : undefined;
+	return names.size === 1
+		? /^(route:.+?|shared(?::[0-9a-z]+)?)(?:~\d+)?$/.exec(name ?? '')?.[1]
+		: undefined;
 }
 
 // The one planned pack every module of a chunk belongs to, lazy siblings named as such.
