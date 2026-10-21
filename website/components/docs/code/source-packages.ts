@@ -13,6 +13,14 @@ export function isRuntimeSpecifier(specifier: string): boolean {
 	return RUNTIME_PACKAGES.some((name) => specifier === name || specifier.startsWith(`${name}/`));
 }
 
+/** The runtime packages the result frame serves from its own copy, under `packagesFolder`. */
+export function runtimePackages(packagesFolder: string): PackageFolder[] {
+	return [
+		{ name: webPackage.name, exports: webPackage.exports, folder: `${packagesFolder}web/` },
+		{ name: corePackage.name, exports: corePackage.exports, folder: `${packagesFolder}core/` },
+	];
+}
+
 /** The packages compiled from source with a block, under `packagesFolder` (the repo's `packages/`). */
 export function sourcePackages(packagesFolder: string): PackageFolder[] {
 	return [
