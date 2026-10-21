@@ -19,8 +19,11 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
-	/** Bring the reading cursor to the element the page focused; `focusedName` is its computed accessible name, or ''. */
-	cursorToFocus?: (reader: R, focusedName: string) => Promise<void>;
+	/**
+	 * Bring the reading cursor to the element the page focused. `focusedName` is its computed accessible name, or '';
+	 * `refocus` puts the page's focus back on that element if the reader moved it.
+	 */
+	cursorToFocus?: (reader: R, focusedName: string, refocus: () => Promise<void>) => Promise<void>;
 };
 
 async function focusedAccessibleName(page: Page): Promise<string> {
@@ -87,8 +90,14 @@ export function realDriver<R extends RealReader>(
 			return heard(reader.lastSpokenPhrase());
 		},
 		async settleOnFocus() {
-			if (spec.cursorToFocus) {
-				await spec.cursorToFocus(reader, page ? await focusedAccessibleName(page) : '');
+			if (spec.cursorToFocus && page) {
+				const focused = await page.evaluateHandle(() => document.activeElement);
+				const refocus = () => focused.evaluate((element) => (element as HTMLElement | null)?.focus());
+				try {
+					await spec.cursorToFocus(reader, await focusedAccessibleName(page), refocus);
+				} finally {
+					await focused.dispose();
+				}
 			}
 			return heard(reader.lastSpokenPhrase());
 		},
