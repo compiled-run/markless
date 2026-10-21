@@ -42,7 +42,13 @@ type Scope = {
 	// A `@switch` outside every component cannot be attributed to one, so no
 	// component's branches may be resolved.
 	readonly unattributedSwitch: boolean;
+	readonly chunkById: Map<string, SemanticMarkupChunk>;
+	readonly childIndexes: Map<SemanticMarkupChunk, ChildIndex>;
 };
+
+// What occupies each child index under one parent path: a host wins over an anchor slot at the same index.
+type ChildPosition = { host: boolean; slot: SemanticMarkupSlot | undefined };
+type ChildIndex = Map<string, Map<number, ChildPosition>>;
 
 type ChunkScopeInput = {
 	readonly chunks: ReadonlyArray<SemanticMarkupChunk>;
@@ -136,6 +142,8 @@ function scopeOf(input: ChunkScopeInput): Scope {
 		unattributedSwitch: input.branchSites.some(
 			(site) => site.kind === 'switch' && !site.componentName,
 		),
+		chunkById: new Map(),
+		childIndexes: new Map(),
 	};
 }
 
@@ -165,16 +173,12 @@ function countChunk(
 ): ModuleGraphInterfaceElementCount {
 	// A chunk that reaches itself through an edge has no countable depth.
 	if (seen.has(chunkId)) return UNKNOWN;
-	const chunk = scope.chunks.find((candidate) => candidate.id === chunkId);
+	if (scope.chunkById.size === 0)
+		for (const candidate of scope.chunks)
+			if (!scope.chunkById.has(candidate.id)) scope.chunkById.set(candidate.id, candidate);
+	const chunk = scope.chunkById.get(chunkId);
 	if (!chunk) return UNKNOWN;
-	return countSiblings(
-		scope,
-		chunk,
-		[],
-		() => true,
-		new Set(seen).add(chunkId),
-		projection,
-	);
+	return countSiblings(scope, chunk, [], () => true, new Set(seen).add(chunkId), projection);
 }
 
 function countSiblings(
@@ -186,32 +190,47 @@ function countSiblings(
 	projection: ModuleGraphInterfaceElementCount,
 ): ModuleGraphInterfaceElementCount {
 	let total = 0;
-	for (const index of siblingIndexes(chunk, parentPath)) {
+	const positions = childIndexOf(scope, chunk).get(pathKey(parentPath));
+	if (!positions) return total;
+	for (const [index, position] of positions) {
 		if (!keep(index)) continue;
-		const count = positionCount(scope, chunk, parentPath, index, seen, projection);
+		const count = positionCount(scope, chunk, parentPath, index, position, seen, projection);
 		if (count === UNKNOWN) return UNKNOWN;
 		total += count;
 	}
 	return total;
 }
 
+function pathKey(path: ReadonlyArray<number>): string {
+	return path.join(',');
+}
+
 // A child index with neither a host nor an anchor slot is static text, which
-// renders no element - so only the occupied indexes need classifying.
-function siblingIndexes(
-	chunk: SemanticMarkupChunk,
-	parentPath: ReadonlyArray<number>,
-): ReadonlyArray<number> {
-	const indexes = new Set<number>();
+// renders no element - so only the occupied indexes are recorded.
+function childIndexOf(scope: Scope, chunk: SemanticMarkupChunk): ChildIndex {
+	const cached = scope.childIndexes.get(chunk);
+	if (cached) return cached;
+	const index: ChildIndex = new Map();
+	const at = (path: ReadonlyArray<number>) => {
+		const parent = pathKey(path.slice(0, -1));
+		let positions = index.get(parent);
+		if (!positions) index.set(parent, (positions = new Map()));
+		const child = path[path.length - 1]!;
+		let position = positions.get(child);
+		if (!position) positions.set(child, (position = { host: false, slot: undefined }));
+		return position;
+	};
 	for (const host of chunk.hosts) {
-		const path = host.coordinate.path;
-		if (isDirectChild(path, parentPath)) indexes.add(path[path.length - 1]!);
+		if (host.coordinate.path.length > 0) at(host.coordinate.path).host = true;
 	}
 	for (const slot of chunk.slots) {
-		if (slot.coordinate.kind !== 'comment-anchor') continue;
-		const path = slot.coordinate.path;
-		if (isDirectChild(path, parentPath)) indexes.add(path[path.length - 1]!);
+		if (slot.coordinate.kind !== 'comment-anchor' || slot.coordinate.path.length === 0)
+			continue;
+		const position = at(slot.coordinate.path);
+		position.slot ??= slot;
 	}
-	return [...indexes];
+	scope.childIndexes.set(chunk, index);
+	return index;
 }
 
 function positionCount(
@@ -219,12 +238,11 @@ function positionCount(
 	chunk: SemanticMarkupChunk,
 	parentPath: ReadonlyArray<number>,
 	index: number,
+	position: ChildPosition,
 	seen: ReadonlySet<string>,
 	projection: ModuleGraphInterfaceElementCount,
 ): ModuleGraphInterfaceElementCount {
-	const isAt = (path: ReadonlyArray<number>) =>
-		isDirectChild(path, parentPath) && path[path.length - 1] === index;
-	if (chunk.hosts.some((host) => isAt(host.coordinate.path))) {
+	if (position.host) {
 		// A host is itself plus everything it renders beneath it, so a DOM census
 		// walking the served markup meets the same number.
 		const inside = countSiblings(
@@ -237,11 +255,7 @@ function positionCount(
 		);
 		return inside === UNKNOWN ? UNKNOWN : 1 + inside;
 	}
-	const slot = chunk.slots.find(
-		(candidate) =>
-			candidate.coordinate.kind === 'comment-anchor' && isAt(candidate.coordinate.path),
-	);
-	return slot ? slotCount(scope, chunk, slot, seen, projection) : 0;
+	return position.slot ? slotCount(scope, chunk, position.slot, seen, projection) : 0;
 }
 
 function slotCount(
@@ -282,14 +296,4 @@ function slotCount(
 		default:
 			return UNKNOWN;
 	}
-}
-
-function isDirectChild(
-	path: ReadonlyArray<number>,
-	parentPath: ReadonlyArray<number>,
-): boolean {
-	return (
-		path.length === parentPath.length + 1 &&
-		parentPath.every((step, depth) => path[depth] === step)
-	);
 }

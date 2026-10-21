@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
-import type { ModuleGraphInterfaceArtifact } from '../src/artifacts.ts';
+import type { ModuleGraphInterfaceArtifact, SemanticMarkupChunk } from '../src/artifacts.ts';
 import { compileTsrxModule } from '../src/index.ts';
+import { chunkElementCount } from '../src/passes/semantic-graph/projection-placement.ts';
 
 type RenderComponent = ModuleGraphInterfaceArtifact['render']['components'][number];
 
@@ -238,4 +239,28 @@ test('a repeat after the hole absorbs the count', async () => {
 	expect(feed.projection?.elementsAfterProjection).toBe('unknown');
 	// The side the repeat does not touch stays a number.
 	expect(feed.projection?.elementsBeforeProjection).toBe(0);
+});
+
+test('counting a chunk stays linear in its elements', () => {
+	// Classifying each child index by rescanning every host took 15 s over a 486-page docs port.
+	const children = 20_000;
+	const chunk: SemanticMarkupChunk = {
+		id: 'template:Page',
+		kind: 'template',
+		componentName: 'Page',
+		statics: [],
+		hosts: [
+			{ hostNodeId: 'h0', tagName: 'ul', coordinate: { kind: 'child-index', path: [0] } },
+			...Array.from({ length: children }, (_, index) => ({
+				hostNodeId: `h${index + 1}`,
+				tagName: 'li',
+				coordinate: { kind: 'child-index' as const, path: [0, index * 2] },
+			})),
+		],
+		slots: [],
+	};
+	const started = performance.now();
+	const count = chunkElementCount({ chunks: [chunk], branchSites: [], chunkId: chunk.id });
+	expect(count).toBe(children + 1);
+	expect(performance.now() - started).toBeLessThan(1_000);
 });

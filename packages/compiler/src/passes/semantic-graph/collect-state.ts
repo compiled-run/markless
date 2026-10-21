@@ -1020,8 +1020,13 @@ function readsOwnBinding(body: AnyNode | undefined, id: AnyNode, state: WalkStat
 /** The binding a declaration site introduces, found by where its name starts. */
 function declaredSymbolAt(semantic: ModuleSemantics, offset: number): number | null {
 	for (let symbolId = 0; symbolId < semantic.bindings.length; symbolId += 1) {
-		for (let declIndex = 0; declIndex < semantic.bindings[symbolId]!.declarations.length; declIndex += 1) {
-			if (semantic.bindings[symbolId]!.declarations[declIndex]!.start === offset) return symbolId;
+		for (
+			let declIndex = 0;
+			declIndex < semantic.bindings[symbolId]!.declarations.length;
+			declIndex += 1
+		) {
+			if (semantic.bindings[symbolId]!.declarations[declIndex]!.start === offset)
+				return symbolId;
 		}
 	}
 
@@ -1616,18 +1621,41 @@ export function localConstantInitializer(
 	symbolId: number,
 	state: WalkState,
 ): AnyNode | undefined {
-	let initializer: AnyNode | undefined;
-	walkNode(ownedModuleAst(state, state.source, state.filename), (node) => {
-		if (initializer || node.type !== 'VariableDeclaration') return;
-		if (variableDeclarationKind(node) !== 'const') return;
+	for (const declarator of constDeclaratorsByName(
+		ownedModuleAst(state, state.source, state.filename),
+	).get(name) ?? []) {
+		if (declaredSymbolAt(state.semantic(), declarator.start) === symbolId)
+			return declarator.init;
+	}
+	return undefined;
+}
+
+type ConstDeclarator = { readonly start: number; readonly init: AnyNode | undefined };
+
+// One walk per module AST: walking the whole module for every constant prop read was 4.5 s of a 122-page build.
+const constDeclaratorsByAst = new WeakMap<
+	AnyNode,
+	ReadonlyMap<string, ReadonlyArray<ConstDeclarator>>
+>();
+
+function constDeclaratorsByName(ast: AnyNode): ReadonlyMap<string, ReadonlyArray<ConstDeclarator>> {
+	const cached = constDeclaratorsByAst.get(ast);
+	if (cached) return cached;
+	const byName = new Map<string, ConstDeclarator[]>();
+	walkNode(ast, (node) => {
+		if (node.type !== 'VariableDeclaration' || variableDeclarationKind(node) !== 'const')
+			return;
 		for (const declarator of asNodes(node.declarations)) {
 			const id = declarator.id as AnyNode | undefined;
-			if (!id || typeof id.start !== 'number' || getIdentifierName(id) !== name) continue;
-			if (declaredSymbolAt(state.semantic(), id.start) !== symbolId) continue;
-			initializer = declarator.init as AnyNode | undefined;
+			const name = id ? getIdentifierName(id) : null;
+			if (!id || typeof id.start !== 'number' || !name) continue;
+			const list = byName.get(name) ?? [];
+			list.push({ start: id.start, init: declarator.init as AnyNode | undefined });
+			byName.set(name, list);
 		}
 	});
-	return initializer;
+	constDeclaratorsByAst.set(ast, byName);
+	return byName;
 }
 
 export function evaluateSyncPolicyConstant(
