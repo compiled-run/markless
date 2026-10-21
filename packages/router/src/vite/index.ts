@@ -67,6 +67,12 @@ import { documentHandlerError, documentNavigationFor } from './document-navigati
 import { runFragmentNavigation, startFragmentNavigation } from './fragment-navigation.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
+	devNitroClosePlugin,
+	devNitroModule,
+	devNitroState,
+	type DevNitroState,
+} from './nitro-dev-close.ts';
+import {
 	prerenderRendererModule,
 	recordServerEntry,
 	serverBuildState,
@@ -175,6 +181,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	const fragmentEntry = resumeEntryState();
 	const routePreloads = routePreloadState();
 	const serverBuild = serverBuildState();
+	const devNitro = devNitroState();
 
 	return [
 		routerConfigPlugin(
@@ -185,6 +192,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			routePreloads,
 			fragmentEntry,
 			serverBuild,
+			devNitro,
 		),
 		devSourceModuleRequestPlugin(),
 		devPageForUrlPlugin(options),
@@ -203,6 +211,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			fragmentEntry,
 		),
 		linkBridgeFilesPlugin(navigationEntry, fragmentEntry, options),
+		devNitroClosePlugin(devNitro),
 		nitroPlugins,
 	];
 }
@@ -339,6 +348,7 @@ function routerConfigPlugin(
 	routePreloads: RoutePreloadState,
 	fragmentEntry: ResumeEntryState = resumeEntryState(),
 	serverBuild: ServerBuildState = serverBuildState(),
+	devNitro: DevNitroState = devNitroState(),
 ): Plugin {
 	let clientOutDir = '';
 	let clientEnvironmentName = '';
@@ -387,6 +397,7 @@ function routerConfigPlugin(
 					serverWatch.ignored,
 					env?.command === 'build',
 					serverBuild,
+					devNitro,
 				),
 				server: {
 					...config.server,
@@ -718,6 +729,7 @@ function createNitroConfig(
 	serverWatchIgnored: readonly WatchIgnorePattern[] = [],
 	isBuild = false,
 	serverBuild: ServerBuildState = serverBuildState(),
+	devNitro: DevNitroState = devNitroState(),
 ): NonNullable<UserConfig['nitro']> {
 	const scanDirs = Array.isArray(nitroConfig?.scanDirs)
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
@@ -744,7 +756,7 @@ function createNitroConfig(
 		modules: [
 			...(nitroConfig?.modules ?? []),
 			fragmentRequestModule(),
-			...(isBuild ? [prerenderRendererModule(serverBuild)] : []),
+			...(isBuild ? [prerenderRendererModule(serverBuild)] : [devNitroModule(devNitro)]),
 		],
 		...(isBuild && {
 			routeRules: {
