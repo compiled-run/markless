@@ -30,6 +30,7 @@ export function widgetRootsOf(
 	const child = childSurfaceOf(surface, componentName)?.components[componentName];
 	const state = child?.state;
 	if (!child || !state) return [];
+	const cellLess = child.cellLessWidgetRoots ?? [];
 	// A module serving several components publishes one payload for all of them
 	// and names each component's own nodes by position, so ownership is the
 	// selection, never the whole payload.
@@ -37,7 +38,7 @@ export function widgetRootsOf(
 	// A carrier holds an unseeded family's cells without rooting it, so ownership
 	// alone would read every part of such a family as a widget root of its own.
 	const carried = new Set(widgetFallbacksOf(surface, componentName) ?? []);
-	return (state.sharedDefinitions ?? []).flatMap((definition) => {
+	const rooted = (state.sharedDefinitions ?? []).flatMap((definition) => {
 		if (definition.scope !== 'widget') return [];
 		if (![...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))) return [];
 		if (!carried.has(definition.id)) return [definition.id];
@@ -54,6 +55,7 @@ export function widgetRootsOf(
 			? [definition.id]
 			: [];
 	});
+	return cellLess.length > 0 ? [...new Set([...rooted, ...cellLess])] : rooted;
 }
 
 /** A component placed on a page, named in the surface that placed it. */

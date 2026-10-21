@@ -128,7 +128,6 @@ export function fileBoundElementHandles(
 	definition: PrerenderDataDefinition,
 	slot: { readonly componentEdgeId: string; readonly projectionChunkId?: string },
 ): ReadonlyMap<string, unknown> | undefined {
-	if (!slot.projectionChunkId) return seeded;
 	const rootEdge = (definition.edges ?? []).find(
 		(candidate) => candidate.id === slot.componentEdgeId,
 	);
@@ -136,7 +135,10 @@ export function fileBoundElementHandles(
 		...new Set(
 			[
 				...(rootEdge ? [rootEdge.childComponentName] : []),
-				...projectionHandleChildNames(surface, definition, slot.projectionChunkId),
+				// A childless widget root still binds the handles of its own template.
+				...(slot.projectionChunkId
+					? projectionHandleChildNames(surface, definition, slot.projectionChunkId)
+					: []),
 			].flatMap((componentName) => boundElementHandlesOf(surface, componentName)),
 		),
 	];

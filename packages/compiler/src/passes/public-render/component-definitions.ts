@@ -333,6 +333,10 @@ export function collectPublicRenderComponentDefinitions(
 				...(widgetRootDefinitionIds(input, componentName).length > 0
 					? { rootsWidget: true }
 					: {}),
+				// The client tells a root by the cells it owns; a family of element() handles alone has none to own.
+				...(cellLessWidgetRoots(componentName).length > 0
+					? { cellLessWidgetRoots: cellLessWidgetRoots(componentName) }
+					: {}),
 				// A build-time gate: the render-data module attaches the per-row record qualifier only here.
 				...(projectsElementsIntoRows(chunks) ? { projectsIntoRows: true } : {}),
 				...rootPropEvents(componentName),
@@ -353,6 +357,15 @@ export function collectPublicRenderComponentDefinitions(
 				...residueReaderFields(),
 			},
 		];
+
+		function cellLessWidgetRoots(name: string): string[] {
+			return widgetRootDefinitionIds(input, name).filter(
+				(definitionId) =>
+					!input.protocolState.cells.some((cell) =>
+						cell.graphNodeId.startsWith(`${definitionId}/`),
+					),
+			);
+		}
 
 		// A handler that is the prop itself takes its composer's callback in a client render too; a wrapping one runs through its bound claim.
 		function rootPropEvents(name: string): { readonly propEvents?: ReturnType<typeof collectSsrPropEvents> } {
