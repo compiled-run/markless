@@ -11,16 +11,24 @@ type LinkedPackage = { readonly id: string; readonly real: string };
 
 const linkedPackagesByRoot = new Map<string, ReadonlyArray<LinkedPackage>>();
 const mintedSources = new Map<string, string>();
+// Like `linkedPackagesByRoot`, this trusts the install layout for the life of the process: resolving a file's
+// links on every call was 10 s of a 57 s docs build.
+const mintedIds = new Map<string, string>();
 
 export function moduleIdFor(filename: string, root: string | undefined): string {
 	if (!root || !isAbsolute(filename)) return filename;
-	const relativeId = relative(root, filename);
-	const id =
-		!relativeId.startsWith('..') && !relativeId.includes('node_modules/')
-			? relativeId
-			: (packageRootedModuleId(filename, root) ??
-				(outsideCheckout(filename, root) ? namedPackageModuleId(filename) : null) ??
-				relativeId);
+	const key = `${root}\0${filename}`;
+	let id = mintedIds.get(key);
+	if (id === undefined) {
+		const relativeId = relative(root, filename);
+		id =
+			!relativeId.startsWith('..') && !relativeId.includes('node_modules/')
+				? relativeId
+				: (packageRootedModuleId(filename, root) ??
+					(outsideCheckout(filename, root) ? namedPackageModuleId(filename) : null) ??
+					relativeId);
+		mintedIds.set(key, id);
+	}
 	mintedSources.set(`${root}\0${id}`, filename);
 	return id;
 }
@@ -35,7 +43,8 @@ function packageRootedModuleId(filename: string, root: string): string | null {
 	const real = realpathOf(filename);
 	for (const linked of linkedPackages(root)) {
 		if (real === linked.real) return linked.id;
-		if (real.startsWith(`${linked.real}/`)) return `${linked.id}${real.slice(linked.real.length)}`;
+		if (real.startsWith(`${linked.real}/`))
+			return `${linked.id}${real.slice(linked.real.length)}`;
 	}
 	return null;
 }

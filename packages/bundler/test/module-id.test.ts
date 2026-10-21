@@ -70,3 +70,12 @@ test('a module id reads back to the file the bundler resolved', () => {
 	expect(sourceForModuleId(absolute, root)).toBe(absolute);
 	expect(sourceForModuleId(absolute, undefined)).toBe(absolute);
 });
+
+test('spelling a dependency file again does not resolve its links again', () => {
+	// The interaction-closures asset spells a module once per handler that reaches it: millions of calls on a docs site.
+	const dependency = join(linkedPackage, 'src/box.tsrx');
+	const started = performance.now();
+	for (let call = 0; call < 200_000; call++) moduleIdFor(dependency, root);
+	expect(performance.now() - started).toBeLessThan(500);
+	expect(moduleIdFor(dependency, root)).toBe('node_modules/@acme/ui/src/box.tsrx');
+});
