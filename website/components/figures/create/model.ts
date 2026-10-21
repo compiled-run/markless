@@ -1,6 +1,7 @@
 // The create-markless run as the figure plays it: the real prompts, options and defaults from packages/cli/src/index.ts, and the files each starter writes.
 import { createCommand, type ManagerId } from '../../docs/walkthrough/facts.ts';
 import { completion, isInvalid, NO_WAIT, ranWith, waitsOf } from './managers.ts';
+import { STARTER_DEV_PORTS } from '../../../../packages/cli/src/index.ts';
 
 export type Starter = 'minimal' | 'app' | 'docs' | 'full-stack';
 export type Format = 'node' | 'bun';
@@ -418,7 +419,7 @@ export function transcript(run: Run): Row[] {
 			row('│', `  cd ${run.name}`, 'value'),
 			row('│', `  ${devCommand(run.manager)}`, 'value'),
 			row('│', 'Then open:', 'value'),
-			row('│', '  http://localhost:3000', 'value'),
+			row('│', `  http://localhost:${STARTER_DEV_PORTS[starterOf(run)]}`, 'value'),
 			row('└', 'Markless app ready.', 'done'),
 		);
 		return [...rows, ...shell(run)];

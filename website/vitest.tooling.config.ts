@@ -3,6 +3,10 @@ export default {
 	root: import.meta.dirname,
 	test: {
 		name: 'website-tooling',
-		include: ['tooling/**/*.test.ts'],
+		include: [
+			'tooling/**/*.test.ts',
+			'components/figures/create/create.test.ts',
+			'components/docs/code/worker-sources.test.ts',
+		],
 	},
 };

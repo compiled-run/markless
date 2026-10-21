@@ -203,7 +203,6 @@ describe('the create figure plays the real CLI', () => {
 		expect(cli).toContain("prompts.intro('Welcome to Markless');");
 		expect(cli).toContain("{ value: 'create', label: 'Create app', hint: '' }");
 		expect(cli).toContain("initialValue: 'minimal'");
-		expect(cli).toContain("'  http://localhost:3000'");
 	});
 
 	it('drops exactly the files the CLI writes for every starter, runtime and editor, each with a true one-line note', async () => {
