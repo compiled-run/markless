@@ -133,8 +133,10 @@ export function nvdaToAnchoredSection(nvda: NVDAPlaywright, page: Page) {
 		enter: () => nvda.navigateToWebContent(),
 		nextHeading: () => nvda.perform(nvda.keyboardCommands.moveToNextHeading),
 		lastSpokenPhrase: () => nvda.lastSpokenPhrase(),
-		// Leaving a grouping on the way prefixes "out of grouping, ".
-		reached: (phrase, heading) => phrase.endsWith(`heading, level 2, ${heading}`),
+		// The H jump says "Checkbox, heading, level 2"; leaving a grouping on the way prefixes "out of grouping, ".
+		reached: (phrase, heading) =>
+			phrase === `${heading}, heading, level 2` ||
+			phrase.endsWith(`, ${heading}, heading, level 2`),
 	});
 }
 
