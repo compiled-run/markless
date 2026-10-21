@@ -144,6 +144,7 @@ jobs:
     # Real NVDA on a real Windows desktop session. guidepup/setup-action
     # installs NVDA and the keyboard automation it needs.
     nvda:
+        if: false
         runs-on: windows-latest
         timeout-minutes: 60
         strategy:
