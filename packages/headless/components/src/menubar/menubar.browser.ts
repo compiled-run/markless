@@ -1,6 +1,6 @@
 import { render, renderSSR } from '@markless/vitest-browser';
 import axe from 'axe-core';
-import { page } from 'vite-plus/test/browser';
+import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { parkPointerClearOfMount } from '../../test-support/pointer-parking.ts';
 import Basic from './scenarios/basic.tsrx';
@@ -241,6 +241,16 @@ for (const mode of MODES) {
 		keyOn(el('bar-view'), ' ');
 		await expectShowing('panel-view');
 		await expectFocused('item-wrap');
+	});
+
+	// A screen reader's activation reaches the page as a trusted click with a count, the same as a mouse's.
+	test(`${mode}: a trusted click opens an item's menu on its first command`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await userEvent.click(el('bar-edit'));
+		await expectShowing('panel-edit');
+		await expectFocused('item-undo');
 	});
 
 	test(`${mode}: an arrow inside an open menu closes it and opens the neighbour's`, async () => {

@@ -274,8 +274,8 @@ function MenubarItemControl({
 
 			const wasOpen = level.expanded === true;
 			level.expanded = wasOpen !== true;
-			// A click with no click count came from Enter or Space, which the APG opens focusing the first command; a mouse click leaves focus on the item.
-			if (wasOpen !== true && event.detail === 0) {
+			// A screen reader's click looks like a mouse's, so every opening goes in except the bar's own hover reveal, an untrusted click with a count.
+			if (wasOpen !== true && (event.isTrusted || event.detail === 0)) {
 				surface?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
 			}
 			event.stopPropagation();

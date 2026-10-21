@@ -233,10 +233,8 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 			const wasOpen = menu.open === true;
 			if (wasOpen) menu.hide();
 			else menu.show();
-			// A click with no click count came from Enter or Space, which the APG opens focusing the first item; a mouse click leaves focus on the trigger.
-			if (wasOpen !== true && event.detail === 0) {
-				focusEdge(ownItems(surfaces, menu.itemEls, surface), false);
-			}
+			// A screen reader's activation is a click with a count and a mouse pointerType, so no click can be told from a keyboard one: every opening goes in.
+			if (wasOpen !== true) focusEdge(ownItems(surfaces, menu.itemEls, surface), false);
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -556,10 +554,7 @@ export function MenuItem({
 				const wasOpen = item.expanded === true;
 				item.expanded = wasOpen !== true;
 				item.byHover = false;
-				// A pointer opening a submenu leaves focus where it is; a keyboard activation, which carries no click count, goes in.
-				if (wasOpen !== true && event.detail === 0) {
-					focusEdge(ownItems(surfaces, menu.itemEls, panel), false);
-				}
+				if (wasOpen !== true) focusEdge(ownItems(surfaces, menu.itemEls, panel), false);
 			} else if (isSelection && menu.radio !== true && menu.checked.includes(item.value)) {
 				menu.uncheck(item.value);
 			} else if (isSelection) {

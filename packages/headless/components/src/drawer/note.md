@@ -74,7 +74,7 @@ why the family needs none of Vaul's `scrollLockTimeout` machinery.
 No reference library gives a keyboard any way to reach an intermediate rest position - a drawer
 resting at 0.5 is stuck there for anyone not using a pointer, in Base UI, Ark and Vaul alike. Here an
 arrow key along the drawer's own axis steps one rest position, guarded to presses that target the
-surface itself so a control inside the drawer keeps its own arrows. `keyIntent()` derives the mapping
+surface or its title (where an opening drawer lands focus) so a control inside the drawer keeps its own arrows. `keyIntent()` derives the mapping
 from the closing direction rather than writing it out four times, so a top sheet and a right-to-left
 side panel are correct without a table.
 

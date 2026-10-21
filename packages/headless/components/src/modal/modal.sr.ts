@@ -71,6 +71,17 @@ test('opening the dialog makes its name reachable', async () => {
 	await readUntil(sr, { name: 'Edit delivery address' });
 });
 
+// APG dialog: focus lands on an element inside the dialog. The title is the static one at the top, so the reader names it.
+test('opening the dialog lands focus on its title, inside the dialog', async () => {
+	await open(Basic);
+	await readUntil(sr, { role: 'button', name: 'Edit address' });
+	await sr.press(sr.keys.enter);
+	const title = document.querySelector<HTMLElement>('[data-testid="title"]')!;
+	await expect.poll(() => document.activeElement).toBe(title);
+	expect(title.closest('[role="dialog"]')).not.toBeNull();
+	expectConveys(await sr.settleOnFocus(), { name: 'Edit delivery address' });
+});
+
 test('the opened surface announces as a dialog', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button', name: 'Edit address' });

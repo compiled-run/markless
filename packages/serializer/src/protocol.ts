@@ -174,6 +174,9 @@ export type ProtocolStatePayload = {
 					readonly key: unknown;
 					readonly error: unknown;
 			  };
+		// A roster derive only: the host-id prefix of the component that declared it,
+		// which its symbol-space id cannot spell once a module holds several components.
+		readonly hostScope?: string;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which

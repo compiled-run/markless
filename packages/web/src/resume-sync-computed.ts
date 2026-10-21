@@ -20,6 +20,7 @@ type ResumeSyncComputedRecord = {
 			readonly path: ReadonlyArray<string>;
 		};
 	}>;
+	readonly hostScope?: string;
 };
 
 /**

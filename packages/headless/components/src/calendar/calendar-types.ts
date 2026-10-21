@@ -165,6 +165,8 @@ export type CalendarInstanceState = {
 	popup: boolean;
 	open: boolean;
 	name: string;
+	/** A page key crossed into a month whose day does not exist yet, so focus waits on the month itself. */
+	landing: boolean;
 	onChange?: CalendarRootProps['onChange'];
 };
 

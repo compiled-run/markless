@@ -34,6 +34,10 @@ export async function readSelectTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	await sr.press(sr.keys.enter);
 	await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: CHANGE_TIMEOUT_MS });
+	// A reader's Enter is a click with a count, and it still hands focus into the list.
+	await expect(page.locator('[role="option"]:focus')).toHaveCount(1, { timeout: CHANGE_TIMEOUT_MS });
+	const landed = await sr.settleOnFocus();
+	expect(missingFacts(sr, landed, { role: 'option' }), `${sr.name} announced "${landed}"`).toEqual([]);
 
 	// A closed listbox keeps its options out of the tree, so reaching all three by
 	// name is the proof the popup opened for the reader and not only for the DOM.

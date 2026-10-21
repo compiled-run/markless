@@ -65,6 +65,7 @@ export type ComposeStateNode = {
 export type ComposeStateComputed = ComposeStateNode & {
 	readonly deriveSymbolId?: string;
 	readonly dependencies?: ReadonlyArray<ComposeGraphRead>;
+	readonly hostScope?: string;
 };
 // "This shared node follows these prop reads": the child module's own seed, so a
 // write on the composing instance re-runs it.
@@ -597,6 +598,9 @@ function marklessComposedState<T extends ComposeStateDraft>(
 					...(computed.deriveSymbolId
 						? { deriveSymbolId: marklessBoundSymbolId(child, computed.deriveSymbolId) }
 						: {}),
+					...(computed.dependencies?.some((read) => read.graphNodeId.includes('/element:')) && {
+						hostScope: child.hostPrefix + (computed.hostScope ?? ''),
+					}),
 				})),
 			),
 		],

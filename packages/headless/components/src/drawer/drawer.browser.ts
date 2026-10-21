@@ -448,6 +448,13 @@ for (const mode of MODES) {
 		expect(el(Content).hasAttribute('aria-describedby')).toBe(false);
 	});
 
+	test(`${mode}: a drawer with no title lands focus on its surface`, async () => {
+		if (mode === 'CSR') await render(Unnamed);
+		else await renderSSR(Unnamed);
+		await openBasic();
+		await expect.poll(() => document.activeElement).toBe(el(Content));
+	});
+
 	test(`${mode}: the two other edges render as their own axis and side`, async () => {
 		if (mode === 'CSR') await render(Panel);
 		else await renderSSR(Panel);
@@ -484,7 +491,8 @@ for (const mode of MODES) {
 		expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 		expectBackgroundOutOfReach(el(Background));
 		expect(el(Root).getAttribute('ui-open')).toBe('');
-		await expect.poll(() => document.activeElement).toBe(el(Content));
+		// On the title, inside the dialog: a reader announces the dialog it entered, then the heading.
+		await expect.poll(() => document.activeElement).toBe(el(Title));
 		expect(document.body.style.overflow).toBe('hidden');
 
 		await closeBasic();
@@ -712,9 +720,10 @@ test('CSR: the arrow keys along the axis step the rest positions', async () => {
 	await render(Snapped);
 	await openBasic();
 	const content = el<HTMLElement>(Content);
-	await expect.poll(() => document.activeElement).toBe(content);
+	const title = el<HTMLElement>(Title);
+	await expect.poll(() => document.activeElement).toBe(title);
 
-	press(content, 'ArrowUp');
+	press(title, 'ArrowUp');
 	await expect.poll(() => el(Snap).textContent).toBe('1');
 	await expect.poll(() => offset(content)).toBe(0);
 
@@ -723,7 +732,7 @@ test('CSR: the arrow keys along the axis step the rest positions', async () => {
 	await expect.poll(() => offset(content)).toBe(0.5);
 
 	// The walk stops at the end rather than cycling round to the top.
-	press(content, 'ArrowDown');
+	press(title, 'ArrowDown');
 	await quiet();
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 	expect(offset(content)).toBe(0.5);

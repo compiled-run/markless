@@ -348,10 +348,8 @@ test('CSR: every key of the roving model moves the focused day', async () => {
 	await expect.poll(() => focused(), { timeout: 5000 }).toBe('2026-08-15');
 });
 
-// Red in CSR because a page-key crossing lands on a day the shown grid does not
-// hold yet, so the handler has no day handle to focus and the commit drops the
-// page to <body>; the keys after it then go nowhere. SSR lands.
-test.fails('CSR: PageDown crosses the month and takes the focus with it', async () => {
+// The day a page key heads for is built by the commit after the handler, so the month holds focus until it exists.
+test('CSR: PageDown crosses the month and takes the focus with it', async () => {
 	await render(Basic);
 	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
 
@@ -364,21 +362,59 @@ test.fails('CSR: PageDown crosses the month and takes the focus with it', async 
 		})
 		.toBe('2026-09-14');
 	expect(days().filter((one) => one.getAttribute('tabindex') === '0').length).toBe(1);
+	// The month held focus only on the way to the day, so it leaves no second tab stop behind.
+	await expect.poll(() => el(Content).hasAttribute('tabindex'), { timeout: 5000 }).toBe(false);
 
 	await userEvent.keyboard('{PageUp}');
 	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('August 2026');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2026-08-14');
 });
 
-test.fails('CSR: Shift with the page keys steps a year', async () => {
+test('SSR: PageDown crosses the month and takes the focus with it', async () => {
+	await renderSSR(Basic);
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	dayFor('2026-08-14').focus();
+	await userEvent.keyboard('{PageDown}');
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('September 2026');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2026-09-14');
+	expect(days().filter((one) => one.getAttribute('tabindex') === '0').length).toBe(1);
+	// The month held focus only on the way to the day, so it leaves no second tab stop behind.
+	await expect.poll(() => el(Content).hasAttribute('tabindex'), { timeout: 5000 }).toBe(false);
+
+	await userEvent.keyboard('{PageUp}');
+	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('August 2026');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
+			timeout: 5000,
+		})
+		.toBe('2026-08-14');
+});
+
+test('CSR: Shift with the page keys steps a year', async () => {
 	await render(Basic);
 	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	const focused = () => (document.activeElement as HTMLElement | null)?.getAttribute('value');
 
 	dayFor('2026-08-14').focus();
 	await userEvent.keyboard('{Shift>}{PageDown}{/Shift}');
 	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('August 2027');
+	await expect.poll(focused, { timeout: 5000 }).toBe('2027-08-14');
 
-	await userEvent.keyboard('{Shift>}{PageUp}{/Shift}{Shift>}{PageUp}{/Shift}');
+	await userEvent.keyboard('{Shift>}{PageUp}{/Shift}');
+	await expect.poll(focused, { timeout: 5000 }).toBe('2026-08-14');
+	await userEvent.keyboard('{Shift>}{PageUp}{/Shift}');
 	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('August 2025');
+	await expect.poll(focused, { timeout: 5000 }).toBe('2025-08-14');
 });
 
 test('CSR: an arrow off the end of the month crosses into the next one', async () => {

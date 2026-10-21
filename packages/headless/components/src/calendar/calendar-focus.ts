@@ -6,10 +6,12 @@ export function landFocus(target: HTMLElement | undefined): void {
 	target?.focus();
 }
 
-/** Land focus on the day holding one date, read off the family's own day handles. */
-export function landFocusOn(days: () => Days, iso: string): void {
-	if (iso === '') return;
-	dayWithValue(days(), iso)?.focus();
+/** Land focus on the day holding one date, read off the family's own day handles; false when no day holds it yet. */
+export function landFocusOn(days: () => Days, iso: string): boolean {
+	if (iso === '') return false;
+	const day = dayWithValue(days(), iso);
+	day?.focus();
+	return day !== undefined;
 }
 
 /** The day button carrying one date, out of the handle set the family binds. */

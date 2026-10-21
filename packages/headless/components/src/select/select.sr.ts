@@ -7,6 +7,7 @@ import { OpenList } from './scenarios/open-list.tsrx';
 import { Prefilled } from './scenarios/prefilled.tsrx';
 import { SignupForm } from './scenarios/signup-form.tsrx';
 import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
+import { assistiveActivate } from '../../test-support/assistive-activation.ts';
 
 // Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
@@ -107,6 +108,20 @@ test('a select showing its popup conveys expanded and a named listbox', async ()
 	await open(OpenList);
 	expectConveys(await readFor([say.button]), [say.button, say.expanded]);
 	expectConveys(await readFor([say.listbox]), [say.listbox, 'Favorite Fruit']);
+});
+
+// The click a screen reader sends carries a count, like a mouse's, and still has to take the reader into the list.
+test("a screen reader's activation of the trigger lands the reader on an option", async () => {
+	await open(Basic);
+	const trigger = document.querySelector<HTMLElement>('[data-testid="trigger"]')!;
+	trigger.focus();
+	await sr.settleOnFocus();
+	assistiveActivate(trigger);
+	await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('true');
+	await expect
+		.poll(() => document.activeElement)
+		.toBe(document.querySelector('[data-testid="apple"]'));
+	expectConveys(await sr.settleOnFocus(), [say.option, 'Apple']);
 });
 
 test('the chosen option is the only one conveyed as selected', async () => {

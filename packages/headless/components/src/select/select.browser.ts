@@ -13,6 +13,7 @@ import { TwoSelects } from './scenarios/two-selects.tsrx';
 import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithOnChange } from './scenarios/with-onchange.tsrx';
 import { WithoutOnChange } from './scenarios/without-onchange.tsrx';
+import { assistiveActivate } from '../../test-support/assistive-activation.ts';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -507,6 +508,30 @@ test('CSR: Enter and Space open the popup and land on the first option', async (
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('false');
 	await openWith(' ');
+	await expect.poll(async () => await focused()).toBe(el(Apple));
+});
+
+// A screen reader activates the trigger with a click indistinguishable from a mouse's, so every opening lands in the list.
+test('CSR: a screen reader activation opens the popup and lands on the first option', async () => {
+	await render(Basic);
+	el(Trigger).focus();
+	assistiveActivate(el(Trigger));
+	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('true');
+	await expect.poll(async () => await focused()).toBe(el(Apple));
+});
+
+test('SSR: a screen reader activation opens the popup and lands on the first option', async () => {
+	await renderSSR(Basic);
+	el(Trigger).focus();
+	assistiveActivate(el(Trigger));
+	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('true');
+	await expect.poll(async () => await focused()).toBe(el(Apple));
+});
+
+test('CSR: a pointer click opens the popup with focus on an option', async () => {
+	await render(Basic);
+	await userEvent.click(el(Trigger));
+	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('true');
 	await expect.poll(async () => await focused()).toBe(el(Apple));
 });
 

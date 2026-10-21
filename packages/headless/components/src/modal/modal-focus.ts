@@ -1,19 +1,22 @@
 /** The two focus moves the overlay behaviour deliberately leaves to the family. */
 
 /**
- * Land focus in the dialog.
+ * Land focus in the dialog, on an element inside it (APG dialog pattern).
  *
- * The surface itself takes it, not the first control inside it. Naming that
- * control would mean asking the DOM for the surface's focusable descendants,
- * and the library selects no DOM nodes. An alert is the exception: it prefers its close control, which is a part and so has a handle.
+ * The title is the static element at the top of the content the APG names for
+ * this: a reader announces the dialog it has entered, then the heading. The
+ * first control would mean asking the DOM for focusable descendants, which the
+ * library never does. An alert prefers its close control, a dialog with no title
+ * part falls back to the surface itself.
  */
 export function focusIntoSurface(
 	content: HTMLElement | undefined,
+	title: HTMLElement | undefined,
 	close: HTMLElement | undefined,
 	isAlert: boolean,
 ): void {
 	if (isAlert && close) return close.focus();
-	content?.focus();
+	(title ?? content)?.focus();
 }
 
 /**
