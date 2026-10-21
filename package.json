@@ -22,6 +22,7 @@
 		"bench:jsfb:guard": "node scripts/benchmarks/jsfb-baseline.mjs compare",
 		"bench:jsfb:prepare": "node scripts/benchmarks/prepare-jsfb-markless.mjs",
 		"bench:interaction:guard": "node scripts/benchmarks/perf-guards/timing-guard.mjs",
+		"build-scale:guard": "node scripts/benchmarks/build-scale/guard.mjs",
 		"perf:guard": "vp test run --config packages/bundler/test/perf-guards/vitest.config.ts",
 		"perf:guard:check": "node scripts/benchmarks/perf-guards/cli.mjs check",
 		"perf:guard:accept": "node scripts/benchmarks/perf-guards/cli.mjs accept",

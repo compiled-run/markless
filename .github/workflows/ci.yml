@@ -162,6 +162,8 @@ jobs:
             run_website_boxes: ${{ steps.website_boxes.outputs.cache-hit != 'true' }}
             key_demo_boxes: ${{ steps.demo_boxes.outputs.cache-primary-key }}
             run_demo_boxes: ${{ steps.demo_boxes.outputs.cache-hit != 'true' }}
+            key_build_scale: ${{ steps.build_scale.outputs.cache-primary-key }}
+            run_build_scale: ${{ steps.build_scale.outputs.cache-hit != 'true' }}
             run_playwright:
                 ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' || steps.boxes_bundler.outputs.cache-hit
                 != 'true' || steps.boxes_router.outputs.cache-hit != 'true' ||
@@ -304,6 +306,16 @@ jobs:
                       'demos/executed-at-load/**/*',
                       '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
 
+            # The generated app is written by scripts/benchmarks/build-scale and built
+            # through packages/*/src, which the shared hash already covers.
+            - name: Probe the build-scale lane
+              id: build_scale
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  path: build-scale-completed.txt
+                  key: build-scale-${{ hashFiles('ci-base-key.txt') }}
+
             # The receipt set is the union of what the box lanes wrote, so every
             # box key feeds this one: a box lane that re-runs re-runs receipts.
             - name: Record the box lane keys
@@ -338,6 +350,7 @@ jobs:
                   echo "receipts=${{ steps.receipts.outputs.cache-hit != 'true' }}"
                   echo "website-boxes=${{ steps.website_boxes.outputs.cache-hit != 'true' }}"
                   echo "demo-boxes=${{ steps.demo_boxes.outputs.cache-hit != 'true' }}"
+                  echo "build-scale=${{ steps.build_scale.outputs.cache-hit != 'true' }}"
 
     # One browser download for the whole run: the unit, browser and box lanes
     # restore this cache instead of each fetching its own copy, which is what
@@ -1203,6 +1216,7 @@ jobs:
                 receipts,
                 website-boxes,
                 demo-boxes,
+                build-scale,
             ]
         if: always()
         runs-on: ubuntu-latest
@@ -1266,6 +1280,42 @@ jobs:
 
             - name: Run the package-manager workspace matrix
               run: pnpm exec vp test run packages/cli/test/workspace-matrix.test.ts --project node
+
+    # A generated app built at 100 and 300 pages: build memory, the largest chunk and the largest
+    # build artifact against scripts/benchmarks/build-scale/budgets.json, and the built server answers.
+    build-scale:
+        needs: [typecheck, lanes]
+        if: needs.lanes.outputs.run_build_scale == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build the generated app at two sizes against its budgets
+              run: pnpm build-scale:guard
+
+            - name: Mark the build-scale lane complete
+              run: echo ok > build-scale-completed.txt
+
+            - name: Save the build-scale lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_build_scale }}
+                  path: build-scale-completed.txt
 
     changes:
         runs-on: ubuntu-latest

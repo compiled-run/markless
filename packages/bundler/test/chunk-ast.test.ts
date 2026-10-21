@@ -3,6 +3,7 @@ import {
 	calleeOffsets,
 	clearParsedChunkCode,
 	mayContainDynamicImport,
+	PARSED_CHUNK_CACHE_MAX_CODE_LENGTH,
 	parseChunkCode,
 	spansAnyOffset,
 	textOffsets,
@@ -17,6 +18,22 @@ describe('chunk syntax trees shared across post-bundle passes', () => {
 		expect(parseChunkCode('a.js', 'export const a=2;')).not.toBe(first);
 		clearParsedChunkCode();
 		expect(parseChunkCode('a.js', code)).not.toBe(first);
+	});
+
+	// Every chunk's tree, and each superseded version of it, stayed held until the next build started.
+	test('drops a chunk tree its rewrite superseded, and parses past the cache budget uncached', () => {
+		clearParsedChunkCode();
+		const before = parseChunkCode('a.js', 'export const a=1;');
+		parseChunkCode('a.js', 'export const a=2;');
+		expect(parseChunkCode('b.js', 'export const a=1;')).not.toBe(before);
+
+		clearParsedChunkCode();
+		const half = 'x'.repeat(PARSED_CHUNK_CACHE_MAX_CODE_LENGTH / 2);
+		const first = parseChunkCode('one.js', `export const a="${half}";`);
+		const second = parseChunkCode('two.js', `export const b="${half}";`);
+		expect(parseChunkCode('one.js', `export const a="${half}";`)).toBe(first);
+		expect(parseChunkCode('two.js', `export const b="${half}";`)).not.toBe(second);
+		clearParsedChunkCode();
 	});
 
 	test('never shares a tree between file kinds that parse differently', () => {

@@ -22,7 +22,7 @@ import {
 	normalizeVirtualId,
 } from '../virtual-ids.ts';
 
-export const MARKLESS_INTERACTION_CLOSURES_VERSION = 1;
+export const MARKLESS_INTERACTION_CLOSURES_VERSION = 2;
 
 // Records whose code can run on a landing page before any input: boot holds their symbols.
 // The rest run only through an input or the writes it makes, inside some control's first use.
@@ -161,6 +161,8 @@ export function computeInteractionClosures(input: {
 	for (const merged of demand.values())
 		for (const id of merged.unknownRecordModuleIds) knownRuntimeIds.add(id);
 
+	// Many controls share one closure; holding each list once keeps a large site's closures in memory once.
+	const sharedClosures = new Map<string, string[]>();
 	// Static and dynamic imports, never into another route. When bounded, a dynamic import is also
 	// skipped when demand data names who loads it: the file's own symbols (its map bounds them;
 	// another file's resolver may not) and, given a runtime set, known runtime outside it.
@@ -223,7 +225,12 @@ export function computeInteractionClosures(input: {
 				pending.push([target, inside]);
 			}
 		}
-		return [...seen].sort();
+		const ids = [...seen].sort();
+		const key = ids.join('\0');
+		const shared = sharedClosures.get(key);
+		if (shared) return shared;
+		sharedClosures.set(key, ids);
+		return ids;
 	};
 
 	const result: RouteInteractionClosures[] = [];
@@ -456,9 +463,38 @@ export function interactionClosuresAsset(input: {
 	};
 	const packs = new Map<string, string[]>();
 	for (const [id, name] of input.packs) push(packs, name, display(id, input.root));
+	// Handlers × closure size outgrew V8's longest string, so each module and each distinct closure is written once.
+	const displayed = new Map<string, string>();
+	for (const route of input.closures)
+		for (const consumer of route.consumers)
+			for (const id of consumer.modules)
+				if (!displayed.has(id)) displayed.set(id, display(id, input.root));
+	const modules = [...new Set(displayed.values())].sort();
+	const moduleIndex = new Map(modules.map((id, index) => [id, index]));
+	const closureSets: number[][] = [];
+	const closureIndex = new Map<readonly string[], number>();
+	const closureByKey = new Map<string, number>();
+	const closureOf = (ids: readonly string[]) => {
+		const known = closureIndex.get(ids);
+		if (known !== undefined) return known;
+		const indexes = [...new Set(ids.map((id) => moduleIndex.get(displayed.get(id)!)!))].sort(
+			(a, b) => a - b,
+		);
+		const key = indexes.join(',');
+		let index = closureByKey.get(key);
+		if (index === undefined) {
+			index = closureSets.length;
+			closureSets.push(indexes);
+			closureByKey.set(key, index);
+		}
+		closureIndex.set(ids, index);
+		return index;
+	};
 	return JSON.stringify({
 		version: MARKLESS_INTERACTION_CLOSURES_VERSION,
 		partition: input.partition,
+		modules,
+		closures: closureSets,
 		routes: input.closures.map((route) => ({
 			route: route.route,
 			...(route.fallback ? { fallback: route.fallback } : {}),
@@ -470,7 +506,7 @@ export function interactionClosuresAsset(input: {
 				kind: consumer.kind,
 				...(consumer.conservative ? { conservative: consumer.conservative } : {}),
 				...(consumer.lean ? { lean: true } : {}),
-				modules: consumer.modules.map((id) => display(id, input.root)).sort(),
+				closure: closureOf(consumer.modules),
 			})),
 		})),
 		packs: Object.fromEntries(
@@ -730,6 +766,47 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
 	const values = map.get(key);
 	if (values) values.push(value);
 	else map.set(key, [value]);
+}
+
+export type InteractionClosuresAssetView = {
+	readonly version: number;
+	readonly partition: string;
+	readonly routes: ReadonlyArray<{
+		readonly route: string;
+		readonly fallback?: string;
+		readonly files?: { readonly firstUse: readonly string[]; readonly render: readonly string[] };
+		readonly consumers: ReadonlyArray<
+			Omit<InteractionConsumer, 'modules'> & { readonly modules: readonly string[] }
+		>;
+	}>;
+	readonly packs: Readonly<Record<string, readonly string[]>>;
+	readonly packFiles?: Readonly<Record<string, readonly string[]>>;
+};
+
+/** The asset with every consumer's closure spelled out as module ids again. */
+export function readInteractionClosuresAsset(source: string): InteractionClosuresAssetView {
+	const parsed = JSON.parse(source) as Omit<InteractionClosuresAssetView, 'routes'> & {
+		readonly modules: readonly string[];
+		readonly closures: ReadonlyArray<readonly number[]>;
+		readonly routes: ReadonlyArray<
+			Omit<InteractionClosuresAssetView['routes'][number], 'consumers'> & {
+				readonly consumers: ReadonlyArray<
+					Omit<InteractionConsumer, 'modules'> & { readonly closure: number }
+				>;
+			}
+		>;
+	};
+	const { modules, closures, ...rest } = parsed;
+	return {
+		...rest,
+		routes: parsed.routes.map((route) => ({
+			...route,
+			consumers: route.consumers.map(({ closure, ...consumer }) => ({
+				...consumer,
+				modules: closures[closure]!.map((index) => modules[index]!),
+			})),
+		})),
+	};
 }
 
 // File lists sort by name when written, but content-hash renaming changes the names after that.

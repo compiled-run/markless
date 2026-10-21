@@ -12,6 +12,7 @@ import {
 import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../../bundler/src/transform.ts';
 import { emitQueuedResumeContainerEvent } from '../../bundler/src/source-module.ts';
+import { sharedInlineSourcesModuleSource } from '../../bundler/src/shared-inline-sources.ts';
 import { compileTsrxModule } from '../../compiler/src/index.ts';
 import { render, renderToString } from '../src/index.ts';
 import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
@@ -574,6 +575,10 @@ async function captureDispatchModuleUrl(
 		);
 		browserModuleSource = browserModuleSource.split(imported.specifier).join(moduleUrl);
 	}
+	for (const sharedId of new Set(browserModuleSource.match(/virtual:markless:inline-sources-[^"']+/g)))
+		browserModuleSource = browserModuleSource
+			.split(sharedId)
+			.join(javascriptModuleUrl((await sharedInlineSourcesModuleSource(sharedId))!));
 	const unresolvedVirtualIds = browserModuleSource.match(/virtual:markless:[^"']+/g);
 	if (unresolvedVirtualIds)
 		throw new Error(`${filename}: ${JSON.stringify(unresolvedVirtualIds)}`);

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
 	computeInteractionClosures,
 	interactionClosuresAsset,
+	readInteractionClosuresAsset,
 	type InteractionClosureModule,
 } from '../src/build/interaction-closures.ts';
 import { symbolVirtualModuleId } from '../src/source-module.ts';
@@ -260,14 +261,39 @@ test('the closures asset names modules relative to the root and is stable', () =
 	const packs = new Map([[`${root}/lib/format.ts`, 'route:screens/panel.tsrx']]);
 	const asset = interactionClosuresAsset({ root, closures, packs, partition: 'tiers' });
 	expect(asset).toBe(interactionClosuresAsset({ root, closures, packs, partition: 'tiers' }));
-	const parsed = JSON.parse(asset);
-	expect(parsed.version).toBe(1);
+	const parsed = readInteractionClosuresAsset(asset);
+	expect(parsed.version).toBe(2);
 	expect(parsed.packs).toEqual({ 'route:screens/panel.tsrx': ['lib/format.ts'] });
-	expect(JSON.stringify(parsed.routes)).not.toContain(encodeURIComponent(`${root}/`));
-	const click = parsed.routes[0].consumers.find((consumer: { key: string }) =>
-		consumer.key.endsWith('#h1:click'),
-	);
+	expect(asset).not.toContain(encodeURIComponent(`${root}/`));
+	const click = parsed.routes[0]!.consumers.find((consumer) => consumer.key.endsWith('#h1:click'))!;
 	expect(click.modules).toContain('virtual:markless:symbol:screens%2Fpanel.tsrx:symbol%3A0');
+});
+
+// ui.shadcn.com's asset passed V8's string limit: 400 handlers each listing a 2,000-module closure on one page.
+test('the closures asset writes each module and each distinct closure once, whatever the handler count', () => {
+	const shared = Array.from({ length: 2_000 }, (_, i) => `${root}/lib/module-${i}.ts`);
+	const routeCount = 3;
+	const actionCount = 400;
+	const closures = Array.from({ length: routeCount }, (_, r) => ({
+		route: `pages/p${r}.tsrx`,
+		consumers: [
+			{ key: 'boot', kind: 'boot' as const, modules: shared.slice(0, 100) },
+			...Array.from({ length: actionCount }, (_, a) => ({
+				key: `action:pages/p${r}.tsrx#h${a}:click`,
+				kind: 'action' as const,
+				modules: a % 2 ? shared : [...shared.slice(0, 1_000), `${root}/pages/p${r}.tsrx`],
+			})),
+		],
+	}));
+	const asset = interactionClosuresAsset({ root, closures, packs: new Map(), partition: 'tiers' });
+	const idBytes = shared.reduce((sum, id) => sum + id.length - root.length, 0);
+	expect(asset.length).toBeLessThan(idBytes * 3 + routeCount * actionCount * 80);
+	const decoded = readInteractionClosuresAsset(asset);
+	const click = decoded.routes[2]!.consumers.find((consumer) => consumer.key.endsWith('#h7:click'))!;
+	expect(click.modules).toEqual(shared.map((id) => id.slice(root.length + 1)).sort());
+	const other = decoded.routes[1]!.consumers.find((consumer) => consumer.key.endsWith('#h8:click'))!;
+	expect(other.modules).toContain('pages/p1.tsrx');
+	expect(other.modules).toHaveLength(1_001);
 });
 
 test('a control whose first use the compiler could not classify keeps everything landing code can import', () => {

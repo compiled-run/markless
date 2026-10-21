@@ -134,7 +134,7 @@ A flake is a test that fails and passes on the same code. Rules:
 
 Byte walls and budgets failed 54 runs, usually by a few bytes to a few hundred. The existing performance-guard model is the rule for all of them:
 
-- Changing a budget or anchor requires a one-line reason in the same commit (`pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"` for the perf guards; the same shape for `fixture-builds` walls, the music-player budgets, and box byte walls).
+- Changing a budget or anchor requires a one-line reason in the same commit (`pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"` for the perf guards; the same shape for `fixture-builds` walls, the music-player budgets, box byte walls, and the `reason` beside each budget in `scripts/benchmarks/build-scale/budgets.json`).
 - Re-anchoring is a decision, not a fix: the reason says what the extra bytes buy, or which win the lower anchor records.
 - A big win re-anchors in the same change set, so the anchor stays close to reality.
 - Byte walls must be measured the way CI measures them (`NODE_ENV=test` from vitest, a clean tree). `ci:local --clean` does that; a hand-run demo build does not.

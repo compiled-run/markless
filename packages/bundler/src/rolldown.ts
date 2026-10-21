@@ -267,6 +267,8 @@ export function createMarklessRolldownPlugin(input: {
 					output.hashCharacters,
 					packing?.api ?? declaredPacks,
 				);
+				// Each cached tree holds its parser's native buffer; a large site's chunks outgrew the heap held together.
+				clearParsedChunkCode();
 			},
 		},
 		async writeBundle(output, bundle) {

@@ -24,6 +24,10 @@ import {
 	transformTsrxModule,
 } from '../transform.ts';
 import { moduleIdFor } from '../module-id.ts';
+import {
+	isSharedInlineSourcesModuleId,
+	sharedInlineSourcesModuleSource,
+} from '../shared-inline-sources.ts';
 import { isRelativeImport as isRelative, normalizeVirtualId, pathname } from '../virtual-ids.ts';
 import {
 	createLinkedModuleInterfaces,
@@ -87,6 +91,8 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 	): Promise<string> {
 		const virtual = virtualSources.get(normalizeVirtualId(id));
 		if (virtual !== undefined) return virtual;
+		const sharedInlineSources = await sharedInlineSourcesModuleSource(normalizeVirtualId(id));
+		if (sharedInlineSources !== null) return sharedInlineSources;
 		const file = pathname(id);
 		const source = await readFile(file, 'utf8');
 		if (!isTsrxModule(file)) return await stripEmittedTypes(source, file);
@@ -120,6 +126,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 		root: string | undefined,
 	): Promise<unknown> {
 		const virtualId = normalizeVirtualId(specifier);
+		if (isSharedInlineSourcesModuleId(virtualId)) return await load(virtualId, resolve, root);
 		const virtualOwner = marklessVirtualModuleSourceFile(virtualId, root);
 		if (virtualOwner) {
 			// A sibling minted by a module this loader has not compiled yet: compile
