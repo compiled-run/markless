@@ -1,0 +1,29 @@
+{
+	"pages": [100, 300],
+	"budgets": {
+		"peakRssBytes": {
+			"bytes": 4831838208,
+			"reason": "4.5 GB: measured 3.33 to 3.36 GB at 300 pages (M-series macOS, Node 24, 2026-10-21), and resident memory moves by a few hundred MB between runs. main before the build-scale fixes: 4.31 GB."
+		},
+		"peakRssBytesPerPage": {
+			"bytes": 12582912,
+			"reason": "12 MB: measured 7.6 to 7.9 MB per page between 100 and 300 pages; main before the build-scale fixes: 12.4 MB."
+		},
+		"retainedHeapBytes": {
+			"bytes": 629145600,
+			"reason": "600 MB: measured 528 to 529 MB held after a full collection at 300 pages, at the end of the client bundle's generate pass; main before the build-scale fixes: 1,104 MB."
+		},
+		"retainedHeapBytesPerPage": {
+			"bytes": 1468006,
+			"reason": "1.4 MB: measured 1.12 to 1.13 MB per page between 100 and 300 pages; main before the build-scale fixes: 3.24 MB."
+		},
+		"largestClientChunkBytes": {
+			"bytes": 262144,
+			"reason": "256 kB: measured 0.12 MB at 300 pages (main the same); the runtime walls in fixture-builds gate framework weight, this catches a chunk that absorbs the site."
+		},
+		"largestArtifactBytes": {
+			"bytes": 4194304,
+			"reason": "4 MB: measured 3.20 MB (interaction-closures.json) at 300 pages; main before the build-scale fixes wrote 84.6 MB."
+		}
+	}
+}

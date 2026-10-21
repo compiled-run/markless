@@ -68,7 +68,9 @@ test('a server build splits compiled modules into chunks no larger than the serv
 		const total = chunks.reduce((sum, chunk) => sum + chunk.code.length, 0);
 		expect(total).toBeGreaterThan(MARKLESS_SERVER_CHUNK_MAX_BYTES * 1.5);
 		for (const chunk of chunks)
-			expect(chunk.code.length, chunk.fileName).toBeLessThanOrEqual(MARKLESS_SERVER_CHUNK_MAX_BYTES);
+			expect(chunk.code.length, chunk.fileName).toBeLessThanOrEqual(
+				MARKLESS_SERVER_CHUNK_MAX_BYTES,
+			);
 		const entry = chunks.find((chunk) => chunk.isEntry)!;
 		const page = (await import(pathToFileURL(resolve(outDir, entry.fileName)).href)) as {
 			default: { renderSsr(): Promise<{ readonly html: string }> };

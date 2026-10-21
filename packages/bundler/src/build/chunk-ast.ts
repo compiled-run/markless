@@ -56,7 +56,10 @@ export async function prefetchChunkParses(
 	let reserved = 0;
 	for (const { fileName, code } of chunks) {
 		if (parsedFor(fileName).has(code)) continue;
-		if (!admits(fileName, code) || cachedCodeLength + reserved + code.length > PARSED_CHUNK_CACHE_MAX_CODE_LENGTH)
+		if (
+			!admits(fileName, code) ||
+			cachedCodeLength + reserved + code.length > PARSED_CHUNK_CACHE_MAX_CODE_LENGTH
+		)
 			continue;
 		reserved += code.length;
 		pending.push(
@@ -231,7 +234,8 @@ export function chunkLocalExportSpecifiers(
 		const braced = code[nextTokenStart(code, statement.start + 'export'.length)] === '{';
 		for (const entry of statement.entries) {
 			if (!braced || entry.moduleRequest) continue;
-			if (entry.exportName.kind !== 'Name' || entry.localName.kind !== 'Name') return undefined;
+			if (entry.exportName.kind !== 'Name' || entry.localName.kind !== 'Name')
+				return undefined;
 			bindings.set(entry.exportName.name!, entry.localName.name!);
 		}
 	}

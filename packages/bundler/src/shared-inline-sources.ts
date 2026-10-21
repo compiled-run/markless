@@ -28,7 +28,10 @@ function sharedInlineSourcesOptions(
 	const bare = id.startsWith('\0') ? id.slice(1) : id;
 	if (!bare.startsWith(PREFIX)) return null;
 	const [flavour, executionLog] = bare.slice(PREFIX.length).split('-');
-	if ((flavour !== 'debug' && flavour !== 'production') || !EXECUTION_LOG_MODES.has(executionLog!))
+	if (
+		(flavour !== 'debug' && flavour !== 'production') ||
+		!EXECUTION_LOG_MODES.has(executionLog!)
+	)
 		return null;
 	return { debug: flavour === 'debug', executionLog: executionLog as MarklessExecutionLogMode };
 }
