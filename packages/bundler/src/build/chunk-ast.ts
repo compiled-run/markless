@@ -2,8 +2,16 @@ import { parse, parseSync } from 'rolldown/experimental';
 
 type ParseResult = ReturnType<typeof parseSync>;
 
+// Callers that hold a chunk's code but not its name pass this placeholder.
+const UNNAMED_CHUNK = 'chunk.js';
+
 // Keyed by exact code: a rewritten chunk is a new string, so a later pass never reads a stale tree.
 const parsedByExtension = new Map<string, Map<string, ParseResult>>();
+// A tree and its parser buffers take ~30 times its code, so a large site's chunks parse uncached past this budget.
+export const PARSED_CHUNK_CACHE_MAX_CODE_LENGTH = 16 * 1024 * 1024;
+let cachedCodeLength = 0;
+// A chunk's superseded code is dropped once its new code is parsed.
+const codeByFile = new Map<string, string>();
 
 function parsedFor(fileName: string): Map<string, ParseResult> {
 	const extension = fileName.slice(fileName.lastIndexOf('.'));
@@ -12,10 +20,31 @@ function parsedFor(fileName: string): Map<string, ParseResult> {
 	return parsed;
 }
 
-export function parseChunkCode(fileName: string, code: string): ParseResult {
+function forgetSuperseded(fileName: string, code: string): void {
+	const previous = codeByFile.get(fileName);
+	if (previous === undefined || previous === code) return;
+	if (parsedFor(fileName).delete(previous)) cachedCodeLength -= previous.length;
+	codeByFile.delete(fileName);
+}
+
+function admits(fileName: string, code: string): boolean {
+	if (fileName !== UNNAMED_CHUNK) forgetSuperseded(fileName, code);
+	return cachedCodeLength + code.length <= PARSED_CHUNK_CACHE_MAX_CODE_LENGTH;
+}
+
+function remember(fileName: string, code: string, result: ParseResult): void {
 	const parsed = parsedFor(fileName);
-	let result = parsed.get(code);
-	if (!result) parsed.set(code, (result = parseSync(fileName, code)));
+	if (parsed.has(code)) return;
+	if (fileName !== UNNAMED_CHUNK) codeByFile.set(fileName, code);
+	parsed.set(code, result);
+	cachedCodeLength += code.length;
+}
+
+export function parseChunkCode(fileName: string, code: string): ParseResult {
+	const cached = parsedFor(fileName).get(code);
+	if (cached) return cached;
+	const result = parseSync(fileName, code);
+	if (admits(fileName, code)) remember(fileName, code, result);
 	return result;
 }
 
@@ -24,14 +53,15 @@ export async function prefetchChunkParses(
 	chunks: Iterable<{ readonly fileName: string; readonly code: string }>,
 ): Promise<void> {
 	const pending: Promise<void>[] = [];
+	let reserved = 0;
 	for (const { fileName, code } of chunks) {
-		const parsed = parsedFor(fileName);
-		if (parsed.has(code)) continue;
+		if (parsedFor(fileName).has(code)) continue;
+		if (!admits(fileName, code) || cachedCodeLength + reserved + code.length > PARSED_CHUNK_CACHE_MAX_CODE_LENGTH)
+			continue;
+		reserved += code.length;
 		pending.push(
 			parse(fileName, code).then(
-				(result) => {
-					if (!parsed.has(code)) parsed.set(code, result);
-				},
+				(result) => remember(fileName, code, result),
 				// A parse that throws is left to the synchronous path, which reports it where it did.
 				() => {},
 			),
@@ -42,6 +72,8 @@ export async function prefetchChunkParses(
 
 export function clearParsedChunkCode(): void {
 	parsedByExtension.clear();
+	codeByFile.clear();
+	cachedCodeLength = 0;
 }
 
 // Over-approximates: an `import` keyword followed, past whitespace and comments, by `(`.
