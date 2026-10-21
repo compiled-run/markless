@@ -158,6 +158,8 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - `timebox`, `datebox`: an empty segment has no `aria-valuenow` and no `aria-valuetext`. VoiceOver reads it as a percentage of the range ("-9.1% hour input stepper"), NVDA as "spin button, 0". The specs do not assert the empty reading, so they pass.
 - `modal`, `drawer` (VoiceOver): opening moves focus onto the dialog container, and VoiceOver reads the title heading without ever saying "dialog".
 
+**VoiceOver specs still red for the harness, not the family:** `menu`, `pad`, `rating` and `slider`, and `toolbar` in some runs. In each, a key or a script moves the page's focus and VoiceOver never hears of it (VO-F4 keeps naming the old element), so the spec reads the wrong item. The fallback, reading a few items each way for the focused element's name, fails when a group carries the same name as its control (`pad`) or when the element is outside the window it reads. Moving VoiceOver's cursor through the pointer (VO-Shift-F5 after warping the pointer onto the element) was tried and lost VoiceOver's place more often than it found the element. NVDA reads all of them. This is why `voiceover` stays advisory.
+
 **Cost and reruns.** macOS jobs share a small organisation-wide pool, and a run can wait hours to start behind other branches' screen-reader runs. Do not rerun a run just to get it green.
 
 ## 8. Cutting a release
