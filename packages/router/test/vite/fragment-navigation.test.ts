@@ -316,6 +316,26 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a class token, declaration and attribute a script added to a container body survive the swap beside the served class', async () => {
+			const { page, errors } = await open(browser);
+			await page.evaluate(() => {
+				document.body.classList.add('menu-open');
+				document.body.style.overflow = 'hidden';
+				document.body.dataset.scrollLocked = 'yes';
+			});
+			await page.locator('[data-nav="other"]').click();
+			await landedOn(page, 'other');
+			expect(
+				await page.evaluate(() => ({
+					classes: [...document.body.classList].sort(),
+					overflow: document.body.style.overflow,
+					locked: document.body.dataset.scrollLocked,
+				})),
+			).toEqual({ classes: ['app', 'menu-open'], overflow: 'hidden', locked: 'yes' });
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('route stylesheets and the title follow the destination', async () => {
 			const { page, errors } = await open(browser);
 			const color = () =>
@@ -659,9 +679,12 @@ for (const [name, browserType] of [
 				const lost: string[] = [];
 				(window as unknown as Record<string, unknown>).__themeLost = lost;
 				const check = (when: string) => {
-					if (!root.classList.contains('dark')) lost.push(`${when}: class ${root.className}`);
-					if (root.style.colorScheme !== 'dark') lost.push(`${when}: style ${root.style.cssText}`);
-					if (root.dataset.mode !== 'dark') lost.push(`${when}: data-mode ${root.dataset.mode}`);
+					if (!root.classList.contains('dark'))
+						lost.push(`${when}: class ${root.className}`);
+					if (root.style.colorScheme !== 'dark')
+						lost.push(`${when}: style ${root.style.cssText}`);
+					if (root.dataset.mode !== 'dark')
+						lost.push(`${when}: data-mode ${root.dataset.mode}`);
 				};
 				new MutationObserver(() => check('mutation')).observe(root, { attributes: true });
 				const frame = () => {
@@ -677,17 +700,101 @@ for (const [name, browserType] of [
 					homeVar: document.documentElement.style.getPropertyValue('--home'),
 					scroll: document.documentElement.style.scrollBehavior,
 				}));
-			expect(await html()).toEqual({ home: true, shell: true, homeVar: '1', scroll: 'smooth' });
+			expect(await html()).toEqual({
+				home: true,
+				shell: true,
+				homeVar: '1',
+				scroll: 'smooth',
+			});
 			await page.locator('[data-pager-next]').click();
 			await landedOn(page, 'alpha');
-			expect(await html()).toEqual({ home: false, shell: true, homeVar: '', scroll: 'smooth' });
+			expect(await html()).toEqual({
+				home: false,
+				shell: true,
+				homeVar: '',
+				scroll: 'smooth',
+			});
 			await page.locator('[data-pager-next]').click();
 			await landedOn(page, 'beta');
 			await page.locator('[data-crumb-home]').click();
 			await landedOn(page, 'index');
-			expect(await html()).toEqual({ home: true, shell: true, homeVar: '1', scroll: 'smooth' });
+			expect(await html()).toEqual({
+				home: true,
+				shell: true,
+				homeVar: '1',
+				scroll: 'smooth',
+			});
 			expect(
-				await page.evaluate(() => (window as unknown as Record<string, unknown>).__themeLost),
+				await page.evaluate(
+					() => (window as unknown as Record<string, unknown>).__themeLost,
+				),
+			).toEqual([]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('what a script set on a shell body survives every swap, in every frame, while the server still owns its own body class tokens, declarations and attributes', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			await page.evaluate(() => {
+				const body = document.body;
+				const lost: string[] = [];
+				(window as unknown as Record<string, unknown>).__bodyLost = lost;
+				const check = (when: string) => {
+					if (!document.body.classList.contains('menu-open'))
+						lost.push(`${when}: class ${document.body.className}`);
+					if (document.body.style.overflow !== 'hidden')
+						lost.push(`${when}: style ${document.body.style.cssText}`);
+					if (document.body.dataset.scrollLocked !== 'yes')
+						lost.push(
+							`${when}: data-scroll-locked ${document.body.dataset.scrollLocked}`,
+						);
+				};
+				new MutationObserver(() => check('mutation')).observe(body, { attributes: true });
+				const frame = () => {
+					check('frame');
+					requestAnimationFrame(frame);
+				};
+				requestAnimationFrame(frame);
+			});
+			const body = () =>
+				page.evaluate(() => ({
+					home: document.body.classList.contains('page-home'),
+					page: document.body.classList.contains('page'),
+					homeVar: document.body.style.getPropertyValue('--body-home'),
+					margin: document.body.style.margin,
+					shown: document.body.dataset.bodyPage,
+				}));
+			expect(await body()).toEqual({
+				home: true,
+				page: true,
+				homeVar: '1',
+				margin: '0px',
+				shown: '/',
+			});
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'alpha');
+			expect(await body()).toEqual({
+				home: false,
+				page: true,
+				homeVar: '',
+				margin: '0px',
+				shown: '/alpha',
+			});
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'beta');
+			await page.locator('[data-crumb-home]').click();
+			await landedOn(page, 'index');
+			expect(await body()).toEqual({
+				home: true,
+				page: true,
+				homeVar: '1',
+				margin: '0px',
+				shown: '/',
+			});
+			expect(
+				await page.evaluate(
+					() => (window as unknown as Record<string, unknown>).__bodyLost,
+				),
 			).toEqual([]);
 			expect(errors).toEqual([]);
 			await page.close();

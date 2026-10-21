@@ -10,6 +10,7 @@ export interface FragmentNavigationConfig {
 	readonly scrollAttribute: string;
 	readonly routeScriptType: string;
 	readonly servedHtmlAttributesProperty: string;
+	readonly servedBodyAttributesProperty: string;
 	readonly retireProperty: string;
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
@@ -408,26 +409,78 @@ async function mergeHead(d: Document, next: Document) {
 }
 
 // A swap applies only what the server changed between its documents; a script's own changes (a theme class) stay.
-const serverHtmlAttributes = new WeakMap<Document, ReadonlyMap<string, string>>();
+type ServedAttributes = ReadonlyMap<string, string>;
+const servedAttributes = {
+	html: new WeakMap<Document, ServedAttributes>(),
+	body: new WeakMap<Document, ServedAttributes>(),
+};
 
-function syncHtmlAttributes(d: Document, next: Document, servedProperty: string): void {
-	const root = d.documentElement;
-	const served =
-		serverHtmlAttributes.get(d) ??
+const attributePairs = (element: Element): ServedAttributes =>
+	new Map(Array.from(element.attributes, (attribute) => [attribute.name, attribute.value]));
+
+// What the served document gave <html> or <body>: the last swap's incoming, else the landing's own record.
+function servedBefore(
+	d: Document,
+	which: 'html' | 'body',
+	servedProperty: string,
+): ServedAttributes {
+	return (
+		servedAttributes[which].get(d) ??
 		new Map(
-			(root as unknown as Record<string, readonly [string, string][] | undefined>)[
-				servedProperty
-			],
-		);
-	const incoming = new Map(
-		Array.from(next.documentElement.attributes, (attribute) => [attribute.name, attribute.value]),
+			(
+				d.documentElement as unknown as Record<
+					string,
+					readonly [string, string][] | undefined
+				>
+			)[servedProperty],
+		)
 	);
+}
+
+function applyServedChanges(
+	d: Document,
+	target: HTMLElement,
+	served: ServedAttributes,
+	incoming: ServedAttributes,
+): void {
 	for (const name of new Set([...served.keys(), ...incoming.keys()])) {
 		const before = served.get(name) ?? null;
 		const after = incoming.get(name) ?? null;
-		if (before !== after) applyServedChange(d, root, name, before, after);
+		if (before !== after) applyServedChange(d, target, name, before, after);
 	}
-	serverHtmlAttributes.set(d, incoming);
+}
+
+function syncHtmlAttributes(d: Document, next: Document, servedProperty: string): void {
+	const incoming = attributePairs(next.documentElement);
+	applyServedChanges(d, d.documentElement, servedBefore(d, 'html', servedProperty), incoming);
+	servedAttributes.html.set(d, incoming);
+}
+
+// A shell <body> the swap morphs in place takes only the server's changes to its attributes.
+function syncBodyAttributes(d: Document, next: Document, servedProperty: string): void {
+	const incoming = attributePairs(next.body);
+	applyServedChanges(d, d.body, servedBefore(d, 'body', servedProperty), incoming);
+	servedAttributes.body.set(d, incoming);
+}
+
+// A container <body> is replaced whole: the incoming one takes the outgoing's attributes plus the server's changes, its own container attributes as served.
+function carryBodyAttributes(
+	d: Document,
+	from: HTMLElement,
+	to: HTMLElement,
+	own: readonly string[],
+	servedProperty: string,
+): void {
+	const incoming = attributePairs(to);
+	const merged = d.createElement(from.localName);
+	for (const attribute of from.attributes) merged.setAttribute(attribute.name, attribute.value);
+	applyServedChanges(d, merged, servedBefore(d, 'body', servedProperty), incoming);
+	for (const name of to.getAttributeNames())
+		if (!own.includes(name) && !merged.hasAttribute(name)) to.removeAttribute(name);
+	for (const attribute of merged.attributes)
+		if (!own.includes(attribute.name) && to.getAttribute(attribute.name) !== attribute.value)
+			to.setAttribute(attribute.name, attribute.value);
+	servedAttributes.body.set(d, incoming);
 }
 
 // class and style are merged a token and a declaration at a time, so a script's own tokens are never dropped.
@@ -469,7 +522,10 @@ function declarations(d: Document, value: string | null): Map<string, [string, s
 	const result = new Map<string, [string, string]>();
 	for (let index = 0; index < style.length; index++) {
 		const property = style.item(index);
-		result.set(property, [style.getPropertyValue(property), style.getPropertyPriority(property)]);
+		result.set(property, [
+			style.getPropertyValue(property),
+			style.getPropertyPriority(property),
+		]);
 	}
 	return result;
 }
@@ -678,7 +734,7 @@ type HeldPage = [parent: Node, before: Node | null, nodes: ChildNode[]][];
 
 function holdPage(parent: Element, after: Node | undefined, before: Node | null): HeldPage {
 	const nodes: ChildNode[] = [];
-	for (let node = after ? after.nextSibling : parent.firstChild; node && node !== before; ) {
+	for (let node = after ? after.nextSibling : parent.firstChild; node && node !== before;) {
 		const next: ChildNode | null = node.nextSibling;
 		nodes.push(node);
 		node.remove();
@@ -810,6 +866,8 @@ export async function navigate(
 	for (const element of d.querySelectorAll(state.config.streamedArmSelector)) element.remove();
 	state.shown = pageKey(new URL(w.location.href));
 	if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
+	if (documentLoads && !isContainer(d.body))
+		syncBodyAttributes(d, next, state.config.servedBodyAttributesProperty);
 	let region: Element;
 	let end: Comment;
 	let start: Comment | undefined;
@@ -823,9 +881,18 @@ export async function navigate(
 		region.append((end = d.createComment('')));
 	} else {
 		region = d.adoptNode(incoming);
+		if (outgoing === d.body)
+			carryBodyAttributes(
+				d,
+				outgoing as HTMLElement,
+				region as HTMLElement,
+				state.config.containerAttributes,
+				state.config.servedBodyAttributesProperty,
+			);
 		const leavingEnd = pageEnd(outgoing, state.config.pageEndComment);
 		if (leavingEnd) {
-			carryHostAttributes(d, outgoing, region, state.config.containerAttributes);
+			if (outgoing !== d.body)
+				carryHostAttributes(d, outgoing, region, state.config.containerAttributes);
 			end =
 				pageEnd(region, state.config.pageEndComment) ??
 				region.appendChild(d.createComment(state.config.pageEndComment));
@@ -865,7 +932,9 @@ export async function navigate(
 	}
 	// A scroll target or a restored position needs the whole page in place before it is applied.
 	const progressive = restore === 'reset' && !url.hash && d.visibilityState !== 'hidden';
-	const filled = held && fillPage(w, held, progressive ? FRAME_ELEMENTS : Infinity, () => id === session.navigation);
+	const filled =
+		held &&
+		fillPage(w, held, progressive ? FRAME_ELEMENTS : Infinity, () => id === session.navigation);
 	if (filled instanceof Promise) {
 		w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 		if (!(await filled)) return;

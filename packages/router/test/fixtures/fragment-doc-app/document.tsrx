@@ -28,7 +28,14 @@ export default function Document({
 			<meta name="description" content={`About ${title}`} />
 			<link rel="canonical" href={`https://guide.test${pathname}`} />
 		</head>
-		<body>
+		<body
+			class={pathname === '/' ? 'page page-home' : 'page'}
+			data-body-page={pathname}
+			style={pathname === '/' ? 'margin: 0; --body-home: 1' : 'margin: 0'}
+		>
+			<script>
+				{'const body = document.body; body.classList.add("menu-open"); body.style.overflow = "hidden"; body.dataset.scrollLocked = "yes";'}
+			</script>
 			<header class="shell-header">
 				<a href="/" data-crumb-home>Guide</a>
 				<span class="crumb">{title}</span>
