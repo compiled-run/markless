@@ -182,7 +182,7 @@ export const nvdaSpec: RealDriverSpec = {
 	segments: commaSegments,
 };
 
-// VoiceOver's cursor and the page's focus are two positions; these are VoiceOver's own commands for joining them.
+// VoiceOver's cursor and the page's focus are two positions; settling joins them with VoiceOver's own command.
 export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	name: 'VoiceOver',
 	vocabulary: voiceOverVocabulary,
@@ -192,14 +192,12 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 		// Asked before it has seen the page's focus change, VoiceOver lands on the document itself ("... web content").
 		for (let attempt = 0; attempt < 10; attempt++) {
 			await voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
-			// Silent when its cursor had already followed the focus; describing the item makes it say where it is.
+			// Silent when its cursor had already followed the focus, so ask it what has the focus.
 			if ((await voiceOver.lastSpokenPhrase()) === '') {
-				await voiceOver.perform(voiceOver.keyboardCommands.describeItem);
+				await voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
 			}
 			const phrase = await voiceOver.lastSpokenPhrase();
 			if (phrase !== '' && !phrase.endsWith(' web content')) return;
 		}
 	},
-	focusToCursor: (voiceOver) =>
-		voiceOver.perform(voiceOver.keyboardCommands.moveKeyboardFocusToCursor),
 };

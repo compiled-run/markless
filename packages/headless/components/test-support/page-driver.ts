@@ -21,8 +21,6 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	segments: (phrase: string) => string[];
 	/** Bring the reading cursor to the element the page focused, for a reader that does not follow focus on its own. */
 	cursorToFocus?: (reader: R) => Promise<void>;
-	/** Bring the page's focus to the item the reading cursor is on, so a key lands on the item the reader just read. */
-	focusToCursor?: (reader: R) => Promise<void>;
 };
 
 /**
@@ -51,10 +49,7 @@ export function realDriver<R extends RealReader>(
 		stop: async () => {},
 		next: () => reader.next(),
 		previous: () => reader.previous(),
-		async press(key) {
-			await spec.focusToCursor?.(reader);
-			await reader.press(key);
-		},
+		press: (key) => reader.press(key),
 		async reannounce() {
 			// Neither reader has a "read the current item again" command that is
 			// guaranteed to re-read from the live DOM, so this steps off the item
