@@ -195,8 +195,19 @@ function emitTsrxCodeBlock(block: TsrxAstNode, source: string): string {
 		emitPlainStatement(statement, source),
 	);
 	const render = block.render ? emitTemplateNode(block.render, source) : '';
-	const renderStatement = render ? `return ${render};` : '';
+	const returned = isNode(block.render) && isMarkupNode(block.render) ? render : `<>${render}</>`;
+	const renderStatement = render ? `return ${returned};` : '';
 	return ['{', ...statements, renderStatement, '}'].filter(Boolean).join('\n');
+}
+
+// A construct or `{expression}` render is a JSX child, so it needs a fragment to be returned.
+function isMarkupNode(node: TsrxAstNode): boolean {
+	return (
+		node.type === 'JSXElement' ||
+		node.type === 'Element' ||
+		node.type === 'JSXFragment' ||
+		node.type === 'Fragment'
+	);
 }
 
 function emitPlainStatement(statement: TsrxAstNode, source: string): string {
