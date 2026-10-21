@@ -77,7 +77,7 @@ jobs:
         outputs:
             sha: ${{ steps.plan.outputs.sha }}
             pr: ${{ steps.plan.outputs.pr }}
-            suites: ${{ steps.plan.outputs.suites }}
+            jobs: ${{ steps.plan.outputs.jobs }}
             lane: ${{ steps.plan.outputs.lane }}
         steps:
             - uses: actions/checkout@v4
@@ -116,12 +116,12 @@ jobs:
                     requested="$INPUT_SUITES"
                     lane="${INPUT_LANE:-sample}"
                   fi
-                  suites="$(node ecosystem-ci/ecosystem-ci.ts list --json ${requested:-all})"
+                  jobs="$(node ecosystem-ci/ecosystem-ci.ts list --matrix --lane "$lane" ${requested:-all})"
                   echo "sha=${sha}" >> "$GITHUB_OUTPUT"
                   echo "pr=${pr}" >> "$GITHUB_OUTPUT"
-                  echo "suites=${suites}" >> "$GITHUB_OUTPUT"
+                  echo "jobs=${jobs}" >> "$GITHUB_OUTPUT"
                   echo "lane=${lane}" >> "$GITHUB_OUTPUT"
-                  echo "Markless ${sha}, ${lane} lane, suites ${suites}${pr:+, results on #${pr}}"
+                  echo "Markless ${sha}, ${lane} lane, jobs ${jobs}${pr:+, results on #${pr}}"
 
     build:
         needs: plan
@@ -171,7 +171,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                suite: ${{ fromJSON(needs.plan.outputs.suites) }}
+                include: ${{ fromJSON(needs.plan.outputs.jobs) }}
         steps:
             - uses: actions/checkout@v4
               with:
@@ -186,16 +186,23 @@ jobs:
 
             - uses: ./ecosystem-ci/.github/actions/setup
 
+            - name: Name the results after the shard
+              id: name
+              env:
+                  SHARD: ${{ matrix.shard }}
+              run: echo "shard=${SHARD/\//-of-}" >> "$GITHUB_OUTPUT"
+
             - name: Run the suite
               env:
                   SUITE: ${{ matrix.suite }}
+                  SHARD: ${{ matrix.shard }}
                   LANE: ${{ needs.plan.outputs.lane }}
-              run: node ecosystem-ci/ecosystem-ci.ts run "$SUITE" --packs packs --lane "$LANE" --results results
+              run: node ecosystem-ci/ecosystem-ci.ts run "$SUITE" --packs packs --lane "$LANE" --shard "$SHARD" --results results
 
             - uses: actions/upload-artifact@v4
               if: always()
               with:
-                  name: ecosystem-results-${{ matrix.suite }}
+                  name: ecosystem-results-${{ matrix.suite }}-${{ steps.name.outputs.shard }}
                   path: |
                       results
                       ecosystem-ci/workspace/runs

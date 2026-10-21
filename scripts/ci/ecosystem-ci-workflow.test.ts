@@ -50,7 +50,7 @@ describe('ecosystem-ci.yml', () => {
 
 	test('the comment text reaches the shell only through an environment variable', () => {
 		const resolve = plan.steps.find((step) =>
-			step.run?.includes('ecosystem-ci.ts list --json'),
+			step.run?.includes('ecosystem-ci.ts list --matrix'),
 		)!;
 		expect(resolve.env!.COMMENT).toBe('${{ github.event.comment.body }}');
 		for (const job of Object.values(workflow.jobs)) {
