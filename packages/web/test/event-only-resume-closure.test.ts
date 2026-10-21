@@ -109,7 +109,10 @@ const resumeOnDemandEntries = [
 // grows them before the page-end comment: resume-keyed-repeats.ts 24,471 -> 26,457 raw, most of it resume-anchor-census.ts
 // counted whole while the bundle keeps only its pageNodes; minified+gzip 3,451 -> 3,536 bytes (rolldown, same method both
 // sides), under the 4,800 gzip wall, and the shipped module is the one resume already loads.
-const sourceByteLimit = 26457;
+// 2026-10-21: a runtime an onIdle or onVisible handler starts leaves its rows' code until the reader's first input (shadcn-admin
+// /settings/account ran 1.5 MB at load without it): 26,457 -> 27,145 raw; minified+gzip 3,495 -> 3,595 bytes (rolldown, same
+// method both sides), under the 4,800 gzip wall.
+const sourceByteLimit = 27145;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

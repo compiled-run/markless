@@ -159,6 +159,8 @@ export function wireKeyedRepeats(
 			!!each.collectionGraphNodeId &&
 			!isProp(each.collectionGraphNodeId),
 	);
+	// An onIdle or onVisible handler started this runtime and no reader has acted yet: building rows is not its code to run.
+	const deferredStart = typeof input.root?.__marklessDelegatedDispatch === 'string';
 	const nested = !onRow && (globalThis as ResumeNestedRepeatsHost).__marklessNestedRepeats;
 	if (nested) return nested({ ...input, pageRepeats }, rowComponentHost);
 	if (!armRows && input.view.keyedRepeats?.some((repeat) => repeat.branchArm))
@@ -251,7 +253,8 @@ export function wireKeyedRepeats(
 		};
 		// No gesture changes a fixed prop list, so none waits for its row code: it loads when idle.
 		const propCollection = !rowsChange && isProp(repeat.collectionGraphNodeId);
-		if (propCollection) (globalThis.requestIdleCallback ?? setTimeout)(startLoading);
+		if (deferredStart) afterReaderInput(startLoading);
+		else if (propCollection) (globalThis.requestIdleCallback ?? setTimeout)(startLoading);
 		else startLoading();
 		let pending: ReturnType<NonNullable<RowMint['rows']>> | undefined;
 		const settledMint = (): { readonly mint: RowMint | undefined } | undefined => {
@@ -330,6 +333,15 @@ export function wireKeyedRepeats(
 			}),
 		);
 	}
+}
+// Window capture runs before the container's dispatch, so a gesture's handler still waits for the rows it writes.
+function afterReaderInput(run: () => void): void {
+	const types = ['pointerover', 'pointerdown', 'focusin', 'keydown', 'click'];
+	const arrive = (): void => {
+		for (const type of types) removeEventListener(type, arrive, true);
+		run();
+	};
+	for (const type of types) addEventListener(type, arrive, true);
 }
 // Instance segments end in ':', so a prop node's local id starts the id or follows one.
 function isProp(id: string): boolean {

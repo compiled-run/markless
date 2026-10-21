@@ -34,8 +34,9 @@ export type ResumeDomElement = ResumeDomNode & {
 	readonly removeAttribute?: (name: string) => void;
 	// The build-complete bootstrap owns DOM capture for the container lifetime.
 	// Full and staged runtimes register records only; they never add a second
-	// listener authority while this marker is present.
-	__marklessDelegatedDispatch?: boolean;
+	// listener authority while this marker is present. A string names the
+	// deferred trigger (idle, visible) that is starting the container.
+	__marklessDelegatedDispatch?: boolean | string;
 	// Set by the startup script: adds its own capture listener for an event type first registered after serve.
 	__marklessListen?: (eventType: string) => void;
 	__marklessDispatch?: (input: {
