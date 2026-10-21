@@ -5,7 +5,9 @@ import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Alert from './scenarios/alert.tsrx';
 import Basic from './scenarios/basic.tsrx';
 import Described from './scenarios/described.tsrx';
+import Fallback from './scenarios/fallback.tsrx';
 import Labelled from './scenarios/labelled.tsrx';
+import Renamed from './scenarios/renamed.tsrx';
 import Nested from './scenarios/nested.tsrx';
 
 // Rows assert the facts an announcement must convey, never a reader product's wording.
@@ -130,8 +132,19 @@ test('opening a second dialog puts the first one out of reach', async () => {
 	expect(await walk(10)).not.toContain('Background');
 });
 
-// The plain-text name is the one VoiceOver speaks for a dialog not directly under <main>; every reader must still hear it with the role.
-test('a dialog given a plain-text aria-label conveys it with the dialog role', async () => {
+// The title names the dialog through aria-labelledby, which both VoiceOver and NVDA read wherever it sits.
+test('an opened dialog conveys the dialog role and its title as its name, with no prop', async () => {
+	await open(Basic);
+	await readUntil(sr, { role: 'button', name: 'Edit address' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Edit delivery address' }), {
+		role: 'dialog',
+		name: 'Edit delivery address',
+	});
+});
+
+test('a title outranks an aria-label written beside it', async () => {
 	await open(Labelled);
 	await readUntil(sr, { role: 'button', name: 'Edit address' });
 	await sr.press(sr.keys.enter);
@@ -139,5 +152,30 @@ test('a dialog given a plain-text aria-label conveys it with the dialog role', a
 	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Edit delivery address' }), {
 		role: 'dialog',
 		name: 'Edit delivery address',
+	});
+});
+
+test("with no title, the dialog's aria-label is the name it conveys", async () => {
+	await open(Fallback);
+	await readUntil(sr, { role: 'button', name: 'Edit address' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Change where it goes' }), {
+		role: 'dialog',
+		name: 'Change where it goes',
+	});
+});
+
+test("the dialog conveys its title's new text once the title changes", async () => {
+	await open(Renamed);
+	await readUntil(sr, { role: 'button', name: 'Edit address' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	const rename = document.querySelector('[data-testid="rename"]') as HTMLElement;
+	rename.click();
+	await expect.poll(() => document.querySelector('[data-testid="title"]')?.textContent).toBe('Edit billing address');
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Edit billing address' }), {
+		role: 'dialog',
+		name: 'Edit billing address',
 	});
 });

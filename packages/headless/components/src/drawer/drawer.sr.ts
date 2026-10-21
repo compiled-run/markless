@@ -4,7 +4,9 @@ import { missingFacts, readUntil, type Conveys } from '../../test-support/driver
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
 import Described from './scenarios/described.tsrx';
+import Fallback from './scenarios/fallback.tsrx';
 import Labelled from './scenarios/labelled.tsrx';
+import Renamed from './scenarios/renamed.tsrx';
 import Nested from './scenarios/nested.tsrx';
 import NonModal from './scenarios/nonmodal.tsrx';
 import Snapped from './scenarios/snapped.tsrx';
@@ -143,8 +145,19 @@ test('a drawer resting at an intermediate position announces as an ordinary dial
 	await readUntil(sr, { name: 'Where to next?' });
 });
 
-// The plain-text name is the one VoiceOver speaks for a dialog not directly under <main>; every reader must still hear it with the role.
-test('a drawer given a plain-text aria-label conveys it with the dialog role', async () => {
+// The title names the drawer through aria-labelledby, which both VoiceOver and NVDA read wherever it sits.
+test('an opened drawer conveys the dialog role and its title as its name, with no prop', async () => {
+	await open(Basic);
+	await readUntil(sr, { role: 'button', name: 'Filter results' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Narrow these results' }), {
+		role: 'dialog',
+		name: 'Narrow these results',
+	});
+});
+
+test('a title outranks an aria-label written beside it', async () => {
 	await open(Labelled);
 	await readUntil(sr, { role: 'button', name: 'Filter results' });
 	await sr.press(sr.keys.enter);
@@ -152,5 +165,30 @@ test('a drawer given a plain-text aria-label conveys it with the dialog role', a
 	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Narrow these results' }), {
 		role: 'dialog',
 		name: 'Narrow these results',
+	});
+});
+
+test("with no title, the drawer's aria-label is the name it conveys", async () => {
+	await open(Fallback);
+	await readUntil(sr, { role: 'button', name: 'Filter results' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Filter options' }), {
+		role: 'dialog',
+		name: 'Filter options',
+	});
+});
+
+test("the drawer conveys its title's new text once the title changes", async () => {
+	await open(Renamed);
+	await readUntil(sr, { role: 'button', name: 'Filter results' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	const rename = document.querySelector('[data-testid="rename"]') as HTMLElement;
+	rename.click();
+	await expect.poll(() => document.querySelector('[data-testid="title"]')?.textContent).toBe('Narrow these orders');
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Narrow these orders' }), {
+		role: 'dialog',
+		name: 'Narrow these orders',
 	});
 });

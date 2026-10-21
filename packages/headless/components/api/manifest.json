@@ -1550,7 +1550,7 @@
 						"name": "aria-label",
 						"type": "string",
 						"required": false,
-						"doc": "A plain-text name, written beside the title's `aria-labelledby`. Give it the\ntitle's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name\nonly when the dialog sits directly under `<main>`, and speaks `aria-label`\nwherever the dialog sits."
+						"doc": "The name of a surface that renders no title. A rendered title names the\nsurface on its own, through `aria-labelledby`, and the accessible-name\ncomputation ranks that reference above `aria-label`, so this never replaces\na title's text."
 					}
 				]
 			},
@@ -2379,7 +2379,7 @@
 						"name": "aria-label",
 						"type": "string",
 						"required": false,
-						"doc": "A plain-text name, written beside the title's `aria-labelledby`. Give it the\ntitle's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name\nonly when the dialog sits directly under `<main>`, and speaks `aria-label`\nwherever the dialog sits."
+						"doc": "The name of a surface that renders no title. A rendered title names the\nsurface on its own, through `aria-labelledby`, and the accessible-name\ncomputation ranks that reference above `aria-label`, so this never replaces\na title's text."
 					}
 				]
 			},
@@ -2953,7 +2953,7 @@
 						"name": "aria-label",
 						"type": "string",
 						"required": false,
-						"doc": "A plain-text name, written beside the title's `aria-labelledby`. Give it the\ntitle's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name\nonly when the dialog sits directly under `<main>`, and speaks `aria-label`\nwherever the dialog sits."
+						"doc": "The name of a surface that renders no title. A rendered title names the\nsurface on its own, through `aria-labelledby`, and the accessible-name\ncomputation ranks that reference above `aria-label`, so this never replaces\na title's text."
 					}
 				]
 			},
