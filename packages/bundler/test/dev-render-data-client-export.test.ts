@@ -15,6 +15,7 @@ afterEach(async () => {
 });
 
 const CHILD_RENDER_DATA_ID = '\0virtual:markless:render-data:src%2Fchild.tsrx';
+const ROOT_RENDER_DATA_ID = '\0virtual:markless:render-data:src%2Froot.tsrx';
 
 // A page whose child is reached through the parent's render data: the browser
 // pulls the child's render-data module by name, then the child's own module.
@@ -237,6 +238,24 @@ test('a render-data request joining an already running child transform completes
 		expect(renderDataCode?.code).toContain('export const marklessPrerenderData');
 	} finally {
 		release();
+		await server.close();
+	}
+}, 60_000);
+
+// Vitest's module cache serves a module's cached code without transforming it,
+// then resolves the virtual ids that code imports before Markless has compiled
+// their owner. Vite shares one pending resolve per url, so a resolve that waited
+// on the owner's compile waited on the owner's own import of that id.
+test('a virtual id resolved before its owner has compiled resolves without waiting on that compile', async () => {
+	const fixture = await createFixture();
+	const server = await createDevServer(fixture);
+	try {
+		const entry =
+			await server.environments.ssr.moduleGraph.ensureEntryFromUrl(ROOT_RENDER_DATA_ID);
+		expect(entry.id).toBe(ROOT_RENDER_DATA_ID);
+		const renderData = await server.environments.ssr.transformRequest(ROOT_RENDER_DATA_ID);
+		expect(renderData?.code).toContain('marklessRenderData');
+	} finally {
 		await server.close();
 	}
 }, 60_000);

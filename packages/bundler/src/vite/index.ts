@@ -52,6 +52,7 @@ import {
 	transformMarklessRequest,
 	viteEnvironmentName,
 } from './environment.ts';
+import { createDevTransformGuard, devTransformStallMs } from './dev-transform-stall.ts';
 import { createViteHmr } from './hmr.ts';
 import { installDevRuntimeImportResolution } from './dev-runtime-imports.ts';
 
@@ -324,9 +325,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			server.config.logger?.info(
 				`markless diagnostics available - window.__MARKLESS_DEBUG__ records containers, lifecycles, and event routing; ${DEBUGGING_PLAYBOOK_HINT}.`,
 			);
+			const guardTransform = createDevTransformGuard(devTransformStallMs());
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>
-					transformMarklessRequest(server, url, environment, options),
+					guardTransform(url, environment, () =>
+						transformMarklessRequest(server, url, environment, options),
+					),
 				importModule: (source) =>
 					serverModuleRunner(server, viteEnvironmentName('server', options)).import(
 						source,

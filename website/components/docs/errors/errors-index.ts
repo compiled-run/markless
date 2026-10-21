@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 284,
+	total: 285,
 	guided: 41,
 	groups: [
 		{
@@ -815,6 +815,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_DEV_RUNTIME_ERROR',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_DEV_TRANSFORM_STALLED',
 					kind: 'build error',
 					guided: false,
 				},
