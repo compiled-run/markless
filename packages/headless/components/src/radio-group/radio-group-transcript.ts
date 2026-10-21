@@ -44,7 +44,7 @@ export async function readRadioGroupTranscript(sr: ScreenReaderDriver, page: Pag
 	for (const name of OPTIONS) {
 		const option = await readUntil(sr, { role: 'radio', name }, WALK_LIMIT);
 		expect(
-			missingFacts(sr, option, { role: 'radio', name, state: ['notChecked'] }),
+			missingFacts(sr, option, { role: 'radio', name, state: ['radioNotChecked'] }),
 			`${sr.name} announced "${option}"`,
 		).toEqual([]);
 	}
@@ -57,5 +57,5 @@ export async function readRadioGroupTranscript(sr: ScreenReaderDriver, page: Pag
 		timeout: CHANGE_TIMEOUT_MS,
 	});
 
-	await expectAnnouncesAfterChange(sr, { role: 'radio', name: 'Lifetime', state: ['checked'] });
+	await expectAnnouncesAfterChange(sr, { role: 'radio', name: 'Lifetime', state: ['radioChecked'] });
 }

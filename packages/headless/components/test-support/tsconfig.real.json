@@ -6,6 +6,7 @@
 	"exclude": [],
 	"include": [
 		"./page-driver.ts",
+		"./nvda-test.ts",
 		"./vocabularies.ts",
 		"./playwright.config.ts",
 		"../src/**/*.nvda.ts",

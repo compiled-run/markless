@@ -43,20 +43,21 @@ export type BuildDelegateLoader = {
 
 // Apps depend on @markless/core alone, so the render catalog generated code
 // imports is answered from the bundler's own dependency on @markless/web.
+// file:///D:/a/x.ts names D:/a/x.ts; keeping the slash before the drive makes Vite serve it as a root-relative URL.
+export function fileUrlModuleId(url: string | undefined): string | undefined {
+	if (!url?.startsWith('file://')) return undefined;
+	const path = decodeURIComponent(url.slice('file://'.length));
+	return /^\/[A-Za-z]:\//.test(path) ? path.slice(1) : path;
+}
+
 export function marklessRuntimeSpecifierId(specifier: string): string | undefined {
 	if (specifier.startsWith('@markless/web/fns/')) {
-		const resolved = import.meta.resolve?.(specifier);
-		return resolved?.startsWith('file://')
-			? decodeURIComponent(resolved.slice('file://'.length))
-			: undefined;
+		return fileUrlModuleId(import.meta.resolve?.(specifier));
 	}
 	if (specifier.startsWith('@markless/web/inline/')) {
-		const root = import.meta.resolve?.('@markless/web');
-		if (!root?.startsWith('file://') || !root.endsWith('/index.ts')) return undefined;
-		return decodeURIComponent(
-			root.slice('file://'.length, -'index.ts'.length) +
-				`${specifier.slice('@markless/web/'.length)}.ts`,
-		);
+		const root = fileUrlModuleId(import.meta.resolve?.('@markless/web'));
+		if (!root?.endsWith('/index.ts')) return undefined;
+		return `${root.slice(0, -'index.ts'.length)}${specifier.slice('@markless/web/'.length)}.ts`;
 	}
 	return undefined;
 }

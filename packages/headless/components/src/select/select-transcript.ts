@@ -34,6 +34,8 @@ export async function readSelectTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	await sr.press(sr.keys.enter);
 	await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: CHANGE_TIMEOUT_MS });
+	// Opening hands focus to an option, so the walk starts where the reader followed it.
+	await sr.settleOnFocus();
 
 	// A closed listbox keeps its options out of the tree, so reaching all three by
 	// name is the proof the popup opened for the reader and not only for the DOM.

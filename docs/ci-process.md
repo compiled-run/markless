@@ -131,6 +131,37 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
 
+### Screen-reader lanes
+
+`.github/workflows/screen-reader.yml` has three lanes: `virtual` (a JavaScript screen reader, one Linux job per family, required), `nvda` and `voiceover`. The two real-reader lanes run the families in four shards that both lanes share, because a Windows or macOS runner is the scarce cost: a run is four macOS jobs, not 29. `voiceover` is advisory (`continue-on-error`), and an advisory lane shows the run green even when every job in it is red, so read the job list and each shard's summary table, not the run's badge.
+
+**What the old red and the old green meant.** Until October 2026 neither real reader had read a family:
+
+- `voiceover`: about 27 of 29 jobs failed in every run (for example runs 39491172338 and 36204470224) with "VoiceOver not running". VoiceOver had started and was speaking. Each spec walked the gallery from the top looking for its family, and the walk could not match: VoiceOver's phrase has no commas ("Checkbox Label unchecked checkbox"), while the matcher split phrases on commas. A 900-step walk at VoiceOver's speed outlasts the 5-minute test timeout, the fixture stops VoiceOver, and the walk's next call throws "VoiceOver not running". Separately, `guidepup/setup-action@0.21.0` bundles `@guidepup/setup` 0.23, whose TCC.db writes sometimes fail on `macos-26` images.
+- `nvda`: every job passed, because the gallery dev server never booted on Windows (`Failed to load url /D:/a/markless/...`): `marklessRuntimeSpecifierId` turned `file:///D:/a/...` into `/D:/a/...`, which Vite serves as a root-relative URL. The lane then fell back to the drivability smoke, which passes on NVDA saying "blank". A gallery that does not render now fails the job.
+
+**How the harness reads now** (`packages/headless/components/test-support/page-driver.ts`, `vocabularies.ts`, `nvda-test.ts`):
+
+- Each spec moves its reader to the family's section heading by heading (VoiceOver's find-next-heading, NVDA's H) instead of walking from the top.
+- A fact is a whole-word run inside one comma segment, for both readers: "checked" never matches inside "unchecked", a run after "not" is dropped, a name holding commas stays whole, and NVDA's spoken symbols ("README dot md", "80 percent") are read back as written. Unit tests: `packages/headless/components/test/reader-segments.test.ts`.
+- `settleOnFocus` waits for the reader to name the element the page focused (Chrome's computed name, read over CDP): NVDA is asked with NVDA+Tab; VoiceOver is asked with VO-F4 before its cursor moves, because its keyboard focus follows its cursor, and when VoiceOver never hears a programmatic focus move the element is found by reading a few items each way.
+- A key for the element the reader was placed on by focus goes to the page directly. Under VoiceOver, synthesised system keystrokes for arrows, Escape and Control+Z were lost in whole runs, and NVDA's browse mode keeps arrows, Space and Enter for itself. A key after a walk still goes to the reader, which acts on its own item, so NVDA's browse-mode activation is what is tested there.
+- Every phrase is printed as `VoiceOver said: "..."` / `NVDA said: "..."`, and every key as `pressed X; the page saw [...]`, so a key the reader kept and a key the widget ignored no longer look the same.
+
+**Red specs that are findings in `@markless/ui`, not the harness.** Each stays red until the family changes:
+
+- `tabs` (both readers): tabs carry no `aria-controls` and panels no `aria-labelledby` (the APG Tabs pattern asks for both), and the gallery's tab list has no name. Neither reader ever says "tab list" or "tab panel".
+- `tour` (both readers): the gallery's controlled tour never opens. Clicking "Take the tour" shows no card in plain Chromium either, with no reader running.
+- `calendar` (both readers): PageDown moves to the next month but focus falls to the body. `calendar.browser.ts` already marks this `test.fails`.
+- `select` (NVDA): Enter on the trigger in browse mode, the way an NVDA user meets the page, does not open the list.
+- `menu` (NVDA): Enter on the trigger in browse mode opens the menu but leaves focus on the trigger. The trigger treats a click with `detail !== 0` as a mouse click, and NVDA's activation is one.
+- `timebox`, `datebox`: an empty segment has no `aria-valuenow` and no `aria-valuetext`. VoiceOver reads it as a percentage of the range ("-9.1% hour input stepper"), NVDA as "spin button, 0". The specs do not assert the empty reading, so they pass.
+- `modal`, `drawer` (VoiceOver): opening moves focus onto the dialog container, and VoiceOver reads the title heading without ever saying "dialog".
+
+**VoiceOver specs still red for the harness, not the family:** `menu`, `pad`, `rating` and `slider`, and `toolbar` in some runs. In each, a key or a script moves the page's focus and VoiceOver never hears of it (VO-F4 keeps naming the old element), so the spec reads the wrong item. The fallback, reading a few items each way for the focused element's name, fails when a group carries the same name as its control (`pad`) or when the element is outside the window it reads. Moving VoiceOver's cursor through the pointer (VO-Shift-F5 after warping the pointer onto the element) was tried and lost VoiceOver's place more often than it found the element. NVDA reads all of them. This is why `voiceover` stays advisory.
+
+**Cost and reruns.** macOS jobs share a small organisation-wide pool, and a run can wait hours to start behind other branches' screen-reader runs. Do not rerun a run just to get it green.
+
 ## 8. Cutting a release
 
 Markless releases **minor versions only**: 0.6.0, 0.7.0, and so on. There are no patch releases. A fix ships in the next minor, so the way to ship a fix sooner is to cut the next minor sooner. No script or workflow accepts a release type; the next version is always the current one with the middle number raised by one.

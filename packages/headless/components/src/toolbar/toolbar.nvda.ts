@@ -1,6 +1,6 @@
-import { nvdaTest } from '@guidepup/playwright';
+import { nvdaTest } from '../../test-support/nvda-test.ts';
 import { PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
-import { realDriver } from '../../test-support/page-driver.ts';
+import { nvdaToAnchoredSection, realDriver } from '../../test-support/page-driver.ts';
 import { nvdaSpec } from '../../test-support/vocabularies.ts';
 import { readToolbarTranscript, TOOLBAR_ANCHOR } from './toolbar-transcript.ts';
 
@@ -11,7 +11,7 @@ nvdaTest('NVDA conveys the named bar, each control by its own role, and an arrow
 	await page.goto(`${PREVIEW_ORIGIN}${TOOLBAR_ANCHOR}`);
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 	// The cursor starts wherever the browser chrome left it, so the walk would otherwise cover the app window's own toolbar.
-	await nvda.navigateToWebContent();
+	await nvdaToAnchoredSection(nvda, page);
 
-	await readToolbarTranscript(realDriver(nvda, nvdaSpec), page);
+	await readToolbarTranscript(realDriver(nvda, nvdaSpec, page), page);
 });

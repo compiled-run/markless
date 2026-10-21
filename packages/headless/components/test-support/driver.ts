@@ -37,6 +37,10 @@ export type Vocabulary = {
 	/** The element a set of radios is presented in - `role="radiogroup"`. */
 	readonly radiogroup: string;
 	readonly radio: string;
+	/** A chosen radio - `aria-checked="true"` on `role="radio"`; readers word it apart from a ticked checkbox. */
+	readonly radioChecked: string;
+	/** A radio that is not the chosen one. */
+	readonly radioNotChecked: string;
 	readonly tablist: string;
 	readonly tab: string;
 	readonly tabpanel: string;

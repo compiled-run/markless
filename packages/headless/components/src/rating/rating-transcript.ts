@@ -36,31 +36,36 @@ export async function readRatingTranscript(sr: ScreenReaderDriver, page: Page) {
 	// The row the real lanes exist to carry: three marks are filled on screen and
 	// only the third is the checked radio.
 	const checkedMarks: ReadonlyArray<Conveys> = [
-		{ role: 'radio', name: '1 of 5', state: ['notChecked'] },
-		{ role: 'radio', name: '2 of 5', state: ['notChecked'] },
-		{ role: 'radio', name: '3 of 5', state: ['checked'] },
-		{ role: 'radio', name: '4 of 5', state: ['notChecked'] },
-		{ role: 'radio', name: '5 of 5', state: ['notChecked'] },
+		{ role: 'radio', name: '1 of 5', state: ['radioNotChecked'] },
+		{ role: 'radio', name: '2 of 5', state: ['radioNotChecked'] },
+		{ role: 'radio', name: '3 of 5', state: ['radioChecked'] },
+		{ role: 'radio', name: '4 of 5', state: ['radioNotChecked'] },
+		{ role: 'radio', name: '5 of 5', state: ['radioNotChecked'] },
 	];
 	for (const conveys of checkedMarks) {
 		const mark = await readUntil(sr, { role: 'radio', name: conveys.name }, GALLERY_WALK_LIMIT);
 		expect(missingFacts(sr, mark, conveys), `${sr.name} announced "${mark}"`).toEqual([]);
 	}
 
+	// Focus rather than the reading cursor: a reader's browse mode keeps arrows for itself until a mark is focused.
+	const rating = section.getByRole('radiogroup', { name: GROUP });
+	await rating.getByRole('radio', { name: '3 of 5' }).focus();
+	await sr.settleOnFocus();
+
 	// An arrow both moves the rating and takes focus with it, so the reader is
 	// asked again only once the mark it landed on carries the new state.
 	await sr.press(sr.keys.arrowRight);
-	await expect(section.getByRole('radio', { name: '4 of 5' })).toBeChecked({
+	await expect(rating.getByRole('radio', { name: '4 of 5' })).toBeChecked({
 		timeout: CHANGE_TIMEOUT_MS,
 	});
 
 	await expect
 		.poll(
 			async () =>
-				missingFacts(sr, await sr.reannounce(), {
+				missingFacts(sr, await sr.settleOnFocus(), {
 					role: 'radio',
 					name: '4 of 5',
-					state: ['checked'],
+					state: ['radioChecked'],
 				}),
 			{ timeout: CHANGE_TIMEOUT_MS },
 		)

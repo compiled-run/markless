@@ -43,15 +43,10 @@ export async function readToolbarTranscript(sr: ScreenReaderDriver, page: Page) 
 	const bar = await readUntil(sr, { name: 'Document' }, GALLERY_WALK_LIMIT);
 	expectConveys(sr, bar, { name: 'Document' });
 
-	// Three families' controls, three roles, one bar. This is the whole claim.
-	const align = await readUntil(sr, { role: 'button', name: 'Left' }, GALLERY_WALK_LIMIT);
-	expectConveys(sr, align, { role: 'button', name: 'Left' });
-
-	const wrap = await readUntil(sr, { role: 'switch', name: 'Wrap lines' }, GALLERY_WALK_LIMIT);
-	expectConveys(sr, wrap, { role: 'switch', name: 'Wrap lines' });
-
-	const print = await readUntil(sr, { role: 'button', name: 'Print' }, GALLERY_WALK_LIMIT);
-	expectConveys(sr, print, { role: 'button', name: 'Print' });
+	// Entered as Tab enters it and crossed by focus: VoiceOver's next-item command steps over a toolbar as one group.
+	await section.getByRole('toolbar').focus();
+	await expect(buttonFor('Left')).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	expectConveys(sr, await sr.settleOnFocus(), { role: 'button', name: 'Left' });
 
 	// An arrow moves the stop and activates nothing. The button group's own value
 	// is the visible proof: the bar walks over its items without pressing one.
@@ -59,17 +54,12 @@ export async function readToolbarTranscript(sr: ScreenReaderDriver, page: Page) 
 		timeout: CHANGE_TIMEOUT_MS,
 	});
 	await sr.press(sr.keys.arrowRight);
-	await expect(buttonFor('Left')).toHaveAttribute('aria-pressed', 'true', {
-		timeout: CHANGE_TIMEOUT_MS,
-	});
+	await expect(buttonFor('Center')).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	await expect(buttonFor('Left')).toHaveAttribute('aria-pressed', 'true');
 	await expect(buttonFor('Center')).toHaveAttribute('aria-pressed', 'false');
 
 	// And the control it landed on is what the reader announces next.
-	await expect
-		.poll(async () => missingFacts(sr, await sr.reannounce(), { role: 'button', name: 'Center' }), {
-			timeout: CHANGE_TIMEOUT_MS,
-		})
-		.toEqual([]);
+	expectConveys(sr, await sr.settleOnFocus(), { role: 'button', name: 'Center' });
 
 	// Space presses the control under the cursor: it is a real button, and the bar
 	// handles no activation key of its own.
@@ -77,4 +67,15 @@ export async function readToolbarTranscript(sr: ScreenReaderDriver, page: Page) 
 	await expect(buttonFor('Center')).toHaveAttribute('aria-pressed', 'true', {
 		timeout: CHANGE_TIMEOUT_MS,
 	});
+
+	// Three families' controls, three roles, one bar. This is the whole claim.
+	await sr.press(sr.keys.arrowRight);
+	await expect(section.getByRole('switch', { name: 'Wrap lines' })).toBeFocused({
+		timeout: CHANGE_TIMEOUT_MS,
+	});
+	expectConveys(sr, await sr.settleOnFocus(), { role: 'switch', name: 'Wrap lines' });
+
+	await sr.press('End');
+	await expect(buttonFor('Print')).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	expectConveys(sr, await sr.settleOnFocus(), { role: 'button', name: 'Print' });
 }

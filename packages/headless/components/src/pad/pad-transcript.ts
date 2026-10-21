@@ -62,13 +62,13 @@ export async function readPadTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	// Both numbers at rest. This is the claim the design turns on: a reader that
 	// read `aria-valuenow` alone would convey x and drop y entirely.
-	const resting = await readForPhrase(sr, [NAME, RESTING], WALK_LIMIT);
+	// Read on focus: NVDA's browse mode drops a slider's name when the label text was just read above it.
+	await handle.focus();
+	const resting = await sr.settleOnFocus();
 	expect(missing(resting, [NAME, RESTING]), `${sr.name} announced "${resting}"`).toEqual([]);
 
 	// A key moves the handle, and what a real reader says about the move is the
 	// second claim: the announcement has to change, not merely the attribute.
-	await handle.focus();
-	await sr.settleOnFocus();
 	await sr.press('ArrowRight');
 	await expect(handle).toHaveAttribute('aria-valuetext', STEPPED, {
 		timeout: CHANGE_TIMEOUT_MS,

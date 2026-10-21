@@ -60,13 +60,10 @@ export async function readGridListTranscript(sr: ScreenReaderDriver, page: Page)
 	const resting = await readForPhrase(sr, [NAME], GALLERY_WALK_LIMIT);
 	expect(missing(resting, [NAME]), `${sr.name} announced "${resting}"`).toEqual([]);
 
-	const named = await readForPhrase(sr, [FIRST], GALLERY_WALK_LIMIT);
-	expect(missing(named, [FIRST]), `${sr.name} announced "${named}"`).toEqual([]);
-
-	// Focus rather than the reading cursor: the space bar only picks a row once
-	// that row is the focused element.
+	// By focus, as a grid is used: VoiceOver's next-item command stays inside a row, and Space picks only the focused row.
 	await first.focus();
-	await sr.settleOnFocus();
+	const named = await sr.settleOnFocus();
+	expect(missing(named, [FIRST]), `${sr.name} announced "${named}"`).toEqual([]);
 	await expect(grid).toHaveAttribute('tabindex', '-1', { timeout: CHANGE_TIMEOUT_MS });
 	await expect(first).toHaveAttribute('tabindex', '0', { timeout: CHANGE_TIMEOUT_MS });
 
@@ -75,6 +72,6 @@ export async function readGridListTranscript(sr: ScreenReaderDriver, page: Page)
 	await sr.press(sr.keys.space);
 	await expect(first).toHaveAttribute('aria-selected', 'true', { timeout: CHANGE_TIMEOUT_MS });
 
-	const picked = await readForPhrase(sr, [FIRST], GALLERY_WALK_LIMIT);
+	const picked = await sr.settleOnFocus();
 	expect(missing(picked, [FIRST]), `${sr.name} announced "${picked}"`).toEqual([]);
 }

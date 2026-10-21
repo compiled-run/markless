@@ -1,6 +1,11 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../sr-app/preview-server.ts';
-import { missingFacts, readUntil, type Conveys, type ScreenReaderDriver } from '../../test-support/driver.ts';
+import {
+	missingFacts,
+	readUntil,
+	type Conveys,
+	type ScreenReaderDriver,
+} from '../../test-support/driver.ts';
 import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
@@ -33,13 +38,17 @@ export async function readTooltipTranscript(sr: ScreenReaderDriver, page: Page) 
 	const section = page.locator(`#${FAMILY_ANCHORS.tooltip.slice(2)}`);
 	const tip = section.getByRole('tooltip', { includeHidden: true });
 
-	// The tip is never shown in this lane, and that is the point: a directly
-	// referenced hidden node still contributes its text to the description.
 	await expect(tip).toBeHidden();
 
-	const phrase = await readUntil(sr, describedTrigger, GALLERY_WALK_LIMIT);
+	expectConveys(sr, await readUntil(sr, describedTrigger, GALLERY_WALK_LIMIT), describedTrigger);
+
+	// The description is read on focus: NVDA's browse mode does not read descriptions at all.
+	const trigger = section.getByRole('button', { name: TRIGGER });
+	await trigger.focus();
+	const phrase = await sr.settleOnFocus();
 	expectConveys(sr, phrase, describedTrigger);
 	expectConveys(sr, phrase, { name: TIP });
 
-	await expect(tip).toBeHidden();
+	// A focused trigger shows its tip.
+	await expect(tip).toBeVisible();
 }

@@ -33,6 +33,9 @@ export async function readDrawerTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	await sr.press(sr.keys.enter);
 	await expect(dialog).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
+	// Opening moves focus onto the drawer, so the reader starts from there.
+	await expect(dialog).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	await sr.settleOnFocus();
 
 	// Named, not merely a dialog: modal, popover and tour serve one, this section four.
 	await readUntil(sr, { role: 'dialog', name: TITLE }, GALLERY_WALK_LIMIT);

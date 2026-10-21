@@ -1,5 +1,11 @@
 import type { Keys, Vocabulary } from './driver.ts';
-import { commaSegments, type RealDriverSpec } from './page-driver.ts';
+import type { NVDAPlaywright, VoiceOverPlaywright } from '@guidepup/playwright';
+import {
+	nvdaSegments,
+	nvdaSymbols,
+	voiceOverSegments,
+	type RealDriverSpec,
+} from './page-driver.ts';
 
 /**
  * What NVDA and VoiceOver call the facts a checkbox announcement has to convey.
@@ -44,6 +50,10 @@ export const nvdaVocabulary: Vocabulary = {
 	radiogroup: 'grouping',
 	// unverified against our markup; aria-at's radiogroup plan says "radio button"
 	radio: 'radio button',
+	// unverified against our markup
+	radioChecked: 'checked',
+	// unverified against our markup
+	radioNotChecked: 'not checked',
 	// unverified against our markup; aria-at's tabs plan says "tab list"
 	tablist: 'tab list',
 	// unverified against our markup
@@ -111,6 +121,10 @@ export const voiceOverVocabulary: Vocabulary = {
 	radiogroup: 'group',
 	// unverified against our markup; aria-at's radiogroup plan says "radio button"
 	radio: 'radio button',
+	// observed on a macos-26 runner: "3 of 5 selected radio button, 3 of 5"
+	radioChecked: 'selected',
+	// observed on a macos-26 runner: "Monthly radio button, 1 of 3", no state word at all
+	radioNotChecked: '',
 	// unverified against our markup; aria-at's tabs plan says "tab list"
 	tablist: 'tab list',
 	// unverified against our markup
@@ -127,8 +141,8 @@ export const voiceOverVocabulary: Vocabulary = {
 	button: 'button',
 	// unverified against our markup
 	progressbar: 'progress indicator',
-	// unverified against our markup
-	textbox: 'text field',
+	// observed on a macos-26 runner: "Type your name required edit text"
+	textbox: 'edit text',
 	// unverified against our markup
 	navigation: 'navigation',
 	// unverified against our markup
@@ -166,16 +180,89 @@ const keys: Keys = {
 	arrowRight: 'ArrowRight',
 };
 
-export const nvdaSpec: RealDriverSpec = {
+// NVDA says which mode a toggle switched it to, so the second toggle runs only when the first went the wrong way.
+async function nvdaMode(nvda: NVDAPlaywright, mode: 'focus mode' | 'browse mode') {
+	await nvda.perform(nvda.keyboardCommands.toggleBetweenBrowseAndFocusMode);
+	const toggled = await nvda.lastSpokenPhrase();
+	console.log(`NVDA mode toggle said: ${JSON.stringify(toggled)}`);
+	if (!toggled.includes(mode)) {
+		await nvda.perform(nvda.keyboardCommands.toggleBetweenBrowseAndFocusMode);
+	}
+}
+
+// Asked twice in a row NVDA spells the answer letter by letter, so another key goes between two askings.
+async function reportNvdaFocus(nvda: NVDAPlaywright) {
+	await nvda.press('Shift');
+	await nvda.perform(nvda.keyboardCommands.reportCurrentFocus);
+}
+
+export const nvdaSpec: RealDriverSpec<NVDAPlaywright> = {
 	name: 'NVDA',
 	vocabulary: nvdaVocabulary,
 	keys,
-	segments: commaSegments,
+	segments: nvdaSegments,
+	// Browse mode keeps arrows, Space and Enter for itself, so a key for the focused element goes to the page.
+	keysThroughPage: true,
+	// A focus move can switch NVDA to focus mode, where its next-item keys are arrows into the widget.
+	keysToReader: (nvda) => nvdaMode(nvda, 'browse mode'),
+	// NVDA speaks a focus change on its own, but the phrase is only captured on a command, so it is asked for.
+	cursorToFocus: reportNvdaFocus,
+	// In focus mode NVDA's next and previous items are the arrow keys, which would move the focused widget.
+	reannounceFocus: reportNvdaFocus,
+	spoken: nvdaSymbols,
 };
 
-export const voiceOverSpec: RealDriverSpec = {
+// VoiceOver's cursor and the page's focus are two positions; settling joins them with VoiceOver's own command.
+export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	name: 'VoiceOver',
 	vocabulary: voiceOverVocabulary,
 	keys,
-	segments: commaSegments,
+	segments: voiceOverSegments,
+	// Synthesised system keystrokes reach the page only some of the time while VoiceOver runs (arrows, Escape and
+	// Control+Z were lost in whole runs), so a key for the focused element goes to the page directly.
+	keysThroughPage: true,
+	// A move onto an item whose speech starts late is captured as "" (Monthly, in a radio group); asking VoiceOver
+	// to describe its cursor's item moves nothing and gets the words.
+	async afterSilentMove(voiceOver) {
+		if ((await voiceOver.lastSpokenPhrase()) === '') {
+			await voiceOver.perform(voiceOver.keyboardCommands.describeItem);
+		}
+	},
+	async cursorToFocus(voiceOver, focused) {
+		// The name alone is the label text beside the control ("Volume"), not the control ("40 Volume slider").
+		const arrived = (phrase: string) =>
+			focused.name === ''
+				? phrase !== '' && !phrase.endsWith(' web content')
+				: phrase.includes(focused.name) && phrase.trim() !== focused.name.trim();
+		const describeFocus = () =>
+			voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
+		// Asked first, because asking moves nothing: moving its cursor while it still believes the old element has
+		// focus would hand the page's focus back there, since its keyboard focus follows its cursor.
+		for (let attempt = 0; attempt < 5; attempt++) {
+			await describeFocus();
+			if (arrived(await voiceOver.lastSpokenPhrase())) {
+				await voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
+				// Silent when its cursor was already there; its answer about the focus is then the phrase.
+				if (!arrived(await voiceOver.lastSpokenPhrase())) await describeFocus();
+				return;
+			}
+			await focused.refocus();
+		}
+		// Some programmatic focus moves never reach VoiceOver. The element is then found the way a person would
+		// find it, by reading on from where the cursor is, a few items each way.
+		console.log(`VoiceOver never named the focused "${focused.name}"; reading for it nearby.`);
+		for (const [move, steps] of [
+			[() => voiceOver.next(), 6],
+			[() => voiceOver.previous(), 12],
+		] as const) {
+			for (let step = 0; step < steps; step++) {
+				await move();
+				if (arrived(await voiceOver.lastSpokenPhrase())) {
+					await focused.refocus();
+					return;
+				}
+			}
+		}
+		await focused.refocus();
+	},
 };

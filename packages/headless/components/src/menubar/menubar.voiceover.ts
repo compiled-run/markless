@@ -1,6 +1,6 @@
 import { voiceOverTest } from '@guidepup/playwright';
 import { PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
-import { realDriver } from '../../test-support/page-driver.ts';
+import { realDriver, voiceOverToAnchoredSection } from '../../test-support/page-driver.ts';
 import { voiceOverSpec } from '../../test-support/vocabularies.ts';
 import { MENUBAR_SECTION, readMenubarTranscript } from './menubar-transcript.ts';
 
@@ -9,8 +9,8 @@ voiceOverTest(
 	async ({ page, voiceOver }) => {
 		await page.goto(`${PREVIEW_ORIGIN}${MENUBAR_SECTION}`);
 		await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
-		await voiceOver.navigateToWebContent();
+		await voiceOverToAnchoredSection(voiceOver, page);
 
-		await readMenubarTranscript(realDriver(voiceOver, voiceOverSpec), page);
+		await readMenubarTranscript(realDriver(voiceOver, voiceOverSpec, page), page);
 	},
 );

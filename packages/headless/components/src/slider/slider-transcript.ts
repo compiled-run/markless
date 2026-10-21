@@ -1,7 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../sr-app/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
-import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are the facts an announcement must convey rather than any reader's
@@ -15,9 +14,6 @@ import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
  * what can be asserted honestly until a CI run prints one.
  */
 
-// The range section is the next one down, so its walk starts where the first
-// walk stopped rather than at the top.
-const RANGE_WALK_LIMIT = 40;
 const CHANGE_TIMEOUT_MS = 15_000;
 const NAME = 'Volume';
 const RANGE_NAME = 'Price';
@@ -43,25 +39,6 @@ function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));
 }
 
-async function readForPhrase(
-	sr: ScreenReaderDriver,
-	facts: readonly string[],
-	limit: number,
-): Promise<string> {
-	const seen: string[] = [];
-	let phrase = await sr.lastSpokenPhrase();
-	for (let step = 0; step <= limit; step++) {
-		seen.push(phrase);
-		if (missing(phrase, facts).length === 0) return phrase;
-		await sr.next();
-		phrase = await sr.lastSpokenPhrase();
-	}
-	throw new Error(
-		`${sr.name} never announced ${JSON.stringify(facts)} in ${limit} steps.\n` +
-			`Transcript: ${JSON.stringify(seen, null, 1)}`,
-	);
-}
-
 // A step reaches the DOM after the dispatch the keystroke woke returns, and a
 // real reader speaks on its own schedule on top of that, so the reader is asked
 // again until the new value is what it reads.
@@ -72,8 +49,7 @@ async function expectAnnouncesAfterChange(sr: ScreenReaderDriver, facts: readonl
 }
 
 /**
- * The range section, read where the single-value walk left the cursor: it is the
- * next section down, so the same forward-only cursor carries into it.
+ * The range section, the next one down.
  *
  * Both thumbs are labelled by the one `<slider.label>` the family renders, so a
  * reader says "Price" on each of them and nothing in either phrase tells them
@@ -103,17 +79,16 @@ async function readRangeSection(sr: ScreenReaderDriver, page: Page) {
 	await expect(startThumb).toHaveAccessibleName(RANGE_NAME);
 	await expect(endThumb).toHaveAccessibleName(RANGE_NAME);
 
+	// Each thumb read on focus, as a person tabbing through it hears it: NVDA's browse mode drops a
+	// slider's name when the label text was just read above it.
 	const startFacts = [ROLE, RANGE_NAME, String(RANGE_START)];
-	await sr.next();
-	const start = await readForPhrase(sr, startFacts, RANGE_WALK_LIMIT);
+	await startThumb.focus();
+	const start = await sr.settleOnFocus();
 	expect(missing(start, startFacts), `${sr.name} announced "${start}"`).toEqual([]);
 
-	// Stepped off the first thumb before the second is looked for: a reader that
-	// speaks a crossed bound puts the other thumb's value in both phrases, so a
-	// search that started here would answer with the thumb already read.
 	const endFacts = [ROLE, RANGE_NAME, String(RANGE_END)];
-	await sr.next();
-	const end = await readForPhrase(sr, endFacts, RANGE_WALK_LIMIT);
+	await endThumb.focus();
+	const end = await sr.settleOnFocus();
 	expect(missing(end, endFacts), `${sr.name} announced "${end}"`).toEqual([]);
 }
 
@@ -128,7 +103,8 @@ export async function readSliderTranscript(sr: ScreenReaderDriver, page: Page) {
 	await expect(thumb).toHaveAttribute('aria-valuemax', String(RANGE_MAX));
 	await expect(thumb).toHaveAttribute('aria-valuenow', String(RESTING));
 
-	const resting = await readForPhrase(sr, [ROLE, NAME, String(RESTING)], GALLERY_WALK_LIMIT);
+	await thumb.focus();
+	const resting = await sr.settleOnFocus();
 	expect(
 		missing(resting, [ROLE, NAME, String(RESTING)]),
 		`${sr.name} announced "${resting}"`,

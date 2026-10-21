@@ -1,6 +1,6 @@
-import { nvdaTest } from '@guidepup/playwright';
+import { nvdaTest } from '../../test-support/nvda-test.ts';
 import { PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
-import { realDriver } from '../../test-support/page-driver.ts';
+import { nvdaToAnchoredSection, realDriver } from '../../test-support/page-driver.ts';
 import { nvdaSpec } from '../../test-support/vocabularies.ts';
 import { MENUBAR_SECTION, readMenubarTranscript } from './menubar-transcript.ts';
 
@@ -10,8 +10,8 @@ nvdaTest(
 		await page.goto(`${PREVIEW_ORIGIN}${MENUBAR_SECTION}`);
 		await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
 		// The cursor starts wherever the browser chrome left it, so the walk would otherwise cover the app window's own toolbar.
-		await nvda.navigateToWebContent();
+		await nvdaToAnchoredSection(nvda, page);
 
-		await readMenubarTranscript(realDriver(nvda, nvdaSpec), page);
+		await readMenubarTranscript(realDriver(nvda, nvdaSpec, page), page);
 	},
 );

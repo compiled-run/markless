@@ -36,8 +36,9 @@ const COLOUR_NAME = 'vibrant cyan blue';
 const HUE_NAME = 'cyan blue';
 const STEPPED_SATURATION = '79';
 
+// Speech has no case: VoiceOver says the "2D Slider" role description as "2d slider", NVDA as written.
 function missing(phrase: string, facts: readonly string[]): string[] {
-	return facts.filter((fact) => !phrase.includes(fact));
+	return facts.filter((fact) => !phrase.toLowerCase().includes(fact.toLowerCase()));
 }
 
 async function readForPhrase(
@@ -75,7 +76,8 @@ export async function hasColorpickerSection(page: Page): Promise<boolean> {
 
 export async function readColorpickerTranscript(sr: ScreenReaderDriver, page: Page) {
 	const section = page.locator('#colorpicker');
-	const area = section.getByRole('group').first();
+	// The plane, not the inline surface group that holds the plane and the hue rail together.
+	const area = section.locator('[ui-plane][role="group"]');
 	const axes = area.getByRole('slider');
 	const hueThumb = section.locator('[ui-channel="hue"][role="slider"]');
 

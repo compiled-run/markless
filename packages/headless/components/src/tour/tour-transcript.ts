@@ -42,6 +42,9 @@ export async function readTourTranscript(sr: ScreenReaderDriver, page: Page) {
 	const startButton: Conveys = { role: 'button', name: START };
 	expectConveys(sr, await readUntil(sr, startButton, GALLERY_WALK_LIMIT), startButton);
 
+	// The key goes to the page's focus, which a reading cursor does not always carry along.
+	await section.getByRole('button', { name: START }).focus();
+	await sr.settleOnFocus();
 	await sr.press(sr.keys.enter);
 	await expect(firstCard).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
 
