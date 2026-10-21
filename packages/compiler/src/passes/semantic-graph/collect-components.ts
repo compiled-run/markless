@@ -42,7 +42,7 @@ import {
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
-import { inlineHandlerRenderLocals } from './render-local-inline.ts';
+import { inlineHandlerRenderLocals, liftArmRenderLocalValue } from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -420,7 +420,7 @@ function componentPropBindings(
 			expression && opaqueSource === source ? constantPropValue(expression, state) : null;
 		const lifted =
 			expression && opaqueSource === source && !constant?.value.ok
-				? liftArmModuleValue(expression, state)
+				? (liftArmModuleValue(expression, state) ?? liftArmRenderLocalValue(expression, state))
 				: null;
 		if (lifted) {
 			props.push({

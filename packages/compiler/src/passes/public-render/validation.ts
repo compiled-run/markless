@@ -207,12 +207,12 @@ export function componentRootDiagnostics(ast: AnyNode, filename: string) {
 			return [
 				unsupportedRenderRootDiagnostic({
 					message: offender
-						? `This component's root is a fragment (<>...</>). For now, a fragment root can only render static HTML: plain elements like <div>, text, and {expression} values, plus @if/@for/@switch/@try blocks as direct children. This fragment contains ${offender}, which needs a single root element to render.`
+						? `This component's root is a fragment (<>...</>). Directly inside a fragment root, Markless renders elements, components, constant text and @if/@for/@switch/@try blocks. This fragment contains ${offender}, which has no element to be written into.`
 						: `This component's root is an empty fragment (<>...</>), so there is nothing to render.`,
 					node: fragmentNode,
 					filename,
 					suggestion: offender
-						? 'Wrap the template in a single root element such as <div> or <section> — components and dynamic content work normally once the component has one root element.'
+						? 'Put it inside an element, for example <span>{value}</span>, or wrap the template in a single root element such as <div>.'
 						: 'Add content to the fragment, or give the component a single root element such as <div>.',
 				}),
 			];

@@ -2,12 +2,8 @@ import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import {
 	getComponentFunction,
 	getDynamicTagExpression,
-	getElementTagName,
-	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
-	isPlainHostTemplateNode,
 	isConstantTextNode,
-	isStaticTextNode,
 } from '../../ast/tsrx.ts';
 
 export type PublicRenderRootSelection = {
@@ -39,7 +35,10 @@ function topLevelTemplateNode(statement: AnyNode): AnyNode | null {
 	return expression && templateNodeTypes.has(expression.type ?? '') ? expression : null;
 }
 
-// Two or more top-level template statements are one root: the fragment the author left implicit.
+// A lone @for stays out: its rows need an element, which soleLoopRoot reports.
+const soleBlockRootTypes = new Set(['JSXIfExpression', 'JSXSwitchExpression', 'JSXTryExpression']);
+
+// Two or more top-level template statements, or one bare @if/@switch/@try, are one root: the fragment the author left implicit.
 function implicitFragment(body: AnyNode): ImplicitFragment | null {
 	const cached = implicitFragments.get(body);
 	if (cached !== undefined) return cached;
@@ -53,7 +52,7 @@ function implicitFragment(body: AnyNode): ImplicitFragment | null {
 	}
 	const first = children[0];
 	const last = children[children.length - 1];
-	const found = first && last && children.length > 1
+	const found = first && last && (children.length > 1 || soleBlockRootTypes.has(first.type ?? ''))
 		? {
 				fragment: {
 					type: first.type?.startsWith('JSX') ? 'JSXFragment' : 'Fragment',
@@ -141,7 +140,7 @@ export function selectPublicRenderRoot(ast: AnyNode): PublicRenderRootSelection 
 export function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
 	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
 	const supported = children.length > 0 && children.every((child) =>
-		((child.type === 'Element' || child.type === 'JSXElement') && isPlainHostTemplateNode(child)) ||
+		((child.type === 'Element' || child.type === 'JSXElement') && !getDynamicTagExpression(child)) ||
 		isConstantTextNode(child) ||
 		child.type === 'JSXStyleElement' ||
 		child.type === 'JSXIfExpression' ||
@@ -152,54 +151,15 @@ export function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
 	return supported ? fragment : null;
 }
 
-const controlFlowBlockLabels: Record<string, string> = {
-	JSXIfExpression: 'an @if block',
-	JSXSwitchExpression: 'a @switch block',
-	JSXForExpression: 'a @for block',
-	JSXTryExpression: 'a @try block',
-};
-
-// Names the first thing that stops a fragment root from rendering, in the
-// user's own terms: "the <Counter> component inside <main>". Mirrors the
-// supportedFragmentRoot / isPlainHostTemplateNode walk so the description
-// always points at a real offender instead of a category. Returns null for a
-// fragment with no content.
+// Names the first direct child that stops a fragment root from rendering, or null for an empty fragment.
 export function describeUnsupportedFragmentContent(fragment: AnyNode): string | null {
 	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
 	if (children.length === 0) return null;
 	for (const child of children) {
-		// Control-flow blocks are supported as direct fragment children; the
-		// offender is whatever comes after them.
-		if (child.type !== undefined && controlFlowBlockLabels[child.type]) continue;
-		if (isConstantTextNode(child)) continue;
-		if (child.type === 'JSXExpressionContainer') {
+		if (child.type === 'JSXExpressionContainer')
 			return 'a {expression} that can change, placed directly inside the fragment';
-		}
-		const offender = describeUnsupportedTemplateNode(child, null);
-		if (offender) return offender;
+		if ((child.type === 'Element' || child.type === 'JSXElement') && getDynamicTagExpression(child))
+			return 'a dynamic <{...}> element placed directly inside the fragment';
 	}
 	return 'content the fragment renderer does not recognize';
-}
-
-function describeUnsupportedTemplateNode(
-	node: AnyNode,
-	enclosingTag: string | null,
-): string | null {
-	const inside = enclosingTag ? ` inside <${enclosingTag}>` : '';
-	if (node.type !== 'Element' && node.type !== 'JSXElement') {
-		if (isStaticTextNode(node)) return null;
-		if (node.type === 'JSXExpressionContainer') return null;
-		const block = node.type !== undefined ? controlFlowBlockLabels[node.type] : undefined;
-		if (block) return `${block}${inside}`;
-		return `unsupported content${inside}`;
-	}
-	if (getDynamicTagExpression(node)) return `a dynamic <{...}> element${inside}`;
-	const tagName = getElementTagName(node);
-	if (!tagName) return `a component reference${inside}`;
-	if (!isHostTagName(tagName)) return `the <${tagName}> component${inside}`;
-	for (const child of asNodes(node.children)) {
-		const offender = describeUnsupportedTemplateNode(child, tagName);
-		if (offender) return offender;
-	}
-	return null;
 }

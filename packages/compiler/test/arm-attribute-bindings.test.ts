@@ -227,3 +227,48 @@ export function Toggle() @{
 		'[[{ "text": "<svg width=\\"15\\" aria-label=\\"say &quot;hi&quot;\\" aria-hidden=\\"true\\"" }, { "attribute": { "name": "class", "read": { "graphNodeId": "state:tone", "path": [] } } }, { "text": "></svg>" }], [{ "text": "<svg width=\\"13\\" class=\\"x\\"></svg>" }]]',
 	);
 });
+
+// A flip has no component body to read a body const from, so it rides a computed of the const's definition.
+test('body consts an @if arm shows as attributes, text and child props rebuild with the arm', async () => {
+	const result = await compile(
+		'src/Details.tsrx',
+		`
+import { state } from '@markless/core';
+
+const LABELS: Record<string, string> = { a: 'Alpha' };
+
+function Caption(props: { text: string }) @{
+	<small>{props.text}</small>
+}
+
+export function Details({ slug }: { slug: string }) @{
+	const id = 'details-' + slug;
+	const label = LABELS[slug] ?? slug;
+	let open = state(false);
+	<section>
+		<button onClick={() => (open = !open)}>Flip</button>
+		@if (open) {
+			const note = label + '!';
+			<>
+				<p id={id} title={note}>{label}</p>
+				<Caption text={label} />
+			</>
+		}
+	</section>
+}`,
+	);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	expect(branchModule(result)).toBeDefined();
+	const lifted = result.semanticGraph.graphBindings.filter((binding) =>
+		binding.id.startsWith('computed:templateExpression:'),
+	);
+	expect(lifted.map((binding) => binding.functionSource)).toEqual([
+		"() => ('details-' + slug)",
+		"() => ((LABELS[slug] ?? slug) + '!')",
+		'() => (LABELS[slug] ?? slug)',
+		'() => (LABELS[slug] ?? slug)',
+	]);
+	for (const binding of lifted)
+		expect(binding.dependencies?.map((dependency) => dependency.source)).toEqual(['slug']);
+});
