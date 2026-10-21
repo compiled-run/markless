@@ -1,4 +1,4 @@
-import { nvdaTest } from '@guidepup/playwright';
+import { nvdaTest } from '../../test-support/nvda-test.ts';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
 import { readCheckboxTranscript } from './checkbox-transcript.ts';
 import { nvdaToAnchoredSection, realDriver } from '../../test-support/page-driver.ts';

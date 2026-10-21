@@ -1,4 +1,4 @@
-import { nvdaTest } from '@guidepup/playwright';
+import { nvdaTest } from '../../test-support/nvda-test.ts';
 import { nvdaToAnchoredSection, realDriver } from '../../test-support/page-driver.ts';
 import { nvdaSpec } from '../../test-support/vocabularies.ts';
 import {

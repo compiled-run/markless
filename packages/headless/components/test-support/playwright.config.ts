@@ -31,17 +31,7 @@ export default defineConfig({
 		timeout: 180_000,
 	},
 	projects: [
-		{
-			name: 'nvda',
-			testMatch: /.*\.nvda\.ts$/,
-			// One control to a browse-mode line: with the screen layout, a line wraps at 100 characters, mid-name.
-			use: {
-				nvdaStartOptions: {
-					capture: 'initial',
-					settings: { virtualBuffers: { useScreenLayout: false } },
-				},
-			} as Record<string, unknown>,
-		},
+		{ name: 'nvda', testMatch: /.*\.nvda\.ts$/ },
 		{ name: 'voiceover', testMatch: /.*\.voiceover\.ts$/ },
 	],
 });

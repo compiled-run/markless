@@ -62,8 +62,11 @@ function recordPageKeys() {
 		'keydown',
 		(event) => {
 			const target = event.target as Element | null;
-			const label = target?.getAttribute('aria-label') ?? target?.textContent?.trim().slice(0, 24);
-			store.__readerKeys?.push(`${event.key} on ${target?.tagName.toLowerCase()} "${label ?? ''}"`);
+			const label =
+				target?.getAttribute('aria-label') ?? target?.textContent?.trim().slice(0, 24);
+			store.__readerKeys?.push(
+				`${event.key} on ${target?.tagName.toLowerCase()} "${label ?? ''}"`,
+			);
 		},
 		{ capture: true },
 	);

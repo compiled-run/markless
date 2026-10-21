@@ -211,6 +211,16 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	vocabulary: voiceOverVocabulary,
 	keys,
 	segments: voiceOverSegments,
+	// Quick Nav turns the bare arrow keys into VoiceOver's own; it says "on" or "off" as it toggles.
+	keepsKey: (key) => /(^|\+)(Arrow\w+|Home|End|PageUp|PageDown)$/.test(key),
+	async keysToPage(voiceOver) {
+		await voiceOver.perform(voiceOver.commanderCommands.TOGGLE_QUICK_NAV_ON_OR_OFF);
+		const toggled = await voiceOver.lastSpokenPhrase();
+		console.log(`VoiceOver Quick Nav toggle said: ${JSON.stringify(toggled)}`);
+		if (!/\boff\b/i.test(toggled)) {
+			await voiceOver.perform(voiceOver.commanderCommands.TOGGLE_QUICK_NAV_ON_OR_OFF);
+		}
+	},
 	async cursorToFocus(voiceOver, focusedName, refocus) {
 		// VoiceOver learns of a page focus change late, landing on the old focus or the document until then.
 		const arrived = (phrase: string) =>
