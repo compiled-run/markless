@@ -199,17 +199,14 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 			voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
 		const describeFocus = () =>
 			voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
-		for (let attempt = 0; attempt < 10; attempt++) {
-			await moveCursor();
-			if (arrived(await voiceOver.lastSpokenPhrase())) return;
-			// Silent when its cursor had already followed the focus, so ask it what has the focus.
+		// Asking moves nothing. Moving the cursor while VoiceOver still believes the old element has focus
+		// would hand the page's focus back to that element, because its keyboard focus follows its cursor.
+		for (let attempt = 0; attempt < 20; attempt++) {
 			await describeFocus();
-			if (arrived(await voiceOver.lastSpokenPhrase())) {
-				// It knows the focus now; one more move puts the cursor there if it was not yet.
-				await moveCursor();
-				if (!arrived(await voiceOver.lastSpokenPhrase())) await describeFocus();
-				return;
-			}
+			if (arrived(await voiceOver.lastSpokenPhrase())) break;
 		}
+		if (!arrived(await voiceOver.lastSpokenPhrase())) return;
+		await moveCursor();
+		if (!arrived(await voiceOver.lastSpokenPhrase())) await describeFocus();
 	},
 };
