@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../sr-app/preview-server.ts';
-import { readUntil, type ScreenReaderDriver } from '../../test-support/driver.ts';
+import { missingFacts, readUntil, type ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -29,6 +29,13 @@ export async function readModalTranscript(sr: ScreenReaderDriver, page: Page) {
 	await expect(dialog).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
 	// VoiceOver speaks a dialog's aria-labelledby name only directly under <main>, so the gallery names it in plain text too.
 	await expect(dialog).toHaveAttribute('aria-label', TITLE);
+	// Focus lands on the title inside the dialog, so the reader announces the dialog it entered and its name.
+	await expect(dialog.getByRole('heading', { name: TITLE })).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	const entered = await sr.settleOnFocus();
+	expect(
+		missingFacts(sr, entered, { role: 'dialog', name: TITLE }),
+		`${sr.name} announced "${entered}"`,
+	).toEqual([]);
 
 	await readUntil(sr, { role: 'dialog', name: TITLE }, WALK_LIMIT);
 }

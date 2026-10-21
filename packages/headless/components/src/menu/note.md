@@ -88,6 +88,13 @@ divergence from `select`, whose note says a listbox has a top and a bottom -
 window, `Enter` and `Space` activate, `Escape` closes the surface holding focus
 and hands focus back, and `Tab` closes and keeps its native move.
 
+A click opens on the first item too. Chromium builds a screen reader's activation
+(NVDA's `Enter` in browse mode) as pointerdown, mousedown, pointerup, mouseup and
+a click whose count is one and whose pointerType is `mouse`, so no field on the
+click tells it from a mouse's, and keydown tracking sees nothing because the
+reader keeps the key. Every opening therefore moves focus in, as the APG menu
+button examples do on click; `select` and `menubar` follow the same rule.
+
 `Space` on a checkbox or radio item toggles it and leaves the menu up; `Enter`
 takes the whole chain down. On an item carrying `submenu`, `ArrowRight`, `Enter`
 and `Space` all open its submenu on the first command inside; `ArrowLeft` inside

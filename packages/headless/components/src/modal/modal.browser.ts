@@ -180,7 +180,8 @@ async function expectTriggerOpensAndCloseButtonCloses() {
 	expectBackgroundOutOfReach(el(Background));
 	expect(el(Root).getAttribute('ui-open')).toBe('');
 	expect(el(Trigger).getAttribute('aria-expanded')).toBe('true');
-	await expect.poll(() => el(Content).contains(document.activeElement)).toBe(true);
+	// On the title, inside the dialog: a reader announces the dialog it entered, then the heading.
+	await expect.poll(() => document.activeElement).toBe(el(Title));
 	expect(document.body.style.overflow).toBe('hidden');
 
 	await closeBasic();
@@ -263,6 +264,13 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Unnamed);
 		else await renderSSR(Unnamed);
 		expectUnnamedOmitsUnboundReferences();
+	});
+
+	test(`${mode}: a dialog with no title lands focus on its surface`, async () => {
+		if (mode === 'CSR') await render(Unnamed);
+		else await renderSSR(Unnamed);
+		await openBasic();
+		await expect.poll(() => document.activeElement).toBe(el(Content));
 	});
 
 	test(`${mode}: the trigger opens the dialog and the close button closes it`, async () => {

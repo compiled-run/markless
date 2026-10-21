@@ -247,12 +247,13 @@ export const drawerState = shared(
 			 * An arrow key along the drawer's axis steps one rest position. No
 			 * reference library offers this: snap points are pointer-only in all
 			 * three, and a keyboard has no other way to reach an intermediate one.
-			 * Keys raised inside the drawer belong to whatever they landed on.
+			 * Keys raised on a control inside the drawer belong to it; the surface and its title are the drawer itself.
 			 */
 			moveByKey(target: EventTarget | null, key: string) {
 				const surface = contentEl;
+				const title = titleEl;
 				if (!surface) return;
-				if (target !== surface) return;
+				if (target !== surface && (title === undefined || target !== title)) return;
 
 				const rests = snaps;
 				if (rests.length < 2) return;
@@ -324,7 +325,7 @@ export function DrawerTrigger({ children, onClick, ...rest }: DrawerTriggerProps
 		onClick={(event) => {
 			drawer.isTriggerOpened = true;
 			drawer.setOpen(true);
-			focusIntoSurface(drawer.contentEl);
+			focusIntoSurface(drawer.contentEl, drawer.titleEl);
 			onClick?.(event);
 		}}
 	>{children}</button>
@@ -502,7 +503,7 @@ export function DrawerContent({
 export function DrawerTitle({ children, ...rest }: DrawerTitleProps) @{
 	const drawer = drawerState();
 
-	<h2 {...rest} el={drawer.titleEl}>{children}</h2>
+	<h2 {...rest} el={drawer.titleEl} tabindex={-1}>{children}</h2>
 }
 
 export function DrawerDescription({ children, ...rest }: DrawerDescriptionProps) @{

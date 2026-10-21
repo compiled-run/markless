@@ -1,16 +1,19 @@
 /** The two focus moves the overlay behaviour deliberately leaves to the family. */
 
 /**
- * Land focus on the drawer surface.
+ * Land focus in the drawer, on an element inside it (APG dialog pattern).
  *
- * The surface itself takes it, not the first control inside it: naming that
- * control would mean asking the DOM for the surface's focusable descendants, and
- * the library selects no DOM nodes. `drawer.content` carries `tabindex="-1"` so
- * it can hold the cursor, and holding it is also what puts the family's arrow
- * keys over the snap points within reach.
+ * The title is the static element at the top of the content the APG names for
+ * this: a reader announces the dialog it has entered, then the heading. The
+ * first control would mean asking the DOM for focusable descendants, which the
+ * library never does. A drawer with no title part falls back to the surface,
+ * which carries `tabindex="-1"`; either holder keeps the snap-point arrows in reach.
  */
-export function focusIntoSurface(content: HTMLElement | undefined): void {
-	content?.focus();
+export function focusIntoSurface(
+	content: HTMLElement | undefined,
+	title: HTMLElement | undefined,
+): void {
+	(title ?? content)?.focus();
 }
 
 /**

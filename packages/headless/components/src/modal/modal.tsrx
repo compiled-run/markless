@@ -79,7 +79,7 @@ export function ModalTrigger({ children, onClick, ...rest }: ModalTriggerProps) 
 		onClick={(event) => {
 			modal.isTriggerOpened = true;
 			modal.setOpen(true);
-			focusIntoSurface(modal.contentEl, modal.closeEl, modal.alert);
+			focusIntoSurface(modal.contentEl, modal.titleEl, modal.closeEl, modal.alert);
 			onClick?.(event);
 		}}
 	>{children}</button>
@@ -149,7 +149,7 @@ export function ModalContent({ children, ...rest }: ModalContentProps) @{
 export function ModalTitle({ children, ...rest }: ModalTitleProps) @{
 	const modal = modalState();
 
-	<h2 {...rest} el={modal.titleEl}>{children}</h2>
+	<h2 {...rest} el={modal.titleEl} tabindex={-1}>{children}</h2>
 }
 
 export function ModalDescription({ children, ...rest }: ModalDescriptionProps) @{
