@@ -285,7 +285,8 @@ jobs:
                   path: website-boxes-completed.txt
                   key:
                       website-boxes-${{ hashFiles('ci-base-key.txt', 'website/**/*',
-                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+                      'packages/headless/components/api/**/*', '!**/node_modules/**', '!**/dist/**',
+                      '!**/.witness/**', '!**/.output/**') }}
 
             # The receipt set is the union of what the box lanes wrote, so every
             # box key feeds this one: a box lane that re-runs re-runs receipts.
@@ -886,6 +887,10 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
+
+            # The website tooling tests ride this lane: its key hashes website/ and the UI API manifest they read.
+            - name: Run website tooling tests
+              run: pnpm --dir website exec vp test run --config vitest.tooling.config.ts
 
             - name: Run website boxes
               run: pnpm --dir website test:boxes
