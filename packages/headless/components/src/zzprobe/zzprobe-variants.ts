@@ -40,6 +40,27 @@ export const VARIANTS: readonly Variant[] = [
 		body: nested(`<div role="dialog" id="d" aria-labelledby="t" hidden>${inner}</div>`),
 		reveal: `d.setAttribute('aria-label', document.getElementById('t').textContent); d.hidden = false`,
 	},
+	{
+		name: 'B-after hidden, aria-label written 150ms after reveal, nested',
+		body: nested(`<div role="dialog" id="d" hidden>${inner}</div>`),
+		reveal: `d.hidden = false; setTimeout(() => d.setAttribute('aria-label', document.getElementById('t').textContent), 150)`,
+	},
+	{
+		name: 'A-after hidden, labelledby, aria-label written 150ms after reveal, nested',
+		body: nested(`<div role="dialog" id="d" aria-labelledby="t" hidden>${inner}</div>`),
+		reveal: `d.hidden = false; setTimeout(() => d.setAttribute('aria-label', document.getElementById('t').textContent), 150)`,
+	},
+	{
+		name: 'B-rename aria-label only, title and label renamed after reveal, nested',
+		body: nested(`<div role="dialog" id="d" aria-label="${TITLE}">${inner}</div>`),
+		reveal: `document.getElementById('t').textContent = 'Renamed title'; d.setAttribute('aria-label', 'Renamed title')`,
+	},
+	{
+		name: 'MB-after modal focus dialog, aria-label written 150ms after focus, nested',
+		body: nested(`<div role="dialog" id="d" aria-modal="true" tabindex="-1" hidden>${inner}</div>`),
+		reveal: `d.hidden = false; d.focus(); setTimeout(() => d.setAttribute('aria-label', document.getElementById('t').textContent), 150)`,
+		focusDialog: true,
+	},
 	{ name: 'C1 native dialog open + labelledby, nested', body: nested(`<dialog open id="d" aria-labelledby="t">${inner}</dialog>`) },
 	{ name: 'C2 labelledby self + aria-label, nested', body: nested(`<div role="dialog" id="d" aria-labelledby="d" aria-label="${TITLE}">${inner}</div>`) },
 	{
