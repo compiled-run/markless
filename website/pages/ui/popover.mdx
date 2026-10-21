@@ -65,8 +65,10 @@ right-to-left text.
 `popover.title` names the panel, and `popover.description` describes it. Leave both out and the
 panel has no name. The family then writes no `aria-labelledby` and no `aria-describedby`.
 
+VoiceOver on Chrome reads a dialog's `aria-labelledby` name only when the dialog sits directly under `<main>`. Anywhere else it says "dialog" with no name. It reads `aria-label` wherever the dialog sits. So give the content an `aria-label` with the title's text as well. The title still names it for every other screen reader through `aria-labelledby`.
+
 ```tsrx
-<popover.content>
+<popover.content aria-label="Share this page">
 	<popover.title>Share this page</popover.title>
 	<popover.description>Anyone with the link can read it.</popover.description>
 </popover.content>
@@ -128,8 +130,12 @@ Your own `onClick` runs after the popover opens or closes.
 
 ### `popover.content`
 
-It has no props of its own. It renders a `<div>` and passes on anything a `<div>` accepts. Your own
-`onDismiss` runs after the family closes the popover.
+It renders a `<div>` and passes on anything a `<div>` accepts. Your own `onDismiss` runs after the
+family closes the popover.
+
+| Prop         | Type     | What it does                                                                         |
+| ------------ | -------- | ------------------------------------------------------------------------------------ |
+| `aria-label` | `string` | A plain-text name. Give it the title's text, so VoiceOver names the panel anywhere. |
 
 | Attribute          | Present when              | Use it for                                                         |
 | ------------------ | ------------------------- | ------------------------------------------------------------------ |

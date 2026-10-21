@@ -100,7 +100,15 @@ export type DrawerBackdropProps = PropsOf<'div'>;
  * unitless fraction of the drawer's own size by which it is currently displaced
  * along its axis. Style the surface from a stylesheet rather than a `style` prop.
  */
-export type DrawerContentProps = PropsOf<'div'>;
+export type DrawerContentProps = PropsOf<'div'> & {
+	/**
+	 * A plain-text name, written beside the title's `aria-labelledby`. Give it the
+	 * title's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name
+	 * only when the dialog sits directly under `<main>`, and speaks `aria-label`
+	 * wherever the dialog sits.
+	 */
+	readonly 'aria-label'?: string;
+};
 
 /** The drawer's name. Mounting it is what names the surface. */
 export type DrawerTitleProps = PropsOf<'h2'>;

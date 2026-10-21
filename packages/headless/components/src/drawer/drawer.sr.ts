@@ -4,6 +4,7 @@ import { missingFacts, readUntil, type Conveys } from '../../test-support/driver
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
 import Described from './scenarios/described.tsrx';
+import Labelled from './scenarios/labelled.tsrx';
 import Nested from './scenarios/nested.tsrx';
 import NonModal from './scenarios/nonmodal.tsrx';
 import Snapped from './scenarios/snapped.tsrx';
@@ -129,4 +130,16 @@ test('a drawer resting at an intermediate position announces as an ordinary dial
 	await settle();
 	await readUntil(sr, { role: 'dialog' });
 	await readUntil(sr, { name: 'Where to next?' });
+});
+
+// The plain-text name is the one VoiceOver speaks for a dialog not directly under <main>; every reader must still hear it with the role.
+test('a drawer given a plain-text aria-label conveys it with the dialog role', async () => {
+	await open(Labelled);
+	await readUntil(sr, { role: 'button', name: 'Filter results' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Narrow these results' }), {
+		role: 'dialog',
+		name: 'Narrow these results',
+	});
 });

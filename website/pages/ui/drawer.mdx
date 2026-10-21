@@ -157,6 +157,14 @@ A `<div role="dialog" tabindex="-1">`, so it can hold focus without being a Tab 
 `aria-modal="true"` is set while `modal` is on. `aria-labelledby` points at `drawer.title`, and
 `aria-describedby` at `drawer.description`.
 
+VoiceOver on Chrome reads a dialog's `aria-labelledby` name only when the dialog sits directly under `<main>`. Anywhere else it says "dialog" with no name. It reads `aria-label` wherever the dialog sits. So give the content an `aria-label` with the title's text as well. The title still names it for every other screen reader through `aria-labelledby`.
+
+```tsrx
+<drawer.content aria-label="Narrow these results">
+	<drawer.title>Narrow these results</drawer.title>
+</drawer.content>
+```
+
 The family owns this element's `style` attribute. It writes `--offset` there: how far the sheet is
 pushed out, as a fraction of its size. Style the sheet with a class and a stylesheet, as the demo
 does with `sheet`.

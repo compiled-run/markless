@@ -10,6 +10,7 @@ import Form from './scenarios/form.tsrx';
 import Nested from './scenarios/nested.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 import SpentTrigger from './scenarios/spent-trigger.tsrx';
+import Labelled from './scenarios/labelled.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
@@ -235,6 +236,17 @@ async function openNestedPair() {
 }
 
 for (const mode of MODES) {
+	// VoiceOver speaks a dialog's aria-labelledby name only when the dialog sits directly under <main>, and its aria-label everywhere.
+	test(`${mode}: a dialog forwards a plain-text aria-label and still names itself by its title`, async () => {
+		if (mode === 'CSR') await render(Labelled);
+		else await renderSSR(Labelled);
+
+		const content = el<HTMLElement>(Content);
+		expect(content.getAttribute('aria-label')).toBe('Edit delivery address');
+		expect(el(Title).id).toBeTruthy();
+		expect(content.getAttribute('aria-labelledby')).toBe(el(Title).id);
+	});
+
 	test(`${mode}: the starter renders a closed dialog wired to its trigger`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);

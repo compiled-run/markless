@@ -64,6 +64,8 @@ export async function readPopoverTranscript(sr: ScreenReaderDriver, page: Page) 
 
 	await sr.press(sr.keys.enter);
 	await expect(surface).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
+	// VoiceOver speaks a dialog's aria-labelledby name only directly under <main>, so the gallery names it in plain text too.
+	await expect(surface).toHaveAttribute('aria-label', TITLE);
 
 	// A closed surface is `hidden`, which takes the whole subtree out of the tree a
 	// reader walks, so reaching the dialog by role and name is the proof it opened
