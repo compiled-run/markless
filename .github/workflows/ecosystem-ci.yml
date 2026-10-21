@@ -78,6 +78,7 @@ jobs:
             sha: ${{ steps.plan.outputs.sha }}
             pr: ${{ steps.plan.outputs.pr }}
             jobs: ${{ steps.plan.outputs.jobs }}
+            suites: ${{ steps.plan.outputs.suites }}
             lane: ${{ steps.plan.outputs.lane }}
         steps:
             - uses: actions/checkout@v4
@@ -116,10 +117,15 @@ jobs:
                     requested="$INPUT_SUITES"
                     lane="${INPUT_LANE:-sample}"
                   fi
+                  if ! printf '%s' "$requested" | grep -Eq '^[a-z0-9 -]*$'; then
+                    echo "::error::Suite names are lowercase letters, digits and dashes, separated by spaces."
+                    exit 1
+                  fi
                   jobs="$(node ecosystem-ci/ecosystem-ci.ts list --matrix --lane "$lane" ${requested:-all})"
                   echo "sha=${sha}" >> "$GITHUB_OUTPUT"
                   echo "pr=${pr}" >> "$GITHUB_OUTPUT"
                   echo "jobs=${jobs}" >> "$GITHUB_OUTPUT"
+                  echo "suites=${requested:-all}" >> "$GITHUB_OUTPUT"
                   echo "lane=${lane}" >> "$GITHUB_OUTPUT"
                   echo "Markless ${sha}, ${lane} lane, jobs ${jobs}${pr:+, results on #${pr}}"
 
@@ -238,13 +244,14 @@ jobs:
               id: compare
               env:
                   LANE: ${{ needs.plan.outputs.lane }}
+                  SUITES: ${{ needs.plan.outputs.suites }}
                   SHA: ${{ needs.plan.outputs.sha }}
                   GATE: ${{ inputs.gate }}
                   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
               run: |
                   set +e
                   title="Ecosystem CI on ${SHA:0:9}${GATE:+ (${GATE} gate)}"
-                  node ecosystem-ci/ecosystem-ci.ts compare --results results --lane "$LANE" --markdown report.md --title "$title" --run-url "$RUN_URL"
+                  node ecosystem-ci/ecosystem-ci.ts compare $SUITES --results results --lane "$LANE" --markdown report.md --title "$title" --run-url "$RUN_URL"
                   echo "status=$?" >> "$GITHUB_OUTPUT"
                   cat report.md >> "$GITHUB_STEP_SUMMARY"
 
