@@ -33,6 +33,7 @@ const INSTANCE_SEGMENT = /r:[^:]*:|[cpm]\d+:/g;
 type RosterComputedRecord = {
 	readonly graphNodeId: string;
 	readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
+	readonly hostScope?: string;
 };
 
 type RosterRevisionGraph = {
@@ -71,7 +72,7 @@ export function createRosterPositionReader(input: {
 	);
 	// The member handle's own id names no instance, so the host path this
 	// derivation stands in separates its element from every sibling part's.
-	const scope = hostScopePath(instancePath);
+	const scope = input.computed.hostScope ?? hostScopePath(instancePath);
 	return (rosterGraphNodeId, handleGraphNodeId) => {
 		const roster = rosterOf?.(rosterGraphNodeId);
 		const member =

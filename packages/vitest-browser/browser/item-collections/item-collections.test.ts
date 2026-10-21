@@ -7,6 +7,7 @@ import ComposedPartPage from './ic-composed-part-page.tsrx';
 import FlatPage from './ic-flat-page.tsrx';
 import KeyedPage from './ic-keyed-page.tsrx';
 import MutatingPage from './ic-mutating-page.tsrx';
+import NestedFlatPage from './ic-nested-flat-page.tsrx';
 import StaticPage from './ic-static-page.tsrx';
 import TwoInstancesPage from './ic-two-instances-page.tsrx';
 
@@ -281,6 +282,20 @@ test('SSR: a flat item behind a removal renumbers and never answers -1', async (
 	expect(positions('[data-ic-first]')).toEqual(['0', '1']);
 	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
 });
+
+// One component down, a host id numbers edges from that component's first and a symbol id from the module's.
+for (const mode of ['CSR', 'SSR'] as const) {
+	test(`${mode}: flat items one component down keep their places after resume`, async () => {
+		await (mode === 'CSR' ? render(NestedFlatPage) : renderSSR(NestedFlatPage));
+		const write = document.querySelector('[data-ic-write]') as HTMLElement;
+		await userEvent.click(write);
+
+		await expect
+			.poll(() => items().map((one) => one.getAttribute('ui-mine')), { timeout: 5000 })
+			.toEqual(['A', 'B', 'C']);
+		expect(positions()).toEqual(['0', '1', '2']);
+	});
+}
 
 test('CSR: the roster of a flat instance reads its own items only', async () => {
 	await render(FlatPage);

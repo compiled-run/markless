@@ -2,7 +2,7 @@
 /** The field names each templated record list may spell, in the order its templates index them. */
 export const PROTOCOL_RECORD_KEYS = {
 	'markless/state': {
-		computed: 'graphNodeId name async deriveSymbolId value version root $type $ref source flags records id type fields items entries values bytes arrayType buffer byteOffset length byteLength directValue dependencies path snapshot status key error',
+		computed: 'graphNodeId name async deriveSymbolId value version root $type $ref source flags records id type fields items entries values bytes arrayType buffer byteOffset length byteLength directValue dependencies path snapshot status key error hostScope',
 		sharedSeeds: 'graphNodeId deriveSymbolId dependencies path reads',
 		sharedDefinitions: 'id name exportedName scope version graphNodeIds projectionIds dependencies definitionId definitionName returnProperties kind graphNodeId path',
 	},
