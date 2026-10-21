@@ -5,6 +5,7 @@ import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Alert from './scenarios/alert.tsrx';
 import Basic from './scenarios/basic.tsrx';
 import Described from './scenarios/described.tsrx';
+import Labelled from './scenarios/labelled.tsrx';
 import Nested from './scenarios/nested.tsrx';
 
 // Rows assert the facts an announcement must convey, never a reader product's wording.
@@ -116,4 +117,16 @@ test('opening a second dialog puts the first one out of reach', async () => {
 	await settle();
 	await readUntil(sr, { name: 'Address added' });
 	expect(await walk(10)).not.toContain('Background');
+});
+
+// The plain-text name is the one VoiceOver speaks for a dialog not directly under <main>; every reader must still hear it with the role.
+test('a dialog given a plain-text aria-label conveys it with the dialog role', async () => {
+	await open(Labelled);
+	await readUntil(sr, { role: 'button', name: 'Edit address' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Edit delivery address' }), {
+		role: 'dialog',
+		name: 'Edit delivery address',
+	});
 });

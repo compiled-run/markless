@@ -59,7 +59,15 @@ export type ModalBackdropProps = PropsOf<'div'>;
  * same way. A surface that detaches while showing leaves the rest of the page
  * inert with nothing left to unmark it.
  */
-export type ModalContentProps = PropsOf<'div'>;
+export type ModalContentProps = PropsOf<'div'> & {
+	/**
+	 * A plain-text name, written beside the title's `aria-labelledby`. Give it the
+	 * title's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name
+	 * only when the dialog sits directly under `<main>`, and speaks `aria-label`
+	 * wherever the dialog sits.
+	 */
+	readonly 'aria-label'?: string;
+};
 
 /** The dialog's name. Mounting it is what names the surface. */
 export type ModalTitleProps = PropsOf<'h2'>;

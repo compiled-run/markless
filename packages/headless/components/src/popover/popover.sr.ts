@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
+import Labelled from './scenarios/labelled.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 
@@ -166,4 +167,15 @@ test('the surface is out of reach again after Escape', async () => {
 	await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('false');
 	await sr.settleOnFocus();
 	expect(await walk(6)).not.toContain('Share this page');
+});
+
+// The plain-text name is the one VoiceOver speaks for a dialog not directly under <main>; every reader must still hear it with the role.
+test('a popover given a plain-text aria-label conveys it with the dialog role', async () => {
+	await open(Labelled);
+	await readUntil(sr, { role: 'button', name: 'Share' });
+	await pressTrigger();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Share this page' }), {
+		role: 'dialog',
+		name: 'Share this page',
+	});
 });

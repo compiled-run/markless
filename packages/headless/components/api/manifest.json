@@ -1545,7 +1545,14 @@
 				"part": "content",
 				"component": "DrawerContent",
 				"doc": "The drawer surface, and the thing a swipe moves. It stays in the page when the\ndrawer is closed - `hidden` on the backdrop decides whether it shows - because\nthe overlay behaviour marks the background off an attached element.\n\nThe family owns this element's `style` attribute to carry `--offset`, the\nunitless fraction of the drawer's own size by which it is currently displaced\nalong its axis. Style the surface from a stylesheet rather than a `style` prop.",
-				"props": []
+				"props": [
+					{
+						"name": "aria-label",
+						"type": "string",
+						"required": false,
+						"doc": "A plain-text name, written beside the title's `aria-labelledby`. Give it the\ntitle's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name\nonly when the dialog sits directly under `<main>`, and speaks `aria-label`\nwherever the dialog sits."
+					}
+				]
 			},
 			{
 				"part": "description",
@@ -2367,7 +2374,14 @@
 				"part": "content",
 				"component": "ModalContent",
 				"doc": "The dialog surface. It stays in the page when the modal is closed - `hidden`\non the backdrop decides whether it shows, never an arm - because the overlay\nbehaviour marks the background off an attached element and unmarks it the\nsame way. A surface that detaches while showing leaves the rest of the page\ninert with nothing left to unmark it.",
-				"props": []
+				"props": [
+					{
+						"name": "aria-label",
+						"type": "string",
+						"required": false,
+						"doc": "A plain-text name, written beside the title's `aria-labelledby`. Give it the\ntitle's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name\nonly when the dialog sits directly under `<main>`, and speaks `aria-label`\nwherever the dialog sits."
+					}
+				]
 			},
 			{
 				"part": "description",
@@ -2934,7 +2948,14 @@
 				"part": "content",
 				"component": "PopoverContent",
 				"doc": "The surface. It is not modal: it carries no `aria-modal`, so the page behind it\nstays reachable, keeps its focus, and is never made inert.\n\nIt stays in the page when the popover is closed - `hidden` decides whether it\nshows, never an arm - because an elevated element removed from the document\nwhile it is showing leaves the overlay stack's marks behind.\n\nA consumer's `onDismiss` runs after the family has closed the popover, so a\nhandler can see which way the family went.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and reflows\nwithout any script. The anchor binding and a default `position-area` of\n`block-end` ship in the parts' own scoped stylesheets, inside `@layer markless`\n- so one unlayered rule of yours replaces the default without a specificity\nfight: `.my-surface { position-area: inline-end }`. `--ui-anchor` names the\nanchor for your own `anchor()` geometry.",
-				"props": []
+				"props": [
+					{
+						"name": "aria-label",
+						"type": "string",
+						"required": false,
+						"doc": "A plain-text name, written beside the title's `aria-labelledby`. Give it the\ntitle's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name\nonly when the dialog sits directly under `<main>`, and speaks `aria-label`\nwherever the dialog sits."
+					}
+				]
 			},
 			{
 				"part": "description",
@@ -3433,6 +3454,12 @@
 						"type": "'horizontal' | 'vertical'",
 						"required": false,
 						"doc": "The axis of the group this divider sits in. Omit it and the root's axis is used."
+					},
+					{
+						"name": "aria-label",
+						"type": "string",
+						"required": false,
+						"doc": "The divider's name. VoiceOver ignores a separator's own `aria-label`, so the\ndivider renders this text in a visually hidden element and points\n`aria-labelledby` at it."
 					}
 				]
 			}

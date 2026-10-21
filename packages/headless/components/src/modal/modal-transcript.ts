@@ -27,7 +27,8 @@ export async function readModalTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	await sr.press(sr.keys.enter);
 	await expect(dialog).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
+	// VoiceOver speaks a dialog's aria-labelledby name only directly under <main>, so the gallery names it in plain text too.
+	await expect(dialog).toHaveAttribute('aria-label', TITLE);
 
-	await readUntil(sr, { role: 'dialog' }, WALK_LIMIT);
-	await readUntil(sr, { name: TITLE }, WALK_LIMIT);
+	await readUntil(sr, { role: 'dialog', name: TITLE }, WALK_LIMIT);
 }

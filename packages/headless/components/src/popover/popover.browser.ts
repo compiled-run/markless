@@ -4,6 +4,7 @@ import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import Rtl from './scenarios/rtl.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
+import Labelled from './scenarios/labelled.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
@@ -123,6 +124,17 @@ function expectRootDropsDestructuredProps() {
 }
 
 for (const mode of MODES) {
+	// VoiceOver speaks a dialog's aria-labelledby name only when the dialog sits directly under <main>, and its aria-label everywhere.
+	test(`${mode}: a surface forwards a plain-text aria-label and still names itself by its title`, async () => {
+		if (mode === 'CSR') await render(Labelled);
+		else await renderSSR(Labelled);
+
+		const content = el<HTMLElement>(Content);
+		expect(content.getAttribute('aria-label')).toBe('Share this page');
+		expect(el(Title).id).toBeTruthy();
+		expect(content.getAttribute('aria-labelledby')).toBe(el(Title).id);
+	});
+
 	test(`${mode}: the starter renders a closed surface wired to its trigger`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);

@@ -38,7 +38,15 @@ export type PopoverTriggerProps = PropsOf<'button'>;
  * fight: `.my-surface { position-area: inline-end }`. `--ui-anchor` names the
  * anchor for your own `anchor()` geometry.
  */
-export type PopoverContentProps = PropsOf<'div'>;
+export type PopoverContentProps = PropsOf<'div'> & {
+	/**
+	 * A plain-text name, written beside the title's `aria-labelledby`. Give it the
+	 * title's text: VoiceOver on Chrome speaks a dialog's `aria-labelledby` name
+	 * only when the dialog sits directly under `<main>`, and speaks `aria-label`
+	 * wherever the dialog sits.
+	 */
+	readonly 'aria-label'?: string;
+};
 
 /** The surface's name. Mounting it is what names the surface. */
 export type PopoverTitleProps = PropsOf<'h2'>;
