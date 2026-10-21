@@ -6,13 +6,12 @@ import { afterAll, expect, test } from 'vitest';
 import { nativePackingPlugins } from '../src/build/native-packing.ts';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { MARKLESS_INTERACTION_CLOSURES } from '../src/build/chunking.ts';
+import { readInteractionClosuresAsset } from '../src/build/interaction-closures.ts';
 
 const exec = promisify(execFile);
 const fixture = resolve(import.meta.dirname, '../fixtures/vite-ssr');
 const outDir = resolve(fixture, 'node_modules/.markless-pack-planner');
 afterAll(() => rm(outDir, { force: true, recursive: true }));
-
-type Consumer = { key: string; kind: string; conservative?: string; modules: string[] };
 
 test('a real counter build names the click handler and its dispatch runtime in the click closure', async () => {
 	await exec(
@@ -20,13 +19,9 @@ test('a real counter build names the click handler and its dispatch runtime in t
 		[resolve(import.meta.dirname, 'helpers/build-pack-planner-fixture.ts'), outDir],
 		{ cwd: fixture },
 	);
-	const asset = JSON.parse(
+	const asset = readInteractionClosuresAsset(
 		await readFile(marklessBuildManifestPath(outDir, MARKLESS_INTERACTION_CLOSURES), 'utf8'),
-	) as {
-		partition: string;
-		routes: { route: string; fallback?: string; consumers: Consumer[] }[];
-		packs: Record<string, string[]>;
-	};
+	);
 	// Entry-rooted builds keep their packs whole; the closures are still reported.
 	expect(asset.partition).toBe('unsplit:entry-roots');
 	const route = asset.routes.find((candidate) => candidate.route === 'src/root.tsrx')!;
