@@ -3631,6 +3631,35 @@ export function App() @{
 	);
 });
 
+test('a bare @switch, @if or @try as the whole template renders as the same block inside <>...</>', async () => {
+	const blocks = {
+		switch: `@switch (kind) {\n\t\t@case 'a': { <main><p>A</p></main> }\n\t\t@default: { <main><p>D</p></main> }\n\t}`,
+		if: `@if (kind === 'a') { <main><p>A</p></main> } @else { <section><p>D</p></section> }`,
+		try: `@try { <article><p>T</p></article> } @catch (error) { <p>failed</p> }`,
+	};
+	for (const [name, block] of Object.entries(blocks)) {
+		const html: string[] = [];
+		for (const template of [block, `<>\n\t${block}\n\t</>`]) {
+			const result = await compileTsrxModule({
+				filename: `pages/${name}.tsrx`,
+				source: `import { state } from '@markless/core';\n\nexport default function Page() @{\n\tlet kind = state('z');\n\t${template}\n}\n`,
+				symbols: [],
+			});
+			expect(
+				result.publicRenderModule.diagnostics.filter((d) => d.severity === 'error'),
+				name,
+			).toEqual([]);
+			expect(result.publicRenderModule.ssrModuleSource, name).not.toBe('');
+			const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+			html.push(
+				(await (ssrModule.marklessRenderSsr as () => Promise<{ html: string }>)()).html,
+			);
+		}
+		expect(html[0], name).toBe(html[1]);
+		expect(html[0], name).toContain(name === "try" ? "markless:async" : "<p>D</p>");
+	}
+});
+
 test('compileTsrxModule passes component children into SSR component props', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/index.tsrx',
