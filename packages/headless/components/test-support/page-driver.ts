@@ -24,8 +24,13 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	 * `refocus` puts the page's focus back on that element if the reader moved it.
 	 */
 	cursorToFocus?: (reader: R, focusedName: string, refocus: () => Promise<void>) => Promise<void>;
-	/** Run before a key goes to the page, for a reader that would otherwise keep that key for itself. */
-	beforeKey?: (reader: R, key: string) => Promise<void>;
+	/**
+	 * For a reader with a reading mode that keeps some keys for itself (NVDA's browse mode): `keysToPage` hands the
+	 * focused widget the keys `keepsKey` names, and `keysToReader` takes them back before the reading cursor moves.
+	 */
+	keepsKey?: (key: string) => boolean;
+	keysToPage?: (reader: R) => Promise<void>;
+	keysToReader?: (reader: R) => Promise<void>;
 	/** Say the focused element again, for a reader whose next-item keys would reach a focused widget instead. */
 	reannounceFocus?: (reader: R) => Promise<void>;
 	/** Undo the reader's own spelling-out of symbols, so a phrase can be compared with the name it read. */
@@ -47,6 +52,21 @@ async function focusedAccessibleName(page: Page): Promise<string> {
 	} finally {
 		await cdp.detach();
 	}
+}
+
+function recordPageKeys() {
+	const store = globalThis as { __readerKeys?: string[] };
+	if (store.__readerKeys) return;
+	store.__readerKeys = [];
+	addEventListener(
+		'keydown',
+		(event) => {
+			const target = event.target as Element | null;
+			const label = target?.getAttribute('aria-label') ?? target?.textContent?.trim().slice(0, 24);
+			store.__readerKeys?.push(`${event.key} on ${target?.tagName.toLowerCase()} "${label ?? ''}"`);
+		},
+		{ capture: true },
+	);
 }
 
 // A walk that would outlast the test fails here with its own message, not as the fixture's "not running" mid-teardown.
@@ -77,6 +97,14 @@ export function realDriver<R extends RealReader>(
 		));
 	const timeout = test.info().timeout;
 	const deadline = timeout > 0 ? Date.now() + timeout - WALK_HEADROOM_MS : Infinity;
+	// Whether keys may now be going to the page rather than the reader: after a hand-over, or a focus move that
+	// can switch the reader over by itself.
+	let keysMayBeWithPage = false;
+	const keysBackToReader = async () => {
+		if (!keysMayBeWithPage || !spec.keysToReader) return;
+		await spec.keysToReader(reader);
+		keysMayBeWithPage = false;
+	};
 	return {
 		name: spec.name,
 		vocabulary: spec.vocabulary,
@@ -90,12 +118,31 @@ export function realDriver<R extends RealReader>(
 					`${spec.name} was still walking with ${WALK_HEADROOM_MS / 1000} s of the test's ${timeout / 1000} s left; the phrases it said are printed above.`,
 				);
 			}
+			await keysBackToReader();
 			await reader.next();
 		},
-		previous: () => reader.previous(),
+		async previous() {
+			await keysBackToReader();
+			await reader.previous();
+		},
 		async press(key) {
-			await spec.beforeKey?.(reader, key);
+			if (spec.keysToPage && spec.keepsKey?.(key) && (await pageHasFocus())) {
+				await spec.keysToPage(reader);
+				keysMayBeWithPage = true;
+			} else if (key === 'Escape') {
+				// A reader handed the keys keeps Escape to take them back, so the page would never see it.
+				await keysBackToReader();
+			}
+			await page?.evaluate(recordPageKeys);
 			await reader.press(key);
+			// Printed with the phrases: a key the reader kept and a key the widget ignored fail the same assertion.
+			if (page) {
+				const seen = await page.evaluate(() => {
+					const keys = (globalThis as { __readerKeys?: string[] }).__readerKeys ?? [];
+					return keys.splice(0);
+				});
+				console.log(`${spec.name} pressed ${key}; the page saw ${JSON.stringify(seen)}`);
+			}
 		},
 		async reannounce() {
 			if (spec.reannounceFocus && (await pageHasFocus())) {
@@ -105,11 +152,13 @@ export function realDriver<R extends RealReader>(
 			// Neither reader has a "read the current item again" command that is
 			// guaranteed to re-read from the live DOM, so this steps off the item
 			// and back onto it - the same move the virtual driver makes.
+			await keysBackToReader();
 			await reader.previous();
 			await reader.next();
 			return heard(reader.lastSpokenPhrase());
 		},
 		async settleOnFocus() {
+			keysMayBeWithPage = true;
 			if (spec.cursorToFocus && page) {
 				const focused = await page.evaluateHandle(() => document.activeElement);
 				const refocus = () =>

@@ -180,17 +180,23 @@ const keys: Keys = {
 	arrowRight: 'ArrowRight',
 };
 
+async function nvdaMode(nvda: NVDAPlaywright, mode: 'focus mode' | 'browse mode') {
+	await nvda.perform(nvda.keyboardCommands.toggleBetweenBrowseAndFocusMode);
+	if (!(await nvda.lastSpokenPhrase()).includes(mode)) {
+		await nvda.perform(nvda.keyboardCommands.toggleBetweenBrowseAndFocusMode);
+	}
+}
+
 export const nvdaSpec: RealDriverSpec<NVDAPlaywright> = {
 	name: 'NVDA',
 	vocabulary: nvdaVocabulary,
 	keys,
 	segments: nvdaSegments,
-	// Browse mode keeps arrows and page keys to move its own cursor; a widget's keys are passed through, as a user would.
-	async beforeKey(nvda, key) {
-		if (/^(Arrow|Home$|End$|Page)/.test(key)) {
-			await nvda.perform(nvda.keyboardCommands.ignoreNextKeyCombination);
-		}
-	},
+	// Browse mode keeps arrows and page keys to move its own cursor. A user hands them to a focused widget by
+	// switching to focus mode (NVDA+Space), and NVDA says which mode it switched to.
+	keepsKey: (key) => /(^|\+)(Arrow\w+|Home|End|PageUp|PageDown|Enter|Space)$/.test(key),
+	keysToPage: (nvda) => nvdaMode(nvda, 'focus mode'),
+	keysToReader: (nvda) => nvdaMode(nvda, 'browse mode'),
 	// NVDA speaks a focus change on its own, but the phrase is only captured on a command, so it is asked for.
 	// Once: asking twice in quick succession makes NVDA spell the answer letter by letter.
 	cursorToFocus: (nvda) => nvda.perform(nvda.keyboardCommands.reportCurrentFocus),
