@@ -2,8 +2,8 @@
 // each specifier becomes a small module that re-exports the frame's instance, so the
 // result and the frame share one runtime.
 import corePackage from '../../../../packages/core/package.json' with { type: 'json' };
-import webPackage from '../../../../packages/web/package.json' with { type: 'json' };
-import { exportTarget } from './package-exports.ts';
+import { exportTarget, packageFile } from './package-exports.ts';
+import { runtimePackages } from './source-packages.ts';
 
 export { exportTarget };
 
@@ -25,17 +25,12 @@ const RUNTIME_IMPORT = '__marklessCodeRuntimeImport';
 const namespaces: Map<string, Namespace> = ((globalThis as Record<string, unknown>)[RUNTIME] ??=
 	new Map()) as Map<string, Namespace>;
 
+const packages = runtimePackages(PACKAGES);
+
 function loaderFor(specifier: string): Loader | undefined {
 	if (specifier === corePackage.name) return () => import('@markless/core');
-	for (const [pkg, folder] of [
-		[webPackage, 'web/'],
-		[corePackage, 'core/'],
-	] as const) {
-		if (specifier !== pkg.name && !specifier.startsWith(`${pkg.name}/`)) continue;
-		const target = exportTarget(pkg.exports, `.${specifier.slice(pkg.name.length)}`);
-		return target ? sources[`${PACKAGES}${folder}${target.slice(2)}`] : undefined;
-	}
-	return undefined;
+	const file = packageFile(packages, specifier);
+	return file ? sources[file] : undefined;
 }
 
 const shims = new Map<string, Promise<string>>();

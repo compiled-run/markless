@@ -1,6 +1,7 @@
 import type { Children } from '@markless/core';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
+import { prefetchCodeBlock } from './code/prefetch.ts';
 import { labelPieces, type CodeStep } from './playground/checklist.ts';
 import { lucide, resizable } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
@@ -22,6 +23,11 @@ function boot(event: { readonly target: unknown }, files: readonly CodeFile[], o
 				).then((live) => live.bootLive(box));
 		},
 	);
+}
+
+function prefetch(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
+	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
+	if (box) prefetchCodeBlock(box, files);
 }
 
 // Mirrors session.ts: `markless-code:editor` and `markless-code:<path>:<block index>:<hash>`.
@@ -84,7 +90,11 @@ export default function Code({
 		class="code-block"
 		data-code="idle"
 		data-code-live={live ? '' : undefined}
-		onVisible={(event) => boot(event, files, true)}
+		onVisible={(event) => {
+			prefetch(event, files);
+			boot(event, files, true);
+		}}
+		onIdle={(event) => prefetch(event, files)}
 		onPointerenter={(event) => boot(event, files)}
 		onTouchstart={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}

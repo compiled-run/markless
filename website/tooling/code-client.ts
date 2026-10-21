@@ -2,13 +2,30 @@
 // a URL the bundler cannot follow, so a page with a block preloads none of it. The result
 // runs in /_code-frame.html and compiles in the one Web Worker the session starts, where the
 // bundler's Node-only imports are swapped for in-memory stand-ins.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import type { Plugin } from 'vite';
+import { CODE_PREFETCH_FILE } from '../components/docs/code/prefetch.ts';
+import { codePrefetchManifest, type PrefetchBundle } from './code-prefetch.ts';
+
+const RUNTIME_SOURCES_SCRIPT = fileURLToPath(new URL('./code-runtime-sources.ts', import.meta.url));
+
+// Its own process: the block compiles must not share module state with this build's bundler.
+async function siteRuntimeSources(): Promise<Record<string, string[]>> {
+	const { stdout } = await promisify(execFile)(
+		process.execPath,
+		['--experimental-transform-types', '--no-warnings', RUNTIME_SOURCES_SCRIPT],
+		{ maxBuffer: 64 * 1024 * 1024 },
+	);
+	return JSON.parse(stdout) as Record<string, string[]>;
+}
 
 const CODE_DIR = fileURLToPath(new URL('../components/docs/code/', import.meta.url));
 const FRAME_ENTRY = `${CODE_DIR}frame.ts`;
+const FRAME_RUNTIME = `${CODE_DIR}frame-runtime.ts`;
 // Each is its own entry chunk the page reaches only through the URL its virtual module exports.
 const BROWSER_ENTRIES: Readonly<Record<string, { readonly file: string; readonly name: string }>> = {
 	'virtual:code-session-url': { file: `${CODE_DIR}session.ts`, name: 'code-session' },
@@ -67,6 +84,7 @@ export function codeCompilerSwaps(): Plugin {
 export function codeClient(): Plugin[] {
 	let base = '/';
 	let frameRef = '';
+	let runtimeSources: Promise<Record<string, string[]>> | undefined;
 	const entryRefs = new Map<string, string>();
 	return [
 		codeCompilerSwaps(),
@@ -94,6 +112,8 @@ export function codeClient(): Plugin[] {
 					this.environment.config.command !== 'build'
 				)
 					return;
+				runtimeSources = siteRuntimeSources();
+				runtimeSources.catch(() => {});
 				frameRef = this.emitFile({ type: 'chunk', id: FRAME_ENTRY, name: 'code-frame' });
 				for (const [url, entry] of Object.entries(BROWSER_ENTRIES))
 					entryRefs.set(url, this.emitFile({ type: 'chunk', id: entry.file, name: entry.name }));
@@ -133,10 +153,24 @@ export function codeClient(): Plugin[] {
 			// modulepreload for every chunk of the site; the frame keeps the map and its own preloads.
 			writeBundle: {
 				order: 'post',
-				handler(options) {
+				async handler(options, bundle) {
 					if (!frameRef || this.environment?.name !== 'client' || !options.dir) return;
-					const file = join(options.dir, CODE_FRAME_FILE);
+					const dir = options.dir;
+					const file = join(dir, CODE_FRAME_FILE);
 					writeFileSync(file, dropSitePreloads(readFileSync(file, 'utf8')));
+					const manifest = codePrefetchManifest(bundle as unknown as PrefetchBundle, {
+						base,
+						sessionEntry: BROWSER_ENTRIES['virtual:code-session-url']!.file,
+						liveEntry: BROWSER_ENTRIES['virtual:code-live-url']!.file,
+						frameEntry: FRAME_ENTRY,
+						runtimeTable: FRAME_RUNTIME,
+						frameFile: `${base}${CODE_FRAME_FILE}`,
+						blocks: await runtimeSources!,
+					});
+					const listed = [manifest.session, manifest.live, manifest.cache, ...Object.values(manifest.blocks)].flat();
+					const missing = listed.filter((url) => !existsSync(join(dir, url.slice(base.length))));
+					if (missing.length) throw new Error(`${CODE_PREFETCH_FILE} names files the build did not write: ${missing.join(', ')}`);
+					writeFileSync(join(dir, CODE_PREFETCH_FILE), JSON.stringify(manifest));
 				},
 			},
 		},
