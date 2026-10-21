@@ -24,13 +24,10 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	 * `refocus` puts the page's focus back on that element if the reader moved it.
 	 */
 	cursorToFocus?: (reader: R, focusedName: string, refocus: () => Promise<void>) => Promise<void>;
-	/**
-	 * For a reader with a reading mode that keeps some keys for itself (NVDA's browse mode): `keysToPage` hands the
-	 * focused widget the keys `keepsKey` names, and `keysToReader` takes them back before the reading cursor moves.
-	 */
-	keepsKey?: (key: string) => boolean;
-	keysToPage?: (reader: R) => Promise<void>;
+	/** Give the reader its own keys back before its reading cursor moves, if a focus move may have taken them. */
 	keysToReader?: (reader: R) => Promise<void>;
+	/** Deliver a key for the focused element through the page rather than as a system keystroke. */
+	keysThroughPage?: boolean;
 	/** Say the focused element again, for a reader whose next-item keys would reach a focused widget instead. */
 	reannounceFocus?: (reader: R) => Promise<void>;
 	/** Undo the reader's own spelling-out of symbols, so a phrase can be compared with the name it read. */
@@ -100,8 +97,7 @@ export function realDriver<R extends RealReader>(
 		));
 	const timeout = test.info().timeout;
 	const deadline = timeout > 0 ? Date.now() + timeout - WALK_HEADROOM_MS : Infinity;
-	// Whether keys may now be going to the page rather than the reader: after a hand-over, or a focus move that
-	// can switch the reader over by itself.
+	// Whether a focus move may have switched the reader to handing its keys to the page.
 	let keysMayBeWithPage = false;
 	const keysBackToReader = async () => {
 		if (!keysMayBeWithPage || !spec.keysToReader) return;
@@ -129,15 +125,12 @@ export function realDriver<R extends RealReader>(
 			await reader.previous();
 		},
 		async press(key) {
-			if (spec.keysToPage && spec.keepsKey?.(key) && (await pageHasFocus())) {
-				await spec.keysToPage(reader);
-				keysMayBeWithPage = true;
-			} else if (key === 'Escape') {
-				// A reader handed the keys keeps Escape to take them back, so the page would never see it.
-				await keysBackToReader();
-			}
 			await page?.evaluate(recordPageKeys);
-			await reader.press(key);
+			if (spec.keysThroughPage && page && (await pageHasFocus())) {
+				await page.keyboard.press(key);
+			} else {
+				await reader.press(key);
+			}
 			// Printed with the phrases: a key the reader kept and a key the widget ignored fail the same assertion.
 			if (page) {
 				const seen = await page.evaluate(() => {

@@ -1,12 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../sr-app/preview-server.ts';
-import {
-	missingFacts,
-	readUntil,
-	type Conveys,
-	type ScreenReaderDriver,
-} from '../../test-support/driver.ts';
-import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
+import { missingFacts, type Conveys, type ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -74,7 +68,9 @@ export async function readCalendarTranscript(sr: ScreenReaderDriver, page: Page)
 	// The whole date is in the name, which is the fact a grid's row and column
 	// position exists to convey - and the reason this family ships neither.
 	const plain: Conveys = { role: 'button', name: plainName };
-	expectConveys(sr, await readUntil(sr, plain, GALLERY_WALK_LIMIT), plain);
+	// On focus, as the grid is used: NVDA's browse mode puts a week of days on one line and wraps it mid-date.
+	await dayFor(PLAIN).focus();
+	expectConveys(sr, await sr.settleOnFocus(), plain);
 
 	// A day already chosen. `aria-pressed`, never `aria-selected`: a button does
 	// not support the latter.

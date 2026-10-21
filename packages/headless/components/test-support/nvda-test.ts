@@ -1,12 +1,12 @@
 import { nvdaTest as guidepupNvdaTest } from '@guidepup/playwright';
 
 /**
- * guidepup's NVDA test, started with one control to a browse-mode line: with the screen layout on, a line holds
- * every inline control and wraps at 100 characters, mid-name.
+ * guidepup's NVDA test with browse-mode lines at NVDA's longest, 250 characters rather than 100, so fewer names
+ * wrap onto a second line. The screen layout stays on, so a checkbox and its label share a line.
  */
 export const nvdaTest = guidepupNvdaTest.extend({
 	nvdaStartOptions: {
 		capture: 'initial',
-		settings: { virtualBuffers: { useScreenLayout: false } },
+		settings: { virtualBuffers: { maxLineLength: 250 } },
 	},
 });

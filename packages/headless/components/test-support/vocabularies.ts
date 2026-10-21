@@ -180,9 +180,12 @@ const keys: Keys = {
 	arrowRight: 'ArrowRight',
 };
 
+// NVDA says which mode a toggle switched it to, so the second toggle runs only when the first went the wrong way.
 async function nvdaMode(nvda: NVDAPlaywright, mode: 'focus mode' | 'browse mode') {
 	await nvda.perform(nvda.keyboardCommands.toggleBetweenBrowseAndFocusMode);
-	if (!(await nvda.lastSpokenPhrase()).includes(mode)) {
+	const toggled = await nvda.lastSpokenPhrase();
+	console.log(`NVDA mode toggle said: ${JSON.stringify(toggled)}`);
+	if (!toggled.includes(mode)) {
 		await nvda.perform(nvda.keyboardCommands.toggleBetweenBrowseAndFocusMode);
 	}
 }
@@ -192,10 +195,9 @@ export const nvdaSpec: RealDriverSpec<NVDAPlaywright> = {
 	vocabulary: nvdaVocabulary,
 	keys,
 	segments: nvdaSegments,
-	// Browse mode keeps arrows and page keys to move its own cursor. A user hands them to a focused widget by
-	// switching to focus mode (NVDA+Space), and NVDA says which mode it switched to.
-	keepsKey: (key) => /(^|\+)(Arrow\w+|Home|End|PageUp|PageDown|Enter|Space)$/.test(key),
-	keysToPage: (nvda) => nvdaMode(nvda, 'focus mode'),
+	// Browse mode keeps arrows, Space and Enter for itself, so a key for the focused element goes to the page.
+	keysThroughPage: true,
+	// A focus move can switch NVDA to focus mode, where its next-item keys are arrows into the widget.
 	keysToReader: (nvda) => nvdaMode(nvda, 'browse mode'),
 	// NVDA speaks a focus change on its own, but the phrase is only captured on a command, so it is asked for.
 	// Once: asking twice in quick succession makes NVDA spell the answer letter by letter.
@@ -211,16 +213,9 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	vocabulary: voiceOverVocabulary,
 	keys,
 	segments: voiceOverSegments,
-	// Quick Nav turns the bare arrow keys into VoiceOver's own; it says "on" or "off" as it toggles.
-	keepsKey: (key) => /(^|\+)(Arrow\w+|Home|End|PageUp|PageDown)$/.test(key),
-	async keysToPage(voiceOver) {
-		await voiceOver.perform(voiceOver.commanderCommands.TOGGLE_QUICK_NAV_ON_OR_OFF);
-		const toggled = await voiceOver.lastSpokenPhrase();
-		console.log(`VoiceOver Quick Nav toggle said: ${JSON.stringify(toggled)}`);
-		if (!/\boff\b/i.test(toggled)) {
-			await voiceOver.perform(voiceOver.commanderCommands.TOGGLE_QUICK_NAV_ON_OR_OFF);
-		}
-	},
+	// Synthesised system keystrokes reach the page only some of the time while VoiceOver runs (arrows, Escape and
+	// Control+Z were lost in whole runs), so a key for the focused element goes to the page directly.
+	keysThroughPage: true,
 	async cursorToFocus(voiceOver, focusedName, refocus) {
 		// VoiceOver learns of a page focus change late, landing on the old focus or the document until then.
 		const arrived = (phrase: string) =>
@@ -229,7 +224,13 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 				: phrase.includes(focusedName);
 		for (let attempt = 0; attempt < 10; attempt++) {
 			await voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
-			if (arrived(await voiceOver.lastSpokenPhrase())) return;
+			const moved = await voiceOver.lastSpokenPhrase();
+			if (arrived(moved)) return;
+			// Silent when its cursor was already there: describing the cursor's item moves nothing and says where it is.
+			if (moved === '') {
+				await voiceOver.perform(voiceOver.keyboardCommands.describeItem);
+				if (arrived(await voiceOver.lastSpokenPhrase())) return;
+			}
 			// Its keyboard focus follows its cursor, so landing on the old element moved the page's focus there too.
 			await refocus();
 		}
