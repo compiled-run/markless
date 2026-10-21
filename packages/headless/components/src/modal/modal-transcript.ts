@@ -27,8 +27,10 @@ export async function readModalTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	await sr.press(sr.keys.enter);
 	await expect(dialog).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
-	// VoiceOver speaks a dialog's aria-labelledby name only directly under <main>, so the gallery names it in plain text too.
-	await expect(dialog).toHaveAttribute('aria-label', TITLE);
+	// The title is the name, by reference and with no prop: VoiceOver and NVDA both read it through aria-labelledby.
+	const titleId = (await dialog.getAttribute('aria-labelledby')) ?? '';
+	await expect(page.locator(`[id="${titleId}"]`)).toHaveText(TITLE);
+	await expect(dialog).not.toHaveAttribute('aria-label');
 	// Focus lands on the title inside the dialog, so the reader announces the dialog it entered and its name.
 	await expect(dialog.getByRole('heading', { name: TITLE })).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
 	const entered = await sr.settleOnFocus();

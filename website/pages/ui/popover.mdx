@@ -65,10 +65,10 @@ right-to-left text.
 `popover.title` names the panel, and `popover.description` describes it. Leave both out and the
 panel has no name. The family then writes no `aria-labelledby` and no `aria-describedby`.
 
-VoiceOver on Chrome reads a dialog's `aria-labelledby` name only when the dialog sits directly under `<main>`. Anywhere else it says "dialog" with no name. It reads `aria-label` wherever the dialog sits. So give the content an `aria-label` with the title's text as well. The title still names it for every other screen reader through `aria-labelledby`.
+Render `popover.title` and it names the panel: the content points `aria-labelledby` at it, with no prop. VoiceOver and NVDA both read that name, on focus and on a walk, wherever the surface sits on the page. Use `aria-label` on `popover.content` only when there is no title. With a title rendered, `aria-labelledby` outranks `aria-label` in the accessible name, so an `aria-label` beside a title changes nothing.
 
 ```tsrx
-<popover.content aria-label="Share this page">
+<popover.content>
 	<popover.title>Share this page</popover.title>
 	<popover.description>Anyone with the link can read it.</popover.description>
 </popover.content>
@@ -135,7 +135,7 @@ family closes the popover.
 
 | Prop         | Type     | What it does                                                                         |
 | ------------ | -------- | ------------------------------------------------------------------------------------ |
-| `aria-label` | `string` | A plain-text name. Give it the title's text, so VoiceOver names the panel anywhere. |
+| `aria-label` | `string` | The panel's name when it has no `popover.title`. A title outranks it. |
 
 | Attribute          | Present when              | Use it for                                                         |
 | ------------------ | ------------------------- | ------------------------------------------------------------------ |

@@ -158,7 +158,7 @@ export function Gallery() @{
 				<modal.root>
 					<modal.trigger>Edit address</modal.trigger>
 					<modal.backdrop>
-						<modal.content aria-label="Edit delivery address">
+						<modal.content>
 							<modal.title>Edit delivery address</modal.title>
 							<modal.close>Cancel</modal.close>
 						</modal.content>
@@ -248,7 +248,7 @@ export function Gallery() @{
 			<div class="scenario">
 				<popover.root>
 					<popover.trigger>Share</popover.trigger>
-					<popover.content aria-label="Share this page">
+					<popover.content>
 						<popover.title>Share this page</popover.title>
 						<popover.description>Anyone with the link can read it.</popover.description>
 						<popover.close>Done</popover.close>
@@ -664,7 +664,7 @@ export function Gallery() @{
 				<drawer.root>
 					<drawer.trigger>Filter results</drawer.trigger>
 					<drawer.backdrop>
-						<drawer.content aria-label="Narrow these results">
+						<drawer.content>
 							<drawer.title>Narrow these results</drawer.title>
 							<button type="button">Apply</button>
 							<drawer.close>Cancel</drawer.close>
@@ -678,7 +678,7 @@ export function Gallery() @{
 				<drawer.root snapPoints={[0.5, 1]} defaultSnapPoint={0.5}>
 					<drawer.trigger>Nearby stops</drawer.trigger>
 					<drawer.backdrop>
-						<drawer.content aria-label="Where to next?">
+						<drawer.content>
 							<drawer.title>Where to next?</drawer.title>
 							<drawer.close>Done</drawer.close>
 						</drawer.content>
@@ -691,12 +691,12 @@ export function Gallery() @{
 				<drawer.root>
 					<drawer.trigger>Payment method</drawer.trigger>
 					<drawer.backdrop>
-						<drawer.content aria-label="Choose a payment method">
+						<drawer.content>
 							<drawer.title>Choose a payment method</drawer.title>
 							<drawer.root>
 								<drawer.trigger>Add a card</drawer.trigger>
 								<drawer.backdrop>
-									<drawer.content aria-label="Card added">
+									<drawer.content>
 										<drawer.title>Card added</drawer.title>
 										<drawer.close>OK</drawer.close>
 									</drawer.content>

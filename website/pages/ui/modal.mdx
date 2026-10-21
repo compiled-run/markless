@@ -26,8 +26,7 @@ layer, so you can center it with one grid rule on the backdrop.
   `aria-expanded` and `aria-controls`.
 - `modal.backdrop` is the layer behind the dialog. It carries `hidden` while the dialog is closed.
 - `modal.content` is the dialog. It writes `role="dialog"`, `aria-modal="true"` and `tabindex="-1"`.
-- `modal.title` is an `<h2>`. It gives the dialog its name. Give `modal.content` an `aria-label`
-  with the same text too, for VoiceOver. See [Name the dialog](#name-the-dialog).
+- `modal.title` is an `<h2>`. It gives the dialog its name. See [Name the dialog](#name-the-dialog).
 - `modal.description` is a `<p>`. A screen reader reads it after the name.
 - `modal.close` is a `<button>` that closes the dialog.
 
@@ -49,11 +48,15 @@ code opens the dialog through `open`, focus goes back where it was when the dial
 
 ## Name the dialog
 
-VoiceOver on Chrome reads a dialog's `aria-labelledby` name only when the dialog sits directly under `<main>`. Anywhere else it says "dialog" with no name. It reads `aria-label` wherever the dialog sits. So give the content an `aria-label` with the title's text as well. The title still names it for every other screen reader through `aria-labelledby`.
+Render `modal.title` and it names the dialog: the content points `aria-labelledby` at it, with no prop. VoiceOver and NVDA both read that name, on focus and on a walk, wherever the surface sits on the page. Use `aria-label` on `modal.content` only when there is no title. With a title rendered, `aria-labelledby` outranks `aria-label` in the accessible name, so an `aria-label` beside a title changes nothing.
 
 ```tsrx
-<modal.content aria-label="Edit delivery address">
+<modal.content>
 	<modal.title>Edit delivery address</modal.title>
+</modal.content>
+
+<modal.content aria-label="Confirm the move">
+	<p>Move these files to the archive?</p>
 </modal.content>
 ```
 

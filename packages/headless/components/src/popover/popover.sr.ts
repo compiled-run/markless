@@ -3,7 +3,9 @@ import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
+import Fallback from './scenarios/fallback.tsrx';
 import Labelled from './scenarios/labelled.tsrx';
+import Renamed from './scenarios/renamed.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 
@@ -169,13 +171,36 @@ test('the surface is out of reach again after Escape', async () => {
 	expect(await walk(6)).not.toContain('Share this page');
 });
 
-// The plain-text name is the one VoiceOver speaks for a dialog not directly under <main>; every reader must still hear it with the role.
-test('a popover given a plain-text aria-label conveys it with the dialog role', async () => {
+// The title names the popover through aria-labelledby, which both VoiceOver and NVDA read wherever it sits.
+test('a title outranks an aria-label written beside it', async () => {
 	await open(Labelled);
 	await readUntil(sr, { role: 'button', name: 'Share' });
 	await pressTrigger();
 	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Share this page' }), {
 		role: 'dialog',
 		name: 'Share this page',
+	});
+});
+
+test("with no title, the popover's aria-label is the name it conveys", async () => {
+	await open(Fallback);
+	await readUntil(sr, { role: 'button', name: 'Share' });
+	await pressTrigger();
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Share options' }), {
+		role: 'dialog',
+		name: 'Share options',
+	});
+});
+
+test("the popover conveys its title's new text once the title changes", async () => {
+	await open(Renamed);
+	await readUntil(sr, { role: 'button', name: 'Share' });
+	await pressTrigger();
+	const rename = document.querySelector('[data-testid="rename"]') as HTMLElement;
+	rename.click();
+	await expect.poll(() => document.querySelector('[data-testid="title"]')?.textContent).toBe('Share this draft');
+	expectConveys(await readUntil(sr, { role: 'dialog', name: 'Share this draft' }), {
+		role: 'dialog',
+		name: 'Share this draft',
 	});
 });

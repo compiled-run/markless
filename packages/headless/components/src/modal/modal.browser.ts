@@ -10,6 +10,7 @@ import Form from './scenarios/form.tsrx';
 import Nested from './scenarios/nested.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 import SpentTrigger from './scenarios/spent-trigger.tsrx';
+import Fallback from './scenarios/fallback.tsrx';
 import Labelled from './scenarios/labelled.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
@@ -237,15 +238,24 @@ async function openNestedPair() {
 }
 
 for (const mode of MODES) {
-	// VoiceOver speaks a dialog's aria-labelledby name only when the dialog sits directly under <main>, and its aria-label everywhere.
-	test(`${mode}: a dialog forwards a plain-text aria-label and still names itself by its title`, async () => {
+	// The title names the surface by reference with no prop; aria-labelledby outranks aria-label in the name computation.
+	test(`${mode}: a rendered title names the dialog, and an aria-label beside it does not replace it`, async () => {
 		if (mode === 'CSR') await render(Labelled);
 		else await renderSSR(Labelled);
 
 		const content = el<HTMLElement>(Content);
-		expect(content.getAttribute('aria-label')).toBe('Edit delivery address');
 		expect(el(Title).id).toBeTruthy();
 		expect(content.getAttribute('aria-labelledby')).toBe(el(Title).id);
+		expect(content.getAttribute('aria-label')).toBe('Change where it goes');
+	});
+
+	test(`${mode}: with no title, the dialog's aria-label is its name`, async () => {
+		if (mode === 'CSR') await render(Fallback);
+		else await renderSSR(Fallback);
+
+		const content = el<HTMLElement>(Content);
+		expect(content.hasAttribute('aria-labelledby')).toBe(false);
+		expect(content.getAttribute('aria-label')).toBe('Change where it goes');
 	});
 
 	test(`${mode}: the starter renders a closed dialog wired to its trigger`, async () => {
