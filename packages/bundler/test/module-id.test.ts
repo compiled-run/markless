@@ -1,8 +1,21 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
-import { afterAll, expect, test } from 'vitest';
+import { afterAll, expect, test, vi } from 'vitest';
 import { moduleIdFor, sourceForModuleId } from '../src/module-id.ts';
+
+const linkResolutions = vi.hoisted(() => ({ count: 0 }));
+vi.mock('node:fs', async (load) => {
+	const fs = await load<typeof import('node:fs')>();
+	const realpathSync = Object.assign(
+		(...args: Parameters<typeof fs.realpathSync>) => {
+			linkResolutions.count++;
+			return fs.realpathSync(...args);
+		},
+		{ native: fs.realpathSync.native },
+	);
+	return { ...fs, default: { ...fs, realpathSync }, realpathSync };
+});
 
 // The id every compiled artifact spells a module by. Root-relative so a build
 // carries no machine path; a dependency reachable as `root/node_modules/<pkg>`
@@ -74,8 +87,9 @@ test('a module id reads back to the file the bundler resolved', () => {
 test('spelling a dependency file again does not resolve its links again', () => {
 	// The interaction-closures asset spells a module once per handler that reaches it: millions of calls on a docs site.
 	const dependency = join(linkedPackage, 'src/box.tsrx');
-	const started = performance.now();
-	for (let call = 0; call < 200_000; call++) moduleIdFor(dependency, root);
-	expect(performance.now() - started).toBeLessThan(500);
+	expect(moduleIdFor(dependency, root)).toBe('node_modules/@acme/ui/src/box.tsrx');
+	linkResolutions.count = 0;
+	for (let call = 0; call < 1_000; call++) moduleIdFor(dependency, root);
+	expect(linkResolutions.count).toBe(0);
 	expect(moduleIdFor(dependency, root)).toBe('node_modules/@acme/ui/src/box.tsrx');
 });
