@@ -136,11 +136,21 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	}) as Plugin & {
 		api: {
 			declareRouteModules: MarklessRolldownPluginApi['declareRouteModules'];
+			declarePackOwnership: MarklessRolldownPluginApi['declarePackOwnership'];
 			invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules;
 			runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
 			runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 		};
 	};
+	const packingPlugins = nativePackingEnabled(options)
+		? nativePackingPlugins(
+				() => resolvedRoot,
+				() => basePlugin.api.runtimeDemandMaps(),
+				() => basePlugin.api.runtimeDemandSources(),
+			)
+		: undefined;
+	const packOwnership = packingPlugins?.[0]?.api;
+	if (packOwnership) basePlugin.api.declarePackOwnership(packOwnership);
 	const hmr = createViteHmr(hmrOptions);
 
 	const marklessPlugin = {
@@ -427,12 +437,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				},
 			},
 		} satisfies Plugin,
-		...(nativePackingEnabled(options)
-			? nativePackingPlugins(
-					() => resolvedRoot,
-					() => basePlugin.api.runtimeDemandMaps(),
-					() => basePlugin.api.runtimeDemandSources(),
-				).map((plugin): Plugin => ({
+		...(packingPlugins
+			? packingPlugins.map((plugin): Plugin => ({
 					...(plugin as Plugin),
 					apply: 'build' as const,
 					enforce: 'post' as const,

@@ -261,3 +261,127 @@ describe('the pack registry behind the import map', () => {
 		}
 	}, 60_000);
 });
+
+// Two pages, each with a route chunk and a render-data chunk of its own, both loading a shared header and the runtime.
+// The route table and its preload list name every page's chunks.
+function siteBundle(variant: { readonly aData?: string; readonly header?: string } = {}) {
+	const part = (name: string, id: string, moduleIds: string[], code: string): TestChunk => ({
+		...chunk(`build/chunk-${id}.js`, `!~{${id.slice(0, 3)}}~`, name, code),
+		moduleIds,
+	});
+	const items = [
+		part(
+			'runtime',
+			'010RUNTI',
+			['/app/node_modules/@markless/web/dist/runtime.js'],
+			'export const run=()=>0;',
+		),
+		part(
+			'header',
+			'011HEADE',
+			['/app/components/header.tsrx'],
+			`import{run}from"./chunk-010RUNTI.js";export const header=()=>${variant.header ?? '"h"'};`,
+		),
+		part(
+			'a-data',
+			'012ADATA',
+			[
+				'\0virtual:markless:render-data:pages%2Fa.tsrx',
+				'/app/pages/a.tsrx?markless-render-data',
+			],
+			`export const data=${variant.aData ?? '1'};`,
+		),
+		part(
+			'b-data',
+			'013BDATA',
+			['\0virtual:markless:render-data:pages%2Fb.tsrx'],
+			'export const data=2;',
+		),
+		part(
+			'a-route',
+			'014AROUT',
+			['/app/pages/a.tsrx?markless-route'],
+			'import{data}from"./chunk-012ADATA.js";import{header}from"./chunk-011HEADE.js";import{run}from"./chunk-010RUNTI.js";export{data,header,run};',
+		),
+		part(
+			'b-route',
+			'015BROUT',
+			['/app/pages/b.tsrx?markless-route'],
+			'import{data}from"./chunk-013BDATA.js";import{header}from"./chunk-011HEADE.js";import{run}from"./chunk-010RUNTI.js";export{data,header,run};',
+		),
+		part(
+			'table',
+			'016TABLE',
+			['/app/node_modules/@markless/router/src/vite/entries/resume-entry.ts'],
+			'import{run}from"./chunk-010RUNTI.js";const pages={"/pages/a.tsrx":()=>import("./chunk-014AROUT.js"),"/pages/b.tsrx":()=>import("./chunk-015BROUT.js")};const preloads=["/docs/build/chunk-012ADATA.js","/docs/build/chunk-013BDATA.js"];export{pages,preloads,run};',
+		),
+	];
+	return Object.fromEntries(items.map((item) => [item.fileName, item]));
+}
+
+const isRoute = (moduleId: string) => /^pages\/[^?]+\.tsrx$/.test(moduleId);
+
+async function buildSite(bundle: Record<string, TestChunk>) {
+	const specifiers = await specifyChunkReferences(bundle, { publicPath, root: '/app', isRoute });
+	await renameChunksToContentHashes(bundle);
+	return specifiers.importMap();
+}
+
+const mappedNames = (bundle: Record<string, TestChunk>, map: { imports: Record<string, string> }) =>
+	Object.values(map.imports)
+		.map((url) => Object.values(bundle).find((item) => publicPath(item.fileName) === url)!.name)
+		.sort();
+const file = (bundle: Record<string, TestChunk>, name: string) =>
+	byName(bundle, name).fileName.slice('build/'.length);
+
+describe('with route modules, only chunks several pages load go through the import map', () => {
+	test("a page's own chunks are named by path; shared chunks keep their specifiers", async () => {
+		const bundle = siteBundle();
+		const map = await buildSite(bundle);
+
+		expect(mappedNames(bundle, map)).toEqual(['header', 'runtime']);
+		const aRoute = byName(bundle, 'a-route').code;
+		expect(aRoute).toContain(`from"./${file(bundle, 'a-data')}"`);
+		expect(aRoute).not.toContain(file(bundle, 'header'));
+		const table = byName(bundle, 'table').code;
+		expect(table).toContain(`import("./${file(bundle, 'a-route')}")`);
+		expect(table).toContain(`"/docs/build/${file(bundle, 'b-data')}"`);
+		const mapped = {
+			...bundle,
+			[MARKLESS_IMPORT_MAP_ASSET]: {
+				type: 'asset',
+				fileName: MARKLESS_IMPORT_MAP_ASSET,
+				source: JSON.stringify(map),
+			},
+		};
+		expect(unmappedChunkSpecifiers(mapped)).toEqual([]);
+		expect(await staleContentHashNames(bundle)).toEqual([]);
+	});
+
+	test("editing one page renames that page's chunks and the table, never the other page or a shared chunk", async () => {
+		const before = siteBundle();
+		const after = siteBundle({ aData: '9' });
+		await buildSite(before);
+		await buildSite(after);
+		const renamed = (name: string) => file(after, name) !== file(before, name);
+
+		expect(['a-data', 'a-route', 'table'].filter(renamed)).toEqual([
+			'a-data',
+			'a-route',
+			'table',
+		]);
+		expect(['b-data', 'b-route', 'header', 'runtime'].filter(renamed)).toEqual([]);
+	});
+
+	test('editing a shared chunk renames only that chunk; the pages that load it keep their bytes', async () => {
+		const before = siteBundle();
+		const after = siteBundle({ header: '"changed"' });
+		const beforeMap = await buildSite(before);
+		const afterMap = await buildSite(after);
+
+		expect(file(after, 'header')).not.toBe(file(before, 'header'));
+		for (const name of ['a-route', 'b-route', 'table', 'a-data', 'runtime'])
+			expect(byName(after, name).code).toBe(byName(before, name).code);
+		expect(Object.keys(afterMap.imports)).toEqual(Object.keys(beforeMap.imports));
+	});
+});

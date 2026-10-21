@@ -48,7 +48,13 @@ type NativePackingPlugin = Pick<
 	| 'renderChunk'
 	| 'renderError'
 	| 'generateBundle'
->;
+> & { readonly api?: PackOwnership };
+
+/** The pack each module was planned into, and the routes a shared pack serves. */
+export type PackOwnership = {
+	readonly packOf: (moduleId: string) => string | undefined;
+	readonly packRoutes: (pack: string) => ReadonlyArray<string> | undefined;
+};
 
 export function nativePackingPlugins(
 	root: () => string,
@@ -69,6 +75,7 @@ export function nativePackingPlugins(
 	return [
 		{
 			name: 'markless:route-packs',
+			api: { packOf: (id) => groups.get(id), packRoutes: (pack) => routeSets.get(pack) },
 			options(input) {
 				return { ...input, preserveEntrySignatures: 'allow-extension' };
 			},

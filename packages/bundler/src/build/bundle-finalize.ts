@@ -16,6 +16,7 @@ import {
 	renameChunksToContentHashes,
 	specifyChunkReferences,
 } from './content-hash-names.ts';
+import type { PackOwnership } from './native-packing.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './head-links.ts';
 import { marklessDeferredChunkFileNames } from './route-pack-groups.ts';
 import {
@@ -66,6 +67,7 @@ export type FinalizeBundleOptions = {
 	packing?: boolean;
 	dev?: boolean;
 	chunkImportMap?: boolean;
+	routeModules?: (moduleId: string) => boolean;
 };
 
 export type FinalizeBundleContext = {
@@ -89,6 +91,7 @@ export async function finalizeBundle(
 			manifests: Iterable<MarklessTransformManifest>,
 		) => ExecutionAttributionTables;
 		readonly hashCharacters?: HashCharacters | undefined;
+		readonly packs?: PackOwnership | undefined;
 	},
 ): Promise<void> {
 	const { options, moduleMetadata } = input;
@@ -135,6 +138,8 @@ const specifiers = chunkImportMapEnabled(options)
 	? await specifyChunkReferences(manifestBundle, {
 			publicPath: options.publicPath ?? ((fileName) => `/${fileName}`),
 			root: input.root,
+			isRoute: options.routeModules,
+			packs: input.packs,
 		})
 	: undefined;
 await renameChunksToContentHashes(manifestBundle, { hashCharacters: input.hashCharacters });
