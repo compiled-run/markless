@@ -1,3 +1,4 @@
+import type { PackOwnership } from './build/native-packing.ts';
 import type {
 	ArtifactChildMaterialization,
 	ModuleGraphInterfaceArtifact,
@@ -250,6 +251,8 @@ export type MarklessRolldownPluginApi = {
 	) => void;
 	/** A host plugin names, per root-relative module id, the modules it renders as pages. */
 	declareRouteModules: (isRoute: (moduleId: string) => boolean) => void;
+	/** The packing pass names the pack each module went into, so the import map can list only chunks several pages load. */
+	declarePackOwnership: (packs: PackOwnership) => void;
 	invalidateGeneratedModules: (
 		parent: string,
 		environment?: MarklessEnvironment,

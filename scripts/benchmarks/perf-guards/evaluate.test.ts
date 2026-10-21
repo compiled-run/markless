@@ -213,11 +213,21 @@ describe('performance guards', () => {
 		]);
 	});
 
-	test("G9 fails a chunk that names another chunk's hashed file", () => {
+	test('G9 fails a chunk that names the hashed file of a chunk several pages load', () => {
 		const m = measurement();
 		m.sites.bench.chunkNameReferences = [{ file: '/build/a.js', names: ['/build/b.js'] }];
+		expect(failures(m)).toEqual([]);
+		m.sites.bench.routes['/other'] = {
+			...m.sites.bench.routes['/records'],
+			preload: {
+				...m.sites.bench.routes['/records'].preload,
+				files: ['/build/b.js', '/build/c.js'],
+			},
+		};
 		expect(failures(m)).toEqual([
-			expect.stringContaining('[G9] bench: /build/a.js names /build/b.js.'),
+			expect.stringContaining(
+				'[G9] bench: /build/a.js names /build/b.js, which several pages load.',
+			),
 		]);
 		m.sites.bench.chunkNameReferences = [];
 		expect(failures(m)).toEqual([]);

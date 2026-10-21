@@ -11,7 +11,7 @@ import {
 } from './build/build-manifests.ts';
 import { executionLogActivationInjection } from './execution-log.ts';
 import { outputDefaults } from './build/chunking.ts';
-import { nativePackingPlugins } from './build/native-packing.ts';
+import { nativePackingPlugins, type PackOwnership } from './build/native-packing.ts';
 import {
 	chunkImportMapEnabled,
 	DEPRECATED_NATIVE_PACKING_WARNING,
@@ -108,6 +108,7 @@ export function createMarklessRolldownPlugin(input: {
 	function getRoot() {
 		return root ?? internalOptions.rootDir;
 	}
+	let declaredPacks: PackOwnership | undefined;
 	const [packing, facades] =
 		environment === 'client' &&
 		nativePackingEnabled(internalOptions) &&
@@ -179,6 +180,9 @@ export function createMarklessRolldownPlugin(input: {
 			},
 			declareRouteModules: (isRoute: (moduleId: string) => boolean) => {
 				internalOptions.routeModules = isRoute;
+			},
+			declarePackOwnership: (packs: PackOwnership) => {
+				declaredPacks = packs;
 			},
 		},
 		name,
@@ -256,7 +260,13 @@ export function createMarklessRolldownPlugin(input: {
 				const hook = facades?.generateBundle;
 				const handler = typeof hook === 'function' ? hook : hook?.handler;
 				await handler?.call(this, output, bundle, isWrite);
-				await generateBundleHook(context, this, bundle, output.hashCharacters);
+				await generateBundleHook(
+					context,
+					this,
+					bundle,
+					output.hashCharacters,
+					packing?.api ?? declaredPacks,
+				);
 			},
 		},
 		async writeBundle(output, bundle) {

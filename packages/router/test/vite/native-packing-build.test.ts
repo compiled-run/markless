@@ -78,7 +78,7 @@ test('a packed router build resolves every symbol of a page that loads through i
 }, 120_000);
 
 // Chunks name each other by stable specifiers, so a renamed chunk changes only its own bytes and the document's map.
-test('a packed router build serves one import map ahead of every module preload that resolves every chunk specifier', async () => {
+test('a packed router build serves one import map, ahead of every module preload, that resolves every chunk specifier and lists only shared chunks', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'markless-router-import-map-'));
 	try {
 		await mkdir(join(root, 'pages'));
@@ -135,14 +135,27 @@ test('a packed router build serves one import map ahead of every module preload 
 			code.match(new RegExp(`${MARKLESS_CHUNK_SPECIFIER_PREFIX}[\\w-]+`, 'g')) ?? [],
 		);
 		expect(specifiers.size).toBeGreaterThan(0);
-		expect(code).not.toMatch(/["'`]\.\/chunk-[\w-]+\.js/);
 		const manifest = JSON.parse(
 			await readFile(
 				clientAssetsManifestPath(join(root, '.output/public')),
 				'utf8',
 			),
-		) as { importMap: { imports: Record<string, string> } };
+		) as {
+			importMap: { imports: Record<string, string> };
+			routes: { navigation: Record<string, readonly string[]> };
+		};
 		expect(Object.keys(manifest.importMap.imports).sort()).toEqual([...specifiers].sort());
+		// A chunk named by its path is one only a single page loads; the toggle is about's alone.
+		const byPath = new Set(
+			[...code.matchAll(/["'`]\.\/(chunk-[\w-]+\.js)/g)].map((match) => match[1]!),
+		);
+		expect(byPath.size).toBeGreaterThan(0);
+		for (const file of byPath)
+			expect(
+				Object.values(manifest.routes.navigation).filter((hrefs) =>
+					hrefs.some((href) => href.endsWith(`/${file}`)),
+				).length,
+			).toBeLessThanOrEqual(1);
 		for (const url of Object.values(manifest.importMap.imports))
 			expect(chunks).toContain(url.replace(/^\/build\//, ''));
 		// The files the client build hands the server build stay out of the statically served output.

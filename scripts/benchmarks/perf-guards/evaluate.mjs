@@ -43,7 +43,7 @@ export function evaluate(measurement, anchors) {
 		if (siteResult.compileHints) checkCompileHints(siteResult.compileHints, fail, note);
 		for (const nav of siteResult.navigation ?? []) checkNavigation(nav, fail, note);
 		if (siteResult.chunkNameReferences)
-			checkLocalRenames(site, siteResult.chunkNameReferences, fail, note);
+			checkLocalRenames(site, siteResult.chunkNameReferences, siteResult.routes, fail, note);
 	}
 	if (measurement.constructGlue)
 		checkConstructGlue(measurement.constructGlue, anchors.constructGlue ?? {}, fail, note);
@@ -365,17 +365,31 @@ function checkNavigation(nav, fail, note) {
 	}
 }
 
-function checkLocalRenames(site, references, fail, note) {
-	if (references.length === 0) {
+// A chunk may name the hashed file of a chunk only one page loads; a file several pages load must be reached through the import map.
+function checkLocalRenames(site, references, routes, fail, note) {
+	const loadedBy = new Map();
+	for (const [route, measured] of Object.entries(routes ?? {}))
+		for (const file of [
+			...(measured.preload?.files ?? []),
+			...(measured.controls ?? []).flatMap((control) => control.inputJs ?? []),
+		])
+			loadedBy.set(file, new Set([...(loadedBy.get(file) ?? []), route]));
+	const shared = references
+		.map((reference) => ({
+			...reference,
+			names: reference.names.filter((name) => (loadedBy.get(name)?.size ?? 0) > 1),
+		}))
+		.filter((reference) => reference.names.length > 0);
+	if (shared.length === 0) {
 		note(
 			'G9',
-			`${site}: no chunk names another chunk's file; an edit renames only the chunks whose bytes changed.`,
+			`${site}: no chunk names a file several measured pages load${references.length ? ` (${references.length} name files one page loads)` : ''}; editing a shared chunk renames only that chunk.`,
 		);
 		return;
 	}
 	fail(
 		'G9',
-		`${site}: ${references.map((r) => `${r.file} names ${r.names.join(', ')}`).join('; ')}. A chunk that names another chunk's hashed file is re-downloaded whenever that file changes, so one edit re-fetches its importers too (a one-line shared edit re-downloaded 302 of 336 KB on the docs home page before chunks imported each other through the import map). ${INVARIANT}`,
+		`${site}: ${shared.map((r) => `${r.file} names ${r.names.join(', ')}`).join('; ')}, which several pages load. A chunk that names another chunk's hashed file is re-downloaded whenever that file changes, so one shared edit re-fetches every importer (a one-line shared edit re-downloaded 302 of 336 KB on the docs home page before chunks imported each other through the import map). ${INVARIANT}`,
 		`${site} chunk names`,
 	);
 }
