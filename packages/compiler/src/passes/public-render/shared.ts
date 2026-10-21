@@ -367,12 +367,19 @@ export function destructureProps(
 		const local = pattern ? (pattern.left as AnyNode | undefined) : value;
 		const fallback = getIdentifierName(local) ?? getIdentifierName(key);
 		if (!fallback) return [];
+		const quotedKey =
+			property.type === 'Property' && !property.computed && key?.type === 'Literal'
+				? key.value
+				: undefined;
 		const defaultSource = pattern?.right
 			? ` = ${strippedExpressionSource(pattern.right as AnyNode, source, {
 					filename,
 					what: "a prop's authored default",
 				})}`
 			: '';
+		if (typeof quotedKey === 'string' || typeof quotedKey === 'number') {
+			return [`${JSON.stringify(quotedKey)}: ${fallback}${defaultSource}`];
+		}
 		if (
 			property.type === 'Property' &&
 			!property.computed &&
@@ -688,7 +695,9 @@ export function componentPropNames(component: AnyNode | undefined): string[] {
 	if (param.type !== 'ObjectPattern') return [];
 
 	return asNodes(param.properties).flatMap((property) => {
-		const value = property.value as AnyNode | undefined;
+		const authored = property.value as AnyNode | undefined;
+		const value =
+			authored?.type === 'AssignmentPattern' ? (authored.left as AnyNode | undefined) : authored;
 		const key = property.key as AnyNode | undefined;
 		// A rest binding names the remaining props, so it is a render-scope name too.
 		const name =

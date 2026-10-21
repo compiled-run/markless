@@ -2,6 +2,7 @@ import { asNodes, isNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
+	graphMemberSource,
 	graphPathSource,
 	resolveGraphPath,
 	semanticAliasMap,
@@ -146,7 +147,7 @@ export function collectObjectPatternAliases(
 		const key = objectPropertyKey(property.key as AnyNode | undefined);
 		if (!key) continue;
 
-		const target = `${targetBase}.${key}`;
+		const target = graphMemberSource(targetBase, key);
 		const value = property.value as AnyNode | undefined;
 		if (value?.type === 'AssignmentPattern') {
 			const owned = propOwner && {

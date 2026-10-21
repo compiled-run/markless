@@ -32,7 +32,10 @@ export function propsRestSignature(component: AnyNode): PropsRestSignature | und
 			if (name) restName = name;
 			continue;
 		}
-		const name = getIdentifierName(property.key as AnyNode | undefined);
+		const key = property.key as AnyNode | undefined;
+		const name =
+			getIdentifierName(key) ??
+			(key?.type === 'Literal' && typeof key.value === 'string' ? key.value : null);
 		if (name) destructuredNames.add(name);
 	}
 	return restName ? { restName, destructuredNames } : undefined;
