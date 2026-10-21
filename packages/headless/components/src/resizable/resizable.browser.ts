@@ -20,6 +20,7 @@ import Nested from './scenarios/nested.tsrx';
 import Rtl from './scenarios/rtl.tsrx';
 import Three from './scenarios/three.tsrx';
 import TwoGroups from './scenarios/two-groups.tsrx';
+import Unlabelled from './scenarios/unlabelled.tsrx';
 import Vertical from './scenarios/vertical.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
@@ -122,6 +123,19 @@ function scopeOf(result: { container: unknown }): Element {
 	return container;
 }
 
+// VoiceOver ignores a separator's aria-label and reads aria-labelledby, so the consumer's label moves into an element the divider holds.
+function expectNamedThroughLabel(divider: Element, name: string) {
+	expect(divider.hasAttribute('aria-label')).toBe(false);
+	const labelId = divider.getAttribute('aria-labelledby') ?? '';
+	expect(labelId).not.toBe('');
+	const label = document.getElementById(labelId);
+	expect(label?.textContent).toBe(name);
+	expect(label && divider.contains(label)).toBe(true);
+	expect(label?.getAttribute('aria-hidden')).toBe('true');
+	const box = label!.getBoundingClientRect();
+	expect(box.width <= 1 && box.height <= 1).toBe(true);
+}
+
 function expectBasicRendered() {
 	const divider = el(Thumb);
 	expect(divider.getAttribute('role')).toBe('separator');
@@ -133,7 +147,7 @@ function expectBasicRendered() {
 	expect(divider.getAttribute('aria-valuenow')).toBe('30');
 	expect(divider.getAttribute('aria-valuetext')).toBe('30%');
 	expect(divider.getAttribute('aria-disabled')).toBe('false');
-	expect(divider.getAttribute('aria-label')).toBe('Resize navigation');
+	expectNamedThroughLabel(divider, 'Resize navigation');
 
 	// The panel's name is minted as its id, which is what aria-controls points at.
 	expect(el(Nav).id).toBe('nav');
@@ -250,6 +264,27 @@ for (const mode of MODES) {
 		expect(el(Thumb).getAttribute('aria-disabled')).toBe('true');
 		expect(el(Root).hasAttribute('ui-disabled')).toBe(true);
 		expect(el(Thumb).hasAttribute('ui-disabled')).toBe(true);
+	});
+
+	test(`${mode}: each divider of a group is named by a label of its own`, async () => {
+		if (mode === 'CSR') await render(Three);
+		else await renderSSR(Three);
+
+		expectNamedThroughLabel(el(FirstThumb), 'Resize left');
+		expectNamedThroughLabel(el(SecondThumb), 'Resize middle');
+		expect(el(FirstThumb).getAttribute('aria-labelledby')).not.toBe(
+			el(SecondThumb).getAttribute('aria-labelledby'),
+		);
+		await expect.element(page.getByRole('separator', { name: 'Resize left' })).toBeVisible();
+		await expect.element(page.getByRole('separator', { name: 'Resize middle' })).toBeVisible();
+	});
+
+	test(`${mode}: a divider given no aria-label is given no name`, async () => {
+		if (mode === 'CSR') await render(Unlabelled);
+		else await renderSSR(Unlabelled);
+
+		const label = document.getElementById(el(Thumb).getAttribute('aria-labelledby') ?? '');
+		expect(label?.textContent).toBe('');
 	});
 
 	test(`${mode}: two widgets on a page report their own sizes`, async () => {

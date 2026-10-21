@@ -127,6 +127,15 @@ test('the divider conveys the splitter role and the name it was given', async ()
 	expectConveys(await readFor(['Resize navigation']), [say.splitter, 'Resize navigation']);
 });
 
+// VoiceOver ignores a separator's aria-label, so the name has to arrive through aria-labelledby.
+test('the name the consumer wrote as aria-label reaches the reader through a labelling element', async () => {
+	await open(Basic);
+	const divider = document.querySelector('[data-testid="thumb"]') as HTMLElement;
+	expect(divider.hasAttribute('aria-label')).toBe(false);
+	expect(divider.getAttribute('aria-labelledby')).toBeTruthy();
+	expectConveys(await readFor(['Resize navigation']), [say.splitter, 'Resize navigation']);
+});
+
 test('the divider conveys the size of the panel it resizes and the two limits it may move between', async () => {
 	await open(Basic);
 	expectConveys(await readFor(['Resize navigation']), [

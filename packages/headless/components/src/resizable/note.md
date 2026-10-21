@@ -87,6 +87,20 @@ first run. It is gone, and nothing replaced it — the navbar rule. Two dividers
 wearing the same invented word are landmarks a reader cannot tell apart, so the
 consumer names each one and `aria-valuetext` carries the size.
 
+The consumer's `aria-label` does not stay on the divider. VoiceOver ignores a
+separator's `aria-label` and `title` ("vertical splitter 30%") and speaks an
+`aria-labelledby` name, even one pointing at a hidden element. So the thumb
+destructures `'aria-label': label`, renders it in a visually hidden,
+`aria-hidden` span of its own, and points `aria-labelledby` at that span. With
+no `aria-label` the span is empty and the divider stays unnamed. A consumer's
+own `aria-labelledby` is replaced, because a declared attribute always beats the
+rest spread.
+
+The span's handle is a component-local `element()`, not a per-thumb `shared()`
+instance on tree's pattern. In CSR, sibling thumbs in one root resolved one
+`shared()` instance and minted the same id (`mx-c0-shared-…-labelEl`), while SSR
+gave each its own. That is a runtime defect to witness separately.
+
 ## What the reader actually says
 
 Captured from the virtual reader on this tree, one whole announcement:

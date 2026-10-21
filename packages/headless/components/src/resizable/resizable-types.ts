@@ -122,6 +122,12 @@ export type ResizableThumbProps = PropsOf<'div'> & {
 	readonly collapsedSize?: number;
 	/** The axis of the group this divider sits in. Omit it and the root's axis is used. */
 	readonly orientation?: ResizableOrientation;
+	/**
+	 * The divider's name. VoiceOver ignores a separator's own `aria-label`, so the
+	 * divider renders this text in a visually hidden element and points
+	 * `aria-labelledby` at it.
+	 */
+	readonly 'aria-label'?: string;
 };
 
 /** One instance per rendered `resizable.thumb`: the limits it was written with. */
