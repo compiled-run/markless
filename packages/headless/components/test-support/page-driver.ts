@@ -13,17 +13,24 @@ import type { Keys, ScreenReaderDriver, Vocabulary } from './driver.ts';
  */
 export type RealReader = NVDAPlaywright | VoiceOverPlaywright;
 
+/** The element the page focused, as a reader's settling step sees it. */
+export type FocusedElement = {
+	/** Its accessible name as the browser computed it, or ''. */
+	readonly name: string;
+	/** Put the page's focus back on it, if the reader moved the focus away. */
+	refocus(): Promise<void>;
+	/** Its centre on the screen, in points. */
+	screenPoint(): Promise<{ readonly x: number; readonly y: number }>;
+};
+
 export type RealDriverSpec<R extends RealReader = RealReader> = {
 	readonly name: string;
 	readonly vocabulary: Vocabulary;
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
-	/**
-	 * Bring the reading cursor to the element the page focused. `focusedName` is its computed accessible name, or '';
-	 * `refocus` puts the page's focus back on that element if the reader moved it.
-	 */
-	cursorToFocus?: (reader: R, focusedName: string, refocus: () => Promise<void>) => Promise<void>;
+	/** Bring the reading cursor to the element the page focused. */
+	cursorToFocus?: (reader: R, focused: FocusedElement) => Promise<void>;
 	/** Give the reader its own keys back before its reading cursor moves, if a focus move may have taken them. */
 	keysToReader?: (reader: R) => Promise<void>;
 	/** Run after every cursor move, for a reader whose move can come back without the phrase it spoke. */
@@ -171,10 +178,29 @@ export function realDriver<R extends RealReader>(
 			placedByFocus = true;
 			if (spec.cursorToFocus && page) {
 				const focused = await page.evaluateHandle(() => document.activeElement);
-				const refocus = () =>
-					focused.evaluate((element) => (element as HTMLElement | null)?.focus());
 				try {
-					await spec.cursorToFocus(reader, await focusedAccessibleName(page), refocus);
+					await spec.cursorToFocus(reader, {
+						name: await focusedAccessibleName(page),
+						refocus: () =>
+							focused.evaluate((element) => (element as HTMLElement | null)?.focus()),
+						// The element's centre in screen points, from the window's own position and its chrome.
+						screenPoint: () =>
+							focused.evaluate((element) => {
+								const box = (element as Element).getBoundingClientRect();
+								return {
+									x:
+										window.screenX +
+										(window.outerWidth - window.innerWidth) / 2 +
+										box.left +
+										box.width / 2,
+									y:
+										window.screenY +
+										(window.outerHeight - window.innerHeight) +
+										box.top +
+										box.height / 2,
+								};
+							}),
+					});
 				} finally {
 					await focused.dispose();
 				}
@@ -193,11 +219,7 @@ export function realDriver<R extends RealReader>(
  * Bring VoiceOver into the web content and, heading by heading, onto the gallery section the URL fragment names.
  * `navigateToWebContent()` starts at the top whatever the fragment says, and a walk from there outlasts a test.
  */
-export async function voiceOverToAnchoredSection(voiceOver: VoiceOverPlaywright, page: Page) {
-	// Playwright emulates page focus by default; the real window focus is what reaches VoiceOver.
-	const cdp = await page.context().newCDPSession(page);
-	await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
-	await cdp.detach();
+export function voiceOverToAnchoredSection(voiceOver: VoiceOverPlaywright, page: Page) {
 	return toAnchoredSection(page, {
 		name: 'VoiceOver',
 		enter: () => voiceOver.navigateToWebContent(),
