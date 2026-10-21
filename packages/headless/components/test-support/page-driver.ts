@@ -19,8 +19,6 @@ export type FocusedElement = {
 	readonly name: string;
 	/** Put the page's focus back on it, if the reader moved the focus away. */
 	refocus(): Promise<void>;
-	/** Its centre on the screen, in points. */
-	screenPoint(): Promise<{ readonly x: number; readonly y: number }>;
 };
 
 export type RealDriverSpec<R extends RealReader = RealReader> = {
@@ -183,23 +181,6 @@ export function realDriver<R extends RealReader>(
 						name: await focusedAccessibleName(page),
 						refocus: () =>
 							focused.evaluate((element) => (element as HTMLElement | null)?.focus()),
-						// The element's centre in screen points, from the window's own position and its chrome.
-						screenPoint: () =>
-							focused.evaluate((element) => {
-								const box = (element as Element).getBoundingClientRect();
-								return {
-									x:
-										window.screenX +
-										(window.outerWidth - window.innerWidth) / 2 +
-										box.left +
-										box.width / 2,
-									y:
-										window.screenY +
-										(window.outerHeight - window.innerHeight) +
-										box.top +
-										box.height / 2,
-								};
-							}),
 					});
 				} finally {
 					await focused.dispose();
