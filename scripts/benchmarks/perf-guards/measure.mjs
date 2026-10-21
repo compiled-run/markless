@@ -162,8 +162,18 @@ export function criticalPathRounds(roots, preloaded, staticImports) {
 	return { ...worst, notPreloaded: missing };
 }
 
+// A not-found page served in a route's place passes every guard while measuring nothing the route ships.
+export async function routeHtml(origin, route) {
+	const response = await fetch(new URL(route, origin));
+	if (!response.ok)
+		throw new Error(
+			`${route} answered ${response.status}; a guarded route must serve its own page (check SITES in config.mjs)`,
+		);
+	return response.text();
+}
+
 async function staticRoute(origin, route, read) {
-	const html = await (await fetch(new URL(route, origin))).text();
+	const html = await routeHtml(origin, route);
 	const { paths, inlineModules } = preloadedPaths(html, origin);
 	const imports = importMapOf(html);
 	const roots = [
@@ -414,7 +424,7 @@ async function sameTask(browser, origin, probe) {
 }
 
 async function navigationRounds(browser, origin, nav, read) {
-	const imports = importMapOf(await (await fetch(new URL(nav.from, origin))).text());
+	const imports = importMapOf(await routeHtml(origin, nav.from));
 	const visit = await openPage(browser);
 	try {
 		await visit.goto(new URL(nav.from, origin).href);
