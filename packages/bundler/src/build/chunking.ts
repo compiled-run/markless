@@ -9,6 +9,8 @@ export const MARKLESS_EXECUTION_SIZES = `${MARKLESS_BUILD_PREFIX}execution-sizes
 export const MARKLESS_EXECUTION_DEMAND = `${MARKLESS_BUILD_PREFIX}execution-demand.json`;
 export const MARKLESS_INTERACTION_CLOSURES = `${MARKLESS_BUILD_PREFIX}interaction-closures.json`;
 export const MARKLESS_BYTE_ATTRIBUTION = `${MARKLESS_BUILD_PREFIX}byte-attribution.json`;
+// A 78 MB server chunk crashed V8's Maglev compiler on arm64 (`Check failed: is_int26(x)`); compiled modules split well below it.
+export const MARKLESS_SERVER_CHUNK_MAX_BYTES = 4 * 1024 * 1024;
 // Fixed-name build metadata: written beside the client output, never inside the directory a host serves.
 export const MARKLESS_BUILD_METADATA_FILES = [
 	MARKLESS_BUNDLE_GRAPH,
@@ -142,6 +144,14 @@ const MARKLESS_RUNTIME_GROUPS = [
 	},
 ] satisfies NonNullable<CodeSplittingOptions['groups']>;
 
+// Grouped as automatic chunking would (by the entries that import them), then split at the cap.
+const MARKLESS_SERVER_COMPILED_GROUP = {
+	name: 'markless-server',
+	test: /\.tsrx(?:[?#]|$)|^\0?virtual:markless:/,
+	entriesAware: true,
+	maxSize: MARKLESS_SERVER_CHUNK_MAX_BYTES,
+} satisfies NonNullable<CodeSplittingOptions['groups']>[number];
+
 export function outputDefaults(
 	output: OutputOptions,
 	environment: MarklessEnvironment,
@@ -154,7 +164,11 @@ export function outputDefaults(
 	if (environment === 'server') {
 		next.entryFileNames ??= '[name].js';
 		next.chunkFileNames ??= 'chunk-[hash].js';
-		next.codeSplitting = marklessCodeSplitting(next.codeSplitting);
+		const splitting = marklessCodeSplitting(next.codeSplitting);
+		next.codeSplitting = {
+			...splitting,
+			groups: [...splitting.groups, MARKLESS_SERVER_COMPILED_GROUP],
+		};
 		return next;
 	}
 

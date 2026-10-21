@@ -1,5 +1,6 @@
 import type { MarklessClientOutput, MarklessEnvironment } from './types.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from './execution-log.ts';
+import { SHARED_INLINE_RESUMER_SOURCES, SHARED_PRERENDER_BOOT } from './shared-inline-sources.ts';
 import type { MarklessExecutionLogMode } from './types.ts';
 import type {
 	InlineResumerSourceVariants,
@@ -274,6 +275,8 @@ export function emitSourceModule(input: {
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
 	readonly prerenderBoot?: PrerenderBootArtifact;
+	/** Server modules read the inline boot sources from this one module rather than each carrying a copy. */
+	readonly sharedInlineSourcesModuleId?: string;
 	readonly needsFullResume?: boolean;
 	readonly dev?: boolean;
 	readonly devResumeReexport?: boolean;
@@ -365,6 +368,9 @@ export function emitSourceModule(input: {
 		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from ${singleQuoted(input.payloadId)};`,
+		sharedInlineSources(input)
+			? `import { ${SHARED_INLINE_RESUMER_SOURCES} as marklessInlineResumerSources, ${SHARED_PRERENDER_BOOT} as marklessPrerenderBoot } from ${singleQuoted(input.sharedInlineSourcesModuleId!)};`
+			: null,
 		// A CSR mount builds its graph from this module, never from a resume
 		// module, so a computed-using CSR app installs the plane here instead.
 		// Server-rendered apps install it in their resume module: putting it here
@@ -475,6 +481,7 @@ export function emitSourceModule(input: {
 					storageSeeds: input.storageSeeds,
 					inlineResumerSources: input.inlineResumerSources,
 					prerenderBoot: input.prerenderBoot,
+					sharedInlineSources: sharedInlineSources(input),
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
@@ -1109,11 +1116,34 @@ function symbolRouteImportSource(importSource: string, includeScalarActionPlans 
 		: `${importSource}?markless-symbols`;
 }
 
+function sharedInlineSources(input: {
+	readonly environment: MarklessEnvironment;
+	readonly clientOutput: MarklessClientOutput;
+	readonly sharedInlineSourcesModuleId?: string;
+	readonly inlineResumerSources?: InlineResumerSourceVariants;
+	readonly prerenderBoot?: PrerenderBootArtifact;
+}): boolean {
+	return (
+		input.environment === 'server' &&
+		!!input.sharedInlineSourcesModuleId &&
+		!!input.inlineResumerSources &&
+		!!input.prerenderBoot
+	);
+}
+
+// The page's own settle module and bounds stay here; the boot sources come from the shared module.
+function sharedPrerenderBootSource(boot: PrerenderBootArtifact): string {
+	if (!boot.settle) return 'marklessPrerenderBoot';
+	const { boot: _boot, ...settle } = boot.settle;
+	return `{ ...marklessPrerenderBoot, settle: { ...${JSON.stringify(settle)}, boot: marklessPrerenderBoot.prerenderSettle } }`;
+}
+
 function emitCompiledAppDefault(input: {
 	readonly environment: MarklessEnvironment;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
 	readonly prerenderBoot?: PrerenderBootArtifact;
+	readonly sharedInlineSources?: boolean;
 	readonly headInjections?: ReadonlyArray<{
 		readonly tag: string;
 		readonly attributes?: Record<string, string>;
@@ -1181,11 +1211,19 @@ function emitCompiledAppDefault(input: {
 			: [];
 	const inlineResumerEntry =
 		input.inlineResumerSources && input.environment !== 'client'
-			? [`\tinlineResumerSources: ${JSON.stringify(input.inlineResumerSources)},`]
+			? [
+					input.sharedInlineSources
+						? '\tinlineResumerSources: marklessInlineResumerSources,'
+						: `\tinlineResumerSources: ${JSON.stringify(input.inlineResumerSources)},`,
+				]
 			: [];
 	const prerenderBootEntry =
 		input.prerenderBoot && input.environment !== 'client'
-			? [`\tprerenderBoot: ${JSON.stringify(input.prerenderBoot)},`]
+			? [
+					input.sharedInlineSources
+						? `\tprerenderBoot: ${sharedPrerenderBootSource(input.prerenderBoot)},`
+						: `\tprerenderBoot: ${JSON.stringify(input.prerenderBoot)},`,
+				]
 			: [];
 	const headInjectionEntry =
 		input.headInjections?.length && input.environment !== 'client'

@@ -58,6 +58,7 @@ import {
 } from './source-module.ts';
 import type { PrerenderSettleBoundMap } from '@markless/web/inline/resumer';
 import { injectExecutionLogModuleHook, normalizeExecutionLogMode } from './execution-log.ts';
+import { sharedInlineSourcesModuleId } from './shared-inline-sources.ts';
 import {
 	compileInlineResumerSources,
 	compilePrerenderInlineResumerSources,
@@ -758,6 +759,14 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					storageSeeds: storageSeeds.length > 0 ? storageSeeds : undefined,
 					inlineResumerSources,
 					prerenderBoot,
+					...(input.environment === 'server'
+						? {
+								sharedInlineSourcesModuleId: sharedInlineSourcesModuleId({
+									debug: input.inlineResumerDebug === true,
+									executionLog: input.executionLog ?? 'never',
+								}),
+							}
+						: {}),
 					devResumeReexport: input.devResumeReexport === true,
 					// The container-event route serves linked children too, so the
 					// closure verdict, not the page-only one, decides its emission.

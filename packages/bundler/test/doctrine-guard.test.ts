@@ -100,6 +100,10 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata exposes resume URLs only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.prerenderWakeModuleUrl && input.environment !== 'client'":
 		'Compiled app metadata exposes prerender-wake URLs only from non-client output.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'server' &&":
+		'Server modules read the build-wide inline boot scripts from one shared module; library output keeps its own copy so it runs without the plugin.',
+	"packages/bundler/src/transform.ts :: ...(input.environment === 'server'":
+		'Server modules name the shared inline boot-script module; library output keeps its own copy so it runs without the plugin.',
 	"packages/bundler/src/source-module.ts :: input.inlineResumerSources && input.environment !== 'client'":
 		'Compiled app metadata exposes inline resumers only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.prerenderBoot && input.environment !== 'client'":

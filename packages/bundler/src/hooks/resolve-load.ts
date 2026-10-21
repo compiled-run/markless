@@ -10,6 +10,10 @@ import {
 	executionLogVirtualModuleSource,
 } from '../execution-log.ts';
 import type { ImportedChild } from '../plugin-state.ts';
+import {
+	isSharedInlineSourcesModuleId,
+	sharedInlineSourcesModuleSource,
+} from '../shared-inline-sources.ts';
 import { MARKLESS_VIRTUAL_PREFIX, symbolVirtualModuleSourceFile } from '../source-module.ts';
 import { marklessVirtualModuleSourceFile } from '../transform.ts';
 import type { MarklessEnvironment } from '../types.ts';
@@ -38,6 +42,7 @@ export async function resolveIdHook(
 	const runtimeCatalogId = marklessRuntimeSpecifierId(source);
 	if (runtimeCatalogId) return { id: runtimeCatalogId };
 	const normalized = normalizeVirtualId(source);
+	if (isSharedInlineSourcesModuleId(normalized)) return { id: resolveVirtualId(normalized) };
 	if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
 		return {
 			id: resolveVirtualId(MARKLESS_EXECUTION_LOG_MODULE_ID),
@@ -105,6 +110,8 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 		});
 	}
 	const normalizedId = normalizeVirtualId(id);
+	const sharedInlineSources = await sharedInlineSourcesModuleSource(normalizedId);
+	if (sharedInlineSources !== null) return sharedInlineSources;
 	const resolverSource = resolverVirtualModuleSourceFile(normalizedId);
 	const symbolSource = symbolVirtualModuleSourceFile(normalizedId);
 	const renderDataSource = normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}render-data:`)

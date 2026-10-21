@@ -191,6 +191,36 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('export default marklessCompiledApp;');
 	});
 
+	// 1,914 layers each carrying its own ~22 kB copy of the boot scripts made a 78 MB server chunk V8 could not compile.
+	test('server modules import the inline boot scripts from one shared module instead of each carrying a copy', async () => {
+		const results = await Promise.all(
+			['Counter', 'Toggle'].map((name) =>
+				transformTsrxModule({
+					filename: `/workspace/app/src/${name}.tsrx`,
+					source: source.replace('App', name),
+					environment: 'server',
+				}),
+			),
+		);
+		const plugin = marklessServer();
+		const importPattern = /import \{[^}]*\} from ["'](virtual:markless:inline-sources-[^"']+)["'];/;
+		const ids = results.map((result) => importPattern.exec(result.code)?.[1]);
+		expect(ids[0]).toBeDefined();
+		expect(ids[1]).toBe(ids[0]);
+		const resolved = (await callResolveId(plugin, ids[0]!)) as { id: string };
+		const shared = (await callLoad(plugin, resolved.id)) as string;
+		const sources = (await import(`data:text/javascript,${encodeURIComponent(shared)}`)) as {
+			inlineResumerSources: { event: string };
+			prerenderBoot: { prerender: string };
+		};
+		expect(sources.inlineResumerSources.event.length).toBeGreaterThan(1_000);
+		for (const result of results) {
+			expect(result.code).toContain('inlineResumerSources: marklessInlineResumerSources,');
+			expect(result.code).not.toContain(sources.inlineResumerSources.event);
+			expect(result.code).not.toContain(JSON.stringify(sources.prerenderBoot.prerender));
+		}
+	});
+
 	test('transformTsrxModule emits a CSR-only default artifact without a runtime preload hook', async () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',

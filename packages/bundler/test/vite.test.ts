@@ -383,7 +383,7 @@ describe('Vite adapter structure', () => {
 
 		expect(result.code).toContain('headInjections:');
 		expect(result.code).toContain('inlineResumerSources:');
-		expect(result.code).toMatch(/"debug":\s*true/);
+		expect(result.code).toContain('virtual:markless:inline-sources-debug-');
 		expect(result.code).toContain('"src": "/dev/@vite/client"'); // re-print spaces object literals
 		expect(result.code).toContain('"rel": "stylesheet"');
 		expect(result.code).toMatch(
