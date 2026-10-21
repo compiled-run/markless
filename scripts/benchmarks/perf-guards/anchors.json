@@ -1498,6 +1498,14 @@
 			"from": 23773,
 			"to": 25274,
 			"reason": "in-place navigation merges body attributes per class token and style declaration like html, so a class a script set on body survives the swap, 2e7152cdf, +1501 B rendered"
+		},
+		{
+			"date": "2026-10-21",
+			"guard": "runtime",
+			"subject": "web/fns/composition",
+			"from": 19605,
+			"to": 19772,
+			"reason": "composition carries the host-id prefix onto each roster derive so a roster position one component down finds its own member, a9dd6589b, +167 B rendered"
 		}
 	],
 	"runtimeModules": {
@@ -1547,7 +1555,7 @@
 		"web/dom-journal-direct": 1223,
 		"web/fns/bound-symbol": 1497,
 		"web/fns/closure-action": 7539,
-		"web/fns/composition": 19605,
+		"web/fns/composition": 19772,
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
