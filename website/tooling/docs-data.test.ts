@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { prepareDocsData, docsData, type DocsInputs } from './docs-data.ts';
 import { fillPageProps } from './page-props.ts';
 import { scenes } from '../components/docs/anatomy/scenes.ts';
@@ -23,6 +23,11 @@ const setup = () => {
 const inputs: DocsInputs = { manifest, scenes, order: (family) => metaIfAny(family)?.partOrder };
 const api = "import ApiTable from '../../components/docs/api-table.tsrx';\n\n";
 const anatomy = "import AnatomyTable from '../../components/docs/anatomy-table.tsrx';\n\n";
+
+// The first prepare loads the MDX parser and the compiler once: 1.5 s alone on an M-series laptop, 4.5 s under the site's plugins, past 5 s on a loaded runner. Pay that here.
+beforeAll(async () => {
+	await prepareDocsData('# Warm', join(tmpdir(), 'warm.mdx'), tmpdir(), inputs);
+}, 60_000);
 
 describe('static docs data', () => {
 	it.each(['accordion', 'tabs'])(

@@ -27,7 +27,10 @@ describe('the playground split', () => {
 		expect(divider).toHaveLength(1);
 		const codeId = (panels[0] ?? '').match(/\bid="([^"]+)"/)?.[1];
 		expect(codeId).toBeTruthy();
-		expect(divider[0] ?? '').toContain('aria-label="Resize code and preview"');
+		// The thumb names itself by reference: VoiceOver reads a separator's aria-labelledby, not its aria-label.
+		const labelId = (divider[0] ?? '').match(/\baria-labelledby="([^"]+)"/)?.[1];
+		expect(labelId).toBeTruthy();
+		expect(html).toMatch(new RegExp(`<span[^>]*\\bid="${labelId}"[^>]*>Resize code and preview</span>`));
 		expect(divider[0] ?? '').toContain(`aria-controls="${codeId}"`);
 		expect(divider[0] ?? '').toContain('aria-valuenow="64"');
 		expect(divider[0] ?? '').toContain('aria-valuemin="25"');
