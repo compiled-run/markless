@@ -1,6 +1,6 @@
 import { nvdaTest } from '@guidepup/playwright';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../sr-app/preview-server.ts';
-import { realDriver } from '../../test-support/page-driver.ts';
+import { nvdaToAnchoredSection, realDriver } from '../../test-support/page-driver.ts';
 import { nvdaSpec } from '../../test-support/vocabularies.ts';
 import { readRadioGroupTranscript } from './radio-group-transcript.ts';
 
@@ -10,8 +10,7 @@ nvdaTest('NVDA conveys every billing option and follows the group through a choi
 }) => {
 	await page.goto(`${PREVIEW_ORIGIN}${FAMILY_ANCHORS['radio-group']}`);
 	await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');
-	// The cursor starts wherever the browser chrome left it, so the walk would otherwise cover the app window's toolbar.
-	await nvda.navigateToWebContent();
+	await nvdaToAnchoredSection(nvda, page);
 
-	await readRadioGroupTranscript(realDriver(nvda, nvdaSpec), page);
+	await readRadioGroupTranscript(realDriver(nvda, nvdaSpec, page), page);
 });

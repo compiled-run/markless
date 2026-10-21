@@ -29,7 +29,9 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 async function focusedAccessibleName(page: Page): Promise<string> {
 	const cdp = await page.context().newCDPSession(page);
 	try {
-		const { result } = await cdp.send('Runtime.evaluate', { expression: 'document.activeElement' });
+		const { result } = await cdp.send('Runtime.evaluate', {
+			expression: 'document.activeElement',
+		});
 		if (!result.objectId) return '';
 		const { nodes } = await cdp.send('Accessibility.getPartialAXTree', {
 			objectId: result.objectId,
@@ -92,7 +94,8 @@ export function realDriver<R extends RealReader>(
 		async settleOnFocus() {
 			if (spec.cursorToFocus && page) {
 				const focused = await page.evaluateHandle(() => document.activeElement);
-				const refocus = () => focused.evaluate((element) => (element as HTMLElement | null)?.focus());
+				const refocus = () =>
+					focused.evaluate((element) => (element as HTMLElement | null)?.focus());
 				try {
 					await spec.cursorToFocus(reader, await focusedAccessibleName(page), refocus);
 				} finally {
@@ -113,11 +116,39 @@ export function realDriver<R extends RealReader>(
  * Bring VoiceOver into the web content and, heading by heading, onto the gallery section the URL fragment names.
  * `navigateToWebContent()` starts at the top whatever the fragment says, and a walk from there outlasts a test.
  */
-export async function voiceOverToAnchoredSection(
-	voiceOver: VoiceOverPlaywright,
+export function voiceOverToAnchoredSection(voiceOver: VoiceOverPlaywright, page: Page) {
+	return toAnchoredSection(page, {
+		name: 'VoiceOver',
+		enter: () => voiceOver.navigateToWebContent(),
+		nextHeading: () => voiceOver.perform(voiceOver.keyboardCommands.findNextHeading),
+		lastSpokenPhrase: () => voiceOver.lastSpokenPhrase(),
+		reached: (phrase, heading) => phrase === `heading level 2 ${heading}`,
+	});
+}
+
+/** The same move for NVDA, whose browse mode jumps heading to heading on H. */
+export function nvdaToAnchoredSection(nvda: NVDAPlaywright, page: Page) {
+	return toAnchoredSection(page, {
+		name: 'NVDA',
+		enter: () => nvda.navigateToWebContent(),
+		nextHeading: () => nvda.perform(nvda.keyboardCommands.moveToNextHeading),
+		lastSpokenPhrase: () => nvda.lastSpokenPhrase(),
+		// Leaving a grouping on the way prefixes "out of grouping, ".
+		reached: (phrase, heading) => phrase.endsWith(`heading, level 2, ${heading}`),
+	});
+}
+
+async function toAnchoredSection(
 	page: Page,
+	reader: {
+		readonly name: string;
+		enter(): Promise<void>;
+		nextHeading(): Promise<void>;
+		lastSpokenPhrase(): Promise<string>;
+		reached(phrase: string, heading: string): boolean;
+	},
 ): Promise<void> {
-	await voiceOver.navigateToWebContent();
+	await reader.enter();
 	const heading = await page.evaluate(() => {
 		const section = document.getElementById(decodeURIComponent(location.hash.slice(1)));
 		return section?.querySelector(':scope > h2')?.textContent?.trim() ?? '';
@@ -125,18 +156,17 @@ export async function voiceOverToAnchoredSection(
 	if (heading === '') {
 		throw new Error(`${page.url()} names no gallery section with a heading to start from.`);
 	}
-	const target = `heading level 2 ${heading}`;
 	const headingCount = await page.locator('h1, h2, h3, h4, h5, h6').count();
 	const seen: string[] = [];
-	let phrase = await voiceOver.lastSpokenPhrase();
+	let phrase = await reader.lastSpokenPhrase();
 	for (let step = 0; step <= headingCount; step++) {
 		seen.push(phrase);
-		if (phrase === target) return;
-		await voiceOver.perform(voiceOver.keyboardCommands.findNextHeading);
-		phrase = await voiceOver.lastSpokenPhrase();
+		if (reader.reached(phrase, heading)) return;
+		await reader.nextHeading();
+		phrase = await reader.lastSpokenPhrase();
 	}
 	throw new Error(
-		`VoiceOver never reached "${target}" in ${headingCount} heading steps.\n` +
+		`${reader.name} never reached the "${heading}" heading in ${headingCount} heading steps.\n` +
 			`Transcript: ${JSON.stringify(seen, null, 1)}`,
 	);
 }

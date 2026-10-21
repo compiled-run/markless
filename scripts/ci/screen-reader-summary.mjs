@@ -17,11 +17,13 @@ if (process.env.GALLERY !== 'success') {
 	const text = readFileSync(transcript, 'utf8');
 	lines.push('', '| family | result |', '| --- | --- |');
 	for (const family of families) {
-		const spec = new RegExp(`src/${family}/${family}\\.\\w+\\.ts`);
-		const results = text.split('\n').filter((line) => spec.test(line) && /[✓✘]/.test(line));
-		const result = results.some((line) => line.includes('✘'))
+		const spec = new RegExp(`src[\\\\/]${family}[\\\\/]${family}\\.\\w+\\.ts`);
+		const results = text
+			.split('\n')
+			.filter((line) => spec.test(line) && /^\s*(✓|✘|ok|x)\s+\d/.test(line));
+		const result = results.some((line) => /^\s*(✘|x)\s/.test(line))
 			? 'FAIL'
-			: results.some((line) => line.includes('✓'))
+			: results.length > 0
 				? 'pass'
 				: 'not run';
 		lines.push(`| ${family} | ${result} |`);

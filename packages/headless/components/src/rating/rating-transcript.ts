@@ -47,17 +47,22 @@ export async function readRatingTranscript(sr: ScreenReaderDriver, page: Page) {
 		expect(missingFacts(sr, mark, conveys), `${sr.name} announced "${mark}"`).toEqual([]);
 	}
 
+	// Focus rather than the reading cursor: a reader's browse mode keeps arrows for itself until a mark is focused.
+	const rating = section.getByRole('radiogroup', { name: GROUP });
+	await rating.getByRole('radio', { name: '3 of 5' }).focus();
+	await sr.settleOnFocus();
+
 	// An arrow both moves the rating and takes focus with it, so the reader is
 	// asked again only once the mark it landed on carries the new state.
 	await sr.press(sr.keys.arrowRight);
-	await expect(section.getByRole('radio', { name: '4 of 5' })).toBeChecked({
+	await expect(rating.getByRole('radio', { name: '4 of 5' })).toBeChecked({
 		timeout: CHANGE_TIMEOUT_MS,
 	});
 
 	await expect
 		.poll(
 			async () =>
-				missingFacts(sr, await sr.reannounce(), {
+				missingFacts(sr, await sr.settleOnFocus(), {
 					role: 'radio',
 					name: '4 of 5',
 					state: ['radioChecked'],

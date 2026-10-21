@@ -288,6 +288,9 @@ jobs:
             - name: Install the screen reader assets guidepup drives
               run: pnpm dlx @guidepup/setup@0.29.3 install
 
+            - name: Record the VoiceOver verbosity defaults (diagnostic)
+              run: defaults read com.apple.VoiceOver4/default | grep -i -E "hint|verbos|follow|focus" || true
+
             - name: Install the browser the reader reads through
               run: pnpm exec playwright install --with-deps chromium
 

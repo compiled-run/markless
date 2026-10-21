@@ -1,5 +1,5 @@
 import type { Keys, Vocabulary } from './driver.ts';
-import type { VoiceOverPlaywright } from '@guidepup/playwright';
+import type { NVDAPlaywright, VoiceOverPlaywright } from '@guidepup/playwright';
 import { commaSegments, voiceOverSegments, type RealDriverSpec } from './page-driver.ts';
 
 /**
@@ -175,11 +175,19 @@ const keys: Keys = {
 	arrowRight: 'ArrowRight',
 };
 
-export const nvdaSpec: RealDriverSpec = {
+export const nvdaSpec: RealDriverSpec<NVDAPlaywright> = {
 	name: 'NVDA',
 	vocabulary: nvdaVocabulary,
 	keys,
 	segments: commaSegments,
+	// NVDA speaks a focus change on its own, but the phrase is only captured on a command, so it is asked for.
+	async cursorToFocus(nvda, focusedName) {
+		for (let attempt = 0; attempt < 10; attempt++) {
+			await nvda.perform(nvda.keyboardCommands.reportCurrentFocus);
+			const phrase = await nvda.lastSpokenPhrase();
+			if (focusedName === '' ? phrase !== '' : phrase.includes(focusedName)) return;
+		}
+	},
 };
 
 // VoiceOver's cursor and the page's focus are two positions; settling joins them with VoiceOver's own command.
