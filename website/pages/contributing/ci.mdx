@@ -33,7 +33,7 @@ The script owns one small table that puts each job in a mode. A new job with che
 
 ## The jobs
 
-- `agent-files` (fast): `pnpm dlx @intellectronica/ruler apply`, then fails on drift.
+- `agent-files` (fast): `pnpm dlx @intellectronica/ruler@0.3.44 apply`, then fails on drift.
 - `typecheck` (fast): `node scripts/ci/check-workflow.mjs .github/workflows/ci.yml`, `pnpm typecheck`, `pnpm exec vp check --no-fmt`.
 - `typecheck-ts7` (fast): `pnpm typecheck:ts7`. The same type check on TypeScript 7.1, over the root `tsconfig.json` and `website/`. It runs next to `typecheck` until TypeScript 7.1 is stable and the two checks have agreed for a while. See [How TypeScript checks a `.tsrx` file](/tooling/type-checking).
 - `unit` (fast): `pnpm exec vp test --project node`.
