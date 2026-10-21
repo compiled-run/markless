@@ -10,6 +10,8 @@ coverage/
 .output-router-preview/
 .witness/
 .vite/
+# compiled-run/markless-ecosystem-ci, fetched by scripts/ci/ecosystem-ci.mjs
+.ecosystem-ci/
 markless-router-env.d.ts
 playwright-report/
 test-results/

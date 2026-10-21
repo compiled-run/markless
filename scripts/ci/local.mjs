@@ -54,6 +54,15 @@ const JOB_POLICY = {
 			reason: 'compares the benchmark job artifacts; nothing to compare without them',
 		},
 	},
+	'ecosystem-ci.yml': Object.fromEntries(
+		['plan', 'build', 'suites', 'report'].map((job) => [
+			job,
+			{
+				mode: 'ci-only',
+				reason: 'runs compiled-run/markless-ecosystem-ci across CI jobs; run `node scripts/ci/ecosystem-ci.mjs run <suite>` for one suite against this checkout',
+			},
+		]),
+	),
 	'screen-reader.yml': {
 		virtual: { mode: 'full', needsBrowser: true },
 		nvda: { mode: 'ci-only', reason: 'needs a Windows runner with NVDA installed' },

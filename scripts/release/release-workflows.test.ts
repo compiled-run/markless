@@ -106,6 +106,28 @@ describe('release.yml mode=cut', () => {
 		).toBe('node scripts/release/required-checks.mjs --names');
 	});
 
+	test('moves main only after ecosystem CI found no regression on the release commit itself', () => {
+		const start = step(cut, 'Start ecosystem CI on the release commit');
+		const wait = step(cut, 'Require ecosystem CI to find no regression on the release commit');
+		for (const gate of [start, wait]) {
+			expect(gate.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'");
+		}
+		expect(start.env!.SHA).toBe('${{ steps.cut.outputs.sha }}');
+		expect(start.run).toContain(
+			'gh workflow run ecosystem-ci.yml --ref main -f ref="$SHA" -f gate=release',
+		);
+		expect(start.run).toContain('Ecosystem CI on ${SHA} (release gate)');
+		expect(wait.env!.RUN_ID).toBe('${{ steps.ecosystem.outputs.run_id }}');
+		expect(wait.run).toBe('gh run watch "$RUN_ID" --exit-status --interval 30');
+		const at = (name: string) => names(cut).indexOf(name);
+		expect(at(start.name!)).toBeGreaterThan(
+			at('Push the release commit to its release branch'),
+		);
+		expect(at(wait.name!)).toBeGreaterThan(at(start.name!));
+		expect(at(wait.name!)).toBeLessThan(at('Move main to the release commit'));
+		expect(cut.permissions!.actions).toBe('write');
+	});
+
 	test('posts no commit status of its own', () => {
 		const commands = cut.steps.map((candidate) => candidate.run ?? '').join('\n');
 		expect(commands).not.toMatch(/\/statuses\/|check-runs -X|--method POST/u);

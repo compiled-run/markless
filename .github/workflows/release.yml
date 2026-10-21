@@ -178,6 +178,31 @@ jobs:
                   TAG: ${{ steps.cut.outputs.tag }}
               run: git push origin "HEAD:refs/heads/release/${TAG}"
 
+            # The sites migrated to Markless, built on the release commit and compared with main's last nightly
+            # results (ecosystem-ci.yml). It runs while CI does; a regression stops the cut before main moves.
+            - name: Start ecosystem CI on the release commit
+              id: ecosystem
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              env:
+                  SHA: ${{ steps.cut.outputs.sha }}
+              run: |
+                  set -euo pipefail
+                  gh workflow run ecosystem-ci.yml --ref main -f ref="$SHA" -f gate=release
+                  title="Ecosystem CI on ${SHA} (release gate)"
+                  run_id=''
+                  for _ in $(seq 1 24); do
+                    run_id="$(gh run list --workflow ecosystem-ci.yml --event workflow_dispatch --limit 20 \
+                      --json databaseId,displayTitle --jq "[.[] | select(.displayTitle == \"${title}\")][0].databaseId // empty")"
+                    [ -n "$run_id" ] && break
+                    sleep 5
+                  done
+                  if [ -z "$run_id" ]; then
+                    echo "::error::No '${title}' run appeared within 2 minutes of dispatching ecosystem-ci.yml."
+                    exit 1
+                  fi
+                  echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+                  echo "Ecosystem CI run ${run_id} checks ${SHA}"
+
             # A pull request opened with this token gets a pull_request run that waits for approval
             # (action_required); approve exactly that run, for this commit and branch, then watch it.
             - name: Run CI on the release pull request
@@ -213,6 +238,12 @@ jobs:
                   fi
                   echo "Watching CI run ${run_id} on ${SHA}"
                   gh run watch "$run_id" --exit-status --interval 30
+
+            - name: Require ecosystem CI to find no regression on the release commit
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              env:
+                  RUN_ID: ${{ steps.ecosystem.outputs.run_id }}
+              run: gh run watch "$RUN_ID" --exit-status --interval 30
 
             - name: Require every check main's protection names on the release commit
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'

@@ -1,0 +1,258 @@
+# Ecosystem CI: the sites migrated to Markless (compiled-run/markless-ecosystem-ci, which holds the suites and
+# the runner), built against one Markless commit and checked against captures of their old sites, then compared
+# with main's last nightly results so only regressions fail.
+#
+# Three ways in, none of which needs a stored secret:
+#   - a maintainer comments `/ecosystem-ci run` (optionally followed by suite names) on a pull request;
+#   - a dispatch: gh workflow run ecosystem-ci.yml -f ref=<commit> [-f pr=<number>] [-f suites='a b'];
+#   - the release cut dispatches it on the release commit and waits for it (release.yml).
+#
+# The token never leaves this repository: the ecosystem repository is public, so checking it out needs none,
+# and the jobs that run pull request code get a read-only token. Only `plan` and `report`, which run no
+# pull request code, may write a comment.
+name: Ecosystem CI
+# The release cut finds the run it dispatched by this title.
+run-name: >-
+    ${{ github.event_name == 'workflow_dispatch'
+    && format('Ecosystem CI on {0}{1}', inputs.ref, inputs.gate != '' && format(' ({0} gate)', inputs.gate) || '')
+    || format('Ecosystem CI on pull request {0}', github.event.issue.number) }}
+
+on:
+    issue_comment:
+        types: [created]
+    workflow_dispatch:
+        inputs:
+            ref:
+                description: 'Markless commit, branch or tag to check'
+                required: true
+                type: string
+                default: main
+            pr:
+                description: 'Pull request number to post the results on (optional)'
+                required: false
+                type: string
+                default: ''
+            suites:
+                description: 'Suites to run, separated by spaces, or all'
+                required: false
+                type: string
+                default: all
+            lane:
+                description: 'sample checks the per-PR route sample; full checks every route'
+                required: false
+                type: choice
+                default: sample
+                options:
+                    - sample
+                    - full
+            gate:
+                description: 'release when a release cut waits on this run'
+                required: false
+                type: string
+                default: ''
+
+concurrency:
+    group: ecosystem-ci-${{ github.event.issue.number || inputs.pr || inputs.ref }}
+    cancel-in-progress: false
+
+permissions: {}
+
+env:
+    ECOSYSTEM_CI_REPOSITORY: compiled-run/markless-ecosystem-ci
+
+jobs:
+    plan:
+        if: >-
+            github.repository == 'compiled-run/markless' &&
+            (github.event_name == 'workflow_dispatch' ||
+            (github.event.issue.pull_request &&
+            (github.event.comment.body == '/ecosystem-ci run' || startsWith(github.event.comment.body, '/ecosystem-ci run ')) &&
+            contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)))
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: read
+            # React to the comment and say the run started.
+            pull-requests: write
+        outputs:
+            sha: ${{ steps.plan.outputs.sha }}
+            pr: ${{ steps.plan.outputs.pr }}
+            suites: ${{ steps.plan.outputs.suites }}
+            lane: ${{ steps.plan.outputs.lane }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: ${{ env.ECOSYSTEM_CI_REPOSITORY }}
+                  path: ecosystem-ci
+                  persist-credentials: false
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+
+            - name: Resolve the commit, the suites and where results go
+              id: plan
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  EVENT: ${{ github.event_name }}
+                  COMMENT: ${{ github.event.comment.body }}
+                  COMMENT_ID: ${{ github.event.comment.id }}
+                  ISSUE: ${{ github.event.issue.number }}
+                  INPUT_REF: ${{ inputs.ref }}
+                  INPUT_PR: ${{ inputs.pr }}
+                  INPUT_SUITES: ${{ inputs.suites }}
+                  INPUT_LANE: ${{ inputs.lane }}
+              run: |
+                  set -euo pipefail
+                  if [ "$EVENT" = issue_comment ]; then
+                    pr="$ISSUE"
+                    sha="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" --jq .head.sha)"
+                    requested="$(printf '%s' "$COMMENT" | head -n 1 | sed -E 's#^/ecosystem-ci run ?##')"
+                    lane=sample
+                    gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" -f content=rocket >/dev/null
+                  else
+                    pr="$INPUT_PR"
+                    sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${INPUT_REF}" --jq .sha)"
+                    requested="$INPUT_SUITES"
+                    lane="${INPUT_LANE:-sample}"
+                  fi
+                  suites="$(node ecosystem-ci/ecosystem-ci.ts list --json ${requested:-all})"
+                  echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+                  echo "pr=${pr}" >> "$GITHUB_OUTPUT"
+                  echo "suites=${suites}" >> "$GITHUB_OUTPUT"
+                  echo "lane=${lane}" >> "$GITHUB_OUTPUT"
+                  echo "Markless ${sha}, ${lane} lane, suites ${suites}${pr:+, results on #${pr}}"
+
+    build:
+        needs: plan
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ needs.plan.outputs.sha }}
+                  path: markless
+                  persist-credentials: false
+
+            - uses: actions/checkout@v4
+              with:
+                  repository: ${{ env.ECOSYSTEM_CI_REPOSITORY }}
+                  path: ecosystem-ci
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  package_json_file: markless/package.json
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+                  cache-dependency-path: markless/pnpm-lock.yaml
+
+            - name: Build and pack Markless
+              run: node ecosystem-ci/ecosystem-ci.ts build --markless-dir markless --packs packs
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: markless-packs
+                  path: packs
+                  if-no-files-found: error
+                  retention-days: 7
+
+    suites:
+        needs: [plan, build]
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        permissions:
+            contents: read
+        strategy:
+            fail-fast: false
+            matrix:
+                suite: ${{ fromJSON(needs.plan.outputs.suites) }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: ${{ env.ECOSYSTEM_CI_REPOSITORY }}
+                  path: ecosystem-ci
+                  persist-credentials: false
+
+            - uses: actions/download-artifact@v4
+              with:
+                  name: markless-packs
+                  path: packs
+
+            - uses: ./ecosystem-ci/.github/actions/setup
+
+            - name: Run the suite
+              env:
+                  SUITE: ${{ matrix.suite }}
+                  LANE: ${{ needs.plan.outputs.lane }}
+              run: node ecosystem-ci/ecosystem-ci.ts run "$SUITE" --packs packs --lane "$LANE" --results results
+
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: ecosystem-results-${{ matrix.suite }}
+                  path: |
+                      results
+                      ecosystem-ci/workspace/runs
+                  if-no-files-found: warn
+                  retention-days: 14
+
+    report:
+        needs: [plan, build, suites]
+        if: always() && needs.plan.result == 'success'
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        permissions:
+            contents: read
+            # Post the results table on the pull request.
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: ${{ env.ECOSYSTEM_CI_REPOSITORY }}
+                  path: ecosystem-ci
+                  persist-credentials: false
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: ecosystem-results-*
+                  path: results
+
+            - name: Compare with main's last nightly results
+              id: compare
+              env:
+                  LANE: ${{ needs.plan.outputs.lane }}
+                  SHA: ${{ needs.plan.outputs.sha }}
+                  GATE: ${{ inputs.gate }}
+                  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              run: |
+                  set +e
+                  title="Ecosystem CI on ${SHA:0:9}${GATE:+ (${GATE} gate)}"
+                  node ecosystem-ci/ecosystem-ci.ts compare --results results --lane "$LANE" --markdown report.md --title "$title" --run-url "$RUN_URL"
+                  echo "status=$?" >> "$GITHUB_OUTPUT"
+                  cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Post the results on the pull request
+              if: needs.plan.outputs.pr != ''
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  PR: ${{ needs.plan.outputs.pr }}
+              run: gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file report.md
+
+            - name: Fail on a regression
+              env:
+                  STATUS: ${{ steps.compare.outputs.status }}
+              run: |
+                  if [ "$STATUS" != 0 ]; then
+                    echo "::error::Ecosystem CI found regressions against main (or a suite did not report); see the table in this run's summary."
+                    exit 1
+                  fi
