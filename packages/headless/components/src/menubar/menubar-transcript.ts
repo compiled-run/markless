@@ -68,8 +68,12 @@ export async function readMenubarTranscript(sr: ScreenReaderDriver, page: Page) 
 	// The bar is always showing, and each menu's own trigger is one of its items.
 	await expect(bar).toBeVisible();
 	await expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
-	expectConveys(sr, await readUntil(sr, collapsedFirst, WALK_LIMIT), collapsedFirst);
+	await readUntil(sr, { name: BAR_FIRST }, WALK_LIMIT);
 	await expect(firstTrigger).toHaveAttribute('aria-haspopup', 'menu');
+
+	// The bar is used from its focused item, as Tab reaches it: arrows only open a menu from there.
+	await firstTrigger.focus();
+	expectConveys(sr, await sr.settleOnFocus(), collapsedFirst);
 
 	await sr.press(sr.keys.arrowDown);
 	await expect(firstTrigger).toHaveAttribute('aria-expanded', 'true', {
