@@ -382,6 +382,7 @@ export function ResizableItem({ value, orientation, children, ...rest }: Resizab
  * consumer labels it; aria-valuetext still reads the size.
  */
 export function ResizableThumb({
+	'aria-label': label,
 	value,
 	min = 0,
 	max = 100,
@@ -438,6 +439,8 @@ export function ResizableThumb({
 	});
 	const dividerTabStop = computed(() => (resizable.disabled ? -1 : 0));
 	const dividerAriaDisabled = computed(() => (resizable.disabled ? 'true' : 'false'));
+	// VoiceOver ignores a separator's aria-label but reads aria-labelledby, even to a hidden node.
+	const labelEl = element<HTMLSpanElement>();
 
 	<div
 		{...rest}
@@ -451,6 +454,7 @@ export function ResizableThumb({
 		aria-valuenow={dividerNow}
 		aria-valuetext={dividerText}
 		aria-disabled={dividerAriaDisabled}
+		aria-labelledby={labelEl}
 		ui-divider={true}
 		ui-value={divider.value}
 		ui-orientation={dividerAxis}
@@ -538,8 +542,10 @@ export function ResizableThumb({
 				[ui-divider][ui-orientation="horizontal"] { cursor: col-resize; }
 				[ui-divider][ui-orientation="vertical"] { cursor: row-resize; }
 				[ui-divider][ui-disabled] { cursor: default; }
+				[ui-divider] > span { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 			}
 		</style>
+		<span el={labelEl} aria-hidden="true">{label}</span>
 		{children}
 	</div>
 }

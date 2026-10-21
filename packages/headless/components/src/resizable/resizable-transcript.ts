@@ -58,6 +58,10 @@ export async function readResizableTranscript(sr: ScreenReaderDriver, page: Page
 	// A side-by-side group is parted by a vertical splitter.
 	await expect(divider).toHaveAttribute('aria-orientation', 'vertical');
 	await expect(divider).toHaveAttribute('aria-valuenow', AT_REST);
+	// VoiceOver ignores a separator's aria-label and reads aria-labelledby, so the name has to arrive by reference.
+	await expect(divider).not.toHaveAttribute('aria-label');
+	const labelId = (await divider.getAttribute('aria-labelledby')) ?? '';
+	await expect(page.locator(`[id="${labelId}"]`)).toHaveText(NAME);
 
 	// The third claim, settled from the markup: aria-controls names the primary
 	// panel, and that panel is on the page under exactly that id.

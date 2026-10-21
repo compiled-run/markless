@@ -153,6 +153,11 @@ The panel passes anything a `<div>` accepts to its element, except `style`.
 
 ### `resizable.thumb`
 
+Name each divider with `aria-label`. VoiceOver ignores a divider's own `aria-label` and `title`, so the
+divider moves your text into a visually hidden element inside it and points `aria-labelledby` at it.
+Every screen reader then reads the same name. Name the divider with `aria-label`, not with your own
+`aria-labelledby`. The family writes `aria-labelledby` itself, so yours would be replaced.
+
 | Prop            | Type                   | What it does                                                                   |
 | --------------- | ---------------------- | ------------------------------------------------------------------------------ |
 | **`value`**     | `string`               | Required. The name of the panel this divider resizes and reports.              |
@@ -161,6 +166,7 @@ The panel passes anything a `<div>` accepts to its element, except `style`.
 | `collapsible`   | `boolean`              | Lets **Enter** fold the panel and bring it back.                               |
 | `collapsedSize` | `number`               | The panel's share while it is folded. The default is 0.                        |
 | `orientation`   | `ResizableOrientation` | The axis of the group this divider sits in. Omit it to use the root's axis.    |
+| `aria-label`    | `string`               | The divider's name. It is read through `aria-labelledby`, as described above. |
 
 | Attribute                        | Present when                           | Use it for                                                         |
 | -------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
@@ -172,6 +178,7 @@ The panel passes anything a `<div>` accepts to its element, except `style`.
 | `aria-valuenow`                  | The panel has a size.                  | The panel's share.                                                 |
 | `aria-valuetext`                 | The panel has a size.                  | The share as a percentage, such as `28%`.                          |
 | `aria-disabled`                  | Always                                 | `true` or `false`.                                                 |
+| `aria-labelledby`                | Always                                 | The `id` of a hidden element holding your `aria-label`.            |
 | `ui-divider`                     | Always                                 | Marks the element as a divider.                                    |
 | `ui-value`                       | Always                                 | The name of the panel this divider resizes.                        |
 | `ui-orientation`                 | Always                                 | The axis of the group this divider sits in.                        |
