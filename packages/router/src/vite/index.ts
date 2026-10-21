@@ -530,7 +530,11 @@ function routerConfigPlugin(
 						outputChunks(bundle).map((chunk) => [chunk.fileName, chunk]),
 					);
 					const closure = new Set<string>();
-					includeChunk(closure, { chunks: everyChunk, everyChunk }, fragmentChunk.fileName);
+					includeChunk(
+						closure,
+						{ chunks: everyChunk, everyChunk },
+						fragmentChunk.fileName,
+					);
 					closure.delete(fragmentChunk.fileName);
 					fragmentEntry.imports = [...closure].map((fileName) =>
 						joinURL(routePreloads.base, fileName),
@@ -579,7 +583,10 @@ function routerConfigPlugin(
 						navigationEntry: joinURL(routePreloads.base, navigationEntry.fileName),
 						...(fragmentEntry.fileName
 							? {
-									fragmentEntry: joinURL(routePreloads.base, fragmentEntry.fileName),
+									fragmentEntry: joinURL(
+										routePreloads.base,
+										fragmentEntry.fileName,
+									),
 									fragmentImports: fragmentEntry.imports,
 								}
 							: {}),
@@ -1530,7 +1537,11 @@ function routeModulePreloadsFromBundle(input: {
 		// A landing chunk evaluates these packs a task after the first event; unpreloaded, that task fetches them.
 		for (const fileName of ssrFileNames)
 			for (const specifier of warmEvaluatedImports(everyChunk.get(fileName)?.code ?? ''))
-				includeChunk(ssrFileNames, landingScope, normalize(join(dirname(fileName), specifier)));
+				includeChunk(
+					ssrFileNames,
+					landingScope,
+					normalize(join(dirname(fileName), specifier)),
+				);
 
 		navigation[routeFile] = [...navigationFileNames].map((fileName) =>
 			joinURL(input.base, fileName),

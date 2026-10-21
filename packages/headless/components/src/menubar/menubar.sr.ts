@@ -120,7 +120,9 @@ test('moving across the bar announces each item as one that has a submenu', asyn
 	el('bar-file').focus();
 	expectConveys(await sr.settleOnFocus(), ['File', say.menuitem, say.haspopup, say.collapsed]);
 
-	el('bar-file').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+	el('bar-file').dispatchEvent(
+		new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+	);
 	await expect.poll(() => document.activeElement, { timeout: 5000 }).toBe(el('bar-edit'));
 	expectConveys(await sr.settleOnFocus(), ['Edit', say.menuitem, say.haspopup, say.collapsed]);
 });
