@@ -26,6 +26,8 @@ export type RealDriverSpec<R extends RealReader = RealReader> = {
 	cursorToFocus?: (reader: R, focusedName: string, refocus: () => Promise<void>) => Promise<void>;
 	/** Give the reader its own keys back before its reading cursor moves, if a focus move may have taken them. */
 	keysToReader?: (reader: R) => Promise<void>;
+	/** Run after every cursor move, for a reader whose move can come back without the phrase it spoke. */
+	afterSilentMove?: (reader: R) => Promise<void>;
 	/** Deliver a key for the focused element through the page rather than as a system keystroke. */
 	keysThroughPage?: boolean;
 	/** Say the focused element again, for a reader whose next-item keys would reach a focused widget instead. */
@@ -123,11 +125,13 @@ export function realDriver<R extends RealReader>(
 			await keysBackToReader();
 			placedByFocus = false;
 			await reader.next();
+			await spec.afterSilentMove?.(reader);
 		},
 		async previous() {
 			await keysBackToReader();
 			placedByFocus = false;
 			await reader.previous();
+			await spec.afterSilentMove?.(reader);
 		},
 		async press(key) {
 			await page?.evaluate(recordPageKeys);
@@ -146,9 +150,13 @@ export function realDriver<R extends RealReader>(
 			}
 		},
 		async reannounce() {
-			if (spec.reannounceFocus && placedByFocus && (await pageHasFocus())) {
-				await spec.reannounceFocus(reader);
-				return heard(reader.lastSpokenPhrase());
+			// A reader placed by focus reads the focused element again: a key may have moved the focus since.
+			if (placedByFocus && (await pageHasFocus())) {
+				if (spec.reannounceFocus) {
+					await spec.reannounceFocus(reader);
+					return heard(reader.lastSpokenPhrase());
+				}
+				if (spec.cursorToFocus) return this.settleOnFocus();
 			}
 			// Neither reader has a "read the current item again" command that is
 			// guaranteed to re-read from the live DOM, so this steps off the item

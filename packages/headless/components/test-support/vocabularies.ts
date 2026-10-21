@@ -221,23 +221,48 @@ export const voiceOverSpec: RealDriverSpec<VoiceOverPlaywright> = {
 	// Synthesised system keystrokes reach the page only some of the time while VoiceOver runs (arrows, Escape and
 	// Control+Z were lost in whole runs), so a key for the focused element goes to the page directly.
 	keysThroughPage: true,
+	// A move onto an item whose speech starts late is captured as "" (Monthly, in a radio group); asking VoiceOver
+	// to describe its cursor's item moves nothing and gets the words.
+	async afterSilentMove(voiceOver) {
+		if ((await voiceOver.lastSpokenPhrase()) === '') {
+			await voiceOver.perform(voiceOver.keyboardCommands.describeItem);
+		}
+	},
 	async cursorToFocus(voiceOver, focusedName, refocus) {
 		// VoiceOver learns of a page focus change late, landing on the old focus or the document until then.
 		const arrived = (phrase: string) =>
 			focusedName === ''
 				? phrase !== '' && !phrase.endsWith(' web content')
 				: phrase.includes(focusedName);
-		for (let attempt = 0; attempt < 10; attempt++) {
-			await voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
-			const moved = await voiceOver.lastSpokenPhrase();
-			if (arrived(moved)) return;
-			// Silent when its cursor was already there: describing the cursor's item moves nothing and says where it is.
-			if (moved === '') {
-				await voiceOver.perform(voiceOver.keyboardCommands.describeItem);
-				if (arrived(await voiceOver.lastSpokenPhrase())) return;
+		const describeFocus = () =>
+			voiceOver.perform(voiceOver.keyboardCommands.describeItemWithKeyboardFocus);
+		// Asked first, because asking moves nothing: moving its cursor while it still believes the old element has
+		// focus would hand the page's focus back there, since its keyboard focus follows its cursor.
+		for (let attempt = 0; attempt < 5; attempt++) {
+			await describeFocus();
+			if (arrived(await voiceOver.lastSpokenPhrase())) {
+				await voiceOver.perform(voiceOver.keyboardCommands.moveCursorToKeyboardFocus);
+				// Silent when its cursor was already there; its answer about the focus is then the phrase.
+				if (!arrived(await voiceOver.lastSpokenPhrase())) await describeFocus();
+				return;
 			}
-			// Its keyboard focus follows its cursor, so landing on the old element moved the page's focus there too.
 			await refocus();
 		}
+		// Some programmatic focus moves never reach VoiceOver at all. The element is then found the way a person
+		// would find it, by reading on from where the cursor is, a few items each way.
+		console.log(`VoiceOver never named the focused "${focusedName}"; reading for it nearby.`);
+		for (const [move, steps] of [
+			[() => voiceOver.next(), 6],
+			[() => voiceOver.previous(), 12],
+		] as const) {
+			for (let step = 0; step < steps; step++) {
+				await move();
+				if (arrived(await voiceOver.lastSpokenPhrase())) {
+					await refocus();
+					return;
+				}
+			}
+		}
+		await refocus();
 	},
 };
