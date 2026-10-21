@@ -106,26 +106,27 @@ describe('release.yml mode=cut', () => {
 		).toBe('node scripts/release/required-checks.mjs --names');
 	});
 
-	test('moves main only after ecosystem CI found no regression on the release commit itself', () => {
+	test('starts ecosystem CI on the release commit, never waits for it, and links it in the release', () => {
 		const start = step(cut, 'Start ecosystem CI on the release commit');
-		const wait = step(cut, 'Require ecosystem CI to find no regression on the release commit');
-		for (const gate of [start, wait]) {
-			expect(gate.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'");
-		}
+		expect(start.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'");
 		expect(start.env!.SHA).toBe('${{ steps.cut.outputs.sha }}');
 		expect(start.run).toContain(
 			'gh workflow run ecosystem-ci.yml --ref main -f ref="$SHA" -f gate=release',
 		);
 		expect(start.run).toContain('Ecosystem CI on ${SHA} (release gate)');
-		expect(wait.env!.RUN_ID).toBe('${{ steps.ecosystem.outputs.run_id }}');
-		expect(wait.run).toBe('gh run watch "$RUN_ID" --exit-status --interval 30');
-		const at = (name: string) => names(cut).indexOf(name);
-		expect(at(start.name!)).toBeGreaterThan(
-			at('Push the release commit to its release branch'),
+		expect(start.run).not.toMatch(/exit 1|set -e[a-z]*o? pipefail\n/u);
+		expect(
+			names(cut).some((name) => /ecosystem/iu.test(name ?? '') && name !== start.name),
+		).toBe(false);
+		expect(cut.steps.map((candidate) => candidate.run ?? '').join('\n')).not.toContain(
+			'steps.ecosystem',
 		);
-		expect(at(wait.name!)).toBeGreaterThan(at(start.name!));
-		expect(at(wait.name!)).toBeLessThan(at('Move main to the release commit'));
-		expect(cut.permissions!.actions).toBe('write');
+		const link = step(announce, 'Link the ecosystem CI run in the release notes');
+		expect(link.env!.RUN_ID).toBe('${{ needs.cut.outputs.ecosystem_run }}');
+		expect(link.run).toContain('release-notes.md');
+		expect(names(announce).indexOf(link.name)).toBeLessThan(
+			names(announce).indexOf('Create the GitHub Release'),
+		);
 	});
 
 	test('posts no commit status of its own', () => {

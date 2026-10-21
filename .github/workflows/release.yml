@@ -89,6 +89,7 @@ jobs:
             version: ${{ steps.cut.outputs.version }}
             tag: ${{ steps.cut.outputs.tag }}
             sha: ${{ steps.cut.outputs.sha }}
+            ecosystem_run: ${{ steps.ecosystem.outputs.run_id }}
         env:
             GH_TOKEN: ${{ github.token }}
             # Outside the checkout: the release commit's pre-commit hook lints the whole tree.
@@ -178,16 +179,19 @@ jobs:
                   TAG: ${{ steps.cut.outputs.tag }}
               run: git push origin "HEAD:refs/heads/release/${TAG}"
 
-            # The sites migrated to Markless, built on the release commit and compared with main's last nightly
-            # results (ecosystem-ci.yml). It runs while CI does; a regression stops the cut before main moves.
+            # The sites migrated to Markless, built on the release commit (ecosystem-ci.yml). The cut never waits for
+            # it and nothing here fails on it: the GitHub Release links its result, and a regression opens an issue.
             - name: Start ecosystem CI on the release commit
               id: ecosystem
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
                   SHA: ${{ steps.cut.outputs.sha }}
               run: |
-                  set -euo pipefail
-                  gh workflow run ecosystem-ci.yml --ref main -f ref="$SHA" -f gate=release
+                  set -uo pipefail
+                  if ! gh workflow run ecosystem-ci.yml --ref main -f ref="$SHA" -f gate=release; then
+                    echo "::warning::Could not start ecosystem CI on ${SHA}; the release goes ahead without it."
+                    exit 0
+                  fi
                   title="Ecosystem CI on ${SHA} (release gate)"
                   run_id=''
                   for _ in $(seq 1 24); do
@@ -197,8 +201,8 @@ jobs:
                     sleep 5
                   done
                   if [ -z "$run_id" ]; then
-                    echo "::error::No '${title}' run appeared within 2 minutes of dispatching ecosystem-ci.yml."
-                    exit 1
+                    echo "::warning::No '${title}' run appeared within 2 minutes; the release goes ahead without a link to it."
+                    exit 0
                   fi
                   echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
                   echo "Ecosystem CI run ${run_id} checks ${SHA}"
@@ -238,12 +242,6 @@ jobs:
                   fi
                   echo "Watching CI run ${run_id} on ${SHA}"
                   gh run watch "$run_id" --exit-status --interval 30
-
-            - name: Require ecosystem CI to find no regression on the release commit
-              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
-              env:
-                  RUN_ID: ${{ steps.ecosystem.outputs.run_id }}
-              run: gh run watch "$RUN_ID" --exit-status --interval 30
 
             - name: Require every check main's protection names on the release commit
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
@@ -290,6 +288,8 @@ jobs:
         timeout-minutes: 10
         permissions:
             contents: write
+            # Read the ecosystem CI run the cut started, to link it.
+            actions: read
         env:
             GH_TOKEN: ${{ github.token }}
             TAG: ${{ needs.cut.outputs.tag }}
@@ -298,6 +298,23 @@ jobs:
               with:
                   name: release-notes
                   path: ${{ runner.temp }}
+
+            - name: Link the ecosystem CI run in the release notes
+              if: needs.cut.outputs.ecosystem_run != ''
+              env:
+                  RUN_ID: ${{ needs.cut.outputs.ecosystem_run }}
+              run: |
+                  set -uo pipefail
+                  run="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json status,conclusion,url \
+                    --jq '"\(.url) \(if .status == "completed" then .conclusion else "still running" end)"')" || exit 0
+                  url="${run%% *}"
+                  state="${run#* }"
+                  case "$state" in
+                    success) line="no regression against main" ;;
+                    failure) line="regressions against main; see the run and the issue labelled ecosystem-ci" ;;
+                    *) line="${state} when this release was published" ;;
+                  esac
+                  printf '\n\nEcosystem CI on the release commit: %s ([run](%s)).\n' "$line" "$url" >> "$RUNNER_TEMP/release-notes.md"
 
             - name: Create the GitHub Release
               run: |

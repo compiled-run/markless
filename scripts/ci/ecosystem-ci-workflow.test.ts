@@ -26,6 +26,7 @@ const source = readFileSync(
 const workflow = parse(source) as {
 	readonly 'run-name': string;
 	readonly on: Record<string, unknown>;
+	readonly concurrency: { readonly group: string; readonly 'cancel-in-progress': string };
 	readonly permissions: Record<string, string>;
 	readonly jobs: Record<string, Job>;
 };
@@ -39,7 +40,8 @@ const checkouts = (job: Job) =>
 
 describe('ecosystem-ci.yml', () => {
 	test('starts on a maintainer comment or a dispatch, in this repository only', () => {
-		expect(Object.keys(workflow.on)).toEqual(['issue_comment', 'workflow_dispatch']);
+		expect(Object.keys(workflow.on)).toEqual(['push', 'issue_comment', 'workflow_dispatch']);
+		expect(workflow.on.push).toEqual({ branches: ['main'] });
 		expect(plan.if).toContain("github.repository == 'compiled-run/markless'");
 		expect(plan.if).toContain('github.event.issue.pull_request');
 		expect(plan.if).toContain("startsWith(github.event.comment.body, '/ecosystem-ci run ')");
@@ -69,6 +71,33 @@ describe('ecosystem-ci.yml', () => {
 		expect(
 			checkouts(build).some((step) => step.with!.ref === '${{ needs.plan.outputs.sha }}'),
 		).toBe(true);
+	});
+
+	test('a newer push to main cancels the run of an older one', () => {
+		expect(workflow.concurrency.group).toContain("github.event_name == 'push' && 'main'");
+		expect(workflow.concurrency['cancel-in-progress']).toBe(
+			"${{ github.event_name == 'push' }}",
+		);
+	});
+
+	test('notifies on runs for main and the release, and shows a non-required status on a pull request', () => {
+		const notify = report.steps.find(
+			(candidate) => candidate.name === 'Notify on main and release runs',
+		)!;
+		expect(notify.run).toContain('ecosystem-ci/scripts/notify.ts --summary summary.json');
+		expect(notify.run).toContain('--mention thejackshelton --label ecosystem-ci');
+		expect(notify.env!.GITHUB_TOKEN).toBe('${{ github.token }}');
+		expect(report.permissions).toEqual({
+			contents: 'read',
+			'pull-requests': 'write',
+			statuses: 'write',
+			issues: 'write',
+		});
+		const status = report.steps.find(
+			(candidate) =>
+				candidate.name === "Set the ecosystem-ci status on the pull request's commit",
+		)!;
+		expect(status.run).toContain('-f context=ecosystem-ci');
 	});
 
 	test('jobs that may comment never check out the pull request', () => {
