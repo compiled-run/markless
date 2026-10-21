@@ -2,7 +2,8 @@ import { renderToString, type RenderToStringOptions, type SsrRenderable } from '
 import { renderToStream } from '@markless/web/render-to-stream';
 import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, resolve } from 'pathe';
-import type { Plugin } from 'vite';
+import type { Plugin, ViteDevServer } from 'vite';
+import type { ModuleRunner } from 'vite/module-runner';
 import type { BrowserCommand } from 'vitest/node';
 // The production island merge itself. Reached by path because @markless/router
 // is not a dependency of this test-only package; emulating it here would make
@@ -96,6 +97,12 @@ function islandResumeModuleSource(modulePaths: ReadonlyArray<string>): string {
 	].join('\n');
 }
 
+function ssrImport(vite: ViteDevServer, path: string): Promise<unknown> {
+	const runner = (vite.environments.ssr as { runner?: ModuleRunner } | undefined)?.runner;
+	if (!runner) throw new Error('renderSSR: the test server has no ssr environment that runs modules.');
+	return runner.import(path);
+}
+
 const renderSsrCommand: BrowserCommand<
 	[componentModulePath: string, exportName: string, options?: SsrFixtureRenderOptions],
 	SsrCommandResult
@@ -104,7 +111,7 @@ const renderSsrCommand: BrowserCommand<
 	// (resume module URL, symbol resolver virtual modules), so SSR must load
 	// the component through the same server for those URLs to stay live.
 	const vite = context.project.browser?.vite ?? context.project.vite;
-	const moduleExports = (await vite.ssrLoadModule(componentModulePath)) as Record<
+	const moduleExports = (await ssrImport(vite, componentModulePath)) as Record<
 		string,
 		SsrRenderable | undefined
 	>;
@@ -132,7 +139,7 @@ const renderSsrIslandsCommand: BrowserCommand<
 	const vite = context.project.browser?.vite ?? context.project.vite;
 	const artifacts = await Promise.all(
 		islands.map(async (island) => {
-			const moduleExports = (await vite.ssrLoadModule(island.componentModulePath)) as Record<
+			const moduleExports = (await ssrImport(vite, island.componentModulePath)) as Record<
 				string,
 				SsrRenderable | undefined
 			>;
@@ -196,7 +203,7 @@ const renderStreamShellCommand: BrowserCommand<
 	StreamShellCommandResult
 > = async (context, componentModulePath, exportName, options) => {
 	const vite = context.project.browser?.vite ?? context.project.vite;
-	const moduleExports = (await vite.ssrLoadModule(componentModulePath)) as Record<
+	const moduleExports = (await ssrImport(vite, componentModulePath)) as Record<
 		string,
 		SsrRenderable | undefined
 	>;

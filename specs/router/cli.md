@@ -63,9 +63,6 @@ flag collection or a manually printed text menu:
   › Node
     Creates a package.json project for pnpm, npm, or yarn.
 
-    Deno
-    If you love its security model. Any deno-compatible runtime works.
-
     Bun
     Creates a package.json project tuned for Bun.
 
@@ -83,7 +80,7 @@ The flow uses real `select` prompts for choices so the active option is
 highlighted, important labels stay prominent, and descriptions render as prompt
 hints. It also asks whether to install dependencies and initialize git, explains
 each choice, shows a `Ready to create?` summary, and lets the user create or
-cancel before files are written. Runtime choices must be ordered Node, Deno, Bun.
+cancel before files are written. Runtime choices must be ordered Node, Bun.
 Starter labels map to existing template IDs: Learn Markless -> `minimal`, Build
 an app -> `app`, Write docs -> `docs`, and Full-stack app -> `full-stack`.
 

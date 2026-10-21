@@ -14,6 +14,8 @@ markless-router-env.d.ts
 playwright-report/
 test-results/
 .vitest-attachments/
+# Vitest 5 writes attachments, failure screenshots and reports under .vitest/.
+.vitest/
 scripts/experiments/**/results/
 scripts/experiments/**/node_modules
 *.tsbuildinfo

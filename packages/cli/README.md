@@ -22,7 +22,7 @@ otherwise. `--editor <vscode|zed|none>` answers up front.
 ## Scaffolding inside an existing workspace
 
 If the new app lands inside a directory tree that already belongs to a pnpm,
-npm, yarn, bun, or Deno workspace, and the app is not one of that workspace's
+npm, yarn, or bun workspace, and the app is not one of that workspace's
 declared members, the CLI says so and asks what you want. The default is to keep
 the app separate: only the app is installed, and the enclosing workspace's
 config, lockfile, and `node_modules` are left exactly as they were.
@@ -32,9 +32,8 @@ Two flags answer that question up front, which is also how a non-interactive run
 
 - `--workspace` — Add the app to the enclosing workspace, if there is one. This
   writes one member entry into the workspace's own config file
-  (`pnpm-workspace.yaml`, the `workspaces` field of `package.json`, or the
-  `workspace` field of `deno.json`/`deno.jsonc`), preserving that file's
-  comments and formatting, and then installs at the workspace root.
+  (`pnpm-workspace.yaml` or the `workspaces` field of `package.json`),
+  preserving that file's comments and formatting, and then installs at the workspace root.
 - `--no-workspace` — Keep the app separate from the enclosing workspace.
 
 Both flags do nothing when no enclosing workspace was found. Without

@@ -21,7 +21,7 @@ export default function DevServer() @{
 	let packageManager = storage('package-manager', 'npm');
 	const completes = computed(() => completesAt(desk, typed, at));
 	const suggesting = computed(() => (showsFooter(desk, typed) ? 'yes' : 'no'));
-	const label = 'Terminal in ' + TARGET + '. Type the dev command of npm, pnpm, yarn, Bun or Deno and press Enter; Enter on an empty line runs the suggested one.';
+	const label = 'Terminal in ' + TARGET + '. Type the dev command of npm, pnpm, yarn or Bun and press Enter; Enter on an empty line runs the suggested one.';
 	const pick = computed(() => washFor(desk.count));
 	const lines = computed(() => {
 		const rows = screen(desk, typed, at);
@@ -87,7 +87,6 @@ export default function DevServer() @{
 						<tspan class="ghost wait-ghost" data-pm="pnpm">{slot.wait1}</tspan>
 						<tspan class="ghost wait-ghost" data-pm="yarn">{slot.wait2}</tspan>
 						<tspan class="ghost wait-ghost" data-pm="bun">{slot.wait3}</tspan>
-						<tspan class="ghost wait-ghost" data-pm="deno">{slot.wait4}</tspan>
 					</text>
 				}
 				<text class="term footer" transform={FOOT}>
@@ -247,7 +246,7 @@ export default function DevServer() @{
 		</div>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal shows cd {TARGET} already run, and a prompt waiting for
-			you to run the dev script with npm, pnpm, yarn, Bun or Deno, the other managers named at the foot of the sheet.
+			you to run the dev script with npm, pnpm, yarn or Bun, the other managers named at the foot of the sheet.
 			Below it lies a browser window at {HOST}, still blank. Type one and press Enter, or press Enter on the empty prompt to take the
 			suggestion: the dev server prints its Local address, and the browser shows the starter page from
 			{PAGE_FILE}, a {HEADING} heading and a {LABEL} button. Press that button to count, as the real page does. Escape starts over.
@@ -319,8 +318,7 @@ export default function DevServer() @{
 			html[data-package-manager='npm'] :is(.wait-ghost, .others)[data-pm='npm'],
 			html[data-package-manager='pnpm'] :is(.wait-ghost, .others)[data-pm='pnpm'],
 			html[data-package-manager='yarn'] :is(.wait-ghost, .others)[data-pm='yarn'],
-			html[data-package-manager='bun'] :is(.wait-ghost, .others)[data-pm='bun'],
-			html[data-package-manager='deno'] :is(.wait-ghost, .others)[data-pm='deno'] {
+			html[data-package-manager='bun'] :is(.wait-ghost, .others)[data-pm='bun'] {
 				display: inline;
 			}
 

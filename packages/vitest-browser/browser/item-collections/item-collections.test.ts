@@ -146,7 +146,7 @@ test('SSR: an item added after resume takes the next position by itself', async 
 	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
 
-	await expect.poll(positions, { timeout: 5000 }).toEqual(['0', '1', '2', '3']);
+	await expect.poll(() => positions(), { timeout: 5000 }).toEqual(['0', '1', '2', '3']);
 });
 
 test('SSR: dropping the first item renumbers the ones behind it', async () => {
@@ -616,7 +616,7 @@ test('CSR: every "n of m" moves when an item arrives', async () => {
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
 
 	await expect
-		.poll(labels, { timeout: 5000 })
+		.poll(() => labels(), { timeout: 5000 })
 		.toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
 	expect(rootLabels()).toEqual(['of 4']);
 });
@@ -627,7 +627,7 @@ test('SSR: every "n of m" moves when an item arrives', async () => {
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
 
 	await expect
-		.poll(labels, { timeout: 5000 })
+		.poll(() => labels(), { timeout: 5000 })
 		.toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
 	expect(rootLabels()).toEqual(['of 4']);
 });
@@ -637,7 +637,7 @@ test('CSR: every "n of m" moves when the first item leaves', async () => {
 	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
 
-	await expect.poll(labels, { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
+	await expect.poll(() => labels(), { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
 	expect(rootLabels()).toEqual(['of 2']);
 });
 
@@ -646,7 +646,7 @@ test('SSR: every "n of m" moves when the first item leaves', async () => {
 	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
 
-	await expect.poll(labels, { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
+	await expect.poll(() => labels(), { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
 	expect(rootLabels()).toEqual(['of 2']);
 });
 
@@ -714,14 +714,14 @@ test('CSR: a dependent derivation re-reads the position after a write', async ()
 	await render(StaticPage);
 	await writeCode();
 
-	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C']);
+	await expect.poll(() => mines(), { timeout: 5000 }).toEqual(['A', 'B', 'C']);
 });
 
 test('SSR: a dependent derivation re-reads the position after a write', async () => {
 	await renderSSR(StaticPage);
 	await writeCode();
 
-	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C']);
+	await expect.poll(() => mines(), { timeout: 5000 }).toEqual(['A', 'B', 'C']);
 });
 
 test('CSR: a dependent derivation follows an item arriving, then a write', async () => {
@@ -730,7 +730,7 @@ test('CSR: a dependent derivation follows an item arriving, then a write', async
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
 	await writeCode();
 
-	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C', 'D']);
+	await expect.poll(() => mines(), { timeout: 5000 }).toEqual(['A', 'B', 'C', 'D']);
 });
 
 test('SSR: a dependent derivation follows an item arriving, then a write', async () => {
@@ -739,7 +739,7 @@ test('SSR: a dependent derivation follows an item arriving, then a write', async
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
 	await writeCode();
 
-	await expect.poll(mines, { timeout: 5000 }).toEqual(['A', 'B', 'C', 'D']);
+	await expect.poll(() => mines(), { timeout: 5000 }).toEqual(['A', 'B', 'C', 'D']);
 });
 
 test('CSR: a dependent derivation renumbers behind a removal', async () => {
@@ -747,7 +747,7 @@ test('CSR: a dependent derivation renumbers behind a removal', async () => {
 	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
 
-	await expect.poll(mines, { timeout: 5000 }).toEqual(['a', 'b']);
+	await expect.poll(() => mines(), { timeout: 5000 }).toEqual(['a', 'b']);
 });
 
 test('SSR: a dependent derivation renumbers behind a removal', async () => {
@@ -755,7 +755,7 @@ test('SSR: a dependent derivation renumbers behind a removal', async () => {
 	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
 
-	await expect.poll(mines, { timeout: 5000 }).toEqual(['a', 'b']);
+	await expect.poll(() => mines(), { timeout: 5000 }).toEqual(['a', 'b']);
 });
 
 test('CSR: a flat instance spends its own places and leaves its sibling alone', async () => {

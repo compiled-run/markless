@@ -42,7 +42,7 @@ Usage:
 
 Options:
   --yes, -y          Use defaults
-  --format <name>   node, deno, or bun
+  --format <name>   node or bun
   --starter <name>  minimal, app, docs, or full-stack
   --editor <name>   vscode, zed, or none
   --agents <list>   claude-code, codex, gemini-cli, github-copilot, or none
@@ -104,8 +104,6 @@ Cursor shows in the list, but you can't pick it. Its User Rules apply to every p
 - `npm run test` runs `vp test`. Runs Vitest.
 
 Run Vite commands through `vp`, as these scripts do: `vp build -c other.config.ts`, not `vite build`. The app lists `vite` as an alias for `@voidzero-dev/vite-plus-core`, so that plugins asking for `vite` get Vite+, and that package has no `vite` command.
-
-A Deno app gets the same tasks in `deno.json`, without `doctor`. Run them with `deno task dev`.
 
 To run the built server without Vite, use `node .output/server/index.mjs`. It reads the `PORT` variable.
 

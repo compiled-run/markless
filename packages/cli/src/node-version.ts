@@ -1,15 +1,15 @@
 /** The Node.js versions a new app's build tools accept: vite-plus's `engines.node`, pinned by a test. */
 export const SUPPORTED_NODE = [
-	{ major: 20, minor: 19 },
 	{ major: 22, minor: 18 },
-	{ major: 24, minor: 11, orNewer: true },
+	{ major: 24, minor: 11 },
+	{ major: 26, minor: 0, orNewer: true },
 ] as const;
 
-export const SUPPORTED_NODE_RANGE = '^20.19.0 || ^22.18.0 || >=24.11.0';
+export const SUPPORTED_NODE_RANGE = '^22.18.0 || ^24.11.0 || >=26.0.0';
 
-/** Why this Node.js cannot run a new app, or null when it can. Bun and Deno report a Node.js version but run the app themselves. */
-export function unsupportedNode(versions: { node: string; bun?: string; deno?: string }): string | null {
-	if (versions.bun || versions.deno) return null;
+/** Why this Node.js cannot run a new app, or null when it can. Bun reports a Node.js version but runs the app itself. */
+export function unsupportedNode(versions: { node: string; bun?: string }): string | null {
+	if (versions.bun) return null;
 	const version = versions.node;
 	const [major = 0, minor = 0] = version.replace(/^v/, '').split('.').map(Number);
 	const fits = SUPPORTED_NODE.some((line) =>
@@ -18,5 +18,5 @@ export function unsupportedNode(versions: { node: string; bun?: string; deno?: s
 			: major === line.major && minor >= line.minor,
 	);
 	if (fits) return null;
-	return `Markless needs Node.js 20.19+, 22.18+ or 24.11+, and this is ${version.replace(/^v?/, 'v')}. Install the latest LTS from https://nodejs.org, then run this again.`;
+	return `Markless needs Node.js 22.18+, 24.11+ or 26+, and this is ${version.replace(/^v?/, 'v')}. Install the latest LTS from https://nodejs.org, then run this again.`;
 }

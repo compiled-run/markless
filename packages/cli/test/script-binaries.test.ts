@@ -21,13 +21,12 @@ const combinations: ReadonlyArray<readonly [ProjectFormat, string, Starter]> = (
 		['node', 'pnpm/10.33.2'],
 		['node', 'yarn/4.9.0'],
 		['bun', 'bun/1.3.0'],
-		['deno', 'deno/2.8.3'],
 	] as const
 ).flatMap(([format, agent]) =>
 	STARTER_CHOICES.map((choice) => [format, agent, choice.value] as const),
 );
 
-// `npm:@scope/name@1.2.3` (deno imports and npm aliases) names the package that actually installs.
+// `npm:@scope/name@1.2.3` (an npm alias) names the package that actually installs.
 function installedName(name: string, spec: string): string {
 	const alias = /^npm:(@?[^@]+)/.exec(spec);
 	return alias ? alias[1]! : name;
@@ -68,23 +67,20 @@ test.each(combinations)(
 			}),
 		);
 		const appRoot = join(root, 'app');
-		const manifestFile = format === 'deno' ? 'deno.json' : 'package.json';
+		const manifestFile = 'package.json';
 		const manifest = JSON.parse(await readFile(join(appRoot, manifestFile), 'utf-8')) as {
 			scripts?: Record<string, string>;
-			tasks?: Record<string, string>;
 			dependencies?: Record<string, string>;
 			devDependencies?: Record<string, string>;
-			imports?: Record<string, string>;
 		};
-		const scripts = manifest.scripts ?? manifest.tasks ?? {};
+		const scripts = manifest.scripts ?? {};
 		const declared = {
 			...manifest.dependencies,
 			...manifest.devDependencies,
-			...manifest.imports,
 		};
 		const provided = new Set([
 			// `bun run` puts a `node` shim on PATH, so a bun app's `node` scripts run under bun.
-			...(format === 'deno' ? ['deno'] : format === 'bun' ? ['bun', 'node'] : ['node']),
+			...(format === 'bun' ? ['bun', 'node'] : ['node']),
 			...Object.entries(declared).flatMap(([name, spec]) => binariesOf(name, spec)),
 		]);
 
@@ -95,7 +91,7 @@ test.each(combinations)(
 		}
 
 		const manager = userAgent.slice(0, userAgent.indexOf('/'));
-		const runDev = format === 'deno' ? 'deno task dev' : `${manager} run dev`;
+		const runDev = `${manager} run dev`;
 		expect(printed.join('')).toContain(`\n  ${runDev}\n`);
 		const readme = await readFile(join(appRoot, 'README.md'), 'utf-8');
 		expect(readme).toContain(`\n${runDev}\n`);

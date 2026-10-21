@@ -34,7 +34,6 @@ export const MANAGERS = [
 	{ id: 'pnpm', label: 'pnpm' },
 	{ id: 'yarn', label: 'yarn' },
 	{ id: 'bun', label: 'Bun' },
-	{ id: 'deno', label: 'Deno' },
 ] as const;
 
 export type ManagerId = (typeof MANAGERS)[number]['id'];
@@ -44,7 +43,6 @@ const CREATE: Record<ManagerId, string> = {
 	pnpm: 'pnpm create markless',
 	yarn: 'yarn create markless',
 	bun: 'bun create markless',
-	deno: 'deno run -A npm:create-markless',
 };
 
 /** npm needs `--` before flags meant for create-markless; the others pass them through. */
@@ -52,7 +50,7 @@ export const createCommand = (manager: ManagerId, target?: string, flags?: strin
 	[CREATE[manager], target, flags && (manager === 'npm' ? '-- ' + flags : flags)].filter(Boolean).join(' ');
 
 /** The same words the CLI prints for `dev` in its next steps. */
-export const scriptCommand = (manager: ManagerId, script: string) => (manager === 'deno' ? 'deno task ' : manager + ' run ') + script;
+export const scriptCommand = (manager: ManagerId, script: string) => manager + ' run ' + script;
 
 
 /** The folder name create-markless offers by default. */

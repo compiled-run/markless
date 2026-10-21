@@ -123,7 +123,7 @@ describe('the create figure plays the real CLI', () => {
 				}
 		expect(filesFor('minimal', 'node')).toContain('pages/index.tsrx');
 		expect(filesFor('docs', 'node')).not.toContain('pages/index.tsrx');
-		expect(filesFor('minimal', 'deno')).toContain('deno.json');
+		expect(filesFor('minimal', 'bun')).toContain('package.json');
 		for (const note of Object.values(NOTES)) expect(noteLines(note).length, note).toBeLessThanOrEqual(NOTE_LINES);
 	});
 
@@ -140,8 +140,6 @@ describe('the create figure plays the real CLI', () => {
 		expect(template('starters/docs/components/layouts/DocsLayout.tsrx')).toContain('<Sidebar active={active} />');
 		expect(template('starters/docs/components/docs/Sidebar.tsrx')).toContain('<nav aria-label="Docs">');
 		expect(template('formats/node/package.json')).toContain('"doctor": "node scripts/markless-doctor.mjs"');
-		expect(template('formats/deno/deno.json')).toContain('"tasks"');
-		expect(template('formats/deno/deno.json')).toContain('"imports"');
 		expect(template('common/vite.config.ts')).toContain('plugins: [markless(), router()]');
 		expect(template('common/tsconfig.json')).toContain('@markless/typescript-plugin');
 		expect(template('common/gitignore')).toContain('node_modules/');
@@ -189,16 +187,14 @@ describe('the create figure plays the real CLI', () => {
 		expect(submit(START, '  npm   create markless ')).toMatchObject({ outcome: 'asking', manager: 'npm', command: 'npm create markless' });
 		expect(submit(START, 'pnpm create markless@latest').outcome).toBe('idle');
 		expect(transcript(submit(START, 'yarn add markless', 'bun')).map((r) => r.text)).toEqual(['yarn add markless', 'Try bun create markless', '']);
-		expect(say(submit(START, 'ls', 'deno'))).toBe('Try deno run -A npm:create-markless');
-		expect(labelOf(START)).toContain('npm, pnpm, yarn, Bun or Deno');
+		expect(say(submit(START, 'ls', 'bun'))).toBe('Try bun create markless');
+		expect(labelOf(START)).toContain('npm, pnpm, yarn or Bun');
 	});
 
 	it("completes whichever manager's command the text starts, the saved one first", () => {
 		expect(ghostFor(START, '', 'bun')).toBe('bun create markless');
-		expect(ghostFor(START, '', 'deno')).toBe('deno run -A npm:create-markless');
 		expect(ghostFor(START, 'p')).toBe('npm create markless');
 		expect(ghostFor(START, 'b', 'npm')).toBe('un create markless');
-		expect(ghostFor(START, 'd', 'npm')).toBe('eno run -A npm:create-markless');
 		expect(ghostFor(START, 'y', 'pnpm')).toBe('arn create markless');
 		expect(ghostFor(START, 'n', 'bun')).toBe('pm create markless@latest');
 		expect(ghostFor(START, 'npm create markless')).toBe('@latest');
@@ -210,7 +206,7 @@ describe('the create figure plays the real CLI', () => {
 		const rows = screen(START, '', 0);
 		expect(rows.slice(0, 2).map((r) => r.kind)).toEqual(['input', 'start']);
 		expect(rows[0]!.ghost).toBe('');
-		expect([rows[0]!.wait0, rows[0]!.wait1, rows[0]!.wait2, rows[0]!.wait3, rows[0]!.wait4]).toEqual(ids.map((id) => createCommand(id)));
+		expect([rows[0]!.wait0, rows[0]!.wait1, rows[0]!.wait2, rows[0]!.wait3]).toEqual(ids.map((id) => createCommand(id)));
 		expect(rows.at(-1)!.kind).toBe('footer');
 		expect(rows.filter((r) => r.kind === 'footer')).toHaveLength(1);
 		expect(rows).toHaveLength(ROWS);
@@ -254,7 +250,7 @@ describe('the create figure plays the real CLI', () => {
 	});
 
 	it('marks a line red once no create command starts with it, and keeps a wrong command red above its hint', () => {
-		for (const typed of ['', 'n', 'pnpm cr', 'deno run -A', COMMAND]) expect(invalidAt(START, typed), typed).toBe(false);
+		for (const typed of ['', 'n', 'pnpm cr', 'bun create', COMMAND]) expect(invalidAt(START, typed), typed).toBe(false);
 		for (const typed of ['x', 'npm i', 'pnpm create markless@']) expect(invalidAt(START, typed), typed).toBe(true);
 		expect(screen(START, 'npm x', 5)[0]).toMatchObject({ invalid: 'yes', ghost: '' });
 		expect(screen(START, 'npm', 3)[0]!.invalid).toBe('no');
@@ -266,7 +262,7 @@ describe('the create figure plays the real CLI', () => {
 	});
 
 	it('asks what the CLI asks when each manager launches it, and prints its summary and next steps', async () => {
-		const answers = [[0, 0, 0, 0, 0, 0, 0], [2, 0, 1, 1, 1, 1, 0], [3, 0, 2, 2, 0, 0, 0], [1, 0, 0, 0, 1, 1, 0]];
+		const answers = [[0, 0, 0, 0, 0, 0, 0], [2, 0, 1, 1, 1, 1, 0], [3, 0, 1, 2, 0, 0, 0], [1, 0, 0, 0, 1, 1, 0]];
 		for (const manager of ids)
 			for (const picks of answers) {
 				const cli = await launched(manager, picks);
@@ -351,9 +347,7 @@ describe('the create figure plays the real CLI', () => {
 				for (const line of lines) expect(line.length).toBeLessThanOrEqual(WRAP);
 				expect(`● ${option.label}`.length).toBeLessThanOrEqual(LONGEST);
 			}
-		expect(wrap(`(${FORMATS[1]!.hint})`)).toHaveLength(2);
-		const deno = screen(move(enter(enter(enter(START))), 1));
-		expect(deno.filter((r) => r.kind === 'hint').map((r) => r.hint)).toEqual(['(If you love its security model.', 'Any deno-compatible runtime works.)']);
+		expect(wrap('(A hint longer than a terminal line wraps onto two rows of about equal length.)')).toEqual(['(A hint longer than a terminal line wraps', 'onto two rows of about equal length.)']);
 		expect(Number(widthOf(screen(enter(START))[4]!))).toBeGreaterThanOrEqual(('● Learn Markless'.length + 1) / LONGEST);
 	});
 

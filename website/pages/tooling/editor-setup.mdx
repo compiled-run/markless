@@ -87,12 +87,6 @@ Here the editor shows `: button` right after `<widget.trigger`. To turn these hi
 `"partHints": false` to the plugin's entry in `tsconfig.json`.
 
 <Callout
-	sprite="cross"
-	title="Why does my Deno app show wrong errors?"
-	text="Deno's language server reads deno.json and ignores the plugins list. So it reads .tsrx files as plain TypeScript. Edit a Deno app in VS Code or Zed instead, and turn off Deno's own editor support for that folder."
-/>
-
-<Callout
 	sprite="check"
 	title="Is my setup right?"
 	text="In a Node or Bun app, run node scripts/markless-doctor.mjs --no-build. One of its checks makes sure that tsconfig.json has the tsrx.compiler line. If the line is missing, it tells you the line to add."

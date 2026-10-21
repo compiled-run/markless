@@ -43,8 +43,12 @@ afterAll(async () => {
 	if (root) await rm(root, { recursive: true, force: true });
 });
 
-async function open(path: string): Promise<{ page: Page; errors: string[] }> {
+async function open(
+	path: string,
+	beforeLoad?: (page: Page) => void,
+): Promise<{ page: Page; errors: string[] }> {
 	const page = await browser!.newPage();
+	beforeLoad?.(page);
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	page.on('console', (message) => {
@@ -666,11 +670,13 @@ test.each([
 	['/hash-target', '[data-section]', '[data-plain]', ''],
 	['/hash-target#second', '[data-plain]', '[data-section]', '#second'],
 ])('a navigation lands on the clicked link (%s), not the one whose prefetch it reused', async (_name, prefetched, clicked, hash) => {
-	const { page, errors } = await open('/hash-links');
 	const fragments: string[] = [];
-	page.on('request', (request) => {
-		if (new URL(request.url()).pathname.startsWith('/_markless/fragment/')) fragments.push(request.url());
-	});
+	// The idle tier can fetch a visible link right after load, so the count starts before the page does.
+	const { page, errors } = await open('/hash-links', (page) =>
+		page.on('request', (request) => {
+			if (new URL(request.url()).pathname.startsWith('/_markless/fragment/')) fragments.push(request.url());
+		}),
+	);
 	await page.evaluate(() => ((globalThis as { __stayed?: boolean }).__stayed = true));
 	await page.focus(prefetched);
 	await expect.poll(() => fragments.length, wake).toBe(1);

@@ -55,7 +55,6 @@ export default function Commands({ kind, only }: { readonly kind: CommandKind; r
 			html[data-package-manager='pnpm'] .variant[data-package-manager='pnpm'],
 			html[data-package-manager='yarn'] .variant[data-package-manager='yarn'],
 			html[data-package-manager='bun'] .variant[data-package-manager='bun'],
-			html[data-package-manager='deno'] .variant[data-package-manager='deno'],
 			.commands[data-only='yes'] .variant {
 				display: block;
 			}

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MANAGERS, scriptCommand } from '../../docs/walkthrough/facts.ts';
-import { completesAt, describe as say, DONE, enter, FOOTER, ghostFor, HEADING, interrupt, LABEL, OUTPUT, PAGE_FILE, press, print, screen, showsFooter, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
+import { BANNER, completesAt, describe as say, DONE, enter, FOOTER, ghostFor, HEADING, interrupt, LABEL, OUTPUT, PAGE_FILE, press, print, screen, showsFooter, SLOTS, START, TARGET, URL_LINE, washFor } from './model.ts';
 import { drawing } from './dev-server.ts';
 
 const COMMAND = scriptCommand('npm', 'dev');
@@ -25,8 +25,9 @@ describe('the dev server figure shows the real starter', () => {
 		expect(cli).toContain("`${options.packageManager} run dev`");
 		expect(COMMAND).toBe('npm run dev');
 		expect(DONE.text).toBe('cd my-markless-app');
-		expect(OUTPUT.map((r) => r.text)).toEqual(['', 'VITE+ v0.3.1', '', `Local:   ${URL_LINE}`, 'Network: use --host to expose']);
-		const blank = { mark: '', text: '', kind: 'blank', caret: '', after: '', ghost: '', invalid: 'no', wait0: '', wait1: '', wait2: '', wait3: '', wait4: '' };
+		expect(BANNER).toMatch(/^VITE\+ v\d+\.\d+\.\d+$/);
+		expect(OUTPUT.map((r) => r.text)).toEqual(['', BANNER, '', `Local:   ${URL_LINE}`, 'Network: use --host to expose']);
+		const blank = { mark: '', text: '', kind: 'blank', caret: '', after: '', ghost: '', invalid: 'no', wait0: '', wait1: '', wait2: '', wait3: '' };
 		const waits = Object.fromEntries(ids.map((id, k) => [`wait${k}`, scriptCommand(id, 'dev')]));
 		expect(screen(START)).toEqual([DONE, { ...blank, mark: '$', kind: 'prompt', caret: '|', ...waits }, { ...blank, text: '↵ Press Enter to run it', kind: 'start' }, ...Array(SLOTS - 4).fill(blank), FOOTER]);
 		expect(screen(START, 'npm r')[1]).toMatchObject({ text: 'npm r', caret: '|', after: '', ghost: 'un dev' });
@@ -42,8 +43,6 @@ describe('the dev server figure shows the real starter', () => {
 			expect(enter(START, scriptCommand(id, 'dev'))).toMatchObject({ phase: 'starting', manager: id, command: scriptCommand(id, 'dev') });
 			expect(enter(START, '', id)).toMatchObject({ phase: 'starting', manager: id, command: scriptCommand(id, 'dev') });
 		}
-		expect(scriptCommand('deno', 'dev')).toBe('deno task dev');
-		expect(enter(START, 'deno run dev')).toMatchObject({ phase: 'starting', manager: 'deno' });
 		const miss = enter(START, 'npm start');
 		expect(miss.phase).toBe('off');
 		expect(miss.history.slice(1).map((r) => r.text)).toEqual(['npm start', 'Try npm run dev']);
@@ -58,10 +57,8 @@ describe('the dev server figure shows the real starter', () => {
 
 	it("completes whichever manager's dev command the text starts, the saved one first", () => {
 		expect(ghostFor('', 'bun')).toBe('bun run dev');
-		expect(ghostFor('', 'deno')).toBe('deno task dev');
 		expect(ghostFor('p')).toBe('npm run dev');
 		expect(ghostFor('b')).toBe('un run dev');
-		expect(ghostFor('d')).toBe('eno task dev');
 		expect(ghostFor('y', 'pnpm')).toBe('arn run dev');
 		expect(ghostFor('n', 'bun')).toBe('pm run dev');
 		expect(screen(START, 'pn', 2)[1]!.ghost).toBe('pm run dev');
@@ -99,7 +96,6 @@ describe('the dev server figure shows the real starter', () => {
 
 	it('marks a line red once no dev command starts with it, and keeps a wrong command red above its hint', () => {
 		expect(screen(START, 'npm r')[1]!.invalid).toBe('no');
-		expect(screen(START, 'deno t')[1]!.invalid).toBe('no');
 		expect(screen(START, 'npm s')[1]).toMatchObject({ invalid: 'yes', ghost: '' });
 		const miss = enter(START, 'npm start');
 		expect(miss.history.slice(1).map((r) => r.invalid)).toEqual(['yes', 'no']);
@@ -115,7 +111,7 @@ describe('the dev server figure shows the real starter', () => {
 			seen.push(say(desk));
 		}
 		expect(desk).toEqual({ ...START, phase: 'on', shown: OUTPUT.length, command: COMMAND });
-		expect(seen.slice(0, -1)).toEqual([COMMAND, 'VITE+ v0.3.1', 'VITE+ v0.3.1', `Local:   ${URL_LINE}`]);
+		expect(seen.slice(0, -1)).toEqual([COMMAND, BANNER, BANNER, `Local:   ${URL_LINE}`]);
 		expect(screen(desk).map((r) => r.text)).toEqual(['cd my-markless-app', COMMAND, ...OUTPUT.map((r) => r.text)]);
 		let late = enter(enter(START, 'x'), '');
 		while (late.phase === 'starting') late = print(late);

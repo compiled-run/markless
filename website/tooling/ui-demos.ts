@@ -387,13 +387,14 @@ export function uiDemos(): Plugin {
 			const invalidate = (file: string) => {
 				if (!file.startsWith(dir) || !file.endsWith('.tsrx')) return;
 				const family = relative(dir, file).split('/')[0];
-				const virtual = server.moduleGraph.getModuleById(VIRTUAL + family);
-				if (virtual) server.moduleGraph.invalidateModule(virtual);
-				// A page's expanded import list is baked into its transform result,
-				// so adding or removing a demo has to re-run that transform too.
-				for (const module of server.moduleGraph.getModulesByFile(file) ?? [])
-					for (const importer of module.importers)
-						server.moduleGraph.invalidateModule(importer);
+				for (const { moduleGraph } of Object.values(server.environments)) {
+					const virtual = moduleGraph.getModuleById(VIRTUAL + family);
+					if (virtual) moduleGraph.invalidateModule(virtual);
+					// A page's expanded import list is baked into its transform result,
+					// so adding or removing a demo has to re-run that transform too.
+					for (const module of moduleGraph.getModulesByFile(file) ?? [])
+						for (const importer of module.importers) moduleGraph.invalidateModule(importer);
+				}
 			};
 			server.watcher.on('add', invalidate);
 			server.watcher.on('unlink', invalidate);

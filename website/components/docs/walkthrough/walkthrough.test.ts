@@ -29,11 +29,9 @@ const starterDirs: Record<string, string[]> = { minimal: ['minimal'], app: ['min
 
 describe('the Walkthrough facts match create-markless', () => {
 	it('only runs scripts every starter format has', () => {
-		const pkg = JSON.parse(readFileSync(new URL('formats/node/package.json', templates), 'utf8')) as { scripts: Record<string, string> };
-		const deno = JSON.parse(readFileSync(new URL('formats/deno/deno.json', templates), 'utf8')) as { tasks: Record<string, string> };
-		for (const script of SHOWN_SCRIPTS) {
-			expect(pkg.scripts, script).toHaveProperty(script);
-			expect(deno.tasks, script).toHaveProperty(script);
+		for (const format of ['node', 'bun']) {
+			const pkg = JSON.parse(readFileSync(new URL(`formats/${format}/package.json`, templates), 'utf8')) as { scripts: Record<string, string> };
+			for (const script of SHOWN_SCRIPTS) expect(pkg.scripts, `${format} ${script}`).toHaveProperty(script);
 		}
 	});
 
@@ -79,13 +77,12 @@ describe('the package-manager commands', () => {
 			'pnpm create markless',
 			'yarn create markless',
 			'bun create markless',
-			'deno run -A npm:create-markless',
 		]);
 	});
 
 	it('runs scripts the way the CLI tells you to run dev', () => {
-		expect(cli).toContain("options.format === 'deno' ? 'deno task dev' : `${options.packageManager} run dev`");
-		for (const manager of MANAGERS) expect(scriptCommand(manager.id, 'dev')).toBe(manager.id === 'deno' ? 'deno task dev' : `${manager.id} run dev`);
+		expect(cli).toContain('return `${options.packageManager} run dev`;');
+		for (const manager of MANAGERS) expect(scriptCommand(manager.id, 'dev')).toBe(`${manager.id} run dev`);
 	});
 
 	it('colours every block exactly as the site highlights a bash fence', () => {

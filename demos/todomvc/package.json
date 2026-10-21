@@ -9,8 +9,8 @@
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*",
 		"@markless/bundler": "workspace:*",
-		"playwright": "1.58.2",
-		"vite-plus": "0.3.1"
+		"playwright": "1.64.1",
+		"vite-plus": "1.3.0"
 	},
 	"packageManager": "pnpm@10.33.2"
 }

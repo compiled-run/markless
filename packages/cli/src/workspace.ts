@@ -2,17 +2,15 @@ import {
 	applyEdits,
 	findNodeAtLocation,
 	modify,
-	parse as parseJsonc,
 	parseTree,
 	type FormattingOptions,
 	type JSONPath,
 	type Node as JsoncNode,
-	type ParseError,
 } from 'jsonc-parser';
 import { basename, dirname, join, relative, resolve } from 'pathe';
 import picomatch from 'picomatch';
 import { Scalar, isScalar, isSeq, parse as parseYaml, parseDocument } from 'yaml';
-import type { PackageManager, ProgramFileSystem, ProgramRuntime, ProjectFormat } from './index.ts';
+import type { PackageManager, ProgramFileSystem, ProgramRuntime } from './index.ts';
 
 /**
  * The package-manager identity workspace detection needs. `yarn` splits in two
@@ -20,7 +18,7 @@ import type { PackageManager, ProgramFileSystem, ProgramRuntime, ProjectFormat }
  * different files and need different standalone-install treatment. This stays
  * internal: the public `PackageManager` union is unchanged.
  */
-export type ManagerFlavor = 'npm' | 'pnpm' | 'yarn-classic' | 'yarn-berry' | 'bun' | 'deno';
+export type ManagerFlavor = 'npm' | 'pnpm' | 'yarn-classic' | 'yarn-berry' | 'bun';
 
 export interface EnclosingWorkspace {
 	/** The manager whose install would walk up into this workspace. */
@@ -36,8 +34,8 @@ export interface EnclosingWorkspace {
 	readonly isMember: boolean;
 	/**
 	 * True when a member declaration uses a pattern construct we do not claim
-	 * parity with the manager on (brace expansion, character class, extglob),
-	 * or a deno entry that may be a glob. Recorded so a reader can see why
+	 * parity with the manager on (brace expansion, character class, extglob).
+	 * Recorded so a reader can see why
 	 * `isMember` fell to its safe side rather than to its measured answer.
 	 */
 	readonly uncertain: boolean;
@@ -69,19 +67,6 @@ export interface InstallPlan {
 	 * declared member on its own.
 	 */
 	readonly skipped: boolean;
-}
-
-/**
- * A deno-format app lists its dependencies in `deno.json`; its `package.json`
- * carries only the name and module type vite-plus needs, so an inferred
- * npm/pnpm/yarn/bun install has nothing to install. Deno owns that manifest,
- * so deno installs it.
- */
-export function installManagerFor(options: {
-	readonly format: ProjectFormat;
-	readonly packageManager: PackageManager;
-}): PackageManager {
-	return options.format === 'deno' ? 'deno' : options.packageManager;
 }
 
 /**
@@ -208,10 +193,9 @@ export function planInstall(input: {
 /**
  * The managers that offer no way to install a directory their own workspace
  * declares as a member: bun accepts `--ignore-workspace` and hoists anyway,
- * yarn classic has no equivalent flag, and deno's isolation only applies to
- * directories the workspace does not declare.
+ * and yarn classic has no equivalent flag.
  */
-const NO_STANDALONE_FLAVORS: readonly ManagerFlavor[] = ['yarn-classic', 'bun', 'deno'];
+const NO_STANDALONE_FLAVORS: readonly ManagerFlavor[] = ['yarn-classic', 'bun'];
 
 function standaloneArgs(flavor: ManagerFlavor): readonly string[] {
 	switch (flavor) {
@@ -221,7 +205,7 @@ function standaloneArgs(flavor: ManagerFlavor): readonly string[] {
 			return ['--ignore-workspace'];
 		case 'npm':
 			return ['--workspaces=false'];
-		// bun, yarn classic and deno all install app-locally already when the
+		// bun and yarn classic both install app-locally already when the
 		// app matches no member declaration, so they get an unchanged install.
 		// bun in particular must never be handed `--ignore-workspace`: it
 		// accepts the unknown flag without error and hoists to the host root
@@ -298,11 +282,6 @@ export function addWorkspaceMember(input: {
 	const { contents, enclosing } = input;
 
 	if (enclosing.flavor === 'pnpm') return addYamlMember(contents, enclosing.memberPath);
-	// Deno's workspace array holds explicit relative paths, spelled with the
-	// leading `./` its own documentation and fixtures use.
-	if (enclosing.flavor === 'deno') {
-		return addJsonMember(contents, ['workspace'], `./${enclosing.memberPath}`);
-	}
 	// npm, yarn and bun all read `workspaces` from package.json, in either the
 	// array form or the `{ packages: [...] }` object form.
 	return addJsonMember(contents, manifestWorkspacePath(contents), enclosing.memberPath);
@@ -447,27 +426,6 @@ async function readWorkspaceRoot(
 		return globWorkspace(manager, flavor, dir, configFile, memberPath, pnpmPackages(contents));
 	}
 
-	if (flavor === 'deno') {
-		for (const name of ['deno.json', 'deno.jsonc']) {
-			const configFile = join(dir, name);
-			const contents = await readFileOrNull(fs, configFile);
-			if (contents === null) continue;
-			const members = denoWorkspaceMembers(contents);
-			if (!members) continue;
-			const verdict = denoMembership(members, dir, resolve(targetDir));
-			return {
-				manager,
-				flavor,
-				root: dir,
-				configFile,
-				memberPath,
-				isMember: verdict.isMember,
-				uncertain: verdict.uncertain,
-			};
-		}
-		return null;
-	}
-
 	const manifestFile = join(dir, 'package.json');
 
 	if (flavor === 'yarn-berry') {
@@ -524,10 +482,6 @@ function globWorkspace(
 // instead of being matched byte-for-byte.
 const UNCERTAIN_PATTERN = /[{[]|[+@?!]\(/;
 
-// Any character that could make a deno workspace entry a glob rather than the
-// explicit relative path deno's documentation shows.
-const DENO_GLOB_CHARACTER = /[*?[\]{}]/;
-
 function matchesPatterns(patterns: readonly string[], memberPath: string): boolean {
 	// Negations subtract from earlier matches in list order, which is why this
 	// walks the whole list instead of returning on the first hit.
@@ -542,24 +496,6 @@ function matchesPatterns(patterns: readonly string[], memberPath: string): boole
 	}
 
 	return matched;
-}
-
-function denoMembership(
-	members: readonly unknown[],
-	root: string,
-	targetDir: string,
-): { isMember: boolean; uncertain: boolean } {
-	for (const entry of members) {
-		if (typeof entry !== 'string') continue;
-		// Deno's own glob resolution inside `workspace` was never positively
-		// confirmed. "Member" is the silent, no-write answer and deno never
-		// corrupts the host either way, so a possible glob is treated as
-		// covering the app rather than guessing it does not.
-		if (DENO_GLOB_CHARACTER.test(entry)) return { isMember: true, uncertain: true };
-		if (resolve(root, entry) === targetDir) return { isMember: true, uncertain: false };
-	}
-
-	return { isMember: false, uncertain: false };
 }
 
 function pnpmPackages(contents: string): readonly string[] {
@@ -586,12 +522,6 @@ function manifestWorkspacePatterns(contents: string): readonly string[] | undefi
 	return stringList(workspaces);
 }
 
-function denoWorkspaceMembers(contents: string): readonly unknown[] | undefined {
-	const parsed = parseJsoncOrNull(contents);
-	if (!isRecord(parsed)) return undefined;
-	return Array.isArray(parsed.workspace) ? parsed.workspace : undefined;
-}
-
 async function readFileOrNull(fs: ProgramFileSystem, path: string): Promise<string | null> {
 	try {
 		return await fs.readFile(path);
@@ -614,17 +544,6 @@ function parseJsonOrNull(contents: string): unknown {
 	} catch {
 		return null;
 	}
-}
-
-/**
- * Deno accepts `deno.jsonc`, and a config carrying `//` comments and trailing
- * commas is still recognized as a workspace root, so both spellings have to be
- * readable here.
- */
-function parseJsoncOrNull(contents: string): unknown {
-	const errors: ParseError[] = [];
-	const parsed = parseJsonc(contents, errors, { allowTrailingComma: true }) as unknown;
-	return errors.length > 0 ? null : parsed;
 }
 
 function stringList(value: unknown): readonly string[] {
