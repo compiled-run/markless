@@ -39,10 +39,10 @@ describe('workerSourceHost', () => {
 
 		expect(first.codeDir).not.toBe(second.codeDir);
 		expect(firstOutcome.ok && firstOutcome.entry).toBe(`${first.codeDir}card.tsrx`);
-		expect(allCode(firstOutcome)).toContain("'Plum'");
-		expect(allCode(firstOutcome)).not.toContain("'Teal'");
-		expect(allCode(secondOutcome)).toContain("'Teal'");
-		expect(allCode(secondOutcome)).not.toContain("'Plum'");
+		expect(allCode(firstOutcome)).toMatch(/\bPlum\b/);
+		expect(allCode(firstOutcome)).not.toMatch(/\bTeal\b/);
+		expect(allCode(secondOutcome)).toMatch(/\bTeal\b/);
+		expect(allCode(secondOutcome)).not.toMatch(/\bPlum\b/);
 		expect(
 			secondOutcome.ok &&
 				secondOutcome.modules.some((module) => module.id.startsWith(first.codeDir)),
