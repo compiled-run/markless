@@ -176,8 +176,12 @@ async function waitForSettledLoadAccounting(
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
 	const started = Date.now();
+	let seen = '(no execution-log summary)';
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
+		seen =
+			html.match(/data-markless-log-(?:summary|app-bytes|instrument-bytes)="[^"]*"/g)?.join(' ') ??
+			seen;
 		if (
 			/data-markless-log-summary="markless: resumed — 0\.0 KB app executed, \d+ modules preloaded \(0 app executed\) · 0\.0 KB instrument"/.test(
 				html,
@@ -189,7 +193,9 @@ async function waitForSettledLoadAccounting(
 		}
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
-	throw new Error('Expected settled SSR load accounting to report zero app/component execution.');
+	throw new Error(
+		`Expected settled SSR load accounting to report zero app/component execution; last seen: ${seen}`,
+	);
 }
 
 async function inspectHeldStream(url: URL): Promise<{
