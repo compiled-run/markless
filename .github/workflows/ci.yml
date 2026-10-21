@@ -160,12 +160,15 @@ jobs:
             run_receipts: ${{ steps.receipts.outputs.cache-hit != 'true' }}
             key_website_boxes: ${{ steps.website_boxes.outputs.cache-primary-key }}
             run_website_boxes: ${{ steps.website_boxes.outputs.cache-hit != 'true' }}
+            key_demo_boxes: ${{ steps.demo_boxes.outputs.cache-primary-key }}
+            run_demo_boxes: ${{ steps.demo_boxes.outputs.cache-hit != 'true' }}
             run_playwright:
                 ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' || steps.boxes_bundler.outputs.cache-hit
                 != 'true' || steps.boxes_router.outputs.cache-hit != 'true' ||
                 steps.boxes_music_player.outputs.cache-hit != 'true' ||
                 steps.boxes_music_player_ssr.outputs.cache-hit != 'true' ||
-                steps.website_boxes.outputs.cache-hit != 'true' }}
+                steps.website_boxes.outputs.cache-hit != 'true' ||
+                steps.demo_boxes.outputs.cache-hit != 'true' }}
 
         steps:
             - uses: actions/checkout@v4
@@ -289,6 +292,18 @@ jobs:
                       'packages/headless/components/api/**/*', '!**/node_modules/**', '!**/dist/**',
                       '!**/.witness/**', '!**/.output/**') }}
 
+            - name: Probe the demo box lane
+              id: demo_boxes
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  path: demo-boxes-completed.txt
+                  key:
+                      demo-boxes-${{ hashFiles('ci-base-key.txt', 'demos/live-feed/**/*',
+                      'demos/live-feed-ssr/**/*', 'demos/same-module-branch/**/*',
+                      'demos/executed-at-load/**/*',
+                      '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
+
             # The receipt set is the union of what the box lanes wrote, so every
             # box key feeds this one: a box lane that re-runs re-runs receipts.
             - name: Record the box lane keys
@@ -322,6 +337,7 @@ jobs:
                   echo "boxes-music-player-ssr=${{ steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}"
                   echo "receipts=${{ steps.receipts.outputs.cache-hit != 'true' }}"
                   echo "website-boxes=${{ steps.website_boxes.outputs.cache-hit != 'true' }}"
+                  echo "demo-boxes=${{ steps.demo_boxes.outputs.cache-hit != 'true' }}"
 
     # One browser download for the whole run: the unit, browser and box lanes
     # restore this cache instead of each fetching its own copy, which is what
@@ -501,6 +517,11 @@ jobs:
             - name: Run the @markless/ui browser project
               if: matrix.shard == '1/2'
               run: pnpm exec vp test --project ui
+
+            # The checked-in @markless/ui API manifest matches the family sources; the lane key hashes packages/headless/**.
+            - name: Check the @markless/ui API manifest
+              if: matrix.shard == '1/2'
+              run: pnpm --dir packages/headless/components api:check
 
     # Packaged editor completion matrix: builds the CJS plugin bundles, so it
     # owns a runner instead of serializing behind the test suites.
@@ -905,6 +926,77 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_website_boxes }}
                   path: website-boxes-completed.txt
 
+    # Witness boxes of three demos no other lane builds, and the compiler-only
+    # half of demos/executed-at-load. The box receipts are not part of the
+    # analyzer receipt set, so this lane is not a `boxes-*` lane.
+    demo-boxes:
+        needs: [typecheck, lanes, prepare-playwright]
+        if: needs.lanes.outputs.run_demo_boxes == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        env:
+            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Restore the Playwright browser cache
+              id: playwright-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+
+            - name: Install Playwright system dependencies
+              run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
+
+            - name: Install Playwright browsers for the demo boxes
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install chromium
+
+            - name: Run live-feed demo boxes
+              run: pnpm --dir demos/live-feed test:boxes
+
+            - name: Run live-feed-ssr demo boxes
+              run: pnpm --dir demos/live-feed-ssr test:boxes
+
+            - name: Run same-module-branch demo boxes
+              run: pnpm --dir demos/same-module-branch test:boxes
+
+            # Its `gate` half holds wall-clock caps and stays manual.
+            - name: Run the executed-at-load fixture tests
+              run: pnpm --dir demos/executed-at-load test
+
+            - name: Mark the demo box lane complete
+              run: echo ok > demo-boxes-completed.txt
+
+            - name: Save the demo box lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_demo_boxes }}
+                  path: demo-boxes-completed.txt
+
     # Reassembles the receipt tree the split box lanes wrote on four different
     # runners, adds the @markless/web receipt that receipts:generate writes
     # here, and runs the same receipts:check that used to run at the end of the
@@ -1113,6 +1205,7 @@ jobs:
                 boxes-music-player-ssr,
                 receipts,
                 website-boxes,
+                demo-boxes,
             ]
         if: always()
         runs-on: ubuntu-latest

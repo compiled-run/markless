@@ -43,6 +43,7 @@ const JOB_POLICY = {
 		'boxes-music-player-ssr': { mode: 'full', needsBrowser: true },
 		receipts: { mode: 'full' },
 		'website-boxes': { mode: 'full', needsBrowser: true },
+		'demo-boxes': { mode: 'full', needsBrowser: true },
 		'package-manager-matrix': { mode: 'full', tools: ['bun', 'corepack'] },
 		benchmark: {
 			mode: 'ci-only',

@@ -40,7 +40,7 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 | Mode      | Jobs                                                                                                                                               | Time                                                                                                                                                                          |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--fast`  | `agent-files` (2 s), `typecheck` (workflow check, `pnpm typecheck`, `vp check --no-fmt`: 9 s), `typecheck-ts7` (`pnpm typecheck:ts7`, TypeScript 7.1 over the root and `website/`: about 3 s, added later), `unit` (`vp test --project node`: 52 s)             | **64 s**                                                                                                                                                                      |
-| `--full`  | fast, plus `browser` (browser + `ui` projects), `completion-matrix` (measured alone: 6 s), the four box jobs, `receipts`, `package-manager-matrix` | not timed end to end in this task: the box jobs bind fixed ports that another worker on this machine was using; expect roughly the sum of the CI lane times, 20 to 40 minutes |
+| `--full`  | fast, plus `browser` (browser + `ui` projects, `api:check`), `completion-matrix` (measured alone: 6 s), the four box jobs, `receipts`, `website-boxes`, `demo-boxes`, `package-manager-matrix` | not timed end to end in this task: the box jobs bind fixed ports that another worker on this machine was using; expect roughly the sum of the CI lane times, 20 to 40 minutes |
 | `--clean` | any mode, in a fresh worktree of `HEAD`                                                                                                            | adds about 5 s (worktree + offline `pnpm install`)                                                                                                                            |
 
 `--fast` on `1f6d2cd3` passed locally, while the same commit's `unit` job failed on CI with 110 failures. The failures were `browserType.launch: Executable doesn't exist`: node-project tests launch Chromium and WebKit, and the `unit` job installs no browsers. The Mac has both browsers cached, so a plain local run cannot see this. `--linux` can, because each job gets its own container with only the setup steps that job declares.
@@ -57,6 +57,25 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 `package-manager-matrix` runs when `bun` and `corepack` are on `PATH` (they are on this Mac) and is skipped with a message otherwise. Browser jobs are skipped with a message when Playwright's Chromium is not installed; `--install` fixes that.
 
 Side effect to know about: the `agent-files` job runs `pnpm dlx @intellectronica/ruler@0.3.44 apply`, which rewrites the generated agent files, including the committed `.agents/` directory. That is what CI does on its throwaway checkout; locally, a change it leaves in `.agents/` means a generated file is stale and belongs in the commit (do not delete `.agents/`, it is tracked), or run with `--clean`.
+
+### Perf guards
+
+`pnpm perf:guard` runs only at the end of `pnpm test`, which CI does not run, so its failures were invisible. From 2026-10-06 to 2026-10-21 the guard measured the docs site's 404 page three times: the docs moved to the site root, while `SITES` in `scripts/benchmarks/perf-guards/config.mjs` still listed `/markless/*`. The guard now reads the base from `website/site-base.ts` and stops when a guarded route does not answer 200. A `perf-guards` lane is ready (5 min 51 s on the runner, 5 min 16 s of it the guards, shorter than the slowest `unit` shard at 7 min 18 s), but it waits on G2 for the docs site. On the real docs pages G2 fails 17 times on this Mac and 22 times on the runner: the `<Code>` playground boots on first hover or focus by design, and on a slower machine more docs islands fetch their code at the first click.
+
+### Suites no CI job runs
+
+Each of these was checked on 2026-10-21. `demos/live-feed`, `demos/live-feed-ssr` and `demos/same-module-branch` boxes now run in `demo-boxes`, the `@markless/ui` `api:check` in `browser`, and the `demos/executed-at-load` fixture tests in `demo-boxes`. The rest stay outside CI:
+
+| Suite | Why it is not in CI |
+| --- | --- |
+| `demos/executed-at-load` `gate` | Five demo builds plus navigation caps in milliseconds (`STATIC_ROUTER_NAVIGATION_MS_CAP`); a wall-clock cap is not a merge gate (flake policy). Its music-player byte budgets are covered by `packages/bundler/test/music-player-*-budget.test.ts`. |
+| `docs:errors:check` | Red and stale: it compares against `docs/pages/errors/`, but the error pages moved to `website/pages/errors/`. Fix the script's paths before wiring it in. |
+| `website` `witness` | Writes screenshots to a developer-machine path and carries its own known-failing list; the website boxes are the CI form. |
+| `website` `typecheck` | The Markless-plugin checker over `website/`; CI checks `website/` with TypeScript 7 in `typecheck-ts7` only. |
+| `demos/benchmarks`, `demos/chained-async-comparison` `test` | Benchmark harness self-tests, several of which launch browsers and build three frameworks. |
+| `pnpm perf:guard` | Waits on the G2 decision for the docs site; see Perf guards above. |
+| `demos/interaction-benchmark/apps/*` `typecheck`, `sync:check` | Comparison apps in other frameworks; `apps/markless` `sync:check` runs inside its build, which only the perf guards run. |
+| `poc/*` | Evidence, not the framework. |
 
 ## 2. Linux parity
 
