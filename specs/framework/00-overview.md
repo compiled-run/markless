@@ -168,7 +168,14 @@ Initial internal production package map:
   Rolldown-first plugin, virtual modules, symbol chunks, compact resolver table
   finalization, bundle-graph metadata, and Vite adapter
   dev/HMR/HTML integration.
-- `packages/typescript-plugin` — editor language integration for `.tsrx` files.
+- `packages/typescript-plugin` — editor language integration for `.tsrx` files
+  on TypeScript 5.9, the `markless-tsc` command-line checker, and
+  `@markless/typescript-plugin/volar-strict`, the compiler entry TypeScript
+  7.1 runs through `@tsrx/content-mapper` (`tsc --runExternalCode`). The
+  strict entry is the editor's TSX without half-typed-file recovery, so it
+  reports the same errors as `markless-tsc` at the same authored positions;
+  `packages/typescript-plugin/test/markless-tsc.test.ts` compares the two on
+  every fixture project.
 - `packages/vitest-browser` — CSR-only Vitest browser-mode support for targeted
   real-browser DOM/runtime mechanics. It should provide framework-specific
   browser render helpers, cleanup, and Vitest browser `page` integration modeled

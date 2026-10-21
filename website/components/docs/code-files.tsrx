@@ -1,8 +1,9 @@
 // No handlers here: in a component with its own handlers, tab trigger events resolve to those handlers instead.
+import type { Children } from '@markless/core';
 import { tabs } from '@markless/ui';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 
-export function CodeTabs({ panes, children }: { readonly panes: readonly CodePane[]; readonly children?: unknown }) @{
+export function CodeTabs({ panes, children }: { readonly panes: readonly CodePane[]; readonly children?: Children }) @{
 	<tabs.root class="file-tabs" value="first">
 		<tabs.list class="strip" aria-label="Files">
 			<div class="strip-row" role="presentation">

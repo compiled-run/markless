@@ -8,12 +8,14 @@
 // counting the elements before them, and every cell or arm this component added
 // would move the ones after it. Every demo's state
 // lives in the projected component, which is its own island.
+import type { Children } from '@markless/core';
+
 export default function Preview({
 	shows,
 	children,
 }: {
 	readonly shows: string;
-	readonly children?: unknown;
+	readonly children?: Children;
 }) @{
 	<div class="ui-preview">
 		<style>

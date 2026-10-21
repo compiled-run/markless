@@ -1,5 +1,7 @@
 // A ruled index card taped to the page. It stays cream in dark mode the way a
 // real card would, so everything on it is pinned to dark ink.
+import type { Children } from '@markless/core';
+
 export default function IndexCard({
 	label,
 	pin,
@@ -12,7 +14,7 @@ export default function IndexCard({
 	readonly pin?: string;
 	/** Rotation as a CSS angle, such as '-1.5deg'. */
 	readonly tilt?: string;
-	readonly children?: unknown;
+	readonly children?: Children;
 }) @{
 	<div class="index-card" data-pin={pin ?? 'tape'} style={'--tilt:' + (tilt ?? '-1deg')}>
 		<span class="tape" aria-hidden="true"></span>

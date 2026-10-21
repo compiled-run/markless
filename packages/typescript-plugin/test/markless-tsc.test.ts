@@ -82,6 +82,45 @@ test('standard event casing and numeric attribute strings typecheck', () => {
 	expect(result.status).toBe(0);
 });
 
+// TypeScript 7.1 cannot load this plugin; it reads .tsrx through @tsrx/content-mapper and the
+// strict compiler entry the fixtures' tsconfig names. Both checkers must report the same errors.
+const typescript7Tsc = join(repoRoot, 'scripts/typescript-7/node_modules/typescript/bin/tsc');
+
+function runTypescript7(fixture: string): Run {
+	return run([
+		typescript7Tsc,
+		'--runExternalCode',
+		'--noEmit',
+		'-p',
+		join(fixtures, fixture, 'tsconfig.json'),
+	]);
+}
+
+function reportedErrors(output: string): string[] {
+	const compileErrorCode = new RegExp(`^TS${MARKLESS_TSRX_PARSE_ERROR_CODE}$|^TSRX\\d+$`);
+	return [...output.matchAll(/^(\S+)\((\d+),(\d+)\): error (TS\d+|TSRX\d+):/gm)]
+		.map(([, file, line, column, code]) => {
+			const kind = compileErrorCode.test(code) ? 'compile error' : code;
+			return `${file}(${line},${column}) ${kind}`;
+		})
+		.sort();
+}
+
+test.each([
+	'good',
+	'body-error',
+	'prop-error',
+	'unparsable',
+	'html-attribute-errors',
+	'standard-attribute-spellings',
+	'attribute-spelling-errors',
+])('TypeScript 7.1 with the content mapper reports what markless-tsc reports: %s', (fixture) => {
+	const typescript5 = runMarklessTsc(fixture);
+	const typescript7 = runTypescript7(fixture);
+	expect(reportedErrors(typescript7.output)).toEqual(reportedErrors(typescript5.output));
+	expect(typescript7.status === 0).toBe(typescript5.status === 0);
+});
+
 test('non-numeric strings in numeric attributes and misspelled events still fail', () => {
 	const result = runMarklessTsc('attribute-spelling-errors');
 	expect(result.status).not.toBe(0);

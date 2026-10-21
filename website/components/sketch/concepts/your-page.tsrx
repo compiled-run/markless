@@ -1,5 +1,7 @@
 // Looks like the demo box but without its class, so page checks that find demos skip it.
-export default function YourPage({ children }: { readonly children?: unknown }) @{
+import type { Children } from '@markless/core';
+
+export default function YourPage({ children }: { readonly children?: Children }) @{
 	<div class="your-page">
 		<p class="strip" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span>your page</p>
 		{children}

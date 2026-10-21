@@ -102,6 +102,53 @@ test('compileTsrxForTypeService maps TSRX control-flow expressions through gener
 	expectExactMapping(result, source, 'error.message');
 });
 
+test('compileTsrxForTypeService returns parseable TSX when a component renders one top-level construct', () => {
+	const bodies = {
+		if: `@if (props.on) {\n\t\t<b>{props.label}</b>\n\t} @else {\n\t\t<i />\n\t}`,
+		for: `@for (const item of props.items) {\n\t\t<b>{item}</b>\n\t}`,
+		switch: `@switch (props.label) {\n\t\t@case 'a': {\n\t\t\t<b />\n\t\t}\n\t\t@default: {\n\t\t\t<i />\n\t\t}\n\t}`,
+		try: `@try {\n\t\t<b>{props.label}</b>\n\t} @catch (error) {\n\t\t<i />\n\t}`,
+		codeBlock: `@{\n\t\tconst shown = props.label.trim();\n\t\t<b>{shown}</b>\n\t}`,
+	};
+	for (const [construct, body] of Object.entries(bodies)) {
+		const source = `export function Shown(props: { on: boolean; label: string; items: string[] }) @{\n\tconst count = props.items.length;\n\t${body}\n}`;
+
+		const result = compileTsrxForTypeService(source, `${construct}.tsrx`, { loose: true });
+
+		expect(result.errors, construct).toEqual([]);
+		expect(formatParseDiagnostics(result.code), construct).toEqual([]);
+		expectExactMapping(result, source, 'props.items.length');
+	}
+});
+
+test('compileTsrxForTypeService keeps sibling markup inside control-flow arms parseable', () => {
+	const source = `export function Rows({ open, rows }: { open: boolean; rows: { id: string; name: string }[] }) @{
+	<table>
+		@if (open) {
+			const total = rows.length;
+			<>
+				<caption>{total}</caption>
+				<tbody>
+					@for (const row of rows; key row.id) {
+						<>
+							<th>{row.id}</th>
+							<td>{row.name}</td>
+						</>
+					}
+				</tbody>
+			</>
+		}
+	</table>
+}`;
+
+	const result = compileTsrxForTypeService(source, 'Rows.tsrx', { loose: true });
+
+	expect(result.errors).toEqual([]);
+	expect(formatParseDiagnostics(result.code)).toEqual([]);
+	expectExactMapping(result, source, 'rows.length');
+	expectExactMapping(result, source, 'row.name');
+});
+
 test('compileTsrxForTypeService emits the ruled TSX envelopes for child constructs', () => {
 	const source = `export function Constructs({ value, items, load }: { value: { kind: 'a'; label: string } | { kind: 'b'; count: number }; items: { id: string }[]; load(): Promise<string> }) @{
 	<section>

@@ -92,6 +92,32 @@ Here the editor shows `: button` right after `<widget.trigger`. To turn these hi
 	text="In a Node or Bun app, run node scripts/markless-doctor.mjs --no-build. One of its checks makes sure that tsconfig.json has the tsrx.compiler line. If the line is missing, it tells you the line to add."
 />
 
+## TypeScript 7.1 (experimental)
+
+The Markless plugin runs on TypeScript 5.9. TypeScript 7 cannot load plugins, so it reads `.tsrx`
+files through a content mapper instead: a separate program, named in `tsconfig.json`, that hands it
+the TSX copy. An editor on the TypeScript 7.1 beta can use `@tsrx/content-mapper`, which follows
+the `tsrx.compiler` line above. The [TSRX VS Code setup](https://github.com/tsrx-org/tsrx/tree/main/packages/vscode-plugin#native-backend-setup)
+shows the settings.
+
+```json
+{
+	"contentMappers": [{ "package": "@tsrx/content-mapper", "extensions": [".tsrx"] }]
+}
+```
+
+Hover, go to definition, member and prop suggestions, and type errors work. These do not, yet:
+
+- the `@` block suggestions, part hints, and the Markless order of tag suggestions
+- an auto-import that adds a new `import` line ([microsoft/TypeScript#64119](https://github.com/microsoft/TypeScript/issues/64119))
+- rename where the TSX copy spells a name differently ([microsoft/TypeScript#63879](https://github.com/microsoft/TypeScript/issues/63879))
+- suggestions right after a fresh `.`; a half-typed file can also show errors in code the editor
+  filled in to keep reading it
+- Find File References and Go to Source Definition
+
+[tsrx-org/tsrx#136](https://github.com/tsrx-org/tsrx/issues/136) tracks every known gap. Stay on
+TypeScript 5.9 for daily work.
+
 Next: [check every file at once](/tooling/type-checking).
 
 <LikeHeart />

@@ -33,6 +33,7 @@ const JOB_POLICY = {
 	'ci.yml': {
 		'agent-files': { mode: 'fast' },
 		typecheck: { mode: 'fast' },
+		'typecheck-ts7': { mode: 'fast' },
 		unit: { mode: 'fast' },
 		browser: { mode: 'full', needsBrowser: true },
 		'completion-matrix': { mode: 'full' },

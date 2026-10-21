@@ -3,10 +3,13 @@ import { parseJavaScriptModule } from '../../../../packages/compiler/src/index.t
 import { generate } from '@tsrx/yuku';
 
 type Diagnostic = { readonly message: string };
+type Program = Parameters<typeof generate>[0];
 
-function parseTypeScript(code: string): { program: unknown; errors: Diagnostic[] } {
+function parseTypeScript(code: string): { program: Program | null; errors: Diagnostic[] } {
 	try {
-		return { program: parseJavaScriptModule(code, 'markless-emitted.ts'), errors: [] };
+		// The compiler hands back yuku's own tree under a looser type; generate takes it as yuku's.
+		const program = parseJavaScriptModule(code, 'markless-emitted.ts') as unknown as Program;
+		return { program, errors: [] };
 	} catch (error) {
 		return {
 			program: null,
@@ -48,6 +51,6 @@ export function parseSync(_filename: string, code: string) {
 
 export function transformSync(_filename: string, code: string) {
 	const { program, errors } = parseTypeScript(code);
-	if (errors.length > 0) return { code: '', errors };
+	if (!program) return { code: '', errors };
 	return { code: generate(program, { strip: true }).code, errors: [] as Diagnostic[] };
 }

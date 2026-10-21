@@ -72,6 +72,38 @@ Found 1 Markless TSRX compile error.
 	text="Not yet. The published @markless/typescript-plugin ships the editor plugin only, with no command."
 />
 
+## TypeScript 7.1
+
+`pnpm typecheck:ts7` runs the same check on the TypeScript 7.1 beta, over the workspace and the
+docs site. CI runs it next to `pnpm typecheck`, and both must pass.
+
+TypeScript 7 cannot load the Markless plugin. Its `tsc --runExternalCode` reads each `.tsrx` file
+through `@tsrx/content-mapper`, which the repo's `tsconfig.json` names. The mapper's `compiler`
+option picks `@markless/typescript-plugin/volar-strict`: the editor's TSX copy without the guesses
+the editor makes to keep reading a half-typed file, so a broken file fails the check.
+
+```json
+{
+	"contentMappers": [
+		{
+			"package": "@tsrx/content-mapper",
+			"extensions": [".tsrx"],
+			"options": { "compiler": "@markless/typescript-plugin/volar-strict" }
+		}
+	]
+}
+```
+
+TypeScript 5.9 ignores `contentMappers`, so one `tsconfig.json` serves both. The errors are the same,
+at the same line and column. Two things read differently:
+
+- A file that does not parse reports `error TSRX771000` instead of `error TS91001`.
+- While any file fails to parse, TypeScript 7 reports only those errors and skips the type errors.
+
+On the workspace the TypeScript 7.1 check takes about a second, against 7 to 10 seconds for
+`pnpm typecheck`. Known gaps are tracked in
+[tsrx-org/tsrx#136](https://github.com/tsrx-org/tsrx/issues/136).
+
 Next: [test a component in a real browser](/tooling/testing).
 
 <LikeHeart />
