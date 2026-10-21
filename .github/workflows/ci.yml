@@ -93,6 +93,42 @@ jobs:
             - name: Lint
               run: pnpm exec vp check --no-fmt
 
+    # The same type gate on TypeScript 7.1, which reads .tsrx through
+    # @tsrx/content-mapper and the strict compiler the tsconfigs name. It runs
+    # beside `typecheck`, not instead of it, until 7.1 is stable and the two
+    # have agreed for a while; also checks website/. Known 7.x gaps:
+    # https://github.com/tsrx-org/tsrx/issues/136
+    typecheck-ts7:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Typecheck on TypeScript 7.1
+              run: pnpm typecheck:ts7
+
     # Content-hash gate in front of every lane. Each lane's inputs are hashed
     # into a cache key and probed read-only; a lane whose key already has a
     # green marker saved against it is skipped instead of re-run. `.github/**`
@@ -1059,6 +1095,7 @@ jobs:
         needs:
             [
                 typecheck,
+                typecheck-ts7,
                 lanes,
                 prepare-playwright,
                 unit,

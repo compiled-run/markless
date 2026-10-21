@@ -51,6 +51,8 @@ if (yaml === null) {
 const NON_TEST_JOBS = new Set([
 	'agent-files',
 	'typecheck',
+	// Runs on every push like `typecheck`, with no content hash; the gate still needs it.
+	'typecheck-ts7',
 	'package-manager-matrix',
 	'changes',
 	'benchmark',

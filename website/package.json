@@ -13,7 +13,8 @@
 		"test:boxes": "witness run",
 		"seo": "node --experimental-strip-types scripts/generate-seo.ts",
 		"witness": "node --experimental-strip-types scripts/witness.ts",
-		"typecheck": "pnpm run typecheck:tsrx",
+		"route-types": "node scripts/write-route-types.ts",
+		"typecheck": "pnpm run route-types && pnpm run typecheck:tsrx",
 		"typecheck:tsrx": "node ../packages/typescript-plugin/src/tsc.ts -p tsconfig.json"
 	},
 	"dependencies": {
@@ -27,8 +28,9 @@
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*",
 		"@markless/typescript-plugin": "workspace:*",
-		"@types/node": "24.12.2",
+		"@tsrx/content-mapper": "0.1.2",
 		"@tsrx/yuku": "0.8.0",
+		"@types/node": "24.12.2",
 		"oxlint": "^1.88.0",
 		"playwright-core": "^1.64.1",
 		"shiki": "^4.4.3",

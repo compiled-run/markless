@@ -1,0 +1,9 @@
+{
+	"name": "@markless/typescript-7-check",
+	"private": true,
+	"description": "The TypeScript 7.1 command-line check, kept in its own package so its tsc never shadows the TypeScript 5 one the editor plugin and markless-tsc run on.",
+	"type": "module",
+	"devDependencies": {
+		"typescript": "7.1.0-beta"
+	}
+}

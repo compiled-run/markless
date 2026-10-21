@@ -1,4 +1,11 @@
 {
+	"contentMappers": [
+		{
+			"package": "@tsrx/content-mapper",
+			"extensions": [".tsrx"],
+			"options": { "compiler": "@markless/typescript-plugin/volar-strict" }
+		}
+	],
 	"tsrx": {
 		"compiler": "@markless/typescript-plugin/volar"
 	},

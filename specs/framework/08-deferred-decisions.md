@@ -50,6 +50,15 @@ their prerequisites exist:
   sites; build options `executionLog: 'never' | 'always'` strip or force.
   v2: dev overlay for aggregates. Until built: Chrome Coverage tab.
 - Devtools (graph visualization).
+- Editor support on TypeScript 7. Until TypeScript 7.1 is stable, auto-import
+  into `.tsrx` works there (microsoft/TypeScript#64119), and Markless decides
+  how to deliver `@` block suggestions and part hints without a plugin API,
+  the editor stays on the TypeScript 5.9 plugin. CI type-checks on both
+  TypeScript 5.9 (`typecheck`) and 7.1 (`typecheck-ts7`); the 5.9 job is
+  retired only after 7.1 is stable and both have agreed over time. Also
+  deferred: `markless-tsc` running the native TypeScript 7 compiler when that
+  is the installed `typescript`, as `tsrx-tsc` does. Known gaps:
+  tsrx-org/tsrx#136.
 - Strict no-inline CSP mode for the resumer, including external bootstrap
   emission, hash/nonce automation beyond caller-provided `renderToString`
   nonces, and the tradeoff between extra requests and per-container

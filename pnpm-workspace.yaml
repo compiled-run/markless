@@ -5,6 +5,7 @@ packages:
   - apps/*
   - demos/*
   - website
+  - scripts/typescript-7
   - demos/interaction-benchmark/apps/markless
   - demos/interaction-benchmark/apps/markless-viewport
 
