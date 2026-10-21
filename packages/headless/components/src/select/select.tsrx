@@ -129,7 +129,8 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 		onClick={(event) => {
 			const isOpening = select.open !== true;
 			select.setOpen(isOpening);
-			if (isOpening && event.detail === 0 && select.disabled !== true) {
+			// A screen reader's activation is a click with a count and a mouse pointerType, so no click can be told from a keyboard one: every opening goes in.
+			if (isOpening && select.disabled !== true) {
 				focusOpeningOption(select.optionEls, select.optionLabelEls, '', false);
 			}
 			onClick?.(event);
@@ -280,7 +281,7 @@ export function SelectItem({
 			if (item.disabled !== true && select.disabled !== true) {
 				select.choose(item.value);
 				select.setOpen(false);
-				if (event.detail !== 0) select.triggerEl?.focus({ preventScroll: true });
+				select.triggerEl?.focus({ preventScroll: true });
 			}
 			onClick?.(event);
 		}}

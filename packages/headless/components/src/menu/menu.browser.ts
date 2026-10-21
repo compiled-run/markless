@@ -12,6 +12,7 @@ import Deep from './scenarios/deep.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import RadioItems from './scenarios/radio-items.tsrx';
 import Submenu from './scenarios/submenu.tsrx';
+import { assistiveActivate } from '../../test-support/assistive-activation.ts';
 
 // The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
 // passed by reference or hidden in a helper: each test branches on the mode instead.
@@ -248,6 +249,25 @@ for (const mode of MODES) {
 
 		el('trigger').focus();
 		activate(el('trigger'));
+		await expect.poll(() => el('content').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectFocused('item-cut');
+	});
+
+	test(`${mode}: a screen reader's activation opens the menu focusing its first item`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		el('trigger').focus();
+		assistiveActivate(el('trigger'));
+		await expect.poll(() => el('content').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectFocused('item-cut');
+	});
+
+	test(`${mode}: a pointer click opens the menu with focus inside it`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await userEvent.click(el('trigger'));
 		await expect.poll(() => el('content').hasAttribute('hidden'), COLD_POLL).toBe(false);
 		await expectFocused('item-cut');
 	});
@@ -513,6 +533,17 @@ for (const mode of MODES) {
 		await expectFocused('sub-item');
 		// Only the submenu went: the surface above it is the one holding the item.
 		expect(el('content').hasAttribute('hidden')).toBe(false);
+	});
+
+	test(`${mode}: a screen reader's activation of a nesting item opens its submenu on the first item`, async () => {
+		if (mode === 'CSR') await render(Submenu);
+		else await renderSSR(Submenu);
+
+		await openByClick();
+		el('sub-item').focus();
+		assistiveActivate(el('sub-item'));
+		await expect.poll(() => el('sub-content').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectFocused('sub-email');
 	});
 
 	test(`${mode}: Enter on a nesting item opens its submenu rather than activating it`, async () => {

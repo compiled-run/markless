@@ -6,6 +6,7 @@ import CheckboxItems from './scenarios/checkbox-items.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import RadioItems from './scenarios/radio-items.tsrx';
 import Submenu from './scenarios/submenu.tsrx';
+import { assistiveActivate } from '../../test-support/assistive-activation.ts';
 
 // Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
@@ -122,6 +123,16 @@ test('the trigger conveys a button, its own name, and a menu it has not opened',
 test('opening the menu flips the trigger to expanded', async () => {
 	await readOpened(Basic);
 	expectConveys(await readFor([say.button, 'Actions']), [say.button, 'Actions', say.expanded]);
+});
+
+// The click a screen reader sends carries a count, like a mouse's, and still has to take the reader into the menu.
+test("a screen reader's activation of the trigger lands the reader on the first menu item", async () => {
+	await read(Basic);
+	el('trigger').focus();
+	await sr.settleOnFocus();
+	assistiveActivate(el('trigger'));
+	await expect.poll(() => document.activeElement).toBe(el('item-cut'));
+	expectConveys(await sr.settleOnFocus(), [say.menuitem, 'Cut']);
 });
 
 test('the surface is a menu, and it takes its name from the trigger that opened it', async () => {
