@@ -1,9 +1,10 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
-import { createBuilder, resolveConfig } from 'vite';
+import { createBuilder, createServer } from 'vite';
 import { afterEach, expect, test } from 'vitest';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { CreateProgram, STARTER_CHOICES, STARTER_DEV_PORTS, type Starter } from '../src/index.ts';
@@ -45,7 +46,8 @@ const servedPages: Record<Starter, ReadonlyArray<readonly [path: string, text: s
 };
 
 async function scaffold(starter: Starter, printed: string[] = []): Promise<string> {
-	const root = await mkdtemp(join(tmpdir(), `markless-starter-${starter}-`));
+	// Nitro's dev worker fails to import its runner from a symlinked path, as macOS's tmpdir is.
+	const root = await mkdtemp(join(await realpath(tmpdir()), `markless-starter-${starter}-`));
 	cleanups.push(() => rm(root, { force: true, recursive: true }));
 	const writable = { write: (chunk: string) => void printed.push(chunk) };
 	await new CreateProgram().run(
@@ -65,6 +67,14 @@ async function scaffold(starter: Starter, printed: string[] = []): Promise<strin
 		await symlink(target, link, 'dir');
 	}
 	return appRoot;
+}
+
+function startDevServer(appRoot: string) {
+	return createServer({
+		root: appRoot,
+		configFile: join(appRoot, 'vite.config.ts'),
+		logLevel: 'silent',
+	});
 }
 
 // The scaffold's own `check` script: formatting under its vite config's fmt settings, then lint.
@@ -95,15 +105,24 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 		cleanups.push(() => {
 			process.env = savedEnv;
 		});
-		const config = await resolveConfig(
-			{ root: appRoot, configFile: join(appRoot, 'vite.config.ts'), logLevel: 'silent' },
-			'serve',
-		);
-		expect(config.server.port).toBe(STARTER_DEV_PORTS[starter]);
-		expect(printed.join('')).toContain(`http://localhost:${config.server.port}\n`);
+		const server = await startDevServer(appRoot);
+		cleanups.push(() => server.close());
+		expect(server.config.server.port).toBe(STARTER_DEV_PORTS[starter]);
+		expect(printed.join('')).toContain(`http://localhost:${server.config.server.port}\n`);
 	},
 	60_000,
 );
+
+// Nitro starts its dev worker while the config resolves; only closing the server stops it.
+test('a closed starter dev server leaves nothing writing into its app', async () => {
+	const appRoot = await scaffold('minimal');
+	const server = await startDevServer(appRoot);
+	await server.close();
+	const nitroDir = join(appRoot, 'node_modules/.nitro');
+	await rm(nitroDir, { force: true, recursive: true });
+	await new Promise((done) => setTimeout(done, 500));
+	expect(existsSync(nitroDir)).toBe(false);
+}, 60_000);
 
 test.each(STARTER_CHOICES.map((choice) => choice.value))(
 	'a freshly scaffolded %s starter builds with its own vite config and serves its pages',

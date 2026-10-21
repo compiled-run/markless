@@ -5,7 +5,8 @@ export type BuiltServer = {
 	readonly origin: string;
 	/** Everything the server wrote to stdout and stderr so far. */
 	output(): string;
-	close(signal?: NodeJS.Signals): void;
+	/** Stops the server and resolves once its process has exited. */
+	close(signal?: NodeJS.Signals): Promise<void>;
 };
 
 /**
@@ -24,17 +25,25 @@ export function startBuiltServer(
 		stdio: ['ignore', 'pipe', 'pipe'],
 	});
 	let output = '';
-	const close = (signal?: NodeJS.Signals) => void child.kill(signal);
+	const exited = new Promise<void>((done) => child.once('exit', () => done()));
+	const close = (signal?: NodeJS.Signals) => {
+		if (child.exitCode === null && child.signalCode === null) child.kill(signal);
+		return exited;
+	};
 	return new Promise((resolveServer, reject) => {
 		const fail = (error: Error) => {
-			close('SIGKILL');
+			void close('SIGKILL');
 			reject(error);
 		};
 		child.stdout.on('data', (chunk: Buffer) => {
 			output += chunk.toString();
 			const listening = /Listening on:\s*(\S+)/.exec(output);
 			if (listening)
-				resolveServer({ origin: new URL(listening[1]!).origin, output: () => output, close });
+				resolveServer({
+					origin: new URL(listening[1]!).origin,
+					output: () => output,
+					close,
+				});
 		});
 		child.stderr.on('data', (chunk: Buffer) => {
 			output += chunk.toString();
