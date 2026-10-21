@@ -185,9 +185,14 @@ export function codeBlockModule(input: {
 	const attributes = block.attributes ? ` ${block.attributes}` : '';
 	const sheets = ordered.filter((file) => file.name.endsWith('.css'));
 	const sheetImports = sheets
-		.map((file, index) => `import sheet${index} from ${JSON.stringify(`./${file.name}?url`)};\n`)
+		.map(
+			(file, index) => `import sheet${index} from ${JSON.stringify(`./${file.name}?url`)};\n`,
+		)
 		.join('');
-	const stylesheets = sheets.length > 0 ? ` stylesheets={[${sheets.map((_, index) => `sheet${index}`).join(', ')}]}` : '';
+	const stylesheets =
+		sheets.length > 0
+			? ` stylesheets={[${sheets.map((_, index) => `sheet${index}`).join(', ')}]}`
+			: '';
 	return `// Written by tooling/code-blocks.ts from ${page}. Edit the page, not this file.
 import Code from ${JSON.stringify(specifier(moduleFile, componentFile))};
 import Starter from ${JSON.stringify(`./${block.entry}`)};
