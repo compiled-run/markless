@@ -10,6 +10,40 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.8.0
+
+### Breaking changes
+
+- **@markless/compiler:** Parse with @tsrx/yuku 0.8.0, where a code block renders one node.
+- **create-markless:** Drop the Deno format.
+
+### @markless/bundler
+
+- **Fixed:** A sibling variant's first pass never stands in for published render data.
+- **Fixed:** Plan packs from the modules an entry reaches, not every module a link step loaded.
+- **Fixed:** A page file with an apostrophe in its name builds.
+
+### @markless/compiler
+
+- **Faster:** Render data lists only the elements a record addresses.
+- **Fixed:** Xlink: and xml: attributes render on the server and update in their namespace.
+- **Fixed:** A fragment root renders constant text, and a bare {...} body fails at compile time.
+- **Fixed:** An attach closure carries the imports it calls.
+- **Fixed:** A literal text container is static text, not a binding.
+- **Fixed:** Content the parser keeps out of document order gets no hosts.
+
+### @markless/web
+
+- **Faster:** The inline boot finds handlers from m:on host attributes and walks nothing at load.
+- **Fixed:** An element a script moves before the page wakes keeps its handlers and bindings.
+- **Fixed:** A broad forward of foreign markup a script already removed passes instead of refusing.
+
+### Other changes
+
+- **Fixed:** Finish the Vitest 5 and vite-plus 1.3 migration across CI lanes.
+
+[All 34 commits since v0.7.0](https://github.com/compiled-run/markless/compare/v0.7.0...v0.8.0)
+
 ## 0.7.0
 
 ### @markless/bundler

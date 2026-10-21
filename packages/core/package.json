@@ -1,6 +1,6 @@
 {
 	"name": "@markless/core",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"description": "Markless core authoring APIs: resumable TSRX apps whose server HTML arrives already wired and loads code only when an event needs it.",
 	"license": "MIT",
 	"repository": {
