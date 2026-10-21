@@ -114,8 +114,10 @@ packet's researched defaults and are still open for revision:
 
 - `aria-valuetext` on the month box only, carrying the month's name in the
   runtime's own language (`Intl`, no locale prop), so a reader speaks "March"
-  rather than "3". Day and year speak their number; an empty box announces no
-  value. React Aria also speaks "Empty" for a placeholder box — not built.
+  rather than "3". Day and year speak their number; an empty box carries
+  `aria-valuetext="Empty"`, React Aria's word. Without it Chrome reports a value
+  of 0 and VoiceOver spoke it as a percentage of the range ("-3.3% day input
+  stepper").
 - QDS's `aria-label` spelling verbatim. React Aria prepends the field's label to
   each box because iOS VoiceOver does not announce groups, so the group's name
   never reaches a box there.

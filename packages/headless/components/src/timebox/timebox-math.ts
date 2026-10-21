@@ -25,6 +25,9 @@ export const MAX_HOUR_24 = 23;
 export const MIN_HOUR_12 = 1;
 export const MAX_HOUR_12 = 12;
 /** The period reads as a two-valued spinbutton: 0 is AM, 1 is PM. */
+/** What a reader speaks for a segment with no value, React Aria's word: with no value text it computes 0 and speaks a percentage. */
+export const EMPTY_VALUE_TEXT = 'Empty';
+
 export const AM = 0;
 export const PM = 1;
 
@@ -452,6 +455,24 @@ export function resolvedPeriodWord(
 	const text = resolvedText('dayperiod', seed, hourAt, minuteAt, secondAt, periodAt, hour12);
 	if (text === '') return '';
 	return segmentNumber(text) === PM ? periodWords(locale).pm : periodWords(locale).am;
+}
+
+/** A segment's `aria-valuetext`: empty, the period's word, or null so a filled number is spoken bare. */
+export function resolvedValueText(
+	type: SegmentType,
+	seed: string,
+	hourAt: string | null,
+	minuteAt: string | null,
+	secondAt: string | null,
+	periodAt: string | null,
+	hour12: boolean,
+	locale: string,
+): string | null {
+	if (resolvedText(type, seed, hourAt, minuteAt, secondAt, periodAt, hour12) === '') {
+		return EMPTY_VALUE_TEXT;
+	}
+	if (type !== 'dayperiod') return null;
+	return resolvedPeriodWord(seed, hourAt, minuteAt, secondAt, periodAt, hour12, locale) || null;
 }
 
 /**

@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../sr-app/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
+import { EMPTY_VALUE_TEXT } from './timebox-math.ts';
 
 /**
  * Expectations are the facts an announcement must convey rather than any reader's
@@ -11,8 +12,9 @@ import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
  * `datebox-transcript.ts` records: `spinbutton` has no `Vocabulary` slot, and a
  * value or a bound is spoken as a phrase around a number rather than as a fixed
  * word. What a real reader is here to settle is narrower than the virtual lane's
- * rows: that a segmented group is reachable at all, and that the AM/PM box - the
- * one carrying `aria-valuetext` - speaks its words rather than a bare 0 or 1.
+ * rows: that a segmented group is reachable at all, that an empty box is spoken as
+ * empty rather than as a percentage, and that the AM/PM box speaks its words rather
+ * than a bare 0 or 1.
  */
 
 const CHANGE_TIMEOUT_MS = 15_000;
@@ -65,7 +67,11 @@ export async function readTimeBoxTranscript(sr: ScreenReaderDriver, page: Page) 
 	// Focus rather than the reading cursor: an arrow only steps a box once it is
 	// the focused control.
 	await hour.focus();
-	await sr.settleOnFocus();
+	// An empty box is spoken as empty: a box with no value text reached VoiceOver as "-9.1% hour input stepper".
+	await expect(hour).not.toHaveAttribute('aria-valuenow');
+	const empty = await sr.settleOnFocus();
+	expect(missing(empty, [HOUR, EMPTY_VALUE_TEXT]), `${sr.name} announced "${empty}"`).toEqual([]);
+	expect(empty, `${sr.name} announced "${empty}"`).not.toContain('%');
 
 	// The gallery starter is empty, so the first step lands on the placeholder
 	// value a 12-hour clock starts from.

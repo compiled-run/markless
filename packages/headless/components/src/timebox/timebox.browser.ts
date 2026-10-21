@@ -15,6 +15,7 @@ import TwentyFourHour from './scenarios/twenty-four-hour.tsrx';
 import TwoWidgets from './scenarios/two-widgets.tsrx';
 import WithHelpAndError from './scenarios/with-help-and-error.tsrx';
 import WithSeconds from './scenarios/with-seconds.tsrx';
+import { EMPTY_VALUE_TEXT } from './timebox-math.ts';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -107,8 +108,10 @@ function expectBasicRendered() {
 	expect(shown(Hour)).toBe('hh');
 	expect(shown(Minute)).toBe('mm');
 	expect(shown(Period)).toBe('--');
-	// Nothing is spelled yet, so the period has no value to speak either.
-	expect(el(Period).hasAttribute('aria-valuetext')).toBe(false);
+	// Nothing is spelled yet, so every box is spoken as empty rather than as a percentage.
+	for (const box of [Hour, Minute, Period]) {
+		expect(el(box).getAttribute('aria-valuetext')).toBe(EMPTY_VALUE_TEXT);
+	}
 }
 
 // A 12-hour clock runs its hour 1 to 12; minutes and seconds always run 0 to 59.

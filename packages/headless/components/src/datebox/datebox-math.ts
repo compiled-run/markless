@@ -17,6 +17,9 @@ export type IsoDate = string;
 /** Which part of the date one segment holds. */
 export type SegmentType = 'day' | 'month' | 'year';
 
+/** What a reader speaks for a box with no value, React Aria's word: with no value text it computes 0 and speaks a percentage. */
+export const EMPTY_VALUE_TEXT = 'Empty';
+
 export const MIN_DAY = 1;
 export const MAX_DAY = 31;
 export const MIN_MONTH = 1;
@@ -320,6 +323,18 @@ export function resolvedMonthName(
 	return new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: 'UTC' }).format(
 		new Date(Date.UTC(2024, month - 1, 1)),
 	);
+}
+
+/** A box's `aria-valuetext`: empty, the month's name, or null so a filled number is spoken bare. */
+export function resolvedValueText(
+	type: SegmentType,
+	seed: string,
+	dayAt: string | null,
+	monthAt: string | null,
+	yearAt: string | null,
+): string | null {
+	if (resolvedText(type, seed, dayAt, monthAt, yearAt) === '') return EMPTY_VALUE_TEXT;
+	return resolvedMonthName(type, seed, dayAt, monthAt, yearAt) || null;
 }
 
 /** The text one box shows right now: its digits, or its placeholder while it is empty. */

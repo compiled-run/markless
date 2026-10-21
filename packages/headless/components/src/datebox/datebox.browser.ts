@@ -12,6 +12,7 @@ import Prefilled from './scenarios/prefilled.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 import WithHelpAndError from './scenarios/with-help-and-error.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
+import { EMPTY_VALUE_TEXT } from './datebox-math.ts';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -74,8 +75,8 @@ function expectBasicRendered() {
 		expect(el(box).getAttribute('role')).toBe('spinbutton');
 		expect(el(box).getAttribute('tabindex')).toBe('0');
 		expect(el(box).hasAttribute('aria-valuenow')).toBe(false);
-		// An empty box has no value to put words to, and nothing is required of it.
-		expect(el(box).hasAttribute('aria-valuetext')).toBe(false);
+		// An empty box is spoken as empty: with no value text a reader computes 0 and speaks a percentage.
+		expect(el(box).getAttribute('aria-valuetext')).toBe(EMPTY_VALUE_TEXT);
 		expect(el(box).hasAttribute('aria-required')).toBe(false);
 		expect(el(box).getAttribute('ui-placeholder')).toBe('');
 		expect(el(box).getAttribute('ui-value')).toBe('');
@@ -259,7 +260,7 @@ test('CSR: a typed month is put into words as it changes', async () => {
 
 	await typeInto(Month, '4');
 	await expect.poll(() => el(Month).getAttribute('aria-valuetext')).toBe(monthName(4));
-	expect(el(Day).hasAttribute('aria-valuetext')).toBe(false);
+	expect(el(Day).getAttribute('aria-valuetext')).toBe(EMPTY_VALUE_TEXT);
 });
 
 test('CSR: typing a digit fills a box and moves on once it can hold no more', async () => {
