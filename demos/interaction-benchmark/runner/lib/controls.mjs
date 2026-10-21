@@ -82,8 +82,24 @@ export async function openPage(browser, { coverage = false } = {}) {
 		documents: 0,
 	};
 	const phaseOf = new WeakMap();
+	// Playwright's `networkidle` load state fires once per document, so waiting on it again after load returns at once.
+	const network = { open: new Set(), started: 0, last: Date.now() };
+	const done = (request) => {
+		network.open.delete(request);
+		network.last = Date.now();
+	};
+	const quiet = async (ms = 500, cap = 10000) => {
+		const until = Date.now() + cap;
+		while (Date.now() < until && (network.open.size > 0 || Date.now() - network.last < ms))
+			await sleep(50);
+	};
+	page.on('requestfinished', done);
+	page.on('requestfailed', done);
 	page.on('pageerror', (e) => state.errors.push(String(e?.message ?? e).slice(0, 300)));
 	page.on('request', (request) => {
+		network.open.add(request);
+		network.started++;
+		network.last = Date.now();
 		if (request.isNavigationRequest() && request.frame() === page.mainFrame())
 			state.documents++;
 		if (!isJsUrl(request.url())) return;
@@ -114,7 +130,7 @@ export async function openPage(browser, { coverage = false } = {}) {
 		// Idle-time work (link and block prefetches) can chain idle periods; settled is a round that starts no request.
 		async idle(rounds = 6) {
 			for (let round = 0; round < rounds; round++) {
-				const before = state.js.load.length;
+				const before = network.started;
 				await page
 					.evaluate(
 						() =>
@@ -129,14 +145,14 @@ export async function openPage(browser, { coverage = false } = {}) {
 							),
 					)
 					.catch(() => {});
-				await page.waitForLoadState('networkidle').catch(() => {});
-				if (state.js.load.length === before) return;
+				await quiet();
+				if (network.started === before) return;
 			}
 		},
 		async settle(ms = 300) {
-			await page.waitForLoadState('networkidle').catch(() => {});
+			await quiet();
 			await sleep(ms);
-			await page.waitForLoadState('networkidle').catch(() => {});
+			await quiet();
 		},
 		async close() {
 			await cov?.stop();
