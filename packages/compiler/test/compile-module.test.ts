@@ -2949,26 +2949,30 @@ export default function Accepted() @{
 	}
 });
 
-test('compileTsrxModule refuses a component placed beside an element in a fragment root', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/App.tsrx',
-		source: `
-import { Widget } from './widget.tsrx';
-
-export function App() @{
-	<>
-		<h1>Title</h1>
-		<Widget />
-	</>
-}
-`,
-		symbols: [],
-	});
-
-	const rootDiagnostic = result.publicRenderModule.diagnostics.find(
+function fragmentRootDiagnostics(result: Awaited<ReturnType<typeof compileTsrxModule>>) {
+	return result.publicRenderModule.diagnostics.filter(
 		(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
 	);
-	expect(rootDiagnostic?.message).toContain('the <Widget> component');
+}
+
+test('compileTsrxModule renders components inside and beside the elements of a fragment root', async () => {
+	const shapes = {
+		beside: `<>\n\t\t<h1>Title</h1>\n\t\t<Widget />\n\t</>`,
+		nested: `<>\n\t\t<main>\n\t\t\t<h1>Title</h1>\n\t\t\t<Widget />\n\t\t</main>\n\t</>`,
+		afterBranch: `<>\n\t\t@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }\n\t\t<Widget />\n\t</>`,
+	};
+	for (const [name, template] of Object.entries(shapes)) {
+		const result = await compileTsrxModule({
+			filename: `src/${name}.tsrx`,
+			source: `import { state } from '@markless/core';\nimport { Widget } from './widget.tsrx';\n\nexport function App() @{\n\tlet open = state(true);\n\n\t${template}\n}\n`,
+			symbols: [],
+		});
+		expect(fragmentRootDiagnostics(result), name).toEqual([]);
+		expect(result.publicRenderModule.ssrModuleSource, name).toContain('"template:App"');
+		expect(result.semanticGraph.componentEdges.map((edge) => edge.childComponentName), name).toEqual([
+			'Widget',
+		]);
+	}
 });
 
 test('compileTsrxModule renders a top-level @if beside sibling elements in a fragment', async () => {
@@ -3064,65 +3068,26 @@ export function App() @{
 	);
 });
 
-test('compileTsrxModule names the nested component blocking a fragment root', async () => {
+test('compileTsrxModule names a dynamic element placed directly in a fragment root', async () => {
 	const result = await compileTsrxModule({
-		filename: 'src/FragmentNestedComponent.tsrx',
+		filename: 'src/FragmentDynamicTag.tsrx',
 		source: `
-import { Counter } from './counter.tsrx';
-
-export function App() @{
+export function App({ tag }) @{
 	<>
-		<main>
-			<h1>Title</h1>
-			<Counter />
-		</main>
+		<h1>Title</h1>
+		<{tag}>body</{tag}>
 	</>
 }
 `,
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.diagnostics).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({
-				code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
-				severity: 'error',
-				message: expect.stringContaining('the <Counter> component inside <main>'),
-			}),
-		]),
-	);
-	const diagnostic = result.publicRenderModule.diagnostics.find(
-		(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
-	);
-	expect(diagnostic?.suggestions?.[0]?.message).toContain('single root element');
-});
-
-test('compileTsrxModule fragment-root diagnostic skips supported control flow to name the offender', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/FragmentBranchThenComponent.tsrx',
-		source: `
-import { state } from '@markless/core';
-import { Widget } from './widget.tsrx';
-
-export function App() @{
-	let open = state(true);
-
-	<>
-		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
-		<Widget />
-	</>
-}
-`,
-		symbols: [],
-	});
-
-	const diagnostic = result.publicRenderModule.diagnostics.find(
-		(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
-	);
-	// The @if child is supported, so the diagnostic must name the component,
-	// not misreport the control-flow block.
-	expect(diagnostic?.message).toContain('the <Widget> component');
-	expect(diagnostic?.message).not.toContain('control-flow');
+	expect(fragmentRootDiagnostics(result)).toEqual([
+		expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('a dynamic <{...}> element placed directly inside the fragment'),
+		}),
+	]);
 });
 
 // This used to interpolate the authored test straight into `((...)?0:1)`, where

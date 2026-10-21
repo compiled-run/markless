@@ -1159,24 +1159,8 @@ function isPublicRoot(node: AnyNode): boolean {
 				child.type === 'JSXTryExpression' ||
 				child.type === 'JSXStyleElement' ||
 				((child.type === 'Element' || child.type === 'JSXElement') &&
-					isPlainStaticHostSubtree(child)),
+					!getDynamicTagExpression(child)),
 		)
-	);
-}
-
-function isPlainStaticHostSubtree(node: AnyNode): boolean {
-	if (isStaticTextNode(node)) return true;
-	if (
-		node.type === 'JSXExpressionContainer' ||
-		node.type === 'JSXStyleElement'
-	)
-		return true;
-	if (node.type !== 'Element' && node.type !== 'JSXElement') return false;
-	const tagName = getElementTagName(node);
-	return (
-		!!tagName &&
-		isHostTagName(tagName) &&
-		asNodes(node.children).every(isPlainStaticHostSubtree)
 	);
 }
 
