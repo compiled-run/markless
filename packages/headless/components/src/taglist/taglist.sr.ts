@@ -1,4 +1,4 @@
-import { render } from '@markless/vitest-browser';
+import { cleanup, render } from '@markless/vitest-browser';
 import { userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
@@ -76,6 +76,39 @@ test('a removal reaches the live region the root always renders', async () => {
 	close.click();
 	const region = scope.querySelector('output[aria-live]') as HTMLElement;
 	await expect.poll(() => region.textContent).toBe('alpha removed');
+});
+
+// The reader announces a live-region change one task after it observes it. Stopped and unmounted
+// in that gap, it used to walk the detached root and throw inside its own name lookup.
+test('a reader stopped with an announcement still queued throws nothing once the row unmounts', async () => {
+	const thrown: unknown[] = [];
+	const record = (event: PromiseRejectionEvent) => {
+		event.preventDefault();
+		thrown.push(event.reason);
+	};
+	addEventListener('unhandledrejection', record);
+	try {
+		const { container } = await render(Basic);
+		const scope = container as unknown as HTMLElement;
+		await sr.start(scope);
+		const region = scope.querySelector('output[aria-live]') as HTMLElement;
+		const unmounted = new Promise<void>((done) => {
+			const observer = new MutationObserver(() => {
+				observer.disconnect();
+				void sr.stop();
+				void cleanup();
+				done();
+			});
+			observer.observe(region, { characterData: true, childList: true, subtree: true });
+		});
+		(scope.querySelector('[data-testid="itemclose-alpha"]') as HTMLButtonElement).click();
+		await unmounted;
+		expect(scope.isConnected).toBe(false);
+		for (let turn = 0; turn < 5; turn++) await new Promise((done) => setTimeout(done));
+		expect(thrown).toEqual([]);
+	} finally {
+		removeEventListener('unhandledrejection', record);
+	}
 });
 
 test('a committed tag reaches the same live region', async () => {

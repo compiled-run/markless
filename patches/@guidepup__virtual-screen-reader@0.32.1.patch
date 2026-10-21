@@ -1,0 +1,32 @@
+diff --git a/lib/cjs/index.cjs b/lib/cjs/index.cjs
+index 63cec50fdd0e1215a20588c2cf58abc85ef30ae0..e945a22776ba95eaa30603e0969c61c0f00d6589 100644
+--- a/lib/cjs/index.cjs
++++ b/lib/cjs/index.cjs
+@@ -2334,7 +2334,10 @@ var Virtual = class {
+   async #announceLiveRegions(mutations) {
+     await tick();
+     const container = this.#container;
+-    mutations.map(
++    if (!container) {
++      return;
++    }
++    mutations.filter(({ target }) => container.contains(target)).map(
+       (mutation) => getLiveSpokenPhrase({
+         container,
+         mutation
+diff --git a/lib/esm/index.mjs b/lib/esm/index.mjs
+index b81c31b776925da1e6d9add67e1f86714f78c76f..dd9cf968699473115641c9089f25952f724ab475 100644
+--- a/lib/esm/index.mjs
++++ b/lib/esm/index.mjs
+@@ -2307,7 +2307,10 @@ var Virtual = class {
+   async #announceLiveRegions(mutations) {
+     await tick();
+     const container = this.#container;
+-    mutations.map(
++    if (!container) {
++      return;
++    }
++    mutations.filter(({ target }) => container.contains(target)).map(
+       (mutation) => getLiveSpokenPhrase({
+         container,
+         mutation

@@ -40,6 +40,9 @@ patchedDependencies:
   '@async/witness@0.7.0':
     hash: ab2002670763280d07ac44dbc239da0f8b627d9f104e95bc0e7c8c94c6916314
     path: patches/@async__witness@0.7.0.patch
+  '@guidepup/virtual-screen-reader@0.32.1':
+    hash: 9ce58ec1d96ef27e71703b7a721c2b5c04f48592d96ecf2ed996890c1b4c51a7
+    path: patches/@guidepup__virtual-screen-reader@0.32.1.patch
 
 importers:
 
@@ -56,7 +59,7 @@ importers:
         version: 0.19.1(@guidepup/guidepup@0.33.2)(@playwright/test@1.64.1)
       '@guidepup/virtual-screen-reader':
         specifier: 0.32.1
-        version: 0.32.1
+        version: 0.32.1(patch_hash=9ce58ec1d96ef27e71703b7a721c2b5c04f48592d96ecf2ed996890c1b4c51a7)
       '@markless/typescript-plugin':
         specifier: workspace:*
         version: link:packages/typescript-plugin
@@ -4233,7 +4236,7 @@ snapshots:
       '@guidepup/guidepup': 0.33.2
       '@playwright/test': 1.64.1
 
-  '@guidepup/virtual-screen-reader@0.32.1':
+  '@guidepup/virtual-screen-reader@0.32.1(patch_hash=9ce58ec1d96ef27e71703b7a721c2b5c04f48592d96ecf2ed996890c1b4c51a7)':
     dependencies:
       '@testing-library/dom': 10.4.1
       '@testing-library/user-event': 14.6.1(@testing-library/dom@10.4.1)

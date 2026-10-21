@@ -43,3 +43,4 @@ overrides:
   vitest: 5.0.5
 patchedDependencies:
   '@async/witness@0.7.0': patches/@async__witness@0.7.0.patch
+  '@guidepup/virtual-screen-reader@0.32.1': patches/@guidepup__virtual-screen-reader@0.32.1.patch
