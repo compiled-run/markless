@@ -206,6 +206,24 @@ test('the tab stop follows the day the keyboard walks onto, across a month cross
 		.toBe('2026-09-01');
 });
 
+test('PageDown lands on the same day of the next month, and the reader announces that day', async () => {
+	await open(Basic);
+	dayEl('2026-08-14').focus();
+	await sr.settleOnFocus();
+
+	await sr.press('PageDown');
+	await expect
+		.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'))
+		.toBe('2026-09-14');
+	const september = new Intl.DateTimeFormat(undefined, {
+		weekday: 'long',
+		year: 'numeric',
+		month: 'long',
+		day: 'numeric',
+	}).format(new Date(2026, 8, 14));
+	expectDayConveys(await sr.settleOnFocus(), september, [say.button]);
+});
+
 test('Escape closes a revealed month and hands the reader back to the trigger', async () => {
 	await open(Popup);
 	const trigger = document.querySelector('[data-testid="trigger"]') as HTMLButtonElement;

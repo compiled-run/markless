@@ -60,6 +60,7 @@ export const calendarState = shared(
 			popup: false,
 			open: false,
 			name: '',
+			landing: false,
 		});
 		const titleEl = element<HTMLHeadingElement>();
 		const contentEl = element<HTMLDivElement>();
@@ -323,7 +324,19 @@ export const calendarState = shared(
 
 				calendar.monthAt = sameMonth(next, shown) ? shown : startOfMonth(next);
 				calendar.focusAt = next;
-				landFocusOn(() => dayEls, next);
+				const isLanded = landFocusOn(() => dayEls, next);
+				// The new month's days are built by the commit, after this handler: the month takes focus there and hands it on.
+				if (isLanded !== true) {
+					calendar.landing = true;
+					landFocus(contentEl);
+				}
+			},
+
+			/** Focus reached the month while a page key was crossing into it; hand it to the day it was headed for. */
+			land() {
+				if (calendar.landing !== true) return;
+				calendar.landing = false;
+				landFocusOn(() => dayEls, calendar.focusAt);
 			},
 
 			setOpen(next: boolean) {
@@ -404,6 +417,7 @@ export function CalendarContent({
 	const ariaDisabled = computed(() => (calendar.disabled ? 'true' : 'false'));
 	// The surface the trigger promises with haspopup="dialog" is the one it opens; inline, the month is a group in the page.
 	const surfaceRole = computed(() => (calendar.popup === true ? 'dialog' : 'group'));
+	const landingStop = computed(() => (calendar.landing === true ? -1 : undefined));
 
 	<div
 		{...rest}
@@ -415,6 +429,7 @@ export function CalendarContent({
 		// wherever the two parts sit in the page.
 		aria-describedby={[calendar.errorEl, calendar.descriptionEl]}
 		aria-disabled={ariaDisabled}
+		tabindex={landingStop}
 		hidden={isShowing !== true}
 		ui-open={isShowing}
 		ui-closed={isShowing !== true}
@@ -425,6 +440,8 @@ export function CalendarContent({
 			// dispatch, when `currentTarget` is already null.
 			const landed = (event.target as HTMLElement).getAttribute('value');
 			if (landed !== null && landed !== '') calendar.hold(landed);
+			const surface = calendar.contentEl;
+			if (event.target === surface) calendar.land();
 			onFocusin?.(event);
 		}}
 		onKeydown={(event) => {
