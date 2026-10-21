@@ -36,7 +36,8 @@ jobs:
 
             - name: Verify committed agent files match .ruler/ sources
               run: |
-                  pnpm dlx @intellectronica/ruler apply
+                  # Pinned with the `rules` script: 0.3.45 writes .claude/skills/.ruler-managed.json, which reads as drift.
+                  pnpm dlx @intellectronica/ruler@0.3.44 apply
                   # Compare against the index so a pre-commit run with correctly staged files passes; in CI the index is HEAD.
                   DRIFT="$(git diff --name-only -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml; git ls-files --others --exclude-standard -- AGENTS.md CLAUDE.md .claude/skills .codex/skills .mcp.json .codex/config.toml)"
                   if [ -n "$DRIFT" ]; then

@@ -39,7 +39,7 @@
 		"release:check": "node scripts/release/sync-version.mjs --check",
 		"release:notes": "node scripts/release/release-notes.mjs",
 		"release:trust": "sh scripts/release/trust-publishers.sh",
-		"rules": "npx -y @intellectronica/ruler apply",
+		"rules": "npx -y @intellectronica/ruler@0.3.44 apply",
 		"prepare": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
