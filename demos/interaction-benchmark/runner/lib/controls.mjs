@@ -74,12 +74,33 @@ export async function openPage(browser, { coverage = false } = {}) {
 	await context.addInitScript(pageAgent);
 	const page = await context.newPage();
 	const cov = coverage ? await startCoverage(context, page) : null;
-	const state = { phase: 'load', js: { load: [], input: [] }, errors: [], documents: 0 };
+	const state = {
+		phase: 'load',
+		js: { load: [], input: [] },
+		fetched: { load: [], input: [] },
+		errors: [],
+		documents: 0,
+	};
+	const phaseOf = new WeakMap();
 	page.on('pageerror', (e) => state.errors.push(String(e?.message ?? e).slice(0, 300)));
 	page.on('request', (request) => {
 		if (request.isNavigationRequest() && request.frame() === page.mainFrame())
 			state.documents++;
-		if (isJsUrl(request.url())) state.js[state.phase].push(request.url());
+		if (!isJsUrl(request.url())) return;
+		state.js[state.phase].push(request.url());
+		phaseOf.set(request, state.phase);
+	});
+	// `fetched` keeps the requests that went to the network; one the HTTP cache answered transfers no bytes and costs no round trip.
+	page.on('requestfinished', async (request) => {
+		const phase = phaseOf.get(request);
+		if (!phase) return;
+		const sizes = await request.sizes().catch(() => null);
+		if (!sizes || sizes.responseHeadersSize + sizes.responseBodySize > 0)
+			state.fetched[phase].push(request.url());
+	});
+	page.on('requestfailed', (request) => {
+		const phase = phaseOf.get(request);
+		if (phase) state.fetched[phase].push(request.url());
 	});
 	return {
 		page,
@@ -89,6 +110,28 @@ export async function openPage(browser, { coverage = false } = {}) {
 			await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 			await page.waitForFunction(() => document.readyState === 'complete');
 			state.documents = 0;
+		},
+		// Idle-time work (link and block prefetches) can chain idle periods; settled is a round that starts no request.
+		async idle(rounds = 6) {
+			for (let round = 0; round < rounds; round++) {
+				const before = state.js.load.length;
+				await page
+					.evaluate(
+						() =>
+							new Promise((resolve) =>
+								requestIdleCallback(
+									() =>
+										globalThis.scheduler?.postTask
+											? globalThis.scheduler.postTask(resolve, { priority: 'background' })
+											: resolve(),
+									{ timeout: 5000 },
+								),
+							),
+					)
+					.catch(() => {});
+				await page.waitForLoadState('networkidle').catch(() => {});
+				if (state.js.load.length === before) return;
+			}
 		},
 		async settle(ms = 300) {
 			await page.waitForLoadState('networkidle').catch(() => {});
@@ -181,6 +224,7 @@ async function firstUse(browser, url, control, { coverage, settleMs }) {
 		const current = (await distinctControls(visit.page)).find((c) => c.key === control.key);
 		if (!current)
 			return { ...control, missing: true, inputJs: [], errors: [...visit.state.errors] };
+		await visit.idle();
 		visit.state.phase = 'input';
 		let inputError = null;
 		await useControl(visit.page, current).catch(
@@ -189,7 +233,7 @@ async function firstUse(browser, url, control, { coverage, settleMs }) {
 		await visit.settle(settleMs);
 		return {
 			...control,
-			inputJs: [...visit.state.js.input],
+			inputJs: [...visit.state.fetched.input],
 			navigated: visit.state.documents > 0,
 			inputError,
 			errors: [...visit.state.errors],
