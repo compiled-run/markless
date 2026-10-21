@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from 'vitest';
+import { beforeAll, expect, test } from 'vitest';
 import ts from 'typescript';
 import { createQuickInfoService } from './twoslash-quickinfo.ts';
 
@@ -9,25 +9,28 @@ const fences = (file: string) =>
 			/^```tsrx\n([\s\S]*?)^```/gm,
 		),
 	].map((match) => match[1]!.replace(/\n+$/, ''));
-const cups = fences('./fixtures/state-cups.mdx').find((text) =>
-	text.includes('function Cups()'),
-)!;
+const cups = fences('./fixtures/state-cups.mdx').find((text) => text.includes('function Cups()'))!;
 const gridlist = fences('./fixtures/gridlist.mdx');
 const files = gridlist.find((text) => text.includes('function Files()'))!;
 const multiple = gridlist.find((text) => text.startsWith('<gridlist.root multiple'))!;
 const wrap = gridlist.find((text) => text.startsWith('<gridlist.root wrap'))!;
 
-test.each([cups, files])(
-	'incomplete fences do not reuse the preceding document: %s',
-	(prior) => {
-		const service = createQuickInfoService();
-		expect(service.queryFence(prior, 'tsrx').length).toBeGreaterThan(0);
-		const first = service.queryFence(multiple, 'tsrx');
-		expect(first).toEqual([]);
-		expect(service.queryFence(wrap, 'tsrx')).toEqual([]);
-		expect(service.queryFence(multiple, 'tsrx')).toBe(first);
-	},
-);
+// The language service is shared and loads each package's types once (4.3 s on an M-series laptop, past 5 s inside one test on a CI runner): pay that here.
+beforeAll(() => {
+	createQuickInfoService().queryFence(
+		"import { state } from '@markless/core';\nimport { gridlist } from '@markless/ui';\nexport const warm = [state, gridlist];",
+		'tsrx',
+	);
+}, 60_000);
+
+test.each([cups, files])('incomplete fences do not reuse the preceding document: %s', (prior) => {
+	const service = createQuickInfoService();
+	expect(service.queryFence(prior, 'tsrx').length).toBeGreaterThan(0);
+	const first = service.queryFence(multiple, 'tsrx');
+	expect(first).toEqual([]);
+	expect(service.queryFence(wrap, 'tsrx')).toEqual([]);
+	expect(service.queryFence(multiple, 'tsrx')).toBe(first);
+});
 
 test('different incomplete tags and two callers keep their own fence results', () => {
 	const first = createQuickInfoService(),
