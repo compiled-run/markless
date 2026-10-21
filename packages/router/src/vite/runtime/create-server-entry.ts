@@ -624,7 +624,13 @@ function landingModulePreloads(
 	const preloads: ModulePreloadInput[] = [];
 	addModulePreloads(preloads, new Set(), routePreloads);
 	if (linkBridgePath) preloads.push(linkBridgePath);
-	return preloads.length > 0 ? preloads : undefined;
+	return preloads.length > 0 ? preloads.map(lowFetchPriority) : undefined;
+}
+
+// Nothing hydrates, so no landing module runs before first paint: keep them off the critical path.
+function lowFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
+	if (typeof preload === 'string') return { href: preload, fetchPriority: 'low' };
+	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'low' };
 }
 
 function routerLinkHrefs(html: string): string[] {
