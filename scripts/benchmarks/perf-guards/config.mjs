@@ -1,6 +1,8 @@
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { siteBase } from '../../../website/site-base.ts';
+
 export const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 export const GUARD_DIR = join(ROOT_DIR, 'scripts/benchmarks/perf-guards');
 export const ANCHORS_PATH = join(GUARD_DIR, 'anchors.json');
@@ -42,8 +44,8 @@ export const SITES = {
 	},
 	docs: {
 		label: 'docs site',
-		base: '/markless/',
-		routes: ['/markless/', '/markless/concepts/state', '/markless/ui/accordion'],
+		base: siteBase,
+		routes: [siteBase, `${siteBase}concepts/state`, `${siteBase}ui/accordion`],
 	},
 };
 

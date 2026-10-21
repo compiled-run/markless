@@ -1449,6 +1449,39 @@
 			"from": 16763,
 			"to": 17266,
 			"reason": "a runtime an onIdle or onVisible handler starts waits for the reader's first input before loading its rows' code (shadcn-admin /settings/account ran 1.5 MB at load): +235 B minified, +100 B gzip"
+		},
+		{
+			"date": "2026-10-21",
+			"guard": "resume",
+			"subject": "docs /",
+			"from": null,
+			"to": {
+				"raw": 220306,
+				"gzip": 20792
+			},
+			"reason": "the docs moved to the site root on 2026-10-06; these are the real pages, the /markless/* anchors measured the 404 page"
+		},
+		{
+			"date": "2026-10-21",
+			"guard": "resume",
+			"subject": "docs /concepts/state",
+			"from": null,
+			"to": {
+				"raw": 433316,
+				"gzip": 88581
+			},
+			"reason": "the docs moved to the site root on 2026-10-06; these are the real pages, the /markless/* anchors measured the 404 page"
+		},
+		{
+			"date": "2026-10-21",
+			"guard": "resume",
+			"subject": "docs /ui/accordion",
+			"from": null,
+			"to": {
+				"raw": 312457,
+				"gzip": 27737
+			},
+			"reason": "the docs moved to the site root on 2026-10-06; these are the real pages, the /markless/* anchors measured the 404 page"
 		}
 	],
 	"runtimeModules": {
@@ -1592,17 +1625,17 @@
 			"raw": 11667,
 			"gzip": 2014
 		},
-		"docs /markless/": {
-			"raw": 103887,
-			"gzip": 9334
+		"docs /": {
+			"raw": 220306,
+			"gzip": 20792
 		},
-		"docs /markless/concepts/state": {
-			"raw": 103915,
-			"gzip": 9339
+		"docs /concepts/state": {
+			"raw": 433316,
+			"gzip": 88581
 		},
-		"docs /markless/ui/accordion": {
-			"raw": 103911,
-			"gzip": 9339
+		"docs /ui/accordion": {
+			"raw": 312457,
+			"gzip": 27737
 		}
 	}
 }

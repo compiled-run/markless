@@ -29,11 +29,12 @@ const guards = {
 	G6: 'over-preload waste (reported, not gated)',
 	G7: 'eager compile hint only on preloaded packs',
 	G8: 'client navigation fetches its code in one round',
-	G9: 'built chunks name no other chunk file, so an edit renames only the chunks it changed',
+	G9: 'no chunk names the hashed file of a chunk several pages load',
 	G10: 'each framework runtime module within its per-feature anchor',
 	G11: 'a page ships only runtime feature modules its own compiled demand names',
 	G12: 'compiler-emitted glue per construct within its anchor',
 	G13: 'resume data each list row adds within its anchor',
+	G14: 'code for content a page has not shown does not run at load',
 } as const;
 
 for (const [guard, title] of Object.entries(guards)) {
@@ -42,3 +43,8 @@ for (const [guard, title] of Object.entries(guards)) {
 		expect(failures.map((finding) => finding.message)).toEqual([]);
 	});
 }
+
+test('every failing guard has a test above', () => {
+	const unnamed = evaluation.failures.filter((finding) => !Object.hasOwn(guards, finding.guard));
+	expect(unnamed.map((finding) => `${finding.guard}: ${finding.message}`)).toEqual([]);
+});

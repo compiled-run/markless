@@ -1,7 +1,9 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, expect, test } from 'vitest';
 import { accept } from './cli.mjs';
 import { evaluate } from './evaluate.mjs';
-import { criticalPathRounds } from './measure.mjs';
+import { criticalPathRounds, routeHtml } from './measure.mjs';
 import { compareCells } from './timing-guard.mjs';
 
 type Json = Record<string, any>;
@@ -455,5 +457,23 @@ describe('timing guard comparison', () => {
 				minMs: 30,
 			})[0].regression,
 		).toBe(true);
+	});
+});
+
+describe('measured routes', () => {
+	test('a route that does not serve its page stops the measurement', async () => {
+		const server = createServer((request, response) => {
+			const real = request.url === '/real';
+			response.statusCode = real ? 200 : 404;
+			response.end(real ? '<p>real</p>' : '<p>not found</p>');
+		});
+		await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+		const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+		try {
+			expect(await routeHtml(origin, '/real')).toBe('<p>real</p>');
+			await expect(routeHtml(origin, '/gone')).rejects.toThrow(/\/gone answered 404/);
+		} finally {
+			await new Promise((resolve) => server.close(resolve));
+		}
 	});
 });
