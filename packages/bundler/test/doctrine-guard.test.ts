@@ -333,10 +333,12 @@ function doctrineError(kind: string, violations: readonly string[], allowlist: s
 	);
 }
 
+// node_modules holds build output that fixture builds in parallel test files create and delete mid-walk.
 async function findFiles(root: string, suffix: string): Promise<string[]> {
 	const entries = await readdir(root, { withFileTypes: true });
 	const files = await Promise.all(
 		entries.map((entry) => {
+			if (entry.isDirectory() && entry.name === 'node_modules') return Promise.resolve([]);
 			const path = resolve(root, entry.name);
 			return entry.isDirectory()
 				? findFiles(path, suffix)
