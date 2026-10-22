@@ -1,3 +1,4 @@
+import { stripTypeScriptTypes } from 'node:module';
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
@@ -203,24 +204,186 @@ export function Tally() @{
 	expect(writes).toEqual([{ graphNodeId: 'state:said', value: 'click!' }]);
 });
 
-test('a handler calling a body function fails the compile, whichever way the function is declared', async () => {
+// A handler calling a body function runs that function's definition, so the body needs no move.
+function graphContext(cells: Record<string, unknown>, props: Record<string, unknown> = {}) {
+	const values = new Map(Object.entries(cells).map(([name, value]) => [`state:${name}`, value]));
+	return {
+		values,
+		context: {
+			graph: {
+				read: (graphNodeId: string, path: ReadonlyArray<string> = []) =>
+					path.reduce<unknown>(
+						(value, key) => (value as Record<string, unknown>)?.[key],
+						graphNodeId.startsWith('prop:') ? props : values.get(graphNodeId),
+					),
+				write: (write: { graphNodeId: string; value: unknown }) => {
+					values.set(write.graphNodeId, write.value);
+				},
+			},
+		},
+	};
+}
+
+async function runHandler(source: string, cells: Record<string, unknown>) {
+	const result = await compile(source);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+	const handlers = result.symbolModules.modules.filter((module) => module.kind === 'event-handler');
+	const { context, values } = graphContext(cells);
+	for (const handler of handlers) await (await load(handler.source))(context);
+	return { values, handlers };
+}
+
+test('a handler calling a body function runs it, whichever way the function is declared', async () => {
 	for (const declaration of [
-		'const bump = () => (ticks = ticks + 1);',
-		'function bump() { ticks = ticks + 1; }',
+		'const bump = () => (ticks = ticks + step);',
+		'const bump = function () { ticks = ticks + step; };',
+		'function bump() { ticks = ticks + step; }',
 	]) {
-		const result = await compile(`import { state } from '@markless/core';
+		const { values, handlers } = await runHandler(
+			`import { state } from '@markless/core';
 export function Dial() @{
-	let ticks = state(0);
+	let ticks = state(1);
+	const step = 2;
 	${declaration}
 	<button onClick={() => bump()}>{ticks}</button>
 }
+`,
+			{ ticks: 1 },
+		);
+		expect(handlers[0]!.source).not.toMatch(/\bstep\b/);
+		expect(values.get('state:ticks')).toBe(3);
+	}
+});
+
+test('a body function called with arguments reads them, state and props', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Cart({ unit }: { readonly unit: number }) @{
+	let total = state(10);
+	let kind = state('');
+	function add(count: number, label: string) {
+		total = total + count * unit;
+		kind = label;
+	}
+	<button onClick={(event) => add(3, event.type)}>{total} {kind}</button>
+}
 `);
-		expect(result.captureAnalysis.diagnostics).toEqual([
-			expect.objectContaining({
-				code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
-				severity: 'error',
-				message: expect.stringContaining('"bump"'),
-			}),
-		]);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+	const handler = result.symbolModules.modules.find((module) => module.kind === 'event-handler')!;
+	const { context, values } = graphContext({ total: 10, kind: '' }, { unit: 5 });
+	await (await load(handler.source))({ ...context, event: { type: 'click' } });
+	expect(values.get('state:total')).toBe(25);
+	expect(values.get('state:kind')).toBe('click');
+});
+
+test('a body function calling other body functions runs all of them', async () => {
+	const { values } = await runHandler(
+		`import { state } from '@markless/core';
+export function Ledger() @{
+	let entries = state(0);
+	let last = state('');
+	const note = (text: string) => { last = text; };
+	function record(amount: number) {
+		entries = entries + amount;
+		note('recorded ' + amount);
+	}
+	function recordTwice(amount: number) {
+		record(amount);
+		record(amount);
+	}
+	<button onClick={() => recordTwice(4)}>{entries} {last}</button>
+}
+`,
+		{ entries: 0, last: '' },
+	);
+	expect(values.get('state:entries')).toBe(8);
+	expect(values.get('state:last')).toBe('recorded 4');
+});
+
+test('a recursive body function keeps calling itself', async () => {
+	const { values } = await runHandler(
+		`import { state } from '@markless/core';
+export function Countdown() @{
+	let ticks = state(0);
+	function tick(times: number) {
+		if (times === 0) return;
+		ticks = ticks + 1;
+		tick(times - 1);
+	}
+	<button onClick={() => tick(3)}>{ticks}</button>
+}
+`,
+		{ ticks: 0 },
+	);
+	expect(values.get('state:ticks')).toBe(3);
+});
+
+test('a row handler passes its row item to a body function', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Picker() @{
+	const fruits = state([{ id: 'pear' }, { id: 'fig' }]);
+	let picked = state('');
+	function pick(id: string) {
+		picked = picked + id;
+	}
+	<>
+		<ul>
+			@for (const fruit of fruits; key fruit.id) {
+				<li><button onClick={() => pick(fruit.id)}>{fruit.id}</button></li>
+			}
+		</ul>
+		<p>{picked}</p>
+	</>
+}
+`);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+	const handler = result.symbolModules.modules.find((module) => module.kind === 'event-handler')!;
+	const { context, values } = graphContext({ picked: 'pear' });
+	await (await load(handler.source))({ ...context, locals: { fruit: { id: 'fig' } } });
+	expect(values.get('state:picked')).toBe('pearfig');
+});
+
+test('a body function reading a body local with no recomputable definition still fails the compile', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Dial({ start }: { readonly start: number }) @{
+	let offset = start * 2;
+	let ticks = state(0);
+	function bump() { ticks = ticks + offset; }
+	<button onClick={() => bump()}>{ticks}</button>
+}
+`);
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
+			message: expect.stringContaining('`offset`'),
+		}),
+	]);
+});
+
+test('a callback prop naming a typed body function runs it with the argument the child passes', async () => {
+	for (const callback of ['pickLabel', '(label: string) => add(label.length)']) {
+		const result = await compile(`import { state } from '@markless/core';
+function Chooser({ onChoose }: { readonly onChoose: (label: string) => void }) @{
+	<button onClick={() => onChoose('xy')}>choose</button>
+}
+export function Shop() @{
+	let total = state(1);
+	function add(count: number) { total = total + count; }
+	function pickLabel(label: string) { add(label.length); }
+	<>
+		<Chooser onChoose={${callback}} />
+		<p>{total}</p>
+	</>
+}
+`);
+		expect(result.semanticGraph.diagnostics).toEqual([]);
+		expect(result.captureAnalysis.diagnostics).toEqual([]);
+		const prop = result.symbolModules.modules.find((module) => module.kind === 'callback-prop')!;
+		const { context, values } = graphContext({ total: 1 });
+		// The bundler strips the parameter's type annotation, as it does for every symbol module.
+		await (await load(stripTypeScriptTypes(prop.source)))({ ...context, args: ['abc'] });
+		expect(values.get('state:total')).toBe(4);
 	}
 });

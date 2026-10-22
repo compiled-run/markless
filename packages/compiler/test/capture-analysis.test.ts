@@ -73,7 +73,7 @@ import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
-	const format = () => count + 1;
+	let format = () => count + 1;
 
 	<button onClick={() => format()}>{count}</button>
 }
@@ -102,7 +102,7 @@ export function App() @{
 			suggestions: [
 				{
 					message:
-						'Move the helper to module scope, inline the derivation, or represent durable data with state()/computed().',
+						'Declare the function with `function` or `const` so the handler can run its definition, or represent durable data with state()/computed().',
 				},
 			],
 		}),

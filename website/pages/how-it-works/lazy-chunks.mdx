@@ -138,8 +138,11 @@ export function Panel() @{
 That fails with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`. The message says why: `panel` is a local
 DOM node value that cannot cross a resume boundary. Use an element handle instead, as above.
 
-A local helper function fails the same way. Move it to module scope, or turn its result into a
-`computed()`.
+A function declared in the component body is different. When the handler calls it, the chunk
+carries the function's definition along, so `onClick={() => add(2)}` works where `add` is a body
+function. The build fails only if that function reads something that cannot cross, such as the
+`panel` node above, or if it is declared with `let`, which could point at another function by the
+time of the click.
 
 | Symbol kind | Error code |
 | --- | --- |

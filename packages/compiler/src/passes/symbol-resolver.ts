@@ -115,6 +115,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			writes: eventWrites(source, input.stateLowering?.writes, [
 				sourceSpan,
 				...inlined.spans,
+				...(event.handlerDefinitionSpans ?? []),
 			]),
 			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
 			elementHandleReads: handleReadsOf(reads),
@@ -164,6 +165,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				writes: eventWrites(source, input.stateLowering?.writes, [
 					prop.sourceSpan,
 					...inlined.spans,
+					...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
 				]),
 				elementHandleReads: handleReadsOf(reads),
 			});

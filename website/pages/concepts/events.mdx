@@ -134,8 +134,10 @@ export default function SaveButton() @{
 
 ## What a handler can read
 
-A handler can read state, props, imports, and `const` values built from those. It cannot read other
-variables from the component body. Those exist only while the component sets up the page, and the
+A handler can read state, props, imports, and `const` values built from those. It can also call a
+function you declared in the component body, with `function` or `const`, and pass it arguments:
+`onClick={() => add(2)}` runs `add` with the state and props it reads, including other body
+functions it calls. It cannot read other variables from the component body. Those exist only while the component sets up the page, and the
 click comes later. The build stops with `MARKLESS_HANDLER_READS_RENDER_LOCAL` and names the
 variable.
 

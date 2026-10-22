@@ -1641,7 +1641,11 @@ function unsupportedCaptureDiagnostic(
 ): CaptureAnalysisDiagnostic {
 	const span = binding?.sourceSpan ? { primarySpan: binding.sourceSpan } : {};
 	const suggestions = [
-		{ message: binding ? suggestionForBinding(binding.kind) : UNREADABLE_SOURCE_SUGGESTION },
+		{
+			message: binding
+				? suggestionForBinding(binding.kind, symbol.kind)
+				: UNREADABLE_SOURCE_SUGGESTION,
+		},
 	];
 	const shared = {
 		severity: 'error' as const,
@@ -1939,7 +1943,10 @@ function bindingKindLabel(kind: SemanticLocalBinding['kind']): string {
 	return 'function';
 }
 
-function suggestionForBinding(kind: SemanticLocalBinding['kind']): string {
+function suggestionForBinding(
+	kind: SemanticLocalBinding['kind'],
+	symbolKind: PlannedSymbol['kind'],
+): string {
 	if (kind === 'class-instance') {
 		return 'Represent durable data with state()/computed(), hoist serializable helpers to module scope, or move DOM-backed setup into a host element behavior with attach.';
 	}
@@ -1952,6 +1959,8 @@ function suggestionForBinding(kind: SemanticLocalBinding['kind']): string {
 		return 'Keep captured constants serializable, move functions to module scope, or represent durable data with state()/computed().';
 	}
 
+	if (symbolKind === 'event-handler' || symbolKind === 'callback-prop')
+		return 'Declare the function with `function` or `const` so the handler can run its definition, or represent durable data with state()/computed().';
 	return 'Move the helper to module scope, inline the derivation, or represent durable data with state()/computed().';
 }
 
