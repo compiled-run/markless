@@ -412,7 +412,7 @@ function installDelegatedTriggers(
 				if (record) {
 					actionKind = protocolEventActionKind(record);
 					named = true;
-					event.__marklessPressHost ??= element;
+					event.__marklessPressPath ??= [element];
 					// The browser reads defaultPrevented when this dispatch returns,
 					// and the handler module is still being fetched then.
 					if (record.syncPolicy && actionKind === PROTOCOL_EVENT_ACTION_KIND.event) {

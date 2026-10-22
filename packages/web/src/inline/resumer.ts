@@ -1184,6 +1184,8 @@ function runInlineResumer(
 			((forwardsUnknownElements || nestedEventNames.includes(event.type)) &&
 				!leavesPage(event))
 		) {
+			// The runtime may hold a record this listener cannot see; it walks this path if the target leaves first.
+			(event as Event & { __marklessPressPath?: Element[] }).__marklessPressPath = path;
 			return forward({
 				event,
 				element: event.target,
