@@ -15,33 +15,33 @@ import Commands from '../../components/docs/walkthrough/commands.tsrx';
 
 <ThemeToggle />
 
-<Subtitle text="In about five minutes you will have a real app running: pages that arrive as finished HTML, wake up only when someone clicks, and build into something you can deploy." />
+<Subtitle text="Run one command and you have an app on your screen. Then change it and build it for deploy. Takes roughly 5 minutes." />
 
 ## Create it
 
-Every new app starts with one page, the few config files that build it, and your editor already set up. Here is each one, and what it's for.
-
-<CreateAnatomy />
-
-Then do it for real, in the folder that will hold your project. The commands on this page use whichever package manager you ran above:
+Open a terminal in the folder that will hold your project, and run:
 
 <Commands kind="create" />
 
-Press Enter through every question to take its default. Nothing is written until you pick **Create app**.
+It asks a few questions. Press Enter on each one to take its default. Nothing is written until you pick **Create app**.
 
-## Start it, and open your page
+Here is what you just got: one page, the few config files that build it, and your editor already set up. The drawing below makes the same app. Press Enter in it to run the command, then hover or tap each file to read what it is for. Use pnpm, Yarn or Bun? Type its command there instead, and every command on this page switches to it.
 
-The dev server serves your app at `localhost:3000` and updates it as you edit. Run it below to see the starter page: a heading and a button that counts.
+<CreateAnatomy />
 
-<DevServer />
+## Run it
 
-Then do it for real, in your new app's folder:
+Go into your new app's folder and start the dev server:
 
 <Commands kind="dev" />
 
-Open `http://localhost:3000`. You see the same page. All of it comes from one file, `pages/index.tsrx`.
+Open `http://localhost:3000`. You see the starter page: a heading and a button that counts. The dev server updates the page every time you save. Here is the same thing running right here:
 
-## Change one line, see your page change
+<DevServer />
+
+All of that page comes from one file, `pages/index.tsrx`.
+
+## Change it
 
 Here is that file, live. Click **Count 0** a few times, then try these:
 

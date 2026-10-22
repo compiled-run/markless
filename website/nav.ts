@@ -60,7 +60,7 @@ export const nav: readonly NavSection[] = [
 					'Make a new app with one command, open it in your browser, and change it.',
 			},
 			{
-				title: 'Migrating an existing app',
+				title: 'Migrating an app',
 				href: '/start/migrate',
 				sprite: 'arrow-curve',
 				icon: 'first-app',
