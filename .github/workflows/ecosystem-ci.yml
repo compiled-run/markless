@@ -132,7 +132,7 @@ jobs:
                     requested="$INPUT_SUITES"
                     lane="${INPUT_LANE:-sample}"
                   fi
-                  if ! printf '%s' "$requested" | grep -Eq '^[a-z0-9 -]*$'; then
+                  if [[ ! "$requested" =~ ^[a-z0-9\ -]*$ ]]; then
                     echo "::error::Suite names are lowercase letters, digits and dashes, separated by spaces."
                     exit 1
                   fi

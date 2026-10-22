@@ -73,6 +73,15 @@ describe('ecosystem-ci.yml', () => {
 		).toBe(true);
 	});
 
+	test('a push, which names no suites, passes the suite-name check', () => {
+		const resolve = plan.steps.find((step) =>
+			step.run?.includes('ecosystem-ci.ts list --matrix'),
+		)!;
+		// grep exits 1 on empty input, which turned every push run red in its first step.
+		expect(resolve.run).toContain('if [[ ! "$requested" =~ ^[a-z0-9\\ -]*$ ]]; then');
+		expect(resolve.run).not.toContain('grep -Eq');
+	});
+
 	test('a newer push to main cancels the run of an older one', () => {
 		expect(workflow.concurrency.group).toContain("github.event_name == 'push' && 'main'");
 		expect(workflow.concurrency['cancel-in-progress']).toBe(
