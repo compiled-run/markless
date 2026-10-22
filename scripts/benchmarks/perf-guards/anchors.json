@@ -1506,6 +1506,14 @@
 			"from": 19605,
 			"to": 19772,
 			"reason": "composition carries the host-id prefix onto each roster derive so a roster position one component down finds its own member, a9dd6589b, +167 B rendered"
+		},
+		{
+			"date": "2026-10-22",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 25274,
+			"to": 26155,
+			"reason": "an in-place navigation keeps the leaving page on screen in a view transition while the next one is laid out a chunk at a time, so no frame paints a partly inserted page, +881 B rendered"
 		}
 	],
 	"runtimeModules": {
@@ -1518,7 +1526,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 25274,
+		"router/vite/entries/fragment-entry": 26155,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 8906,

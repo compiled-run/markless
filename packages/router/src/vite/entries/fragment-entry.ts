@@ -727,8 +727,8 @@ async function streamAppends(
 	return signal.aborted ? undefined : all;
 }
 
-// Inserting a big page whole lays it out in one long frame; the HTML parser yields while it streams a document, and the swap does the same.
-const FRAME_ELEMENTS = 800;
+// Inserting a big page whole lays it out in one long task; the swap lays it out this many elements at a time and yields between.
+const CHUNK_ELEMENTS = 800;
 
 type HeldPage = [parent: Node, before: Node | null, nodes: ChildNode[]][];
 
@@ -746,23 +746,27 @@ function holdPage(parent: Element, after: Node | undefined, before: Node | null)
 const elementsIn = (node: Node) =>
 	node.nodeType === 1 ? (node as Element).getElementsByTagName('*').length + 1 : 0;
 
-// Places a frame's worth synchronously, so the first paint shows the top of the page; true when everything is in.
-// An element that fits in a frame goes in whole, so a script watching the page never finds it half-built.
+// Runs while the leaving page is held on screen; each chunk is laid out before yielding and an element that fits in one goes in whole.
 function fillPage(
 	w: Window,
 	held: HeldPage,
 	budget: number,
 	current: () => boolean,
 ): true | Promise<boolean> {
-	const nextFrame = () =>
-		new Promise<void>((resolve) =>
-			w.requestAnimationFrame(() => w.setTimeout(resolve, 0)),
-		).then(() => current() && fillPage(w, held, budget, current));
+	const laidOut = () => {
+		void w.document.documentElement.offsetHeight;
+		return new Promise<boolean>((resolve) => {
+			const channel = new MessageChannel();
+			channel.port1.onmessage = () => resolve(current());
+			channel.port2.postMessage(0);
+		});
+	};
+	const nextChunk = () => laidOut().then((still) => still && fillPage(w, held, budget, current));
 	let used = 0;
 	while (held.length) {
 		const [parent, before, nodes] = held[0]!;
 		const size = elementsIn(nodes[0]!);
-		if (used > 0 && used + size > budget && size <= budget) return nextFrame();
+		if (used > 0 && used + size > budget && size <= budget) return nextChunk();
 		const node = nodes.shift()!;
 		if (!nodes.length) held.shift();
 		if (size > budget && node.firstChild) {
@@ -772,9 +776,10 @@ function fillPage(
 			used += 1;
 		} else used += size;
 		parent.insertBefore(node, before);
-		if (used >= budget && held.length) return nextFrame();
+		if (used >= budget && held.length) return nextChunk();
 	}
-	return true;
+	// The last chunk is laid out in its own task too, so what runs once the page is in starts on a laid-out page.
+	return budget === Infinity ? true : laidOut();
 }
 
 export async function navigate(
@@ -848,102 +853,128 @@ export async function navigate(
 		if (mode === 'push') w.history.pushState(entry, '', landed.href);
 		else w.history.replaceState(entry, '', landed.href);
 	}
-	const offsets: ScrolledBox[] = [];
-	for (const element of state.scrolled) {
-		if (!element.isConnected || !scope.contains(element)) continue;
-		if (element.scrollTop || element.scrollLeft)
-			offsets.push({
-				path: elementPath(scope, element),
-				id: element.id,
-				kind: boxKind(element),
-				top: element.scrollTop,
-				left: element.scrollLeft,
-			});
-	}
-	state.scrolled.clear();
-	retire(state, outgoing);
-	(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
-	for (const element of d.querySelectorAll(state.config.streamedArmSelector)) element.remove();
-	state.shown = pageKey(new URL(w.location.href));
-	if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
-	if (documentLoads && !isContainer(d.body))
-		syncBodyAttributes(d, next, state.config.servedBodyAttributesProperty);
-	let region: Element;
-	let end: Comment;
-	let start: Comment | undefined;
-	let scripts: Element[];
-	let held: HeldPage | undefined;
-	if (documentLoads && !isContainer(d.body)) {
-		const fresh: Element[] = [];
-		region = d.body;
-		morphChildren(d, region, incoming, fresh);
-		scripts = fresh.flatMap(scriptsIn);
-		region.append((end = d.createComment('')));
-	} else {
-		region = d.adoptNode(incoming);
-		if (outgoing === d.body)
-			carryBodyAttributes(
-				d,
-				outgoing as HTMLElement,
-				region as HTMLElement,
-				state.config.containerAttributes,
-				state.config.servedBodyAttributesProperty,
-			);
-		const leavingEnd = pageEnd(outgoing, state.config.pageEndComment);
-		if (leavingEnd) {
-			if (outgoing !== d.body)
-				carryHostAttributes(d, outgoing, region, state.config.containerAttributes);
-			end =
-				pageEnd(region, state.config.pageEndComment) ??
-				region.appendChild(d.createComment(state.config.pageEndComment));
-			// The document's own nodes after the page stay; a document app morphs them to its next shell.
-			const focused = d.activeElement as HTMLElement | null;
-			const kept = nodesAfter(d, leavingEnd);
-			const arriving = nodesAfter(d, end);
-			const fresh: Element[] = [];
-			if (documentLoads) morphChildren(d, kept, arriving, fresh);
-			const leavingStart = pageStart(outgoing, state.config.pageStartComment);
-			start = pageStart(region, state.config.pageStartComment);
-			if (leavingStart || start) {
-				start ??= region.insertBefore(
-					d.createComment(state.config.pageStartComment),
-					region.firstChild,
-				);
-				const keptBefore = leavingStart
-					? nodesBefore(d, leavingStart)
-					: d.createDocumentFragment();
-				const arrivingBefore = nodesBefore(d, start);
-				if (documentLoads) morphChildren(d, keptBefore, arrivingBefore, fresh);
-				region.insertBefore(keptBefore, start);
-			}
-			scripts = [...scriptsIn(region), ...fresh.flatMap(scriptsIn)];
-			region.append(kept);
-			held = holdPage(region, start, end);
-			outgoing.replaceWith(region);
-			// The document's own nodes moved to the new element; focus inside them stays put.
-			if (focused && focused !== d.activeElement && region.contains(focused))
-				focused.focus({ preventScroll: true });
-		} else {
-			scripts = scriptsIn(region);
-			held = holdPage(region, undefined, null);
-			outgoing.replaceWith(region);
-			region.after((end = d.createComment('')));
+	// A scroll target or a restored position needs the whole page in place before it is applied; a page that fits in a chunk goes in at once.
+	const progressive =
+		restore === 'reset' &&
+		!url.hash &&
+		d.visibilityState !== 'hidden' &&
+		typeof d.startViewTransition === 'function' &&
+		incoming.getElementsByTagName('*').length > CHUNK_ELEMENTS;
+	let region!: Element;
+	let end!: Comment;
+	let scripts: Element[] = [];
+	const commit = async (): Promise<boolean> => {
+		if (id !== session.navigation) return false;
+		const offsets: ScrolledBox[] = [];
+		for (const element of state.scrolled) {
+			if (!element.isConnected || !scope.contains(element)) continue;
+			if (element.scrollTop || element.scrollLeft)
+				offsets.push({
+					path: elementPath(scope, element),
+					id: element.id,
+					kind: boxKind(element),
+					top: element.scrollTop,
+					left: element.scrollLeft,
+				});
 		}
-	}
-	// A scroll target or a restored position needs the whole page in place before it is applied.
-	const progressive = restore === 'reset' && !url.hash && d.visibilityState !== 'hidden';
-	const filled =
-		held &&
-		fillPage(w, held, progressive ? FRAME_ELEMENTS : Infinity, () => id === session.navigation);
-	if (filled instanceof Promise) {
-		w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-		if (!(await filled)) return;
-	}
-	// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
-	for (const box of offsets)
-		sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
-	for (const element of head.stale) element.remove();
-	if (next.title && d.title !== next.title) d.title = next.title;
+		state.scrolled.clear();
+		retire(state, outgoing);
+		(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
+		for (const element of d.querySelectorAll(state.config.streamedArmSelector))
+			element.remove();
+		state.shown = pageKey(new URL(w.location.href));
+		if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
+		if (documentLoads && !isContainer(d.body))
+			syncBodyAttributes(d, next, state.config.servedBodyAttributesProperty);
+		let start: Comment | undefined;
+		let held: HeldPage | undefined;
+		if (documentLoads && !isContainer(d.body)) {
+			const fresh: Element[] = [];
+			region = d.body;
+			morphChildren(d, region, incoming, fresh);
+			scripts = fresh.flatMap(scriptsIn);
+			region.append((end = d.createComment('')));
+		} else {
+			region = d.adoptNode(incoming);
+			if (outgoing === d.body)
+				carryBodyAttributes(
+					d,
+					outgoing as HTMLElement,
+					region as HTMLElement,
+					state.config.containerAttributes,
+					state.config.servedBodyAttributesProperty,
+				);
+			const leavingEnd = pageEnd(outgoing, state.config.pageEndComment);
+			if (leavingEnd) {
+				if (outgoing !== d.body)
+					carryHostAttributes(d, outgoing, region, state.config.containerAttributes);
+				end =
+					pageEnd(region, state.config.pageEndComment) ??
+					region.appendChild(d.createComment(state.config.pageEndComment));
+				// The document's own nodes after the page stay; a document app morphs them to its next shell.
+				const focused = d.activeElement as HTMLElement | null;
+				const kept = nodesAfter(d, leavingEnd);
+				const arriving = nodesAfter(d, end);
+				const fresh: Element[] = [];
+				if (documentLoads) morphChildren(d, kept, arriving, fresh);
+				const leavingStart = pageStart(outgoing, state.config.pageStartComment);
+				start = pageStart(region, state.config.pageStartComment);
+				if (leavingStart || start) {
+					start ??= region.insertBefore(
+						d.createComment(state.config.pageStartComment),
+						region.firstChild,
+					);
+					const keptBefore = leavingStart
+						? nodesBefore(d, leavingStart)
+						: d.createDocumentFragment();
+					const arrivingBefore = nodesBefore(d, start);
+					if (documentLoads) morphChildren(d, keptBefore, arrivingBefore, fresh);
+					region.insertBefore(keptBefore, start);
+				}
+				scripts = [...scriptsIn(region), ...fresh.flatMap(scriptsIn)];
+				region.append(kept);
+				held = holdPage(region, start, end);
+				outgoing.replaceWith(region);
+				// The document's own nodes moved to the new element; focus inside them stays put.
+				if (focused && focused !== d.activeElement && region.contains(focused))
+					focused.focus({ preventScroll: true });
+			} else {
+				scripts = scriptsIn(region);
+				held = holdPage(region, undefined, null);
+				outgoing.replaceWith(region);
+				region.after((end = d.createComment('')));
+			}
+		}
+		const filled =
+			held &&
+			fillPage(
+				w,
+				held,
+				progressive ? CHUNK_ELEMENTS : Infinity,
+				() => id === session.navigation,
+			);
+		if (filled instanceof Promise && !(await filled)) return false;
+		if (progressive) w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
+		for (const box of offsets)
+			sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
+		for (const element of head.stale) element.remove();
+		if (next.title && d.title !== next.title) d.title = next.title;
+		return true;
+	};
+	let committed: boolean;
+	if (progressive) {
+		// The leaving page stays on screen while the next one is laid out a chunk at a time; it then paints in one frame, with no animation.
+		let result = false;
+		const transition = d.startViewTransition(async () => {
+			result = await commit();
+		});
+		transition.ready.catch(() => {});
+		transition.finished.catch(() => {});
+		await transition.updateCallbackDone.then(() => transition.skipTransition(), reportAsync);
+		committed = result;
+	} else committed = await commit();
+	if (!committed) return;
 	const ran = runScripts(
 		d,
 		[...head.scripts, ...(scripts as HTMLScriptElement[])],
@@ -956,7 +987,7 @@ export async function navigate(
 	if (restore === 'reset') {
 		const target = url.hash ? d.getElementById(decodeURIComponent(url.hash.slice(1))) : null;
 		if (target) target.scrollIntoView({ behavior: 'instant' });
-		else if (!(filled instanceof Promise)) w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+		else if (!progressive) w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
 	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
