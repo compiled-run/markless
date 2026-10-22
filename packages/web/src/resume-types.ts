@@ -90,8 +90,8 @@ export type ResumeDomEvent = {
 	readonly preventDefault?: () => void;
 	readonly stopPropagation?: () => void;
 	readonly composedPath?: () => ReadonlyArray<ResumeDomElement>;
-	// The nearest host with a record when the browser dispatched the event, kept by the queue that received it.
-	__marklessPressHost?: ResumeDomElement;
+	// The press-time path for a dispatch that runs after the browser's: the nearest host with a record, or the whole path when none was found.
+	__marklessPressPath?: ReadonlyArray<ResumeDomElement>;
 };
 export type ResumeSharedPatchEvent = {
 	readonly type: 'async:shared-patch';

@@ -993,7 +993,7 @@ export function emitQueuedResumeContainerEvent(
 		'\t\troot.__marklessDispatch = next => {',
 		'\t\t\tconst event = next.event, eventTime = event?.timeStamp;',
 		// The host the press-time walk matched; a script may take the target out before this dispatch runs.
-		'\t\t\tif (event && next.eventRecord && next.element) event.__marklessPressHost ??= next.element;',
+		'\t\t\tif (event && next.eventRecord && next.element) event.__marklessPressPath ??= [next.element];',
 		// One click reaches here once per container listener, and a wake dispatch can land between the copies.
 		'\t\t\tif ((event === lastEvent && eventTime === lastEventTime) || (seen.has(event) && seen.get(event) === eventTime)) return done;',
 		'\t\t\tif (Object(event) === event) seen.set(event, eventTime);',

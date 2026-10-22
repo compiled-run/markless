@@ -481,14 +481,14 @@ export function createEventWiring(input: {
 		const attached = containsElement(input.root, target);
 		const anchor = attached ? undefined : detachedRowAnchor(target);
 		const rowAnchor = anchor && containsElement(input.root, anchor) ? anchor : undefined;
-		// A script outside Markless took the target out after the press found its host: the walk starts at that host.
-		const pressHost = event.__marklessPressHost;
+		// A script outside Markless took the target out after the press: the walk starts at the nearest element still on the page.
+		const pressPath = event.__marklessPressPath || [];
 		const pressAnchor =
-			!attached && !rowAnchor && pressHost && containsElement(input.root, pressHost)
-				? pressHost
-				: undefined;
+			attached || rowAnchor
+				? undefined
+				: pressPath.find((element) => element.nodeType === 1 && containsElement(input.root, element));
 		// The host itself went with the redraw: nothing on the page is left to run.
-		if (!attached && !rowAnchor && pressHost && !pressAnchor) return;
+		if (!attached && !rowAnchor && pressPath[0] && !pressAnchor) return;
 		const bubbles = event.bubbles !== false;
 		const path = collectDispatchPath(
 			pressAnchor ?? target,
