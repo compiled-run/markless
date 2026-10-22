@@ -1,6 +1,6 @@
 import { dirname, join, normalize } from 'pathe';
 import { RolldownMagicString, type Plugin } from 'rolldown';
-import { parseChunkCode } from './chunk-ast.ts';
+import { parseChunkCode, renderedChunkCount } from './chunk-ast.ts';
 import { PACK_LOAD, PACK_LOADER_PREFIX } from './lazy-module-facades.ts';
 
 // Packs keep Rolldown's unminified cross-chunk names so a name never depends on emission order;
@@ -280,19 +280,45 @@ export function planShortExportNames(chunks: readonly ShortNameChunk[]): ShortNa
 	return { renames, edits, pruned, exports };
 }
 
-// Searching every string once per chunk took 20 s on a 4,518-chunk build; only strings holding a chunk's extension can name it.
+// A name ends in its extension, so each extension occurrence is checked against the names of the lengths that exist:
+// searching the strings once per chunk name took 16 s on a 486-page site.
 export function namedInStrings(strings: readonly string[], fileNames: readonly string[]): string[] {
-	const texts = new Map<string, string>();
-	return fileNames.filter((fileName) => {
-		const base = fileName.slice(fileName.lastIndexOf('/') + 1);
-		const extension = base.includes('.') ? base.slice(base.lastIndexOf('.')) : '';
-		let text = texts.get(extension);
-		if (text === undefined) {
-			text = strings.filter((value) => value.includes(extension)).join('\n');
-			texts.set(extension, text);
+	const baseOf = (fileName: string) => fileName.slice(fileName.lastIndexOf('/') + 1);
+	const byExtension = new Map<string, Set<string>>();
+	const bare: string[] = [];
+	for (const fileName of fileNames) {
+		const base = baseOf(fileName);
+		if (!base.includes('.')) {
+			bare.push(base);
+			continue;
 		}
-		return text.includes(base);
-	});
+		const extension = base.slice(base.lastIndexOf('.'));
+		const bases = byExtension.get(extension) ?? new Set();
+		bases.add(base);
+		byExtension.set(extension, bases);
+	}
+	const found = new Set<string>();
+	for (const [extension, bases] of byExtension) {
+		const lengths = [...new Set([...bases].map((base) => base.length))];
+		for (const value of strings)
+			for (
+				let at = value.indexOf(extension);
+				at !== -1;
+				at = value.indexOf(extension, at + 1)
+			) {
+				const end = at + extension.length;
+				for (const length of lengths) {
+					if (length > end) continue;
+					const candidate = value.slice(end - length, end);
+					if (bases.has(candidate)) found.add(candidate);
+				}
+			}
+	}
+	if (bare.length) {
+		const text = strings.join('\n');
+		for (const base of bare) if (text.includes(base)) found.add(base);
+	}
+	return fileNames.filter((fileName) => found.has(baseOf(fileName)));
 }
 
 /** Deterministic: each name is the shortest prefix of its own hash that no other name in the set shares. */
@@ -359,7 +385,7 @@ export function shortExportNamesPlugin(
 					resolve,
 					reject,
 				});
-				if (pending.size !== Object.keys(meta.chunks).length) return;
+				if (pending.size !== renderedChunkCount(meta.chunks)) return;
 				try {
 					const plan = planShortExportNames(
 						[...pending.values()].map((item) => item.chunk),

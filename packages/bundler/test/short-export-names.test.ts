@@ -7,8 +7,10 @@ import { expect, test } from 'vitest';
 import {
 	namedInStrings,
 	planShortExportNames,
+	shortExportNamesPlugin,
 	shortNames,
 } from '../src/build/short-export-names.ts';
+import { lazyModuleFacadesPlugin } from '../src/build/lazy-module-facades.ts';
 import { nativePackingPlugins } from '../src/build/native-packing.ts';
 
 async function buildPacked(sources: Record<string, string>) {
@@ -272,4 +274,91 @@ test('finding the chunks named in strings stays linear in the strings on a docs-
 	const elapsed = performance.now() - started;
 	expect(named).toEqual(['build/chunk-named-1234.js']);
 	expect(elapsed).toBeLessThan(2_000);
+});
+
+test('finding the chunks named in strings stays linear when most strings hold the extension', () => {
+	// A docs port's render data names a module in most strings, so grouping strings by extension alone kept every one.
+	const hash = (index: number) => ((index * 2_654_435_761) >>> 0).toString(36).padStart(7, 'x');
+	const strings = Array.from(
+		{ length: 60_000 },
+		(_, index) => `{"href":"/assets/chunk-${hash(index)}.js"}`,
+	);
+	const fileNames = Array.from(
+		{ length: 4_000 },
+		(_, index) => `assets/chunk-${hash(index + 1_000_000)}.js`,
+	);
+	fileNames.push(`assets/chunk-${hash(1999)}.js`);
+	const started = performance.now();
+	const named = namedInStrings(strings, fileNames);
+	const elapsed = performance.now() - started;
+	expect(named).toEqual([`assets/chunk-${hash(1999)}.js`]);
+	expect(elapsed).toBeLessThan(2_000);
+});
+
+test('the passes that wait for every rendered chunk count the chunks once per render', async () => {
+	// Rolldown passes each renderChunk call the same `meta.chunks`; listing its keys per call was quadratic at 18,000 chunks.
+	const fileNames = Array.from({ length: 50 }, (_, index) => `chunk-${index}.js`);
+	for (const plugin of [shortExportNamesPlugin(), lazyModuleFacadesPlugin()]) {
+		let listed = 0;
+		const chunks = new Proxy(Object.fromEntries(fileNames.map((fileName) => [fileName, {}])), {
+			ownKeys(target) {
+				listed++;
+				return Reflect.ownKeys(target);
+			},
+		});
+		const hooks = plugin as unknown as {
+			renderStart(): void;
+			renderChunk(this: unknown, ...args: unknown[]): Promise<unknown>;
+		};
+		hooks.renderStart();
+		const context = { getModuleInfo: () => null };
+		await Promise.all(
+			fileNames.map((fileName) =>
+				hooks.renderChunk.call(
+					context,
+					'export const value = 1;',
+					{
+						fileName,
+						exports: ['value'],
+						imports: [],
+						dynamicImports: [],
+						moduleIds: [],
+						isEntry: true,
+						isDynamicEntry: false,
+						facadeModuleId: null,
+					},
+					{ sourcemap: false },
+					{ chunks },
+				),
+			),
+		);
+		expect(listed).toBe(1);
+	}
+});
+
+test('a chunk is named in strings exactly when a plain substring search finds it', () => {
+	let seed = 7;
+	const next = () => (seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648) / 2_147_483_648;
+	const parts = ['a', 'b', 'ab', '.js', '.mjs', '.', '/', 'x.js', 'b.mjs', 'js', '-'];
+	const word = (count: number) =>
+		Array.from({ length: count }, () => parts[Math.floor(next() * parts.length)]).join('');
+	for (let round = 0; round < 200; round++) {
+		const strings = Array.from({ length: 1 + Math.floor(next() * 6) }, () =>
+			word(1 + Math.floor(next() * 8)),
+		);
+		const fileNames = [
+			...new Set(
+				Array.from(
+					{ length: 1 + Math.floor(next() * 8) },
+					() => `dir/${word(1 + Math.floor(next() * 4))}`,
+				),
+			),
+		];
+		const text = strings.join('\n');
+		expect(namedInStrings(strings, fileNames)).toEqual(
+			fileNames.filter((fileName) =>
+				text.includes(fileName.slice(fileName.lastIndexOf('/') + 1)),
+			),
+		);
+	}
 });
