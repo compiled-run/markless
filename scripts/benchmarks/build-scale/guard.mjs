@@ -9,7 +9,7 @@ import { MARKLESS_SERVER_CHUNK_MAX_BYTES } from '../../../packages/bundler/src/b
 
 const config = JSON.parse(readFileSync(new URL('./budgets.json', import.meta.url), 'utf8'));
 const budgets = Object.fromEntries(
-	Object.entries(config.budgets).map(([name, budget]) => [name, budget.bytes]),
+	Object.entries(config.budgets).map(([name, budget]) => [name, budget.bytes ?? budget.value]),
 );
 const buildScript = new URL('./build.mjs', import.meta.url).pathname;
 const MB = 1024 * 1024;
@@ -102,13 +102,35 @@ try {
 	];
 	const failures = [];
 	console.log(
-		`build scale: ${small} and ${large} pages (${atSmall.seconds}s and ${atLarge.seconds}s wall, ${atLarge.cpuSeconds}s cpu at ${large})`,
+		`build scale: ${small} and ${large} pages (${atSmall.seconds}s and ${atLarge.seconds}s wall, ${atSmall.buildCpuSeconds}s and ${atLarge.buildCpuSeconds}s build cpu)`,
 	);
 	for (const [name, value, budget] of rows) {
 		const over = value > budget;
 		console.log(
 			`${over ? 'FAIL' : 'ok  '} ${name}: ${(value / MB).toFixed(2)} MB (budget ${(budget / MB).toFixed(2)} MB)`,
 		);
+		if (over) failures.push(name);
+	}
+	// Build time: CPU, which a busy runner moves far less than wall time, per page and as growth with page count.
+	const timeRows = [
+		[
+			'build CPU per page',
+			`${(perPage('buildCpuSeconds') * 1000).toFixed(0)} ms`,
+			perPage('buildCpuSeconds') * 1000,
+			budgets.buildCpuMsPerPage,
+			`${budgets.buildCpuMsPerPage} ms`,
+		],
+		[
+			`build CPU growth for ${large / small}x the pages`,
+			`${(atLarge.buildCpuSeconds / atSmall.buildCpuSeconds).toFixed(2)}x`,
+			atLarge.buildCpuSeconds / atSmall.buildCpuSeconds,
+			budgets.buildCpuGrowth,
+			`${budgets.buildCpuGrowth}x`,
+		],
+	];
+	for (const [name, shown, value, budget, budgetShown] of timeRows) {
+		const over = value > budget;
+		console.log(`${over ? 'FAIL' : 'ok  '} ${name}: ${shown} (budget ${budgetShown})`);
 		if (over) failures.push(name);
 	}
 	const page = await serves(join(work, `app-${large}`), `/p${large - 2}`, `Page ${large - 2}`);
