@@ -890,37 +890,41 @@ try {
 			'the counter inside the line card counts',
 		);
 		const readingDemos = page.locator('.code-block [data-code-stage]');
-		const labelledLine = readingDemos.nth(0).locator('p').first();
+		const labelledLine = readingDemos.nth(2).locator('p').first();
 		await labelledLine.waitFor();
 		check(
 			((await labelledLine.textContent()) ?? '').trim() === 'You clicked 0 times.',
 			'the fragment demo serves its paragraph at 0',
 			((await labelledLine.textContent()) ?? '').trim(),
 		);
-		await readingDemos.nth(0).getByRole('button', { name: 'Click me' }).click();
+		await readingDemos.nth(2).getByRole('button', { name: 'Click me' }).click();
 		await settleText(
 			labelledLine,
 			(text) => text === 'You clicked 1 times.',
 			'the paragraph beside the button follows its click',
 		);
-		const teaToggle = readingDemos.nth(1).getByRole('button');
-		const teaNote = readingDemos.nth(1).locator('p.note');
+		const cart = readingDemos.nth(3);
+		const cartRows = cart.locator('li');
+		const cartNote = cart.locator('p');
 		check(
-			((await teaToggle.textContent()) ?? '').trim() === 'Show the note' &&
-				(await teaNote.count()) === 0,
-			'the @if demo starts with no note in the page',
+			(await cartRows.count()) === 2 &&
+				((await cartNote.textContent()) ?? '').trim() === 'Add 1 more for free shipping.',
+			'the @for demo serves two rows and the @else note',
+			((await cartNote.textContent()) ?? '').trim(),
 		);
-		await teaToggle.click();
-		await teaNote.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-		check(
-			((await teaNote.textContent()) ?? '').trim() === 'Steep it for three minutes.' &&
-				((await teaToggle.textContent()) ?? '').trim() === 'Hide the note',
-			'opening the branch puts the note into the page',
-			((await teaToggle.textContent()) ?? '').trim(),
+		await cart.getByRole('button', { name: 'Add a bag' }).click();
+		await settleText(
+			cartNote,
+			(text) => text === 'Free shipping!',
+			'a third bag adds a row and turns the @if branch on',
 		);
-		await teaToggle.click();
-		await teaNote.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-		check((await teaNote.count()) === 0, 'closing the branch takes the note out of the page');
+		check((await cartRows.count()) === 3, 'the @for drew one row per bag');
+		await cart.getByRole('button', { name: 'Empty the cart' }).click();
+		await settleText(
+			cartRows.first(),
+			(text) => text === 'Your cart is empty.',
+			'an empty cart shows the @empty row',
+		);
 		await page.screenshot({
 			path: `${shotsDir}/T005-reading-tsrx-after.png`,
 			fullPage: true,

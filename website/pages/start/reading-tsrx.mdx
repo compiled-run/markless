@@ -1,45 +1,115 @@
 import PageMeta from '../../components/page-meta.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
+import Collapsible from '../../components/docs/collapsible.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
 import LineToPart from '../../components/sketch/start/line-to-part.tsrx';
+import PartsAnatomy from '../../components/figures/reading/parts-anatomy.tsrx';
+import BoxesAnatomy from '../../components/figures/reading/boxes-anatomy.tsrx';
+import FlowAnatomy from '../../components/figures/reading/flow-anatomy.tsrx';
 
 <Sidebar />
 
-# A .tsrx file is TypeScript with elements in it
+# Reading a .tsrx file
 
-<PageMeta level="Start here" time="4 min" assumes="nothing" sprite="bookmark" />
+<PageMeta level="Start here" time="7 min" assumes="nothing" sprite="bookmark" />
 
 <ThemeToggle />
 
-Open a `.tsrx` file and most of it looks familiar. Imports are imports. A component is a function. Types are types.
+<Subtitle text="A .tsrx file is TypeScript with your page's elements written right inside it. Between those elements you can write real statements too, like if and for. Takes roughly 7 minutes to learn." />
 
-A few things are new. This page goes through each of them. Then it walks through the other files in a starter app.
+## Write an element
 
-## The counter, line by line
+Here's one button, taken apart: its code on one sheet, the page it makes on the other. Press the drawing.
 
-Here is the counter again. Click a line of the file to see which part of the button it made. Then click the button.
+<PartsAnatomy />
 
-<LineToPart />
+The click ran `bags++`, and the one number wired to `{bags}` changed. Nothing else on the page moved.
 
-**`import { state } from '@markless/core'`** is a normal import. `@markless/core` is the main Markless package.
+An **element** is one piece of the page: a button, a paragraph, a list. You write it as a **tag**. `<button>` opens it, `</button>` closes it, and whatever sits between the two is inside it. Here that's the text `Add to cart:` and a value.
 
-**`export default function Counter() @{`** starts a function. Its body opens with `@{` instead of `{`. Inside `@{`, you can write elements like `<button>` and TypeScript statements like `let`.
+An **attribute** is a setting on the element, written inside the opening tag as `name="value"`. They're the attributes HTML already has: `class`, `type`, `href`, `disabled`.
 
-**`let count = state(0)`** makes a value the page follows. It is still a `let`, and it starts at `0`.
+Elements go inside elements. That's how you build a whole page:
 
-**`<button ...>`** is an element. It works like HTML, with a few extras: `{count}` shows a value, and `onClick` runs code on a click. You do not `return` it. You write it after the statements: a body runs its statements first, then shows the one element at its end.
+<Code steps={[{ label: 'Change the heading to `Dark roast`.', shows: 'Dark roast' }, { label: 'Under the first paragraph, add `<p>250 g bag</p>`.', shows: '250 g bag' }, { label: 'Give the input a `placeholder="How many?"` attribute.', source: 'placeholder="How many?"' }]}>
+```tsrx title="bean-card.tsrx"
+export default function BeanCard() @{
+	<article class="card">
+		<h2>House blend</h2>
+		<p>Chocolate, hazelnut, a little cherry.</p>
+		<label>
+			Bags
+			<input type="number" />
+		</label>
+	</article>
+}
+```
+</Code>
 
-**`onClick={() => count++}`** handles a click. An event prop is `on` plus the event name, so `onInput` and `onKeyDown` work the same way.
+Text goes straight between tags, no quotes needed. An element with nothing inside, like `<input />`, closes itself with `/>`. Leave the slash off and the build stops.
 
-**`{count}`** is a hole in the elements. Curly braces hold an expression, in text or in an attribute: a read like `{count}`, or math like `{count * 2}`. When `count` changes, that text changes with it.
+## Put a value on the page with `{ }`
 
-## More than one element
+Click **Add a bag** and watch both lines.
 
-A body shows one element. To show several, put them inside `<>` and `</>`. That pair is a fragment: it holds elements together and adds nothing to the page. The same goes for the body of each `@if`, `@for`, `@switch` and `@try` block below.
+<Code steps={[{ label: 'Click **Add a bag**. Both lines change together.', rewrites: 2 }, { label: 'Make a bag cost 16: change `14` to `16`.', source: 'bags * 16' }, { label: 'Start with 5 bags.', source: 'state(5)' }]}>
+```tsrx title="cart-line.tsrx"
+import { state } from '@markless/core';
 
-<Code note="Add a third line that shows count times two, with {count * 2}. Then move the paragraph below the button.">
+export default function CartLine() @{
+	let bags = state(2);
+
+	<section>
+		<p>In your cart: {bags} bags</p>
+		<p>Total: {bags * 14} dollars</p>
+		<button title={'You have ' + bags} onClick={() => bags++}>
+			Add a bag
+		</button>
+	</section>
+}
+```
+</Code>
+
+Curly braces hold an **expression**: any bit of code that produces a value. `bags` is an expression. So are `bags * 14` and `'You have ' + bags`. Markless puts the value on the page, in text or in an attribute, and keeps it current.
+
+`state(2)` makes a value the page follows, starting at 2. [State](/concepts/state) covers it properly.
+
+Quotes or braces? Quotes are fixed text: `class="buy"`. Braces are code: `title={'You have ' + bags}`.
+
+## Run code on a click
+
+`onClick={() => bags++}` is an **event handler**. Its value is a function, and Markless calls it every time someone clicks. The name is `on` plus the event, with a capital letter: `onClick`, `onInput`, `onKeyDown`, `onSubmit`.
+
+Write it in lowercase, as `onclick`, and it's a plain attribute, not a handler. The build warns you.
+
+## Statements go in `@{ }`, values go in `{ }`
+
+There are two kinds of code, and a `.tsrx` file has a box for each.
+
+An **expression** produces a value. `bags * 14` is 28 when `bags` is 2.
+
+A **statement** does something. `let bags = state(2)` makes a variable. `if` decides. `for` repeats. A statement has no value to show.
+
+Press the drawing to run the file.
+
+<BoxesAnatomy />
+
+The statements ran in order, top to bottom. Then the paragraph showed up, and its braces handed it one value.
+
+| | `@{ }` statement container | `{ }` expression container |
+| --- | --- | --- |
+| Holds | statements: `let`, `const`, `@if`, `@for`, then elements | one expression |
+| Gives the page | the one element it ends with | a value, in text or an attribute |
+| Example | `function Cart() @{ let bags = state(2); <p>…</p> }` | `<p>Total: {bags * 14}</p>` |
+
+A component's body is a statement container: it opens with `@{` instead of `{`. Write your statements first, then one element at the end. No `return`.
+
+One element? To show several, wrap them in `<>` and `</>`. That pair is a **fragment**: it holds elements together and adds nothing to the page.
+
+<Code note="Add a third paragraph that shows {count * 2}. Then take the <> and </> away and read the build error.">
 ```tsrx title="labelled-counter.tsrx"
 import { state } from '@markless/core';
 
@@ -56,47 +126,84 @@ export default function LabelledCounter() @{
 ```
 </Code>
 
-The paragraph reads `count`. Click the button, and only the number in the paragraph changes. Without the fragment, Markless stops with an error that shows where to add it.
+Try putting a statement in braces, like `{let x = 1}`. The build stops: braces take one expression, nothing more.
 
-## Lines that start with @ control the elements
+## Show and repeat with @if and @for
 
-An at sign at the start of a line among the elements starts a block. `@if` shows its elements only while a condition is true. `@for` repeats its elements for each item in a list.
+Here's where statements pay off. Right among your elements, a line that starts with `@` is a block: `@if` shows its elements only while its test is true, and `@for` repeats its elements once per item.
 
-<Code note="After the closing brace of the @if, add @else { <p>The note is hidden.</p> } and press the button. Then change the note text, and the class name in both places.">
-```tsrx title="tea-note.tsrx"
+Press the drawing to add a third bag.
+
+<FlowAnatomy />
+
+The `@for` drew one more row. With three bags, the `@if` test turned true, so its note landed on the page. Press again and both go away.
+
+<Code steps={[{ label: 'Click **Add a bag** until shipping is free.', shows: 'Free shipping!' }, { label: 'Click **Empty the cart**. The `@empty` row takes over.', shows: 'Your cart is empty.' }, { label: 'Make shipping free from 2 bags: change `2` to `1` in the `@if` test.', source: 'bags.length > 1' }]}>
+```tsrx title="cart-list.tsrx"
 import { state } from '@markless/core';
 
-export default function TeaNote() @{
-	let open = state(false);
+export default function CartList() @{
+	let bags = state([
+		{ id: 'house', name: 'House blend' },
+		{ id: 'dark', name: 'Dark roast' },
+	]);
 
 	<section>
-		<style>
-			.note {
-				font-style: italic;
+		<ul>
+			@for (const bag of bags; key bag.id) {
+				<li>{bag.name}</li>
+			} @empty {
+				<li>Your cart is empty.</li>
 			}
-		</style>
-		<button onClick={() => (open = !open)}>
-			{open ? 'Hide' : 'Show'} the note
-		</button>
-		@if (open) {
-			<p class="note">
-				Steep it for three minutes.
-			</p>
+		</ul>
+		@if (bags.length > 2) {
+			<p>Free shipping!</p>
+		} @else {
+			const left = 3 - bags.length;
+			<p>Add {left} more for free shipping.</p>
 		}
+		<button onClick={() => (bags = [...bags, { id: 'bag' + bags.length, name: 'Decaf' }])}>
+			Add a bag
+		</button>
+		<button onClick={() => (bags = [])}>Empty the cart</button>
 	</section>
 }
 ```
 </Code>
 
-This file shows one more thing: the `<style>` block. Its rules reach the elements in this file and nothing else. Another file can use the class `note` for something different.
+Look at the `@else` block. It starts with `const left = ...`, a statement, right where the elements are. Each block's body is a statement container too.
 
-[Conditionals](/concepts/conditionals), [Lists](/concepts/lists) and [Styling](/concepts/styling) go deeper on each of these.
+`@for` needs a `key`: something that names each item, like `bag.id`. That's how a row keeps its own state when the list changes. `@empty` shows when the list has nothing in it.
+
+Two more blocks work the same way. `@switch` picks one of several cases, and `@try` waits for data. [Conditionals](/concepts/conditionals), [Lists](/concepts/lists) and [Async](/concepts/async) go deeper.
 
 <Callout
 	sprite="cross"
-	title="Can I keep my .tsx files?"
-	text="No. Markless reads components from .tsrx files only. It does not support JSX or TSX components."
+	title="Why did plain else stop the build?"
+	text="After an @if, write @else with the at sign. A plain else stops the build with MARKLESS_BRANCH_ELSE_SPELLING."
 />
+
+<Collapsible sprite="star-badge" summary="Coming from JSX?">
+
+Most of it will feel familiar. Here's what's different:
+
+- **No `return`.** A component's body opens with `@{` and ends with its element.
+- **HTML names.** Write `class` and `for`, the way HTML does. The type checker rejects `className`.
+- **Braces hold values, not elements.** `{open && <p>…</p>}` and `{items.map(…)}` render once and never update, and the build warns. Use `@if` and `@for`.
+- **The key lives in the loop.** Write `key bag.id` in the `@for` line, not on the element. Every `@for` needs one.
+- **Comments are plain.** Write `// note` on its own line among elements. No `{/* */}` needed.
+- **Styles stay local.** A `<style>` block inside a component only reaches that component's elements.
+- **Nothing re-renders.** A component runs once, to set up the page. A click runs only its handler, and only the spots that read a changed value update.
+
+</Collapsible>
+
+## Read the counter from your new app
+
+You've now seen every part of the counter on your app's home page. Click a line to see which part of the button it made, then click the button.
+
+<LineToPart />
+
+`export default function Counter() @{` starts the component and its statement container. `let count = state(0)` is a statement. `<button ...>` is the element it ends with, `onClick` its handler, `{count}` its value.
 
 ## The other files in a starter app
 
@@ -121,7 +228,7 @@ my-app/
   .gitignore
 ```
 
-The default `minimal` starter has the same files, minus `document.tsrx`, `404.tsrx` and `500.tsrx`.
+The default `minimal` starter is the same, minus `404.tsrx` and `500.tsrx`.
 
 | File | What it does |
 | --- | --- |
@@ -130,32 +237,12 @@ The default `minimal` starter has the same files, minus `document.tsrx`, `404.ts
 | `pages/500.tsrx` | The page you get when a page fails with an error. It says "Something went wrong". |
 | `document.tsrx` | The HTML shell around every page, built with `<Html>` from `@markless/router`. |
 | `public/` | Files your app serves as they are, like images. It starts empty. |
-| `vite.config.ts` | Adds the `markless()` and `router()` plugins. |
+| `vite.config.ts` | Adds the `markless()` and `router()` plugins. `router()` turns `pages/` into URLs. |
 | `tsconfig.json` | Lets your editor read `.tsrx` files. |
 | `scripts/markless-doctor.mjs` | Checks your setup. Run it with `npm run doctor`. |
 | `.vscode/`, `.zed/` | Editor settings. VS Code suggests the TSRX extension, `ripple-ts.ripple-ts-vscode-plugin`. |
 
-Every starter has this `vite.config.ts`:
-
-```ts
-import { markless } from '@markless/core/vite';
-import { router } from '@markless/router/vite';
-import { defineConfig } from 'vite-plus';
-
-export default defineConfig({
-	plugins: [markless(), router()],
-});
-```
-
-The `router()` plugin is what turns `pages/` into URLs.
-
 The `full-stack` starter adds two more files. `api/health.ts` answers a request with `ok`. `middleware/request.ts` adds a header to every response.
-
-<Callout
-	sprite="cross"
-	title="Where did .output come from?"
-	text="Your first dev run or build writes an .output folder and a markless-router-env.d.ts file. The starter's .gitignore does not list .output yet, so add it yourself."
-/>
 
 <Callout
 	sprite="cross"
@@ -167,6 +254,6 @@ The `full-stack` starter adds two more files. `api/health.ts` answers a request 
 
 [State](/concepts/state) is about `state()`, the one new word in the counter.
 
-[Events](/concepts/events) is about `onClick` and the other event props.
+[Events](/concepts/events) covers `onClick` and the other event handlers.
 
 <LikeHeart />
