@@ -508,7 +508,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 						) as Array<{ readonly fileName: string; readonly code: string }>,
 					);
 					collapseInitFacadeImports(bundle);
-					unwrapAsyncImportWrappers(bundle);
+					await unwrapAsyncImportWrappers(bundle);
 					// Held to finalize, one entry per chunk with an import() grew with page count; finalize reads its own.
 					clearChunkFactCaches();
 				},

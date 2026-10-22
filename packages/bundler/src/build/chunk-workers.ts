@@ -3,7 +3,7 @@ import {
 	mayContainDynamicImport,
 	rememberChunkDynamicImports,
 } from './chunk-ast.ts';
-import type { ChunkTaskName, ChunkTaskResult } from './chunk-tasks.ts';
+import type { ChunkTaskContext, ChunkTaskName, ChunkTaskResult } from './chunk-tasks.ts';
 import { runChunkTaskInline } from './chunk-tasks.ts';
 import { runChunkJob } from '../build-workers.ts';
 
@@ -15,10 +15,12 @@ export function runChunkTask<T extends ChunkTaskName>(
 	task: T,
 	fileName: string,
 	code: string,
+	context?: ChunkTaskContext<T>,
 ): Promise<ChunkTaskResult<T>> {
-	if (code.length >= CHUNK_WORKER_MIN_CODE_LENGTH) return runChunkJob(task, fileName, code);
+	if (code.length >= CHUNK_WORKER_MIN_CODE_LENGTH)
+		return runChunkJob(task, fileName, code, context);
 	try {
-		return Promise.resolve(runChunkTaskInline(task, fileName, code));
+		return Promise.resolve(runChunkTaskInline(task, fileName, code, context));
 	} catch (error) {
 		return Promise.reject(error);
 	}

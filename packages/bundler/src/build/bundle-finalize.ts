@@ -99,7 +99,7 @@ await stripEmptyPreloadWrappersFromChunks(bundle);
 const removedSymbolFacades = new Set(rewriteGeneratedSymbolFacadeImports(bundle));
 await prefetchDynamicImportParses(bundle);
 for (const fileName of collapseInitFacadeImports(bundle)) removedSymbolFacades.add(fileName);
-unwrapAsyncImportWrappers(bundle);
+await unwrapAsyncImportWrappers(bundle);
 rewriteGeneratedSymbolInitExports(bundle);
 compactGeneratedDirectSymbolLoaders(bundle);
 const manifestBundle = bundleWithoutRemovedChunks(bundle, removedSymbolFacades);
@@ -297,7 +297,7 @@ async function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknow
 			output.code = nextCode;
 		}
 	}
-	stripUnusedVitePreloadHelperFromBundle(
+	await stripUnusedVitePreloadHelperFromBundle(
 		Object.values(bundle).filter(
 			(output): output is PreloadHelperChunk => isChunkWithCode(output) && isChunkFile(output),
 		),
