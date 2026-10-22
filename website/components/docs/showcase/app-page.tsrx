@@ -219,7 +219,7 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 			</div>
 		}
 		<p class="back">
-			<Link href="/start/migrate">Back to Migrating an existing app</Link>
+			<Link href="/start/migrate">Back to Migrating an app</Link>
 		</p>
 
 		<style>
