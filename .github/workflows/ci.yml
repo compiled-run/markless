@@ -452,6 +452,11 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true' || steps.apt-cache.outputs.cache-hit != 'true'
               run: pnpm install --frozen-lockfile
 
+            # A stalled mirror request waited out apt's 120 s default before apt tried the next mirror, 10 minutes in all on 2026-10-22.
+            - name: Move past a stalled apt mirror in seconds
+              if: steps.playwright-cache.outputs.cache-hit != 'true' || steps.apt-cache.outputs.cache-hit != 'true'
+              run: printf 'Acquire::http::Timeout "10";\nAcquire::Retries "5";\n' | sudo tee /etc/apt/apt.conf.d/99stalled-mirror
+
             - name: Install the pinned Chromium and WebKit
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
