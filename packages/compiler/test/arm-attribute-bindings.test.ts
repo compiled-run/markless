@@ -264,11 +264,57 @@ export function Details({ slug }: { slug: string }) @{
 		binding.id.startsWith('computed:templateExpression:'),
 	);
 	expect(lifted.map((binding) => binding.functionSource)).toEqual([
-		"() => ('details-' + slug)",
-		"() => ((LABELS[slug] ?? slug) + '!')",
-		'() => (LABELS[slug] ?? slug)',
-		'() => (LABELS[slug] ?? slug)',
+		"() => ((open)) ? ('details-' + slug) : undefined",
+		"() => ((open)) ? ((LABELS[slug] ?? slug) + '!') : undefined",
+		'() => ((open)) ? (LABELS[slug] ?? slug) : undefined',
+		'() => ((open)) ? (LABELS[slug] ?? slug) : undefined',
 	]);
 	for (const binding of lifted)
-		expect(binding.dependencies?.map((dependency) => dependency.source)).toEqual(['slug']);
+		expect(binding.dependencies?.map((dependency) => dependency.source).sort()).toEqual([
+			'open',
+			'slug',
+		]);
+});
+
+// Computeds are derived eagerly at render, so a lifted body const must not read past the arm guarding it.
+test('a body const an arm shows is only computed while every enclosing arm condition holds', async () => {
+	const result = await compile(
+		'src/Profile.tsrx',
+		`
+import { state } from '@markless/core';
+
+const PEOPLE: Record<string, { name: string; team?: { label: string } }> = {};
+
+export function Profile({ who }: { who?: string }) @{
+	let mode = state('card');
+	const person = who ? PEOPLE[who] : undefined;
+	<aside>
+		<button onClick={() => (mode = mode === 'card' ? 'row' : 'card')}>Mode</button>
+		@if (!person) {
+			<em>nobody</em>
+		} @else {
+			@switch (mode) {
+				@case 'card': {
+					@if (person.team) {
+						<b title={person.team.label}>{person.name}</b>
+					}
+				}
+				@default: {
+					<i>{person.name}</i>
+				}
+			}
+		}
+	</aside>
+}`,
+	);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	const lifted = result.semanticGraph.graphBindings.filter((binding) =>
+		binding.id.startsWith('computed:templateExpression:'),
+	);
+	const person = '(who ? PEOPLE[who] : undefined)';
+	expect(lifted.map((binding) => binding.functionSource)).toEqual([
+		`() => (!(!${person}) && (mode) === ('card') && (${person}.team)) ? ${person}.team.label : undefined`,
+		`() => (!(!${person}) && (mode) === ('card') && (${person}.team)) ? ${person}.name : undefined`,
+		`() => (!(!${person}) && !((mode) === ('card'))) ? ${person}.name : undefined`,
+	]);
 });
