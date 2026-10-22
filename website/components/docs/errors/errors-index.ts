@@ -849,6 +849,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_NODE_IN_BROWSER',
+					kind: 'build error',
+					guided: true,
+				},
+				{
 					code: 'MARKLESS_PRERENDER_CONTAINER_MISSING',
 					kind: 'build error',
 					guided: false,

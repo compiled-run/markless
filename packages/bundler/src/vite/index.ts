@@ -62,6 +62,7 @@ import {
 } from './environment.ts';
 import { createViteHmr } from './hmr.ts';
 import { installDevRuntimeImportResolution } from './dev-runtime-imports.ts';
+import { browserNodeGuard } from './browser-node-guard.ts';
 
 export type {
 	BundleGraphAdder,
@@ -452,6 +453,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 
 	return [
 		marklessPlugin,
+		browserNodeGuard(),
 		{
 			name: 'markless:shared-render-data-reach',
 			// Ahead of Vite's own resolver, which would otherwise keep the route root in the id.

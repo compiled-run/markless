@@ -117,6 +117,9 @@ importers:
       yaml:
         specifier: 2.9.1
         version: 2.9.1
+      yuku:
+        specifier: 0.20.1
+        version: 0.20.1
 
   demos/async-waterfall:
     dependencies:
@@ -615,6 +618,9 @@ importers:
       vite:
         specifier: npm:@voidzero-dev/vite-plus-core@1.3.0
         version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1)'
+      yuku:
+        specifier: 0.20.1
+        version: 0.20.1
     devDependencies:
       '@markless/analyzer':
         specifier: workspace:*
@@ -715,6 +721,22 @@ importers:
       vite-plus:
         specifier: 1.3.0
         version: 1.3.0(@types/node@24.12.2)(@vitest/browser-playwright@5.0.5(@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1))(playwright@1.64.1)(vitest@5.0.5))(@vitest/ui@5.0.5(vitest@5.0.5))(@volar/typescript@2.4.28)(jiti@2.7.0)(playwright@1.64.1)(typescript@5.9.3)(yaml@2.9.1)
+
+  packages/bundler/fixtures/vite-node-in-browser:
+    dependencies:
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../..
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@1.3.0
+        version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1)'
 
   packages/bundler/fixtures/vite-plus:
     dependencies:

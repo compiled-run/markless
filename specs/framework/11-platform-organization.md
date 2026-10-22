@@ -122,6 +122,30 @@ The current Vite integration remains a web adapter surface until a platform
 package owns it. Do not move web Vite behavior into mobile or desktop just
 because all adapters share build concepts.
 
+### No Node code in the browser
+
+What a browser loads never contains Node code. This covers the client build,
+every web worker it bundles, and the dev server's browser requests, including
+the dependencies it pre-bundles. The Vite adapter fails with
+`MARKLESS_NODE_IN_BROWSER` when a module the browser loads:
+
+- imports a Node built-in (`node:*`, `bun:*`, or a bare name such as `fs`,
+  `os` or `child_process`), directly or through re-exports, `export *` or
+  `import()`, and no other plugin answers that import with a browser module;
+- imports a module Vite would replace with an empty browser stand-in, such as
+  one a package's `browser` field maps to `false`;
+- uses `process`, `Buffer`, `global`, `__dirname`, `__filename` or `require`
+  outside a `typeof` check. `process.env` reads are allowed: Vite replaces
+  them in an app, Vitest's browser runner provides them, and a library leaves
+  them to the app that bundles it. A `require("x")` with a literal name is
+  judged by the module it reaches.
+
+The error lists every module from the page entry to the Node import and tells
+the author to move what the browser needs (often one constant or type) into a
+module that imports nothing from Node. There is no allow list and no warning
+mode. Server, SSR and Nitro environments are not checked. CI scans the built
+browser files a second time, independently (`scripts/ci/browser-output-scan.mjs`).
+
 ## Future `@markless/core/ui`
 
 Do not create or export `@markless/core/ui` yet. The future UI layer should sit above

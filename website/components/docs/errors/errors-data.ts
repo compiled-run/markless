@@ -4495,6 +4495,202 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NODE_IN_BROWSER',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'Code that only runs in Node is reachable from code the browser loads.',
+		printed: [
+			'MARKLESS_NODE_IN_BROWSER: Node-only code is reachable from the browser build ("<environment>").',
+		],
+		structured: false,
+		guide: {
+			summary: 'Code that only runs in Node is reachable from code the browser loads.',
+			what: [
+				{
+					id: 's0',
+					text: 'A module the browser loads imports a Node built-in like ',
+				},
+				{
+					id: 's1',
+					text: 'node:fs',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' or ',
+				},
+				{
+					id: 's3',
+					text: 'os',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', directly or through other modules, or uses a global only Node has, like ',
+				},
+				{
+					id: 's5',
+					text: '__dirname',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' or ',
+				},
+				{
+					id: 's7',
+					text: 'Buffer',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: '. A browser has none of these. The build stops and lists every module from the page to the Node import.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Follow the list to the module your page actually needs. Move what it needs, often one constant or type, into its own file that imports nothing from Node, and import that file instead. Keep the Node work in server-only files.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '// starter-ports.ts imports nothing from Node',
+							style: 'color:#6a737d;--shiki-dark:#6a737d',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'STARTER_DEV_PORTS',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' { minimal: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '5173',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r9',
+							text: ' } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'as',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r11',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r13',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' { STARTER_DEV_PORTS } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'./starter-ports.ts'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/browser-node-guard.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/browser-node-guard.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED',
 		packageName: '@markless/compiler',
 		stage: 'compile',

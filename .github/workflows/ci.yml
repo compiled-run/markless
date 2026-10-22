@@ -356,7 +356,8 @@ jobs:
                   path: build-warnings-completed.txt
                   key:
                       build-warnings-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'demos/**/*',
-                      'packages/headless/**/*', 'scripts/ci/build-warnings.mjs', '!**/node_modules/**',
+                      'packages/headless/**/*', 'scripts/ci/build-warnings.mjs',
+                      'scripts/ci/browser-output-scan.mjs', '!**/node_modules/**',
                       '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
 
             # The receipt set is the union of what the box lanes wrote, so every
@@ -1558,7 +1559,8 @@ jobs:
                   path: build-scale-completed.txt
 
     # The docs site and the demo apps build without a single warning on stderr
-    # (scripts/ci/build-warnings.mjs); the starters are held to the same in the unit lane.
+    # (scripts/ci/build-warnings.mjs) and ship no Node-only code to the browser
+    # (scripts/ci/browser-output-scan.mjs); the starters are held to the same in the unit lane.
     build-warnings:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_build_warnings == 'true'
@@ -1581,7 +1583,7 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Build the docs site and demos and fail on any warning
+            - name: Build the docs site and demos and fail on any warning or Node-only browser code
               run: pnpm build-warnings:guard
 
             - name: Mark the build-warnings lane complete
