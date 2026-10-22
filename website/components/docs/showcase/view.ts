@@ -1,6 +1,7 @@
 import { showcaseApps } from './apps.data.ts';
 import type { BytesRange, ShowcaseApp } from './types.ts';
-import { cardInkFiles, movedShare, type CardInkFiles } from './ink-files.ts';
+import { shotPlacement, sketchFile } from './sketch.ts';
+import type { Mark } from '../ink-logos.ts';
 
 /** Plain words for the check report's dimensions, in the order the report lists them. */
 export const checkNames: Readonly<Record<string, string>> = {
@@ -57,6 +58,20 @@ export function progressLine(app: ShowcaseApp): string {
 	return app.coverage ? `${app.coverage.ported} of ${app.coverage.total} pages moved` : 'Pages not counted yet';
 }
 
+const marks: readonly (readonly [RegExp, Mark])[] = [
+	[/docusaurus/i, 'docusaurus'],
+	[/vitepress|vue/i, 'vue'],
+	[/next\.js/i, 'nextjs'],
+	[/remix/i, 'remix'],
+	[/angular/i, 'angular'],
+	[/htmx/i, 'htmx'],
+	[/alpine/i, 'alpine'],
+	[/react/i, 'react'],
+];
+
+/** The ink logo for what an app was built with, by the first framework its description names. */
+export const markFor = (builtWith: string): Mark | null => marks.find(([pattern]) => pattern.test(builtWith))?.[1] ?? null;
+
 export type Card = {
 	readonly slug: string;
 	readonly name: string;
@@ -70,7 +85,9 @@ export type Card = {
 	readonly before: string | null;
 	readonly after: string | null;
 	readonly tone: string;
-	readonly ink: CardInkFiles;
+	readonly mark: Mark | null;
+	readonly sketch: string;
+	readonly placement: ReturnType<typeof shotPlacement>;
 };
 
 const tones = ['pink', 'yellow', 'purple', 'green'];
@@ -87,7 +104,9 @@ export const cards: readonly Card[] = showcaseApps.map((app, at) => ({
 	before: app.headline ? kB(app.headline.before) : null,
 	after: app.headline ? kB(app.headline.after) : null,
 	tone: tones[at % tones.length],
-	ink: cardInkFiles(at, app.slug, movedShare(app), app.status === 'done'),
+	mark: markFor(app.builtWith),
+	sketch: sketchFile(app.slug),
+	placement: shotPlacement(at),
 }));
 
 export function findApp(slug: string): ShowcaseApp | undefined {

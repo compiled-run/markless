@@ -1,58 +1,65 @@
 import { Link } from '@markless/core/router';
 import { asset } from '../../../site-base.ts';
-import { STAMP } from './ink-files.ts';
+import InkLogo from '../ink-logo.tsrx';
+import { CAST_LAYERS, DESK_LAYERS, PILES, SHEET_OVER, SHEET_UNDER, VIEW } from './sketch.ts';
 import { cards } from './view.ts';
 
-const mask = (file: string) => 'mask-image: url(' + asset(file) + ')';
+const viewBox = '0 0 ' + VIEW.width + ' ' + VIEW.height;
+const oldLabel = PILES.old + PILES.w / 2;
+const movedLabel = PILES.moved + PILES.w / 2;
+const labelY = PILES.base + 17;
 
 export default function ShowcaseGrid() @{
 	<ul class="showcase" aria-label="Apps being moved with markless-migrate">
 		@for (const card of cards; key card.slug) {
 			<li class={'card tone-' + card.tone}>
-				<span class="ink wash tall" style={mask(card.ink.wash)} aria-hidden="true"></span>
-				<span class="ink wash wide" style={mask(card.ink.washWide)} aria-hidden="true"></span>
 				<Link href="/start/migrate/[app]" params={{ app: card.slug }} class="hit">
-					<span class="ink frame tall" style={mask(card.ink.frame)} aria-hidden="true"></span>
-					<span class="ink frame wide" style={mask(card.ink.frameWide)} aria-hidden="true"></span>
-					<span class="thumb">
-						<span class="shot">
-							<img src={asset(card.shot)} alt={card.alt} width="800" height="500" loading="lazy" decoding="async" />
-						</span>
-						@if (card.ink.stamp) {
-							<span class="stamp">
-								<svg viewBox={'0 0 ' + STAMP.width + ' ' + STAMP.height} aria-hidden="true">
-									<rect class="stamp-paper" x="5" y="5" width="110" height="46" rx="7" />
-									<text x="60" y="36.5" text-anchor="middle">MOVED</text>
-								</svg>
-								<span class="ink stamp-ring" style={mask(card.ink.stamp)} aria-hidden="true"></span>
-								<span class="sr-only">Finished</span>
-							</span>
-						}
-					</span>
+					<svg class="sketch" viewBox={viewBox} role="img" aria-label={card.alt}>
+						<g class="desk">
+							@for (const layer of DESK_LAYERS; key layer) {
+								<use href={asset(card.sketch) + '#' + layer} class={'l-' + layer} />
+							}
+							<text class="pile-label" x={oldLabel} y={labelY} text-anchor="middle">old pages</text>
+							<text class="pile-label" x={movedLabel} y={labelY} text-anchor="middle">moved</text>
+						</g>
+						<g class="cast">
+							@for (const layer of CAST_LAYERS; key layer) {
+								<use href={asset(card.sketch) + '#' + layer} class={'l-' + layer} />
+							}
+						</g>
+						<g class="sheet">
+							<use href={asset(card.sketch) + '#' + SHEET_UNDER} class="l-sheet-paper" />
+							<image
+								class="print"
+								href={asset(card.shot)}
+								x={card.placement.x}
+								y={card.placement.y}
+								width={card.placement.width}
+								height={card.placement.height}
+								transform={card.placement.transform}
+								preserveAspectRatio="xMidYMin slice"
+							/>
+							@for (const layer of SHEET_OVER; key layer) {
+								<use href={asset(card.sketch) + '#' + layer} class={'l-' + layer} />
+							}
+						</g>
+					</svg>
 					<span class="name">{card.name}</span>
-					<span class="progress">
-						<span class="progress-text">{card.progress}</span>
-						<span class="bar" aria-hidden="true">
-							@if (card.ink.barFill) {
-								<span class="ink bar-fill" style={mask(card.ink.barFill)}></span>
-							}
-							@if (card.ink.barHatch) {
-								<span class="ink bar-hatch" style={mask(card.ink.barHatch)}></span>
-							}
-							<span class="ink bar-ink" style={mask(card.ink.bar)}></span>
-						</span>
+					<span class="progress">{card.progress}</span>
+					<span class="quiet">
+						Was built with
+						@if (card.mark) {
+							<span class="logo"><InkLogo mark={card.mark} /></span>
+						}
+						{card.builtWith}
 					</span>
-					<span class="built">Was built with {card.builtWith}</span>
-					<span class="built checks">Checks passed: {card.checksPassed}</span>
+					<span class="quiet">Checks passed: {card.checksPassed}</span>
 					@if (card.before && card.after) {
-						<span class="metric">
-							<span class="metric-label">JavaScript run at load, home page</span>
-							<span class="metric-value">
-								<s>{card.before}</s>
-								<span aria-hidden="true"> → </span>
-								<span class="sr-only"> before, now </span>
-								<b>{card.after}</b>
-							</span>
+						<span class="quiet">
+							JavaScript at load: {card.before}
+							<span aria-hidden="true"> → </span>
+							<span class="sr-only"> before, now </span>
+							{card.after}
 						</span>
 					}
 				</Link>
@@ -61,8 +68,8 @@ export default function ShowcaseGrid() @{
 		<style>
 			.showcase {
 				display: grid;
-				grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr));
-				gap: var(--space-m) var(--space-m);
+				grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+				gap: var(--space-l) var(--space-m);
 				margin: var(--space-m) 0 var(--space-l);
 				padding: 0;
 				list-style: none;
@@ -70,8 +77,6 @@ export default function ShowcaseGrid() @{
 
 			.card {
 				--tone: var(--pink);
-				position: relative;
-				isolation: isolate;
 				margin: 0;
 				padding: 0;
 			}
@@ -92,193 +97,141 @@ export default function ShowcaseGrid() @{
 				--tone: var(--green-star);
 			}
 
-			.ink {
-				position: absolute;
-				inset: 0;
-				background: var(--ink);
-				mask-size: 100% 100%;
-				mask-repeat: no-repeat;
-				pointer-events: none;
-			}
-
-			.wide {
-				display: none;
-			}
-
-			.wash {
-				z-index: -1;
-				background: var(--tone);
-				opacity: 0.8;
-				transform: translate(7px, 9px);
-
-				html.dark & {
-					opacity: 0.55;
-				}
-			}
-
 			.hit {
-				position: relative;
 				display: flex;
 				flex-direction: column;
-				gap: 0.2em;
-				height: 100%;
-				box-sizing: border-box;
-				padding: 0.6rem 0.6rem 0.9rem;
-				border-radius: 14px;
-				background: var(--raised);
+				gap: 0.1em;
 				color: var(--ink);
 				text-decoration: none;
-				transition: transform 140ms ease;
-			}
-
-			.hit:hover,
-			.hit:focus-visible {
-				transform: translate(-2px, -3px);
 			}
 
 			.hit:focus-visible {
 				outline: 2px solid var(--ink);
-				outline-offset: 4px;
+				outline-offset: 6px;
+				border-radius: 6px;
 			}
 
-			.thumb {
-				position: relative;
-				display: block;
-				margin-bottom: 0.45em;
-			}
-
-			.shot {
-				display: block;
-				border: 1px solid color-mix(in oklch, var(--ink) 55%, transparent);
-				border-radius: 8px;
-				overflow: hidden;
-				aspect-ratio: 8 / 5;
-				background: var(--paper);
-			}
-
-			.shot img {
-				display: block;
-				width: 100%;
-				height: 100%;
-				object-fit: cover;
-				object-position: top;
-			}
-
-			.stamp {
-				--stamp: oklch(47% 0.13 150);
-				position: absolute;
-				top: -0.55rem;
-				right: -0.5rem;
-				width: min(46%, 7.25rem);
-				transform: rotate(-11deg);
-				pointer-events: none;
-
-				html.dark & {
-					--stamp: var(--green-star);
-				}
-			}
-
-			.stamp svg {
+			.sketch {
 				display: block;
 				width: 100%;
 				height: auto;
+				overflow: visible;
+				color: var(--ink);
 			}
 
-			.stamp-paper {
-				fill: var(--raised);
-				opacity: 0.85;
+			.l-sheet-paper,
+			.l-pile-paper {
+				fill: var(--paper);
 			}
 
-			.stamp-ring {
-				background: var(--stamp);
+			.l-sheet-paper {
+				fill: color-mix(in oklch, var(--paper) 88%, currentColor);
 			}
 
-			.stamp text {
-				fill: var(--stamp);
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: 22px;
-				font-weight: 700;
-				letter-spacing: 0.14em;
+			.l-pile-tone {
+				fill: currentColor;
+				opacity: 0.12;
 			}
 
-			.name {
-				padding-inline: 0.2rem;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-1);
-				font-weight: 700;
-				line-height: 1.15;
+			.l-sheet-shade {
+				fill: currentColor;
+				opacity: 0.06;
 			}
 
-			.progress {
-				display: grid;
-				gap: 0.15em;
-				padding-inline: 0.2rem;
-				margin-bottom: 0.35em;
-			}
-
-			.progress-text {
-				font-size: var(--step--1);
-				font-weight: 700;
-				line-height: 1.35;
-			}
-
-			.bar {
-				position: relative;
-				display: block;
-				height: 0.85rem;
-			}
-
-			.bar-fill {
-				background: var(--tone);
-				opacity: 0.9;
-			}
-
-			.bar-hatch {
-				opacity: 0.35;
-			}
-
-			.built {
-				padding-inline: 0.2rem;
-				color: color-mix(in oklch, var(--ink) 72%, var(--paper));
-				font-size: var(--step--1);
-				line-height: 1.35;
-			}
-
-			.checks {
-				margin-bottom: 0.5em;
-			}
-
-			.metric {
-				display: grid;
-				padding: 0.4em 0.6em;
-				border-radius: 8px;
-				margin-top: auto;
-				background: color-mix(in srgb, var(--tone) 22%, var(--paper));
-			}
-
-			.metric-label,
-			.metric-value {
-				line-height: 1.35;
-			}
-
-			.metric-label {
-				font-size: var(--step--2);
-				letter-spacing: 0.01em;
-				opacity: 0.8;
-			}
-
-			.metric-value {
-				font-family: var(--font-mono);
-				font-size: var(--step--1);
-			}
-
-			.metric-value s {
-				text-decoration: none;
+			.l-sheet-hatch,
+			.l-pile-shadow,
+			.l-pile-hatch {
+				stroke: currentColor;
+				stroke-width: 0.55;
+				stroke-linecap: round;
 				opacity: 0.7;
 			}
 
-			.metric-value b {
-				font-weight: 800;
+			.l-sheet-texture {
+				stroke: currentColor;
+				stroke-width: 0.4;
+				stroke-linecap: round;
+				opacity: 0.2;
+			}
+
+			.l-pile-wash {
+				fill: var(--tone);
+				opacity: 0.4;
+			}
+
+			.l-ground,
+			.l-pile-ink,
+			.l-sheet-ink {
+				fill: currentColor;
+			}
+
+			.print {
+				filter: grayscale(1) sepia(0.35) contrast(0.8) brightness(1.04);
+				mix-blend-mode: multiply;
+				opacity: 0.85;
+
+				html.dark & {
+					filter: grayscale(1) sepia(0.3) contrast(0.75) brightness(0.85);
+					mix-blend-mode: luminosity;
+					opacity: 0.7;
+				}
+			}
+
+			.pile-label {
+				fill: currentColor;
+				font-size: 10px;
+				opacity: 0.75;
+			}
+
+			.sheet,
+			.cast {
+				transform-box: fill-box;
+				transform-origin: 40% 40%;
+				transition:
+					transform 180ms ease,
+					opacity 180ms ease;
+			}
+
+			.hit:is(:hover, :focus-visible) .sheet {
+				transform: translate(-1.5px, -4px) rotate(-0.6deg);
+			}
+
+			.hit:is(:hover, :focus-visible) .cast {
+				transform: translate(2px, 3px) scale(1.04);
+				opacity: 0.8;
+			}
+
+			.name {
+				position: relative;
+				margin: -0.9em 0 0.15em 0.2rem;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: var(--step-2);
+				font-weight: 700;
+				line-height: 1.05;
+				letter-spacing: 0.01em;
+				transform: rotate(-1.5deg);
+				transform-origin: left center;
+				width: fit-content;
+				max-width: 62%;
+			}
+
+			.progress {
+				padding-inline: 0.2rem;
+				font-size: var(--step-0);
+				font-weight: 700;
+				line-height: 1.3;
+			}
+
+			.quiet {
+				padding-inline: 0.2rem;
+				color: color-mix(in oklch, var(--ink) 66%, var(--paper));
+				font-size: var(--step--1);
+				line-height: 1.35;
+			}
+
+			.logo {
+				margin-inline-start: 0.2em;
+				color: var(--ink);
 			}
 
 			.sr-only {
@@ -290,54 +243,15 @@ export default function ShowcaseGrid() @{
 				white-space: nowrap;
 			}
 
-			@media (max-width: 600px) {
-				.showcase {
-					gap: var(--space-m);
-				}
-
-				.tall {
-					display: none;
-				}
-
-				.wide {
-					display: block;
-				}
-
-				.hit {
-					display: grid;
-					grid-template-columns: 38% minmax(0, 1fr);
-					grid-template-rows: auto auto auto auto 1fr;
-					column-gap: 0.75em;
-					padding: 0.55rem;
-				}
-
-				.thumb {
-					grid-row: 1 / 6;
-					align-self: start;
-					margin: 0;
-				}
-
-				.name {
-					font-size: var(--step-0);
-				}
-
-				.progress {
-					margin-bottom: 0.2em;
-				}
-
-				.checks {
-					margin-bottom: 0.3em;
-				}
-
-				.metric {
-					align-self: end;
-					padding: 0.3em 0.5em;
-				}
-			}
-
 			@media (prefers-reduced-motion: reduce) {
-				.hit {
+				.sheet,
+				.cast {
 					transition: none;
+				}
+
+				.hit:is(:hover, :focus-visible) .sheet,
+				.hit:is(:hover, :focus-visible) .cast {
+					transform: none;
 				}
 			}
 		</style>
