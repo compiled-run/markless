@@ -125,6 +125,7 @@ export function lazyNamespaceObjects(fileName: string, code: string): Edit[] {
 
 // `var a;var b;` -> `var a,b;` at the first: declarations without initializers hoist either way.
 export function mergedBareVarDeclarations(fileName: string, code: string): Edit[] {
+	if (!hasTwoBareVarStatements(code)) return [];
 	const parsed = parseChunkCode(fileName, code);
 	if (parsed.errors.length) return [];
 	const bare = (parsed.program.body as unknown as Syntax[]).filter(
@@ -144,6 +145,15 @@ export function mergedBareVarDeclarations(fileName: string, code: string): Edit[
 		end: node.end,
 		source: index === 0 ? `var ${names.join(',')};` : '',
 	}));
+}
+
+// A bare `var` statement's first name is followed by `,` or the statement's end, never `=`, so fewer than two
+// such texts means nothing to merge and no parse: parsing every rendered chunk here was 5 s of a 498-page build.
+const BARE_VAR_TEXT = /\bvar\s+[^\s,;=(){}[\]]+\s*(?:[,;\n\r}]|$)/g;
+
+function hasTwoBareVarStatements(code: string): boolean {
+	BARE_VAR_TEXT.lastIndex = 0;
+	return BARE_VAR_TEXT.test(code) && BARE_VAR_TEXT.test(code);
 }
 
 export function packTopLevelPlugin(): Plugin {

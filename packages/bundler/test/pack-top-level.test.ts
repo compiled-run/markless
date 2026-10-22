@@ -84,3 +84,15 @@ test('bare var lists merge into the first one; initialized declarations stay put
 	expect(next).toBe('var a,b,c,e;\nfunction f() { a = 1; }\n\nvar d = 2;\n\nexport { f };');
 	expect(mergedBareVarDeclarations('chunk.js', 'var a;\nlet b;')).toEqual([]);
 });
+
+test('bare var lists merge the same whatever their spelling', () => {
+	const merged = (code: string) =>
+		mergedBareVarDeclarations('chunk.js', code)
+			.filter((edit) => edit.source)
+			.map((edit) => edit.source);
+	expect(merged('var a\nvar b')).toEqual(['var a,b;']);
+	expect(merged('var\n\ta ,\n\tb;var é;')).toEqual(['var a,b,é;']);
+	expect(merged('var $a;function f(){var x = 1}var _b;')).toEqual(['var $a,_b;']);
+	expect(merged('var a = 1;var b = 2;')).toEqual([]);
+	expect(merged('var a = 1, b;var c;')).toEqual([]);
+});
