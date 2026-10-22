@@ -17,18 +17,30 @@ let entries = 0;
 // Sorted, because the two requests for one module build their interface records
 // in whatever order they resolved imports; the values are compiler artifacts,
 // whose own key order is fixed by the code that builds them.
-function sortedRecordEntries(record: Readonly<Record<string, unknown>> | undefined) {
-	if (!record) return null;
-	return Object.keys(record)
+function sortedRecordJson(record: Readonly<Record<string, unknown>> | undefined): string {
+	if (!record) return 'null';
+	return `[${Object.keys(record)
 		.sort()
-		.map((key) => [key, record[key]]);
+		.map((key) => `[${JSON.stringify(key)},${artifactJson(record[key])}]`)
+		.join(',')}]`;
+}
+
+// One child's interface reaches every module that imports it, so its text is built once, not per importer.
+// Artifacts are never mutated: the memo below already hands one result object to every request.
+const artifactJsonByObject = new WeakMap<object, string>();
+
+function artifactJson(value: unknown): string {
+	if (!value || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+	let json = artifactJsonByObject.get(value);
+	if (json === undefined) artifactJsonByObject.set(value, (json = JSON.stringify(value)));
+	return json;
 }
 
 // Every field `compileTsrxModule` reads besides `source`, the outer key. A field left out here would serve one
 // request's output to a different request, so this list must track the input type.
 export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 	try {
-		return JSON.stringify([
+		return `${JSON.stringify([
 			input.filename,
 			input.moduleId ?? null,
 			input.buildId ?? null,
@@ -38,10 +50,9 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 			input.serverOnlyProps ?? null,
 			input.routeRoot === true,
 			input.symbols,
-			sortedRecordEntries(input.importedModuleInterfaces),
-			sortedRecordEntries(input.importedModuleConstants),
-			sortedRecordEntries(input.artifactChildMaterializations),
-		]);
+		])}${sortedRecordJson(input.importedModuleInterfaces)}${sortedRecordJson(
+			input.importedModuleConstants,
+		)}${sortedRecordJson(input.artifactChildMaterializations)}`;
 	} catch {
 		return null;
 	}

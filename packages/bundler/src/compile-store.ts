@@ -16,6 +16,13 @@ export const DEFAULT_COMPILE_CACHE_MAX_BYTES = 1024 * 1024 * 1024;
 export type PersistentCompileCache = PersistentCompileStore & {
 	/** Waits for every write this process started, then trims the store to its size budget. */
 	flush(): Promise<void>;
+	/** Type-stripped emitted code, by the exact text and mode that was stripped. */
+	readonly strippedCode: PersistentTextMemo;
+};
+
+export type PersistentTextMemo = {
+	get(key: string): string | undefined;
+	set(key: string, value: string): void;
 };
 
 /** Runtimes without zstd in `node:zlib` (older Node, some Bun releases) build without the cache. */
@@ -30,6 +37,10 @@ export function createPersistentCompileCache(input: {
 }): PersistentCompileCache {
 	const used = new Set<string>();
 	const writes = new Set<Promise<void>>();
+	const strippedCode = persistentTextMemo(
+		join(input.directory, 'stripped-code.bin'),
+		`${input.fingerprint}\0${stripperVersion()}`,
+	);
 	const pathOf = (source: string, key: string) => {
 		const hash = createHash('sha256')
 			.update(input.fingerprint)
@@ -80,9 +91,52 @@ export function createPersistentCompileCache(input: {
 				.finally(() => writes.delete(pending));
 			writes.add(pending);
 		},
+		strippedCode,
 		async flush() {
 			while (writes.size) await Promise.all(writes);
+			await strippedCode.save();
 			await trim(input.directory, input.maxBytes ?? DEFAULT_COMPILE_CACHE_MAX_BYTES, used);
+		},
+	};
+}
+
+// One file for every entry: thousands of small strips cost more to open one by one than to strip again.
+// Each save keeps only the entries this build asked for, so the file tracks the app instead of growing.
+function persistentTextMemo(path: string, fingerprint: string) {
+	let stored: Map<string, string> | undefined;
+	const kept = new Map<string, string>();
+	let changed = false;
+	const hashOf = (key: string) =>
+		createHash('sha256').update(fingerprint).update('\0').update(key).digest('base64');
+	const load = () => {
+		if (stored) return stored;
+		try {
+			stored = new Map(
+				deserialize(zlib.zstdDecompressSync(readFileSync(path))) as [string, string][],
+			);
+		} catch {
+			stored = new Map();
+		}
+		return stored;
+	};
+	return {
+		get(key: string) {
+			const hash = hashOf(key);
+			const value = kept.get(hash) ?? load().get(hash);
+			if (value !== undefined) kept.set(hash, value);
+			return value;
+		},
+		set(key: string, value: string) {
+			kept.set(hashOf(key), value);
+			changed = true;
+		},
+		async save() {
+			if (!changed && kept.size === load().size) return;
+			const packed = await promisify(zlib.zstdCompress)(serialize([...kept]));
+			await mkdir(dirname(path), { recursive: true });
+			const partial = `${path}.${process.pid}.tmp`;
+			await writeFile(partial, packed);
+			await rename(partial, path);
 		},
 	};
 }
@@ -124,6 +178,18 @@ export function compilerFingerprint(): string {
 		}
 	}
 	return hash.digest('hex');
+}
+
+// The type strip runs oxc through rolldown, so a rolldown upgrade invalidates every stored strip.
+function stripperVersion(): string {
+	try {
+		return readFileSync(
+			join(packageDirectory(createRequire(import.meta.url), 'rolldown'), 'package.json'),
+			'utf8',
+		);
+	} catch {
+		return 'rolldown:missing';
+	}
 }
 
 // Packages that do not export their package.json are found from their entry file upward.
