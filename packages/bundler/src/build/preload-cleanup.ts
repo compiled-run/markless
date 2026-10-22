@@ -1,27 +1,17 @@
 import { callsImportedOrFreeName, type JavaScriptAstNode } from '@markless/compiler';
 import { parseSync } from 'rolldown/experimental';
 import { calleeOffsets, parseChunkCode, spansAnyOffset } from './chunk-ast.ts';
-import { PACK_LOADER_PREFIX } from './lazy-module-facades.ts';
+import { PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 
 export function stripEmptyVitePreloadWrappers(code: string): string {
 	return stripImportedVitePreloadHelper(stripEmptyVitePreloadWrapperCalls(code));
 }
 
-// The text-only half of the strip; what is left needs a parse, which a caller can run ahead in parallel.
+// The text-only half of the strip; what is left needs a parse.
 export function stripEmptyVitePreloadWrapperCalls(code: string): string {
 	const withoutDirectImports = stripDirectEmptyPreloadWrappers(code);
 	const withoutAsyncLoaders = stripAsyncEmptyPreloadWrappers(withoutDirectImports);
 	return stripUnusedVitePreloadHelper(withoutAsyncLoaders);
-}
-
-// The texts stripImportedVitePreloadHelper parses for this code.
-export function importedVitePreloadHelperParses(code: string): string[] {
-	const helper = findImportedVitePreloadHelper(code);
-	if (!helper) return [];
-	return [
-		code,
-		code.slice(0, helper.importStart) + helper.keptImport + code.slice(helper.importEnd),
-	];
 }
 
 type ImportedVitePreloadHelper = {

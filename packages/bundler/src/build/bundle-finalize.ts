@@ -6,7 +6,8 @@ import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_DEMAND } from './chunking.ts'
 import { createExecutionSizesAsset } from './execution-sizes.ts';
 import { executionDemandAsset } from './execution-demand.ts';
 import { collectRenderedModules, createByteAttributionAsset } from './byte-attribution.ts';
-import { clearParsedChunkCode, prefetchChunkParses } from './chunk-ast.ts';
+import { clearParsedChunkCode } from './chunk-ast.ts';
+import { prefetchChunkDynamicImports, runChunkTask } from './chunk-workers.ts';
 import { unwrapAsyncImportWrappers } from './async-import-wrappers.ts';
 import { collapseInitFacadeImports } from './init-facade-imports.ts';
 import {
@@ -20,11 +21,6 @@ import {
 import type { PackOwnership } from './native-packing.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './head-links.ts';
 import { marklessDeferredChunkFileNames } from './route-pack-groups.ts';
-import {
-	importedVitePreloadHelperParses,
-	stripEmptyVitePreloadWrapperCalls,
-	stripImportedVitePreloadHelper,
-} from './preload-cleanup.ts';
 import {
 	type PreloadHelperChunk,
 	stripUnusedVitePreloadHelperFromBundle,
@@ -292,14 +288,11 @@ function bundleWithoutRemovedChunks(
 
 async function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
 	const chunks = Object.values(bundle).filter(isChunkWithCode);
-	const staged = chunks.map((chunk) => stripEmptyVitePreloadWrapperCalls(chunk.code));
-	await prefetchChunkParses(
-		staged.flatMap((code) =>
-			importedVitePreloadHelperParses(code).map((text) => ({ fileName: 'chunk.js', code: text })),
-		),
+	const stripped = await Promise.all(
+		chunks.map((chunk) => runChunkTask('strippedPreloadHelper', 'chunk.js', chunk.code)),
 	);
 	for (const [index, output] of chunks.entries()) {
-		const nextCode = stripImportedVitePreloadHelper(staged[index]!);
+		const nextCode = stripped[index]!;
 		if (nextCode !== output.code) {
 			output.code = nextCode;
 		}
@@ -312,7 +305,7 @@ async function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknow
 }
 
 function prefetchDynamicImportParses(bundle: Record<string, unknown>): Promise<void> {
-	return prefetchChunkParses(
+	return prefetchChunkDynamicImports(
 		Object.values(bundle).filter(
 			(output): output is { readonly type: 'chunk'; readonly fileName: string; code: string } =>
 				isChunkWithCode(output) && isChunkFile(output) && output.code.includes('import('),

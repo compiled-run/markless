@@ -1,5 +1,6 @@
 import { RolldownMagicString, type Plugin } from 'rolldown';
 import { parseChunkCode } from './chunk-ast.ts';
+import { runChunkTask } from './chunk-workers.ts';
 
 // Top-level statements of a pack run when it evaluates, even for modules it only declares. Two
 // rewrites shrink them: namespace objects are built on first read, and bare `var` lists merge.
@@ -156,15 +157,17 @@ function hasTwoBareVarStatements(code: string): boolean {
 	return BARE_VAR_TEXT.test(code) && BARE_VAR_TEXT.test(code);
 }
 
+// Namespace edits touch initialized declarations and references; merging touches only bare ones.
+export function packTopLevelEdits(fileName: string, code: string): Edit[] {
+	return [...lazyNamespaceObjects(fileName, code), ...mergedBareVarDeclarations(fileName, code)];
+}
+
 export function packTopLevelPlugin(): Plugin {
 	return {
 		name: 'markless-pack-top-level',
-		renderChunk(code, chunk, options) {
-			// Namespace edits touch initialized declarations and references; merging touches only bare ones.
-			const edits = [
-				...lazyNamespaceObjects(chunk.fileName, code),
-				...mergedBareVarDeclarations(chunk.fileName, code),
-			];
+		async renderChunk(code, chunk, options) {
+			if (!code.includes(NAMESPACE_HELPER) && !hasTwoBareVarStatements(code)) return null;
+			const edits = await runChunkTask('packTopLevelEdits', chunk.fileName, code);
 			if (!edits.length) return null;
 			const source = new RolldownMagicString(code);
 			for (const edit of edits)

@@ -150,6 +150,8 @@ const buildOrder: PackUserConfig[] = [
 		// The isolated-declarations emitter cannot type the web sources the prerender path bundles.
 		dts: { eager: true },
 		entry: {
+			// Spawned by path at run time, so it ships as its own file beside the bundles that start it.
+			'chunk-worker': './src/build/chunk-worker.ts',
 			'dev-error': './src/dev-error/index.ts',
 			preload: './src/preload.ts',
 			rolldown: './src/rolldown.ts',
