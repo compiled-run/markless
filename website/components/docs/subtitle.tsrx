@@ -22,7 +22,7 @@ export default function Subtitle({
 
 	<>
 	@if (terms) {
-		// A div: each term's popup is a div, which a <p> cannot hold. The ink fades, not the box, so the popup stays opaque.
+		// A div: each term's popup is a div, which a <p> cannot hold.
 		<div class="page-subtitle rich" role="paragraph">
 			@for (const piece of pieces; key piece.key) {
 				@if (piece.term) {
@@ -37,12 +37,6 @@ export default function Subtitle({
 					margin-block: -0.2em var(--space-m);
 					font-size: var(--step-1);
 					line-height: 135%;
-					opacity: 0.72;
-				}
-
-				.page-subtitle.rich {
-					opacity: 1;
-					color: color-mix(in oklch, currentColor 72%, transparent);
 				}
 			</style>
 		</div>
@@ -56,7 +50,6 @@ export default function Subtitle({
 					margin-block: -0.2em var(--space-m);
 					font-size: var(--step-1);
 					line-height: 135%;
-					opacity: 0.72;
 				}
 			</style>
 		</p>
