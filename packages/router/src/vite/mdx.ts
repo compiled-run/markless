@@ -316,13 +316,18 @@ function tsrxImportShapeMessage(
 	);
 	if (named) {
 		const exported =
-			named.imported.type === 'Identifier' ? named.imported.name : String(named.imported.value);
+			named.imported.type === 'Identifier'
+				? named.imported.name
+				: String(named.imported.value);
 		return `${intro} Write \`import ${named.local.name} from '${source}';\` and make ${exported} the file's \`export default\`.`;
 	}
 	return `${intro} Write \`import Component from '${source}';\` and make the component the file's \`export default\`.`;
 }
 
-type EstreeImportDeclaration = Extract<EstreeProgram['body'][number], { type: 'ImportDeclaration' }>;
+type EstreeImportDeclaration = Extract<
+	EstreeProgram['body'][number],
+	{ type: 'ImportDeclaration' }
+>;
 
 type EstreeImportSpecifier = Extract<
 	EstreeImportDeclaration['specifiers'][number],
@@ -739,10 +744,9 @@ function renderMdxRenderDataLoader(
 		});
 		return `import(${JSON.stringify(source)})`;
 	});
-	const exportName = reachedFrom ? 'marklessPrerenderData' : 'marklessRenderData';
 	const children = components.map(
 		(component, index) =>
-			`{ componentIndex: ${index}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}, props: ${componentPropsExpression(component)}, surface: modules[${index}].${exportName} }`,
+			`{ componentIndex: ${index}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}, props: ${componentPropsExpression(component)}, surface: modules[${index}].marklessPrerenderData }`,
 	);
 	const load = `Promise.all([${imports.join(', ')}]).then(modules => createMdxRenderDataSurface(marklessMdxParts, [${children.join(', ')}]))`;
 	return parts
