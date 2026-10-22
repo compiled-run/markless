@@ -16,10 +16,11 @@ type Job = {
 	readonly reject: (error: unknown) => void;
 };
 
-type PooledWorker = { readonly worker: Worker; job: Job | undefined };
+type PooledWorker = { readonly worker: Worker; job: Job | undefined; gone: boolean };
 
 let pool: PooledWorker[] | undefined;
 let unavailable = false;
+let poolSize = 0;
 const queue: Job[] = [];
 let nextId = 0;
 
@@ -33,39 +34,57 @@ function workerUrl(): URL {
 
 function startPool(): PooledWorker[] | undefined {
 	if (pool || unavailable) return pool;
-	const size = Math.max(1, Math.min(availableParallelism() - 1, 8));
-	try {
-		pool = Array.from({ length: size }, () => {
-			const entry: PooledWorker = { worker: new Worker(workerUrl()), job: undefined };
-			entry.worker.unref();
-			entry.worker.on('message', (message: { result?: unknown; error?: string }) => {
-				const job = entry.job;
-				entry.job = undefined;
-				if (job) {
-					if (message.error !== undefined) job.reject(new Error(message.error));
-					else job.resolve(message.result as never);
-				}
-				dispatch();
-			});
-			entry.worker.on('error', () => {
-				const job = entry.job;
-				entry.job = undefined;
-				// A dead worker takes its job's inline answer and leaves the pool.
-				pool = pool?.filter((item) => item !== entry);
-				if (job) runInline(job);
-				if (!pool?.length) {
-					pool = undefined;
-					unavailable = true;
-					for (const queued of queue.splice(0)) runInline(queued);
-				} else dispatch();
-			});
-			return entry;
-		});
-	} catch {
-		unavailable = true;
-		pool = undefined;
-	}
+	poolSize = Math.max(1, Math.min(availableParallelism() - 1, 8));
+	pool = [];
+	addWorker();
 	return pool;
+}
+
+// One worker boots at a time: workers booting together under a CPU profiler deadlocked inside Node's builtin loader.
+function addWorker(): void {
+	if (!pool || pool.length >= poolSize) return;
+	let worker: Worker;
+	try {
+		worker = new Worker(workerUrl());
+	} catch {
+		if (!pool.length) {
+			pool = undefined;
+			unavailable = true;
+			for (const queued of queue.splice(0)) runInline(queued);
+		}
+		return;
+	}
+	const entry: PooledWorker = { worker, job: undefined, gone: false };
+	pool.push(entry);
+	worker.unref();
+	worker.once('online', addWorker);
+	worker.on('message', (message: { result?: unknown; error?: string }) => {
+		const job = entry.job;
+		entry.job = undefined;
+		if (job) {
+			if (message.error !== undefined) job.reject(new Error(message.error));
+			else job.resolve(message.result as never);
+		}
+		dispatch();
+	});
+	// A worker that dies, with or without an error, hands its job to the main thread and leaves the pool.
+	const retire = () => {
+		if (entry.gone) return;
+		entry.gone = true;
+		const job = entry.job;
+		entry.job = undefined;
+		if (job) runInline(job);
+		if (!pool?.includes(entry)) return;
+		pool = pool.filter((item) => item !== entry);
+		if (!pool.length) {
+			pool = undefined;
+			unavailable = true;
+			for (const queued of queue.splice(0)) runInline(queued);
+		} else dispatch();
+	};
+	worker.on('error', retire);
+	worker.on('exit', retire);
+	dispatch();
 }
 
 function runInline(job: Job): void {
@@ -132,12 +151,10 @@ export function runChunkTask<T extends ChunkTaskName>(
 	});
 }
 
-export async function closeChunkWorkers(): Promise<void> {
+// Idle workers are unreferenced, so they never keep the process alive. The pool is shared by every build in the
+// process and builds can overlap, so a build that ends forgets its answers but leaves the workers running.
+export function releaseChunkWorkers(): void {
 	forgetChunkTaskResults();
-	const current = pool;
-	pool = undefined;
-	unavailable = false;
-	if (current) await Promise.all(current.map((entry) => entry.worker.terminate()));
 }
 
 /** Reads the dynamic imports of every large chunk on the workers, so later passes find them cached. */

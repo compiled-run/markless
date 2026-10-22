@@ -1,12 +1,7 @@
-import { afterAll, expect, test } from 'vitest';
-import {
-	CHUNK_WORKER_MIN_CODE_LENGTH,
-	closeChunkWorkers,
-	runChunkTask,
-} from '../src/build/chunk-workers.ts';
+import { expect, test } from 'vitest';
+import { CHUNK_WORKER_MIN_CODE_LENGTH, runChunkTask } from '../src/build/chunk-workers.ts';
 import { runChunkTaskInline, type ChunkTaskName } from '../src/build/chunk-tasks.ts';
 
-afterAll(() => closeChunkWorkers());
 
 // A rendered pack: namespace objects, bare vars, cross-chunk imports and exports, a facade-style
 // dynamic import read, a Vite preload helper, and enough filler to clear the worker threshold.
