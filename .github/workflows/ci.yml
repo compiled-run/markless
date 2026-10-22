@@ -413,8 +413,18 @@ jobs:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
 
+            # Every lane installs Playwright's system libraries from these packages instead of the runner's
+            # apt mirror, which has stalled lanes for up to 20 minutes downloading the same 119 MB.
+            - name: Look up the cached Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+                  lookup-only: true
+
             - name: Install Markless dependencies
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              if: steps.playwright-cache.outputs.cache-hit != 'true' || steps.apt-cache.outputs.cache-hit != 'true'
               run: pnpm install --frozen-lockfile
 
             - name: Install the pinned Chromium and WebKit
@@ -428,6 +438,22 @@ jobs:
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
+
+            - name: Download the Playwright system packages
+              if: steps.apt-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: |
+                  echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99keep-downloaded-packages
+                  pnpm --dir packages/vitest-browser exec playwright install-deps chromium webkit
+                  mkdir -p ${{ github.workspace }}-playwright-apt
+                  cp /var/cache/apt/archives/*.deb ${{ github.workspace }}-playwright-apt/
+
+            - name: Save the Playwright system packages
+              if: steps.apt-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
 
     # The steps that used to run back-to-back inside one 30-minute `test` job
     # now run as the parallel lanes below. Nothing was dropped: every step of
@@ -478,6 +504,17 @@ jobs:
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
+
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium webkit
@@ -535,6 +572,17 @@ jobs:
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
+
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
@@ -644,6 +692,17 @@ jobs:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
 
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
+
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
@@ -717,6 +776,17 @@ jobs:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
 
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
+
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
@@ -786,6 +856,17 @@ jobs:
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
+
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
@@ -859,6 +940,17 @@ jobs:
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
+
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
@@ -935,6 +1027,17 @@ jobs:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
 
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
+
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
@@ -1002,6 +1105,17 @@ jobs:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
 
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
+
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
 
@@ -1062,6 +1176,17 @@ jobs:
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
+
+            - name: Restore the Playwright system packages
+              id: apt-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
+            - name: Hand the cached system packages to apt
+              if: steps.apt-cache.outputs.cache-hit == 'true'
+              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
               run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
