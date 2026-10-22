@@ -3,6 +3,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { writeHeapSnapshot } from 'node:v8';
 import { createBuilder } from 'vite';
 import { markless } from '../../../packages/core/src/vite.ts';
 import { router } from '../../../packages/router/src/vite/index.ts';
@@ -46,6 +47,8 @@ const retainedAt = (phase) =>
 			heapBytes: process.memoryUsage().heapUsed,
 			rssBytes: process.memoryUsage().rss,
 		});
+		if (process.env.BUILD_SCALE_SNAPSHOT === `${this.environment?.name}:${phase}`)
+			writeHeapSnapshot(join(app.dir, `${this.environment?.name}-${phase}.heapsnapshot`));
 	};
 const phases = ['buildStart', 'buildEnd', 'renderStart', 'generateBundle', 'writeBundle'];
 const retainedHeapPlugin = {

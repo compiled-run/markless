@@ -1,29 +1,29 @@
 {
-	"pages": [100, 300],
+	"pages": [60, 180],
 	"budgets": {
 		"peakRssBytes": {
-			"bytes": 4831838208,
-			"reason": "4.5 GB: measured 3.33 to 3.36 GB at 300 pages (M-series macOS, Node 24, 2026-10-21), and resident memory moves by a few hundred MB between runs. main before the build-scale fixes: 4.31 GB."
+			"bytes": 6442450944,
+			"reason": "6 GB: measured 3.30 and 4.72 GB at 180 pages (M-series macOS, Node 24, 2026-10-22); resident memory varies by over 1 GB between runs. origin/main before the transform-cache release: 6.48 GB."
 		},
 		"peakRssBytesPerPage": {
-			"bytes": 12582912,
-			"reason": "12 MB: measured 7.6 to 7.9 MB per page between 100 and 300 pages; main before the build-scale fixes: 12.4 MB."
+			"bytes": 20971520,
+			"reason": "20 MB: measured 0.05 and 13.7 MB per page between 60 and 180 pages (noisy, so the budget catches gross growth only); origin/main before: 26.9 MB."
 		},
 		"retainedHeapBytes": {
-			"bytes": 629145600,
-			"reason": "600 MB: measured 528 to 529 MB held after a full collection at 300 pages, at the end of the client bundle's generate pass; main before the build-scale fixes: 1,104 MB."
+			"bytes": 838860800,
+			"reason": "800 MB: measured 732 and 733 MB held after a full collection at 180 pages; origin/main before: 843 MB."
 		},
 		"retainedHeapBytesPerPage": {
-			"bytes": 1468006,
-			"reason": "1.4 MB: measured 1.12 to 1.13 MB per page between 100 and 300 pages; main before the build-scale fixes: 3.24 MB."
+			"bytes": 3040870,
+			"reason": "2.9 MB: measured 2.62 and 2.63 MB per page between 60 and 180 pages; origin/main before: 3.25 MB. Each page compiles about 70 symbol modules of its own, which is what this grows with."
 		},
 		"largestClientChunkBytes": {
 			"bytes": 262144,
-			"reason": "256 kB: measured 0.12 MB at 300 pages (main the same); the runtime walls in fixture-builds gate framework weight, this catches a chunk that absorbs the site."
+			"reason": "256 kB: measured 0.11 MB at 180 pages (origin/main the same); the runtime walls in fixture-builds gate framework weight, this catches a chunk that absorbs the site."
 		},
 		"largestArtifactBytes": {
-			"bytes": 4194304,
-			"reason": "4 MB: measured 3.20 MB (interaction-closures.json) at 300 pages; main before the build-scale fixes wrote 84.6 MB."
+			"bytes": 6291456,
+			"reason": "6 MB: measured 4.63 MB (interaction-closures.json) at 180 pages; origin/main before wrote a 22.6 MB execution-demand.json."
 		}
 	}
 }
