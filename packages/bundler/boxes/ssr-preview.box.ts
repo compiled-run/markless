@@ -7,6 +7,7 @@ import {
 } from '../test-support/execution-expectations.ts';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { MARKLESS_EXECUTION_DEMAND, MARKLESS_EXECUTION_SIZES } from '../src/build/chunking.ts';
+import { readExecutionDemandAsset } from '../src/build/execution-demand.ts';
 import { executedModulesPlugin } from '../test-support/executed-modules-plugin.ts';
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/resumer-script/src/resumer-source.mjs';
@@ -106,13 +107,13 @@ export default box(
 		const action = counterClickAction(view);
 		// The demand map ships as a build asset (payload-module exports are
 		// tree-shaken from built pages by design).
-		const demandByModule = JSON.parse(
+		const demandByModule = readExecutionDemandAsset(
 			(
 				await instrumentedBuild.artifact(
 					marklessBuildManifestPath(DIST, MARKLESS_EXECUTION_DEMAND),
 				)
 			).text,
-		) as Record<string, unknown>;
+		);
 		const runtimeDemandMap = Object.values(demandByModule)[0];
 		const allowed = deriveAllowedModules(
 			view,

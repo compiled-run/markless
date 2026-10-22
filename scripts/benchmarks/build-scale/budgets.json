@@ -2,12 +2,12 @@
 	"pages": [60, 180],
 	"budgets": {
 		"peakRssBytes": {
-			"bytes": 6442450944,
-			"reason": "6 GB: measured 3.30 and 4.72 GB at 180 pages (M-series macOS, Node 24, 2026-10-22); resident memory varies by over 1 GB between runs. origin/main before the transform-cache release: 6.48 GB."
+			"bytes": 9663676416,
+			"reason": "9 GB: five runs at 180 pages measured 3.30, 4.72 and 7.22 GB on an M-series Mac and 6.23 GB on CI's ubuntu runner (2026-10-22). Peak resident memory is mostly rolldown's native memory per module and moves by 4 GB between identical runs, so this catches gross growth only; held heap carries the per-page gate. origin/main locally: 6.48 GB."
 		},
 		"peakRssBytesPerPage": {
-			"bytes": 20971520,
-			"reason": "20 MB: measured 0.05 and 13.7 MB per page between 60 and 180 pages (noisy, so the budget catches gross growth only); origin/main before: 26.9 MB."
+			"bytes": 50331648,
+			"reason": "48 MB: the same runs measured 0.05, 13.7 and 34.0 MB per page locally and 27.5 MB on CI between 60 and 180 pages, the spread of the peak above; origin/main locally: 26.9 MB."
 		},
 		"retainedHeapBytes": {
 			"bytes": 838860800,
