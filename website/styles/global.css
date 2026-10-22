@@ -422,7 +422,7 @@ markless-outline { display: contents; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	html:has(markless-outline) { scroll-behavior: smooth; }
+	html:has(.on-this-page:is(:hover, :focus-within)) { scroll-behavior: smooth; }
 }
 
 @media (prefers-reduced-motion: reduce) {

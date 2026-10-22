@@ -130,6 +130,36 @@ try {
 	assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior), 'auto');
 	console.log('PASS: long outlines, both themes, and reduced motion.');
 
+	const reload = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+	await reload.goto(`${base}/reference`);
+	await reload.waitForFunction(() => document.querySelector('.on-this-page[data-outline-ready]'));
+	await reload.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight / 2, behavior: 'instant' }));
+	await reload.waitForFunction(() => document.querySelector('.on-this-page-link')?.getAttribute('aria-current') !== 'location');
+	const saved = await reload.locator('.on-this-page [aria-current]').getAttribute('href');
+	await reload.addInitScript(() => {
+		window.outlineFrames = [];
+		let settled = 0;
+		const tick = () => {
+			const rail = document.querySelector('.on-this-page');
+			if (rail) window.outlineFrames.push([...rail.querySelectorAll('[aria-current]')].map(link => link.getAttribute('href')).join(' '));
+			if (rail?.hasAttribute('data-outline-ready')) settled += 1;
+			if (settled < 20) requestAnimationFrame(tick);
+			else window.outlineSettled = true;
+		};
+		requestAnimationFrame(tick);
+	});
+	await reload.route('**/outline*.js', async route => {
+		await new Promise(resolve => setTimeout(resolve, 800));
+		await route.continue();
+	});
+	await reload.reload();
+	await reload.waitForFunction(() => window.outlineSettled);
+	const frames = await reload.evaluate(() => window.outlineFrames);
+	assert.ok(frames.length > 20);
+	assert.deepEqual([...new Set(frames)], [saved], 'A reload partway down paints the saved heading as active from the first frame, before outline.js runs');
+	await reload.close();
+	console.log('PASS: reload keeps the active heading from the first frame.');
+
 	const touch = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 	await touch.goto(`${base}/concepts/state`);
 	await touch.waitForFunction(() => document.querySelector('.on-this-page[data-outline-ready]'));
@@ -149,6 +179,7 @@ try {
 	const plain = await browser.newPage({ javaScriptEnabled: false, reducedMotion: 'reduce', viewport: { width: 1600, height: 1000 } });
 	await plain.goto(`${base}/concepts/state`);
 	assert.equal(await plain.locator('.on-this-page-label').first().evaluate(label => getComputedStyle(label).opacity), '0', 'The first paint is already the compact outline, with no script');
+	assert.equal(await plain.locator('.on-this-page-link').first().getAttribute('aria-current'), 'location', 'Without JavaScript the first heading is the active one');
 	const plainRows = await rowBoxes(plain);
 	await plain.locator('.on-this-page').hover();
 	assert.deepEqual([...new Set(await plain.locator('.on-this-page-label').evaluateAll(labels => labels.map(label => getComputedStyle(label).opacity)))], ['1']);

@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { transformMdxRoute } from '../../packages/router/src/vite/mdx.ts';
-import { highlightMdx, stackTables } from './highlight-mdx.ts';
+import { readFileSync } from 'node:fs';
+import { OUTLINE_RESTORE_SCRIPT, OUTLINE_STORAGE_KEY, highlightMdx, stackTables } from './highlight-mdx.ts';
 
 test('the outline keeps native heading links inside an independently mounted reader', async () => {
 	const code = await transformMdxRoute(
@@ -21,6 +22,15 @@ test('the outline keeps native heading links inside an independently mounted rea
 	expect(html).toContain('href="#first-2"');
 	expect(html).toContain('<span class="on-this-page-label">Nested <code>code</code></span>');
 	expect(html.indexOf('<markless-outline>')).toBeGreaterThan(html.indexOf('</h1>'));
+	expect([...html.matchAll(/aria-current="location"/g)]).toHaveLength(1);
+	expect(html).toContain('<a class="on-this-page-link" href="#first" aria-current="location">');
+	expect(html).toContain(`</nav><script>${OUTLINE_RESTORE_SCRIPT}</script></markless-outline>`);
+});
+
+test('the first-paint restore script stays tiny, synchronous and shares the saved-heading key', () => {
+	expect(OUTLINE_RESTORE_SCRIPT).not.toContain('<');
+	expect(new TextEncoder().encode(OUTLINE_RESTORE_SCRIPT).length).toBeLessThan(512);
+	expect(readFileSync(new URL('../public/outline.js', import.meta.url), 'utf8')).toContain(`\`${OUTLINE_STORAGE_KEY}\${location.pathname}\``);
 });
 
 test('a markdown table labels each body cell with its column header so a phone can stack the rows', async () => {
