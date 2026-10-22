@@ -386,6 +386,10 @@ function splitStartupPacksByStaticReach(
 	// What a first event on some route statically reaches. A handler whose own imports would add a
 	// file's worth of code stays off the path: only its own event waits for it.
 	const staticReach = new Set<string>();
+	// Listed once: filtering every owner for each route was quadratic in the page count.
+	const ownHandlers = new Map<string, string[]>();
+	for (const [id, routes] of owners)
+		if (routes.size === 1 && seed(id) && handler(id)) push(ownHandlers, [...routes][0]!, id);
 	for (const [route, ids] of input.routes) {
 		const visited = new Set<string>();
 		const first = closure(
@@ -395,15 +399,7 @@ function splitStartupPacksByStaticReach(
 		);
 		for (const id of first.reached) visited.add(id);
 		// A handler only this page reaches rides its route pack; one other routes share keeps its shared pack whole.
-		const candidates = [
-			...first.handlers,
-			...[...owners]
-				.filter(
-					([id, routes]) =>
-						routes.size === 1 && routes.has(route) && seed(id) && handler(id),
-				)
-				.map(([id]) => id),
-		];
+		const candidates = [...first.handlers, ...(ownHandlers.get(route) ?? [])];
 		while (candidates.length) {
 			const id = candidates.pop()!;
 			if (visited.has(id)) continue;
