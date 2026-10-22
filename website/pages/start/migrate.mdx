@@ -10,44 +10,42 @@ import MigrateAnatomy from '../../components/figures/migrate/migrate-anatomy.tsr
 
 # Migrating an app
 
-<PageMeta level="Start here" time="3 min" assumes="nothing" sprite="arrow-curve" />
+<PageMeta level="Start here" time="2 min" assumes="nothing" sprite="arrow-curve" />
 
 <ThemeToggle />
 
-<Subtitle text="From Next.js and Angular apps to Vue, htmx and Alpine.js sites: markless-migrate moves your app to Markless one page at a time, and a page goes live only once it works the same as before." />
+<Subtitle text="Move a Next.js, Angular, Vue, htmx or Alpine.js app to Markless one page at a time. Each page goes live only once it works the same as before." />
 
-## Will it work for my app?
+## How it works
 
-So far it has moved pages of apps built with Next.js, Remix, Angular, React (Docusaurus and shadcn-admin), Vue (VitePress), htmx and Alpine.js. It can work from your source code, or from the live site alone: htmx.org and alpinejs.dev are being moved from their public URLs, with no source code. It also reads the routes of Rails, Laravel, Django and WordPress apps, though none of those has been moved yet.
-
-What it cannot do yet:
-
-- Charts, maps, editors and 3D views that draw into a canvas, or that you drag, pan or type into, are not rewritten. The check cannot test them, so the new page keeps using the library, loaded after the page itself.
-- Requests your server makes while it builds a page are compared only for Node servers. For PHP, Ruby, Python or Go servers, only the browser's requests are compared.
-- It holds back requests that save or delete data, unless both apps run on your machine or you mark them as staging with test data. Writes your server makes on its own while it answers a page cannot be held back, so point it at test data.
-- Pages behind bot protection, like Cloudflare's challenge page, need a staging URL or a bypass token.
-
-## How it stays safe
-
-Your coding agent rewrites one page. markless-migrate then opens the old page and the new one side by side, at desktop and phone sizes, and clicks everything on them. It compares what people see, what search engines and screen readers get, the requests each page makes, and how much JavaScript runs at load.
-
-A page switches to Markless only when it looks, behaves and loads the same as the old one. Until then, your old app keeps serving it, so nothing your visitors use breaks while you move. Your agent cannot switch a page that fails. You can force one, but it is recorded as forced, with your name and reason.
+Your coding agent rewrites a page. markless-migrate checks the old and new page side by side: what people see, what search engines and screen readers get, and how fast it loads. The page switches only when they match. Until then, your old app keeps serving it.
 
 <MigrateAnatomy />
 
 ## Start
 
-It works through the coding agent you already use, like Claude Code, Codex or Cursor. One command sets it up for your agent, and `setup --undo` puts everything back:
+Works with Claude Code, Codex, Cursor and other coding agents:
 
 ```bash
 npx @markless/migrate setup
 ```
 
-It is open source under the MIT license, and the source is in the [markless-migrate repo on GitHub](https://github.com/compiled-run/markless-migrate). It is a preview and not on npm yet.
+It is a preview and not on npm yet. MIT licensed, [source on GitHub](https://github.com/compiled-run/markless-migrate).
+
+## Will it work for my app?
+
+It has moved Next.js, Remix, Angular, React, Vue, htmx and Alpine.js apps, from source code or from the live site alone.
+
+Not yet:
+
+- Charts, maps, editors and 3D views drawn on a canvas keep their original library.
+- Requests your server makes are compared only on Node servers.
+- Requests that save or delete data are held back, so point it at test data.
+- Pages behind bot protection need a staging URL or bypass token.
 
 ## Apps moved so far
 
-Each card shows how many pages have moved and how many checks pass. Click a card for its full check report.
+Click a card for its full report.
 
 <ShowcaseGrid />
 
