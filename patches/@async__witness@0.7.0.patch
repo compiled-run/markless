@@ -1,8 +1,31 @@
 diff --git a/dist/runner-KOWah4hZ.mjs b/dist/runner-KOWah4hZ.mjs
-index cacf0c6df0cdefd7d000ba41804308c88f7307f0..39d5fb5e58465bcb127e871656255320f5ac56b5 100644
+index cacf0c6df0cdefd7d000ba41804308c88f7307f0..7c8e5fe571ea8b676444c316989a30e39fce0161 100644
 --- a/dist/runner-KOWah4hZ.mjs
 +++ b/dist/runner-KOWah4hZ.mjs
-@@ -2519,6 +2519,39 @@ async function mirrorWsUpdateEvidence(state, store) {
+@@ -1598,7 +1598,8 @@ function createExpectApi(options) {
+ 		const driver = getPageDriver(page, "expect.page");
+ 		try {
+ 			return await driver.page.evaluate(expression);
+-		} catch {
++		} catch (error) {
++			if (error?.witnessPageUnanswered) throw error;
+ 			return;
+ 		}
+ 	};
+@@ -1607,8 +1608,10 @@ function createExpectApi(options) {
+ 		const driver = getPageDriver(page, `expect.${assertion}`);
+ 		try {
+ 			await driver.page.waitForExpression(condition, timeoutMs);
+-		} catch {
+-			failAssertion(assertion, driver.record.environment, null, `${await describeFailure()} (page ${page.url}, waited ${timeoutMs}ms)`);
++		} catch (waitError) {
++			const describe = waitError?.witnessPageUnanswered ? Promise.reject(waitError) : describeFailure();
++			const description = await describe.catch((error) => `the page stopped answering: ${errorMessage(error)}`);
++			failAssertion(assertion, driver.record.environment, null, `${description} (page ${page.url}, waited ${timeoutMs}ms)`);
+ 		}
+ 		passAssertion(assertion, driver.record.environment, null);
+ 	};
+@@ -2519,6 +2522,39 @@ async function mirrorWsUpdateEvidence(state, store) {
  	if (!store.events.some((event) => event.kind === "hot-payload" && event.source === "channel" && event.payload.type === "update")) return;
  	await store.waitUntil("the websocket hot client to mirror the HMR update payload", () => store.events.find((event) => event.kind === "hot-payload" && event.source === "ws" && event.payload.type === "update"), 3e3).catch(() => void 0);
  }
@@ -42,7 +65,7 @@ index cacf0c6df0cdefd7d000ba41804308c88f7307f0..39d5fb5e58465bcb127e871656255320
  async function runSingleBox(args) {
  	const { discovered, root, runDir, receiptPath, boxIndex, assertionTimeoutMs, fileSystem, browser: browserCapability, headless } = args;
  	const definition = discovered.box;
-@@ -2692,8 +2725,16 @@ async function runSingleBox(args) {
+@@ -2692,8 +2728,16 @@ async function runSingleBox(args) {
  		exportName: discovered.exportName
  	});
  	let status = "passed";
@@ -60,7 +83,7 @@ index cacf0c6df0cdefd7d000ba41804308c88f7307f0..39d5fb5e58465bcb127e871656255320
  	} catch (error) {
  		status = "failed";
  		recorder.error = error instanceof Error ? {
-@@ -2702,13 +2743,15 @@ async function runSingleBox(args) {
+@@ -2702,13 +2746,15 @@ async function runSingleBox(args) {
  		} : { message: String(error) };
  		recorder.timeline("box failed", { message: recorder.error.message });
  	} finally {
@@ -81,7 +104,7 @@ index cacf0c6df0cdefd7d000ba41804308c88f7307f0..39d5fb5e58465bcb127e871656255320
  		}
  		await projectRuntime.restoreAll();
 diff --git a/dist/witness.mjs b/dist/witness.mjs
-index 8d5c052916c1b0a0565a34dba70799457f8ac51c..4e4f2b6d3337f48f11575494e38e0aa85817682a 100755
+index 8d5c052916c1b0a0565a34dba70799457f8ac51c..e7e5b05f879e059c8caa8d914203b2e53c5beb3f 100755
 --- a/dist/witness.mjs
 +++ b/dist/witness.mjs
 @@ -275,9 +275,10 @@ function spawnWithNode(childProcess, executable, args) {
@@ -133,7 +156,19 @@ index 8d5c052916c1b0a0565a34dba70799457f8ac51c..4e4f2b6d3337f48f11575494e38e0aa8
  		liveBrowserShutdowns.delete(shutdown);
  	};
  	let shutdownOutcome = null;
-@@ -657,6 +674,7 @@ async function raceHostBackstop(pageAnswer, backstopMs) {
+@@ -587,6 +604,11 @@ const WAIT_SAFETY_TICK_MS = 100;
+ const HOST_BACKSTOP_SLACK_MS = 500;
+ /** Pause before re-evaluating after a navigation destroys the wait's context. */
+ const CONTEXT_RETRY_PAUSE_MS = 20;
++/** Bound on a plain page read; a live page answers one in milliseconds. */
++const PAGE_ANSWER_TIMEOUT_MS = 1e4;
++function pageUnansweredError(message) {
++	return Object.assign(new Error(message), { witnessPageUnanswered: true });
++}
+ function delay(ms) {
+ 	return new Promise((resolve) => setTimeout(resolve, ms));
+ }
+@@ -657,6 +679,7 @@ async function raceHostBackstop(pageAnswer, backstopMs) {
  	}
  }
  /** Signals that the wait's execution context died before the page answered. */
@@ -141,7 +176,17 @@ index 8d5c052916c1b0a0565a34dba70799457f8ac51c..4e4f2b6d3337f48f11575494e38e0aa8
  const EXECUTION_CONTEXT_GONE = Symbol("witness execution context gone");
  /**
  * Bounded, event-driven wait on an in-page predicate: a single
-@@ -742,10 +760,17 @@ function clickPointExpression(selector) {
+@@ -685,7 +708,8 @@ async function waitForInPagePredicate(options) {
+ 				unsubscribeContextGone = onExecutionContextGone?.(() => resolve(EXECUTION_CONTEXT_GONE));
+ 			});
+ 			outcome = await raceHostBackstop(Promise.race([evaluateExpression(buildInPageWaitExpression(predicateExpression, remainingMs)), contextGone]), remainingMs + hostBackstopSlackMs);
+-		} catch {
++		} catch (error) {
++			if (error?.witnessPageUnanswered) throw error;
+ 			outcome = EXECUTION_CONTEXT_GONE;
+ 		} finally {
+ 			unsubscribeContextGone?.();
+@@ -742,10 +766,17 @@ function clickPointExpression(selector) {
  	if (element.disabled === true) { return null; }
  	const style = getComputedStyle(element);
  	if (style.display === 'none' || style.visibility === 'hidden') { return null; }
@@ -162,8 +207,55 @@ index 8d5c052916c1b0a0565a34dba70799457f8ac51c..4e4f2b6d3337f48f11575494e38e0aa8
  })()`;
  }
  function decodeBase64(data) {
-@@ -879,10 +904,16 @@ async function createCdpPage(wiring) {
- 			return composePageContent(await evaluateExpression(PAGE_CONTENT_EXPRESSION));
+@@ -759,9 +790,27 @@ async function createCdpPage(wiring) {
+ 	await Promise.all([
+ 		pageConnection.send("Page.enable"),
+ 		pageConnection.send("Runtime.enable"),
+-		pageConnection.send("Network.enable")
++		pageConnection.send("Network.enable"),
++		pageConnection.send("Inspector.enable")
+ 	]);
+ 	const mainFrameId = targetId;
++	// A crashed renderer never answers, so every call waiting on it would hang until the box watchdog.
++	let crashed;
++	const rendererCrashed = new Promise((resolve) => pageConnection.on("Inspector.targetCrashed", () => {
++		crashed = pageUnansweredError("the page's renderer process crashed");
++		resolve(crashed);
++	}));
++	const answeredUnlessCrashed = (call) => crashed ? Promise.reject(crashed) : Promise.race([call, rendererCrashed.then((error) => Promise.reject(error))]);
++	const answeredWithin = async (call, what) => {
++		let timer;
++		try {
++			return await Promise.race([answeredUnlessCrashed(call), new Promise((_resolve, reject) => {
++				timer = setTimeout(() => reject(pageUnansweredError(`the page did not answer ${what} within ${PAGE_ANSWER_TIMEOUT_MS}ms: its main thread is busy or its renderer hung`)), PAGE_ANSWER_TIMEOUT_MS);
++			})]);
++		} finally {
++			clearTimeout(timer);
++		}
++	};
+ 	const loadWaiters = /* @__PURE__ */ new Set();
+ 	pageConnection.on("Page.loadEventFired", () => {
+ 		const waiters = [...loadWaiters];
+@@ -802,11 +851,11 @@ async function createCdpPage(wiring) {
+ 		};
+ 	};
+ 	const evaluateExpression = async (expression) => {
+-		const evaluation = await pageConnection.send("Runtime.evaluate", {
++		const evaluation = await answeredUnlessCrashed(pageConnection.send("Runtime.evaluate", {
+ 			expression,
+ 			returnByValue: true,
+ 			awaitPromise: true
+-		});
++		}));
+ 		const exceptionDetails = evaluation.exceptionDetails;
+ 		if (exceptionDetails !== void 0) throw new Error(pageExceptionMessage(exceptionDetails));
+ 		return evaluation.result?.value;
+@@ -876,15 +925,21 @@ async function createCdpPage(wiring) {
+ 		goto: (url) => navigateAndAwaitLoad(`goto ${url}`, () => pageConnection.send("Page.navigate", { url })),
+ 		reload: () => navigateAndAwaitLoad("reload", () => pageConnection.send("Page.reload")),
+ 		content: async () => {
+-			return composePageContent(await evaluateExpression(PAGE_CONTENT_EXPRESSION));
++			return composePageContent(await answeredWithin(evaluateExpression(PAGE_CONTENT_EXPRESSION), "a content read"));
  		},
  		screenshot: async (filePath) => {
 -			await writeBinaryFile(filePath, decodeBase64((await pageConnection.send("Page.captureScreenshot", {
@@ -179,9 +271,29 @@ index 8d5c052916c1b0a0565a34dba70799457f8ac51c..4e4f2b6d3337f48f11575494e38e0aa8
 +			})]).finally(() => clearTimeout(timer));
 +			await writeBinaryFile(filePath, decodeBase64(capture.data));
  		},
- 		evaluate: (expression) => evaluateExpression(expression),
+-		evaluate: (expression) => evaluateExpression(expression),
++		evaluate: (expression) => answeredWithin(evaluateExpression(expression), "an evaluation"),
  		waitForExpression: async (expression, timeoutMs) => {
-@@ -1056,6 +1087,9 @@ function createHostBrowser(options = {}) {
+ 			await waitForInPagePredicate({
+ 				predicateExpression: `!!(${expression})`,
+@@ -916,7 +971,7 @@ async function createCdpPage(wiring) {
+ 				...mouseEvent,
+ 				type: "mouseReleased"
+ 			});
+-			await Promise.all([pressed, released]);
++			await answeredUnlessCrashed(Promise.all([pressed, released]));
+ 		},
+ 		onConsoleMessage: (listener) => {
+ 			pageConnection.on("Runtime.consoleAPICalled", (params) => {
+@@ -931,6 +986,7 @@ async function createCdpPage(wiring) {
+ 			pageConnection.on("Runtime.exceptionThrown", (params) => {
+ 				listener({ message: pageExceptionMessage(params.exceptionDetails ?? {}) });
+ 			});
++			void rendererCrashed.then((error) => listener({ message: error.message }));
+ 		},
+ 		onRequestFailed: (listener) => {
+ 			pageConnection.on("Network.loadingFailed", (params) => {
+@@ -1056,6 +1112,9 @@ function createHostBrowser(options = {}) {
  	};
  	return {
  		name: "chromium",
