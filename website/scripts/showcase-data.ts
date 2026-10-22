@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildShowcase, renderShowcaseModule } from '../tooling/showcase-data.ts';
+import { writeShowcaseSketches } from '../tooling/showcase-sketch.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const defaultSource = resolve(root, '../../markless-migrate');
@@ -12,4 +13,5 @@ const out = resolve(root, 'components/docs/showcase/apps.data.ts');
 
 const data = buildShowcase(source);
 await writeFile(out, renderShowcaseModule(data));
-console.log(`showcase-data: ${data.length} apps written to ${out}`);
+await writeShowcaseSketches(resolve(root, 'public/showcase/sketch'), data);
+console.log(`showcase-data: ${data.length} apps written to ${out}, with their card sketches`);

@@ -1,5 +1,7 @@
 import { showcaseApps } from './apps.data.ts';
 import type { BytesRange, ShowcaseApp } from './types.ts';
+import { shotPlacement, sketchFile } from './sketch.ts';
+import type { Mark } from '../ink-logos.ts';
 
 /** Plain words for the check report's dimensions, in the order the report lists them. */
 export const checkNames: Readonly<Record<string, string>> = {
@@ -51,19 +53,41 @@ export function checksPassed(app: ShowcaseApp): string {
 	return `${ran.filter((check) => check.failed === 0).length} of ${ran.length}`;
 }
 
+/** `212 of 498 pages moved`, or `Pages not counted yet` before a coverage run. */
+export function progressLine(app: ShowcaseApp): string {
+	return app.coverage ? `${app.coverage.ported} of ${app.coverage.total} pages moved` : 'Pages not counted yet';
+}
+
+const marks: readonly (readonly [RegExp, Mark])[] = [
+	[/docusaurus/i, 'docusaurus'],
+	[/vitepress|vue/i, 'vue'],
+	[/next\.js/i, 'nextjs'],
+	[/remix/i, 'remix'],
+	[/angular/i, 'angular'],
+	[/htmx/i, 'htmx'],
+	[/alpine/i, 'alpine'],
+	[/react/i, 'react'],
+];
+
+/** The ink logo for what an app was built with, by the first framework its description names. */
+export const markFor = (builtWith: string): Mark | null => marks.find(([pattern]) => pattern.test(builtWith))?.[1] ?? null;
+
 export type Card = {
 	readonly slug: string;
 	readonly name: string;
 	readonly builtWith: string;
 	readonly shot: string;
 	readonly alt: string;
-	readonly inProgress: boolean;
-	readonly statusLabel: string;
-	readonly pagesMoved: string;
+	readonly done: boolean;
+	readonly progress: string;
 	readonly checksPassed: string;
-	readonly before: string;
-	readonly after: string;
+	/** `null` when the home page's JavaScript was not measured. */
+	readonly before: string | null;
+	readonly after: string | null;
 	readonly tone: string;
+	readonly mark: Mark | null;
+	readonly sketch: string;
+	readonly placement: ReturnType<typeof shotPlacement>;
 };
 
 const tones = ['pink', 'yellow', 'purple', 'green'];
@@ -74,13 +98,15 @@ export const cards: readonly Card[] = showcaseApps.map((app, at) => ({
 	builtWith: app.builtWith,
 	shot: app.shot,
 	alt: `The ${app.name} home page, served by Markless`,
-	inProgress: app.status === 'in-progress',
-	statusLabel: app.status === 'done' ? 'Done' : 'In progress',
-	pagesMoved: pagesMoved(app),
+	done: app.status === 'done',
+	progress: progressLine(app),
 	checksPassed: checksPassed(app),
-	before: kB(app.headline.before),
-	after: kB(app.headline.after),
+	before: app.headline ? kB(app.headline.before) : null,
+	after: app.headline ? kB(app.headline.after) : null,
 	tone: tones[at % tones.length],
+	mark: markFor(app.builtWith),
+	sketch: sketchFile(app.slug),
+	placement: shotPlacement(at),
 }));
 
 export function findApp(slug: string): ShowcaseApp | undefined {
@@ -103,7 +129,7 @@ export type AppView = {
 	readonly app: ShowcaseApp;
 	readonly hostName: string;
 	readonly facts: readonly { readonly id: string; readonly text: string }[];
-	readonly headline: string;
+	readonly headline: string | null;
 	readonly checkedOn: string;
 	readonly summary: string;
 	readonly links: readonly {
@@ -225,7 +251,7 @@ export function appView(app: ShowcaseApp): AppView {
 			},
 			{ id: 'sign-in', text: app.signIn ? 'Has sign-in' : 'No sign-in' },
 		],
-		headline: beforeAfter(app.headline.before, app.headline.after),
+		headline: app.headline ? beforeAfter(app.headline.before, app.headline.after) : null,
 		checkedOn: new Date(app.checkedAt).toLocaleDateString('en-US', {
 			year: 'numeric',
 			month: 'long',

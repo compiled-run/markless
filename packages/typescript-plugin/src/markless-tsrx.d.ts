@@ -379,6 +379,8 @@ declare namespace __MarklessTypeService {
 		fillOpacity?: string | number;
 		opacity?: string | number;
 		height?: string | number;
+		/** The SVG 2 link on `<use>`, `<image>` and `<a>`. */
+		href?: string;
 		markerEnd?: string;
 		markerMid?: string;
 		markerStart?: string;

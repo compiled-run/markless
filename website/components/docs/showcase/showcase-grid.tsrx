@@ -1,39 +1,75 @@
 import { Link } from '@markless/core/router';
 import { asset } from '../../../site-base.ts';
+import InkLogo from '../ink-logo.tsrx';
+import { CAST_LAYERS, DESK_LAYERS, PILES, SHEET_OVER, SHEET_UNDER, VIEW } from './sketch.ts';
 import { cards } from './view.ts';
+
+const viewBox = '0 0 ' + VIEW.width + ' ' + VIEW.height;
+const oldLabel = PILES.old + PILES.w / 2;
+const movedLabel = PILES.moved + PILES.w / 2;
+const labelY = PILES.base + 17;
 
 export default function ShowcaseGrid() @{
 	<ul class="showcase" aria-label="Apps being moved with markless-migrate">
 		@for (const card of cards; key card.slug) {
 			<li class={'card tone-' + card.tone}>
 				<Link href="/start/migrate/[app]" params={{ app: card.slug }} class="hit">
-					<span class="thumb">
-						<img src={asset(card.shot)} alt={card.alt} width="800" height="500" loading="lazy" decoding="async" />
-					</span>
+					<svg class="sketch" viewBox={viewBox} role="img" aria-label={card.alt}>
+						<g class="desk">
+							@for (const layer of DESK_LAYERS; key layer) {
+								<use href={asset(card.sketch) + '#' + layer} class={'l-' + layer} />
+							}
+							<text class="pile-label" x={oldLabel} y={labelY} text-anchor="middle">old pages</text>
+							<text class="pile-label" x={movedLabel} y={labelY} text-anchor="middle">moved</text>
+						</g>
+						<g class="cast">
+							@for (const layer of CAST_LAYERS; key layer) {
+								<use href={asset(card.sketch) + '#' + layer} class={'l-' + layer} />
+							}
+						</g>
+						<g class="sheet">
+							<use href={asset(card.sketch) + '#' + SHEET_UNDER} class="l-sheet-paper" />
+							<image
+								class="print"
+								href={asset(card.shot)}
+								x={card.placement.x}
+								y={card.placement.y}
+								width={card.placement.width}
+								height={card.placement.height}
+								transform={card.placement.transform}
+								preserveAspectRatio="xMidYMin slice"
+							/>
+							@for (const layer of SHEET_OVER; key layer) {
+								<use href={asset(card.sketch) + '#' + layer} class={'l-' + layer} />
+							}
+						</g>
+					</svg>
 					<span class="name">{card.name}</span>
-					<span class="built">Was built with {card.builtWith}</span>
-					<span class="tally">
-						<span>Pages moved: <b>{card.pagesMoved}</b></span>
-						<span>Checks passed: <b>{card.checksPassed}</b></span>
+					<span class="progress">{card.progress}</span>
+					<span class="quiet">
+						Was built with
+						@if (card.mark) {
+							<span class="logo"><InkLogo mark={card.mark} /></span>
+						}
+						{card.builtWith}
 					</span>
-					<span class="metric">
-						<span class="metric-label">JavaScript run at load, home page</span>
-						<span class="metric-value">
-							<s>{card.before}</s>
+					<span class="quiet">Checks passed: {card.checksPassed}</span>
+					@if (card.before && card.after) {
+						<span class="quiet">
+							JavaScript at load: {card.before}
 							<span aria-hidden="true"> → </span>
 							<span class="sr-only"> before, now </span>
-							<b>{card.after}</b>
+							{card.after}
 						</span>
-					</span>
+					}
 				</Link>
-				<span class={card.inProgress ? 'progress' : 'progress is-done'}>{card.statusLabel}</span>
 			</li>
 		}
 		<style>
 			.showcase {
 				display: grid;
-				grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr));
-				gap: var(--space-m) var(--space-s);
+				grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+				gap: var(--space-l) var(--space-m);
 				margin: var(--space-m) 0 var(--space-l);
 				padding: 0;
 				list-style: none;
@@ -41,7 +77,6 @@ export default function ShowcaseGrid() @{
 
 			.card {
 				--tone: var(--pink);
-				position: relative;
 				margin: 0;
 				padding: 0;
 			}
@@ -65,126 +100,138 @@ export default function ShowcaseGrid() @{
 			.hit {
 				display: flex;
 				flex-direction: column;
-				gap: 0.2em;
-				height: 100%;
-				box-sizing: border-box;
-				padding: 0.55rem 0.55rem 0.85rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 14px;
-				background: var(--raised);
-				box-shadow: 6px 6px 0 var(--tone);
+				gap: 0.1em;
 				color: var(--ink);
 				text-decoration: none;
-				transition: transform 140ms ease, box-shadow 140ms ease;
 			}
 
-			.hit:hover,
 			.hit:focus-visible {
-				transform: translate(-2px, -2px);
-				box-shadow: 9px 9px 0 var(--tone);
+				outline: 2px solid var(--ink);
+				outline-offset: 6px;
+				border-radius: 6px;
 			}
 
-			.thumb {
-				display: block;
-				margin-bottom: 0.45em;
-				border: 1px solid var(--ink);
-				border-radius: 8px;
-				overflow: hidden;
-				aspect-ratio: 8 / 5;
-				background: var(--paper);
-			}
-
-			.thumb img {
+			.sketch {
 				display: block;
 				width: 100%;
-				height: 100%;
-				object-fit: cover;
-				object-position: top;
+				height: auto;
+				overflow: visible;
+				color: var(--ink);
 			}
 
-			.name {
-				padding-inline: 0.2rem;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-1);
-				font-weight: 700;
-				line-height: 1.15;
+			.l-sheet-paper,
+			.l-pile-paper {
+				fill: var(--paper);
 			}
 
-			.name + .built {
-				margin-bottom: 0.3em;
+			.l-sheet-paper {
+				fill: color-mix(in oklch, var(--paper) 88%, currentColor);
 			}
 
-			.tally {
-				display: grid;
-				padding-inline: 0.2rem;
-				margin-bottom: 0.6em;
-				font-size: var(--step--1);
-				line-height: 1.35;
+			.l-pile-tone {
+				fill: currentColor;
+				opacity: 0.12;
 			}
 
-			.tally b {
-				font-family: var(--font-mono);
-				font-weight: 800;
+			.l-sheet-shade {
+				fill: currentColor;
+				opacity: 0.06;
 			}
 
-			.built {
-				padding-inline: 0.2rem;
-				color: color-mix(in oklch, var(--ink) 72%, var(--paper));
-				font-size: var(--step--1);
-				line-height: 1.35;
-			}
-
-			.metric {
-				display: grid;
-				padding: 0.4em 0.6em;
-				border-radius: 8px;
-				margin-top: auto;
-				background: color-mix(in srgb, var(--tone) 28%, var(--paper));
-			}
-
-			.metric-label,
-			.metric-value {
-				line-height: 1.35;
-			}
-
-			.metric-label {
-				font-size: var(--step--2);
-				letter-spacing: 0.01em;
-				opacity: 0.8;
-			}
-
-			.metric-value {
-				font-family: var(--font-mono);
-				font-size: var(--step--1);
-			}
-
-			.metric-value s {
-				text-decoration: none;
+			.l-sheet-hatch,
+			.l-pile-shadow,
+			.l-pile-hatch {
+				stroke: currentColor;
+				stroke-width: 0.55;
+				stroke-linecap: round;
 				opacity: 0.7;
 			}
 
-			.metric-value b {
-				font-weight: 800;
+			.l-sheet-texture {
+				stroke: currentColor;
+				stroke-width: 0.4;
+				stroke-linecap: round;
+				opacity: 0.2;
+			}
+
+			.l-pile-wash {
+				fill: var(--tone);
+				opacity: 0.4;
+			}
+
+			.l-ground,
+			.l-pile-ink,
+			.l-sheet-ink {
+				fill: currentColor;
+			}
+
+			.print {
+				filter: grayscale(1) sepia(0.35) contrast(0.8) brightness(1.04);
+				mix-blend-mode: multiply;
+				opacity: 0.85;
+
+				html.dark & {
+					filter: grayscale(1) sepia(0.3) contrast(0.75) brightness(0.85);
+					mix-blend-mode: luminosity;
+					opacity: 0.7;
+				}
+			}
+
+			.pile-label {
+				fill: currentColor;
+				font-size: 10px;
+				opacity: 0.75;
+			}
+
+			.sheet,
+			.cast {
+				transform-box: fill-box;
+				transform-origin: 40% 40%;
+				transition:
+					transform 180ms ease,
+					opacity 180ms ease;
+			}
+
+			.hit:is(:hover, :focus-visible) .sheet {
+				transform: translate(-1.5px, -4px) rotate(-0.6deg);
+			}
+
+			.hit:is(:hover, :focus-visible) .cast {
+				transform: translate(2px, 3px) scale(1.04);
+				opacity: 0.8;
+			}
+
+			.name {
+				position: relative;
+				margin: -0.9em 0 0.15em 0.2rem;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: var(--step-2);
+				font-weight: 700;
+				line-height: 1.05;
+				letter-spacing: 0.01em;
+				transform: rotate(-1.5deg);
+				transform-origin: left center;
+				width: fit-content;
+				max-width: 62%;
 			}
 
 			.progress {
-				position: absolute;
-				top: -0.7rem;
-				right: -0.5rem;
-				padding: 0.2em 0.75em;
-				border: 2px solid var(--ink);
-				border-radius: 999px;
-				background: var(--yellow);
-				box-shadow: 0 0 0 3px white, 2px 3px 0 3px color-mix(in srgb, var(--ink) 25%, transparent);
-				color: var(--on-accent);
-				font-size: var(--step--1);
-				font-weight: 800;
-				transform: rotate(4deg);
-				pointer-events: none;
+				padding-inline: 0.2rem;
+				font-size: var(--step-0);
+				font-weight: 700;
+				line-height: 1.3;
 			}
 
-			.progress.is-done {
-				background: var(--green-star);
+			.quiet {
+				padding-inline: 0.2rem;
+				color: color-mix(in oklch, var(--ink) 66%, var(--paper));
+				font-size: var(--step--1);
+				line-height: 1.35;
+			}
+
+			.logo {
+				margin-inline-start: 0.2em;
+				color: var(--ink);
 			}
 
 			.sr-only {
@@ -196,51 +243,15 @@ export default function ShowcaseGrid() @{
 				white-space: nowrap;
 			}
 
-			@media (max-width: 600px) {
-				.showcase {
-					gap: var(--space-s);
-				}
-
-				.hit {
-					display: grid;
-					grid-template-columns: 38% minmax(0, 1fr);
-					grid-template-rows: auto auto auto 1fr;
-					column-gap: 0.75em;
-					padding: 0.5rem;
-				}
-
-				.thumb {
-					grid-row: 1 / 5;
-					align-self: start;
-					margin: 0;
-				}
-
-				.name {
-					font-size: var(--step-0);
-				}
-
-				.name + .built,
-				.tally {
-					margin-bottom: 0.3em;
-				}
-
-				.metric {
-					align-self: end;
-					padding: 0.3em 0.5em;
-				}
-
-				.progress {
-					top: -0.6rem;
-					right: auto;
-					left: -0.4rem;
-					font-size: var(--step--2);
-					transform: rotate(-4deg);
-				}
-			}
-
 			@media (prefers-reduced-motion: reduce) {
-				.hit {
+				.sheet,
+				.cast {
 					transition: none;
+				}
+
+				.hit:is(:hover, :focus-visible) .sheet,
+				.hit:is(:hover, :focus-visible) .cast {
+					transform: none;
 				}
 			}
 		</style>
