@@ -1,5 +1,5 @@
 import { art } from './ink-logos.art.ts';
-import type { Mark } from './ink-logos.ts';
+import type { LogoMark as Mark } from './ink-logos.ts';
 
 export type { Mark };
 

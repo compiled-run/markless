@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { drawing, rings } from './ink-logos.ts';
+import { flatNav, flatUiNav } from '../../nav.ts';
+import { ICONS } from './ink-icons.ts';
+import { drawing, inkSprite, logoArt, rings } from './ink-logos.ts';
+import { INK_MARKS } from './ink-marks.ts';
 
 const art = drawing();
 const logo = readFileSync(new URL('./ink-logo.tsrx', import.meta.url), 'utf8');
@@ -8,7 +11,7 @@ const agents = readFileSync(new URL('./agent-logos.tsrx', import.meta.url), 'utf
 
 describe('ink logos', () => {
 	it('draws the coding agents Markless Migrate sets up, the frameworks it moves apps from, the checks it runs and its own mark, each with tone, hatching and ink', () => {
-		expect(Object.keys(art.logos)).toEqual(['claude', 'codex', 'cursor', 'gemini', 'copilot', 'opencode', 'nextjs', 'vue', 'htmx', 'alpine', 'remix', 'angular', 'react', 'docusaurus', 'vite', 'shadcn', 'eye', 'magnifier', 'speaker', 'stopwatch', 'migrate']);
+		expect(Object.keys(art.logos)).toEqual(['claude', 'codex', 'cursor', 'gemini', 'copilot', 'opencode', 'nextjs', 'vue', 'htmx', 'alpine', 'remix', 'angular', 'react', 'docusaurus', 'vite', 'shadcn', 'eye', 'magnifier', 'speaker', 'stopwatch', 'migrate', ...Object.keys(ICONS)]);
 		for (const drawn of Object.values(art.logos)) for (const layer of [drawn.tone, drawn.hatch, drawn.ink]) expect(layer.length).toBeGreaterThan(40);
 	});
 
@@ -26,13 +29,33 @@ describe('ink logos', () => {
 	});
 });
 
+describe('page marks', () => {
+	const pages = [...flatNav, ...flatUiNav];
+
+	it('gives every docs page its own mark', () => {
+		const icons = pages.map((page) => page.icon);
+		for (const icon of icons) expect(icon && icon in art.logos).toBe(true);
+		expect(new Set(icons).size).toBe(icons.length);
+	});
+
+	it('draws a mark only when a page shows it', () => {
+		const shown = new Set(pages.map((page) => page.icon));
+		expect(Object.keys(ICONS).filter((mark) => !shown.has(mark as keyof typeof ICONS))).toEqual([]);
+	});
+});
+
 describe('frozen art', () => {
 	it('freezes the drawings into a plain-data module the compiler can read (run with -u after editing)', async () => {
 		const module = `// Written by ink-logos.test.ts from ink-logos.ts. Run \`vp test -u\` to refresh.
-import type { drawing } from './ink-logos.ts';
+import type { LogoArt } from './ink-logos.ts';
 
-export const art: ReturnType<typeof drawing> = ${JSON.stringify(art, null, '\t')};
+export const art: LogoArt = ${JSON.stringify(logoArt(art), null, '\t')};
 `;
 		await expect(module).toMatchFileSnapshot('./ink-logos.art.ts');
+	});
+
+	it('freezes the page marks into one sprite the sidebar and page titles link into (run with -u after editing)', async () => {
+		const marks = [...new Set([...flatNav, ...flatUiNav].map((page) => page.icon!))];
+		await expect(inkSprite(marks, art)).toMatchFileSnapshot(`../../public/${INK_MARKS}`);
 	});
 });

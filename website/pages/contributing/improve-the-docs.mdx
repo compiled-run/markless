@@ -8,7 +8,7 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Improve the docs
 
-<PageMeta time="7 min" assumes="nothing" sprite="sparkle" />
+<PageMeta time="7 min" assumes="nothing" />
 
 <ThemeToggle />
 
@@ -56,14 +56,14 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # One title per page
 
-<PageMeta time="3 min" assumes="state,events" sprite="burst" />
+<PageMeta time="3 min" assumes="state,events" />
 
 <ThemeToggle />
 
 Prose, demos and callouts go here.
 ```
 
-`PageMeta` takes three props. `assumes` lists keys from the `concepts` map in `nav.ts`. `sprite` names a file in `public/sprites/`. `time` comes from a formula, not a guess. `website/README.md` has it, so recompute it when you rewrite a page.
+`PageMeta` takes two props. `assumes` lists keys from the `concepts` map in `nav.ts`. `time` comes from a formula, not a guess. The ink mark beside the title is the page's `icon` in `nav.ts`, the same one the sidebar shows. `website/README.md` has it, so recompute it when you rewrite a page.
 
 Code fences in `tsrx`, `ts`, `tsx`, `js`, `json`, `css`, `sh`, `bash` and `html` get highlighted at build time. In a `tsrx` fence, readers can point at `state` or `@if` and get a one-sentence explanation.
 
