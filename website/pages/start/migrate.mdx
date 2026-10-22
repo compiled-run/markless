@@ -5,6 +5,9 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 import LikeHeart from '../../components/docs/like-heart.tsrx';
 import ShowcaseGrid from '../../components/docs/showcase/showcase-grid.tsrx';
 import MigrateAnatomy from '../../components/figures/migrate/migrate-anatomy.tsrx';
+import AgentLogos from '../../components/docs/agent-logos.tsrx';
+import FrameworkLogos from '../../components/docs/framework-logos.tsrx';
+import MarkedText from '../../components/docs/marked-text.tsrx';
 
 <Sidebar />
 
@@ -16,15 +19,17 @@ import MigrateAnatomy from '../../components/figures/migrate/migrate-anatomy.tsr
 
 <Subtitle text="Move any web app to Markless, from Next.js and Vue to htmx and Alpine.js, one page at a time. Each page goes live only once it works the same as before." />
 
+<FrameworkLogos marks="nextjs:Next.js vue:Vue htmx:htmx alpine:Alpine.js" />
+
 ## How it works
 
-Your coding agent rewrites one page. markless-migrate then opens the old page and the new one side by side and checks them like a picky tester: what people see, what search engines and screen readers get, and how fast it loads. If anything differs, the page doesn't switch, and your old app keeps serving it. So you can move a big app bit by bit without ever shipping a broken page.
+<MarkedText text="Your coding agent rewrites one page. markless-migrate then opens the old page and the new one side by side and checks them like a picky tester: what people see, what search engines and screen readers get, and how fast it loads. If anything differs, the page doesn't switch, and your old app keeps serving it. So you can move a big app bit by bit without ever shipping a broken page." marks="eye:what people see|magnifier:search engines|speaker:screen readers|stopwatch:how fast it loads" />
 
 <MigrateAnatomy />
 
 ## Set it up
 
-Works with Claude Code, Codex, Cursor and other coding agents:
+<AgentLogos lead="Works with" end=":" />
 
 ```bash
 npx @markless/migrate setup
