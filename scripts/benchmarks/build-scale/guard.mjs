@@ -11,6 +11,9 @@ const config = JSON.parse(readFileSync(new URL('./budgets.json', import.meta.url
 const budgets = Object.fromEntries(
 	Object.entries(config.budgets).map(([name, budget]) => [name, budget.bytes ?? budget.value]),
 );
+const cpuPerPageBudget = config.budgets.buildCpuPerPageInReferenceRuns;
+budgets.buildCpuPerPageInReferenceRuns =
+	cpuPerPageBudget.byPlatform?.[`${process.platform}-${process.arch}`] ?? cpuPerPageBudget.value;
 const buildScript = new URL('./build.mjs', import.meta.url).pathname;
 const referenceScript = new URL('./reference.mjs', import.meta.url).pathname;
 const MB = 1024 * 1024;
@@ -56,7 +59,10 @@ async function build(dir, pages) {
 async function referenceCpuMs() {
 	let fastest = Infinity;
 	for (let attempt = 0; attempt < 3; attempt++)
-		fastest = Math.min(fastest, JSON.parse(await run(process.execPath, [referenceScript])).cpuMs);
+		fastest = Math.min(
+			fastest,
+			JSON.parse(await run(process.execPath, [referenceScript])).cpuMs,
+		);
 	return fastest;
 }
 

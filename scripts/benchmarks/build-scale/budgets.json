@@ -26,8 +26,9 @@
 			"reason": "6 MB: measured 4.63 MB (interaction-closures.json) at 180 pages; origin/main before wrote a 22.6 MB execution-demand.json."
 		},
 		"buildCpuPerPageInReferenceRuns": {
-			"value": 0.9,
-			"reason": "PROVISIONAL"
+			"value": 0.5,
+			"byPlatform": { "darwin-arm64": 0.7 },
+			"reason": "0.5 runs of reference.mjs per extra page between 60 and 180 pages: five CI runs on one tree (2026-10-22) measured 441 to 784 ms per page, the runner speeds CI hands out, but 0.360 to 0.422 reference runs; an M-series Mac measured 0.517 and, at load 27, 0.556, so it gets 0.7: the workload runs relatively faster there than the build does. Main before the 2026-10 build-time fixes took 1.5 to 1.65 times this tree's per-page CPU, about 0.56 or more."
 		},
 		"buildCpuGrowth": {
 			"value": 2.9,
