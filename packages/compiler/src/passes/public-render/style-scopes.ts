@@ -69,11 +69,22 @@ export function collectModuleStyleScopes(
 	};
 }
 
-function findStyleNodes(root: AnyNode): AnyNode[] {
+// One compile asks for the same subtrees' style blocks from the semantic graph, the markup collector and the
+// render plan; walking each tree once per ask was the pass's whole cost on a docs site.
+const styleNodesByRoot = new WeakMap<AnyNode, ReadonlyArray<AnyNode>>();
+
+function findStyleNodes(root: AnyNode): ReadonlyArray<AnyNode> {
+	const cached = styleNodesByRoot.get(root);
+	if (cached) return cached;
 	const styleNodes: AnyNode[] = [];
 	const visit = (node: AnyNode): void => {
 		if (node.type === 'JSXStyleElement') {
 			styleNodes.push(node);
+			return;
+		}
+		const known = node === root ? undefined : styleNodesByRoot.get(node);
+		if (known) {
+			for (const styleNode of known) styleNodes.push(styleNode);
 			return;
 		}
 		for (const value of Object.values(node)) {
@@ -97,6 +108,7 @@ function findStyleNodes(root: AnyNode): AnyNode[] {
 		}
 	};
 	visit(root);
+	styleNodesByRoot.set(root, styleNodes);
 	return styleNodes;
 }
 
@@ -112,7 +124,7 @@ function compileStyleNodes(
 	const cssParts: string[] = [];
 
 	for (const styleNode of styleNodes) {
-		const scoped = scopeStyleElement(styleNode, scopeId);
+		const scoped = scopedStyleElement(styleNode, scopeId);
 		if (scoped === null) {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
@@ -134,6 +146,17 @@ function compileStyleNodes(
 		styleScopes: cssParts.length > 0 ? [{ scopeId, cssText: cssParts.join('\n') }] : [],
 		diagnostics,
 	};
+}
+
+const scopedByStyleNode = new WeakMap<AnyNode, Map<string, string | null>>();
+
+function scopedStyleElement(styleNode: AnyNode, scopeId: string): string | null {
+	let byScope = scopedByStyleNode.get(styleNode);
+	if (!byScope) scopedByStyleNode.set(styleNode, (byScope = new Map()));
+	if (byScope.has(scopeId)) return byScope.get(scopeId)!;
+	const scoped = scopeStyleElement(styleNode, scopeId);
+	byScope.set(scopeId, scoped);
+	return scoped;
 }
 
 // Until @tsrx/yuku returns each `<style>` with its parsed sheet, the sheet is parsed here, once per block.
@@ -196,7 +219,8 @@ function selectorScopeInsert(selector: CssParent): number | null {
 	}
 	for (let index = compound; index < parts.length; index += 1) {
 		const type = parts[index]!.type;
-		if (type === 'PseudoClassSelector' || type === 'PseudoElementSelector') return parts[index]!.start;
+		if (type === 'PseudoClassSelector' || type === 'PseudoElementSelector')
+			return parts[index]!.start;
 	}
 	return parts[parts.length - 1]!.end;
 }
