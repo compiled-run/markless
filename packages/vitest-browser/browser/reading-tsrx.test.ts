@@ -6,6 +6,7 @@ import { Note } from './reading-tsrx/statement-container.tsrx';
 import { Steps } from './reading-tsrx/for-index.tsrx';
 import { Bags } from './reading-tsrx/const-times-state.tsrx';
 import { NameCounters } from './reading-tsrx/name-counters.tsrx';
+import { ShopPage } from './reading-tsrx/body-function-calls.tsrx';
 
 // The constructs the "Reading a .tsrx file" guide teaches, each served and client-rendered.
 
@@ -56,6 +57,23 @@ async function constantPropText(c: HTMLElement) {
 	expect(button('first').textContent).toBe('first 1');
 }
 
+async function bodyFunctionCalls(c: HTMLElement) {
+	const click = (selector: string) => (c.querySelector(selector) as HTMLButtonElement).click();
+	const total = () => c.querySelector('[data-total]')?.textContent;
+	const last = () => c.querySelector('[data-last]')?.textContent;
+	click('[data-add]');
+	await expect.poll(total).toBe('6');
+	expect(last()).toBe('added 2');
+	click('[data-bonus]');
+	await expect.poll(total).toBe('36');
+	expect(last()).toBe('added 10');
+	click('[data-fruit="fig"]');
+	await expect.poll(last).toBe('fig');
+	click('[data-choose]');
+	await expect.poll(total).toBe('45');
+	expect(last()).toBe('added 3');
+}
+
 test('CSR: onClick names a function declared in the body', async () =>
 	bodyFunction((await render(Counter)).container as HTMLElement));
 test('SSR: onClick names a function declared in the body', async () =>
@@ -80,3 +98,7 @@ test('CSR: an imported child joining a constant prop with state keeps the prop',
 	constantPropText((await render(NameCounters)).container as HTMLElement));
 test('SSR: an imported child joining a constant prop with state keeps the prop', async () =>
 	constantPropText((await renderSSR(NameCounters)).container as HTMLElement));
+test('CSR: handlers call body functions with arguments, from rows and callback props', async () =>
+	bodyFunctionCalls((await render(ShopPage)).container as HTMLElement));
+test('SSR: handlers call body functions with arguments, from rows and callback props', async () =>
+	bodyFunctionCalls((await renderSSR(ShopPage)).container as HTMLElement));

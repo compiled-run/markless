@@ -153,8 +153,8 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	},
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: {
 		summary: 'An event handler reads a local variable that does not exist in the browser.',
-		what: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a function, a class instance, a DOM node, or another value that is not plain data.',
-		how: 'Move the function to the top of the file. Keep plain data in the local, or make it `state()`. For an element, use `element()`.',
+		what: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a class instance, a DOM node, a function declared with `let`, or another value that is not plain data.',
+		how: 'Declare a function with `function` or `const`, and the handler runs its definition. Keep plain data in the local, or make it `state()`. For an element, use `element()`.',
 	},
 	MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION: {
 		summary: 'An event prop like onClick gets a value instead of a function.',

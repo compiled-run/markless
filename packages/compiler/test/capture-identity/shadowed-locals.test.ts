@@ -80,12 +80,12 @@ import { state } from '@markless/core';
 
 export default function Panel() @{
 	const s = state({ label: 'a', seen: '' });
-	const decorate = (text) => text + '!';
+	let decorate = (text) => text + '!';
 	<button data-panel onClick={() => { s.seen = decorate(s.label); }}>{s.seen}</button>
 }
 `;
 
-test('a handler reading a component-scope local function is still refused', async () => {
+test('a handler reading a reassignable component-scope function is still refused', async () => {
 	const compiled = await compileOne('src/panel.tsrx', HANDLER_CAPTURES_COMPONENT_LOCAL);
 	const refusals = errors(compiled);
 	expect(refusals.map((item) => item.code)).toEqual(['MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED']);
@@ -119,7 +119,7 @@ import { state } from '@markless/core';
 
 export default function Panel() @{
 	const s = state({ label: 'a', seen: '' });
-	const decorate = (text) => text + '!';
+	let decorate = (text) => text + '!';
 	<div data-panel>
 		<button data-shadow onClick={() => { const decorate = (text) => text; s.seen = decorate(s.label); }}>one</button>
 		<button data-capture onClick={() => { s.seen = decorate(s.label); }}>two</button>
@@ -132,4 +132,12 @@ test('one handler shadowing the name leaves exactly one refusal for the handler 
 	const refusals = errors(compiled);
 	expect(refusals.length).toBe(1);
 	expect(refusals[0]!.message).toContain('"decorate"');
+});
+
+test('a handler shadowing a const body function runs its own, the other runs the body one', async () => {
+	const compiled = await compileOne('src/panel.tsrx', SHADOW_AND_CAPTURE.replace('let decorate', 'const decorate'));
+	expect(errors(compiled)).toEqual([]);
+	const [shadow, capture] = compiled.symbolModules.modules.filter((item) => item.kind === 'event-handler');
+	expect(shadow!.source).not.toContain("'!'");
+	expect(capture!.source).toContain("'!'");
 });

@@ -52,6 +52,8 @@ export function inlineRenderLocals(
 	options: {
 		readonly leaveCaptureOwned?: boolean;
 		readonly leaveRowItems?: boolean;
+		// A body function is spliced in as its own definition, as a `const` value is.
+		readonly inlineFunctions?: boolean;
 		// Only locals declared where this answers true are spliced; any other is left as written.
 		readonly inlineOnly?: (declarationStart: number) => boolean;
 	} = {},
@@ -60,6 +62,7 @@ export function inlineRenderLocals(
 	const result = inlineWithin(node, state, definitions, new Set(), {
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
+		inlineFunctions: options.inlineFunctions === true,
 		inlineOnly: options.inlineOnly,
 	});
 	return 'source' in result ? { kind: 'inlined', source: result.source, definitions } : result;
@@ -73,6 +76,7 @@ function inlineWithin(
 	options: {
 		readonly leaveCaptureOwned: boolean;
 		readonly leaveRowItems: boolean;
+		readonly inlineFunctions: boolean;
 		readonly inlineOnly: ((declarationStart: number) => boolean) | undefined;
 	},
 ):
@@ -114,8 +118,10 @@ function inlineWithin(
 				) {
 					freeNames.add(name);
 				} else {
-					const local = classifyLocal(symbolId, name, state);
-					if (
+					const local = classifyLocal(symbolId, name, state, options.inlineFunctions);
+					if (local.kind === 'definition' && local.named && inlining.has(symbolId)) {
+						// A function declaration is spliced as a named function expression, which binds its own name.
+					} else if (
 						local.kind === 'graph' ||
 						(local.kind === 'capture-owned' && options.leaveCaptureOwned) ||
 						(local.kind === 'row-binding' && options.leaveRowItems)
@@ -231,6 +237,7 @@ export function inlineHandlerRenderLocals(
 	const inlined = inlineRenderLocals(node, state, {
 		leaveCaptureOwned: true,
 		leaveRowItems: true,
+		inlineFunctions: true,
 	});
 	if (inlined.kind !== 'inlined') {
 		state.graph.diagnostics.push(
@@ -389,16 +396,40 @@ function readsGraph(name: string, state: WalkState): boolean {
 
 type LocalKind =
 	| { readonly kind: 'graph' | 'capture-owned' | 'row-binding' | 'opaque' }
-	| { readonly kind: 'definition'; readonly init: AnyNode };
+	| { readonly kind: 'definition'; readonly init: AnyNode; readonly named?: boolean };
 
 // What a component-body local is, from its declaration: a graph cell declared later in the
 // body, a value the capture pass owns, a @for row binding, a `const` definition to recompute,
 // or none of these.
-function classifyLocal(symbolId: number, name: string, state: WalkState): LocalKind {
+function classifyLocal(
+	symbolId: number,
+	name: string,
+	state: WalkState,
+	inlineFunctions = false,
+): LocalKind {
 	const semantic = state.semantic();
 	if (semantic.bindings[symbolId]!.declarations.length !== 1) return { kind: 'opaque' };
+	const declared = classifyDeclaration(symbolId, state, inlineFunctions);
+	if (declared.kind === 'definition' && isFunctionNode(declared.init)) return declared;
 	if (state.graph.localBindings.some((binding) => binding.name === name))
 		return { kind: 'capture-owned' };
+	return declared;
+}
+
+function isFunctionNode(node: AnyNode): boolean {
+	return (
+		node.type === 'FunctionDeclaration' ||
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression'
+	);
+}
+
+function classifyDeclaration(
+	symbolId: number,
+	state: WalkState,
+	inlineFunctions: boolean,
+): LocalKind {
+	const semantic = state.semantic();
 	const declarationStart = semantic.bindings[symbolId]!.declarations[0]!.start;
 	let found: LocalKind | null = null;
 	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
@@ -413,7 +444,9 @@ function classifyLocal(symbolId: number, name: string, state: WalkState): LocalK
 		}
 		if (candidate.type === 'FunctionDeclaration') {
 			if ((candidate.id as AnyNode | undefined)?.start === declarationStart)
-				found = { kind: 'capture-owned' };
+				found = inlineFunctions
+					? { kind: 'definition', init: candidate, named: true }
+					: { kind: 'capture-owned' };
 			return;
 		}
 		if (candidate.type !== 'VariableDeclaration') return;
@@ -426,10 +459,12 @@ function classifyLocal(symbolId: number, name: string, state: WalkState): LocalK
 					? { kind: 'opaque' }
 					: callsFrameworkApi(init, state)
 						? { kind: 'graph' }
-						: init.type === 'ArrowFunctionExpression' ||
-							  init.type === 'FunctionExpression' ||
-							  init.type === 'NewExpression'
-							? { kind: 'capture-owned' }
+						: inlineFunctions && candidate.kind === 'const' && isFunctionNode(init)
+							? { kind: 'definition', init }
+							: init.type === 'ArrowFunctionExpression' ||
+								  init.type === 'FunctionExpression' ||
+								  init.type === 'NewExpression'
+								? { kind: 'capture-owned' }
 							: candidate.kind === 'const'
 								? { kind: 'definition', init: declarator.init as AnyNode }
 								: { kind: 'opaque' };

@@ -2082,7 +2082,7 @@ test('B908 reports unsupported captured body locals by name for handler emit', a
 import { state } from '@markless/core';
 
 export function App() @{
-	const localHelper = () => 1;
+	let localHelper = () => 1;
 	let count = state(0);
 
 	<button onClick={() => { count = localHelper(); }}>{count}</button>

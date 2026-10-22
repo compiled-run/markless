@@ -227,8 +227,13 @@ An extracted closure may capture only:
 5. serializable constants (JSON-compatible values, plus the framework's extended
    set: Date, RegExp, Map, Set, URL, BigInt, typed arrays, ArrayBuffer)
 
-Capturing anything else — a local class instance, a raw function, a DOM node held
-in a plain variable — is a **compile-time diagnostic** pointing at the exact
+A handler or callback prop that calls a function declared in the component body
+(`function f() {}` or `const f = () => ...`) carries that function's definition
+into its symbol, recursively, so the function's own reads are checked against the
+same list; the body is never re-run in the browser.
+
+Capturing anything else — a local class instance, a reassignable (`let`) function,
+a DOM node held in a plain variable — is a **compile-time diagnostic** pointing at the exact
 variable, explaining why it can't cross a resume boundary and what to do instead
 (usually: make it state, make it an `element()` handle, hoist it to module scope,
 derive it inside the closure, or move DOM-backed setup into a host element
