@@ -9,7 +9,13 @@ import type {
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
 import { resolve } from 'pathe';
-import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
+import { DEBUGGING_PLAYBOOK_HINT, usePersistentCompileStore } from '@markless/compiler';
+import {
+	compilerFingerprint,
+	createPersistentCompileCache,
+	persistentCompileCacheAvailable,
+	type PersistentCompileCache,
+} from '../compile-store.ts';
 import { joinURL, parsePath, withQuery } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import {
@@ -32,7 +38,9 @@ import { isCompilerStatefulModuleId, sharedReachedRenderDataRequest } from '../v
 
 // The slice of Vitest's `configureVitest` context this plugin uses; vitest stays out of the bundler's dependencies.
 type VitestCacheKeyContext = {
-	readonly defineCacheKeyGenerator: (generator: (context: { readonly id: string }) => false | undefined) => void;
+	readonly defineCacheKeyGenerator: (
+		generator: (context: { readonly id: string }) => false | undefined,
+	) => void;
 };
 import {
 	type BundleGraphAdder,
@@ -71,6 +79,11 @@ export interface MarklessViteOptions extends MarklessRolldownOptions {
 	clientEnvironment?: string;
 	debug?: boolean;
 	serverEnvironment?: string;
+	/**
+	 * Keep each module's compile result under Vite's `cacheDir` (`markless-compile/`), keyed by the module's
+	 * source, its compile inputs and the compiler's own files, so the next build reuses it. Default `true`.
+	 */
+	compileCache?: boolean;
 }
 
 type MarklessOutputOptions = OutputOptions | OutputOptions[] | undefined;
@@ -132,6 +145,14 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		pageForUrl: undefined as ((url: string) => string | undefined) | undefined,
 	};
 	let devPrerender: ReturnType<typeof createDevPrerender> | undefined;
+	let compileCache: PersistentCompileCache | undefined;
+	const flushCompileCache = async () => {
+		const cache = compileCache;
+		if (!cache) return;
+		compileCache = undefined;
+		usePersistentCompileStore(undefined);
+		await cache.flush();
+	};
 	const devTags = createDevTags();
 	rolldownOptions.devInjections = devTags.tags;
 	const basePlugin = createMarklessRolldownPlugin({
@@ -236,6 +257,13 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			rolldownOptions.dev = serve;
 			rolldownOptions.rootDir = resolvedConfig.root;
 			rolldownOptions.publicPath = (fileName) => joinURL(resolvedConfig.base, fileName);
+			if (!serve && options.compileCache !== false && persistentCompileCacheAvailable()) {
+				compileCache = createPersistentCompileCache({
+					directory: resolve(resolvedConfig.cacheDir, 'markless-compile'),
+					fingerprint: compilerFingerprint(),
+				});
+				usePersistentCompileStore(compileCache);
+			}
 			if (serve) {
 				devTags.registerViteTags(resolvedConfig.base);
 				if (prerender && prerenderEntry) {
@@ -294,6 +322,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					);
 				}
 				await buildMarklessEnvironments(builder, options);
+				await flushCompileCache();
 				if (prerender && prerenderEntry) {
 					const source = resolve(resolvedRoot, prerenderEntry);
 					const clientEnvironment =
@@ -318,7 +347,9 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			},
 		},
 		configureVitest({ defineCacheKeyGenerator }: VitestCacheKeyContext) {
-			defineCacheKeyGenerator(({ id }) => (isCompilerStatefulModuleId(id) ? false : undefined));
+			defineCacheKeyGenerator(({ id }) =>
+				isCompilerStatefulModuleId(id) ? false : undefined,
+			);
 		},
 		configureServer(server: ViteDevServer) {
 			server.config.logger?.info(

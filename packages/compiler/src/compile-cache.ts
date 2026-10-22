@@ -47,6 +47,37 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 	}
 }
 
+/**
+ * A compile store that outlives the process, keyed by the input itself; the host owns where results live.
+ * Reads are synchronous: a stored result must arrive in the same turn a compile would start in, because the
+ * bundler's claim publication counts on siblings publishing without another task running in between.
+ */
+export type PersistentCompileStore = {
+	read(source: string, key: string): CompileTsrxModuleResult | undefined;
+	write(source: string, key: string, result: CompileTsrxModuleResult): void;
+};
+
+let persistent: PersistentCompileStore | undefined;
+
+export function usePersistentCompileStore(store: PersistentCompileStore | undefined): void {
+	persistent = store;
+}
+
+function compileThroughStore(
+	input: CompileTsrxModuleInput,
+	key: string,
+	compile: () => Promise<CompileTsrxModuleResult>,
+): Promise<CompileTsrxModuleResult> {
+	const store = persistent;
+	if (!store) return compile();
+	const stored = store.read(input.source, key);
+	if (stored) return Promise.resolve(stored);
+	return compile().then((result) => {
+		store.write(input.source, key, result);
+		return result;
+	});
+}
+
 export function memoizedCompile(
 	input: CompileTsrxModuleInput,
 	compile: () => Promise<CompileTsrxModuleResult>,
@@ -60,7 +91,7 @@ export function memoizedCompile(
 		compiles.set(input.source, bySource!);
 		return cached;
 	}
-	const pending = compile();
+	const pending = compileThroughStore(input, key, compile);
 	if (!bySource) compiles.set(input.source, (bySource = new Map()));
 	bySource.set(key, pending);
 	entries++;

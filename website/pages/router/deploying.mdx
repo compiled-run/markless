@@ -102,6 +102,14 @@ key-value store. Counters, sessions and carts all go there, not in memory.
 	text="It looks that way, but Nitro's per-route Vercel functions are links to one shared bundle. Nitro keeps them so each route shows up on its own in Vercel's logs and metrics. A compatibilityDate.vercel earlier than 2025-07-15 turns them off. To get functions that are truly separate, with their own copy of the bundle, use vercel.functionRules."
 />
 
+## The compile cache
+
+A build keeps each `.tsrx` file's compiled result in `node_modules/.vite/markless-compile/`. The next build
+reads a result back instead of compiling again, as long as the file, everything it was compiled against, and
+the Markless compiler itself are unchanged, so it builds the same output. The cache holds at most 1 GB and
+drops the results no recent build used. To compile everything every time, pass `markless({ compileCache:
+false })`. Deleting the folder is always safe.
+
 ## Nitro configuration
 
 Put Nitro configuration under a top-level `nitro` key in `vite.config.ts`. The router merges it into
