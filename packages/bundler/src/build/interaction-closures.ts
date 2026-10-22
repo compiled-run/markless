@@ -318,6 +318,18 @@ export function computeInteractionClosures(input: {
 			roots.filter((id) => !renderRoots.includes(id)),
 		);
 		const page = pageIndex(files, demand);
+		// Many controls on a page seed the same symbols and runtime, so each distinct walk runs once per route.
+		const actionClosures = new Map<string, string[]>();
+		const actionClosure = (seeds: ReadonlySet<string>, runtimeIds: ReadonlySet<string>) => {
+			const key = `${[...seeds].join('\0')}\u0001${[...runtimeIds].sort().join('\0')}`;
+			let ids = actionClosures.get(key);
+			if (!ids)
+				actionClosures.set(
+					key,
+					(ids = useClosure(route, reach, seeds, { runtimeIds }, seeds)),
+				);
+			return ids;
+		};
 		// Boot holds what resume start and the records that run before input need; a symbol only some control's
 		// first use or no known path loads is left to that control's closure or to on-demand fetch.
 		const resume = joinPage(page.resume, page);
@@ -449,7 +461,7 @@ export function computeInteractionClosures(input: {
 					kind: 'action',
 					...(conservative ? { conservative } : {}),
 					...(lean ? { lean: true } : {}),
-					modules: useClosure(route, reach, seeds, { runtimeIds }, seeds),
+					modules: actionClosure(seeds, runtimeIds),
 				});
 			}
 		}
@@ -787,7 +799,10 @@ export type InteractionClosuresAssetView = {
 	readonly routes: ReadonlyArray<{
 		readonly route: string;
 		readonly fallback?: string;
-		readonly files?: { readonly firstUse: readonly string[]; readonly render: readonly string[] };
+		readonly files?: {
+			readonly firstUse: readonly string[];
+			readonly render: readonly string[];
+		};
 		readonly consumers: ReadonlyArray<
 			Omit<InteractionConsumer, 'modules'> & { readonly modules: readonly string[] }
 		>;
