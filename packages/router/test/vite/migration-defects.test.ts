@@ -544,25 +544,57 @@ test('a page whose body is only text renders it', async () => {
 	expect(await response.text()).toContain('only text');
 });
 
-test('a long page navigated to in place paints its top before the rest, then resumes', async () => {
+test('a long page navigated to in place is laid out over several tasks but paints whole, then resumes', async () => {
 	const { page, errors } = await open('/long-link');
 	await page.evaluate(() => {
-		const seen: number[] = [];
-		(globalThis as { __framesSeen?: number[] }).__framesSeen = seen;
+		const host = globalThis as {
+			__framesSeen?: number[][];
+			__insertBatches?: number;
+			__stayed?: boolean;
+		};
+		const seen: number[][] = [];
+		host.__framesSeen = seen;
+		host.__insertBatches = 0;
+		new MutationObserver((records) => {
+			if (
+				records.some((record) =>
+					[...record.addedNodes].some(
+						(node) =>
+							node.nodeType === 1 &&
+							((node as Element).matches('[data-long-section]') ||
+								(node as Element).querySelector('[data-long-section]')),
+					),
+				)
+			)
+				host.__insertBatches!++;
+		}).observe(document, { childList: true, subtree: true });
 		const tick = () => {
-			seen.push(document.querySelectorAll('[data-long-section]').length);
+			seen.push([
+				document.querySelectorAll('[data-to-long]').length,
+				document.querySelectorAll('[data-long-section]').length,
+			]);
 			requestAnimationFrame(tick);
 		};
 		requestAnimationFrame(tick);
-		(globalThis as { __stayed?: boolean }).__stayed = true;
+		host.__stayed = true;
 	});
 	await page.click('[data-to-long]');
 	await page.waitForSelector('[data-long-tap]');
 	await page.click('[data-long-tap]');
 	await expect.poll(() => text(page, '[data-long-tap]')).toBe('1');
-	const seen = await page.evaluate(() => (globalThis as { __framesSeen?: number[] }).__framesSeen!);
-	expect(seen.some((count) => count > 0 && count < 300)).toBe(true);
-	expect(seen.at(-1)).toBe(300);
+	const { seen, batches } = await page.evaluate(() => {
+		const host = globalThis as { __framesSeen?: number[][]; __insertBatches?: number };
+		return { seen: host.__framesSeen!, batches: host.__insertBatches! };
+	});
+	// Every frame shows the leaving page or the whole next one, never a part of it.
+	expect(
+		seen.filter(
+			([link, sections]) =>
+				!(link === 1 && sections === 0) && !(link === 0 && sections === 300),
+		),
+	).toEqual([]);
+	expect(seen.at(-1)).toEqual([0, 300]);
+	expect(batches).toBeGreaterThan(1);
 	expect(await page.evaluate(() => (globalThis as { __stayed?: boolean }).__stayed)).toBe(true);
 	expect(errors).toEqual([]);
 	await page.close();
