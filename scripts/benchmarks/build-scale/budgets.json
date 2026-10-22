@@ -26,8 +26,8 @@
 			"reason": "6 MB: measured 4.63 MB (interaction-closures.json) at 180 pages; origin/main before wrote a 22.6 MB execution-demand.json."
 		},
 		"buildCpuMsPerPage": {
-			"value": 560,
-			"reason": "560 ms of build CPU per extra page between 60 and 180 pages: an M-series Mac measured 297 ms and the CI runner measured 1.37 times the Mac's per-page CPU on the earlier fixture (about 410 ms here); main before the 2026-10 build-time fixes took 1.5 to 1.65 times the per-page CPU of this tree."
+			"value": 720,
+			"reason": "720 ms of build CPU per extra page between 60 and 180 pages: the CI runner measured 539 ms (an M-series Mac 297 ms); main before the 2026-10 build-time fixes took 1.5 to 1.65 times this tree's per-page CPU, about 810 to 890 ms on the runner."
 		},
 		"buildCpuGrowth": {
 			"value": 2.9,
