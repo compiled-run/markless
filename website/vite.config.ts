@@ -18,8 +18,8 @@ import { siteBase } from './site-base.ts';
 export default {
 	base: siteBase,
 	nitro: { baseURL: siteBase },
-	// Measured: the /concepts/state pack, 854 kB with its 487 kB drawing; Markless packs a page's code together on purpose.
-	build: { chunkSizeWarningLimit: 900 },
+	// Measured: /concepts/state is 854 kB in the browser and 914 kB on the server, 487 kB of it drawing data.
+	build: { chunkSizeWarningLimit: 1000 },
 	// pageProps, codeBlocks and uiDemos run before router(): they rewrite the .mdx source router() parses.
 	// highlightMdx runs after router(): it rewrites the module router() emits.
 	lint: {
