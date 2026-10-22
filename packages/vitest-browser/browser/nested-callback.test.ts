@@ -181,7 +181,7 @@ test('CSR: a part that guards an optional event prop out of a rest spread reache
 //
 //   - the served view record for the part's own event names the BOUND id
 //     (`{"hostNodeId":"c16:h1","eventName":"keydown",
-//     "symbolIds":["bound:symbol%3A0:component-edge%3A16"]}`), so
+//     "symbolIds":["bound:symbol%3A0:16"]}`), so
 //     `boundEventSymbolIds` (protocol-view.ts) already maps it;
 //   - the served resolver carries `createBoundGraph` and that row's capture
 //     slot with `legacyGraphRead {graphNodeId:"prop:props",path:["onKeyDown"]}`

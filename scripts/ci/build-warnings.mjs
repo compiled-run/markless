@@ -10,6 +10,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 export const GUARDED_BUILDS = [
 	'website',
+	'demos/computed-chain',
 	'demos/live-feed',
 	'demos/live-feed-ssr',
 	'demos/music-player',

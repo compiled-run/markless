@@ -8,12 +8,12 @@ export const OWNER_LEVELS = Object.freeze([1, 11, 21, 31, 41, 51, 61, 71, 81, 91
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixtureDirectory = path.join(here, 'fixture');
 
-export function createFixtureModel({ miswireMiddle = false } = {}) {
-	return Array.from({ length: LEVEL_COUNT }, (_, offset) => {
+export function createFixtureModel({ miswireMiddle = false, levels = LEVEL_COUNT, owners = OWNER_LEVELS } = {}) {
+	return Array.from({ length: levels }, (_, offset) => {
 		const level = offset + 1;
 		return {
 			level,
-			owner: OWNER_LEVELS.includes(level),
+			owner: owners.includes(level),
 			predecessor: level === 1 ? null : miswireMiddle && level === 51 ? null : level - 1,
 		};
 	});
@@ -34,21 +34,23 @@ export function generateFixtureSource(options = {}) {
 
 export function generateFixtureFiles(options = {}) {
 	const model = createFixtureModel(options);
+	const levelCount = options.levels ?? LEVEL_COUNT;
+	const ownerLevels = (options.owners ?? OWNER_LEVELS).filter((level) => level <= levelCount);
 	const files = new Map();
 	// Owners live at the ROOT. Each write button dispatches one handler; the
 	// batch buttons write ALL TEN owners in one handler and one dispatch
 	// (cross-event clicks do not coalesce - measured: ten separate clicks
 	// propagate sequentially, 550 evaluations, exactly like the spaced sweep).
-	const ownerList = OWNER_LEVELS.map((level) => `owner${level}`);
+	const ownerList = ownerLevels.map((level) => `owner${level}`);
 	let app = `import { state } from '@markless/core';\nimport C1 from './chain-1-10.tsrx';\n\nexport default function App() @{\n`;
-	for (const level of OWNER_LEVELS) app += `\tlet owner${level} = state(0);\n`;
+	for (const level of ownerLevels) app += `\tlet owner${level} = state(0);\n`;
 	app += `\n\t<main id='computed-chain'>\n\t\t<div class='owner-actions'>\n`;
-	for (const level of OWNER_LEVELS) {
+	for (const level of ownerLevels) {
 		app += `\t\t\t<button type='button' data-owner='${level}' onClick={() => owner${level}++}>write ${level}</button>\n`;
 	}
 	app += `\t\t\t<button type='button' data-equal='1' onClick={() => { const same = owner1; owner1 = same; }}>equal</button>\n`;
-	app += `\t\t\t<button type='button' data-batch='forward' onClick={() => { ${OWNER_LEVELS.map((l) => `owner${l}++`).join('; ')}; }}>batch forward</button>\n`;
-	app += `\t\t\t<button type='button' data-batch='reverse' onClick={() => { ${[...OWNER_LEVELS].reverse().map((l) => `owner${l}++`).join('; ')}; }}>batch reverse</button>\n`;
+	app += `\t\t\t<button type='button' data-batch='forward' onClick={() => { ${ownerLevels.map((l) => `owner${l}++`).join('; ')}; }}>batch forward</button>\n`;
+	app += `\t\t\t<button type='button' data-batch='reverse' onClick={() => { ${[...ownerLevels].reverse().map((l) => `owner${l}++`).join('; ')}; }}>batch reverse</button>\n`;
 	app += `\t\t</div>\n\t\t<C1 ${ownerList.map((name) => `${name}={${name}}`).join(' ')} />\n\t</main>\n}\n`;
 	files.set('app.tsrx', app);
 	// The evaluation counter is an IMPORTED helper: module-scope function
@@ -56,16 +58,16 @@ export function generateFixtureFiles(options = {}) {
 	// extracted derive-symbol chunks (runtime ReferenceError at mount), while
 	// imported helpers travel through the module graph (compiler T130).
 	files.set('counted.ts', `export function counted(level: number, value: number): number { globalThis.__chainEvaluationCounts[level]++; return value; }\n`);
-	for (let start = 1; start <= LEVEL_COUNT; start += 10) {
+	for (let start = 1; start <= levelCount; start += 10) {
 		const end = start + 9;
 		let source = `import { computed } from '@markless/core';\n`;
 		source += `import { counted } from './counted.ts';\n`;
-		if (end < LEVEL_COUNT) source += `import C${end + 1} from './chain-${end + 1}-${end + 10}.tsrx';\n`;
+		if (end < levelCount) source += `import C${end + 1} from './chain-${end + 1}-${end + 10}.tsrx';\n`;
 		source += `\n`;
 		for (let level = end; level >= start; level--) {
 			const node = model[level - 1];
-			const owners = OWNER_LEVELS.map((ownerLevel) => `owner${ownerLevel}`);
-			const passed = level === LEVEL_COUNT ? owners.map((name) => `${name}: _${name}`) : owners;
+			const owners = ownerLevels.map((ownerLevel) => `owner${ownerLevel}`);
+			const passed = level === levelCount ? owners.map((name) => `${name}: _${name}`) : owners;
 			const parameter = level === 1 ? `{ ${passed.join(', ')} }` : `{ input${level}, ${passed.join(', ')} }`;
 			const exported = level === start ? 'export default ' : '';
 			source += `${exported}function C${level}(${parameter}) @{\n`;
@@ -75,7 +77,7 @@ export function generateFixtureFiles(options = {}) {
 			const local = node.owner && level !== 1 ? ` + owner${level}` : '';
 			source += `\tconst value${level} = computed(() => counted(${level}, ${predecessor}${local}));\n`;
 			source += `\t<div class='c' data-level='${level}'><output data-value='${level}'>{value${level}}</output>`;
-			if (level < LEVEL_COUNT) source += `<C${level + 1} input${level + 1}={value${level}} ${owners.map((name) => `${name}={${name}}`).join(' ')} />`;
+			if (level < levelCount) source += `<C${level + 1} input${level + 1}={value${level}} ${owners.map((name) => `${name}={${name}}`).join(' ')} />`;
 			source += `</div>\n}\n\n`;
 		}
 		files.set(`chain-${start}-${end}.tsrx`, source);

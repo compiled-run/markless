@@ -1877,8 +1877,8 @@ export function App() @{
 
 		expect(rows).toHaveLength(2);
 		expect(rows.map((row) => row.id)).toEqual([
-			`bound:${encodeURIComponent(childHandler.symbolId)}:${encodeURIComponent('component-edge:0')}`,
-			`bound:${encodeURIComponent(childHandler.symbolId)}:${encodeURIComponent('component-edge:1')}`,
+			`bound:${encodeURIComponent(childHandler.symbolId)}:0`,
+			`bound:${encodeURIComponent(childHandler.symbolId)}:1`,
 		]);
 		expect(new Set(rows.map((row) => row.id)).size).toBe(2);
 		expect(new Set(rows.map((row) => row.loaderSymbolId))).toEqual(new Set([loaderSymbolId]));
@@ -2104,8 +2104,9 @@ export function App() @{
 				),
 			).toBe(true);
 			const emittedCode = chunks.map((chunk) => chunk.code).join('\n');
-			expect(emittedCode).toContain('component-edge%3A0');
-			expect(emittedCode).toContain('component-edge%3A1');
+			// The bound row table keys each instance's rows by its edge half of the bound id.
+			expect(emittedCode).toMatch(/"0":\s*\[\[/);
+			expect(emittedCode).toMatch(/"1":\s*\[\[/);
 		},
 	);
 
