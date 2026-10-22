@@ -81,7 +81,7 @@ import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundle
 const STRIPPED_CODE_LIMIT = 4096;
 const strippedCode = new Map<string, string>();
 
-// Strips outlive the process through the host's store: a warm build strips nothing it stripped before.
+// Strips and fragment verdicts outlive the process through the host's store, so a warm build redoes neither.
 let persistentStrippedCode:
 	| { get(key: string): string | undefined; set(key: string, value: string): void }
 	| undefined;
@@ -169,7 +169,10 @@ const FRAGMENT_VERDICT_LIMIT = 4096;
 async function fragmentCarriesTypeScript(code: string): Promise<boolean> {
 	const known = fragmentVerdicts.get(code);
 	if (known !== undefined) return known;
-	const verdict = await fragmentCarriesTypeScriptUncached(code);
+	const stored = persistentStrippedCode?.get(`t${code}`);
+	const verdict =
+		stored === undefined ? await fragmentCarriesTypeScriptUncached(code) : stored === 'true';
+	if (stored === undefined) persistentStrippedCode?.set(`t${code}`, String(verdict));
 	if (fragmentVerdicts.size >= FRAGMENT_VERDICT_LIMIT)
 		fragmentVerdicts.delete(fragmentVerdicts.keys().next().value!);
 	fragmentVerdicts.set(code, verdict);
