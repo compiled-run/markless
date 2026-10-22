@@ -1,4 +1,5 @@
 import { parseChunkCode, spansAnyOffset, textOffsets } from './chunk-ast.ts';
+import { runChunkTask } from './chunk-workers.ts';
 
 type Syntax = { type?: string; start: number; end: number; [key: string]: unknown };
 type Edit = { readonly start: number; readonly end: number; readonly text: string };
@@ -11,11 +12,17 @@ type Edit = { readonly start: number; readonly end: number; readonly text: strin
  * `await import(x)` instead, and any other reader gets
  * `import(x).then(m=>({a:m.a}))`, which resolves to the same snapshot object.
  */
-export function unwrapAsyncImportWrappers(bundle: Record<string, unknown>): void {
-	for (const output of Object.values(bundle)) {
-		if (!isChunk(output) || !output.code.includes('async()=>{')) continue;
-		output.code = unwrapAsyncImportWrappersInCode(output.code);
-	}
+export async function unwrapAsyncImportWrappers(bundle: Record<string, unknown>): Promise<void> {
+	const chunks = Object.values(bundle).filter(
+		(output): output is { type: 'chunk'; code: string; fileName?: string } =>
+			isChunk(output) && output.code.includes('async()=>{'),
+	);
+	const unwrapped = await Promise.all(
+		chunks.map((chunk) =>
+			runChunkTask('unwrappedAsyncImports', chunk.fileName ?? 'chunk.js', chunk.code),
+		),
+	);
+	for (const [index, chunk] of chunks.entries()) chunk.code = unwrapped[index]!;
 }
 
 const GAP = String.raw`(?:\s|/\*[\s\S]*?\*/|//[^\n]*\n)*`;

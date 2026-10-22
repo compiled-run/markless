@@ -22,6 +22,7 @@ function largeChunk(seed: string): string {
 		`init_preload_helper();`,
 		`const load_${seed} = () => import("./pack-${seed}.js").then((m) => (m.init_pack(), m.symbol_${seed}));`,
 		`const text = "see chunk-${seed}.js and ${seed}Word";`,
+		`const wrapped_${seed} = async () => (await (async()=>{let{first:e}=await import("./target-${seed}.js");return{first:e}})()).first;`,
 		...filler,
 		`export const read_${seed} = () => Promise.resolve().then(() => lazy_${seed}_exports);`,
 		`export { shared as ${seed}_shared, other, load_${seed}, text };`,
@@ -34,6 +35,7 @@ const tasks: ChunkTaskName[] = [
 	'chunkDynamicImports',
 	'strippedPreloadHelper',
 	'facadeChunkFacts',
+	'unwrappedAsyncImports',
 ];
 
 test('a chunk worker answers every task exactly as the main thread does', async () => {
@@ -49,6 +51,22 @@ test('a chunk worker answers every task exactly as the main thread does', async 
 				runChunkTaskInline(task, chunk.fileName, chunk.code),
 			);
 		}
+});
+
+test('a task with context answers on a worker as on the main thread', async () => {
+	const code = largeChunk('delta');
+	const context = {
+		helperFileName: 'build/preload-delta.js',
+		exported: new Map<string, 'init' | 'preload'>([
+			['__vitePreload', 'preload'],
+			['init_preload_helper', 'init'],
+		]),
+	};
+	const fromWorker = await runChunkTask('helperImporterRewrite', 'build/chunk-delta.js', code, context);
+	expect(fromWorker).toEqual(
+		runChunkTaskInline('helperImporterRewrite', 'build/chunk-delta.js', code, context),
+	);
+	expect(fromWorker).not.toBeUndefined();
 });
 
 test('a task that throws on a worker rejects with its message', async () => {

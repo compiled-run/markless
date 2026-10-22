@@ -481,7 +481,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 						) as Array<{ readonly fileName: string; readonly code: string }>,
 					);
 					collapseInitFacadeImports(bundle);
-					unwrapAsyncImportWrappers(bundle);
+					await unwrapAsyncImportWrappers(bundle);
 				},
 			},
 		} satisfies Plugin,

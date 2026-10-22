@@ -4,11 +4,22 @@ import { runChunkTaskInline, type ChunkTaskName } from './chunk-tasks.ts';
 
 parentPort!.on(
 	'message',
-	(message: { id: number; task: ChunkTaskName; fileName: string; code: string }) => {
+	(message: {
+		id: number;
+		task: ChunkTaskName;
+		fileName: string;
+		code: string;
+		context: unknown;
+	}) => {
 		try {
 			parentPort!.postMessage({
 				id: message.id,
-				result: runChunkTaskInline(message.task, message.fileName, message.code),
+				result: runChunkTaskInline(
+					message.task,
+					message.fileName,
+					message.code,
+					message.context as never,
+				),
 			});
 		} catch (error) {
 			parentPort!.postMessage({

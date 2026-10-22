@@ -86,14 +86,14 @@ test.each([
 	expect(unwrapAsyncImportWrappersInCode(code)).toBe(code);
 });
 
-test('rewrites every chunk in the bundle and skips other outputs', () => {
+test('rewrites every chunk in the bundle and skips other outputs', async () => {
 	const code = `export const p=(await ${WRAPPER}).first;`;
 	const bundle: Record<string, { type: string; code?: string; source?: string }> = {
 		'a.js': { type: 'chunk', code },
 		'a.css': { type: 'asset', source: code },
 	};
 
-	unwrapAsyncImportWrappers(bundle);
+	await unwrapAsyncImportWrappers(bundle);
 
 	expect(bundle['a.js']!.code).toBe('export const p=(await import("./target.mjs")).n;');
 	expect(bundle['a.css']!.source).toBe(code);

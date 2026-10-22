@@ -5,7 +5,7 @@ import {
 	mayContainDynamicImport,
 	rememberChunkDynamicImports,
 } from './chunk-ast.ts';
-import type { ChunkTaskName, ChunkTaskResult } from './chunk-tasks.ts';
+import type { ChunkTaskContext, ChunkTaskName, ChunkTaskResult } from './chunk-tasks.ts';
 import { runChunkTaskInline } from './chunk-tasks.ts';
 
 // Below this a chunk's analysis costs less than posting it to a worker and back.
@@ -16,6 +16,7 @@ type Job = {
 	readonly task: ChunkTaskName;
 	readonly fileName: string;
 	readonly code: string;
+	readonly context: unknown;
 	readonly resolve: (value: never) => void;
 	readonly reject: (error: unknown) => void;
 };
@@ -94,7 +95,7 @@ function addWorker(): void {
 
 function runInline(job: Job): void {
 	try {
-		job.resolve(runChunkTaskInline(job.task, job.fileName, job.code) as never);
+		job.resolve(runChunkTaskInline(job.task, job.fileName, job.code, job.context as never) as never);
 	} catch (error) {
 		job.reject(error);
 	}
@@ -113,6 +114,7 @@ function dispatch(): void {
 			task: job.task,
 			fileName: job.fileName,
 			code: job.code,
+			context: job.context,
 		});
 	}
 	for (const entry of pool) if (!entry.job) entry.worker.unref();
@@ -123,16 +125,17 @@ export function runChunkTask<T extends ChunkTaskName>(
 	task: T,
 	fileName: string,
 	code: string,
+	context?: ChunkTaskContext<T>,
 ): Promise<ChunkTaskResult<T>> {
 	if (code.length < CHUNK_WORKER_MIN_CODE_LENGTH || !startPool()) {
 		try {
-			return Promise.resolve(runChunkTaskInline(task, fileName, code));
+			return Promise.resolve(runChunkTaskInline(task, fileName, code, context));
 		} catch (error) {
 			return Promise.reject(error);
 		}
 	}
 	return new Promise((resolve, reject) => {
-		queue.push({ id: nextId++, task, fileName, code, resolve, reject });
+		queue.push({ id: nextId++, task, fileName, code, context, resolve, reject });
 		dispatch();
 	});
 }
