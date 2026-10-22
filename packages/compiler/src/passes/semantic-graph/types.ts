@@ -36,6 +36,15 @@ import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
 import { moduleSemantics, type ModuleSemantics } from './shared-ast.ts';
 
+export type ArmGuard =
+	| { readonly kind: 'if'; readonly test: AnyNode; readonly holds: boolean }
+	| { readonly kind: 'case'; readonly discriminant: AnyNode; readonly test: AnyNode }
+	| {
+			readonly kind: 'default';
+			readonly discriminant: AnyNode;
+			readonly tests: ReadonlyArray<AnyNode>;
+	  };
+
 export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
 	filename: string;
@@ -128,6 +137,8 @@ export type WalkState = {
 	// host at arm entry: a read still seeing it has no host of its own inside
 	// the arm, so hosting it there would erase the sibling arm's markers.
 	currentArmScope: { readonly branchSiteId: string; readonly hostNodeId: string | null } | null;
+	// The conditions every enclosing @if/@switch arm needs to hold, outermost first.
+	currentArmGuards: ArmGuard[];
 	// Set while walking a component edge's children; `hostNodeId` is the enclosing
 	// host at entry. A read still seeing it is projected into the child.
 	currentProjectionScope: {
@@ -269,6 +280,7 @@ export function createWalkState(input: {
 		keyedRepeatItemSpans: new Map(),
 		currentHostNodeId: null,
 		currentArmScope: null,
+		currentArmGuards: [],
 		currentProjectionScope: null,
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,

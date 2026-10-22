@@ -208,7 +208,10 @@ export function liftArmRenderLocalValue(
 		return null;
 	const inlined = inlineRenderLocals(expression, state);
 	if (inlined.kind !== 'inlined' || inlined.definitions.length === 0) return null;
-	const dependencies = [expression, ...inlined.definitions].flatMap((node) =>
+	const guard = armGuardCondition(state);
+	if (!guard) return null;
+	const definitions = [...guard.definitions, ...inlined.definitions];
+	const dependencies = [expression, ...guard.nodes, ...definitions].flatMap((node) =>
 		collectGraphDependencies(node, state),
 	);
 	const asyncNodeIds = new Set(
@@ -216,15 +219,55 @@ export function liftArmRenderLocalValue(
 	);
 	if (dependencies.some((dependency) => asyncNodeIds.has(dependency.graphNodeId))) return null;
 	const lifted = mintTemplateExpressionComputed(
-		`() => ${inlined.source}`,
+		guard.source === null
+			? `() => ${inlined.source}`
+			: `() => (${guard.source}) ? ${inlined.source} : undefined`,
 		[...new Set(dependencies.map((dependency) => dependency.source))],
 		state,
 		false,
 		undefined,
 		true,
 	);
-	if (lifted) for (const definition of inlined.definitions) collectDefinitionReads(definition, state);
+	if (lifted) for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
 	return lifted;
+}
+
+// The enclosing arms' conditions with body locals inlined, so a lifted value is only computed where its arm renders.
+function armGuardCondition(state: WalkState): {
+	readonly source: string | null;
+	readonly nodes: ReadonlyArray<AnyNode>;
+	readonly definitions: ReadonlyArray<AnyNode>;
+} | null {
+	const nodes: AnyNode[] = [];
+	const definitions: AnyNode[] = [];
+	const inline = (node: AnyNode): string | null => {
+		const inlined = inlineRenderLocals(node, state);
+		if (inlined.kind !== 'inlined') return null;
+		nodes.push(node);
+		definitions.push(...inlined.definitions);
+		return `(${inlined.source})`;
+	};
+	const conditions: string[] = [];
+	for (const guard of state.currentArmGuards) {
+		if (guard.kind === 'if') {
+			const test = inline(guard.test);
+			if (test === null) return null;
+			conditions.push(guard.holds ? test : `!${test}`);
+			continue;
+		}
+		const discriminant = inline(guard.discriminant);
+		if (discriminant === null) return null;
+		const tests = guard.kind === 'case' ? [guard.test] : guard.tests;
+		const matches: string[] = [];
+		for (const test of tests) {
+			const source = inline(test);
+			if (source === null) return null;
+			matches.push(`${discriminant} === ${source}`);
+		}
+		if (guard.kind === 'case') conditions.push(matches[0]!);
+		else if (matches.length > 0) conditions.push(`!(${matches.join(' || ')})`);
+	}
+	return { source: conditions.length > 0 ? conditions.join(' && ') : null, nodes, definitions };
 }
 
 // The spliced definition's reads are lowered at its own span, once however many handlers splice it.

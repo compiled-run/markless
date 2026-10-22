@@ -64,7 +64,12 @@ import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { childContainerRepeatDiagnostics, containerRepeatComponents } from './container-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
-import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
+import {
+	createMutableSemanticGraphArtifact,
+	createWalkState,
+	type ArmGuard,
+	type WalkState,
+} from './types.ts';
 import { collectSemanticMarkup, componentStyleScopeClass } from './collect-markup.ts';
 import { moduleIdOf } from '../../module-id.ts';
 
@@ -468,9 +473,14 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'JSXIfExpression': {
 			collectBranchSite(node, state);
 			const site = lastBranchSiteId(state);
+			const test = node.test as AnyNode | undefined;
 			withArmScope(state, site, () => {
-				walkBranch(node.consequent as AnyNode | undefined, state);
-				walkBranch(node.alternate as AnyNode | undefined, state);
+				withArmGuard(state, test && { kind: 'if', test, holds: true }, () =>
+					walkBranch(node.consequent as AnyNode | undefined, state),
+				);
+				withArmGuard(state, test && { kind: 'if', test, holds: false }, () =>
+					walkBranch(node.alternate as AnyNode | undefined, state),
+				);
 			});
 			collectConditionalBranchText(node, state);
 			return;
@@ -479,14 +489,26 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			collectBranchSite(node, state);
 			const site = lastBranchSiteId(state);
 			walk(node.discriminant as AnyNode | undefined, state);
+			const discriminant = node.discriminant as AnyNode | undefined;
+			const caseTests = asNodes(node.cases).flatMap((switchCase) =>
+				switchCase.test ? [switchCase.test as AnyNode] : [],
+			);
 			withArmScope(state, site, () => {
 				for (const switchCase of asNodes(node.cases)) {
 					walk(switchCase.test as AnyNode | undefined, state);
 					const caseBranchId = `branch:${state.nextBranchId++}`;
+					const caseTest = switchCase.test as AnyNode | undefined;
+					const guard: ArmGuard | undefined =
+						discriminant &&
+						(caseTest
+							? { kind: 'case', discriminant, test: caseTest }
+							: { kind: 'default', discriminant, tests: caseTests });
 					state.currentBranchScopeIds.push(caseBranchId);
-					for (const caseChild of asNodes(switchCase.consequent)) {
-						walkMarkupStatement(caseChild, state);
-					}
+					withArmGuard(state, guard, () => {
+						for (const caseChild of asNodes(switchCase.consequent)) {
+							walkMarkupStatement(caseChild, state);
+						}
+					});
 					state.currentBranchScopeIds.pop();
 				}
 			});
@@ -502,11 +524,14 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 					state.keyedRepeatItemSpans.set(repeat.id, { start: left.start, end: left.end });
 			}
 			// A row's reads belong to the row template, not to any arm around it.
+			const outerGuards = state.currentArmGuards;
+			state.currentArmGuards = [];
 			withArmScope(state, null, () => {
 				for (const child of childNodes(node)) {
 					walk(child, state);
 				}
 			});
+			state.currentArmGuards = outerGuards;
 			if (repeat) state.currentKeyedRepeatScopeIds.pop();
 			attachKeyedRepeatRowHost(node, state, repeatIndex);
 			return;
@@ -682,6 +707,12 @@ function withArmScope(state: WalkState, branchSiteId: string | null, run: () => 
 		: null;
 	run();
 	state.currentArmScope = previous;
+}
+
+function withArmGuard(state: WalkState, guard: ArmGuard | undefined, run: () => void): void {
+	if (guard) state.currentArmGuards.push(guard);
+	run();
+	if (guard) state.currentArmGuards.pop();
 }
 
 function withCreationSite(
