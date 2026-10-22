@@ -1,16 +1,14 @@
-// The level / reading time / prerequisite line under every H1, plus the sprite
+// The reading time / prerequisite line under every H1, plus the sprite
 // that sits beside the title. MDX cannot nest a component inside a markdown
 // heading, so the sprite rides here and CSS lifts it up next to the H1.
 import Sprite from './sprite.tsrx';
 import { assumesFor } from '../nav.ts';
 
 export default function PageMeta({
-	level,
 	time,
 	assumes,
 	sprite,
 }: {
-	readonly level: string;
 	readonly time: string;
 	readonly assumes: string;
 	readonly sprite?: string;
@@ -30,15 +28,6 @@ export default function PageMeta({
 				margin-block: calc(var(--space-xs) * -0.5) var(--space-m);
 				font-size: var(--step--1);
 				color: color-mix(in oklch, var(--ink) 72%, var(--paper));
-			}
-
-			.page-meta-level {
-				padding: 0.1em 0.55em;
-				background: var(--yellow);
-				border: 2px solid var(--ink);
-				border-radius: 999px;
-				color: var(--on-accent);
-				font-weight: 700;
 			}
 
 			.page-meta-sep {
@@ -68,9 +57,7 @@ export default function PageMeta({
 		<span class="page-meta-sprite">
 			<Sprite name={sprite ?? 'sparkle'} size="2.6em" />
 		</span>
-		<span class="page-meta-level">{level}</span>
-		<span class="page-meta-sep">·</span>
-		<span>{time}</span>
+		<span class="page-meta-time">{time}</span>
 		<span class="page-meta-sep">·</span>
 		<span>
 			Assumes: {plain}

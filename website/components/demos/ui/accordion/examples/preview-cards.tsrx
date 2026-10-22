@@ -38,7 +38,7 @@ export default function AccordionPreviewCards() @{
    h3 { margin:0; font:600 clamp(1.1rem,1.35vw,1.35rem)/1.2 'Joy Elia',serif; color:var(--ink); text-shadow:none; }
    .arrow { font-size:1.15rem; line-height:1.3; }
    .caption p { grid-column:1/-1; margin:0; font-size:0.9rem; line-height:1.45; }
-   @media(max-width:48rem) { .cards { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:1.25rem; padding:0.75rem 0.5rem 1rem; margin:-0.5rem -0.5rem 0; }.sticker { flex:0 0 82%; box-sizing:border-box; scroll-snap-align:center; }.caption { padding:0.8rem 0.5rem 0.55rem; }h3 { font-size:1.3rem; } }
+   @media(max-width:48rem) { .cards { grid-template-columns:minmax(0,1fr); gap:1.5rem; }.caption { padding:0.8rem 0.5rem 0.55rem; }h3 { font-size:1.3rem; } }
    @media(prefers-reduced-motion:reduce) { .sticker { transition:none; } }
   </style>
  </section>;

@@ -26,11 +26,13 @@ export function CodeTabs({ panes, children }: { readonly panes: readonly CodePan
 		display: flex;
 		align-items: end;
 		height: var(--code-tab-h);
+		max-width: calc(100% - var(--code-tab-left, 0px));
 	}
 
 	.strip-row {
 		display: flex;
 		align-items: flex-end;
+		min-width: 0;
 	}
 
 	.tab {
@@ -47,6 +49,11 @@ export function CodeTabs({ panes, children }: { readonly panes: readonly CodePan
 		line-height: 1.35;
 		cursor: pointer;
 		transition: color 130ms ease;
+		flex: 0 1 auto;
+		min-width: 2.5em;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
 	}
 
 	.tab + .tab {
@@ -63,6 +70,7 @@ export function CodeTabs({ panes, children }: { readonly panes: readonly CodePan
 
 	.tab[ui-selected] {
 		z-index: 1;
+		flex-shrink: 0;
 		padding: 0.25em 1.25em 0.3em;
 		background: var(--paper);
 		color: var(--ink);
@@ -76,6 +84,22 @@ export function CodeTabs({ panes, children }: { readonly panes: readonly CodePan
 	.tab:focus-visible {
 		outline: 2px solid var(--ink);
 		outline-offset: 2px;
+	}
+
+	@media (max-width: 30rem) {
+		.tab,
+		.tab[ui-selected] {
+			padding-inline: 0.75em;
+			font-size: var(--step--1);
+		}
+
+		.tab {
+			min-width: 4.5em;
+		}
+
+		.tab[ui-selected] {
+			font-size: var(--step-0);
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

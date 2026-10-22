@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { transformMdxRoute } from '../../packages/router/src/vite/mdx.ts';
-import { highlightMdx } from './highlight-mdx.ts';
+import { highlightMdx, stackTables } from './highlight-mdx.ts';
 
 test('the outline keeps native heading links inside an independently mounted reader', async () => {
 	const code = await transformMdxRoute(
@@ -14,10 +14,43 @@ test('the outline keeps native heading links inside an independently mounted rea
 	const html = JSON.parse(/return \{ html: ("(?:[^"\\]|\\.)*") \};/.exec(result!.code)![1]);
 	expect(html).toContain('<markless-outline>');
 	expect(html).toContain('aria-label="On this page"');
+	expect(html).toContain(
+		'<details class="on-this-page-fold"><summary class="on-this-page-title">On this page</summary>',
+	);
 	expect(html).toContain('href="#first"');
 	expect(html).toContain('href="#first-2"');
 	expect(html).toContain('<span class="on-this-page-label">Nested <code>code</code></span>');
 	expect(html.indexOf('<markless-outline>')).toBeGreaterThan(html.indexOf('</h1>'));
+});
+
+test('a markdown table labels each body cell with its column header so a phone can stack the rows', async () => {
+	const code = await transformMdxRoute(
+		'# Title\n\n## Props\n\n| Prop | Type | What it *does* |\n| --- | :-: | --- |\n| `value` | `string` | Picks a row. |\n| `size` | `number` | Counts. |\n',
+		'/table.mdx',
+	);
+	const transform = highlightMdx().transform as {
+		handler: (code: string, id: string) => Promise<{ code: string } | undefined>;
+	};
+	const result = await transform.handler(code, '/table.mdx');
+	const html = JSON.parse(/return \{ html: ("(?:[^"\\]|\\.)*") \};/.exec(result!.code)![1]);
+	expect(html).toContain('<table data-stack>');
+	expect(html).toContain('data-label="Prop"><code>value</code>');
+	expect(html).toContain('<td style="text-align: center" data-label="Type">');
+	expect(html).toContain('data-label="What it does">Picks a row.');
+	expect(html.match(/data-label=/g)).toHaveLength(6);
+});
+
+test('a table without a header row, or with one column, is left as it was', () => {
+	const bare = '<table>\n<tbody>\n<tr>\n<td>a</td>\n</tr>\n</tbody>\n</table>';
+	const single =
+		'<table>\n<thead>\n<tr>\n<th>Only</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>a</td>\n</tr>\n</tbody>\n</table>';
+	expect(stackTables(bare)).toBe(bare);
+	expect(stackTables(single)).toBe(single);
+	expect(
+		stackTables(
+			'<table>\n<thead>\n<tr>\n<th>A "x"</th>\n<th>B</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</tbody>\n</table>',
+		),
+	).toContain('<td data-label="A &quot;x&quot;">1</td>');
 });
 
 test('highlighting preserves the element order used by client navigation', async () => {

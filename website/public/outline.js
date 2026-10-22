@@ -12,6 +12,12 @@ class MarklessOutline extends HTMLElement {
 			if (!entries.length) return;
 			const controller = new AbortController();
 			const header = document.querySelector('.site-header');
+			const fold = rail.querySelector('.on-this-page-fold');
+			const docked = () => getComputedStyle(rail).position === 'fixed';
+			if (fold && docked()) fold.open = true;
+			rail.addEventListener('click', (event) => {
+				if (fold && !docked() && event.target.closest('a')) fold.open = false;
+			}, { signal: controller.signal });
 			let frame = 0;
 			let current;
 			const update = () => {
@@ -29,7 +35,7 @@ class MarklessOutline extends HTMLElement {
 					next.link.setAttribute('aria-current', 'location');
 					current = next;
 				}
-				if (getComputedStyle(rail).position !== 'fixed' || rail.matches(':hover, :focus-within')) return;
+				if (!docked() || rail.matches(':hover, :focus-within')) return;
 				const bounds = rail.getBoundingClientRect();
 				const linkBounds = next.link.getBoundingClientRect();
 				if (linkBounds.bottom > bounds.bottom) rail.scrollTop += linkBounds.bottom - bounds.bottom + 8;
