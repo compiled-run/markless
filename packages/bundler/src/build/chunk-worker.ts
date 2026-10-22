@@ -1,4 +1,5 @@
 import { parentPort } from 'node:worker_threads';
+import { clearParsedChunkCode } from './chunk-ast.ts';
 import { runChunkTaskInline, type ChunkTaskName } from './chunk-tasks.ts';
 
 parentPort!.on(
@@ -14,6 +15,9 @@ parentPort!.on(
 				id: message.id,
 				error: error instanceof Error ? (error.stack ?? error.message) : String(error),
 			});
+		} finally {
+			// A task's reads share one tree; kept past the task, every worker would hold a full parse cache of its own.
+			clearParsedChunkCode();
 		}
 	},
 );

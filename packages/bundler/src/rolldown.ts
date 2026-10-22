@@ -5,7 +5,7 @@ import {
 	type LinkedModuleChildResolution,
 } from '@markless/compiler';
 import { clearParsedChunkCode } from './build/chunk-ast.ts';
-import { closeChunkWorkers } from './build/chunk-workers.ts';
+import { releaseChunkWorkers } from './build/chunk-workers.ts';
 import {
 	moveBuildMetadataOutOfClientOutput,
 	moveImportMapOutOfClientOutput,
@@ -275,7 +275,7 @@ export function createMarklessRolldownPlugin(input: {
 				);
 				// Each cached tree holds its parser's native buffer; a large site's chunks outgrew the heap held together.
 				clearParsedChunkCode();
-				await closeChunkWorkers();
+				releaseChunkWorkers();
 			},
 		},
 		async writeBundle(output, bundle) {
