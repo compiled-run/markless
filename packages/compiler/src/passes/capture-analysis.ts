@@ -55,6 +55,28 @@ const CAPTURE_SOURCE_PARSE_FILENAME = 'generated.ts';
 
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
 	const semantics = createSymbolSourceSemanticsReader();
+	// A handler the body-local splice already refused is reported once, by that refusal.
+	const refusedSpans = input.semanticGraph.diagnostics.flatMap((diagnostic) =>
+		(diagnostic.code === 'MARKLESS_HANDLER_READS_RENDER_LOCAL' ||
+			diagnostic.code === 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL') &&
+		diagnostic.primarySpan
+			? [diagnostic.primarySpan]
+			: [],
+	);
+	const refusedByInliner = new Set(
+		input.symbolResolver.symbols.flatMap((symbol) => {
+			const span = 'sourceSpan' in symbol ? symbol.sourceSpan : undefined;
+			return span &&
+				refusedSpans.some(
+					(refused) =>
+						refused.filename === span.filename &&
+						refused.start <= span.start &&
+						refused.end >= span.end,
+				)
+				? [symbol.id]
+				: [];
+		}),
+	);
 	const localSymbols = input.symbolResolver.symbols.map((symbol) => {
 		const captureSlots = symbolCaptureSlots(symbol, input, semantics);
 		const firstOwner = captureSlots[0]?.owner;
@@ -101,6 +123,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 			),
 		),
 		...extractedSymbols.flatMap((symbol) => {
+			if (refusedByInliner.has(symbol.symbolId)) return [];
 			const { freeNames, analysisFailed } = semantics.read(symbol.source);
 			// A source the analyzer could not read proves nothing about what it
 			// closes over, so it cannot clear anything. The refusal does not depend

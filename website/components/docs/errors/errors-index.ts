@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 284,
-	guided: 41,
+	total: 285,
+	guided: 42,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -320,6 +320,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
+					kind: 'compile error',
+					guided: true,
+				},
+				{
+					code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 					kind: 'compile error',
 					guided: true,
 				},

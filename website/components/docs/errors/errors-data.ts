@@ -3953,6 +3953,252 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'An event handler changes a value from the component body, and the change would be lost.',
+		printed: [
+			'MARKLESS_HANDLER_WRITES_RENDER_LOCAL: The `<handlerLabel>` handler changes `<localName>` with `<write>`. `<localName>` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so the change would be lost before the next run.',
+			'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A method the compiler cannot prove only reads the value counts as a change.',
+			'Keep data that changes in state(): `const <localName> = state(...)`, and assign a new value to it, for example a copy with the change applied.',
+			'https://markless.dev/errors/MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
+		],
+		structured: true,
+		guide: {
+			summary:
+				'An event handler changes a value from the component body, and the change would be lost.',
+			what: [
+				{
+					id: 's0',
+					text: 'A handler that reads a ',
+				},
+				{
+					id: 's1',
+					text: 'const',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' from the component body builds a fresh copy of it each time it runs. Changing that copy, with ',
+				},
+				{
+					id: 's3',
+					text: 'list.push(...)',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: 'names.set(...)',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' or ',
+				},
+				{
+					id: 's7',
+					text: 'box.count = 1',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ', would be lost before the next run. A method the compiler cannot prove only reads the value counts as a change.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Keep data that changes in ',
+				},
+				{
+					id: 's1',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', and assign it a new value: a copy with the change applied.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' list ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '([',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '1',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r7',
+							text: ', ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '2',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r9',
+							text: ']);',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' (list ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' [',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '...',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r11',
+							text: 'list, list.',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'length',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r13',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: '+',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r15',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: '1',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r17',
+							text: '])}>Add</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r18',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r19',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING',
 		packageName: '@markless/compiler',
 		stage: 'compile',

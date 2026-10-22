@@ -21,7 +21,11 @@ import {
 	pureCompositeReadSources,
 	type CompositeReadOptions,
 } from './composite-reads.ts';
-import { handlerReadsRenderLocalDiagnostic } from './diagnostics.ts';
+import {
+	handlerReadsRenderLocalDiagnostic,
+	handlerWritesRenderLocalDiagnostic,
+} from './diagnostics.ts';
+import { rebuiltLocalWrite } from './rebuilt-local-writes.ts';
 import { findSharedInstance, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './imports.ts';
@@ -42,7 +46,8 @@ export type RenderLocalInline =
 			readonly definitions: ReadonlyArray<AnyNode>;
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
-	| { readonly kind: 'render-local'; readonly name: string };
+	| { readonly kind: 'render-local'; readonly name: string }
+	| { readonly kind: 'writes-render-local'; readonly name: string; readonly write: string };
 
 type Replacement = { readonly start: number; readonly end: number; readonly text: string };
 
@@ -94,6 +99,7 @@ function inlineWithin(
 	const boundInside = new Set<string>();
 	let refusal: Exclude<RenderLocalInline, { readonly kind: 'inlined' }> | null = null;
 
+	const ancestors: AnyNode[] = [];
 	const visit = (candidate: AnyNode, parent: AnyNode | null): void => {
 		if (refusal) return;
 		if (candidate.type === 'Identifier' && typeof candidate.start === 'number') {
@@ -132,6 +138,16 @@ function inlineWithin(
 						refusal = { kind: 'row-item', name };
 					} else if (local.kind !== 'definition' || inlining.has(symbolId)) {
 						refusal = { kind: 'render-local', name };
+					} else if (
+						options.inlineFunctions &&
+						!isFunctionNode(local.init) &&
+						rebuiltLocalWrite(candidate, ancestors, local.init, state.source)
+					) {
+						refusal = {
+							kind: 'writes-render-local',
+							name,
+							write: rebuiltLocalWrite(candidate, ancestors, local.init, state.source)!,
+						};
 					} else {
 						const definition = local.init;
 						definitions.push(definition);
@@ -169,11 +185,11 @@ function inlineWithin(
 			}
 		}
 		// A shorthand property's key and value are one identifier; only the value reads it.
-		if (candidate.type === 'Property' && candidate.shorthand === true) {
+		ancestors.push(candidate);
+		if (candidate.type === 'Property' && candidate.shorthand === true)
 			visit(candidate.value as AnyNode, candidate);
-			return;
-		}
-		for (const child of childNodes(candidate)) visit(child, candidate);
+		else for (const child of childNodes(candidate)) visit(child, candidate);
+		ancestors.pop();
 	};
 	visit(node, null);
 	if (refusal) return refusal;
@@ -240,6 +256,18 @@ export function inlineHandlerRenderLocals(
 		leaveRowItems: true,
 		inlineFunctions: true,
 	});
+	if (inlined.kind === 'writes-render-local') {
+		state.graph.diagnostics.push(
+			handlerWritesRenderLocalDiagnostic({
+				handlerLabel,
+				localName: inlined.name,
+				write: inlined.write,
+				handler: node,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
 	if (inlined.kind !== 'inlined') {
 		state.graph.diagnostics.push(
 			handlerReadsRenderLocalDiagnostic({

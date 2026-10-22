@@ -138,8 +138,9 @@ A handler can read state, props, imports, and `const` values built from those. I
 function you declared in the component body, with `function` or `const`, and pass it arguments:
 `onClick={() => add(2)}` runs `add` with the state and props it reads, including other body
 functions it calls. A `const` built with `new Map(...)`, `new Set(...)`, `new Date(...)` or another
-built-in the browser has is built again for each click, so treat it as read-only; keep changing data in
-`state()`. It cannot read other variables from the component body. Those exist only while the
+built-in, or any other body `const`, is built again for each click, so it is read-only there: a
+handler that changes it, as in `list.push(3)` or `box.count = 1`, stops the build with
+`MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`. It cannot read other variables from the component body. Those exist only while the
 component sets up the page, and the click comes later. The build stops with
 `MARKLESS_HANDLER_READS_RENDER_LOCAL`, or with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` for an
 instance of your own class, and names the variable.
