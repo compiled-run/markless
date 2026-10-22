@@ -34,11 +34,7 @@ export default function Counter() @{
 
 ## Decided before anything runs
 
-<MugSpot mood="thinking">
-
 From that file, the compiler works out three things:
-
-</MugSpot>
 
 1. **The state.** `count` becomes a node in a graph, with the ID `state:count`.
 2. **The updates.** The text `Count {count}` becomes one planned text write.
@@ -46,6 +42,8 @@ From that file, the compiler works out three things:
 
 The same compile also writes two render modules. One builds the counter in a browser. The other
 renders it to HTML on a server. [The compiler](/how-it-works/compiler) shows all of this output.
+
+<MugSpot mood="thinking" from="left" />
 
 <PlanAnywhere />
 

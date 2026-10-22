@@ -28,15 +28,13 @@ One click changed three things: the highlighted button, the saved value in `loca
 `data-docs-drink` attribute on `<html>`. The Watch line shows the attribute. Now click **Reload
 page**. Your pick keeps its highlight.
 
-<MugSpot mood="wink">
-
 The first argument is the `localStorage` key. The second is the starting value, for a reader who
 has not picked yet. With the key `docs-drink`, `<html>` gets `data-docs-drink`.
 
-</MugSpot>
-
 The highlight is plain CSS that reads that attribute. The demo uses a rule like this one for each
 drink:
+
+<MugSpot mood="wink" />
 
 ```css
 html[data-docs-drink='coffee'] .coffee {

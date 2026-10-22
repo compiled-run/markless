@@ -141,8 +141,11 @@ screenshots into the markless repo's goal notes.
   Stickers are die-cut, with their own white border and shadow, so they carry depth and one file
   reads on both grounds; they are the larger accents — the landing hero, a callout corner, the
   footer strip — while sprites stay small and inline.
-- `components/mascot/mug-spot.tsrx`: the mug tucked into a few pages, each spot with its own fixed
-  face or pose that fits the text beside it. At most one per page. It wears the glaze, pour, coaster
+- `components/mascot/mug-spot.tsrx`: the mug hiding on a few pages, peeking over the top edge of
+  the code block, callout, figure or pager that follows it, with a face or pose that fits the text
+  there. At most one per page. Where the browser supports scroll-driven animations he rises from
+  behind the edge as the spot scrolls in (`react="duck"` sinks him back down as you look); with
+  reduced motion he just sits there. It wears the glaze, pour, coaster
   and companion the reader picked on `/mascot`: a tiny inline script copies them from
   `localStorage` onto `<html>` before the mug paints, so the page ships no other JavaScript for it.
 - `tooling/` — build-time code. `highlight-mdx.ts` is a Vite plugin registered after `router()`;

@@ -80,16 +80,14 @@ pnpm ci:local --dry-run                         # print the commands, run nothin
 
 ## Never weaken a check
 
-<MugSpot mood="angry">
-
 When a check fails, sort the failure first: environment drift, your regression, an older failure, or a flaky test. Then fix the cause.
-
-</MugSpot>
 
 - Do not skip, delete or loosen a test to make it pass.
 - Do not add retries to Vitest, Playwright or the workflow.
 - Raise a timeout only with a measured reason.
 - Change a perf guard anchor only with `pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"`. The command fails without `--reason`.
+
+<MugSpot mood="angry" />
 
 <Callout
 	sprite="thought-bubble"

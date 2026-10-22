@@ -1,4 +1,3 @@
-import type { Children } from '@markless/core';
 import MugArt from './mug-art.tsrx';
 
 // Lands the reader's saved studio choices on <html> before the mug below it paints, without waking the runtime.
@@ -8,76 +7,116 @@ const paintSavedMug = `(()=>{const h=document.documentElement;for(const k of['gl
 export default function MugSpot({
 	mood,
 	at,
-	children,
+	from,
+	react,
 }: {
 	/** A studio pose such as `cheers`, `sleep`, `brew` or `bow`, or a face such as `scared` or `proud`. */
 	readonly mood: string;
-	/** `side` floats the mug beside the children, `peek` looks over the top edge of the code block or cards that follow. */
+	/** How much of him clears the edge of the block that follows: `peek` shows his face, `eyes` only the rim and eyes, `bottom` peeks his eyes over the pager line at the end of a page. */
 	readonly at?: string;
-	readonly children?: Children;
+	/** Which end of the edge he hides behind: `right` or `left`. */
+	readonly from?: string;
+	/** `duck`: he rises as the spot scrolls in, then sinks back down as you look at him. */
+	readonly react?: string;
 }) @{
-	<div class={'docs-mug is-' + (at ?? 'side')}>
+	<div
+		class={'docs-mug is-' + (at ?? 'peek') + ' from-' + (from ?? 'right') + ' react-' + (react ?? 'rise')}
+		aria-hidden="true"
+	>
 		<style>
+			/* The blocks a spot stands on (code, cards, callouts, figures) open with a --space-m margin, the pager with --space-xl; the negative margin lands the cut on that edge. */
 			.docs-mug {
 				--mug-width: 5.75rem;
 				--mug-height: 7.06rem;
-				margin-block: var(--space-s);
+				--show: 0.78;
+				display: flex;
+				justify-content: flex-end;
+				height: calc(var(--mug-height) * var(--show));
+				margin-top: var(--space-xs);
+				margin-bottom: calc(-1 * var(--space-m));
+				padding-inline: var(--space-l);
+				overflow: clip;
 			}
-			.docs-mug.is-side {
-				display: flow-root;
+			.is-eyes {
+				--show: 0.64;
 			}
-			.is-side > .docs-mug-art + * {
-				margin-top: 0;
+			.is-bottom {
+				--show: 0.7;
+				margin-bottom: calc(-1 * var(--space-xl));
 			}
-			.docs-mug.is-side > :last-child {
-				margin-bottom: 0;
+			.from-left {
+				justify-content: flex-start;
 			}
 			.docs-mug-art {
-				display: block;
+				flex: none;
 				width: var(--mug-width);
 				height: var(--mug-height);
 			}
-			.is-side > .docs-mug-art {
-				float: right;
-				margin: -0.6rem 0 0.25rem var(--space-s);
+			.from-left .docs-mug-art {
+				rotate: 4deg;
 			}
-			/* The blocks a peek sits on (code, cards) open with a --space-m margin; this lands the cut on their top edge. */
-			.is-peek {
-				height: calc(var(--mug-height) * 0.8);
-				margin-bottom: calc(-1 * var(--space-m));
-				padding-left: var(--space-m);
-				overflow: hidden;
+			.from-right .docs-mug-art {
+				rotate: -4deg;
 			}
-			@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-				.docs-mug-art:hover {
-					animation: docs-mug-wiggle 700ms ease-in-out;
+			@media (prefers-reduced-motion: no-preference) {
+				@supports (animation-timeline: view()) {
+					.docs-mug-art {
+						animation: docs-mug-rise linear both;
+						animation-timeline: view();
+						animation-range: entry 10% entry 100%;
+					}
+					.react-duck .docs-mug-art {
+						animation-name: docs-mug-duck;
+						animation-range: entry 10% cover 70%;
+					}
+				}
+				@media (hover: hover) {
+					.docs-mug:hover .docs-mug-art svg {
+						animation: docs-mug-wiggle 700ms ease-in-out;
+					}
+				}
+			}
+			@keyframes docs-mug-rise {
+				from {
+					translate: 0 72%;
+				}
+				to {
+					translate: 0 0;
+				}
+			}
+			@keyframes docs-mug-duck {
+				0% {
+					translate: 0 72%;
+				}
+				15%,
+				55% {
+					translate: 0 0;
+				}
+				100% {
+					translate: 0 30%;
 				}
 			}
 			@keyframes docs-mug-wiggle {
 				0%,
 				100% {
-					transform: none;
+					rotate: 0deg;
 				}
 				25% {
-					transform: rotate(-5deg);
+					rotate: -5deg;
 				}
 				60% {
-					transform: rotate(4deg);
+					rotate: 4deg;
 				}
 			}
 			@media (max-width: 40rem) {
 				.docs-mug {
 					--mug-width: 4.5rem;
 					--mug-height: 5.52rem;
-				}
-				.is-peek {
-					display: flex;
-					justify-content: flex-end;
-					padding-inline: 0 var(--space-m);
+					padding-inline: var(--space-m);
 				}
 			}
 		</style>
-		<span class="docs-mug-art" aria-hidden="true">
+		<span class="docs-mug-art">
 			<script>{paintSavedMug}</script>
 			<MugArt
 				variant="spot"
@@ -91,6 +130,5 @@ export default function MugSpot({
 				interacted="false"
 			/>
 		</span>
-		{children}
 	</div>
 }
