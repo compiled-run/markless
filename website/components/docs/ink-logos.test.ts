@@ -7,8 +7,8 @@ const logo = readFileSync(new URL('./ink-logo.tsrx', import.meta.url), 'utf8');
 const agents = readFileSync(new URL('./agent-logos.tsrx', import.meta.url), 'utf8');
 
 describe('ink logos', () => {
-	it('draws the coding agents markless-migrate sets up and the frameworks it moves apps from, and the checks it runs, each with tone, hatching and ink', () => {
-		expect(Object.keys(art.logos)).toEqual(['claude', 'codex', 'cursor', 'gemini', 'copilot', 'opencode', 'nextjs', 'vue', 'htmx', 'alpine', 'remix', 'angular', 'react', 'docusaurus', 'vite', 'shadcn', 'eye', 'magnifier', 'speaker', 'stopwatch']);
+	it('draws the coding agents Markless Migrate sets up, the frameworks it moves apps from, the checks it runs and its own mark, each with tone, hatching and ink', () => {
+		expect(Object.keys(art.logos)).toEqual(['claude', 'codex', 'cursor', 'gemini', 'copilot', 'opencode', 'nextjs', 'vue', 'htmx', 'alpine', 'remix', 'angular', 'react', 'docusaurus', 'vite', 'shadcn', 'eye', 'magnifier', 'speaker', 'stopwatch', 'migrate']);
 		for (const drawn of Object.values(art.logos)) for (const layer of [drawn.tone, drawn.hatch, drawn.ink]) expect(layer.length).toBeGreaterThan(40);
 	});
 

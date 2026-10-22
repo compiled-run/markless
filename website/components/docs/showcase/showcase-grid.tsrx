@@ -10,7 +10,7 @@ const movedLabel = PILES.moved + PILES.w / 2;
 const labelY = PILES.base + 17;
 
 export default function ShowcaseGrid() @{
-	<ul class="showcase" aria-label="Apps being moved with markless-migrate">
+	<ul class="showcase" aria-label="Apps being moved with Markless Migrate">
 		@for (const card of cards; key card.slug) {
 			<li class={'card tone-' + card.tone}>
 				<Link href="/start/migrate/[app]" params={{ app: card.slug }} class="hit">

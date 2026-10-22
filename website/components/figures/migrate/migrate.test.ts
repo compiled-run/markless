@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AGENTS, breaks, CHECKS, COLS, completesAt, describe as say, doneOf, FOOTERS, ghostFor, inputRows, interrupt, invalidAt, print, printAll, printing, reportOf, ROUTES, ROWS, runCommand, screen, servedBy, showsFooter, START, STEPS, submit, tour, tourAgent, TOUR_START, type Run, transcript } from './model.ts';
+import { AGENTS, ASK, breaks, CHECK, CHECKS, COLS, completesAt, describe as say, FOOTERS, ghostFor, inputRows, interrupt, invalidAt, labelOf, pickAgent, PLAN, print, printAll, printing, reportOf, ROUTES, ROWS, screen, sent, servedBy, session, showsFooter, START, submit, SWITCH, tour, tourAgent, TOUR_START, type Run, transcript } from './model.ts';
 import { drawing } from './migrate.ts';
 
 const scene = drawing();
@@ -12,57 +12,64 @@ const finish = (run: Run) => {
 	while (printing(r)) r = print(r);
 	return r;
 };
-const runTo = (n: number, agent = ''): Run => Array.from({ length: n }).reduce<Run>((run, _, i) => finish(submit(run, i === 1 && agent ? runCommand(agent) : '')), START);
+const asked = (agent = 'claude', ask = ''): Run => finish(submit(pickAgent(START, agent), ask));
 const text = (run: Run) => transcript(run).map((r) => r.mark + ' ' + r.text + r.after + r.ghost + r.value).join('\n');
+const lines = (agent = 'claude') => session(agent as Run['agent']);
 
-describe('the migrate run', () => {
-	it('plans, runs the agent until the page is green, and switches, with the CLI’s own commands', () => {
-		expect(STEPS.map((s) => s.commands('claude')[0])).toEqual([
-			'markless-migrate plan --old $OLD --source ../shop',
-			'markless-migrate run --agent claude --old $OLD --new $NEW --route /account',
-			'markless-migrate switch /account',
-		]);
-		expect(ROUTES).toEqual(['/', '/pricing', '/account', '/blog']);
-		expect(text(runTo(1))).toContain('4 routes on http://localhost:3000');
-		const ran = text(runTo(2));
-		for (const line of ['attempt 1/3  /account: running claude', 'Claude Code converted /account', 'every button works', 'attempt 2/3  /account: running claude', 'Claude Code fixed what check found', 'green          /account after 2 attempt(s)', '1 of 1 routes green.']) expect(ran).toContain(line);
-		expect(text(runTo(3))).toContain('Switched /account to the new app.');
+describe('the migrate session', () => {
+	it('takes the request in plain words, and the agent runs the CLI’s own commands: plan, check, check again, switch', () => {
+		expect(ASK).toBe('Use Markless Migrate on my coffee shop site');
+		expect([PLAN, CHECK, SWITCH]).toEqual(['markless-migrate plan --old $OLD --source ../beanshop', 'markless-migrate check --old $OLD --new $NEW --route /account', 'markless-migrate switch /account']);
+		expect(lines().filter((l) => l.kind === 'cmd').map((l) => l.text)).toEqual([PLAN, CHECK, CHECK, SWITCH]);
+		expect(ROUTES).toEqual(['/', '/menu', '/account', '/blog']);
+		expect(text(asked())).toContain('> Use Markless Migrate on my coffee shop site');
+		const done = lines().map((l) => l.text).join('\n');
+		for (const line of ['4 routes on the old site to port, from crawl 4, source 4', 'Wrote .migrate/inventory.json', 'FAIL  /account  [behaviour]', '0 of 1 routes green, 1 red.', 'pass  /account', 'run at load 84.0 kB -> 1.1 kB', '1 of 1 routes green.', 'Partial run: 1 of 4 routes checked.', 'Switched /account to the new app.']) expect(done).toContain(line);
 	});
 
-	it('drives any of the six agents run knows, by the id the reader types, and names that agent in the output', () => {
+	it('switches only after the second check passes, and says the old app keeps the rest', () => {
+		const all = lines();
+		const kinds = all.map((l) => l.text);
+		expect(kinds.indexOf(SWITCH)).toBeGreaterThan(kinds.lastIndexOf('1 of 1 routes green.'));
+		expect(kinds.indexOf('0 of 1 routes green, 1 red.')).toBeLessThan(kinds.lastIndexOf(CHECK));
+		expect(all.at(-1)!.text).toContain('The old app still serves /, /menu and /blog');
+	});
+
+	it('takes the reader’s own sentence as the request too', () => {
+		const own = asked('claude', '  port   my shop please ');
+		expect(sent(own)).toBe(true);
+		expect(text(own)).toContain('> port my shop please');
+		expect(text(own)).toContain('Switched /account to the new app.');
+	});
+
+	it('opens any of the six agents setup installs the skill for, by name or from the footer, before anything is sent', () => {
 		expect(AGENTS.map((a) => a.id)).toEqual(['claude', 'codex', 'cursor', 'gemini', 'copilot', 'opencode']);
-		const codex = runTo(2, 'codex');
-		expect(codex.agent).toBe('codex');
-		expect(text(codex)).toContain('$ markless-migrate run --agent codex --old\n $OLD --new $NEW --route /account');
-		expect(text(codex)).toContain('Codex converted /account');
-		expect(text(codex)).toContain('Codex fixed what check found');
-		expect(text(codex)).not.toContain('Claude');
-		expect(text(runTo(2, 'cursor'))).toContain('running cursor-agent');
-		const prefix = 'markless-migrate run --agent co';
-		expect(ghostFor(runTo(1), prefix)).toBe('dex --old $OLD --new $NEW --route /account');
-		expect(ghostFor(runTo(1), prefix + 'p')).toBe('ilot --old $OLD --new $NEW --route /account');
-		expect(ghostFor(runTo(1), '')).toBe(runCommand('claude'));
-		expect(invalidAt(runTo(1), 'markless-migrate run --agent devin')).toBe(true);
-		expect(doneOf(submit(runTo(1), 'markless-migrate run --agent devin --old $OLD --new $NEW --route /account'))).toBe(1);
+		expect(submit(START, 'codex').agent).toBe('codex');
+		expect(submit(START, 'Gemini CLI').agent).toBe('gemini');
+		expect(sent(submit(START, 'codex'))).toBe(false);
+		expect(transcript(pickAgent(START, 'cursor'))[0]!.text).toBe('Cursor');
+		expect(pickAgent(asked(), 'codex').agent).toBe('claude');
+		expect(say(asked('gemini'))).toContain('/account is live');
+		expect(text(asked('codex'))).not.toContain('Claude');
+		expect(labelOf(START)).toContain('Use Markless Migrate on my coffee shop site');
 	});
 
-	it('names the other agents in a footer on the empty run prompt, and nowhere else', () => {
+	it('names the other agents in a footer on the empty prompt, and nowhere else', () => {
 		expect(FOOTERS.find((f) => f.agent === 'claude')!.others.map((o) => o.gap + o.id).join('')).toBe('codex · cursor · gemini · copilot · opencode');
-		expect(screen(runTo(1)).at(-1)!.kind).toBe('footer');
-		expect(showsFooter(runTo(1), 'm')).toBe(false);
-		expect(showsFooter(START, '')).toBe(false);
-		expect(showsFooter(runTo(2), '')).toBe(false);
+		expect(screen(START).at(-1)!.kind).toBe('footer');
+		expect(showsFooter(START, 'U')).toBe(false);
+		expect(showsFooter(asked(), '')).toBe(false);
 	});
 
-	it('ticks the checks in plain words, each with its report dimension, and fails only every button works the first time', () => {
-		expect(CHECKS.map((c) => c.plain)).toEqual(['looks the same', 'every button works', 'same requests', 'same SEO', 'screen reader the same', 'every language', 'signed in and out']);
-		const lines = STEPS[1]!.out('claude');
-		expect(lines.filter((l) => l.mark === '✗').map((l) => l.value)).toEqual(['behaviour']);
-		expect(lines.filter((l) => l.mark === '✓')).toHaveLength(CHECKS.length * 2 - 1);
+	it('runs the checks in plain words, each with its report dimension, and fails only every button works the first time', () => {
+		expect(CHECKS.map((c) => c.plain)).toEqual(['what people see', 'every button works', 'same requests', 'what search engines get', 'what screen readers get', 'how fast it loads']);
+		expect(CHECKS.map((c) => c.dimension)).toEqual(['visual', 'behaviour', 'network', 'seo', 'a11y', 'load']);
+		expect(lines().filter((l) => l.mark === '✗').map((l) => l.value)).toEqual(['behaviour']);
+		expect(lines().filter((l) => l.mark === '✓')).toHaveLength(CHECKS.length * 2 - 1);
 	});
 
-	it('prints a line at a time, with no prompt until the command is done, and the report follows what has printed', () => {
-		let run = submit(runTo(1));
+	it('prints a line at a time, with no prompt until the agent is done, and the report follows what has printed', () => {
+		let run = submit(START);
 		expect(printing(run)).toBe(true);
 		expect(transcript(run).some((r) => r.kind === 'input')).toBe(false);
 		const seen: string[] = [];
@@ -72,62 +79,68 @@ describe('the migrate run', () => {
 		}
 		expect([...new Set(seen)]).toEqual(['none', 'red', 'green']);
 		expect(transcript(run).some((r) => r.kind === 'input')).toBe(true);
-		expect(printAll(submit(runTo(1))).shown).toBe(STEPS[1]!.out('claude').length);
-		expect(submit(submit(runTo(1)))).toEqual(submit(runTo(1)));
+		expect(printAll(submit(START)).shown).toBe(lines().length);
+		expect(submit(submit(START))).toEqual(submit(START));
 	});
 
-	it('prints only lines that fit the terminal, for every agent, and wraps long commands at a space', () => {
-		for (const agent of AGENTS) for (const step of STEPS) for (const l of step.out(agent.id)) expect(l.value ? l.text.length <= 24 && l.value.length <= 10 : l.text.length <= COLS).toBe(true);
-		expect(breaks(runCommand('claude')).length).toBe(2);
-		for (let n = 0; n <= STEPS.length; n++) expect(screen(runTo(n))).toHaveLength(ROWS);
+	it('prints only lines that fit the terminal, for every agent', () => {
+		for (const agent of AGENTS) for (const l of lines(agent.id)) expect(l.value ? l.text.length <= 24 && l.value.length <= 10 : l.text.length <= COLS * 3).toBe(true);
+		expect(breaks(CHECK).length).toBe(2);
+		for (const run of [START, submit(START), asked()]) expect(screen(run)).toHaveLength(ROWS);
 	});
 
-	it('takes Enter on an empty line or the exact next command, and answers anything else with the command to try', () => {
-		expect(doneOf(submit(START, '  markless-migrate   plan --old $OLD --source ../shop '))).toBe(1);
-		const wrong = submit(START, 'markless-migrate switch /account');
-		expect(doneOf(wrong)).toBe(0);
-		expect(transcript(wrong).filter((r) => r.kind === 'try').map((r) => r.text).join(' ')).toBe('Try markless-migrate plan --old $OLD --source ../shop');
-		expect(transcript(wrong).find((r) => r.kind === 'cmd')!.invalid).toBe('yes');
-		expect(submit(runTo(STEPS.length))).toEqual(runTo(STEPS.length));
-		expect(text(interrupt(START, 'markl'))).toContain('markl^C');
-		expect(completesAt(START, 'mark', 4)).toBe(true);
-		expect(completesAt(START, 'mark', 2)).toBe(false);
+	it('suggests the request as faint text, echoes later lines as done, and abandons a line on Ctrl+C', () => {
+		expect(ghostFor(START, '')).toBe(ASK);
+		expect(ghostFor(START, 'Use Mark')).toBe('less Migrate on my coffee shop site');
+		expect(ghostFor(START, 'port')).toBe('');
+		expect(completesAt(START, 'Use', 3)).toBe(true);
+		expect(completesAt(START, 'Use', 1)).toBe(false);
+		expect(invalidAt(asked(), 'again')).toBe(true);
+		const later = submit(asked(), 'again');
+		expect(transcript(later).filter((r) => r.kind === 'try').map((r) => r.text)).toEqual(['Done. Press Escape to start over.']);
+		expect(submit(asked(), '')).toEqual(asked());
+		expect(text(interrupt(START, 'Use'))).toContain('Use^C');
 	});
 
 	it('splits the typed line across its wrapped rows with the caret in the right piece', () => {
-		const cmd = runCommand('codex');
-		const rows = inputRows(cmd.slice(0, 50), 50, cmd.slice(50), false);
+		const long = 'Use Markless Migrate on my coffee shop site and keep the old one up';
+		const rows = inputRows(long.slice(0, 50), 50, long.slice(50), false);
 		expect(rows).toHaveLength(2);
-		expect(rows[0]!.text + rows[1]!.text + rows[1]!.caret + rows[1]!.ghost).toBe(cmd.slice(0, 50) + '|' + cmd.slice(50));
+		expect(rows[0]!.text + rows[1]!.text + rows[1]!.caret + rows[1]!.ghost).toBe(long.slice(0, 50).replace(/ $/, '') + '|' + long.slice(50));
 		const mid = inputRows('abc def', 2, '', false);
 		expect([mid[0]!.text, mid[0]!.caret, mid[0]!.after]).toEqual(['ab', '|', 'c def']);
 	});
 
-	it('fills the report as the run goes, and Markless serves the page only once switched', () => {
-		expect([0, 1, 2, 3].map((n) => reportOf(runTo(n)).check)).toEqual(['none', 'none', 'green', 'green']);
-		expect([0, 1].map((n) => reportOf(runTo(n)).listed)).toEqual(['no', 'yes']);
-		expect(ROUTES.map((r) => servedBy(r, runTo(2)))).toEqual(['old app', 'old app', 'old app', 'old app']);
-		expect(ROUTES.map((r) => servedBy(r, runTo(3)))).toEqual(['old app', 'old app', 'Markless', 'old app']);
+	it('fills the report as the agent works, and Markless serves the page only once switched', () => {
+		expect(reportOf(START)).toEqual({ listed: 'no', check: 'none', live: 'no' });
+		expect(reportOf(asked())).toEqual({ listed: 'yes', check: 'green', live: 'yes' });
+		let run = submit(START);
+		while (printing(run) && reportOf(run).check !== 'green') run = print(run);
+		expect(ROUTES.map((r) => servedBy(r, run))).toEqual(['old app', 'old app', 'old app', 'old app']);
+		expect(ROUTES.map((r) => servedBy(r, asked()))).toEqual(['old app', 'old app', 'Markless', 'old app']);
 	});
 
-	it('speaks one plain sentence per command, naming the agent that ran', () => {
+	it('speaks one plain sentence per step, naming the agent', () => {
 		expect(say(START)).toBe('');
-		expect(say(runTo(2, 'gemini'))).toContain('Gemini CLI fixed it on the second attempt');
-		expect(say(runTo(2))).toContain('84.0 kB to 1.1 kB');
-		expect(say(runTo(3))).toBe('/account is live, served by Markless. /, /pricing and /blog are still served by the old app.');
+		expect(say(submit(START))).toBe('Sent to Claude Code: Use Markless Migrate on my coffee shop site');
+		let run = submit(pickAgent(START, 'gemini'));
+		const said = new Set<string>();
+		while (printing(run)) said.add(say((run = print(run))));
+		expect([...said].some((s) => s.startsWith('Gemini CLI fixed it and every check passed.') && s.includes('84.0 kB to 1.1 kB'))).toBe(true);
+		expect(say(asked())).toBe('/account is live, served by Markless. /, /menu and /blog are still served by the old app.');
 	});
 
-	it('tours by typing each command, letting it print, holding, then starting over with another agent', () => {
+	it('tours by typing the request, letting the agent work, holding, then starting over in the next agent', () => {
 		let t = TOUR_START;
 		const seen: string[] = [];
-		for (let i = 0; i < 20000 && seen.length < 4; i++) {
-			const before = doneOf(t.run);
+		for (let i = 0; i < 20000 && seen.length < 2; i++) {
+			const before = t.run.agent;
 			t = tour(t);
-			if (t.entered) seen.push(String(doneOf(t.run)));
-			if (before === STEPS.length && doneOf(t.run) === 0) seen.push('0');
+			if (t.entered) seen.push(t.run.agent);
+			if (t.run.agent !== before) seen.push('next ' + t.run.agent);
 		}
-		expect(seen).toEqual(['1', '2', '3', '0']);
-		expect([0, 1].map(tourAgent)).toEqual(['codex', 'cursor']);
+		expect(seen).toEqual(['claude', 'next codex']);
+		expect([0, 1].map(tourAgent)).toEqual(['claude', 'codex']);
 	});
 });
 
