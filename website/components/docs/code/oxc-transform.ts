@@ -1,4 +1,4 @@
-// The two calls the bundler makes on rolldown/experimental, answered by yuku in the browser.
+// The bundler's calls on rolldown/experimental, answered by yuku in the browser.
 import { parseJavaScriptModule } from '../../../../packages/compiler/src/index.ts';
 import { generate } from '@tsrx/yuku';
 
@@ -53,4 +53,9 @@ export function transformSync(_filename: string, code: string) {
 	const { program, errors } = parseTypeScript(code);
 	if (!program) return { code: '', errors };
 	return { code: generate(program, { strip: true }).code, errors: [] as Diagnostic[] };
+}
+
+// Only a server build minifies the inline resumer; the worker compiles for the client.
+export function minifySync(): never {
+	throw new Error('The <Code> worker cannot minify: it compiles for the client environment only.');
 }

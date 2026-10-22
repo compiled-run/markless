@@ -2,8 +2,6 @@
 import { createHighlighterCore, type HighlighterCore, type LanguageRegistration } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import css from 'shiki/langs/css.mjs';
-import jsx from 'shiki/langs/jsx.mjs';
-import tsx from 'shiki/langs/tsx.mjs';
 import typescript from 'shiki/langs/typescript.mjs';
 import githubDark from 'shiki/themes/github-dark.mjs';
 import githubLight from 'shiki/themes/github-light.mjs';
@@ -63,12 +61,11 @@ export function loadHighlighter(): Promise<Highlighter> {
 		themes: [githubLight, githubDark],
 		langs: [
 			typescript,
-			jsx,
-			tsx,
 			css,
 			{
 				...(tsrxGrammar as unknown as LanguageRegistration),
-				embeddedLangs: ['jsx', 'tsx', 'css'],
+				// The tsrx grammar includes no grammar but source.css.
+				embeddedLangs: ['css'],
 				name: 'tsrx',
 			},
 		],

@@ -1,7 +1,7 @@
 // The create-markless run as the figure plays it: the real prompts, options and defaults from packages/cli/src/index.ts, and the files each starter writes.
 import { createCommand, type ManagerId } from '../../docs/walkthrough/facts.ts';
 import { completion, isInvalid, NO_WAIT, ranWith, waitsOf } from './managers.ts';
-import { STARTER_DEV_PORTS } from '../../../../packages/cli/src/index.ts';
+import { STARTER_DEV_PORTS } from '../../../../packages/cli/src/starter-ports.ts';
 
 export type Starter = 'minimal' | 'app' | 'docs' | 'full-stack';
 export type Format = 'node' | 'bun';

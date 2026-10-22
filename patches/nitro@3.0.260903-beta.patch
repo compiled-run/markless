@@ -1,0 +1,24 @@
+diff --git a/dist/_build/rolldown.mjs b/dist/_build/rolldown.mjs
+index 0ac43930fcf7dd37a9a8a1e91fc157b24ffb6d3a..30e2f208f40b5444b62efa70152e3f8d32da4d0c 100644
+--- a/dist/_build/rolldown.mjs
++++ b/dist/_build/rolldown.mjs
+@@ -48,6 +48,7 @@ const getRolldownConfig = async (nitro) => {
+ 			minifyInternalExports: false,
+ 			chunkFileNames: (chunk) => getChunkName(chunk, nitro),
+ 			codeSplitting: { groups: [{
++				debugName: "nitro-libs",
+ 				test: NODE_MODULES_RE,
+ 				name: (id) => libChunkName(id)
+ 			}] },
+diff --git a/dist/vite.mjs b/dist/vite.mjs
+index 851b1c1a1a3433d836ebbe438041bbb6a1cab9f7..e44884dd1bc6fd2075cbc200e604e77fd2c4c669 100644
+--- a/dist/vite.mjs
++++ b/dist/vite.mjs
+@@ -35,6 +35,7 @@ const getBundlerConfig = async (ctx) => {
+ 			output: {
+ 				minifyInternalExports: false,
+ 				codeSplitting: { groups: [{
++					debugName: "nitro-libs",
+ 					test: NODE_MODULES_RE,
+ 					name: (id) => libChunkName(id)
+ 				}] }

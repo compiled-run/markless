@@ -4,8 +4,9 @@ import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { join, resolve } from 'pathe';
-import { createBuilder, createServer } from 'vite';
+import { createServer } from 'vite';
 import { afterEach, expect, test } from 'vitest';
+import { buildWarnings } from '../../../scripts/ci/build-warnings.mjs';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { CreateProgram, STARTER_CHOICES, STARTER_DEV_PORTS, type Starter } from '../src/index.ts';
 import { createNodeRuntime } from '../src/node-runtime.ts';
@@ -88,6 +89,19 @@ async function check(appRoot: string): Promise<string> {
 	return result.stdout + result.stderr;
 }
 
+// The scaffold's own `build` script; returns the warning lines it printed.
+async function build(appRoot: string): Promise<string[]> {
+	const bin = join(repoRoot, 'node_modules/.bin');
+	const result = await execFileAsync(join(bin, 'vp'), ['run', 'build'], {
+		cwd: appRoot,
+		env: { ...process.env, NO_COLOR: '1', PATH: `${bin}:${process.env.PATH}` },
+		maxBuffer: 64 * 1024 * 1024,
+	}).catch((error: { stdout?: string; stderr?: string }) => {
+		throw new Error(`vp run build failed:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
+	});
+	return buildWarnings(result.stderr);
+}
+
 test('the starter list this build covers is the list the CLI offers', () => {
 	expect(STARTER_CHOICES.map((choice) => choice.value).toSorted()).toEqual(
 		Object.keys(servedPages).toSorted(),
@@ -129,12 +143,7 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 	async (starter) => {
 		const appRoot = await scaffold(starter);
 		await check(appRoot);
-		const builder = await createBuilder({
-			root: appRoot,
-			configFile: join(appRoot, 'vite.config.ts'),
-			logLevel: 'silent',
-		});
-		await builder.buildApp();
+		expect(await build(appRoot)).toEqual([]);
 		await check(appRoot);
 
 		const server = await startBuiltServer(join(appRoot, '.output/server/index.mjs'), {

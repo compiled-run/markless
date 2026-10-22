@@ -141,6 +141,10 @@ Byte walls and budgets failed 54 runs, usually by a few bytes to a few hundred. 
 
 The `fixture-builds` walls have been seen to differ between worktrees on the same Mac. Until that is explained, a wall that passes in one checkout and fails in another is treated as an environment bug to fix, not as slack to spend.
 
+### Build warnings
+
+The `build-warnings` job (`pnpm build-warnings:guard`, `scripts/ci/build-warnings.mjs`) builds the docs site and the demo apps and fails on any line a build prints to stderr; `packages/cli/test/starter-build.test.ts` holds every starter's `vp build` to the same rule. Bundler, Vite, Nitro and Node warnings all go to stderr. Rolldown's `[PLUGIN_TIMINGS]` report is the one block it skips: it reports how long plugin callbacks took, not a defect. Each `ALLOWED_WARNINGS` entry names one build and the one-line reason its warning stays. The only entry today is the docs site's Vite chunk-size warning, an open owner decision: the figure drawings ship in page packs (the home page pack is 2.0 MB, 623 kB gzip) and the `<Code>` compile worker is 3.4 MB. Fix a warning where it starts; do not silence it with `/* @vite-ignore */`, a raised `chunkSizeWarningLimit` or a disabled Rolldown check unless that line can be written.
+
 ## 7. Workflow changes
 
 Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. Before opening it:
