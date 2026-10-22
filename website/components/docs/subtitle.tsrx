@@ -33,10 +33,7 @@ export default function Subtitle({
 			}
 			<style>
 				.page-subtitle {
-					max-width: 46ch;
-					margin-block: -0.2em var(--space-m);
-					font-size: var(--step-1);
-					line-height: 135%;
+					margin-block: 0 var(--space-m);
 				}
 			</style>
 		</div>
@@ -46,10 +43,7 @@ export default function Subtitle({
 			{children}
 			<style>
 				.page-subtitle {
-					max-width: 46ch;
-					margin-block: -0.2em var(--space-m);
-					font-size: var(--step-1);
-					line-height: 135%;
+					margin-block: 0 var(--space-m);
 				}
 			</style>
 		</p>
