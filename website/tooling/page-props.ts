@@ -53,6 +53,7 @@ export function pageProps(): Plugin {
 		enforce: 'pre',
 		transform: {
 			order: 'pre',
+			filter: { id: /\.mdx(?:$|\?)/ },
 			handler(code: string, id: string) {
 				const file = id.split('?', 1)[0] ?? id;
 				if (!file.endsWith('.mdx')) return;

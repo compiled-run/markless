@@ -43,6 +43,13 @@ const BUNDLER_SWAPS: Readonly<Record<string, string>> = {
 	'rolldown/experimental': `${CODE_DIR}oxc-transform.ts`,
 };
 
+// Every source the swap answers; any other import never leaves rolldown.
+const BUNDLER_SWAP_SOURCE = new RegExp(
+	`^(?:${[...Object.keys(BUNDLER_SWAPS), 'node:path']
+		.map((source) => source.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'))
+		.join('|')})$|(?:^|/)event-loop\\.ts$`,
+);
+
 /** The file the frame is served as, under the site's base path. */
 export const CODE_FRAME_FILE = '_code-frame.html';
 
@@ -69,14 +76,17 @@ export function codeCompilerSwaps(): Plugin {
 	return {
 		name: 'compiled-website:code-compiler-swaps',
 		enforce: 'pre',
-		async resolveId(source, importer) {
-			if (this.environment?.config.consumer === 'server' || !importer) return null;
-			if (!importer.includes('/packages/bundler/src/')) return null;
-			// The bundler's hooks run in the worker over an in-memory copy of the block's source.
-			if (source === 'node:path')
-				return (await this.resolve('pathe', importer, { skipSelf: true }))?.id ?? null;
-			if (/(?:^|\/)event-loop\.ts$/.test(source)) return `${CODE_DIR}bundler-shims.ts`;
-			return BUNDLER_SWAPS[source] ?? null;
+		resolveId: {
+			filter: { id: BUNDLER_SWAP_SOURCE },
+			async handler(source, importer) {
+				if (this.environment?.config.consumer === 'server' || !importer) return null;
+				if (!importer.includes('/packages/bundler/src/')) return null;
+				// The bundler's hooks run in the worker over an in-memory copy of the block's source.
+				if (source === 'node:path')
+					return (await this.resolve('pathe', importer, { skipSelf: true }))?.id ?? null;
+				if (/(?:^|\/)event-loop\.ts$/.test(source)) return `${CODE_DIR}bundler-shims.ts`;
+				return BUNDLER_SWAPS[source] ?? null;
+			},
 		},
 	};
 }
@@ -118,17 +128,23 @@ export function codeClient(): Plugin[] {
 				for (const [url, entry] of Object.entries(BROWSER_ENTRIES))
 					entryRefs.set(url, this.emitFile({ type: 'chunk', id: entry.file, name: entry.name }));
 			},
-			resolveId(source) {
-				return Object.hasOwn(BROWSER_ENTRIES, source) ? `\0${source}` : null;
+			resolveId: {
+				filter: { id: /^virtual:code-/ },
+				handler(source) {
+					return Object.hasOwn(BROWSER_ENTRIES, source) ? `\0${source}` : null;
+				},
 			},
-			load(id) {
-				const url = id.startsWith('\0') ? id.slice(1) : '';
-				const entry = Object.hasOwn(BROWSER_ENTRIES, url) ? BROWSER_ENTRIES[url] : undefined;
-				if (!entry) return null;
-				if (this.environment?.config.consumer === 'server') return 'export default "";';
-				const ref = entryRefs.get(url);
-				if (ref) return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
-				return `export default ${JSON.stringify(`${base}@fs${entry.file}`)};`;
+			load: {
+				filter: { id: /^\0virtual:code-/ },
+				handler(id) {
+					const url = id.startsWith('\0') ? id.slice(1) : '';
+					const entry = Object.hasOwn(BROWSER_ENTRIES, url) ? BROWSER_ENTRIES[url] : undefined;
+					if (!entry) return null;
+					if (this.environment?.config.consumer === 'server') return 'export default "";';
+					const ref = entryRefs.get(url);
+					if (ref) return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
+					return `export default ${JSON.stringify(`${base}@fs${entry.file}`)};`;
+				},
 			},
 			// A quoted relative path lets the bundler name the chunk through the import map, so a rename re-fetches only it.
 			resolveFileUrl({ referenceId, relativePath }) {
