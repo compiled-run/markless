@@ -71,13 +71,25 @@ function collectHeadings(html: string, seen: Set<string>, out: Heading[]): strin
 	});
 }
 
+// public/outline.js saves the active heading id under this key + pathname.
+export const OUTLINE_STORAGE_KEY = 'markless-outline:';
+
+// Runs before first paint, so it must stay tiny, synchronous and free of `<` (the element counter reads raw HTML).
+export const OUTLINE_RESTORE_SCRIPT =
+	`(()=>{try{const n=document.currentScript.previousElementSibling,` +
+	`t=performance.getEntriesByType("navigation")[0]?.type,` +
+	`s=t=="reload"||t=="back_forward"?sessionStorage.getItem("${OUTLINE_STORAGE_KEY}"+location.pathname):null,` +
+	`p=id=>id&&n.querySelector('a[href="#'+CSS.escape(id)+'"]'),` +
+	`a=p(s)||p(decodeURIComponent(location.hash.slice(1)));` +
+	`if(a){n.querySelector("[aria-current]")?.removeAttribute("aria-current");a.setAttribute("aria-current","location")}}catch{}})()`;
+
 function outlineMarkup(headings: readonly Heading[]): string {
 	if (headings.length < 2) return '';
 	const items = headings
 		.map(
 			(heading, index) =>
 				`<li class="on-this-page-item on-this-page-item-h${heading.level}" style="--outline-order:${index}">` +
-				`<a class="on-this-page-link" href="#${heading.id}">` +
+				`<a class="on-this-page-link" href="#${heading.id}"${index === 0 ? ' aria-current="location"' : ''}>` +
 				`<span class="on-this-page-label">${heading.html}</span></a></li>`,
 		)
 		.join('');
@@ -85,7 +97,7 @@ function outlineMarkup(headings: readonly Heading[]): string {
 		'<markless-outline><nav class="on-this-page" aria-label="On this page">' +
 		'<p class="on-this-page-title on-this-page-heading" aria-hidden="true">On this page</p>' +
 		'<details class="on-this-page-fold"><summary class="on-this-page-title on-this-page-toggle">On this page</summary>' +
-		`<ul class="on-this-page-list">${items}</ul></details></nav></markless-outline>`
+		`<ul class="on-this-page-list">${items}</ul></details></nav><script>${OUTLINE_RESTORE_SCRIPT}</script></markless-outline>`
 	);
 }
 
