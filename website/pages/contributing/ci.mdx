@@ -3,7 +3,7 @@ import CiModes from '../../components/demos/contributing/ci-modes.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -80,7 +80,11 @@ pnpm ci:local --dry-run                         # print the commands, run nothin
 
 ## Never weaken a check
 
+<MugSpot mood="angry">
+
 When a check fails, sort the failure first: environment drift, your regression, an older failure, or a flaky test. Then fix the cause.
+
+</MugSpot>
 
 - Do not skip, delete or loosen a test to make it pass.
 - Do not add retries to Vitest, Playwright or the workflow.
@@ -96,5 +100,3 @@ When a check fails, sort the failure first: environment drift, your regression, 
 A flaky test fails and passes on the same code. Fix its cause, such as a fixed port or a fixed poll window. If you cannot fix it now, `docs/ci-process.md` describes a quarantine with an owner and an expiry date.
 
 Next: [specs, rules and skills](/contributing/specs-and-rules).
-
-<LikeHeart />

@@ -2,7 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -73,6 +73,8 @@ export default function List() @{
 
 The build prints this. In your app, the file path is longer:
 
+<MugSpot mood="scared" at="peek" />
+
 ```text
 MARKLESS_COMPILE_BLOCKED: List.tsrx has 1 compiler error(s).
 
@@ -139,5 +141,3 @@ grouped by the package that raises it.
 />
 
 Next: [how Markless works under the hood](/how-it-works).
-
-<LikeHeart />

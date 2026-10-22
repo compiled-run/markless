@@ -38,7 +38,6 @@ export default function MarklessMug({
 			companion="off"
 			paused="false"
 			interacted="false"
-			reaction="rest"
 		/>
 	</span>
 }

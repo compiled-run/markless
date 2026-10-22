@@ -3189,40 +3189,29 @@ try {
 			);
 		}
 
+		await page.goto(`${origin}/how-it-works/payload`, { waitUntil: 'load' });
+		await page.evaluate(() => localStorage.setItem('mascot-glaze', 'green'));
+		await page.reload({ waitUntil: 'load' });
+		const spot = page.locator('.docs-mug');
+		check(
+			(await spot.count()) === 1 &&
+				(await spot.locator('[aria-hidden="true"] svg[data-variant="spot"]').count()) === 1 &&
+				(await spot.locator('button, a').count()) === 0,
+			'a docs page shows one hidden-from-screen-readers mug spot with no click target',
+		);
+		check(
+			(await spot
+				.locator('.body-shape')
+				.evaluate((node) => getComputedStyle(node).fill)) === 'rgb(165, 206, 180)',
+			'the mug spot wears the glaze the reader saved in the studio',
+		);
+		await page.evaluate(() => localStorage.removeItem('mascot-glaze'));
+		await page.screenshot({ path: `${shotsDir}/mug-spot.png`, fullPage: false });
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const mugButton = page.getByRole('button', { name: 'Say hello to the mug' });
-		const mug = mugButton.locator('[data-docs-mug]');
-		await mugButton.waitFor();
 		check(
-			(await page.getByRole('button', { name: 'Like this page', exact: true }).count()) ===
-				0 &&
-				(await page
-					.locator('.like-heart-count,.thanks,.bean-flight,.coffee-bean')
-					.count()) === 0,
-			'the standalone mug has no like UI or flying beans',
+			(await page.locator('.docs-mug, [data-variant="toc"]').count()) === 0,
+			'a page without a mug spot has no mug in its outline rail',
 		);
-		await page.mouse.move(300, 200);
-		await page.waitForTimeout(150);
-		check(
-			(await mug.getAttribute('style'))?.includes('--gaze-x') === true,
-			'the mug follows movement before activation',
-		);
-		for (const activation of ['mouse', 'Enter', 'Space']) {
-			if (activation === 'mouse') await mugButton.click();
-			else {
-				await mugButton.focus();
-				await page.keyboard.press(activation);
-			}
-			await page.waitForTimeout(50);
-			const response = await mugButton.locator('.greeting-eyes').evaluate((node) => {
-				const animation = node.getAnimations()[0];
-				animation?.pause();
-				if (animation) animation.currentTime = 100;
-				return new DOMMatrix(getComputedStyle(node).transform).d;
-			});
-			check(response < 0.9, `${activation} greeting produces a visible blink`);
-		}
-		await page.screenshot({ path: `${shotsDir}/mug-greeting.png`, fullPage: false });
 
 		// --- UI family playgrounds: each control and demo really drives the family --
 		{
