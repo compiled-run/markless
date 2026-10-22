@@ -295,7 +295,10 @@ markless-outline { display: contents; }
 	text-transform: uppercase;
 	letter-spacing: 0.12em;
 	color: color-mix(in srgb, var(--ink) 60%, var(--paper));
+	list-style: none;
 }
+
+.on-this-page-title::-webkit-details-marker { display: none; }
 
 .prose .on-this-page-list {
 	display: grid;
@@ -348,6 +351,12 @@ markless-outline { display: contents; }
 
 .prose :is(h2, h3)[id] { scroll-margin-top: calc(var(--header-height) + var(--space-s)); }
 
+/* The rail is always open beside the article; the fold only collapses on narrower screens. */
+@media (min-width: 70.01rem) {
+	.on-this-page-fold::details-content { content-visibility: visible; }
+	.prose .on-this-page-title { pointer-events: none; }
+}
+
 @media (min-width: 70.01rem) and (hover: hover) and (pointer: fine) {
 	/* Rows keep the revealed text's size at rest, so revealing it only paints. */
 	.on-this-page-link { position: relative; }
@@ -380,33 +389,32 @@ markless-outline { display: contents; }
 		max-width: 68ch;
 		max-height: none;
 		margin: 0 auto var(--space-xs);
-		display: flex;
+		overflow: visible;
+		font-size: 0.9375rem;
+	}
+	.prose .on-this-page-title {
+		display: inline-flex;
 		align-items: center;
 		gap: 0.6em;
-		overflow: hidden;
-	}
-	.prose .on-this-page-title { margin: 0; flex: 0 0 auto; }
-	.prose .on-this-page-list {
-		display: flex;
-		gap: 0.4em;
-		overflow-x: auto;
-		scrollbar-width: thin;
-		padding: 2px 2px 0.3rem;
-	}
-	.on-this-page-item { flex: 0 0 auto; max-width: 100%; }
-	.on-this-page-link,
-	.on-this-page-item-h3 .on-this-page-link {
 		min-height: 2.75rem;
-		border: 1px solid var(--code-edge);
-		border-radius: 999px;
-		padding: 0 0.75rem;
+		margin: 0;
+		font-size: 0.75rem;
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
 	}
-	.on-this-page-link::before { display: none; }
-	.on-this-page-link[aria-current='location'] {
-		background: var(--yellow);
-		color: var(--on-accent);
-		border-color: currentColor;
+	.prose .on-this-page-title::after {
+		content: '';
+		width: 0.45em;
+		height: 0.45em;
+		border-right: 1.5px solid currentColor;
+		border-bottom: 1.5px solid currentColor;
+		transform: translateY(-25%) rotate(45deg);
+		transition: transform 200ms ease;
 	}
+	.on-this-page-fold[open] .on-this-page-title::after { transform: translateY(25%) rotate(225deg); }
+	.on-this-page-title:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 0.25rem; }
+	.prose .on-this-page-list { padding-block-end: var(--space-xs); }
+	.on-this-page-link { min-height: 2.75rem; padding-block: 0; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -417,7 +425,8 @@ markless-outline { display: contents; }
 	.on-this-page .on-this-page-link,
 	.on-this-page .on-this-page-link::before,
 	.on-this-page .on-this-page-label,
-	.on-this-page:is(:hover, :has(:focus-visible)) .on-this-page-label {
+	.on-this-page:is(:hover, :has(:focus-visible)) .on-this-page-label,
+	.prose .on-this-page-title::after {
 		transition: none;
 	}
 }
@@ -1014,6 +1023,7 @@ html.dark .prose .torn-strip {
    the ones that were keep `.prose code` exactly as the rest of the page has it. */
 .prose code.api-text {
 	display: inline;
+	white-space: normal;
 	padding: 0;
 	background: none;
 	color: inherit;
@@ -1422,10 +1432,50 @@ html.dark .prose .torn-strip {
 	white-space: nowrap;
 }
 
-/* On a phone a wide table keeps readable columns and scrolls inside its own box. */
+/* On a phone a markdown table stacks each row; tooling/highlight-mdx.ts writes the column labels. */
 @media (max-width: 48rem) {
-	.prose :is(th, td):where(:not(.code-stage *)):not(:first-child) {
-		min-width: 9rem;
+	.prose table[data-stack] {
+		display: block;
+		overflow: visible;
+		border-top: 1px solid var(--code-edge);
+	}
+	.prose table[data-stack] thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	.prose table[data-stack] :is(tbody, tr, td) {
+		display: block;
+	}
+	.prose table[data-stack] tr {
+		padding-block: 0.6em;
+		border-bottom: 1px solid var(--code-edge);
+	}
+	.prose table[data-stack] td {
+		padding: 0.15em 0;
+		border: 0;
+		text-align: start;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+	.prose table[data-stack] td:first-child {
+		font-weight: 600;
+	}
+	.prose table[data-stack] td code {
+		white-space: normal;
+	}
+	.prose table[data-stack] td:not(:first-child)::before {
+		content: attr(data-label) ': ';
+		color: color-mix(in srgb, var(--ink) 60%, var(--paper));
+		font-size: var(--step--2);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.prose table[data-stack] tr:has(> td:nth-child(2):last-child) > td::before {
+		content: none;
 	}
 }
 

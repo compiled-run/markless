@@ -456,7 +456,7 @@ export function Choice({
 	const name = `pv-choice-${label}`;
 
 	<div class="pg-cell">
-		<div class="pg-ctl" role="radiogroup" aria-label={label}>
+		<div class="pg-ctl pv-choice" role="radiogroup" aria-label={label}>
 			<span class="pg-name" aria-hidden="true">{label}</span>
 			<div class="pv-seg">
 				<label class="pv-seg-item">
@@ -513,8 +513,14 @@ export function Choice({
 			<Hint title={label} text={hint} />
 		}
 		<style>
+			.pv-choice {
+				flex-wrap: wrap;
+			}
+
 			.pv-seg {
 				display: flex;
+				flex-wrap: wrap;
+				row-gap: 0.35em;
 			}
 
 			.pv-seg-item {

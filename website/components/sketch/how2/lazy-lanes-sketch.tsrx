@@ -155,6 +155,7 @@ export default function LazyLanesSketch() @{
 			}
 
 			.symbols td {
+				white-space: normal;
 				padding: 0.4em 0.6em;
 				border-block-end: 1px solid var(--pg-edge);
 			}

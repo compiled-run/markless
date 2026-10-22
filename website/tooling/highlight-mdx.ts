@@ -28,6 +28,26 @@ export function markApiCode(html: string): string {
 
 const HEADING = /<h([23])((?:\s[^>]*)?)>([\s\S]*?)<\/h\1>/g;
 
+const TABLE = /<table>(\s*<thead>[\s\S]*?<\/thead>)([\s\S]*?)<\/table>/g;
+const HEADER_CELL = /<th(?:\s[^>]*)?>([\s\S]*?)<\/th>/g;
+const ROW = /<tr>([\s\S]*?)<\/tr>/g;
+const BODY_CELL = /<td((?:\s[^>]*)?)>/g;
+
+// A markdown table stacks its rows on a phone, so each body cell carries its column's header as a label.
+export function stackTables(html: string): string {
+	return html.replace(TABLE, (whole, head: string, body: string) => {
+		const labels = [...head.matchAll(HEADER_CELL)].map((cell) =>
+			cell[1].replace(/<[^>]+>/g, '').replace(/"/g, '&quot;').trim(),
+		);
+		if (labels.length < 2) return whole;
+		const labelled = body.replace(ROW, (row, cells: string) => {
+			let column = 0;
+			return `<tr>${cells.replace(BODY_CELL, (cell, attributes: string) => `<td${attributes} data-label="${labels[column++] ?? ''}">`)}</tr>`;
+		});
+		return `<table data-stack>${head}${labelled}</table>`;
+	});
+}
+
 function slugify(text: string): string {
 	return (
 		text
@@ -63,8 +83,8 @@ function outlineMarkup(headings: readonly Heading[]): string {
 		.join('');
 	return (
 		'<markless-outline><nav class="on-this-page" aria-label="On this page">' +
-		'<p class="on-this-page-title">On this page</p>' +
-		`<ul class="on-this-page-list">${items}</ul></nav></markless-outline>`
+		'<details class="on-this-page-fold"><summary class="on-this-page-title">On this page</summary>' +
+		`<ul class="on-this-page-list">${items}</ul></details></nav></markless-outline>`
 	);
 }
 
@@ -103,7 +123,7 @@ async function highlightParts(code: string, id: string): Promise<string> {
 		highlighted.push(highlightFences(part.html).then(frameCodeBlocks));
 	}
 	const rewritten = (await Promise.all(highlighted)).map((html) =>
-		html === undefined ? undefined : collectHeadings(markApiCode(html), seen, headings),
+		html === undefined ? undefined : collectHeadings(stackTables(markApiCode(html)), seen, headings),
 	);
 	const outline = outlineMarkup(headings);
 	if (outline && firstHtml >= 0)
@@ -135,7 +155,7 @@ async function highlightSoloHtml(code: string): Promise<string> {
 	if (!solo) return code;
 	const headings: Heading[] = [];
 	const body = collectHeadings(
-		markApiCode(frameCodeBlocks(await highlightFences(JSON.parse(solo[1]) as string))),
+		stackTables(markApiCode(frameCodeBlocks(await highlightFences(JSON.parse(solo[1]) as string)))),
 		new Set<string>(),
 		headings,
 	);

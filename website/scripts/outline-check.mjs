@@ -135,11 +135,14 @@ try {
 	await touch.waitForFunction(() => document.querySelector('.on-this-page[data-outline-ready]'));
 	assert.equal(await touch.locator('.on-this-page-label').first().evaluate(label => getComputedStyle(label).opacity), '1');
 	assert.equal(await touch.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+	assert.equal(await touch.locator('.on-this-page-link').first().isVisible(), false, 'The phone outline starts folded');
+	await touch.locator('.on-this-page-title').tap();
 	assert.ok((await touch.locator('.on-this-page-link').first().boundingBox()).height >= 44);
 	await checkHeadingText(touch, 'Mobile');
 	await touch.screenshot({ path: `${output}/outline-mobile.png` });
 	await touch.locator('.on-this-page-link').first().tap();
 	await touch.waitForURL(url => Boolean(url.hash));
+	assert.equal(await touch.locator('.on-this-page-fold').evaluate(fold => fold.open), false, 'Picking a heading folds the phone outline again');
 	await touch.setViewportSize({ width: 1280, height: 900 });
 	await touch.goto(`${base}/concepts/state`);
 	assert.equal(await touch.locator('.on-this-page-label').first().evaluate(label => getComputedStyle(label).opacity), '1', 'Large touch screens keep the labels');

@@ -69,8 +69,8 @@ served from there and `robots.txt` names the sitemap. Adding a page still means 
 
 ## Page metadata
 
-Every page carries one `<PageMeta level time assumes sprite />` line under its `H1`. Three of those
-four are judgement calls; `time` is not, because a per-page guess is what made the old numbers
+Every page carries one `<PageMeta time assumes sprite />` line under its `H1`. Two of those
+three are judgement calls; `time` is not, because a per-page guess is what made the old numbers
 wrong by up to four minutes.
 
 **The formula.** `words` is the whitespace-separated token count of the page's `.mdx` source with
@@ -84,8 +84,8 @@ believes. Every page sets its `time` from it.
 sed '/^import /d' pages/concepts/state.mdx | wc -w
 ```
 
-Rewriting a page means recomputing its `time` in the same change set. The other three props:
-`level` is one of "Start here", "Building", "Under the hood", "Reference", "Contributing", "Tooling" or "Extras"; `assumes` is a
+Rewriting a page means recomputing its `time` in the same change set. The other two props:
+`assumes` is a
 comma-separated list of keys from the `concepts` map in `nav.ts`, or the word `nothing`, and a key
 with no entry behind it prints as plain text and warns during the build; `sprite` names a file in
 `public/sprites/`.

@@ -9,7 +9,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # Improve the docs
 
-<PageMeta level="Contributing" time="7 min" assumes="nothing" sprite="sparkle" />
+<PageMeta time="7 min" assumes="nothing" sprite="sparkle" />
 
 <ThemeToggle />
 
@@ -58,7 +58,7 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 # One title per page
 
-<PageMeta level="Building" time="3 min" assumes="state,events" sprite="burst" />
+<PageMeta time="3 min" assumes="state,events" sprite="burst" />
 
 <ThemeToggle />
 
@@ -67,7 +67,7 @@ Prose, demos and callouts go here.
 <LikeHeart />
 ```
 
-`PageMeta` takes four props. `level` names the part of the site. `assumes` lists keys from the `concepts` map in `nav.ts`. `sprite` names a file in `public/sprites/`. `time` comes from a formula, not a guess. `website/README.md` has it, so recompute it when you rewrite a page.
+`PageMeta` takes three props. `assumes` lists keys from the `concepts` map in `nav.ts`. `sprite` names a file in `public/sprites/`. `time` comes from a formula, not a guess. `website/README.md` has it, so recompute it when you rewrite a page.
 
 Code fences in `tsrx`, `ts`, `tsx`, `js`, `json`, `css`, `sh`, `bash` and `html` get highlighted at build time. In a `tsrx` fence, readers can point at `state` or `@if` and get a one-sentence explanation.
 

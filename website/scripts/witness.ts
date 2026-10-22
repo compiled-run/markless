@@ -481,13 +481,13 @@ try {
 				await page.goto(`${origin}${entry.href}`, { waitUntil: 'load' });
 				const meta = page.locator('.page-meta');
 				const metaText = await meta.innerText();
-				const readingTime = await meta.locator(':scope > span').nth(3).innerText();
+				const readingTime = await meta.locator('.page-meta-time').innerText();
 				check(
 					(await meta.isVisible()) &&
-						(await meta.locator('.page-meta-level').innerText()).trim().length > 0 &&
 						/(?:\d+\s*(?:min|hour)|\bbreak\b)/i.test(readingTime) &&
+						!/^\s*·/.test(metaText) &&
 						/Assumes:\s*\S/.test(metaText),
-					`${entry.href} renders readable level, reading time and prerequisites`,
+					`${entry.href} renders a readable reading time and prerequisites, with no leading separator`,
 					metaText.replace(/\s+/g, ' '),
 				);
 				const heading = ((await page.locator('h1').first().textContent()) ?? '').trim();
