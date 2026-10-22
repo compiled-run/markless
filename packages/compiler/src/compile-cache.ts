@@ -6,9 +6,9 @@
 // be invalidated by hand.
 import type { CompileTsrxModuleInput, CompileTsrxModuleResult } from './artifacts.ts';
 
-// Eviction only costs a recompile, so this bounds a long dev session's memory
-// rather than deciding correctness.
-const MAX_ENTRIES = 512;
+// Eviction only costs a recompile, so this bounds a long dev session's memory rather than deciding correctness.
+// At 512, a 123-page app re-ran 5,203 of its 8,160 compiles after eviction; holding them all did not raise peak memory.
+const MAX_ENTRIES = 16_384;
 
 // Outer key is the source text itself: stringifying it into every key cost more than the compiles the memo saved.
 const compiles = new Map<string, Map<string, Promise<CompileTsrxModuleResult>>>();
@@ -72,7 +72,8 @@ export function memoizedCompile(
 		if (owner.get(key) === pending) {
 			owner.delete(key);
 			entries--;
-			if (owner.size === 0 && compiles.get(input.source) === owner) compiles.delete(input.source);
+			if (owner.size === 0 && compiles.get(input.source) === owner)
+				compiles.delete(input.source);
 		}
 	});
 	for (const [source, oldest] of compiles) {
