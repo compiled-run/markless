@@ -7,22 +7,42 @@ import { transformTsrx } from './transform/tsrx.ts';
 
 export type { IconPackOptions, IconsOptions } from './options.ts';
 
+export const ICON_SOURCE_ID = /\.(?:tsrx|mdx)(?:$|[?#])/;
+
 export function icons(input: IconsOptions = {}): Plugin {
 	const options = resolveOptions(input);
 	const loader = new CollectionLoader(options);
+	// Each query variant of one file (`?markless-symbols`, `?markless-render-data`, ...) arrives with the same code.
+	const lastByFile = new Map<
+		string,
+		{ code: string; result: Promise<{ transformed: string | undefined; warnings: string[] }> }
+	>();
 	return {
 		name: '@markless/icons',
 		enforce: 'pre',
 		transform: {
 			order: 'pre',
+			filter: { id: ICON_SOURCE_ID },
 			async handler(code, id) {
 				const filename = id.split(/[?#]/, 1)[0]!;
-				const diagnostic = (message: string) => this.warn(message);
-				const transformed = filename.endsWith('.tsrx')
-					? await transformTsrx(code, filename, options, loader, diagnostic)
-					: filename.endsWith('.mdx')
-						? await transformMdx(code, filename, options, loader, diagnostic)
-						: undefined;
+				let last = lastByFile.get(filename);
+				if (last?.code !== code) {
+					const warnings: string[] = [];
+					const diagnostic = (message: string) => warnings.push(message);
+					const transformed = filename.endsWith('.tsrx')
+						? transformTsrx(code, filename, options, loader, diagnostic)
+						: filename.endsWith('.mdx')
+							? transformMdx(code, filename, options, loader, diagnostic)
+							: Promise.resolve(undefined);
+					last = {
+						code,
+						result: transformed.then((value) => ({ transformed: value, warnings })),
+					};
+					lastByFile.set(filename, last);
+					last.result.catch(() => lastByFile.delete(filename));
+				}
+				const { transformed, warnings } = await last.result;
+				for (const message of warnings) this.warn(message);
 				if (transformed === undefined) return;
 				if (options.debug) this.info(`@markless/icons: transformed ${filename}`);
 				return { code: transformed, map: null };
@@ -36,12 +56,19 @@ function resolveOptions(input: IconsOptions): ResolvedIconsOptions {
 		? [...input.availableCollections]
 		: installedPrefixes();
 	if (input.collections) {
-		prefixes.push(...(input.collections instanceof Map ? input.collections.keys() : Object.keys(input.collections)));
+		prefixes.push(
+			...(input.collections instanceof Map
+				? input.collections.keys()
+				: Object.keys(input.collections)),
+		);
 	}
 	const byName = new Map<string, string[]>();
 	for (const prefix of prefixes) {
 		const name = packName(prefix);
-		if (!name) throw new Error(`@markless/icons: collection prefix ${prefix} does not produce a pack name`);
+		if (!name)
+			throw new Error(
+				`@markless/icons: collection prefix ${prefix} does not produce a pack name`,
+			);
 		const group = byName.get(name) ?? [];
 		if (!group.includes(prefix)) group.push(prefix);
 		byName.set(name, group);
@@ -53,7 +80,8 @@ function resolveOptions(input: IconsOptions): ResolvedIconsOptions {
 		);
 	}
 	const packs = new Map([...byName].map(([name, group]) => [name, group[0]!]));
-	for (const [name, value] of Object.entries(input.packs ?? {})) packs.set(name, value.iconifyPrefix);
+	for (const [name, value] of Object.entries(input.packs ?? {}))
+		packs.set(name, value.iconifyPrefix);
 	return {
 		debug: input.debug ?? false,
 		importSources: new Set(input.importSources ?? ['@markless/icons']),
