@@ -15,6 +15,10 @@ const checkHeadingText = async (page, phase) => {
 		.map(label => label.textContent));
 	assert.deepEqual(clipped, [], `${phase}: headings must be readable in full`);
 };
+const rowBoxes = (page) => page.locator('.on-this-page, .on-this-page-title, .on-this-page-link').evaluateAll(nodes => nodes.map(node => {
+	const { x, y, width, height } = node.getBoundingClientRect();
+	return { x, y, width, height };
+}));
 try {
 	const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 	const errors = [];
@@ -43,8 +47,10 @@ try {
 	await checkRailWidth('Collapsed');
 	assert.equal(await links.first().getAttribute('aria-current'), 'location');
 	await page.screenshot({ path: `${output}/outline-rest.png` });
+	const rowsAtRest = await rowBoxes(page);
 	await rail.hover();
 	await page.waitForFunction(() => [...document.querySelectorAll('.on-this-page-label')].every(label => getComputedStyle(label).opacity === '1'));
+	assert.deepEqual(await rowBoxes(page), rowsAtRest, 'Revealing the headings never moves a row');
 	await checkRailWidth('Hovered');
 	await checkHeadingText(page, 'Hovered');
 	const headingBox = await page.locator('h1').boundingBox();
@@ -137,9 +143,13 @@ try {
 	await touch.setViewportSize({ width: 1280, height: 900 });
 	await touch.goto(`${base}/concepts/state`);
 	assert.equal(await touch.locator('.on-this-page-label').first().evaluate(label => getComputedStyle(label).opacity), '1', 'Large touch screens keep the labels');
-	const plain = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 1600, height: 1000 } });
+	const plain = await browser.newPage({ javaScriptEnabled: false, reducedMotion: 'reduce', viewport: { width: 1600, height: 1000 } });
 	await plain.goto(`${base}/concepts/state`);
-	assert.equal(await plain.locator('.on-this-page-label').first().evaluate(label => getComputedStyle(label).opacity), '1');
+	assert.equal(await plain.locator('.on-this-page-label').first().evaluate(label => getComputedStyle(label).opacity), '0', 'The first paint is already the compact outline, with no script');
+	const plainRows = await rowBoxes(plain);
+	await plain.locator('.on-this-page').hover();
+	assert.deepEqual([...new Set(await plain.locator('.on-this-page-label').evaluateAll(labels => labels.map(label => getComputedStyle(label).opacity)))], ['1']);
+	assert.deepEqual(await rowBoxes(plain), plainRows, 'Without JavaScript: revealing the headings never moves a row');
 	await checkHeadingText(plain, 'Without JavaScript');
 	await plain.locator('.on-this-page-link').nth(1).click();
 	await plain.waitForURL(url => Boolean(url.hash));
