@@ -23,7 +23,9 @@ import {
 	workspaceJoinNote,
 	type EnclosingWorkspace,
 } from './workspace.ts';
+import { STARTER_DEV_PORTS } from './starter-ports.ts';
 
+export { STARTER_DEV_PORTS } from './starter-ports.ts';
 export type { EnclosingWorkspace, InstallPlan, ManagerFlavor, PreparedFile } from './workspace.ts';
 export {
 	addWorkspaceMember,
@@ -756,14 +758,6 @@ function creationSummary(options: CreateOptions): string {
 function devCommand(options: Pick<CreateOptions, 'packageManager'>): string {
 	return `${options.packageManager} run dev`;
 }
-
-/** The port each starter's `dev` script serves on; every starter is a Router app on Nitro, whose dev server defaults to 3000. */
-export const STARTER_DEV_PORTS = {
-	minimal: 3000,
-	app: 3000,
-	docs: 3000,
-	'full-stack': 3000,
-} as const satisfies Record<Starter, number>;
 
 function nextSteps(options: CreateOptions): string {
 	return [

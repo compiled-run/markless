@@ -1,6 +1,7 @@
 import type { Plugin } from 'rolldown';
 import type { RuntimeDemandMapManifest } from '../types.ts';
 import { entryReachableModuleIds, runtimeModuleIdFromOrigin } from './bundle-graph.ts';
+import { dynamicImportersOf, isPlannedCoLocation } from './planned-co-location.ts';
 import { MARKLESS_DEFERRED_PACK } from './route-pack-groups.ts';
 import {
 	isReExportDoor,
@@ -71,7 +72,10 @@ export function deferredRuntimePacks(input: {
 	return packs;
 }
 
-type DeferredRuntimePlugin = Pick<Plugin, 'name' | 'options' | 'buildEnd' | 'outputOptions'>;
+type DeferredRuntimePlugin = Pick<
+	Plugin,
+	'name' | 'options' | 'buildEnd' | 'outputOptions' | 'onLog'
+>;
 
 // Unpacked client builds: runtime no compiled record demands leaves the shared chunks for deferred
 // packs, which no preload plan follows; each still loads on its first import().
@@ -79,6 +83,7 @@ export function deferredRuntimePlugin(
 	demandMaps: () => Iterable<RuntimeDemandMapManifest | undefined>,
 ): DeferredRuntimePlugin {
 	let packs = new Map<string, string>();
+	let dynamicImporters = new Map<string, readonly string[]>();
 	return {
 		name: 'markless:deferred-runtime',
 		// Deferred packs leave shared dependencies where they are, which Rolldown allows only here.
@@ -89,6 +94,7 @@ export function deferredRuntimePlugin(
 		},
 		buildEnd(error) {
 			packs = new Map();
+			dynamicImporters = new Map();
 			if (error) return;
 			const modules = new Map<string, ModuleEdges>();
 			for (const id of entryReachableModuleIds(this)) {
@@ -107,6 +113,10 @@ export function deferredRuntimePlugin(
 					moduleIds: modules.keys(),
 				}),
 			});
+			dynamicImporters = dynamicImportersOf(modules);
+		},
+		onLog(_level, log) {
+			if (isPlannedCoLocation(log, (id) => packs.get(id), dynamicImporters)) return false;
 		},
 		outputOptions(output) {
 			if (typeof output.codeSplitting !== 'object') return null;
@@ -116,6 +126,7 @@ export function deferredRuntimePlugin(
 					...output.codeSplitting,
 					groups: [
 						{
+							debugName: 'markless-deferred-runtime',
 							name: (id: string) => packs.get(id) ?? null,
 							priority: 1000,
 							includeDependenciesRecursively: false,
