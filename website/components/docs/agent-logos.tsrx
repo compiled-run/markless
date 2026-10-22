@@ -9,7 +9,7 @@ const AGENTS = [
 	{ mark: 'opencode', name: 'OpenCode' },
 ] as const;
 
-/** A paragraph naming the coding agents markless-migrate sets up, each name after an ink drawing of its mark. `lead` and `end` are the text before and after the list. */
+/** A paragraph naming the coding agents Markless Migrate sets up, each name after an ink drawing of its mark. `lead` and `end` are the text before and after the list. */
 export default function AgentLogos({ lead, end }: { readonly lead: string; readonly end: string }) @{
 	<p class="agents">
 		{lead + ' '}

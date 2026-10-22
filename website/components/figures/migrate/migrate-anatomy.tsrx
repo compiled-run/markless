@@ -1,6 +1,6 @@
-// A terminal drawn on a sheet on the desk replaying a markless-migrate run on a small shop, with the report it writes lying below: Enter runs the next command.
+// A terminal drawn on a sheet on the desk with a coding agent open in it: the reader asks it to use Markless Migrate on a small shop, and the report the run writes lies below.
 import { computed, state } from '@markless/core';
-import { completesAt, describe, doneOf, FOOTERS, focusRow, ghostFor, interrupt, JS, labelOf, MAX_TYPED, PAGE, print, printAll, printing, reportOf, ROUTES, ROWS, type Run, runCommand, screen, servedBy, showsFooter, START, submit, TICK_MS, tour, TOUR_START, type Tour } from './model.ts';
+import { completesAt, describe, FOOTERS, focusRow, ghostFor, interrupt, JS, labelOf, MAX_TYPED, openSentence, PAGE, pickAgent, print, printAll, printing, reportOf, ROUTES, ROWS, type Run, screen, sent, servedBy, showsFooter, START, submit, TICK_MS, tour, TOUR_START, type Tour } from './model.ts';
 import { art } from './migrate.art.ts';
 import { recall, remember } from '../create/history.ts';
 
@@ -45,11 +45,11 @@ export default function MigrateAnatomy() @{
 				if (touched) {
 					if (!printing(run)) return;
 					run = print(run);
-					if (!printing(run)) said = describe(run);
+					if (describe(run) !== said) said = describe(run);
 					return;
 				}
 				t = tour(t);
-				if (t.entered || (printing(run) && !printing(t.run))) said = describe(t.run);
+				if (describe(t.run) !== said) said = describe(t.run);
 				run = t.run;
 				typed = t.typed;
 				at = t.typed.length;
@@ -67,12 +67,9 @@ export default function MigrateAnatomy() @{
 			onClick={(event) => {
 				const pick = (event.target as Element).closest("[data-pick]:not([data-pick=''])")?.getAttribute('data-pick');
 				if (!pick) return;
-				const input = (event.target as Element).closest('.stage')!.querySelector('input')!;
-				const fill = runCommand(pick);
-				input.value = fill;
-				typed = fill;
-				at = fill.length;
-				input.focus();
+				run = pickAgent(run, pick);
+				said = openSentence(run);
+				(event.target as Element).closest('.stage')!.querySelector('input')!.focus();
 			}}
 			onPointerDown={(event) => {
 				if (touched) return;
@@ -131,11 +128,12 @@ export default function MigrateAnatomy() @{
 					} else if (event.key === 'Enter') {
 						const after = submit(run, input.value);
 						if (after === run) return;
-						const stepped = doneOf(after) > doneOf(run);
-						if (stepped) ran = remember(ran, input.value.trim() || ghostFor(run, ''));
+						const asked = sent(after) && !sent(run);
+						if (input.value.trim() !== '' || asked) ran = remember(ran, input.value.trim() || ghostFor(run, ''));
 						back = 0;
-						run = stepped && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? printAll(after) : after;
-						said = describe(run);
+						const switched = !asked && after.agent !== run.agent;
+						run = asked && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? printAll(after) : after;
+						said = switched ? openSentence(run) : describe(run);
 						input.value = '';
 						typed = '';
 						at = 0;
@@ -147,7 +145,7 @@ export default function MigrateAnatomy() @{
 						typed = '';
 						at = 0;
 					} else if (event.key === 'Escape') {
-						run = START;
+						run = { ...START, agent: run.agent };
 						ran = [];
 						back = 0;
 						said = 'Started over.';
@@ -284,12 +282,13 @@ export default function MigrateAnatomy() @{
 			</svg>
 		</label>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal replays a markless-migrate run on a small shop with four pages:
-			/, /pricing, /account and /blog. Press Enter to run each command in turn: plan lists the pages and what it read on each; Claude
-			Code converts /account; check compares the old and new /account in seven plain checks and fails one, because the new Settings button
-			opens nothing; Claude Code fixes it; check runs again and passes; switch makes /account live. Below lies the report: the four pages
-			and which app serves each, the old and new /account side by side, and the JavaScript run at load before and after. Arrow Up recalls
-			earlier commands, Escape starts over.
+			A pen-and-ink drawing of a desk. A sheet of paper drawn as a terminal has Claude Code open in it, and the prompt suggests asking it to
+			use Markless Migrate on a coffee shop site with four pages: /, /menu, /account and /blog. Press Enter to send that, or type your own
+			request or another agent's name. The agent plans the pages, converts /account, and checks it against the old page: what people see,
+			every button, requests, what search engines and screen readers get, and how fast it loads. One check fails, because the new Settings
+			button opens nothing; the agent fixes it, checks again, and only then switches /account to Markless while the old app keeps serving
+			the rest. Below lies the report: the four pages and which app serves each, the old and new /account side by side, and the JavaScript
+			run at load before and after. Arrow Up recalls earlier lines, Escape starts over.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -478,7 +477,7 @@ export default function MigrateAnatomy() @{
 				opacity: 0.7;
 			}
 
-			.row:is([data-kind='cmd'], [data-kind='input'], [data-kind='head'], [data-kind='agent'], [data-kind='fail']) .line,
+			.row:is([data-kind='banner'], [data-kind='prompt'], [data-kind='input'], [data-kind='head'], [data-kind='agent'], [data-kind='fail']) .line,
 			.row[data-kind='start'] .line {
 				font-weight: 700;
 			}

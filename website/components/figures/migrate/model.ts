@@ -1,33 +1,33 @@
-// A markless-migrate run on a small shop, as the figure replays it; commands, agent ids, check dimensions and summary wording follow markless-migrate's src/cli.ts, src/run/drivers.ts, src/run/loop.ts, src/check/summary.ts and src/switch/state.ts.
+// A coding-agent session on the Beanshop site, as the figure replays it: the agent follows the skill `markless-migrate setup` installs (src/agents/skill.ts), and its commands, check dimensions and output wording follow markless-migrate's src/cli.ts, src/plan/inventory.ts, src/check/summary.ts and src/switch/state.ts.
 export const COLS = 44;
 export const ROWS = 15;
 export const OLD = 'http://localhost:3000';
-export const ROUTES = ['/', '/pricing', '/account', '/blog'] as const;
+export const ROUTES = ['/', '/menu', '/account', '/blog'] as const;
 export const PAGE = '/account';
 export const JS = { old: '84.0 kB', new: '1.1 kB' };
-export const ATTEMPTS = 3;
+/** The request the prompt suggests; Enter on an empty prompt sends it. */
+export const ASK = 'Use Markless Migrate on my coffee shop site';
 
-/** The agents `run --agent` drives, with the binary it starts and the agent's own name; the first is suggested until the reader runs another. */
+/** The agents `markless-migrate setup` installs the skill for; the first is open until the reader picks another. */
 export const AGENTS = [
-	{ id: 'claude', binary: 'claude', label: 'Claude Code' },
-	{ id: 'codex', binary: 'codex', label: 'Codex' },
-	{ id: 'cursor', binary: 'cursor-agent', label: 'Cursor' },
-	{ id: 'gemini', binary: 'gemini', label: 'Gemini CLI' },
-	{ id: 'copilot', binary: 'copilot', label: 'GitHub Copilot CLI' },
-	{ id: 'opencode', binary: 'opencode', label: 'opencode' },
+	{ id: 'claude', label: 'Claude Code' },
+	{ id: 'codex', label: 'Codex' },
+	{ id: 'cursor', label: 'Cursor' },
+	{ id: 'gemini', label: 'Gemini CLI' },
+	{ id: 'copilot', label: 'GitHub Copilot CLI' },
+	{ id: 'opencode', label: 'opencode' },
 ] as const;
 export type AgentId = (typeof AGENTS)[number]['id'];
 export const agentOf = (id: string) => AGENTS.find((a) => a.id === id) ?? AGENTS[0];
 
-/** The checks, in plain words, with the report dimension each one is. */
+/** The checks, in the page's plain words, with the report dimension each one is. */
 export const CHECKS = [
-	{ plain: 'looks the same', dimension: 'visual' },
+	{ plain: 'what people see', dimension: 'visual' },
 	{ plain: 'every button works', dimension: 'behaviour' },
 	{ plain: 'same requests', dimension: 'network' },
-	{ plain: 'same SEO', dimension: 'seo' },
-	{ plain: 'screen reader the same', dimension: 'rendered' },
-	{ plain: 'every language', dimension: 'i18n' },
-	{ plain: 'signed in and out', dimension: 'auth' },
+	{ plain: 'what search engines get', dimension: 'seo' },
+	{ plain: 'what screen readers get', dimension: 'a11y' },
+	{ plain: 'how fast it loads', dimension: 'load' },
 ] as const;
 export const FAILING = 'behaviour';
 
@@ -36,74 +36,68 @@ export interface Line {
 	readonly text: string;
 	/** Faint text in its own column, like the dimension behind a check. */
 	readonly value: string;
-	/** out, head, pass, fail, reason, agent, path */
+	/** out, head, pass, fail, reason, agent, cmd, path */
 	readonly kind: string;
 	/** Milliseconds before the line prints. */
 	readonly pause: number;
 	/** What the report shows once this line has printed. */
 	readonly report: '' | 'listed' | 'red' | 'green' | 'live';
+	/** The sentence the live region speaks once this line has printed. */
+	readonly say: string;
 }
-const out = (text: string, kind = 'out', pause = 90, more: Partial<Line> = {}): Line => ({ mark: '', text, value: '', kind, pause, report: '', ...more });
+const out = (text: string, kind = 'out', pause = 90, more: Partial<Line> = {}): Line => ({ mark: '', text, value: '', kind, pause, report: '', say: '', ...more });
+const agentSays = (text: string, pause: number, more: Partial<Line> = {}) => out(text, 'agent', pause, { mark: '●', ...more });
+const shell = (text: string, pause = 500) => out(text, 'cmd', pause, { mark: '$' });
 const ticks = (failing: boolean): Line[] =>
 	CHECKS.flatMap((c) => {
 		const bad = failing && c.dimension === FAILING;
-		const row = out(c.plain, bad ? 'fail' : 'pass', 240, { mark: bad ? '✗' : '✓', value: c.dimension, report: bad ? 'red' : '' });
+		const row = out(c.plain, bad ? 'fail' : 'pass', 240, { mark: bad ? '✗' : '✓', value: c.dimension });
 		return bad ? [row, out('  click "Settings": the old page opens', 'reason', 120), out('  its settings panel, the new one does not', 'reason', 120)] : [row];
 	});
 
-export const runCommand = (agent: string) => `markless-migrate run --agent ${agent} --old $OLD --new $NEW --route ${PAGE}`;
-export const PLAN = 'markless-migrate plan --old $OLD --source ../shop';
+export const PLAN = 'markless-migrate plan --old $OLD --source ../beanshop';
+export const CHECK = `markless-migrate check --old $OLD --new $NEW --route ${PAGE}`;
 export const SWITCH = `markless-migrate switch ${PAGE}`;
+const others = ROUTES.filter((r) => r !== PAGE);
+const listed = `${others.slice(0, -1).join(', ')} and ${others.at(-1)}`;
 
-export interface Step {
-	readonly key: 'plan' | 'run' | 'switch';
-	/** Every command that runs this step, the suggested one first. */
-	readonly commands: (agent: AgentId) => readonly string[];
-	readonly out: (agent: AgentId) => readonly Line[];
-	/** How long the idle tour lets the reader look once the output has printed. */
-	readonly hold: number;
+/** What the agent does with the request, line by line: plan, convert one page, check it, fix what the check found, check again, and switch it only once it passes. */
+export function session(id: AgentId): readonly Line[] {
+	const agent = agentOf(id).label;
+	return [
+		agentSays("I'll take stock of the old site first.", 900),
+		shell(PLAN, 600),
+		out(`4 routes on the old site to port, from crawl 4, source 4`, 'head', 900),
+		out('  200 /  "Beanshop"'),
+		out('  200 /menu  "Menu · Beanshop"'),
+		out('  200 /account  "Your account · Beanshop"'),
+		out('  200 /blog  "Journal · Beanshop"'),
+		out('Wrote .migrate/inventory.json', 'path', 200, { report: 'listed', say: `Markless Migrate planned 4 pages: ${ROUTES.slice(0, -1).join(', ')} and ${ROUTES.at(-1)}.` }),
+		agentSays(`Converting ${PAGE} to Markless first.`, 1100),
+		agentSays(`Converted ${PAGE}: pages/account.tsrx`, 2000),
+		shell(CHECK),
+		...ticks(true),
+		out(`FAIL  ${PAGE}  [${FAILING}]`, 'fail', 300, { report: 'red', say: `The check failed one thing: on the new ${PAGE}, the Settings button opens nothing.` }),
+		out('0 of 1 routes green, 1 red.', 'out', 150),
+		agentSays('The new Settings button opens nothing. Fixing it.', 1200),
+		agentSays('Fixed: the panel opens on click again.', 1900),
+		shell(CHECK),
+		...ticks(false),
+		out(`pass  ${PAGE}`, 'head', 300, { report: 'green' }),
+		out(`  run at load ${JS.old} -> ${JS.new}`),
+		out('1 of 1 routes green.', 'out', 150, { say: `${agent} fixed it and every check passed. JavaScript run at load goes from ${JS.old} to ${JS.new}.` }),
+		out(`Partial run: 1 of ${ROUTES.length} routes checked.`, 'path', 100),
+		agentSays(`It passes. Switching ${PAGE} to Markless.`, 1000),
+		shell(SWITCH),
+		out(`Switched ${PAGE} to the new app.`, 'head', 400, { report: 'live' }),
+		out('  .migrate/switched.json', 'path', 100),
+		agentSays(`${PAGE} is live. The old app still serves ${listed} until each one passes its check too.`, 900, { say: `${PAGE} is live, served by Markless. ${listed} are still served by the old app.` }),
+	];
 }
 
-export const STEPS: readonly Step[] = [
-	{
-		key: 'plan',
-		commands: () => [PLAN],
-		out: () => [
-			out(`4 routes on ${OLD}`, 'head', 500),
-			out('  200 /         8 links, 2 scripts'),
-			out('  200 /pricing  6 links, 1 form, 2 scripts'),
-			out('  200 /account  5 links, 2 forms, 4 scripts'),
-			out('  200 /blog     12 links, 2 scripts'),
-			out('Libraries: 2 (react-hook-form, swr)', 'out', 300),
-			out('Wrote .migrate/inventory.json', 'path', 200, { report: 'listed' }),
-		],
-		hold: 2600,
-	},
-	{
-		key: 'run',
-		commands: (agent) => [runCommand(agent), ...AGENTS.filter((a) => a.id !== agent).map((a) => runCommand(a.id))],
-		out: (id) => {
-			const agent = agentOf(id);
-			return [
-				out(`attempt 1/${ATTEMPTS}  ${PAGE}: running ${agent.binary}`, 'out', 900),
-				out(`${agent.label} converted ${PAGE}`, 'agent', 1700, { mark: '●' }),
-				out(`check ${PAGE}`, 'path', 500),
-				...ticks(true),
-				out(`attempt 2/${ATTEMPTS}  ${PAGE}: running ${agent.binary}`, 'out', 1400),
-				out(`${agent.label} fixed what check found`, 'agent', 1700, { mark: '●' }),
-				out(`check ${PAGE}`, 'path', 500),
-				...ticks(false),
-				out(`green          ${PAGE} after 2 attempt(s)`, 'head', 400, { report: 'green' }),
-				out('1 of 1 routes green. Log: .migrate/run.log', 'out', 200),
-			];
-		},
-		hold: 3800,
-	},
-	{ key: 'switch', commands: () => [SWITCH], out: () => [out(`Switched ${PAGE} to the new app.`, 'head', 400, { report: 'live' }), out('  .migrate/switched.json', 'path', 100)], hold: 5200 },
-];
-
-export type Entry = number | string;
-/** The run: what was entered at the prompt (a number is a step that ran, a string a line no step takes), the agent the run step uses, and how much of the last step's output has printed. */
+/** What was entered at the prompt: the request the agent took, or a line it did not (abandoned with Ctrl+C, or typed once the session is done). */
+export type Entry = { readonly ask: string } | string;
+/** The session: what was entered, the agent it is open in, and how much of the agent's work has printed. */
 export interface Run {
 	readonly log: readonly Entry[];
 	readonly agent: AgentId;
@@ -111,15 +105,12 @@ export interface Run {
 	readonly wait: number;
 }
 export const START: Run = { log: [], agent: 'claude', shown: 0, wait: 0 };
-export const doneOf = (run: Run) => run.log.filter((e) => typeof e === 'number').length;
-export const nextOf = (run: Run): Step | undefined => STEPS[doneOf(run)];
-const lastStep = (run: Run) => {
-	const last = run.log.at(-1);
-	return typeof last === 'number' ? last : -1;
-};
-const outOf = (run: Run, step: number) => STEPS[step]!.out(run.agent);
-/** Whether the last command is still printing; the prompt comes back when it is done. */
-export const printing = (run: Run) => lastStep(run) >= 0 && run.shown < outOf(run, lastStep(run)).length;
+const askIn = (run: Run) => run.log.find((e): e is { ask: string } => typeof e !== 'string')?.ask;
+/** Whether the reader has sent a request yet. */
+export const sent = (run: Run) => askIn(run) !== undefined;
+const lastIsAsk = (run: Run) => typeof run.log.at(-1) === 'object';
+/** Whether the agent is still working; the prompt comes back when it is done. */
+export const printing = (run: Run) => lastIsAsk(run) && run.shown < session(run.agent).length;
 
 export const tidy = (typed: string) => typed.trim().replace(/\s+/g, ' ');
 export const TICK_MS = 60;
@@ -129,42 +120,42 @@ const ticksFor = (ms: number) => Math.round(ms / TICK_MS);
 export function print(run: Run): Run {
 	if (!printing(run)) return run;
 	if (run.wait > 0) return { ...run, wait: run.wait - 1 };
-	const lines = outOf(run, lastStep(run));
+	const lines = session(run.agent);
 	const shown = run.shown + 1;
 	return { ...run, shown, wait: shown < lines.length ? ticksFor(lines[shown]!.pause) : 0 };
 }
-/** Everything the last command prints, at once, for reduced motion. */
-export const printAll = (run: Run): Run => (printing(run) ? { ...run, shown: outOf(run, lastStep(run)).length, wait: 0 } : run);
+/** Everything the agent prints, at once, for reduced motion. */
+export const printAll = (run: Run): Run => (printing(run) ? { ...run, shown: session(run.agent).length, wait: 0 } : run);
 
-const agentIn = (line: string) => AGENTS.find((a) => runCommand(a.id) === line)?.id;
+/** The agent a typed line names, by id or by its own name, so the keyboard can switch agents as the footer does. */
+export const agentNamed = (line: string) => AGENTS.find((a) => a.id === line.toLowerCase() || a.label.toLowerCase() === line.toLowerCase())?.id;
+/** Opens the session in another agent, before anything is sent. */
+export const pickAgent = (run: Run, id: string): Run => (sent(run) ? run : { ...run, agent: agentNamed(id) ?? run.agent });
 
-/** Enter: an empty line runs the suggested command, the next step's command (with any agent, for run) runs it, anything else is echoed with a hint. */
+const keepLastTry = (log: readonly Entry[]) => {
+	const ask = log.findIndex((e) => typeof e !== 'string');
+	return ask < 0 ? log.slice(-1) : [...log.slice(0, ask + 1), ...log.slice(ask + 1).slice(-1)];
+};
+
+/** Enter: before anything is sent, an agent's name opens that agent and any other line (or the suggestion, on an empty prompt) is the request; afterwards a line is echoed with a hint. */
 export function submit(run: Run, text = ''): Run {
 	if (printing(run)) return run;
-	const next = nextOf(run);
 	const line = tidy(text);
-	if (next && (line === '' || next.commands(run.agent).includes(line))) {
-		const agent = next.key === 'run' ? (agentIn(line) ?? run.agent) : run.agent;
-		const ran = { ...run, log: [...run.log, doneOf(run)], agent, shown: 0 };
-		return { ...ran, wait: ticksFor(outOf(ran, lastStep(ran))[0]!.pause) };
+	if (!sent(run)) {
+		if (agentNamed(line)) return pickAgent(run, line);
+		const asked = { ...run, log: [...keepLastTry(run.log), { ask: line || ASK }], shown: 0 };
+		return { ...asked, wait: ticksFor(session(run.agent)[0]!.pause) };
 	}
 	if (line === '') return run;
-	return { ...run, log: [...withoutOldTries(run.log), line] };
+	return { ...run, log: keepLastTry([...run.log, line]) };
 }
-const withoutOldTries = (log: readonly Entry[]) => {
-	const last = log.findLastIndex((e) => typeof e === 'number');
-	return [...log.slice(0, last + 1), ...log.slice(last + 1).slice(-1)];
-};
 
 /** Ctrl+C abandons the line, as a shell does. */
-export const interrupt = (run: Run, typed: string): Run => (printing(run) ? run : { ...run, log: [...withoutOldTries(run.log), `${typed}^C`] });
+export const interrupt = (run: Run, typed: string): Run => (printing(run) ? run : { ...run, log: keepLastTry([...run.log, `${typed}^C`]) });
 
-/** The faint rest of the first command the typed text starts, the suggested agent's first. */
-export const ghostFor = (run: Run, typed: string) => {
-	const command = nextOf(run)?.commands(run.agent).find((c) => c.startsWith(typed));
-	return command ? command.slice(typed.length) : '';
-};
-export const invalidAt = (run: Run, typed: string) => typed !== '' && !(nextOf(run)?.commands(run.agent) ?? []).some((c) => c.startsWith(typed));
+/** The faint rest of the suggested request, while what is typed starts it. */
+export const ghostFor = (run: Run, typed: string) => (!sent(run) && ASK.startsWith(typed) ? ASK.slice(typed.length) : '');
+export const invalidAt = (run: Run, typed: string) => typed !== '' && sent(run);
 export const completesAt = (run: Run, typed: string, at: number) => at === typed.length && ghostFor(run, typed) !== '';
 export const MAX_TYPED = 80;
 
@@ -172,7 +163,7 @@ export interface Row {
 	readonly mark: string;
 	readonly text: string;
 	readonly value: string;
-	/** cmd, out, head, pass, fail, reason, agent, path, try, input, start, blank, footer */
+	/** banner, prompt, cmd, out, head, pass, fail, reason, agent, path, try, input, start, blank, footer */
 	readonly kind: string;
 	readonly invalid: string;
 	readonly caret: string;
@@ -181,15 +172,15 @@ export interface Row {
 }
 const row = (mark: string, text = '', kind = 'out', value = ''): Row => ({ mark, text, value, kind, invalid: 'no', caret: '', after: '', ghost: '' });
 const BLANK = row('', '', 'blank');
-/** The bottom row, kept clear for the footer naming the other agents while the run prompt is empty. */
+/** The bottom row, kept clear for the footer naming the other agents while nothing has been sent. */
 export const FOOTER = row('', '', 'footer');
 
-/** For each suggested agent, the others the footer names, each with the separator before it. */
-export const FOOTERS = AGENTS.map((suggested) => ({
-	agent: suggested.id,
-	others: AGENTS.filter((a) => a.id !== suggested.id).map((a, k) => ({ id: a.id, gap: k === 0 ? '' : ' · ' })),
+/** For each open agent, the others the footer names, each with the separator before it. */
+export const FOOTERS = AGENTS.map((open) => ({
+	agent: open.id,
+	others: AGENTS.filter((a) => a.id !== open.id).map((a, k) => ({ id: a.id, gap: k === 0 ? '' : ' · ' })),
 }));
-export const showsFooter = (run: Run, typed: string) => !printing(run) && typed === '' && nextOf(run)?.key === 'run';
+export const showsFooter = (run: Run, typed: string) => !sent(run) && typed === '';
 
 /** Where a long line wraps: after the last space that fits, or at the width when none does. */
 export function breaks(text: string, width = COLS): number[] {
@@ -217,7 +208,7 @@ export function inputRows(typed: string, at: number, ghost: string, invalid: boo
 		const end = Math.min(e, typed.length);
 		const before = here ? typed.slice(s, at) : at >= e ? typed.slice(s, end) : '';
 		return {
-			...row(i === 0 ? '$' : '', before || '\u200b', 'input'),
+			...row(i === 0 ? '>' : '', before || '\u200b', 'input'),
 			caret: here ? '|' : '',
 			after: here ? typed.slice(at, end) : at < s ? typed.slice(s, end) : '',
 			ghost: full.slice(Math.max(s, typed.length), e),
@@ -226,32 +217,28 @@ export function inputRows(typed: string, at: number, ghost: string, invalid: boo
 	});
 }
 
-/** The command a step entry ran, as it was typed: the run step names its agent. */
-const commandOf = (run: Run, step: number) => (STEPS[step]!.key === 'run' ? runCommand(run.agent) : STEPS[step]!.commands(run.agent)[0]!);
-
-/** The whole transcript so far, top to bottom: each command and what it printed, then the prompt once the last command is done. */
+/** The whole session so far, top to bottom: the agent's name, each line entered and what the agent did, then the prompt once it is done. */
 export function transcript(run: Run, typed = '', at = typed.length): Row[] {
-	const rows: Row[] = [];
+	const rows: Row[] = [row('', agentOf(run.agent).label, 'banner')];
 	run.log.forEach((entry, i) => {
-		if (typeof entry === 'number') {
-			const lines = outOf(run, entry);
-			rows.push(...wrapped('$', commandOf(run, entry), 'cmd'));
-			for (const line of i === run.log.length - 1 ? lines.slice(0, run.shown) : lines) rows.push(row(line.mark, line.text, line.kind, line.value));
+		if (typeof entry !== 'string') {
+			const lines = session(run.agent);
+			rows.push(...wrapped('>', entry.ask, 'prompt'));
+			for (const line of i === run.log.length - 1 ? lines.slice(0, run.shown) : lines) rows.push(...(line.value ? [row(line.mark, line.text, line.kind, line.value)] : wrapped(line.mark, line.text, line.kind)));
 			return;
 		}
-		if (entry.endsWith('^C')) return rows.push(...wrapped('$', entry, 'cmd'));
-		rows.push(...wrapped('$', entry, 'cmd').map((r) => ({ ...r, invalid: 'yes' })));
-		const next = nextOf({ ...run, log: run.log.slice(0, i) });
-		rows.push(...wrapped('', next ? `Try ${next.commands(run.agent)[0]}` : 'Done. Press Escape to start over.', 'try'));
+		if (entry.endsWith('^C')) return rows.push(...wrapped('>', entry, 'prompt'));
+		rows.push(...wrapped('>', entry, 'prompt').map((r) => ({ ...r, invalid: 'yes' })));
+		rows.push(row('', 'Done. Press Escape to start over.', 'try'));
 	});
 	if (printing(run)) return rows;
 	rows.push(...inputRows(typed, at, at === typed.length ? ghostFor(run, typed) : '', invalidAt(run, typed)));
-	if (run.log.length === 0) rows.push(row('', '↵ Press Enter to run it', 'start'));
-	if (!nextOf(run) && lastStep(run) === STEPS.length - 1) rows.push(row('', 'Esc starts over', 'start'));
+	if (!sent(run)) rows.push(row('', '↵ Press Enter to ask it', 'start'));
+	else if (lastIsAsk(run)) rows.push(row('', 'Esc starts over', 'start'));
 	return rows;
 }
 
-/** What the terminal shows: the last rows, like a terminal that scrolls, and the footer on the bottom row while the run prompt is empty. */
+/** What the terminal shows: the last rows, like a terminal that scrolls, and the footer on the bottom row while nothing has been sent. */
 export function screen(run: Run, typed = '', at = typed.length): Row[] {
 	const foot = showsFooter(run, typed) ? [FOOTER] : [];
 	const all = transcript(run, typed, at).slice(-(ROWS - foot.length));
@@ -259,60 +246,52 @@ export function screen(run: Run, typed = '', at = typed.length): Row[] {
 }
 export const focusRow = (rows: readonly Row[]) => rows.findIndex((r) => r.kind === 'input');
 
+const printed = (run: Run) => run.log.flatMap((entry, i) => (typeof entry === 'string' ? [] : i === run.log.length - 1 ? session(run.agent).slice(0, run.shown) : session(run.agent)));
+
 /** What the report below the terminal shows, from what has printed so far: the routes once planned, the old and new screenshots once checked, red or green, and which app serves the page. */
 export function reportOf(run: Run) {
-	const marks = run.log.flatMap((entry, i) => (typeof entry === 'number' ? (i === run.log.length - 1 ? outOf(run, entry).slice(0, run.shown) : outOf(run, entry)) : [])).map((l) => l.report);
+	const marks = printed(run).map((l) => l.report);
 	const check = marks.findLast((m) => m === 'red' || m === 'green');
 	return { listed: marks.includes('listed') ? 'yes' : 'no', check: check ?? 'none', live: marks.includes('live') ? 'yes' : 'no' };
 }
 export const servedBy = (route: string, run: Run) => (route === PAGE && reportOf(run).live === 'yes' ? 'Markless' : 'old app');
 
 export function labelOf(run: Run): string {
-	if (printing(run)) return 'Terminal. The command is running.';
-	const next = nextOf(run);
-	if (!next) return 'Terminal. The run is done; press Escape to start over.';
-	const agents = next.key === 'run' ? ` Name any agent after --agent: ${AGENTS.map((a) => a.id).join(', ')}.` : '';
-	return `Terminal. Press Enter to run the next command: ${commandOf({ ...run, log: [...run.log, doneOf(run)] }, doneOf(run))}.${agents} Arrow Up recalls earlier commands, Escape starts over.`;
+	const agent = agentOf(run.agent).label;
+	if (printing(run)) return `Terminal with ${agent} open. ${agent} is working.`;
+	if (sent(run)) return `Terminal with ${agent} open. ${agent} is done; press Escape to start over.`;
+	return `Terminal with ${agent} open. Press Enter to ask: ${ASK}, or type your own request. Type another agent's name to open it instead: ${AGENTS.filter((a) => a.id !== run.agent).map((a) => a.id).join(', ')}. Arrow Up recalls earlier lines, Escape starts over.`;
 }
 
-/** The sentence the live region speaks: what the command did, once it has printed it. */
+/** The sentence the live region speaks: the latest step the agent finished. */
 export function describe(run: Run): string {
 	const last = run.log.at(-1);
 	if (last === undefined) return '';
-	if (typeof last === 'string') {
-		if (last.endsWith('^C')) return 'Line abandoned.';
-		const next = nextOf(run);
-		return next ? `Try ${next.commands(run.agent)[0]}` : 'Done. Press Escape to start over.';
-	}
-	if (printing(run)) return run.shown === 0 ? `Running ${commandOf(run, last)}` : '';
-	const agent = agentOf(run.agent).label;
-	return [
-		'plan found 4 pages, /, /pricing, /account and /blog, and read the links, forms and scripts on each and 2 libraries.',
-		`run had ${agent} convert ${PAGE}, then checked it: every button works failed, because the new Settings button opened nothing. ${agent} fixed it on the second attempt and all 7 checks passed. JavaScript run at load goes from ${JS.old} to ${JS.new}.`,
-		`${PAGE} is live, served by Markless. /, /pricing and /blog are still served by the old app.`,
-	][last]!;
+	if (typeof last === 'string') return last.endsWith('^C') ? 'Line abandoned.' : 'Done. Press Escape to start over.';
+	const said = printed(run).findLast((l) => l.say)?.say;
+	return said ?? `Sent to ${agentOf(run.agent).label}: ${last.ask}`;
 }
+export const openSentence = (run: Run) => `${agentOf(run.agent).label} is open.`;
 
-/** The idle tour, one tick at a time: wait, type the next command two characters a tick, press Enter, let it print, hold while the reader looks; after the last step it starts over. */
+/** The idle tour, one tick at a time: wait, type the suggestion two characters a tick, press Enter, let the agent work, hold while the reader looks, then start over in the next agent. */
 export interface Tour {
 	readonly run: Run;
 	readonly typed: string;
 	readonly wait: number;
 	readonly entered: boolean;
-	/** Which pass of the tour this is: each pass runs a different agent, starting with Codex. */
+	/** Which pass of the tour this is: each pass opens the next agent, starting with the one open on load. */
 	readonly loop: number;
 }
+const HOLD = 5200;
 export const TOUR_START: Tour = { run: START, typed: '', wait: ticksFor(1400), entered: false, loop: 0 };
-export const tourAgent = (loop: number) => AGENTS[(loop + 1) % AGENTS.length]!.id;
+export const tourAgent = (loop: number) => AGENTS[loop % AGENTS.length]!.id;
 export function tour(t: Tour): Tour {
 	if (printing(t.run)) {
 		const run = print(t.run);
-		return { ...t, run, entered: false, wait: printing(run) ? 0 : ticksFor(STEPS[lastStep(run)]!.hold) };
+		return { ...t, run, entered: false, wait: printing(run) ? 0 : ticksFor(HOLD) };
 	}
 	if (t.wait > 0) return { ...t, wait: t.wait - 1, entered: false };
-	const next = nextOf(t.run);
-	if (!next) return { ...TOUR_START, loop: t.loop + 1 };
-	const command = next.key === 'run' ? runCommand(tourAgent(t.loop)) : next.commands(t.run.agent)[0]!;
-	if (t.typed.length < command.length) return { ...t, typed: command.slice(0, t.typed.length + 2), entered: false };
+	if (sent(t.run)) return { ...TOUR_START, run: { ...START, agent: tourAgent(t.loop + 1) }, loop: t.loop + 1 };
+	if (t.typed.length < ASK.length) return { ...t, typed: ASK.slice(0, t.typed.length + 2), entered: false };
 	return { ...t, run: submit(t.run, t.typed), typed: '', wait: 0, entered: true };
 }

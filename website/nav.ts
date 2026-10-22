@@ -66,7 +66,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'first-app',
 				number: '3',
 				description:
-					'Your coding agent moves your app to Markless one page at a time, and each page is checked against the original before it switches over.',
+					'Your coding agent moves your app to Markless one page at a time, and Markless Migrate checks each page against the original before it switches over.',
 			},
 			{
 				title: 'Reading a .tsrx file',
