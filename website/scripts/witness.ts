@@ -1410,6 +1410,7 @@ try {
 		);
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
+		const markInk: string[] = [];
 		for (const theme of ['light', 'dark'] as const) {
 			await page.goto(`${origin}/`, { waitUntil: 'load' });
 			await page.evaluate((wanted) => {
@@ -1420,34 +1421,27 @@ try {
 			const icons = await page.evaluate(async () => {
 				const links = [...document.querySelectorAll('.sidebar-link')];
 				const shown = links.map((link) => {
-					const images = [
-						...link.querySelectorAll('img.nav-icon-ink'),
-					] as HTMLImageElement[];
-					const visible = images.filter(
-						(image) => getComputedStyle(image).display !== 'none',
-					);
+					const use = link.querySelector('svg.nav-icon use') as SVGUseElement | null;
+					const box = use?.getBBox();
 					return {
 						href: link.getAttribute('href'),
-						sources: images.map((image) => image.getAttribute('src')),
-						count: images.length,
-						visible: visible.length,
-						image: visible[0],
+						mark: use?.getAttribute('href') ?? '',
+						shown: link.getClientRects().length > 0,
+						drawn: (box?.width ?? 0) > 0 && (box?.height ?? 0) > 0,
+						inked:
+							use !== null &&
+							getComputedStyle(use.closest('svg')!).color === getComputedStyle(link).color,
 					};
 				});
-				await Promise.all(
-					shown.map((entry) =>
-						entry.image && !entry.image.complete
-							? entry.image.decode().catch(() => {})
-							: undefined,
-					),
-				);
+				const sprite = await fetch('/ink-marks.svg').then((response) => response.text());
 				return {
 					links: links.length,
-					entries: shown.map((entry) => ({ href: entry.href, sources: entry.sources })),
-					pairs: shown.filter((entry) => entry.count === 2).length,
-					oneVisible: shown.filter((entry) => entry.visible === 1).length,
-					loaded: shown.filter((entry) => (entry.image?.naturalWidth ?? 0) > 0).length,
-					sources: shown.map((entry) => entry.image?.getAttribute('src') ?? ''),
+					entries: shown,
+					served: shown.filter((entry) => sprite.includes(`<symbol id="${entry.mark.split('#')[1]}"`)).length,
+					shown: shown.filter((entry) => entry.shown).length,
+					drawn: shown.filter((entry) => entry.shown && entry.drawn).length,
+					inked: shown.filter((entry) => entry.inked).length,
+					color: getComputedStyle(document.querySelector('svg.nav-icon')!).color,
 				};
 			});
 			const expected = nav.flatMap((section) => section.entries);
@@ -1460,46 +1454,32 @@ try {
 				'the sidebar contains each navigation destination exactly once',
 				String(icons.links),
 			);
-			for (const entry of expected) {
-				const actual = icons.entries.find((actual) => actual.href === entry.href);
-				const cuts = ['light', 'dark'].map((cut) =>
-					entry.icon
-						? `/sidebar/${entry.icon}-${cut}.png`
-						: `/sprites/${entry.sprite ?? 'sparkle'}${cut === 'dark' ? '.dark' : ''}.png`,
-				);
-				check(
-					cuts.every((src) => actual?.sources.includes(src)),
-					`${entry.href} carries the navigation data's paired assets`,
-				);
-			}
-			check(
-				icons.pairs === icons.links,
-				'every sidebar entry carries both cuts of its icon',
-				`${icons.pairs} of ${icons.links}`,
-			);
-			check(
-				icons.oneVisible === icons.pairs,
-				`the ${theme} theme displays exactly one cut per entry`,
-				String(icons.oneVisible),
-			);
-			check(
-				icons.loaded === icons.pairs,
-				`every ${theme} sidebar icon is a file the server really serves`,
-				`${icons.loaded} decoded — e.g. ${icons.sources[0]}`,
-			);
 			check(
 				expected.every(
-					(entry, index) =>
-						icons.sources[index] ===
-						(entry.icon
-							? `/sidebar/${entry.icon}-${theme}.png`
-							: `/sprites/${entry.sprite ?? 'sparkle'}${theme === 'dark' ? '.dark' : ''}.png`),
+					(entry, index) => icons.entries[index]?.mark === `/ink-marks.svg#${entry.icon}`,
 				),
-				`the ${theme} theme selects the matching navigation asset`,
+				'every sidebar entry links its own ink mark from the navigation data',
 			);
+			check(
+				icons.served === icons.links,
+				'every sidebar mark is a symbol the served sprite really has',
+				`${icons.served} of ${icons.links}`,
+			);
+			check(
+				icons.shown > 0 && icons.drawn === icons.shown,
+				`every ${theme} sidebar mark in an open section is drawn`,
+				`${icons.drawn} of ${icons.shown}`,
+			);
+			check(
+				icons.inked === icons.links,
+				`every ${theme} sidebar mark is in the row's own ink`,
+				`${icons.inked} of ${icons.links} (${icons.color})`,
+			);
+			markInk.push(icons.color);
 			const rail = page.locator('nav.sidebar');
 			await rail.screenshot({ path: `${shotsDir}/T034-sidebar-${theme}.png` });
 		}
+		check(new Set(markInk).size === 2, 'the sidebar marks change ink with the theme', markInk.join(' vs '));
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
 
 		for (const [label, href] of [

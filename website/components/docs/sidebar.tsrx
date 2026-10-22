@@ -3,18 +3,14 @@ import { Link } from '@markless/core/router';
 import ModeSelect from './mode-select.tsrx';
 import { modeFor, sidebarFor } from '../../nav.ts';
 import { asset } from '../../site-base.ts';
+import { INK_MARKS } from './ink-marks.ts';
 
 export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	const here = modeFor(pathname);
+	const marks = asset(INK_MARKS) + '#';
 	const sections = sidebarFor(pathname).map((section) => ({
 		...section,
 		expanded: section.entries.some((entry) => entry.active),
-		entries: section.entries.map((entry) => ({
-			...entry,
-			icon: here.key === 'ui'
-				? 'ui/' + (entry.href === here.href ? 'overview' : entry.href.slice(here.href.length + 1))
-				: entry.icon,
-		})),
 	}));
 
 	<nav
@@ -67,20 +63,9 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 												tabindex={-1}
 												aria-current={entry.active ? 'page' : undefined}
 											>
-												<span class="nav-icon" aria-hidden="true">
-													<img
-														class="nav-icon-ink nav-icon-light"
-														src={asset(entry.icon ? 'sidebar/' + entry.icon + '-light.png' : 'sprites/' + (entry.sprite ?? 'sparkle') + '.png')}
-														alt=""
-														decoding="async"
-													/>
-													<img
-														class="nav-icon-ink nav-icon-dark"
-														src={asset(entry.icon ? 'sidebar/' + entry.icon + '-dark.png' : 'sprites/' + (entry.sprite ?? 'sparkle') + '.dark.png')}
-														alt=""
-														decoding="async"
-													/>
-												</span>
+												<svg class="nav-icon" viewBox="0 0 108 108" aria-hidden="true">
+													<use href={marks + entry.icon} />
+												</svg>
 												<tree.itemlabel class="sidebar-text">{entry.title}</tree.itemlabel>
 											</Link>
 										</tree.item>
@@ -140,15 +125,11 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 			}
 
-			/* One hand-drawn icon per sidebar entry, cut from the owner's sheet in both
-			   variants (`tooling/cut-sprites.ts sidebar`). Both are in the markup and the
-			   theme decides which one is displayed, the same trick `.sprite` uses. */
 			.nav-icon {
-				display: inline-block;
 				width: 2.6em;
 				height: 2.6em;
 				flex: none;
-				line-height: 1;
+				overflow: visible;
 			}
 
 			@media (max-width: 70rem) {
@@ -160,20 +141,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				.sidebar-link {
 					min-height: 2.5em;
 				}
-			}
-
-			.nav-icon-ink {
-				width: 100%;
-				height: 100%;
-				object-fit: contain;
-			}
-
-			.nav-icon-light {
-				display: var(--sprite-light);
-			}
-
-			.nav-icon-dark {
-				display: var(--sprite-dark);
 			}
 
 			/* Three columns, so the sprite, the number and the title line up down the

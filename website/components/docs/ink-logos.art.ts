@@ -1,7 +1,7 @@
 // Written by ink-logos.test.ts from ink-logos.ts. Run `vp test -u` to refresh.
-import type { drawing } from './ink-logos.ts';
+import type { LogoArt } from './ink-logos.ts';
 
-export const art: ReturnType<typeof drawing> = {
+export const art: LogoArt = {
 	"size": 108,
 	"logos": {
 		"claude": {
