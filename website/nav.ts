@@ -51,7 +51,7 @@ export const nav: readonly NavSection[] = [
 					'What Markless is: elements and events in TypeScript, with an API designed to compile to any device. The browser, server rendering and tests work today, and iOS and macOS are early proofs.',
 			},
 			{
-				title: 'Creating a new app',
+				title: 'Create an app',
 				href: '/start/new-app',
 				sprite: 'plus',
 				icon: 'first-app',
@@ -60,7 +60,7 @@ export const nav: readonly NavSection[] = [
 					'Make a new app with one command, open it in your browser, and change it.',
 			},
 			{
-				title: 'Migrating an app',
+				title: 'Migrate an app',
 				href: '/start/migrate',
 				sprite: 'arrow-curve',
 				icon: 'first-app',
