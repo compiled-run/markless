@@ -15,35 +15,33 @@ import Commands from '../../components/docs/walkthrough/commands.tsrx';
 
 <ThemeToggle />
 
-<Subtitle text="Run one command and you have an app on your screen. Then change it and build it for deploy. Takes roughly 5 minutes." />
+<Subtitle text="Create an app, run it, change it and ship it. Takes roughly 5 minutes." />
 
 ## Create it
 
-Open a terminal in the folder that will hold your project, and run:
-
-<Commands kind="create" />
-
-It asks a few questions. Press Enter on each one to take its default. Nothing is written until you pick **Create app**.
-
-Here is what you just got: one page, the few config files that build it, and your editor already set up. The drawing below makes the same app. Press Enter in it to run the command, then hover or tap each file to read what it is for. Use pnpm, Yarn or Bun? Type its command there instead, and every command on this page switches to it.
+Try it in the drawing first: press Enter to run the command, then hover a file to see what it does. Type `pnpm`, `yarn` or `bun` instead and the commands below follow.
 
 <CreateAnatomy />
 
+Then run it for real:
+
+<Commands kind="create" />
+
+Press Enter to take each default.
+
 ## Run it
-
-Go into your new app's folder and start the dev server:
-
-<Commands kind="dev" />
-
-Open `http://localhost:3000`. You see the starter page: a heading and a button that counts. The dev server updates the page every time you save. Here is the same thing running right here:
 
 <DevServer />
 
-All of that page comes from one file, `pages/index.tsrx`.
+For real:
+
+<Commands kind="dev" />
+
+Open `localhost:3000`. The page updates every time you save.
 
 ## Change it
 
-Here is that file, live. Click **Count 0** a few times, then try these:
+The whole page is one file, `pages/index.tsrx`. Click **Count 0**, then try these:
 
 <Code steps={[{ label: 'Change the heading to `My first app`.', shows: 'My first app' }, { label: 'Start the count at `10` instead of `0`.', source: 'state(10)' }, { label: 'Under the button, add `<p>Clicked {count} times</p>`. Click the button, and both lines update.', rewrites: 2 }]}>
 ```tsrx title="index.tsrx"
@@ -62,20 +60,16 @@ export default function Home() @{
 ```
 </Code>
 
-Make the same change in your own `pages/index.tsrx` and save it. The page at `localhost:3000` shows it.
-
-The file is named `index`, so it is the page at `/`. Add `pages/about.tsrx`, and you have a page at `/about`.
+Do the same in your own file and save. Add `pages/about.tsrx` and you have a page at `/about`.
 
 ## Ship it
 
-Build your app, then serve the build to click through exactly what your users will get:
-
 <Commands kind="ship" />
 
-The build is a Node server by default, and it can target Vercel and other hosts. [Deploying](/router/deploying) shows how.
+This builds a Node server. For Vercel and other hosts, see [Deploying](/router/deploying).
 
 ## Where to go next
 
-[Reading a .tsrx file](/start/reading-tsrx) goes through your first page line by line.
+[Reading a .tsrx file](/start/reading-tsrx) walks through your first page line by line.
 
 <LikeHeart />
