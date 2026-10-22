@@ -535,8 +535,9 @@ function buildApp(
 		!coverage.signedOutOnly;
 	const checks = [...checkTotals.values()];
 	const green = checks.every((one) => one.failed === 0) && red.size === 0;
-	const home = report.routes.find((one) => one.route === '/' && one.weight);
-	if (!home?.weight) throw new Error(`showcase: ${app.slug} report has no weighed "/" route`);
+	const home = report.routes.find(
+		(one) => one.route === '/' && one.weight && one.weight.old.executed + one.weight.new.executed > 0,
+	);
 	const checkedPatterns = new Set(routes.map((one) => one.pattern));
 	const basis = fromLog
 		? logWeightBasis(log)
@@ -572,7 +573,9 @@ function buildApp(
 		downloadedBasis: app.downloadedNote
 			? `${basis}. ${checkedFact(app.downloadedNote, log, 'downloadedNote')}`
 			: basis,
-		headline: { route: '/', before: home.weight.old.executed, after: home.weight.new.executed },
+		headline: home?.weight
+			? { route: '/', before: home.weight.old.executed, after: home.weight.new.executed }
+			: null,
 		links: {
 			frontDoor: links.front,
 			old: links.old ?? oldOrigin,

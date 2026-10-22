@@ -1,6 +1,6 @@
 import { showcaseApps } from './apps.data.ts';
 import type { BytesRange, ShowcaseApp } from './types.ts';
-import { cardInk, type CardInk } from './card-ink.ts';
+import { cardInkFiles, movedShare, type CardInkFiles } from './ink-files.ts';
 
 /** Plain words for the check report's dimensions, in the order the report lists them. */
 export const checkNames: Readonly<Record<string, string>> = {
@@ -57,11 +57,6 @@ export function progressLine(app: ShowcaseApp): string {
 	return app.coverage ? `${app.coverage.ported} of ${app.coverage.total} pages moved` : 'Pages not counted yet';
 }
 
-/** The share of pages moved, 0 to 1; 0 before a coverage run. */
-export function movedShare(app: ShowcaseApp): number {
-	return app.coverage && app.coverage.total > 0 ? app.coverage.ported / app.coverage.total : 0;
-}
-
 export type Card = {
 	readonly slug: string;
 	readonly name: string;
@@ -71,10 +66,11 @@ export type Card = {
 	readonly done: boolean;
 	readonly progress: string;
 	readonly checksPassed: string;
-	readonly before: string;
-	readonly after: string;
+	/** `null` when the home page's JavaScript was not measured. */
+	readonly before: string | null;
+	readonly after: string | null;
 	readonly tone: string;
-	readonly ink: CardInk;
+	readonly ink: CardInkFiles;
 };
 
 const tones = ['pink', 'yellow', 'purple', 'green'];
@@ -88,10 +84,10 @@ export const cards: readonly Card[] = showcaseApps.map((app, at) => ({
 	done: app.status === 'done',
 	progress: progressLine(app),
 	checksPassed: checksPassed(app),
-	before: kB(app.headline.before),
-	after: kB(app.headline.after),
+	before: app.headline ? kB(app.headline.before) : null,
+	after: app.headline ? kB(app.headline.after) : null,
 	tone: tones[at % tones.length],
-	ink: cardInk(app.slug, movedShare(app), app.status === 'done'),
+	ink: cardInkFiles(at, app.slug, movedShare(app), app.status === 'done'),
 }));
 
 export function findApp(slug: string): ShowcaseApp | undefined {
@@ -114,7 +110,7 @@ export type AppView = {
 	readonly app: ShowcaseApp;
 	readonly hostName: string;
 	readonly facts: readonly { readonly id: string; readonly text: string }[];
-	readonly headline: string;
+	readonly headline: string | null;
 	readonly checkedOn: string;
 	readonly summary: string;
 	readonly links: readonly {
@@ -236,7 +232,7 @@ export function appView(app: ShowcaseApp): AppView {
 			},
 			{ id: 'sign-in', text: app.signIn ? 'Has sign-in' : 'No sign-in' },
 		],
-		headline: beforeAfter(app.headline.before, app.headline.after),
+		headline: app.headline ? beforeAfter(app.headline.before, app.headline.after) : null,
 		checkedOn: new Date(app.checkedAt).toLocaleDateString('en-US', {
 			year: 'numeric',
 			month: 'long',

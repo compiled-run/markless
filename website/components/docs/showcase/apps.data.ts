@@ -7365,11 +7365,7 @@ export const showcaseApps: readonly ShowcaseApp[] = [
 			},
 		],
 		downloadedBasis: 'On the wire during the check, as the servers it compared sent it',
-		headline: {
-			route: '/',
-			before: 0,
-			after: 0,
-		},
+		headline: null,
 		links: {
 			frontDoor: 'https://mm-shadcn-admin.vercel.app',
 			old: 'https://mm-shadcn-admin-old.vercel.app',

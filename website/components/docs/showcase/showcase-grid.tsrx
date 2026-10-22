@@ -1,38 +1,30 @@
 import { Link } from '@markless/core/router';
 import { asset } from '../../../site-base.ts';
-import { BAR, FRAME, FRAME_WIDE, STAMP } from './card-ink.ts';
+import { STAMP } from './ink-files.ts';
 import { cards } from './view.ts';
 
-const box = (size: { width: number; height: number }) => '0 0 ' + size.width + ' ' + size.height;
+const mask = (file: string) => 'mask-image: url(' + asset(file) + ')';
 
 export default function ShowcaseGrid() @{
 	<ul class="showcase" aria-label="Apps being moved with markless-migrate">
 		@for (const card of cards; key card.slug) {
 			<li class={'card tone-' + card.tone}>
-				<svg class="wash tall" viewBox={box(FRAME)} preserveAspectRatio="none" aria-hidden="true">
-					<path d={card.ink.frame.wash} />
-				</svg>
-				<svg class="wash wide" viewBox={box(FRAME_WIDE)} preserveAspectRatio="none" aria-hidden="true">
-					<path d={card.ink.frameWide.wash} />
-				</svg>
+				<span class="ink wash tall" style={mask(card.ink.wash)} aria-hidden="true"></span>
+				<span class="ink wash wide" style={mask(card.ink.washWide)} aria-hidden="true"></span>
 				<Link href="/start/migrate/[app]" params={{ app: card.slug }} class="hit">
-					<svg class="frame tall" viewBox={box(FRAME)} preserveAspectRatio="none" aria-hidden="true">
-						<path d={card.ink.frame.ink} />
-					</svg>
-					<svg class="frame wide" viewBox={box(FRAME_WIDE)} preserveAspectRatio="none" aria-hidden="true">
-						<path d={card.ink.frameWide.ink} />
-					</svg>
+					<span class="ink frame tall" style={mask(card.ink.frame)} aria-hidden="true"></span>
+					<span class="ink frame wide" style={mask(card.ink.frameWide)} aria-hidden="true"></span>
 					<span class="thumb">
 						<span class="shot">
 							<img src={asset(card.shot)} alt={card.alt} width="800" height="500" loading="lazy" decoding="async" />
 						</span>
 						@if (card.ink.stamp) {
 							<span class="stamp">
-								<svg viewBox={box(STAMP)} aria-hidden="true">
+								<svg viewBox={'0 0 ' + STAMP.width + ' ' + STAMP.height} aria-hidden="true">
 									<rect class="stamp-paper" x="5" y="5" width="110" height="46" rx="7" />
-									<path d={card.ink.stamp.ink} />
 									<text x="60" y="36.5" text-anchor="middle">MOVED</text>
 								</svg>
+								<span class="ink stamp-ring" style={mask(card.ink.stamp)} aria-hidden="true"></span>
 								<span class="sr-only">Finished</span>
 							</span>
 						}
@@ -40,23 +32,29 @@ export default function ShowcaseGrid() @{
 					<span class="name">{card.name}</span>
 					<span class="progress">
 						<span class="progress-text">{card.progress}</span>
-						<svg class="bar" viewBox={box(BAR)} preserveAspectRatio="none" aria-hidden="true">
-							<path class="bar-fill" d={card.ink.bar.fill} />
-							<path class="bar-hatch" d={card.ink.bar.hatch} />
-							<path class="bar-ink" d={card.ink.bar.ink} />
-						</svg>
+						<span class="bar" aria-hidden="true">
+							@if (card.ink.barFill) {
+								<span class="ink bar-fill" style={mask(card.ink.barFill)}></span>
+							}
+							@if (card.ink.barHatch) {
+								<span class="ink bar-hatch" style={mask(card.ink.barHatch)}></span>
+							}
+							<span class="ink bar-ink" style={mask(card.ink.bar)}></span>
+						</span>
 					</span>
 					<span class="built">Was built with {card.builtWith}</span>
 					<span class="built checks">Checks passed: {card.checksPassed}</span>
-					<span class="metric">
-						<span class="metric-label">JavaScript run at load, home page</span>
-						<span class="metric-value">
-							<s>{card.before}</s>
-							<span aria-hidden="true"> → </span>
-							<span class="sr-only"> before, now </span>
-							<b>{card.after}</b>
+					@if (card.before && card.after) {
+						<span class="metric">
+							<span class="metric-label">JavaScript run at load, home page</span>
+							<span class="metric-value">
+								<s>{card.before}</s>
+								<span aria-hidden="true"> → </span>
+								<span class="sr-only"> before, now </span>
+								<b>{card.after}</b>
+							</span>
 						</span>
-					</span>
+					}
 				</Link>
 			</li>
 		}
@@ -94,24 +92,24 @@ export default function ShowcaseGrid() @{
 				--tone: var(--green-star);
 			}
 
-			svg.wide {
+			.ink {
+				position: absolute;
+				inset: 0;
+				background: var(--ink);
+				mask-size: 100% 100%;
+				mask-repeat: no-repeat;
+				pointer-events: none;
+			}
+
+			.wide {
 				display: none;
 			}
 
 			.wash {
-				position: absolute;
-				inset: 0;
 				z-index: -1;
-				width: 100%;
-				height: 100%;
-				overflow: visible;
-				transform: translate(7px, 9px);
-				pointer-events: none;
-			}
-
-			.wash path {
-				fill: var(--tone);
+				background: var(--tone);
 				opacity: 0.8;
+				transform: translate(7px, 9px);
 
 				html.dark & {
 					opacity: 0.55;
@@ -141,20 +139,6 @@ export default function ShowcaseGrid() @{
 			.hit:focus-visible {
 				outline: 2px solid var(--ink);
 				outline-offset: 4px;
-			}
-
-			.frame {
-				position: absolute;
-				inset: 0;
-				width: 100%;
-				height: 100%;
-				overflow: visible;
-				pointer-events: none;
-			}
-
-			.frame path,
-			.bar-ink {
-				fill: var(--ink);
 			}
 
 			.thumb {
@@ -198,7 +182,6 @@ export default function ShowcaseGrid() @{
 				display: block;
 				width: 100%;
 				height: auto;
-				overflow: visible;
 			}
 
 			.stamp-paper {
@@ -206,8 +189,8 @@ export default function ShowcaseGrid() @{
 				opacity: 0.85;
 			}
 
-			.stamp path {
-				fill: var(--stamp);
+			.stamp-ring {
+				background: var(--stamp);
 			}
 
 			.stamp text {
@@ -240,22 +223,17 @@ export default function ShowcaseGrid() @{
 			}
 
 			.bar {
+				position: relative;
 				display: block;
-				width: 100%;
 				height: 0.85rem;
-				overflow: visible;
 			}
 
 			.bar-fill {
-				fill: var(--tone);
+				background: var(--tone);
 				opacity: 0.9;
 			}
 
 			.bar-hatch {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 0.6;
-				stroke-linecap: round;
 				opacity: 0.35;
 			}
 
@@ -317,11 +295,11 @@ export default function ShowcaseGrid() @{
 					gap: var(--space-m);
 				}
 
-				svg.tall {
+				.tall {
 					display: none;
 				}
 
-				svg.wide {
+				.wide {
 					display: block;
 				}
 

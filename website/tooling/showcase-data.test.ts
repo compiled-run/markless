@@ -1,8 +1,9 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildShowcase, routeCoverage, showcaseSourcesPresent } from './showcase-data.ts';
 import { showcaseApps } from '../components/docs/showcase/apps.data.ts';
+import { showcaseInk } from './showcase-ink.ts';
 
 const website = resolve(import.meta.dirname, '..');
 const source = resolve(
@@ -18,6 +19,13 @@ describe('migrate showcase data', () => {
 			expect(showcaseApps).toEqual(buildShowcase(source));
 		},
 	);
+
+	it('has the card ink committed exactly as scripts/showcase-ink.ts draws it', () => {
+		const dir = resolve(website, 'public/showcase/ink');
+		const files = showcaseInk(showcaseApps);
+		expect(readdirSync(dir).sort()).toEqual([...files.keys()].sort());
+		for (const [name, text] of files) expect(readFileSync(resolve(dir, name), 'utf8'), name).toBe(text);
+	});
 
 	it('has a screenshot and a unique slug for every app', () => {
 		const slugs = showcaseApps.map((app) => app.slug);

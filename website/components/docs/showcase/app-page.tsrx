@@ -60,8 +60,12 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 							<span>Pages moved: <b>{view.pagesMoved}</b></span>
 							<span>Checks passed: <b>{view.checksPassed}</b></span>
 						</span>
-						<span class="stat-label">JavaScript run at load, home page</span>
-						<span class="stat-value">{view.headline}</span>
+						@if (view.headline) {
+							<>
+								<span class="stat-label">JavaScript run at load, home page</span>
+								<span class="stat-value">{view.headline}</span>
+							</>
+						}
 						<span class="stat-note">{view.summary}, checked {view.checkedOn}.</span>
 						<span class={inProgress ? 'status is-progress' : 'status'}>{view.status}</span>
 					</div>
