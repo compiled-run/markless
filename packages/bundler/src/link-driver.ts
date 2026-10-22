@@ -113,12 +113,15 @@ export function linkedClaims(
 	for (const source of sources) {
 		if (!unawaited.has(source)) metadata.assertSourceClaimsSealed(environment, source);
 	}
+	const requests = sources.map((source) => ({
+		source,
+		resolverId: resolverVirtualModuleId(source),
+	}));
 	return linkClaimManifests({
-		byEmittedModule: metadata.symbolClaimMap(),
-		sources: sources.map((source) => ({
-			source,
-			resolverId: resolverVirtualModuleId(source),
-		})),
+		byEmittedModule: metadata.symbolClaimMapForResolvers(
+			requests.map((request) => request.resolverId),
+		),
+		sources: requests,
 	});
 }
 
@@ -427,7 +430,8 @@ export async function forceImportedModules(
 		const artifact = moduleArtifacts.get(child.source);
 		// A child waiting on this parent cannot finish first, so the parent links its first pass.
 		const pendingRequest =
-			options.dev === true || metadata.waitsOn(environment, child.source, pathname(child.parent))
+			options.dev === true ||
+			metadata.waitsOn(environment, child.source, pathname(child.parent))
 				? undefined
 				: artifact?.provisionalUntil;
 		const loadSource =
@@ -798,14 +802,12 @@ export function linkedInterfaces(
 	claims: ReadonlyArray<LinkedInterfaceClaim> = [],
 ) {
 	return computeLinkedInterfaces({
-		imports: imports.map(
-			(imported): LinkedInterfaceImport => ({
-				specifier: imported.specifier,
-				source: imported.source,
-				interfaceHash: artifacts.get(imported.source)?.interfaceHash,
-				moduleInterface: artifacts.get(imported.source)?.moduleGraphInterface,
-			}),
-		),
+		imports: imports.map((imported): LinkedInterfaceImport => ({
+			specifier: imported.specifier,
+			source: imported.source,
+			interfaceHash: artifacts.get(imported.source)?.interfaceHash,
+			moduleInterface: artifacts.get(imported.source)?.moduleGraphInterface,
+		})),
 		claims,
 	});
 }

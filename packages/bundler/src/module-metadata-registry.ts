@@ -39,6 +39,10 @@ function publicationKey(environment: MarklessEnvironment, source: string): strin
 export class ModuleMetadataRegistry {
 	readonly #captureManifestsBySource = new Map<string, CaptureManifest>();
 	readonly #symbolClaimsByEmittedModule = new Map<string, MarklessTransformManifest>();
+	// Owners by resolver, each with its position in the map above: a per-source read scanned every owner in the build.
+	readonly #claimOwnersByResolver = new Map<string, Set<string>>();
+	readonly #claimOrder = new Map<string, number>();
+	#nextClaimOrder = 0;
 	readonly #sourceClaimPublications = new Map<string, SourceClaimPublication>();
 	// Which source is blocked on which (a load or the barrier), so a cycle is read, not deadlocked.
 	readonly #waits = new Map<string, Map<string, number>>();
@@ -101,6 +105,8 @@ export class ModuleMetadataRegistry {
 	clear(): void {
 		this.#captureManifestsBySource.clear();
 		this.#symbolClaimsByEmittedModule.clear();
+		this.#claimOwnersByResolver.clear();
+		this.#claimOrder.clear();
 		this.#sourceClaimPublications.clear();
 		this.#waits.clear();
 	}
@@ -119,11 +125,29 @@ export class ModuleMetadataRegistry {
 	}
 
 	recordSymbolClaims(emittedModule: string, manifest: MarklessTransformManifest): void {
+		const previous = this.#symbolClaimsByEmittedModule.get(emittedModule);
+		if (previous) this.#unindexClaimOwner(emittedModule, previous);
+		else this.#claimOrder.set(emittedModule, this.#nextClaimOrder++);
 		this.#symbolClaimsByEmittedModule.set(emittedModule, manifest);
+		const resolverId = manifest.resolver.virtualModuleId;
+		const owners = this.#claimOwnersByResolver.get(resolverId);
+		if (owners) owners.add(emittedModule);
+		else this.#claimOwnersByResolver.set(resolverId, new Set([emittedModule]));
 	}
 
 	deleteSymbolClaims(emittedModule: string): void {
+		const previous = this.#symbolClaimsByEmittedModule.get(emittedModule);
+		if (!previous) return;
+		this.#unindexClaimOwner(emittedModule, previous);
+		this.#claimOrder.delete(emittedModule);
 		this.#symbolClaimsByEmittedModule.delete(emittedModule);
+	}
+
+	#unindexClaimOwner(emittedModule: string, manifest: MarklessTransformManifest): void {
+		const resolverId = manifest.resolver.virtualModuleId;
+		const owners = this.#claimOwnersByResolver.get(resolverId);
+		owners?.delete(emittedModule);
+		if (owners?.size === 0) this.#claimOwnersByResolver.delete(resolverId);
 	}
 
 	hasSymbolClaims(emittedModule: string): boolean {
@@ -320,6 +344,22 @@ export class ModuleMetadataRegistry {
 
 	symbolClaimMap(): ReadonlyMap<string, MarklessTransformManifest> {
 		return this.#symbolClaimsByEmittedModule;
+	}
+
+	/** The claims routed through these resolvers, in the order `symbolClaimMap` lists them. */
+	symbolClaimMapForResolvers(
+		resolverIds: Iterable<string>,
+	): ReadonlyMap<string, MarklessTransformManifest> {
+		const owners = new Set<string>();
+		for (const resolverId of resolverIds)
+			for (const owner of this.#claimOwnersByResolver.get(resolverId) ?? [])
+				owners.add(owner);
+		const order = this.#claimOrder;
+		return new Map(
+			[...owners]
+				.sort((left, right) => order.get(left)! - order.get(right)!)
+				.map((owner) => [owner, this.#symbolClaimsByEmittedModule.get(owner)!]),
+		);
 	}
 
 	/**

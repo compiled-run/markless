@@ -373,6 +373,44 @@ describe('module metadata identity registry', () => {
 			'MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED',
 		);
 	});
+
+	test('reads one resolver’s claims in the order the whole map lists them, through moves and deletes', () => {
+		const registry = new ModuleMetadataRegistry();
+		const shared = 'virtual:markless:resolver:shared';
+		const other = 'virtual:markless:resolver:other';
+		registry.recordSymbolClaims('/app/a.tsrx', manifest('/app/a.tsrx', shared));
+		registry.recordSymbolClaims('/app/b.tsrx', manifest('/app/b.tsrx', other));
+		registry.recordSymbolClaims('/app/c.tsrx', manifest('/app/c.tsrx', shared));
+		registry.recordSymbolClaims('/app/b.tsrx', manifest('/app/b.tsrx', shared));
+		registry.recordSymbolClaims('/app/d.tsrx', manifest('/app/d.tsrx', other));
+		registry.deleteSymbolClaims('/app/a.tsrx');
+		registry.recordSymbolClaims('/app/a.tsrx', manifest('/app/a.tsrx', shared));
+		const whole = (resolverId: string) =>
+			[...registry.symbolClaimMap()].filter(
+				([, item]) => item.resolver.virtualModuleId === resolverId,
+			);
+
+		for (const resolverId of [shared, other])
+			expect([...registry.symbolClaimMapForResolvers([resolverId])]).toEqual(
+				whole(resolverId),
+			);
+		expect([...registry.symbolClaimMapForResolvers([shared])].map(([owner]) => owner)).toEqual([
+			'/app/b.tsrx',
+			'/app/c.tsrx',
+			'/app/a.tsrx',
+		]);
+	});
+
+	test('reading one source’s claims does not scan every owner in the build', () => {
+		// Each transform reads its own source's claims; scanning every owner per read took 7.5 s here and 5 s of a 122-page build.
+		const registry = new ModuleMetadataRegistry();
+		const sources = Array.from({ length: 5_000 }, (_, index) => `/app/page-${index}.tsrx`);
+		for (const source of sources) registry.recordSymbolClaims(source, manifest(source));
+		const started = performance.now();
+		for (const source of sources) sourceSymbolManifest(registry, source, 'client');
+		expect(performance.now() - started).toBeLessThan(2_500);
+		expect(sourceSymbolManifest(registry, sources[7]!, 'client')?.source).toBe(sources[7]);
+	});
 });
 
 function manifest(
