@@ -196,6 +196,49 @@ for (const [name, browserType] of [
 			await browser?.close();
 		});
 
+		test('a swapped-in <noscript> holds its markup as text, as a fresh load does, and later handlers still resume', async () => {
+			const noscript = (page: Page) =>
+				page.evaluate(() => {
+					const element = document.querySelector('[data-noscript]');
+					return {
+						children: [...(element?.childNodes ?? [])].map((node) => node.nodeName),
+						text: element?.textContent ?? null,
+					};
+				});
+			const fresh = await open(browser, '/other');
+			await landedOn(fresh.page, 'other');
+			const loaded = await noscript(fresh.page);
+			await fresh.page.close();
+			expect(loaded.children).toEqual(['#text']);
+
+			const { page, errors } = await open(browser);
+			await page.locator('[data-nav="other"]').click();
+			await landedOn(page, 'other');
+			expect(await noscript(page)).toEqual(loaded);
+			await page.locator('[data-tap]').click();
+			await expect.poll(() => text(page, '[data-taps]')).toBe('1');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a module a handler imports with import() is fetched when pressed, not preloaded at landing', async () => {
+			const page = await browser.newPage();
+			const lazyLoads: string[] = [];
+			page.on('response', async (response) => {
+				if (response.request().resourceType() !== 'script' && !response.url().endsWith('.js'))
+					return;
+				const body = await response.text().catch(() => '');
+				if (body.includes('tools ready')) lazyLoads.push(new URL(response.url()).pathname);
+			});
+			await page.goto(`${origin}/other`, { waitUntil: 'networkidle' });
+			await landedOn(page, 'other');
+			expect(lazyLoads).toEqual([]);
+			await page.locator('[data-tools]').click();
+			await expect.poll(() => text(page, '[data-tools-text]')).toBe('tools ready');
+			await expect.poll(() => lazyLoads.length).toBe(1);
+			await page.close();
+		});
+
 		test('a link click swaps in the server region with no destination render code, and it resumes', async () => {
 			const { page, errors, requests } = await open(browser);
 			await page.evaluate(() => {

@@ -728,8 +728,8 @@ test('a control closure follows dynamic imports the demand maps cannot rule out'
 	});
 	const byKey = new Map(route!.consumers.map((consumer) => [consumer.key, consumer.modules]));
 	const click = byKey.get('action:pages/list.tsrx#h1:click')!;
-	// Unmapped code a handler imports lazily, and runtime the compiler does not track, stay in.
-	expect(click).toContain(lazyHelper);
+	// Runtime the compiler does not track stays in; code the author imports lazily is left to load when reached.
+	expect(click).not.toContain(lazyHelper);
 	expect(click).toContain(runtime('storage-plane'));
 	// Another file's symbols its map cannot bound for this control stay in.
 	expect(click).toContain(symbol(child, 'symbol:0'));
@@ -749,6 +749,66 @@ test('a control closure follows dynamic imports the demand maps cannot rule out'
 	expect(boot).not.toContain(`${file}?markless-route`);
 	expect(byKey.get('render')).toContain(`${file}?markless-route`);
 	expect(byKey.get('render')).toContain(`${file}?markless-render-data`);
+});
+
+// An import() the author wrote is code they chose to load when it is reached, so no first use preloads it.
+test('a module the author imports lazily joins no closure, from a control, from boot or unbounded', () => {
+	const file = `${root}/pages/home.tsrx`;
+	const site = `${root}/lib/site.ts`;
+	const search = `${root}/lib/search.ts`;
+	const searchLib = `${root}/node_modules/search-lib/index.js`;
+	const modules = new Map<string, InteractionClosureModule>([
+		[
+			`${file}?markless-resume`,
+			{ dependencies: [], dynamicDependencies: [runtime('resume-events')], source: file },
+		],
+		[symbol(file, 'symbol:0'), { dependencies: [site], source: file }],
+		[symbol(file, 'symbol:1'), { dependencies: [site], source: file }],
+		[site, { dependencies: [], dynamicDependencies: [search], source: site }],
+		[search, { dependencies: [], dynamicDependencies: [searchLib], source: search }],
+		[searchLib, { dependencies: [], source: searchLib }],
+		[runtime('resume-events'), { dependencies: [], source: runtime('resume-events') }],
+	]);
+	const action = (hostNodeId: string, unknown: boolean) => ({
+		hostNodeId,
+		eventName: 'click',
+		recordKind: 'event' as const,
+		recordKinds: ['event' as const],
+		payloadRecordIds: [],
+		runtimeModuleIds: ['web/resume-events'],
+		firstUse: unknown
+			? ('unknown' as const)
+			: { symbolIds: ['symbol:0'], runtimeModuleIds: ['web/resume-events'] },
+	});
+	for (const unknown of [false, true]) {
+		const [route] = computeInteractionClosures({
+			root,
+			modules,
+			routes: new Map([
+				[
+					'pages/home.tsrx',
+					[`${file}?markless-resume`, symbol(file, 'symbol:0'), symbol(file, 'symbol:1')],
+				],
+			]),
+			demand: [
+				{
+					source: `${file}?markless-symbols`,
+					map: demandMap({
+						actions: [action('h1', unknown)],
+						page: { resume: { symbolIds: ['symbol:1'], runtimeModuleIds: [] } },
+					}),
+				},
+			],
+		});
+		expect(route!.fallback).toBeUndefined();
+		for (const consumer of route!.consumers) {
+			if (consumer.kind === 'render') continue;
+			expect(consumer.modules, consumer.key).not.toContain(search);
+			expect(consumer.modules, consumer.key).not.toContain(searchLib);
+		}
+		const click = route!.consumers.find((consumer) => consumer.kind === 'action')!;
+		expect(click.modules).toContain(site);
+	}
 });
 
 test('boot leaves a symbol only a control or nothing loads to that control, unless resume start is unbounded', () => {
