@@ -8,6 +8,8 @@ on:
     # Manual runs only: main's ruleset does not count required checks from a dispatched run.
     workflow_dispatch:
 
+# On main a running run always finishes; a newer push replaces only a run still waiting its turn,
+# and tests the whole tree that run would have tested.
 concurrency:
     group: ci-${{ github.ref }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -253,7 +255,9 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   lookup-only: true
-                  path: boxes-bundler-completed.txt
+                  path: |
+                      boxes-bundler-completed.txt
+                      packages/bundler/.witness/receipts
                   key:
                       boxes-bundler-${{ hashFiles('ci-base-key.txt', 'packages/bundler/**/*',
                       '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
@@ -263,7 +267,9 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   lookup-only: true
-                  path: boxes-router-completed.txt
+                  path: |
+                      boxes-router-completed.txt
+                      packages/router/.witness/receipts
                   key:
                       boxes-router-${{ hashFiles('ci-base-key.txt', 'packages/router/**/*',
                       '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
@@ -273,7 +279,9 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   lookup-only: true
-                  path: boxes-music-player-completed.txt
+                  path: |
+                      boxes-music-player-completed.txt
+                      demos/music-player/.witness/receipts
                   key:
                       boxes-music-player-${{ hashFiles('ci-base-key.txt', 'demos/music-player/**/*',
                       '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
@@ -283,7 +291,9 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   lookup-only: true
-                  path: boxes-music-player-ssr-completed.txt
+                  path: |
+                      boxes-music-player-ssr-completed.txt
+                      demos/music-player-ssr/.witness/receipts
                   key:
                       boxes-music-player-ssr-${{ hashFiles('ci-base-key.txt', 'demos/music-player-ssr/**/*',
                       '!**/node_modules/**', '!**/dist/**', '!**/.witness/**') }}
@@ -1581,34 +1591,49 @@ jobs:
     changes:
         runs-on: ubuntu-latest
         timeout-minutes: 10
+        permissions:
+            contents: read
+            # Reads main's last green CI run.
+            actions: read
         outputs:
             bench: ${{ steps.filter.outputs.bench }}
+            base: ${{ steps.filter.outputs.base }}
         steps:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
                   fetch-depth: 0
 
+            # On main the base is the last commit whose CI run passed, not the previous push: a newer
+            # push replaces a waiting run, and the commits that run would have benchmarked still need it.
             - name: Decide whether benchmarks can be affected
               id: filter
+              env:
+                  GH_TOKEN: ${{ github.token }}
               run: |
                   if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
                     base="${{ github.event.pull_request.base.sha }}"
                   elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
-                    base="${{ github.event.before }}"
+                    base="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1" \
+                      --jq '.workflow_runs[0].head_sha // empty' || true)"
+                    if [ -z "$base" ] || ! git merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+                      base="${{ github.event.before }}"
+                    fi
                   else
                     base="$(git rev-parse HEAD^)"
                   fi
                   bench=true
                   if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
                     changed=$(git diff --name-only "$base" HEAD)
-                    # Skip benchmarking only when every changed file is docs/spec-only.
-                    if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^(specs/|docs/|\.claude/|\.codex/|LICENSE$|.*\.md$)'; then
+                    # Skip benchmarking only when every changed file is docs, specs or the docs site, none
+                    # of which the benchmark app is built from.
+                    if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^(specs/|docs/|website/|\.claude/|\.codex/|LICENSE$|.*\.md$)'; then
                       bench=false
                     fi
                   fi
                   echo "bench=$bench" >> "$GITHUB_OUTPUT"
-                  echo "benchmarks needed: $bench"
+                  echo "base=$base" >> "$GITHUB_OUTPUT"
+                  echo "benchmarks needed against ${base}: $bench"
 
     benchmark:
         needs: changes
@@ -1668,15 +1693,9 @@ jobs:
               run: mkdir -p "$MARKLESS_CI_TEMP"
 
             - name: Resolve benchmark baseline revision
-              run: |
-                  if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-                    echo "MARKLESS_BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
-                  elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
-                    echo "MARKLESS_BASE_SHA=${{ github.event.before }}" >> "$GITHUB_ENV"
-                  else
-                    # A dispatched run (the release cut's) has no previous push to compare against.
-                    echo "MARKLESS_BASE_SHA=$(git rev-parse HEAD^)" >> "$GITHUB_ENV"
-                  fi
+              env:
+                  BASE: ${{ needs.changes.outputs.base }}
+              run: echo "MARKLESS_BASE_SHA=$BASE" >> "$GITHUB_ENV"
 
             - name: Checkout benchmark baseline revision
               run: git worktree add "$MARKLESS_BASE_REPO_ROOT" "$MARKLESS_BASE_SHA"

@@ -63,22 +63,36 @@ describe('release.yml mode=cut', () => {
 		expect(run).toContain('node scripts/release/cut.mjs\n');
 	});
 
-	test('moves main only after pull request CI passed every required check on the release commit itself', () => {
+	test('moves main only after the release commit inherited a green run or pull request CI passed every required check on it', () => {
 		const order = [
 			'Push the release commit to its release branch',
+			'Inherit the green CI run of the commit the release was cut from',
 			'Run CI on the release pull request',
 			"Require every check main's protection names on the release commit",
 			'Move main to the release commit',
 		];
-		for (const name of order) {
-			expect(step(cut, name).if).toBe(
-				"inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'",
-			);
-		}
+		const cutting = "inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'";
+		const notInherited = `${cutting} && steps.inherit.outputs.inherited != 'true'`;
+		expect(order.map((name) => step(cut, name).if)).toEqual([
+			cutting,
+			cutting,
+			notInherited,
+			notInherited,
+			cutting,
+		]);
 		const positions = order.map((name) => names(cut).indexOf(name));
 		expect(positions).toEqual(positions.toSorted((left, right) => left - right));
-		expect(step(cut, order[0]!).run).toBe('git push origin "HEAD:refs/heads/release/${TAG}"');
-		const ci = step(cut, order[1]!).run!;
+		expect(step(cut, order[0]!).run).toBe('git push origin "${SHA}:refs/heads/release/${TAG}"');
+		const inherit = step(cut, order[1]!);
+		expect(inherit.run).toBe(
+			'node scripts/release/inherit-ci.mjs --release "$SHA" --base "$BASE" --run "$RUN_ID"',
+		);
+		expect(inherit.env).toEqual({
+			SHA: '${{ steps.cut.outputs.sha }}',
+			BASE: '${{ steps.cut.outputs.base }}',
+			RUN_ID: '${{ steps.cut.outputs.base_run_id }}',
+		});
+		const ci = step(cut, order[2]!).run!;
 		expect(ci).toContain('gh pr create --base main --head "release/${TAG}"');
 		expect(ci).toContain('--event pull_request --commit "$SHA"');
 		expect(ci).not.toContain('gh workflow run');
@@ -87,18 +101,21 @@ describe('release.yml mode=cut', () => {
 			ci.indexOf('/approve"'),
 		);
 		expect(ci).toContain('gh run watch "$run_id" --exit-status');
-		expect(step(cut, order[2]!).run).toBe(
+		expect(step(cut, order[3]!).run).toBe(
 			'node scripts/release/required-checks.mjs --sha "$SHA"',
 		);
-		const move = step(cut, order[3]!).run!;
-		expect(move).toContain('if [ "$main" != "$base" ]; then');
-		expect(move.trimEnd().split('\n').at(-1)!.trim()).toBe(
-			'git push origin "${SHA}:refs/heads/main"',
+		const move = step(cut, order[4]!).run!;
+		expect(move).toContain(
+			'if [ "$main" = "$base" ] && git push origin "${SHA}:refs/heads/main"; then',
 		);
-		expect(move).not.toMatch(/--force|\+\$\{SHA\}|--admin/u);
+		expect(move).toContain('gh pr merge "$pr" --merge --match-head-commit "$SHA"');
+		expect(move.indexOf('git push origin "${SHA}:refs/heads/main"')).toBeLessThan(
+			move.indexOf('gh pr merge'),
+		);
+		expect(move).not.toMatch(/--force|\+\$\{SHA\}|--admin|--squash|--rebase/u);
 		const pushTag = step(cut, 'Push the tag');
 		expect(pushTag.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'");
-		expect(names(cut).indexOf('Push the tag')).toBeGreaterThan(names(cut).indexOf(order[3]!));
+		expect(names(cut).indexOf('Push the tag')).toBeGreaterThan(names(cut).indexOf(order[4]!));
 		expect(cut.permissions!['pull-requests']).toBe('write');
 		expect(step(cut, 'Delete the release branch').if).toContain('always()');
 		expect(
@@ -129,10 +146,11 @@ describe('release.yml mode=cut', () => {
 		);
 	});
 
-	test('posts no commit status of its own', () => {
+	test('posts commit statuses only through inherit-ci.mjs, which proves the release changed versions alone', () => {
 		const commands = cut.steps.map((candidate) => candidate.run ?? '').join('\n');
 		expect(commands).not.toMatch(/\/statuses\/|check-runs -X|--method POST/u);
-		expect(cut.permissions!.statuses).toBeUndefined();
+		expect(cut.permissions!.statuses).toBe('write');
+		expect(commands.match(/inherit-ci\.mjs/gu)).toHaveLength(1);
 	});
 
 	test('the cut and announce jobs cannot publish', () => {

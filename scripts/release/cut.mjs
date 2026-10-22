@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Cut the next MINOR release: refuse unless HEAD is origin/main with a green CI run, bump every
-// release package in lockstep, write the CHANGELOG section, commit, and tag v<X.Y.0>.
+// Cut the next MINOR release from the newest main commit whose push CI run passed main's required
+// checks (main's head when that is green): bump every release package in lockstep, write the
+// CHANGELOG section, commit on top of that commit, and tag v<X.Y.0>.
 // Markless releases minor versions only, so there is no release-type argument to get wrong.
 //
 // Pushing, publishing and the GitHub Release belong to release.yml's mode=cut jobs.
@@ -18,10 +19,20 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { repoRoot, rootVersion } from './release-packages.mjs';
+import {
+	checkRunProblems,
+	checkRunsFor,
+	gh,
+	repository,
+	requiredChecks,
+	statusesFor,
+	statusProblems,
+} from './required-checks.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const RELEASE_VERSION = /^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$/u;
 const CHANGED_BY_A_CUT = /^(?:package\.json|packages\/.+\/package\.json|CHANGELOG\.md)$/u;
+const GREEN_SEARCH_DEPTH = 50;
 
 export class CutError extends Error {}
 
@@ -46,6 +57,31 @@ export function ciRefusal(runs, sha) {
 		return `main's latest CI run for ${sha.slice(0, 12)} ended ${run.conclusion} (${run.url}); fix main first`;
 	}
 	return null;
+}
+
+/**
+ * The newest of `candidates` (main's commits, newest first) whose push CI run passed and whose
+ * required checks came out of that run, with the reason each newer commit was passed over.
+ */
+export function newestGreenCommit(candidates, runFor, requiredProblemsFor) {
+	const passedOver = [];
+	for (const sha of candidates) {
+		const run = runFor(sha);
+		const refusal = ciRefusal(run ? [run] : [], sha);
+		if (refusal) {
+			passedOver.push(refusal);
+			continue;
+		}
+		const problems = requiredProblemsFor(sha, run);
+		if (problems.length > 0) {
+			passedOver.push(
+				`${sha.slice(0, 12)}'s required checks did not pass in ${run.url}: ${problems.join('; ')}`,
+			);
+			continue;
+		}
+		return { sha, run, passedOver };
+	}
+	return { sha: null, run: null, passedOver };
 }
 
 /** CHANGELOG.md with `section` placed above the newest release, below the preamble. */
@@ -124,7 +160,7 @@ function checkoutRefusals(git) {
 	return { head, refusals };
 }
 
-function ciRefusalFor(sha, root) {
+function latestCiRun(sha, root, filters = []) {
 	const listed = spawnSync(
 		'gh',
 		[
@@ -134,17 +170,63 @@ function ciRefusalFor(sha, root) {
 			'ci.yml',
 			'--commit',
 			sha,
+			...filters,
 			'--limit',
 			'1',
 			'--json',
-			'headSha,status,conclusion,url',
+			'databaseId,headSha,status,conclusion,url',
 		],
 		{ cwd: root, encoding: 'utf8' },
 	);
 	if (listed.status !== 0) {
-		return `could not read main's CI runs with gh: ${(listed.stderr ?? '').trim()}`;
+		throw new CutError(
+			`could not read main's CI runs with gh: ${(listed.stderr ?? '').trim()}`,
+		);
 	}
-	return ciRefusal(JSON.parse(listed.stdout || '[]'), sha);
+	return JSON.parse(listed.stdout || '[]')[0];
+}
+
+/** Why a release commit is unverified: neither its own CI run nor the statuses it inherited pass. */
+function releaseCommitRefusal(sha, root) {
+	const run = latestCiRun(sha, root);
+	const refusal = ciRefusal(run ? [run] : [], sha);
+	if (!refusal) return null;
+	const inherited = statusProblems(requiredChecks(), statusesFor(sha));
+	return inherited.length === 0
+		? null
+		: `${refusal}, and its inherited statuses do not cover main's required checks (${inherited.join('; ')})`;
+}
+
+/** Main's first-parent commits from `head` back to the released commit, newest first. */
+function releasableCommits(git, root, head, releasedSha) {
+	const releasable = [];
+	for (const sha of git(
+		'rev-list',
+		'--first-parent',
+		`--max-count=${GREEN_SEARCH_DEPTH}`,
+		head,
+	).split('\n')) {
+		const containsRelease =
+			spawnSync('git', ['merge-base', '--is-ancestor', releasedSha, sha], { cwd: root })
+				.status === 0;
+		if (!containsRelease) break;
+		releasable.push(sha);
+	}
+	return releasable;
+}
+
+function greenBase(git, root, head, releasedSha) {
+	const required = requiredChecks();
+	return newestGreenCommit(
+		releasableCommits(git, root, head, releasedSha),
+		(sha) => latestCiRun(sha, root, ['--event', 'push', '--branch', 'main']),
+		(sha, run) =>
+			checkRunProblems(
+				required,
+				checkRunsFor(sha),
+				new Set([gh(`repos/${repository}/actions/runs/${run.databaseId}`).check_suite_id]),
+			),
+	);
 }
 
 function githubReleaseExists(tag, root) {
@@ -214,8 +296,27 @@ export function main(argv) {
 	}
 	// A tag without a GitHub Release is a cut that stopped after pushing: finish it, never skip it.
 	const resume = pushTag || !githubReleaseExists(currentTag, root);
-	const ciProblem = ciRefusalFor(resume ? currentSha : head, root);
-	if (ciProblem) refusals.push(ciProblem);
+	let base = head;
+	let baseRun = null;
+	if (resume) {
+		const ciProblem = releaseCommitRefusal(currentSha, root);
+		if (ciProblem) refusals.push(ciProblem);
+	} else {
+		const green = greenBase(git, root, head, currentSha);
+		for (const line of green.passedOver) console.log(`release-cut: passed over ${line}`);
+		if (green.sha === null) {
+			refusals.push(
+				`no main commit since ${currentTag} has a green push CI run with main's required checks (${green.passedOver.length} checked)`,
+			);
+		} else {
+			base = green.sha;
+			baseRun = green.run;
+			const newer = green.passedOver.length;
+			console.log(
+				`release-cut: cutting from ${base.slice(0, 12)} "${git('log', '-1', '--format=%s', base)}", whose push CI run ${baseRun.url} passed; ${newer === 0 ? "it is main's head" : `main's head ${head.slice(0, 12)} is ${newer} commit(s) newer`}`,
+			);
+		}
+	}
 	if (refusals.length > 0 && !dryRun) {
 		throw new CutError(`refusing to cut a release:\n${refusalText(refusals)}`);
 	}
@@ -254,10 +355,12 @@ export function main(argv) {
 	}
 
 	const scratch = mkdtempSync(path.join(tmpdir(), 'markless-cut-'));
-	const workdir = dryRun ? path.join(scratch, 'checkout') : root;
+	// The checkout stays at main's head, so release.yml's later steps run main's release scripts.
+	const inWorktree = dryRun || base !== head;
+	const workdir = inWorktree ? path.join(scratch, 'checkout') : root;
 	try {
-		if (dryRun) {
-			run('git', ['worktree', 'add', '--detach', workdir, head], { cwd: root });
+		if (inWorktree) {
+			run('git', ['worktree', 'add', '--detach', workdir, base], { cwd: root });
 			run('pnpm', ['install', '--frozen-lockfile', '--prefer-offline'], { cwd: workdir });
 		}
 		const work = gitIn(workdir);
@@ -282,7 +385,7 @@ export function main(argv) {
 				'--version',
 				version,
 				'--to',
-				head,
+				base,
 				'--out',
 				sectionFile,
 			],
@@ -324,12 +427,15 @@ export function main(argv) {
 			version,
 			tag,
 			sha,
+			base,
+			base_run: baseRun?.url ?? '',
+			base_run_id: baseRun?.databaseId ?? '',
 			notes_file: notesFile,
 			resumed: 'false',
 			push_tag: dryRun ? 'false' : 'true',
 		});
 	} finally {
-		if (dryRun) {
+		if (inWorktree) {
 			spawnSync('git', ['worktree', 'remove', '--force', workdir], {
 				cwd: root,
 				stdio: 'inherit',

@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
+import { parse } from 'yaml';
 
 const workflowPath = join(process.cwd(), '.github/workflows/ci.yml');
 
@@ -31,5 +32,34 @@ describe('CI benchmark workflow', () => {
 		find('run_side current "$bench" "$MARKLESS_REPO_ROOT"', pairedRun);
 		expect(workflow).not.toContain('- name: Install baseline Markless benchmark fixture');
 		expect(workflow).not.toContain('- name: Install current Markless benchmark fixture');
+	});
+
+	test('a push to main benchmarks against the last main commit whose CI passed, the same base the skip decision used', async () => {
+		const workflow = parse(await readFile(workflowPath, 'utf8')) as {
+			jobs: Record<
+				string,
+				{
+					outputs?: Record<string, string>;
+					permissions?: Record<string, string>;
+					steps: Array<{ name?: string; run?: string; env?: Record<string, string> }>;
+				}
+			>;
+		};
+		const { changes, benchmark } = workflow.jobs;
+		const filter = changes!.steps.find(
+			(step) => step.name === 'Decide whether benchmarks can be affected',
+		)!.run!;
+		expect(filter).toContain(
+			'actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1',
+		);
+		expect(filter).toContain('git merge-base --is-ancestor "$base" HEAD');
+		expect(filter).toContain('echo "base=$base" >> "$GITHUB_OUTPUT"');
+		expect(changes!.outputs!.base).toBe('${{ steps.filter.outputs.base }}');
+		expect(changes!.permissions).toEqual({ contents: 'read', actions: 'read' });
+		const baseline = benchmark!.steps.find(
+			(step) => step.name === 'Resolve benchmark baseline revision',
+		)!;
+		expect(baseline.env).toEqual({ BASE: '${{ needs.changes.outputs.base }}' });
+		expect(baseline.run).toBe('echo "MARKLESS_BASE_SHA=$BASE" >> "$GITHUB_ENV"');
 	});
 });
