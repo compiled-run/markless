@@ -1,5 +1,6 @@
 import { showcaseApps } from './apps.data.ts';
 import type { BytesRange, ShowcaseApp } from './types.ts';
+import { cardInk, type CardInk } from './card-ink.ts';
 
 /** Plain words for the check report's dimensions, in the order the report lists them. */
 export const checkNames: Readonly<Record<string, string>> = {
@@ -51,19 +52,29 @@ export function checksPassed(app: ShowcaseApp): string {
 	return `${ran.filter((check) => check.failed === 0).length} of ${ran.length}`;
 }
 
+/** `212 of 498 pages moved`, or `Pages not counted yet` before a coverage run. */
+export function progressLine(app: ShowcaseApp): string {
+	return app.coverage ? `${app.coverage.ported} of ${app.coverage.total} pages moved` : 'Pages not counted yet';
+}
+
+/** The share of pages moved, 0 to 1; 0 before a coverage run. */
+export function movedShare(app: ShowcaseApp): number {
+	return app.coverage && app.coverage.total > 0 ? app.coverage.ported / app.coverage.total : 0;
+}
+
 export type Card = {
 	readonly slug: string;
 	readonly name: string;
 	readonly builtWith: string;
 	readonly shot: string;
 	readonly alt: string;
-	readonly inProgress: boolean;
-	readonly statusLabel: string;
-	readonly pagesMoved: string;
+	readonly done: boolean;
+	readonly progress: string;
 	readonly checksPassed: string;
 	readonly before: string;
 	readonly after: string;
 	readonly tone: string;
+	readonly ink: CardInk;
 };
 
 const tones = ['pink', 'yellow', 'purple', 'green'];
@@ -74,13 +85,13 @@ export const cards: readonly Card[] = showcaseApps.map((app, at) => ({
 	builtWith: app.builtWith,
 	shot: app.shot,
 	alt: `The ${app.name} home page, served by Markless`,
-	inProgress: app.status === 'in-progress',
-	statusLabel: app.status === 'done' ? 'Done' : 'In progress',
-	pagesMoved: pagesMoved(app),
+	done: app.status === 'done',
+	progress: progressLine(app),
 	checksPassed: checksPassed(app),
 	before: kB(app.headline.before),
 	after: kB(app.headline.after),
 	tone: tones[at % tones.length],
+	ink: cardInk(app.slug, movedShare(app), app.status === 'done'),
 }));
 
 export function findApp(slug: string): ShowcaseApp | undefined {
