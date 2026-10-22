@@ -136,7 +136,7 @@ try {
 	assert.equal(await touch.locator('.on-this-page-label').first().evaluate(label => getComputedStyle(label).opacity), '1');
 	assert.equal(await touch.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 	assert.equal(await touch.locator('.on-this-page-link').first().isVisible(), false, 'The phone outline starts folded');
-	await touch.locator('.on-this-page-title').tap();
+	await touch.locator('.on-this-page-toggle').tap();
 	assert.ok((await touch.locator('.on-this-page-link').first().boundingBox()).height >= 44);
 	await checkHeadingText(touch, 'Mobile');
 	await touch.screenshot({ path: `${output}/outline-mobile.png` });

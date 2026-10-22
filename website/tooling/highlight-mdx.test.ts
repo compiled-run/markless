@@ -15,7 +15,7 @@ test('the outline keeps native heading links inside an independently mounted rea
 	expect(html).toContain('<markless-outline>');
 	expect(html).toContain('aria-label="On this page"');
 	expect(html).toContain(
-		'<details class="on-this-page-fold"><summary class="on-this-page-title">On this page</summary>',
+		'<details class="on-this-page-fold"><summary class="on-this-page-title on-this-page-toggle">On this page</summary>',
 	);
 	expect(html).toContain('href="#first"');
 	expect(html).toContain('href="#first-2"');

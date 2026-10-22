@@ -354,7 +354,11 @@ markless-outline { display: contents; }
 /* The rail is always open beside the article; the fold only collapses on narrower screens. */
 @media (min-width: 70.01rem) {
 	.on-this-page-fold::details-content { content-visibility: visible; }
-	.prose .on-this-page-title { pointer-events: none; }
+	.on-this-page-toggle { display: none; }
+}
+
+@media (max-width: 70rem) {
+	.on-this-page-heading { display: none; }
 }
 
 @media (min-width: 70.01rem) and (hover: hover) and (pointer: fine) {
