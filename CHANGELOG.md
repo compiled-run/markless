@@ -10,6 +10,50 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.9.0
+
+### @markless/bundler
+
+- **Faster:** The import map lists only chunks several pages load.
+- **Fixed:** Write each module and each distinct closure once in interaction-closures.json.
+- **Fixed:** Keep server chunks under 4 MB and the inline boot scripts in one module.
+- **Fixed:** Bound the chunk syntax-tree cache so a large site's build memory stops growing with it.
+- **Fixed:** Cap only the server modules several entries share, so each entry keeps its own code.
+- **Fixed:** Keep <noscript> text after a swap.
+- **Faster:** Spell each module id once instead of resolving its links per call.
+- **Faster:** Read one source's symbol claims without scanning every owner in the build.
+- **Faster:** Resolve the generated init export renames once per bundle, not once per chunk.
+- **Faster:** Keep the short-export-names and lazy-facade passes linear in the chunk count.
+- **Faster:** Walk each distinct control closure once per route and list single-route handlers once.
+
+### @markless/compiler
+
+- **Fixed:** Return a fragment when a component's markup is one top-level construct.
+- **Fixed:** A quoted, hyphenated prop key destructures the prop it names.
+- **Fixed:** Bare block roots, fragment roots with components, body consts in @if arms.
+- **Fixed:** Keep an @if arm's expressions inside its guard.
+- **Faster:** Stop rescanning a module per lookup in three semantic-graph and render passes.
+- **Faster:** Keep a build's compiles memoized instead of re-running evicted ones.
+
+### @markless/vitest-browser
+
+- **Fixed:** RenderSSR on a warm Vitest module cache no longer hangs.
+
+### @markless/web
+
+- **Faster:** A runtime an onIdle or onVisible handler starts leaves its rows' code until the reader acts.
+- **Fixed:** A childless widget root of an element()-only family mints its own ids on CSR.
+- **Fixed:** A roster position one component down finds its own member.
+- **Fixed:** A roster position inside an island asks under the island's host scope.
+
+### Other changes
+
+- **Fixed:** The virtual reader drops an announcement it queued before it stopped.
+- **Fixed:** Docs:errors:check runs the website's error catalogue check.
+- **Fixed:** A page that stops answering fails its assertion instead of hanging the box.
+
+[All 78 commits since v0.8.0](https://github.com/compiled-run/markless/compare/v0.8.0...v0.9.0)
+
 ## 0.8.0
 
 ### Breaking changes
