@@ -13,6 +13,7 @@ import {
 	transformTsrxModule,
 } from '../src/rolldown.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../src/execution-log.ts';
+import { readExecutionDemandAsset } from '../src/build/execution-demand.ts';
 import { UNSHIPPED_HOOK_REASON } from '../src/build/execution-sizes.ts';
 import { verifyGeneratedSymbolTableRoutes } from '../src/build/symbol-table.ts';
 import { moduleIdFor } from '../src/module-id.ts';
@@ -203,7 +204,8 @@ describe('TSRX Rolldown plugin structure', () => {
 			),
 		);
 		const plugin = marklessServer();
-		const importPattern = /import \{[^}]*\} from ["'](virtual:markless:inline-sources-[^"']+)["'];/;
+		const importPattern =
+			/import \{[^}]*\} from ["'](virtual:markless:inline-sources-[^"']+)["'];/;
 		const ids = results.map((result) => importPattern.exec(result.code)?.[1]);
 		expect(ids[0]).toBeDefined();
 		expect(ids[1]).toBe(ids[0]);
@@ -394,11 +396,18 @@ describe('TSRX Rolldown plugin structure', () => {
 				chunk.moduleIds.some((id) => normalizeModuleId(id) === filename),
 			),
 		).toBe(false);
-		const demandSources = Object.keys(JSON.parse(String(demandAsset?.source)));
+		const demand = readExecutionDemandAsset(String(demandAsset?.source));
+		const demandSources = Object.keys(demand);
 		// Asset keys are root-relative, so the build carries no checkout path.
 		expect(demandSources).toContain('pages/harbor.tsrx?markless-symbols');
 		expect(demandSources).toContain('pages/harbor.tsrx?markless-render-data');
 		expect(demandSources).not.toContain('pages/harbor.tsrx');
+		// One page's requests share its map; the asset writes it once (it grew 3x per page on ui.shadcn.com).
+		expect(demand['pages/harbor.tsrx?markless-render-data']).toEqual(
+			demand['pages/harbor.tsrx?markless-symbols'],
+		);
+		const stored = JSON.parse(String(demandAsset?.source)) as { maps: unknown[] };
+		expect(stored.maps.length).toBeLessThan(demandSources.length);
 		expect(JSON.parse(String(graphAsset?.source))).toEqual(
 			expect.arrayContaining(['symbol:0', 'symbol:5']),
 		);

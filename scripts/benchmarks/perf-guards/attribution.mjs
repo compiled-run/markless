@@ -6,6 +6,7 @@ import {
 	MARKLESS_EXECUTION_DEMAND,
 } from '../../../packages/bundler/src/build/chunking.ts';
 import { marklessBuildManifestPath } from '../../../packages/bundler/src/build/build-manifests.ts';
+import { readExecutionDemandAsset } from '../../../packages/bundler/src/build/execution-demand.ts';
 import { CARRIES_UNLISTED_RECORDS } from '../../../packages/bundler/src/build/undemanded-runtime.ts';
 import { RUNTIME_CAPABILITY_MODULE_IDS } from '../../../packages/compiler/src/passes/runtime-demand-map.ts';
 
@@ -19,7 +20,10 @@ export function readBuildJson(publicDir, asset) {
 }
 
 export const readAttribution = (publicDir) => readBuildJson(publicDir, MARKLESS_BYTE_ATTRIBUTION);
-export const readDemand = (publicDir) => readBuildJson(publicDir, MARKLESS_EXECUTION_DEMAND);
+export const readDemand = (publicDir) => {
+	const file = marklessBuildManifestPath(publicDir, MARKLESS_EXECUTION_DEMAND);
+	return existsSync(file) ? readExecutionDemandAsset(readFileSync(file, 'utf8')) : null;
+};
 
 const chunkKey = (pathname, base) => {
 	const prefix = `${base}${MARKLESS_BUILD_PREFIX}`;
