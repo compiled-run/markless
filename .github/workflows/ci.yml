@@ -1738,7 +1738,27 @@ jobs:
             - name: Install Markless benchmark fixture
               run: pnpm bench:jsfb:prepare -- --jsfb-root "$JSFB_ROOT"
 
+            # Both sides build the same fixture, so byte-identical output means no benchmark can measure
+            # a change, and timing it anyway measures only the runner: the guard went red at up to 121%
+            # on commits whose built app was identical to the baseline's.
+            - name: Compare the built benchmark app with the baseline's
+              id: bundle
+              working-directory: ${{ env.JSFB_ROOT }}
+              run: |
+                  set -euo pipefail
+                  mkdir -p "$MARKLESS_CI_TEMP/markless-jsfb"
+                  digest() {
+                    MARKLESS_REPO_ROOT="$1" node --input-type=module -e "import { rebuildFrameworks } from './cli/rebuild-build-single.js'; if (!rebuildFrameworks(['keyed/markless'], true)) process.exit(1);" >&2
+                    node "$MARKLESS_REPO_ROOT/scripts/benchmarks/jsfb-bundle-digest.mjs" digest frameworks/keyed/markless/dist "$1"
+                  }
+                  digest "$MARKLESS_BASE_REPO_ROOT" > "$RUNNER_TEMP/bundle-baseline.json"
+                  digest "$MARKLESS_REPO_ROOT" > "$RUNNER_TEMP/bundle-current.json"
+                  node "$MARKLESS_REPO_ROOT/scripts/benchmarks/jsfb-bundle-digest.mjs" compare \
+                    "$RUNNER_TEMP/bundle-baseline.json" "$RUNNER_TEMP/bundle-current.json" |
+                    tee "$MARKLESS_CI_TEMP/markless-jsfb/bundle-${{ matrix.shard }}.txt"
+
             - name: Start JS Framework Benchmark server
+              if: steps.bundle.outputs.identical != 'true'
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
                   npm start > "$JSFB_SERVER_LOG" 2>&1 &
@@ -1755,6 +1775,7 @@ jobs:
             # of each guard ratio see the same runner speed; separated passes
             # drift several percent on hosted runners and flake the guard.
             - name: Run interleaved baseline/current benchmark pairs
+              if: steps.bundle.outputs.identical != 'true'
               working-directory: ${{ env.JSFB_ROOT }}
               run: |
                   set -o pipefail
@@ -1802,6 +1823,7 @@ jobs:
                       ${{ env.MARKLESS_JSFB_BASELINE_TRACES }}
                       ${{ env.MARKLESS_JSFB_TRACES }}
                       ${{ env.JSFB_SERVER_LOG }}
+                      ${{ env.MARKLESS_CI_TEMP }}/markless-jsfb/bundle-*.txt
 
     benchmark-guard:
         needs: [changes, benchmark]
@@ -1827,5 +1849,23 @@ jobs:
                   merge-multiple: true
                   path: .jsfb-merged
 
+            - name: Pass when every shard built the same app as the baseline
+              id: bundle
+              run: |
+                  set -euo pipefail
+                  verdicts="$( (cat .jsfb-merged/markless-jsfb/bundle-*.txt 2>/dev/null || true) | grep -E '^identical=' | sort | uniq -c || true)"
+                  echo "shard verdicts: ${verdicts:-none}"
+                  identical=false
+                  if printf '%s' "$verdicts" | grep -q 'identical=true'; then
+                    if printf '%s' "$verdicts" | grep -q 'identical=false'; then
+                      echo "::error::The benchmark shards disagree on whether the app changed, so its build is not deterministic: ${verdicts}"
+                      exit 1
+                    fi
+                    identical=true
+                    echo "::notice::Every benchmark shard built an app byte-identical to the baseline's, so there is no change to measure."
+                  fi
+                  echo "identical=${identical}" >> "$GITHUB_OUTPUT"
+
             - name: Compare benchmark results against baseline
+              if: steps.bundle.outputs.identical != 'true'
               run: node scripts/benchmarks/jsfb-baseline.mjs compare

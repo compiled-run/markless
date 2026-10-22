@@ -34,6 +34,50 @@ describe('CI benchmark workflow', () => {
 		expect(workflow).not.toContain('- name: Install current Markless benchmark fixture');
 	});
 
+	test('timing is skipped, and the guard passes, only when every shard built an app byte-identical to the baseline', async () => {
+		const workflow = parse(await readFile(workflowPath, 'utf8')) as {
+			jobs: Record<
+				string,
+				{
+					steps: Array<{
+						name?: string;
+						id?: string;
+						if?: string;
+						run?: string;
+						with?: Record<string, string>;
+					}>;
+				}
+			>;
+		};
+		const { benchmark, 'benchmark-guard': guard } = workflow.jobs;
+		const names = benchmark!.steps.map((step) => step.name);
+		const compare = benchmark!.steps.find((step) => step.id === 'bundle')!;
+		expect(names.indexOf(compare.name)).toBeGreaterThan(
+			names.indexOf('Install Markless benchmark fixture'),
+		);
+		expect(compare.run).toContain('digest "$MARKLESS_BASE_REPO_ROOT"');
+		expect(compare.run).toContain('digest "$MARKLESS_REPO_ROOT"');
+		expect(compare.run).toContain('jsfb-bundle-digest.mjs" compare');
+		for (const timed of [
+			'Start JS Framework Benchmark server',
+			'Run interleaved baseline/current benchmark pairs',
+		]) {
+			const step = benchmark!.steps.find((candidate) => candidate.name === timed)!;
+			expect(step.if).toBe("steps.bundle.outputs.identical != 'true'");
+			expect(names.indexOf(timed)).toBeGreaterThan(names.indexOf(compare.name));
+		}
+		expect(
+			benchmark!.steps.find((step) => step.name === 'Upload JSFB shard results')!.with!.path,
+		).toContain('/markless-jsfb/bundle-*.txt');
+		const verdict = guard!.steps.find((step) => step.id === 'bundle')!;
+		expect(verdict.run).toContain("grep -q 'identical=false'");
+		expect(verdict.run).toContain('exit 1');
+		expect(
+			guard!.steps.find((step) => step.name === 'Compare benchmark results against baseline')!
+				.if,
+		).toBe("steps.bundle.outputs.identical != 'true'");
+	});
+
 	test('a push to main benchmarks against the last main commit whose CI passed, the same base the skip decision used', async () => {
 		const workflow = parse(await readFile(workflowPath, 'utf8')) as {
 			jobs: Record<
