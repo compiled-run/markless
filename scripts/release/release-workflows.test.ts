@@ -100,7 +100,9 @@ describe('release.yml mode=cut', () => {
 		expect(ci.indexOf('"pull_request ${SHA} release/${TAG}"')).toBeLessThan(
 			ci.indexOf('/approve"'),
 		);
-		expect(ci).toContain('gh run watch "$run_id" --exit-status');
+		// The run's own verdict includes jobs main does not require; the next step reads the required ones.
+		expect(ci).toContain('gh run watch "$run_id" --interval 30');
+		expect(ci).not.toContain('--exit-status');
 		expect(step(cut, order[3]!).run).toBe(
 			'node scripts/release/required-checks.mjs --sha "$SHA"',
 		);
@@ -169,8 +171,33 @@ describe('release.yml mode=cut', () => {
 		);
 		expect(release.steps[0]!.with!.ref).toBe('${{ needs.cut.outputs.tag || github.ref }}');
 		expect(announce.needs).toEqual(['cut', 'release']);
-		expect(announce.if).toBe("inputs.mode == 'cut' && needs.release.result == 'success'");
-		expect(step(announce, 'Create the GitHub Release').run).toContain('--latest --verify-tag');
+		expect(announce.if).toBe(
+			"always() && needs.release.result == 'success' && (inputs.mode == 'cut' || inputs.mode == 'publish')",
+		);
+		expect(step(announce, 'Create the GitHub Release').run).toContain('"$latest" --verify-tag');
+	});
+
+	test('a publish-mode recovery gets its GitHub Release from the tag it published', () => {
+		expect(announce.env!.TAG).toBe(
+			"${{ needs.cut.outputs.tag || format('v{0}', inputs.version) }}",
+		);
+		const checkout = announce.steps.find(
+			(candidate) => candidate.uses === 'actions/checkout@v4',
+		)!;
+		expect(checkout.if).toBe("inputs.mode == 'publish'");
+		expect(checkout.with!.ref).toBe("${{ format('refs/tags/v{0}', inputs.version) }}");
+		const notes = step(announce, "Take the release notes from the tag's CHANGELOG.md");
+		expect(notes.if).toBe("inputs.mode == 'publish'");
+		expect(notes.run).toBe(
+			'node scripts/release/changelog-section.mjs "${TAG#v}" "$RUNNER_TEMP/release-notes.md"',
+		);
+		expect(names(announce).indexOf(notes.name)).toBeLessThan(
+			names(announce).indexOf('Create the GitHub Release'),
+		);
+		expect(
+			announce.steps.find((candidate) => candidate.uses === 'actions/download-artifact@v4')!
+				.if,
+		).toBe("inputs.mode == 'cut'");
 	});
 });
 

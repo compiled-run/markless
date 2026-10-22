@@ -259,8 +259,11 @@ jobs:
                     echo "Approved CI run ${run_id}: it waited for approval because this workflow's token opened ${pr}"
                   fi
                   echo "Watching CI run ${run_id} on ${SHA}"
-                  gh run watch "$run_id" --exit-status --interval 30
+                  gh run watch "$run_id" --interval 30 >/dev/null
+                  echo "CI run ${run_id} ended $(gh run view "$run_id" --json conclusion --jq .conclusion); the next step decides on the checks main requires"
 
+            # The same checks main's ruleset requires for any merge: a job outside them (the npm-installing
+            # package-manager-matrix timed out on the 0.9.0 release commit) does not block a release either.
             - name: Require every check main's protection names on the release commit
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true' && steps.inherit.outputs.inherited != 'true'
               env:
@@ -322,10 +325,13 @@ jobs:
                     git push origin --delete "release/${TAG}"
                   fi
 
-    # Runs after `release` has published the tag the cut pushed.
+    # Runs after `release` has published the tag the cut pushed, or the tag a publish-mode recovery
+    # published, so a recovered release gets its GitHub Release too.
     announce:
         needs: [cut, release]
-        if: inputs.mode == 'cut' && needs.release.result == 'success'
+        if: >-
+            always() && needs.release.result == 'success' &&
+            (inputs.mode == 'cut' || inputs.mode == 'publish')
         runs-on: ubuntu-latest
         timeout-minutes: 10
         permissions:
@@ -334,12 +340,24 @@ jobs:
             actions: read
         env:
             GH_TOKEN: ${{ github.token }}
-            TAG: ${{ needs.cut.outputs.tag }}
+            TAG: ${{ needs.cut.outputs.tag || format('v{0}', inputs.version) }}
+            DIST_TAG: ${{ inputs.dist_tag }}
         steps:
             - uses: actions/download-artifact@v4
+              if: inputs.mode == 'cut'
               with:
                   name: release-notes
                   path: ${{ runner.temp }}
+
+            - uses: actions/checkout@v4
+              if: inputs.mode == 'publish'
+              with:
+                  ref: ${{ format('refs/tags/v{0}', inputs.version) }}
+                  persist-credentials: false
+
+            - name: Take the release notes from the tag's CHANGELOG.md
+              if: inputs.mode == 'publish'
+              run: node scripts/release/changelog-section.mjs "${TAG#v}" "$RUNNER_TEMP/release-notes.md"
 
             - name: Link the ecosystem CI run in the release notes
               if: needs.cut.outputs.ecosystem_run != ''
@@ -364,8 +382,11 @@ jobs:
                   if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
                     echo "GitHub Release ${TAG} already exists."
                   else
+                    # Latest on GitHub only when npm's latest dist-tag moved too.
+                    latest=--latest
+                    if [ -n "$DIST_TAG" ] && [ "$DIST_TAG" != latest ]; then latest=--latest=false; fi
                     gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" \
-                      --notes-file "$RUNNER_TEMP/release-notes.md" --latest --verify-tag
+                      --notes-file "$RUNNER_TEMP/release-notes.md" "$latest" --verify-tag
                   fi
 
     # The only job that can publish. It must stay the last job in this file: its

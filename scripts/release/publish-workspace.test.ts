@@ -10,7 +10,15 @@ import { releasePackages, rootVersion } from './release-packages.mjs';
 const publishCli = fileURLToPath(new URL('./publish-workspace.mjs', import.meta.url));
 const version = rootVersion() as string;
 
-type Upload = 'ok' | 'staged' | 'unauthorized' | 'exists' | 'broken';
+type Upload =
+	| 'ok'
+	| 'staged'
+	| 'unauthorized'
+	| 'notFound'
+	| 'unavailable'
+	| 'tooMany'
+	| 'exists'
+	| 'broken';
 type View = 'missing' | 'visible';
 type Script = { readonly upload?: readonly Upload[]; readonly view?: readonly View[] };
 
@@ -26,6 +34,18 @@ const uploadAnswers: Record<Upload, { readonly status: number; readonly stderr: 
 	unauthorized: {
 		status: 1,
 		stderr: 'npm error code E401\nnpm error 401 Unauthorized - PUT https://registry.npmjs.org/NAME - Failed to generate Web Auth URLs due to error: BadRequestError: token is invalid\n',
+	},
+	notFound: {
+		status: 1,
+		stderr: "npm error code E404\nnpm error 404 Not Found - PUT https://registry.npmjs.org/NAME - Not found\nnpm error 404  The requested resource 'NAME' could not be found or you do not have permission to access it.\n",
+	},
+	unavailable: {
+		status: 1,
+		stderr: 'npm error code E503\nnpm error 503 Service Unavailable - PUT https://registry.npmjs.org/NAME - Service Unavailable\n',
+	},
+	tooMany: {
+		status: 1,
+		stderr: 'npm error code E429\nnpm error 429 Too Many Requests - PUT https://registry.npmjs.org/NAME\n',
 	},
 	exists: {
 		status: 1,
@@ -97,6 +117,7 @@ async function runPublish(fakeDirectory: string, deadlineMs = 10_000) {
 			MARKLESS_REGISTRY_DEADLINE_MS: String(deadlineMs),
 			MARKLESS_REGISTRY_FIRST_DELAY_MS: '20',
 			MARKLESS_REGISTRY_MAX_DELAY_MS: '40',
+			MARKLESS_PUBLISH_RETRY_DELAY_MS: '10',
 		},
 	});
 	const calls = (await readFile(join(fakeDirectory, 'calls.log'), 'utf8')).trim().split('\n');
@@ -141,20 +162,37 @@ test('a package the registry shows is skipped without an upload', async () => {
 	expect(result.stdout).toContain(`${first}@${version} already on the registry — skipping.`);
 });
 
-test('one E401 is retried once, and the retry publishes', async () => {
+test('an E401 is retried with a fresh OIDC exchange, and the retry publishes', async () => {
 	const fake = await fakeTools({ [second]: { upload: ['unauthorized', 'ok'] } });
 	const result = await runPublish(fake);
 	expect(result.exitCode).toBe(0);
 	expect(result.uploads(second)).toBe(2);
 	expect(result.stdout).toContain(
-		`${second}@${version} got E401 from the registry; retrying once with a fresh OIDC exchange.`,
+		`${second}@${version} got E401 or E404 from the registry; retrying in 0 s with a fresh OIDC exchange (attempt 2 of 4).`,
+	);
+});
+
+test('the answers 0.9.0 got, E503, E429 and E404 on a PUT, are retried within the run', async () => {
+	const fake = await fakeTools({
+		[first]: { upload: ['unavailable', 'ok'] },
+		[second]: { upload: ['tooMany', 'unavailable', 'ok'] },
+		[third]: { upload: ['notFound', 'unauthorized', 'ok'] },
+	});
+	const result = await runPublish(fake);
+	expect(result.stderr).not.toContain('publish-workspace:');
+	expect(result.exitCode).toBe(0);
+	expect([result.uploads(first), result.uploads(second), result.uploads(third)]).toEqual([
+		2, 3, 3,
+	]);
+	expect(result.stdout).toContain(
+		`${second}@${version} got a busy or unavailable answer from the registry; retrying in 0 s with a fresh OIDC exchange (attempt 3 of 4).`,
 	);
 });
 
 test('an E401 whose upload went through is finished by the retry seeing it staged or published', async () => {
 	const fake = await fakeTools({
-		[first]: { upload: ['unauthorized', 'staged'], view: ['missing', 'visible'] },
-		[second]: { upload: ['unauthorized', 'exists'], view: ['missing', 'visible'] },
+		[first]: { upload: ['unauthorized', 'staged'], view: ['missing', 'missing', 'visible'] },
+		[second]: { upload: ['unauthorized', 'exists'], view: ['missing', 'missing', 'visible'] },
 	});
 	const result = await runPublish(fake);
 	expect(result.exitCode).toBe(0);
@@ -162,11 +200,21 @@ test('an E401 whose upload went through is finished by the retry seeing it stage
 	expect(result.uploads(second)).toBe(2);
 });
 
-test('a second E401 stops the run before the next package', async () => {
-	const fake = await fakeTools({ [second]: { upload: ['unauthorized', 'unauthorized'] } });
+test('a failed answer for an upload npm shows before the retry is not uploaded again', async () => {
+	const fake = await fakeTools({
+		[first]: { upload: ['unavailable'], view: ['missing', 'visible'] },
+	});
+	const result = await runPublish(fake);
+	expect(result.exitCode).toBe(0);
+	expect(result.uploads(first)).toBe(1);
+	expect(result.stdout).toContain(`${first}@${version} reached the registry after all.`);
+});
+
+test('an E401 on every attempt stops the run before the next package', async () => {
+	const fake = await fakeTools({ [second]: { upload: ['unauthorized'] } });
 	const result = await runPublish(fake);
 	expect(result.exitCode).toBe(1);
-	expect(result.uploads(second)).toBe(2);
+	expect(result.uploads(second)).toBe(4);
 	expect(result.uploads(third)).toBe(0);
 	expect(result.stderr).toContain(`${second}@${version} failed with exit code 1. Stopping here`);
 });

@@ -196,6 +196,25 @@ describe('release cut helpers', () => {
 	});
 });
 
+test('changelog-section.mjs writes the section a publish-mode GitHub Release carries', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'markless-section-'));
+	await writeFile(join(directory, 'CHANGELOG.md'), CHANGELOG);
+	const cli = fileURLToPath(new URL('./changelog-section.mjs', import.meta.url));
+	const out = join(directory, 'notes.md');
+	const written = spawnSync(process.execPath, [cli, '1.1.0', out], {
+		cwd: directory,
+		encoding: 'utf8',
+	});
+	expect(written.status).toBe(0);
+	expect(await readFile(out, 'utf8')).toBe('### @example/a\n\n- **New:** A thing.\n');
+	const missing = spawnSync(process.execPath, [cli, '9.9.0', out], {
+		cwd: directory,
+		encoding: 'utf8',
+	});
+	expect(missing.status).toBe(1);
+	expect(missing.stderr).toContain('CHANGELOG.md has no "## 9.9.0" section');
+});
+
 describe('release cut command', () => {
 	test('there is no patch or major option', () => {
 		const result = spawnSync(process.execPath, [cutCli, '--patch'], {

@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { sectionBody } from './changelog-section.mjs';
 import { repoRoot, rootVersion } from './release-packages.mjs';
 import {
 	checkRunProblems,
@@ -94,14 +95,11 @@ export function insertChangelogSection(changelog, section) {
 
 /** The released section for `version` out of CHANGELOG.md, heading excluded. */
 export function changelogSectionBody(changelog, version) {
-	const lines = changelog.split('\n');
-	const start = lines.findIndex((line) => line.trim() === `## ${version}`);
-	if (start === -1) throw new CutError(`CHANGELOG.md has no "## ${version}" section`);
-	const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
-	return `${lines
-		.slice(start + 1, end === -1 ? undefined : end)
-		.join('\n')
-		.trim()}\n`;
+	try {
+		return sectionBody(changelog, version);
+	} catch (error) {
+		throw new CutError(error.message);
+	}
 }
 
 function run(command, args, { cwd, env } = {}) {
