@@ -4,8 +4,7 @@ import MugSpot from '../components/mascot/mug-spot.tsrx';
 export default function NotFound() @{
 	<div>
 		<Sidebar pathname="/" />
-		<MugSpot mood="confused">
-			<h1>Not found</h1>
-		</MugSpot>
+		<h1>Not found</h1>
+		<MugSpot mood="confused" at="bottom" />
 	</div>
 }

@@ -3195,7 +3195,8 @@ try {
 		const spot = page.locator('.docs-mug');
 		check(
 			(await spot.count()) === 1 &&
-				(await spot.locator('[aria-hidden="true"] svg[data-variant="spot"]').count()) === 1 &&
+				(await spot.getAttribute('aria-hidden')) === 'true' &&
+				(await spot.locator('svg[data-variant="spot"]').count()) === 1 &&
 				(await spot.locator('button, a').count()) === 0,
 			'a docs page shows one hidden-from-screen-readers mug spot with no click target',
 		);

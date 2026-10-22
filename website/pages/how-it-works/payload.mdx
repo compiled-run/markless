@@ -76,16 +76,14 @@ Values must be data. `@markless/serializer` refuses a function with
 
 I built the same component with `<p>Count {count}</p>` and no handler. Here is the whole response:
 
+<MugSpot mood="proud" from="left" />
+
 ```html
 <div data-async-container><p>Count 0</p></div>
 ```
 
-<MugSpot mood="proud">
-
 No state script, no view script, no inline resumer. If nothing on the page can react, the browser
 has nothing to wake up.
-
-</MugSpot>
 
 Prerendered pages are different again. They leave both records out, and the resume module rebuilds
 them in the browser. Prerendering is a preview, so this page does not cover it further.

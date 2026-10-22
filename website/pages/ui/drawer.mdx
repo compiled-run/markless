@@ -18,13 +18,9 @@ Press **Change day** to open the sheet. Pick a day, press Escape, or drag the sh
 A drawer is a dialog that slides in from one edge of the screen. A person can swipe it back out.
 Use it for a bottom sheet on a phone, or a side panel of filters or settings.
 
-<MugSpot mood="shy">
-
 While the drawer is open, the page behind it is out of reach. A click, Tab or a screen reader
 cannot get to it, and it does not scroll. Escape, a press on the backdrop, a swipe or
 `drawer.close` puts the drawer away. Then focus goes back to the trigger.
-
-</MugSpot>
 
 ## Anatomy
 
@@ -43,6 +39,8 @@ explains.
 A drawer comes up from the bottom by default. Set `orientation` to `horizontal` for a side panel.
 Add `start` to bring it from the other edge. Both follow the page's direction, so a right-to-left
 page gets the mirrored side with no extra prop.
+
+<MugSpot mood="shy" at="eyes" react="duck" />
 
 ```tsrx
 <drawer.root orientation="horizontal" start>

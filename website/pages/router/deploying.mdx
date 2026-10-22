@@ -23,17 +23,15 @@ and a preset picks the host. Your files stay the same. Only the output folder ch
 
 ## The default: a Node server
 
+<MugSpot mood="cheers" />
+
 ```bash
 npm run build
 PORT=3000 node .output/server/index.mjs
 ```
 
-<MugSpot mood="cheers">
-
 The build runs three steps: the browser build, the server build, then Nitro. By default, Nitro
 builds a Node server. The server reads the port from the `PORT` variable.
-
-</MugSpot>
 
 To try the build on your own machine, run `npm run preview`.
 
