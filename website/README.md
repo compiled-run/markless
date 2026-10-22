@@ -141,10 +141,10 @@ screenshots into the markless repo's goal notes.
   Stickers are die-cut, with their own white border and shadow, so they carry depth and one file
   reads on both grounds; they are the larger accents — the landing hero, a callout corner, the
   footer strip — while sprites stay small and inline.
-- `components/docs/like-heart.tsrx` — the mug under the "On this page" rail, a `MugArt` inside a
-  button labelled "Say hello to the mug". Each click plays the mug's reaction. The click count is a
-  `state()` and resets on reload. The mug's face, glaze, pour, coaster and companion are `storage()`
-  bindings, so they keep the reader's choices.
+- `components/mascot/mug-spot.tsrx`: the mug tucked into a few pages, each spot with its own fixed
+  face or pose that fits the text beside it. At most one per page. It wears the glaze, pour, coaster
+  and companion the reader picked on `/mascot`: a tiny inline script copies them from
+  `localStorage` onto `<html>` before the mug paints, so the page ships no other JavaScript for it.
 - `tooling/` — build-time code. `highlight-mdx.ts` is a Vite plugin registered after `router()`;
   `highlight-code.ts` runs shiki; `tsrx-docs.ts` holds the one-sentence explanation of each TSRX
   token; `tsrx.tmLanguage.json` is the TSRX TextMate grammar. It is not called `plugins/` because

@@ -1367,27 +1367,7 @@ html.dark .prose .torn-strip {
 	translate: 0 -0.25rem;
 }
 
-@media (min-width: 70.01rem) {
-	@supports (position-anchor: --on-this-page) {
-		.on-this-page {
-			anchor-name: --on-this-page;
-			max-height: calc(100vh - var(--header-height) - 2 * var(--space-s) - 12rem);
-		}
-	}
-}
-
-.like-burst-piece .sprite-ink-light {
-	display: var(--sprite-light);
-}
-
-.like-burst-piece .sprite-ink-dark {
-	display: var(--sprite-dark);
-}
-
 @media (prefers-reduced-motion: reduce) {
-	.like-heart-image,
-	.like-burst-piece,
-	.like-heart-plus,
 	.pager-doodles .sticker {
 		transition-duration: 1ms;
 	}

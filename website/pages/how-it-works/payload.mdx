@@ -2,8 +2,8 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
 import PayloadCard from '../../components/sketch/how/payload-card.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -80,12 +80,14 @@ I built the same component with `<p>Count {count}</p>` and no handler. Here is t
 <div data-async-container><p>Count 0</p></div>
 ```
 
+<MugSpot mood="proud">
+
 No state script, no view script, no inline resumer. If nothing on the page can react, the browser
 has nothing to wake up.
+
+</MugSpot>
 
 Prerendered pages are different again. They leave both records out, and the resume module rebuilds
 them in the browser. Prerendering is a preview, so this page does not cover it further.
 
 Next: [what happens on the first click](/how-it-works/resuming).
-
-<LikeHeart />

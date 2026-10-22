@@ -2,8 +2,8 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
 import BuildTargets from '../../components/sketch/router/build-targets.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -28,8 +28,12 @@ npm run build
 PORT=3000 node .output/server/index.mjs
 ```
 
+<MugSpot mood="cheers">
+
 The build runs three steps: the browser build, the server build, then Nitro. By default, Nitro
 builds a Node server. The server reads the port from the `PORT` variable.
+
+</MugSpot>
 
 To try the build on your own machine, run `npm run preview`.
 
@@ -127,5 +131,3 @@ Build your app twice: once with no preset, once with `NITRO_PRESET=vercel`. Comp
 `.vercel/output/`. Your own files did not change between the two builds.
 
 Back to the start of this section: [make a file, get a URL](/router/pages).
-
-<LikeHeart />

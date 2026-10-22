@@ -147,7 +147,6 @@ export default function MugStudio() @{
 				<div class="drawing">
 					<MugArt
 						variant="studio"
-						reaction="rest"
 						mood={mood}
 						face={validFace}
 						glaze={validGlaze}

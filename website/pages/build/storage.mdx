@@ -3,7 +3,7 @@ import DrinkPick from '../../components/demos/build/drink-pick.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -28,8 +28,12 @@ One click changed three things: the highlighted button, the saved value in `loca
 `data-docs-drink` attribute on `<html>`. The Watch line shows the attribute. Now click **Reload
 page**. Your pick keeps its highlight.
 
+<MugSpot mood="wink">
+
 The first argument is the `localStorage` key. The second is the starting value, for a reader who
 has not picked yet. With the key `docs-drink`, `<html>` gets `data-docs-drink`.
+
+</MugSpot>
 
 The highlight is plain CSS that reads that attribute. The demo uses a rule like this one for each
 drink:
@@ -101,5 +105,3 @@ Copy the `DrinkPick` code into your own app. Add a **Water** button with the cla
 highlight rule of its own. Pick water, then reload the page.
 
 Next: [share state between components](/build/shared).
-
-<LikeHeart />

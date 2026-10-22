@@ -75,7 +75,6 @@ export default function CounterSketch() @{
 					companion="off"
 					paused="false"
 					interacted={clicks > 0 ? 'true' : 'false'}
-					reaction="rest"
 				/>
 			</div>
 

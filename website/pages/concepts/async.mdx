@@ -3,7 +3,7 @@ import AsyncSketch from '../../components/sketch/concepts/async-sketch.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -102,8 +102,12 @@ away, waits before it answers anything else, and fails for a mug it does not kno
 
 `@catch` holds what you show when the recipe throws or its promise rejects.
 
+<MugSpot mood="brew">
+
 `@pending` holds what you show while there is no answer yet. If a new answer takes a while, it can
 show again.
+
+</MugSpot>
 
 <Callout
 	sprite="cross"
@@ -118,5 +122,3 @@ the first `await` tell Markless when to run the recipe again. A state read after
 build with `MARKLESS_ASYNC_POST_AWAIT_READ`.
 
 Next: [two components that both call something .card](/concepts/styling).
-
-<LikeHeart />

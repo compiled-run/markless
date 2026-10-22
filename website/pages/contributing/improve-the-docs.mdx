@@ -3,7 +3,6 @@ import TypoCountDemo from '../../components/demos/contributing/typo-count-demo.t
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 <Sidebar />
 
@@ -45,14 +44,13 @@ PORT=4310 node website/.output/server/index.mjs
 
 ## The shape of a page
 
-Each page is an `.mdx` file. The top imports the components it uses. Then come the sidebar, one `H1`, the meta line and the theme toggle. The prose follows, and the like heart closes the page.
+Each page is an `.mdx` file. The top imports the components it uses. Then come the sidebar, one `H1`, the meta line and the theme toggle. The prose follows.
 
 ```txt
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
 
 <Sidebar />
 
@@ -63,8 +61,6 @@ import LikeHeart from '../../components/docs/like-heart.tsrx';
 <ThemeToggle />
 
 Prose, demos and callouts go here.
-
-<LikeHeart />
 ```
 
 `PageMeta` takes three props. `assumes` lists keys from the `concepts` map in `nav.ts`. `sprite` names a file in `public/sprites/`. `time` comes from a formula, not a guess. `website/README.md` has it, so recompute it when you rewrite a page.
@@ -191,5 +187,3 @@ pnpm docs:build                   # the production build
 Then serve the build and open each page you changed. Look at it in the light and the dark theme, on a wide window and on a phone-sized one. Click every demo.
 
 Next: [every Markless package](/reference).
-
-<LikeHeart />

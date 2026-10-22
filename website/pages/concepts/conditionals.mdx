@@ -3,7 +3,7 @@ import ConditionalsSketch from '../../components/sketch/concepts/conditionals-sk
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -74,9 +74,13 @@ it reads `note` too.
 Move `let note = state('');` inside the `@if`, and the build stops with
 `MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The message reads: state() creates "note" inside a branch.
 
+<MugSpot mood="sad">
+
 Picture that note if the build let it through. It leaves the page with the branch. Opening the
 panel again creates a new, empty note. Markless stops the build instead of shipping that bug. The same
 run can list other errors on the same lines. They go away with the first one.
+
+</MugSpot>
 
 **Where you declare a value decides how long it lives.** The component body lasts as long as the
 component. A branch lasts as long as its test is true.
@@ -125,5 +129,3 @@ this is the fix.
 />
 
 Next: [rows that keep their own state when the list moves](/concepts/lists).
-
-<LikeHeart />

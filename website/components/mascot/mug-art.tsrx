@@ -8,7 +8,6 @@ export default function MugArt({
 	companion,
 	paused,
 	interacted,
-	reaction,
 }: {
 	variant: string;
 	mood: string;
@@ -19,7 +18,6 @@ export default function MugArt({
 	companion: string;
 	paused: string;
 	interacted: string;
-	reaction: string;
 }) @{
 	<svg
 		class="mug"
@@ -34,7 +32,6 @@ export default function MugArt({
 		data-companion={companion}
 		data-paused={paused}
 		data-interacted={interacted}
-		data-reaction={reaction}
 		role="img"
 		aria-label="The Markless mug"
 	>
@@ -792,26 +789,31 @@ export default function MugArt({
 .mug[data-state='idle'] .eye-r { html[data-mascot-expression='sleepy'] & { transform:translate(136px,156px) rotate(8deg) scale(1,0.17); } }
 
 .mug[data-variant='toc'] { width:10rem; height:10rem; }
+/* A docs spot's mood can also name a studio face. */
+.mug[data-variant='spot']:is([data-state='confused'],[data-state='curious'],[data-state='scared'],[data-state='proud'],[data-state='angry'],[data-state='shy'],[data-state='sad'],[data-state='excited'],[data-state='laughing']) .blink { animation:blink 7s linear infinite; }
+.mug[data-variant='spot'][data-state='confused'] .eye-l { transform:translate(100px,141px) rotate(-28deg) scale(0.88,0.95); }
+.mug[data-variant='spot'][data-state='confused'] .eye-r { transform:translate(136px,154px) rotate(22deg) scale(0.88,0.6); }
+.mug[data-variant='spot'][data-state='curious'] .eye-l { transform:translate(103px,142px) rotate(-18deg) scale(1,1.1); }
+.mug[data-variant='spot'][data-state='curious'] .eye-r { transform:translate(139px,147px) rotate(-18deg) scale(0.7,0.78); }
+.mug[data-variant='spot'][data-state='scared'] .eye-l { transform:translate(96px,155px) rotate(-7deg) scale(1.15,1.4); }
+.mug[data-variant='spot'][data-state='scared'] .eye-r { transform:translate(140px,155px) rotate(7deg) scale(1.15,1.4); }
+.mug[data-variant='spot'][data-state='proud'] .eye-l { transform:translate(100px,138px) rotate(-14deg) scale(1,0.3); }
+.mug[data-variant='spot'][data-state='proud'] .eye-r { transform:translate(136px,138px) rotate(14deg) scale(1,0.3); }
+.mug[data-variant='spot'][data-state='angry'] .eye-l { transform:translate(100px,146px) rotate(30deg) scale(1.05,0.58); }
+.mug[data-variant='spot'][data-state='angry'] .eye-r { transform:translate(136px,146px) rotate(-30deg) scale(1.05,0.58); }
+.mug[data-variant='spot'][data-state='shy'] .eye-l { transform:translate(96px,155px) rotate(-20deg) scale(0.6,0.65); }
+.mug[data-variant='spot'][data-state='shy'] .eye-r { transform:translate(132px,155px) rotate(20deg) scale(0.6,0.65); }
+.mug[data-variant='spot'][data-state='sad'] .eye-l { transform:translate(100px,153px) rotate(-32deg) scale(0.8,0.65); }
+.mug[data-variant='spot'][data-state='sad'] .eye-r { transform:translate(136px,153px) rotate(32deg) scale(0.8,0.65); }
+.mug[data-variant='spot'][data-state='excited'] .eye-l { transform:translate(100px,151px) rotate(-22deg) scale(1,1.25); }
+.mug[data-variant='spot'][data-state='excited'] .eye-r { transform:translate(136px,151px) rotate(22deg) scale(1,1.25); }
+.mug[data-variant='spot'][data-state='laughing'] .eye-l { transform:translate(100px,140px) rotate(-36deg) scale(1.2,0.32); }
+.mug[data-variant='spot'][data-state='laughing'] .eye-r { transform:translate(136px,140px) rotate(36deg) scale(1.2,0.32); }
 .mug[data-docs-mug] .gaze { animation:none; transform:translate(var(--gaze-x,0px),var(--gaze-y,0px)); }
-.mug[data-reaction='odd'] .steam { animation:tip-steam-odd 1800ms linear; }
-.mug[data-reaction='even'] .steam { animation:tip-steam-even 1800ms linear; }
-@keyframes tip-steam-odd { 0%,100% { opacity:1; } 5%,90% { opacity:0; } }
-@keyframes tip-steam-even { 0%,100% { opacity:1; } 5%,90% { opacity:0; } }
-.greeting-eyes { transform-origin:118px 149px; }
-.mug[data-reaction='odd'] .pop { animation:tip-odd 1800ms var(--spring); }
-.mug[data-reaction='even'] .pop { animation:tip-even 1800ms var(--spring); }
-.mug[data-reaction='odd'] .greeting-eyes { animation:eyes-odd 900ms var(--spring); }
-.mug[data-reaction='even'] .greeting-eyes { animation:eyes-even 900ms var(--spring); }
-@keyframes tip-odd { 0%,100% { transform:none; } 35%,60% { transform:translate(-65px,-83px) rotate(90deg); } }
-@keyframes tip-even { 0%,100% { transform:none; } 35%,60% { transform:translate(-65px,-83px) rotate(90deg); } }
-@keyframes eyes-odd { from { transform:scaleY(.1); } to { transform:none; } }
-@keyframes eyes-even { from { transform:scaleY(.1); } to { transform:none; } }
 @media(prefers-reduced-motion:reduce) {
 .mug .eye-l,.mug .eye-r,.mug .pose { transition:none!important; }
-.mug .pop,.mug .breath,.mug .greeting-eyes,.mug .steam { animation:none!important; }
+.mug .pop,.mug .breath,.mug .steam { animation:none!important; }
 .mug[data-docs-mug] .gaze { transform:none; }
-.mug[data-reaction='odd'] .greeting-eyes { transform:scaleY(.65); }
-.mug[data-reaction='even'] .greeting-eyes { transform:scaleY(.8); }
 }
 
 </style>

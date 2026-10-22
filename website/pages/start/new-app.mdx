@@ -2,10 +2,10 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LikeHeart from '../../components/docs/like-heart.tsrx';
 import CreateAnatomy from '../../components/figures/create/create-anatomy.tsrx';
 import DevServer from '../../components/figures/dev-server/dev-server-anatomy.tsrx';
 import Commands from '../../components/docs/walkthrough/commands.tsrx';
+import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
@@ -31,7 +31,11 @@ Every question has a sensible default, so Enter, Enter, Enter is fine. Nothing t
 
 ## Start the dev server
 
+<MugSpot mood="hello">
+
 The dev server is what runs while you work. It serves your app at `localhost:3000` and updates the page every time you save. Try it here first:
+
+</MugSpot>
 
 <DevServer />
 
@@ -77,5 +81,3 @@ The build is a Node server out of the box. Deploying to Vercel or another host? 
 ## Where to go next
 
 You just edited your first `.tsrx` file without anyone telling you what it all means. [Reading a .tsrx file](/start/reading-tsrx) fixes that, line by line.
-
-<LikeHeart />
