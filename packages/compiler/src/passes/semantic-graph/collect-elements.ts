@@ -87,6 +87,7 @@ import {
 	collectDefinitionReads,
 	inlineHandlerRenderLocals,
 	inlineRenderLocals,
+	liftRenderLocalComposite,
 	liftArmRenderLocalValue,
 } from './render-local-inline.ts';
 import { collectGraphDependencies } from './collect-async.ts';
@@ -194,10 +195,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	state.currentHostNodeId = previousHost;
 }
 
-export function collectTemplateExpression(
-	expression: AnyNode | undefined,
-	state: WalkState,
-): void {
+export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
 	// Same bound the attribute branch already takes: no write can move a prop after
 	// the render that read it, so a props-only text read owes no record - and with
@@ -211,7 +209,8 @@ export function collectTemplateExpression(
 			requireWritableRead: true,
 		}) ??
 		liftArmModuleValue(expression, state) ??
-		liftArmRenderLocalValue(expression, state);
+		liftArmRenderLocalValue(expression, state) ??
+		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
 	const armScoped =
@@ -251,7 +250,9 @@ function joinHostText(host: AnyNode, state: WalkState): void {
 		for (const run of textRuns(shapes))
 			if (run.holes > 1 && runPosition(shapes, run) !== null)
 				joinTextParts(
-					children.slice(run.start, run.end).filter((_, at) => shapes[run.start + at] !== 'none'),
+					children
+						.slice(run.start, run.end)
+						.filter((_, at) => shapes[run.start + at] !== 'none'),
 					state,
 				);
 		return;
@@ -321,7 +322,10 @@ function joinTextParts(
 	if (values.some(isProjectedChildren)) return null;
 	// A shared() factory's locals are carried by the factory scope, not recomputed here.
 	const shared = Boolean(state.currentSharedDefinitionId);
-	const inlined = new Map<AnyNode, { readonly source: string; readonly definitions: AnyNode[] }>();
+	const inlined = new Map<
+		AnyNode,
+		{ readonly source: string; readonly definitions: AnyNode[] }
+	>();
 	for (const value of values as AnyNode[]) {
 		const entry = shared
 			? {
@@ -401,7 +405,11 @@ function refuseUnroutedExpression(expression: AnyNode, target: string, state: Wa
 	let owned = false;
 	walkNode(expression, (node) => {
 		// Markup values and writes each have their own diagnostic.
-		if (/^(?:JSX|Element$|Fragment$|TSRX|AssignmentExpression$|UpdateExpression$)/.test(String(node.type)))
+		if (
+			/^(?:JSX|Element$|Fragment$|TSRX|AssignmentExpression$|UpdateExpression$)/.test(
+				String(node.type),
+			)
+		)
 			owned = true;
 	});
 	if (owned) return false;
@@ -409,7 +417,8 @@ function refuseUnroutedExpression(expression: AnyNode, target: string, state: Wa
 		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId),
 		aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId),
 	};
-	if (!readsUnroutedGraphCell(expression, state, scope, TEMPLATE_READ_OPTIONS, true)) return false;
+	if (!readsUnroutedGraphCell(expression, state, scope, TEMPLATE_READ_OPTIONS, true))
+		return false;
 	state.graph.diagnostics.push(
 		templateExpressionUnsupportedDiagnostic({
 			target,
@@ -422,10 +431,7 @@ function refuseUnroutedExpression(expression: AnyNode, target: string, state: Wa
 }
 
 function isTemplateExpressionChild(node: AnyNode): boolean {
-	return (
-		(node.type === 'JSXExpressionContainer') &&
-		literalContainerText(node) === null
-	);
+	return node.type === 'JSXExpressionContainer' && literalContainerText(node) === null;
 }
 
 function textPartValue(node: AnyNode): string {
@@ -507,7 +513,9 @@ function textNodeTarget(
 	shapes: ReadonlyArray<HostChildShape>,
 	index: number,
 ): SemanticTemplateBindingTarget {
-	const run = textRuns(shapes).find((candidate) => candidate.start <= index && index < candidate.end);
+	const run = textRuns(shapes).find(
+		(candidate) => candidate.start <= index && index < candidate.end,
+	);
 	const textNode = run ? runPosition(shapes, run) : null;
 	if (!run || textNode === null) return { kind: 'text' };
 	// The joined derive already spells the run's static text.
@@ -631,8 +639,7 @@ export function collectElementHandleDiagnostics(
 		const resolved =
 			elementHandlePath(
 				resolveSharedInstanceGraphPath(binding.handleName, graph, binding.componentName),
-			) ??
-			resolveGraphPath(binding.handleName, scope.bindings, scope.aliases);
+			) ?? resolveGraphPath(binding.handleName, scope.bindings, scope.aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
 		if (binding.keyedRepeatScopeIds.length > 0) {
@@ -748,7 +755,13 @@ export function collectElementHandleDiagnostics(
 
 	collectElementHandleDeriveReads(graph);
 
-	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle, firstBindingByScopedHandle, pluralHandleNames);
+	resolveElementHandleIdrefs(
+		graph,
+		pendingIdrefs,
+		firstBindingByHandle,
+		firstBindingByScopedHandle,
+		pluralHandleNames,
+	);
 }
 
 /**
@@ -803,10 +816,7 @@ function isRosterQueryRead(
 	binding: SemanticGraphBinding,
 	graphNodeId: string,
 ): boolean {
-	const records = [
-		...(graph.elementRosterPositions ?? []),
-		...(graph.elementRosterCounts ?? []),
-	];
+	const records = [...(graph.elementRosterPositions ?? []), ...(graph.elementRosterCounts ?? [])];
 	return records.some(
 		(record) =>
 			record.computedGraphNodeId === binding.id &&
@@ -842,9 +852,7 @@ function elementHandleBindingExpressions(value: AnyNode): ReadonlyArray<AnyNode>
  * An attribute with no value at all stays one absent handler, which is the
  * record shape `onClick` written bare has always produced.
  */
-function eventHandlerExpressions(
-	value: AnyNode | undefined,
-): ReadonlyArray<AnyNode | undefined> {
+function eventHandlerExpressions(value: AnyNode | undefined): ReadonlyArray<AnyNode | undefined> {
 	if (value?.type !== 'ArrayExpression') return [value];
 	return asNodes(value.elements).filter((entry): entry is AnyNode => Boolean(entry));
 }
@@ -1207,8 +1215,12 @@ function collectAttribute(
 				requireWritableRead: true,
 			}) ??
 			liftArmModuleValue(expressionValue, state) ??
-			liftArmRenderLocalValue(expressionValue, state);
-		if (!composite && refuseUnroutedExpression(expressionValue, `Attribute \`${attributeName}\``, state)) {
+			liftArmRenderLocalValue(expressionValue, state) ??
+			liftRenderLocalComposite(expressionValue, state, TEMPLATE_READ_OPTIONS);
+		if (
+			!composite &&
+			refuseUnroutedExpression(expressionValue, `Attribute \`${attributeName}\``, state)
+		) {
 			walk(expressionValue, state);
 			return;
 		}
@@ -1246,7 +1258,8 @@ function collectStyleObjectAttribute(
 	});
 	if (lowering?.kind === 'static') return;
 
-	const composite = lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, state) : null;
+	const composite =
+		lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, state) : null;
 	if (lowering?.kind === 'dynamic' && composite) {
 		state.graph.templateReads.push({
 			hostNodeId,
@@ -1289,11 +1302,7 @@ function mintStyleObjectComputed(
 	);
 	if (!readSources || readSources.length === 0) return null;
 
-	return mintTemplateExpressionComputed(
-		`() => ${lowering.expressionSource}`,
-		readSources,
-		state,
-	);
+	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, readSources, state);
 }
 
 function collectDuplicateAttributeDiagnostics(
@@ -1418,7 +1427,8 @@ function attributeValueDiagnostic(
 		return styleObjectUnsupportedDiagnostic({
 			valueSource,
 			reason:
-				expressionValue.type === 'ArrayExpression' || resolved?.binding.valueKind === 'array'
+				expressionValue.type === 'ArrayExpression' ||
+				resolved?.binding.valueKind === 'array'
 					? 'an array of styles'
 					: 'a whole object held in state and passed as the style value — the object lives in the graph at runtime, so the compiler cannot freeze it into CSS text',
 			node: expressionValue,
@@ -1584,7 +1594,8 @@ function classifyIdrefValue(
 	state: WalkState,
 ): IdrefValueClassification | null {
 	const handle = resolvedElementHandle(expression, state);
-	if (handle) return { kind: 'handle', handleName: handle.name, scope: handleDeclaringScope(handle) };
+	if (handle)
+		return { kind: 'handle', handleName: handle.name, scope: handleDeclaringScope(handle) };
 	const handles = staticHandleList(expression, state);
 	if (handles) {
 		return {
@@ -1792,7 +1803,9 @@ function bindingTargetForAttribute(
 	// The runtime writes the whole class attribute, so a scoped module hands the
 	// writers its scope class to compose back in.
 	if (attributeName === 'class')
-		return styleScopeClass ? { kind: 'class', constantClass: styleScopeClass } : { kind: 'class' };
+		return styleScopeClass
+			? { kind: 'class', constantClass: styleScopeClass }
+			: { kind: 'class' };
 	if (attributeName === 'style') return { kind: 'style' };
 
 	if (isDomPropertyBindingName(attributeName)) {
@@ -1898,7 +1911,9 @@ function behaviorSourceParts(
 			source: behaviorSource,
 			functionSource: localFunctionDeclarationSource(node, state) ?? behaviorSource,
 			inputSources: [],
-			...(span ? { functionSpan: span, functionParameters: handlerParameterNames(node) } : {}),
+			...(span
+				? { functionSpan: span, functionParameters: handlerParameterNames(node) }
+				: {}),
 		};
 	}
 
@@ -2042,7 +2057,12 @@ function localFunctionValueNode(declarationStart: number, state: WalkState): Any
 	let found: AnyNode | null = null;
 
 	walkNode(ast, (node) => {
-		if (found || node.type !== 'VariableDeclarator') return;
+		if (found) return;
+		if (node.type === 'FunctionDeclaration') {
+			if ((node.id as AnyNode | undefined)?.start === declarationStart) found = node;
+			return;
+		}
+		if (node.type !== 'VariableDeclarator') return;
 		const id = node.id as AnyNode | undefined;
 		const init = node.init as AnyNode | undefined;
 		if (

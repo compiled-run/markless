@@ -1,7 +1,10 @@
-import { PROTOCOL_PROP_GRAPH_NODE_PREFIX, PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
+import {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+} from '@markless/serializer';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
-import { componentDeriveGraphNodeIds } from './derive-set.ts';
+import { componentDeriveGraphNodeIds, computedDependencyEdges } from './derive-set.ts';
 import { componentPropCellId } from './shared.ts';
 
 /**
@@ -52,7 +55,23 @@ function derivePropReads(
 	input: PublicRenderModuleInput,
 	componentName: string,
 ): ReadonlyArray<PropRead> {
-	const reachable = componentDeriveGraphNodeIds(input, componentName);
+	const reachable = new Set(componentDeriveGraphNodeIds(input, componentName));
+	// A text or attribute that joins a prop with state re-derives from the prop cell on the first write.
+	const hosts = new Set(
+		input.renderData.chunks.flatMap((chunk) =>
+			chunk.componentName === componentName ? chunk.hosts.map((host) => host.hostNodeId) : [],
+		),
+	);
+	const edges = computedDependencyEdges(input);
+	const queue = input.protocolView.domUpdates.flatMap((update) =>
+		hosts.has(update.hostNodeId) ? [update.graphNodeId] : [],
+	);
+	while (queue.length > 0) {
+		const id = queue.pop()!;
+		if (!edges.has(id) || reachable.has(id)) continue;
+		reachable.add(id);
+		queue.push(...(edges.get(id) ?? []));
+	}
 	return input.protocolState.computed.flatMap((computed) =>
 		computed.async ||
 		computed.deriveSymbolId === undefined ||

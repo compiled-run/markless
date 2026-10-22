@@ -241,3 +241,33 @@ export function Choices({ heading, choices, children }) @{
 		'marklessSsrProps, [{"graphNodeId":"prop:props","keys":[],"rowKeys":["choices"]}])',
 	);
 });
+
+// A text joining a prop with state re-derives after resume from the prop cell, so the
+// served payload has to carry the prop or the first click drops it from the text.
+for (const [component, prop, cell, tag] of [
+	['NameCounter', 'name', 'count', 'button'],
+	['Tally', 'label', 'hits', 'p'],
+] as const)
+	test(`SSR seeds the \`${prop}\` prop a joined text reads beside state`, async () => {
+		const result = await compileTsrxModule({
+			filename: `src/${component}.tsrx`,
+			source: `
+import { state } from '@markless/core';
+export function ${component}({ ${prop} }) @{
+	let ${cell} = state(0);
+	<${tag} onClick={() => ${cell}++}>{${prop}} {${cell}}</${tag}>
+}
+`,
+			symbols: [],
+		});
+
+		const ssr = componentSsrSource(
+			result.publicRenderModule.ssrModuleSource,
+			'marklessRenderSsr',
+		);
+		const seed = /marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\])\)/.exec(ssr)?.[1];
+		expect(seed).toBeDefined();
+		expect(JSON.parse(seed as string)).toEqual([
+			{ graphNodeId: 'prop:props', keys: [], scalarKeys: [prop] },
+		]);
+	});

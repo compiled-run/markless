@@ -83,6 +83,7 @@ type CollectionContext = {
 	// The rest binding those names were taken out of. Only a spread of THIS
 	// identifier carries consumer props; any other object is the author's own.
 	restName: string | null;
+	readonly nestedLocalSource: ((expression: AnyNode) => string | null) | null;
 };
 
 type ChunkBuilder = {
@@ -114,6 +115,7 @@ export function collectSemanticMarkup(input: {
 	readonly moduleId: string;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly hostIds: WeakMap<object, string>;
+	readonly nestedLocalSource?: (expression: AnyNode) => string | null;
 }): SemanticMarkupArtifact {
 	const chunks: SemanticMarkupChunk[] = [];
 	const context: CollectionContext = {
@@ -129,6 +131,7 @@ export function collectSemanticMarkup(input: {
 		styleConstResolver: null,
 		destructuredNames: [],
 		restName: null,
+		nestedLocalSource: input.nestedLocalSource ?? null,
 	};
 	const components: Array<{
 		readonly name: string;
@@ -266,6 +269,12 @@ function emitNode(
 		return expression?.type?.startsWith('JSX')
 			? emitNode(expression, path, builder, context, repeat)
 			: 0;
+	}
+
+	// A nested `@{ ... }` renders its one node in place; its statements only declare what that node reads.
+	if (node.type === 'JSXCodeBlock') {
+		const rendered = node.render as AnyNode | undefined;
+		return rendered ? emitNode(rendered, path, builder, context, repeat) : 0;
 	}
 
 	if (isStaticTextNode(node)) {
@@ -632,7 +641,8 @@ function emitScriptBody(
 	}
 	let childIndex = 0;
 	for (const segment of scriptBodySegments(context.source, span.start, span.end)) {
-		if (segment.kind === 'text') append(builder, context.source.slice(segment.start, segment.end));
+		if (segment.kind === 'text')
+			append(builder, context.source.slice(segment.start, segment.end));
 		else
 			addSlot(builder, {
 				kind: 'text',
@@ -1035,8 +1045,9 @@ function expressionResidue(
 	componentName: string,
 	attributeName?: string,
 ): SemanticMarkupResidue {
-	return sourceResidue(
-		expressionSource(expression, context.source),
+	const source = expressionSource(expression, context.source);
+	const residue = sourceResidue(
+		source,
 		sourceSpan(expression, context.filename),
 		context,
 		repeat,
@@ -1044,6 +1055,9 @@ function expressionResidue(
 		attributeName === 'style' &&
 			(expression.type === 'ObjectExpression' || expression.type === 'Identifier'),
 	);
+	if (residue.kind !== 'authored-expression' || residue.source !== source) return residue;
+	const inlined = context.nestedLocalSource?.(expression);
+	return inlined ? { kind: 'authored-expression', source: inlined } : residue;
 }
 
 function sourceResidue(

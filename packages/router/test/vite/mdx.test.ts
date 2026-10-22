@@ -8,6 +8,7 @@ import {
 	mdxTransformPlugin,
 	transformMdxRoute,
 } from '../../src/vite/mdx.ts';
+import { createMdxRenderDataSurface } from '../../src/vite/runtime/mdx-route.ts';
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'markless-mdx-config-'));
 afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }));
@@ -173,10 +174,55 @@ This page is static markdown.
 		expect(code).toContain(`'@markless/router/vite/runtime/mdx-route'`);
 		expect(code).toContain(`../../components/InteractiveCounter.tsrx?markless-symbols`);
 		expect(code).toContain(`../../components/InteractiveCounter.tsrx?markless-render-data`);
-		expect(code).toContain('modules[0].marklessRenderData');
-		expect(code).not.toContain('modules[0].marklessPrerenderData');
+		expect(code).toContain('modules[0].marklessPrerenderData');
+		expect(code).not.toContain('modules[0].marklessRenderData');
 		expect(code).toContain('renderMdxChild(marklessMdxChildren, InteractiveCounter');
 		expect(code).toContain('<h1>Body</h1>');
+	});
+
+	// Minting a row in the browser composes the page surface from each island's render
+	// data; a raw `marklessRenderData` has no `rootComponentName`, so the first row
+	// minted on a dev or resumed page threw MARKLESS_MDX_RENDER_DATA_ROOT_MISSING.
+	it('every MDX route variant composes its islands from their linked surfaces', async () => {
+		const surface = {
+			rootComponentName: 'Steps',
+			renderData: { chunks: [] },
+			components: { Steps: {} },
+			imports: {},
+		};
+		const island = {
+			marklessRenderData: { root: { componentName: 'Steps' } },
+			marklessPrerenderData: surface,
+		};
+		for (const id of [
+			'/project/pages/steps.mdx',
+			'/project/pages/steps.mdx?markless-resume',
+			'/project/pages/steps.mdx?markless-route',
+		]) {
+			const code = await transformMdxRoute(
+				`import Steps from './Steps.tsrx';\n\n# Steps\n\n<Steps />\n`,
+				id,
+			);
+			const declared = (name: string) => {
+				const init = parseSync('route.js', code)
+					.program.body.flatMap((node) =>
+						node.type === 'VariableDeclaration' ? node.declarations : [],
+					)
+					.find((node) => node.id.type === 'Identifier' && node.id.name === name)?.init;
+				return init ? code.slice(init.start, init.end) : undefined;
+			};
+			const loader = declared('marklessMdxRenderData');
+			expect(loader, id).toBeDefined();
+			const load = new Function(
+				'createMdxRenderDataSurface',
+				'marklessImport',
+				`const marklessMdxParts = ${declared('marklessMdxParts') ?? '[]'};\nreturn ${loader!.replaceAll('import(', 'marklessImport(')};`,
+			)(createMdxRenderDataSurface, async () => island) as () => Promise<{
+				readonly imports: Record<string, unknown>;
+			}>;
+			const composed = await load();
+			expect(composed.imports, id).toEqual({ Steps: surface });
+		}
 	});
 
 	// A composed page reaches an island's own module only lazily, through the
@@ -294,7 +340,7 @@ import Choices from '../../components/Choices.tsrx';
 		expect(code).toContain('./Meter.tsrx?markless-symbols&markless-scalar-plans');
 		expect(code).toContain('renderData: marklessMdxRenderData');
 		expect(code).toContain('return Promise.all([import("./Meter.tsrx?markless-render-data")])');
-		expect(code).toContain('modules[0].marklessRenderData');
+		expect(code).toContain('modules[0].marklessPrerenderData');
 	});
 
 	// The host reads storage seeds off the page artifact, which for an MDX route is
