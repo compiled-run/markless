@@ -116,7 +116,17 @@ export async function compileTsrxModuleLinkArtifact(input: {
 	};
 }
 
+// Every importer of a barrel asks for the same interface object's hash; artifacts never change once built.
+const interfaceHashes = new WeakMap<ModuleGraphInterfaceArtifact, string>();
+
 export function moduleInterfaceHash(value: ModuleGraphInterfaceArtifact | undefined): string {
+	if (!value) return interfaceHashOf(value);
+	let hash = interfaceHashes.get(value);
+	if (hash === undefined) interfaceHashes.set(value, (hash = interfaceHashOf(value)));
+	return hash;
+}
+
+function interfaceHashOf(value: ModuleGraphInterfaceArtifact | undefined): string {
 	let hash = 0x811c9dc5;
 	const source = JSON.stringify(hashedInterface(value));
 	for (let index = 0; index < source.length; index++) {
