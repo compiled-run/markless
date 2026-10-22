@@ -131,7 +131,7 @@ async function loadModuleSizes(input) {
 	return marklessSizesPromise;
 }
 function symbolParts(id) { const match = /^virtual:markless:symbol:([^:]+):([^:]+)$/.exec(id); if (!match) return null; try { return { source: decodeURIComponent(match[1]), symbolId: decodeURIComponent(match[2]) }; } catch { return null; } }
-function baseSymbolId(id) { if (!id.startsWith('bound:')) return null; const separator = id.indexOf(':', 'bound:'.length); if (separator < 0) return null; try { return decodeURIComponent(id.slice('bound:'.length, separator)); } catch { return null; } }
+function baseSymbolId(id) { if (!id.startsWith('bound:')) return null; if (id[6] === '(') { for (let depth = 0, at = 6; at < id.length; at++) { if (id[at] === '(') depth++; else if (id[at] === ')' && --depth === 0) return id.slice(7, at); } return null; } const separator = id.indexOf(':', 'bound:'.length); if (separator < 0) return null; try { return decodeURIComponent(id.slice('bound:'.length, separator)); } catch { return null; } }
 function routeFile() { const text = document.querySelector?.('script[type="@markless/core/route"]')?.textContent; if (!text) return null; try { const value = JSON.parse(text).file; return typeof value === 'string' ? value : null; } catch { return null; } }
 // Attribution tables are keyed by the bare path this lookup can name: the
 // document's route file, or — for a routeless page — the build's single root,

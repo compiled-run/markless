@@ -22,7 +22,11 @@ import {
 	semanticAliasMap,
 	type ResolvedGraphPath,
 } from '../artifact-helpers/graph-paths.ts';
-import { protocolInstanceQualifies } from '@markless/serializer';
+import {
+	protocolBoundSymbolPrefix,
+	protocolBoundSymbolSegment,
+	protocolInstanceQualifies,
+} from '@markless/serializer';
 import { sourceWithoutStringOrCommentText } from '../artifact-helpers/source-text.ts';
 import {
 	componentEdgeHostSegment,
@@ -31,6 +35,7 @@ import {
 } from '../component-edge-instance.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { COMPONENT_EDGE_ID_PREFIX } from '../component-edge-instance.ts';
 import { createSourceMemo } from './semantic-graph/shared-ast.ts';
 import {
 	createSymbolSourceSemanticsReader,
@@ -566,18 +571,24 @@ function boundRowPieces(
 }
 
 export function boundSymbolIdPrefix(baseSymbolId: string): string {
-	return `bound:${encodeURIComponent(baseSymbolId)}`;
+	return protocolBoundSymbolPrefix(baseSymbolId);
 }
 
 function boundSymbolId(baseSymbolId: string, ancestry: BoundSymbolResolverRow['ancestry']): string {
-	const segment = (values: ReadonlyArray<string>) => values.map(encodeURIComponent).join(',');
+	const segment = (values: ReadonlyArray<string>) =>
+		values.map(protocolBoundSymbolSegment).join(',');
 	return `${boundSymbolIdPrefix(baseSymbolId)}:${ancestry
 		.map((entry) => {
 			const scopes =
 				entry.branchScopeIds.length === 0 && entry.keyedRepeatScopeIds.length === 0
 					? ''
 					: `b=${segment(entry.branchScopeIds)};k=${segment(entry.keyedRepeatScopeIds)}`;
-			const edgeId = encodeURIComponent(entry.componentEdgeId);
+			// Every edge id carries the same prefix, so the id spells only what follows it.
+			const edgeId = protocolBoundSymbolSegment(
+				entry.componentEdgeId.startsWith(COMPONENT_EDGE_ID_PREFIX)
+					? entry.componentEdgeId.slice(COMPONENT_EDGE_ID_PREFIX.length)
+					: entry.componentEdgeId,
+			);
 			return scopes ? `${edgeId}[${scopes}]` : edgeId;
 		})
 		.join('/')}`;

@@ -86,3 +86,43 @@ export function protocolInstanceQualifies(graphNodeId: string): boolean | undefi
 		? true
 		: undefined;
 }
+
+// A bound symbol id is `bound:<base>:<instance path>`. A base that is itself bound is written as is
+// inside parentheses, so a nesting level adds its own path once instead of re-escaping the levels below.
+const PROTOCOL_BOUND_PREFIX = 'bound:';
+
+/** One base or path segment of a bound id: percent-encoded, parentheses included. */
+export function protocolBoundSymbolSegment(value: string): string {
+	return encodeURIComponent(value).replace(/\(/g, '%28').replace(/\)/g, '%29');
+}
+
+/** `bound:<base>`, the part of a bound id that names the symbol it binds. */
+export function protocolBoundSymbolPrefix(base: string): string {
+	return (
+		PROTOCOL_BOUND_PREFIX +
+		(base.startsWith(PROTOCOL_BOUND_PREFIX) ? `(${base})` : protocolBoundSymbolSegment(base))
+	);
+}
+
+/** Where the base of a bound id ends (the `:` before its instance path), or -1 for any other id. */
+export function protocolBoundSymbolBaseEnd(id: string): number {
+	if (!id.startsWith(PROTOCOL_BOUND_PREFIX)) return -1;
+	for (let depth = 0, at = PROTOCOL_BOUND_PREFIX.length; at < id.length; at++) {
+		if (id[at] === '(') depth++;
+		else if (id[at] === ')') depth--;
+		else if (id[at] === ':' && !depth) return at;
+	}
+	return -1;
+}
+
+/** The symbol id a bound id binds, one level down, or undefined for any other id. */
+export function protocolBoundSymbolBase(id: string): string | undefined {
+	const end = protocolBoundSymbolBaseEnd(id);
+	if (end < 0) return undefined;
+	const base = id.slice(PROTOCOL_BOUND_PREFIX.length, end);
+	try {
+		return base[0] === '(' ? base.slice(1, -1) : decodeURIComponent(base);
+	} catch {
+		return undefined;
+	}
+}

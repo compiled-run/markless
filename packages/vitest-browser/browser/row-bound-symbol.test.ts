@@ -183,7 +183,7 @@ test("SSR: a resumed bound handler in a keyed row writes its own row's widget gr
 //
 // No row is involved in this failure, which is what makes it a layer of its own.
 // Measured on the base this test was written against: the record `c4:h1`
-// matches, `bound:symbol%3A0:component-edge%3A4` runs, and it reads and writes
+// matches, `bound:symbol%3A0:4` runs, and it reads and writes
 // `c3:p4:shared:<file>#rowWidget/state:w` - the PROJECTION SITE the part sits
 // at, never resolved to the widget root at `c3:` that owns the cells. Nothing
 // listens on that id, so the record matches, the symbol runs warm, and the
