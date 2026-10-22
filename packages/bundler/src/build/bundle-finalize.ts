@@ -4,6 +4,7 @@ import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build-m
 import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
 import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_DEMAND } from './chunking.ts';
 import { createExecutionSizesAsset } from './execution-sizes.ts';
+import { executionDemandAsset } from './execution-demand.ts';
 import { collectRenderedModules, createByteAttributionAsset } from './byte-attribution.ts';
 import { clearParsedChunkCode, prefetchChunkParses } from './chunk-ast.ts';
 import { unwrapAsyncImportWrappers } from './async-import-wrappers.ts';
@@ -260,17 +261,15 @@ context.emitFile(
 context.emitFile({
 	type: 'asset',
 	fileName: MARKLESS_EXECUTION_DEMAND,
-	source: JSON.stringify(
-		Object.fromEntries(
-			clientManifest.modules
-				.filter((module) => module.runtimeDemandMap)
-				.map((module) => [
-					rootRelativeId(module.source, input.root),
-					nativePackingEnabled(options) && !options.dev
-						? module.runtimeDemandMap
-						: withoutFirstUse(module.runtimeDemandMap),
-				]),
-		),
+	source: executionDemandAsset(
+		clientManifest.modules
+			.filter((module) => module.runtimeDemandMap)
+			.map((module) => [
+				rootRelativeId(module.source, input.root),
+				nativePackingEnabled(options) && !options.dev
+					? module.runtimeDemandMap
+					: withoutFirstUse(module.runtimeDemandMap),
+			]),
 		(key, value) =>
 			key === 'file' && typeof value === 'string' ? rootRelativeId(value, input.root) : value,
 	),

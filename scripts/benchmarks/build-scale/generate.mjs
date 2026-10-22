@@ -1,4 +1,4 @@
-// Writes a router app whose size is set by its arguments: pages that each use some of a pool of
+// Writes a router app whose size is set by its arguments: pages with controls of their own that each use some of a pool of
 // stateful components, and a document whose body extras render one portaled layer per page.
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -69,15 +69,31 @@ export default function Layer${index}() @{
 `;
 }
 
-function pageSource(page, widgets) {
+// Each page also has controls of its own, as a converted site's pages do: their handlers are this page's alone.
+function pageSource(page, widgets, ownControls) {
 	const imports = widgets.map((w) => `import Widget${w} from '../components/widget-${w}.tsrx';`);
 	const uses = widgets.map((w) => `\t\t<Widget${w} label="Page ${page}" />`);
-	return `${imports.join('\n')}
+	const controls = Array.from(
+		{ length: ownControls },
+		(_, i) => `\t\t<section class="own-${i}">
+			<button type="button" aria-pressed={pressed${i}} onClick={() => (pressed${i} = !pressed${i})}>Option ${i} of page ${page}</button>
+			@if (pressed${i}) { <><p>Page ${page} detail ${i}: {note${i}}</p></> }
+			<input value={note${i}} onInput={(event) => (note${i} = event.currentTarget.value)} />
+		</section>`,
+	);
+	const states = Array.from(
+		{ length: ownControls },
+		(_, i) => `\tlet pressed${i} = state(false);\n\tlet note${i} = state('');`,
+	);
+	return `import { state } from '@markless/core';
+${imports.join('\n')}
 
 export default function Page${page}() @{
+${states.join('\n')}
 	<main data-page="${page}">
 		<h1>Page ${page}</h1>
 ${uses.join('\n')}
+${controls.join('\n')}
 	</main>
 }
 `;
@@ -123,7 +139,7 @@ export default function Document({ url, children }: { readonly url?: { readonly 
 `;
 
 /**
- * @param {{ dir: string, pages: number, components?: number, perPage?: number, layers?: number, layerBytes?: number }} options
+ * @param {{ dir: string, pages: number, components?: number, perPage?: number, layers?: number, layerBytes?: number, ownControls?: number }} options
  */
 export async function generateBuildScaleApp(options) {
 	const { dir, pages } = options;
@@ -131,6 +147,7 @@ export async function generateBuildScaleApp(options) {
 	const perPage = options.perPage ?? 20;
 	const layers = options.layers ?? pages;
 	const layerBytes = options.layerBytes ?? 4_000;
+	const ownControls = options.ownControls ?? 12;
 	await rm(dir, { recursive: true, force: true });
 	await mkdir(join(dir, 'pages'), { recursive: true });
 	await mkdir(join(dir, 'components/layers'), { recursive: true });
@@ -149,9 +166,12 @@ export async function generateBuildScaleApp(options) {
 		await writeFile(join(dir, `components/layers/layer-${i}.tsrx`), layerSource(i, layerBytes));
 	await writeFile(
 		join(dir, 'pages/index.tsrx'),
-		pageSource('home', pick(-1, perPage, components)),
+		pageSource('home', pick(-1, perPage, components), ownControls),
 	);
 	for (let i = 0; i < pages - 1; i++)
-		await writeFile(join(dir, `pages/p${i}.tsrx`), pageSource(i, pick(i, perPage, components)));
-	return { dir, pages, components, perPage, layers, layerBytes };
+		await writeFile(
+			join(dir, `pages/p${i}.tsrx`),
+			pageSource(i, pick(i, perPage, components), ownControls),
+		);
+	return { dir, pages, components, perPage, layers, layerBytes, ownControls };
 }

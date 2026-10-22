@@ -235,7 +235,12 @@ export function createMarklessRolldownPlugin(input: {
 				}
 			}
 		},
-		buildEnd: packing?.buildEnd,
+		async buildEnd(error) {
+			const hook = packing?.buildEnd;
+			await (typeof hook === 'function' ? hook : hook?.handler)?.call(this, error);
+			// Kept only to reuse a compile within the module graph; render and later environments never read it.
+			if (internalOptions.dev !== true) state.linkedTransformCache.clear();
+		},
 		renderStart: facades?.renderStart,
 		renderChunk: facades?.renderChunk,
 		renderError: facades?.renderError,
