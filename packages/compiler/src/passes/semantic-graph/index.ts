@@ -72,6 +72,7 @@ import {
 } from './types.ts';
 import { collectSemanticMarkup, componentStyleScopeClass } from './collect-markup.ts';
 import { moduleIdOf } from '../../module-id.ts';
+import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -175,6 +176,7 @@ export async function buildSemanticGraph(
 		moduleId,
 		graph,
 		hostIds: state.hostIds,
+		nestedLocalSource: (expression) => inlineNestedTemplateLocals(expression, state),
 	});
 	// Needs the chunks, so it runs after them: a repeat inside a child's
 	// `{children}` renders into that child's markup, not the enclosing element of
@@ -407,7 +409,7 @@ function resolveComponentLocalReferences(state: WalkState, bodySpan: SourceSpan)
 		// A type-position use never reads or writes the value beside it.
 		if (semantic.references[referenceId]!.inTypePosition) continue;
 
-		const symbolId = (semantic.references[referenceId]!.binding?.id ?? null);
+		const symbolId = semantic.references[referenceId]!.binding?.id ?? null;
 		if (symbolId === null) continue;
 		const declaration = semantic.bindings[symbolId]!.declarations[0]!;
 		const binding = state.componentLocalBindings.get(
@@ -545,6 +547,8 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'ArrowFunctionExpression':
 		case 'FunctionExpression':
 		case 'FunctionDeclaration':
+			if (node.type === 'FunctionDeclaration' && state.currentFunctionSite === null)
+				collectBodyFunctionDeclaration(node, state);
 			withFunctionSite(state, state.currentHostNodeId ? 'handler' : 'helper', () => {
 				withCreationSite(state, state.currentHostNodeId ? 'handler' : 'helper', () => {
 					for (const child of childNodes(node)) {
@@ -602,10 +606,7 @@ function componentExportName(statement: AnyNode, componentName: string): string 
 }
 
 // `const checkbox = { root: CheckboxRoot }` lets <checkbox.root /> collapse to CheckboxRoot.
-function collectMemberTagTargets(
-	statements: ReadonlyArray<AnyNode>,
-	state: WalkState,
-): void {
+function collectMemberTagTargets(statements: ReadonlyArray<AnyNode>, state: WalkState): void {
 	for (const statement of statements) {
 		const declaration =
 			statement.type === 'ExportNamedDeclaration'
@@ -724,6 +725,17 @@ function withCreationSite(
 	state.currentCreationSite = previous ?? site;
 	run();
 	state.currentCreationSite = previous;
+}
+
+function collectBodyFunctionDeclaration(node: AnyNode, state: WalkState): void {
+	const id = node.id as AnyNode | undefined;
+	const name = getIdentifierName(id);
+	if (!id || !name) return;
+	state.graph.localBindings.push({
+		name,
+		kind: 'function',
+		sourceSpan: sourceSpan(id, state.filename),
+	});
 }
 
 function withFunctionSite(

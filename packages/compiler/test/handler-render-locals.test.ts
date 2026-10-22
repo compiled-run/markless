@@ -15,9 +15,14 @@ async function compile(source: string) {
 	});
 }
 
+const webFns = new URL('../../web/src/fns/', import.meta.url).href;
+
 async function load(source: string) {
+	const resolved = source.replace(/"@markless\/web\/fns\/([\w-]+)"/g, (_, name: string) =>
+		JSON.stringify(`${webFns}${name}.ts`),
+	);
 	const loaded = await import(
-		'data:text/javascript;base64,' + Buffer.from(source).toString('base64')
+		'data:text/javascript;base64,' + Buffer.from(resolved).toString('base64')
 	);
 	return Object.values(loaded).find((value) => typeof value === 'function') as (
 		context: unknown,
@@ -170,4 +175,52 @@ export function Shelf({ seed }: { readonly seed: number }) @{
 			message: expect.stringContaining('`onChoose`'),
 		}),
 	]);
+});
+
+// A function declaration in the body follows the rule an arrow `const` does.
+test('a handler named by a body function declaration runs that function in the browser', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Tally() @{
+	let said = state('');
+	const suffix = '!';
+	function shout(event: Event) {
+		said = event.type + suffix;
+	}
+	<div>
+		<button onClick={shout}>shout</button>
+		<p>{said}</p>
+	</div>
+}
+`);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+	const handler = result.symbolModules.modules.find((module) => module.kind === 'event-handler')!;
+	expect(handler.source).not.toMatch(/\bsuffix\b/);
+	const { context, writes } = recordingContext({});
+	await (
+		await load(handler.source)
+	)({ ...context, event: { type: 'click' } });
+	expect(writes).toEqual([{ graphNodeId: 'state:said', value: 'click!' }]);
+});
+
+test('a handler calling a body function fails the compile, whichever way the function is declared', async () => {
+	for (const declaration of [
+		'const bump = () => (ticks = ticks + 1);',
+		'function bump() { ticks = ticks + 1; }',
+	]) {
+		const result = await compile(`import { state } from '@markless/core';
+export function Dial() @{
+	let ticks = state(0);
+	${declaration}
+	<button onClick={() => bump()}>{ticks}</button>
+}
+`);
+		expect(result.captureAnalysis.diagnostics).toEqual([
+			expect.objectContaining({
+				code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
+				severity: 'error',
+				message: expect.stringContaining('"bump"'),
+			}),
+		]);
+	}
 });

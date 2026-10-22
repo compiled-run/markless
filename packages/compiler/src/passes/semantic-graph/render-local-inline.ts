@@ -14,7 +14,12 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectGraphDependencies } from './collect-async.ts';
 import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
-import { mintTemplateExpressionComputed } from './composite-reads.ts';
+import {
+	isCompositeTemplateExpression,
+	mintTemplateExpressionComputed,
+	pureCompositeReadSources,
+	type CompositeReadOptions,
+} from './composite-reads.ts';
 import { handlerReadsRenderLocalDiagnostic } from './diagnostics.ts';
 import { findSharedInstance, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
@@ -44,12 +49,18 @@ export function inlineRenderLocals(
 	node: AnyNode,
 	state: WalkState,
 	// A function, class instance, or DOM node local is the capture pass's to refuse, by name.
-	options: { readonly leaveCaptureOwned?: boolean; readonly leaveRowItems?: boolean } = {},
+	options: {
+		readonly leaveCaptureOwned?: boolean;
+		readonly leaveRowItems?: boolean;
+		// Only locals declared where this answers true are spliced; any other is left as written.
+		readonly inlineOnly?: (declarationStart: number) => boolean;
+	} = {},
 ): RenderLocalInline {
 	const definitions: AnyNode[] = [];
 	const result = inlineWithin(node, state, definitions, new Set(), {
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
+		inlineOnly: options.inlineOnly,
 	});
 	return 'source' in result ? { kind: 'inlined', source: result.source, definitions } : result;
 }
@@ -59,7 +70,11 @@ function inlineWithin(
 	state: WalkState,
 	definitions: AnyNode[],
 	inlining: Set<number>,
-	options: { readonly leaveCaptureOwned: boolean; readonly leaveRowItems: boolean },
+	options: {
+		readonly leaveCaptureOwned: boolean;
+		readonly leaveRowItems: boolean;
+		readonly inlineOnly: ((declarationStart: number) => boolean) | undefined;
+	},
 ):
 	| { readonly source: string; readonly freeNames: ReadonlySet<string> }
 	| Exclude<RenderLocalInline, { readonly kind: 'inlined' }> {
@@ -89,7 +104,14 @@ function inlineWithin(
 				} else if (repeatRowBindsName(name, state)) {
 					if (options.leaveRowItems) freeNames.add(name);
 					else refusal = { kind: 'row-item', name };
-				} else if (semantic.scopes[scopeId]!.kind === 'module' || readsGraph(name, state)) {
+				} else if (
+					semantic.scopes[scopeId]!.kind === 'module' ||
+					readsGraph(name, state) ||
+					(options.inlineOnly &&
+						!options.inlineOnly(
+							semantic.bindings[symbolId]!.declarations[0]?.start ?? -1,
+						))
+				) {
 					freeNames.add(name);
 				} else {
 					const local = classifyLocal(symbolId, name, state);
@@ -161,6 +183,41 @@ function inlineWithin(
 	return { source: text, freeNames };
 }
 
+// A row renders from its item alone, and a nested `@{ ... }` has no body of its own in the render
+// either, so a slot reading a `const` declared in one carries that const's definition instead.
+export function inlineNestedTemplateLocals(node: AnyNode, state: WalkState): string | null {
+	const scopes = nestedTemplateScopes(state);
+	if (scopes.length === 0) return null;
+	const inlined = inlineRenderLocals(node, state, {
+		leaveCaptureOwned: true,
+		leaveRowItems: true,
+		inlineOnly: (start) => scopes.some((scope) => start >= scope.start && start < scope.end),
+	});
+	return inlined.kind === 'inlined' && inlined.definitions.length > 0 ? inlined.source : null;
+}
+
+type Span = { readonly start: number; readonly end: number };
+const nestedTemplateScopeCache = new WeakMap<WalkState, ReadonlyArray<Span>>();
+
+// Every @for body, and every `@{ ... }` written among template children rather than as a function body.
+function nestedTemplateScopes(state: WalkState): ReadonlyArray<Span> {
+	const cached = nestedTemplateScopeCache.get(state);
+	if (cached) return cached;
+	const spans: Span[] = [];
+	const add = (node: AnyNode | undefined) => {
+		if (typeof node?.start === 'number' && typeof node.end === 'number')
+			spans.push({ start: node.start, end: node.end });
+	};
+	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
+		if (candidate.type === 'JSXForExpression') add(candidate.body as AnyNode | undefined);
+		if (!Array.isArray(candidate.children)) return;
+		for (const child of candidate.children as AnyNode[])
+			if (child?.type === 'JSXCodeBlock') add(child);
+	});
+	nestedTemplateScopeCache.set(state, spans);
+	return spans;
+}
+
 /**
  * A handler or callback runs as a browser symbol with no component body, so each body
  * local it reads is recomputed from its definition; any other local fails the build.
@@ -193,6 +250,39 @@ export function inlineHandlerRenderLocals(
 			(definition) => sourceSpan(definition, state.filename) ?? [],
 		),
 	};
+}
+
+// An expression combining graph reads with body consts derives from their definitions, so a write moves it.
+export function liftRenderLocalComposite(
+	expression: AnyNode,
+	state: WalkState,
+	options: CompositeReadOptions,
+): { readonly graphNodeId: string } | null {
+	if (state.currentKeyedRepeatScopeIds.length > 0 || state.currentSharedDefinitionId) return null;
+	if (!isCompositeTemplateExpression(expression, options)) return null;
+	const readSources = pureCompositeReadSources(expression, state, options);
+	if (!readSources) return null;
+	const inlined = inlineRenderLocals(expression, state);
+	if (inlined.kind !== 'inlined' || inlined.definitions.length === 0) return null;
+	const sources = new Set(readSources.filter((source) => readsGraphRoot(source, state)));
+	for (const definition of inlined.definitions)
+		for (const dependency of collectGraphDependencies(definition, state))
+			sources.add(dependency.source);
+	const lifted = mintTemplateExpressionComputed(
+		`() => ${inlined.source}`,
+		[...sources],
+		state,
+		true,
+	);
+	if (lifted)
+		for (const definition of new Set(inlined.definitions))
+			collectDefinitionReads(definition, state);
+	return lifted;
+}
+
+function readsGraphRoot(source: string, state: WalkState): boolean {
+	const root = /^[^.?[(\s]+/.exec(source)?.[0];
+	return Boolean(root && readsGraph(root, state));
 }
 
 // A flipped arm rebuilds from graph reads alone, so a body const it shows rides a computed of its definition.
@@ -228,7 +318,8 @@ export function liftArmRenderLocalValue(
 		undefined,
 		true,
 	);
-	if (lifted) for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+	if (lifted)
+		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
 	return lifted;
 }
 

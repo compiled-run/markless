@@ -131,12 +131,12 @@ export function Editor() @{
 	]);
 });
 
-test('a component local beside state is refused; a module lookup keyed by state is routed', async () => {
+test('a reassignable component local beside state is refused; a const local and a module lookup keyed by state are routed', async () => {
 	const found = await refusals(`import { state } from '@markless/core';
 const LABELS: Record<string, string> = { on: 'On', off: 'Off' };
 export function Toggle() @{
 	let mode = state('on');
-	const suffix = '!';
+	let suffix = '!';
 	<button data-label={LABELS[mode]} title={mode + suffix} onClick={() => (mode = 'off')}>go</button>
 }
 `);
@@ -147,12 +147,16 @@ export function Toggle() @{
 const LABELS: Record<string, string> = { on: 'On', off: 'Off' };
 export function Toggle() @{
 	let mode = state('on');
-	<button data-label={LABELS[mode]} onClick={() => (mode = 'off')}>go</button>
+	const suffix = '!';
+	<button data-label={LABELS[mode]} title={mode + suffix} onClick={() => (mode = 'off')}>go</button>
 }
 `);
 	expect(updatesFor(result, 'data-label')[0]?.graphNodeId).toMatch(
 		/^computed:templateExpression:/,
 	);
+	const title = updatesFor(result, 'title')[0]?.graphNodeId;
+	expect(title).toMatch(/^computed:templateExpression:/);
+	expect(deriveSourceOf(result, title!)).toContain(`context.graph.read("state:mode") + '!'`);
 });
 
 test('projected children beside an interpolation are markup, never joined into its text', async () => {
