@@ -58,6 +58,7 @@ const retainedHeapPlugin = {
 	),
 };
 const started = performance.now();
+const cpuBefore = process.cpuUsage();
 const builder = await createBuilder({
 	root: app.dir,
 	configFile: false,
@@ -66,6 +67,7 @@ const builder = await createBuilder({
 });
 await builder.buildApp();
 const seconds = (performance.now() - started) / 1000;
+const buildCpu = process.cpuUsage(cpuBefore);
 clearInterval(sampler);
 
 async function files(directory) {
@@ -89,6 +91,8 @@ console.log(
 		...app,
 		seconds: Math.round(seconds * 10) / 10,
 		cpuSeconds: Math.round((process.cpuUsage().user + process.cpuUsage().system) / 1e5) / 10,
+		// CPU of the build alone, every thread of this process: what the build-time budgets read.
+		buildCpuSeconds: Math.round((buildCpu.user + buildCpu.system) / 1e4) / 100,
 		// maxRSS is reported in kilobytes.
 		peakRssBytes: process.resourceUsage().maxRSS * 1024,
 		peakHeapBytes: peakHeap,

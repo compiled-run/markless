@@ -24,6 +24,14 @@
 		"largestArtifactBytes": {
 			"bytes": 6291456,
 			"reason": "6 MB: measured 4.63 MB (interaction-closures.json) at 180 pages; origin/main before wrote a 22.6 MB execution-demand.json."
+		},
+		"buildCpuMsPerPage": {
+			"value": 560,
+			"reason": "560 ms of build CPU per extra page between 60 and 180 pages: an M-series Mac measured 297 ms and the CI runner measured 1.37 times the Mac's per-page CPU on the earlier fixture (about 410 ms here); main before the 2026-10 build-time fixes took 1.5 to 1.65 times the per-page CPU of this tree."
+		},
+		"buildCpuGrowth": {
+			"value": 2.9,
+			"reason": "2.9x the build CPU for 3x the pages, a backstop for a step that grows faster than the page count: an M-series Mac measured 2.68x on this fixture (2.55x to 2.64x and the runner 2.26x on the earlier one); main before the 2026-10 build-time fixes took 3.05x."
 		}
 	}
 }
