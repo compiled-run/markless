@@ -30,7 +30,7 @@ async function load(source: string) {
 	) => unknown;
 }
 
-function recordingContext(props: Record<string, unknown>) {
+function recordingContext(props: Record<string, unknown>, cells: Record<string, unknown> = {}) {
 	const writes: Array<{ graphNodeId: string; value: unknown }> = [];
 	return {
 		writes,
@@ -42,7 +42,7 @@ function recordingContext(props: Record<string, unknown>) {
 								(value, key) => (value as Record<string, unknown>)?.[key],
 								props,
 							)
-						: undefined,
+						: cells[graphNodeId],
 				write: (write: { graphNodeId: string; value: unknown }) => {
 					writes.push({ graphNodeId: write.graphNodeId, value: write.value });
 				},
@@ -203,10 +203,88 @@ export function Tally() @{
 	expect(writes).toEqual([{ graphNodeId: 'state:said', value: 'click!' }]);
 });
 
-test('a handler calling a body function fails the compile, whichever way the function is declared', async () => {
+// A handler runs in the browser with no component body, so each body function it calls
+// travels inside the handler as its own definition, closures over state included.
+test('a handler calling body functions runs them in the browser, however they are declared', async () => {
+	for (const [declarations, call, expected] of [
+		[
+			`const suffix = '!';
+	function shout(mark: string) {
+		said = said + mark + suffix;
+	}`,
+			`shout('A')`,
+			'nA!',
+		],
+		[
+			`function shout(mark: string) {
+		said = said + mark;
+	}
+	const whisper = (mark: string) => shout(mark.toLowerCase());`,
+			`whisper('B')`,
+			'nb',
+		],
+		[
+			`const twice = function (mark: string) {
+		return mark + mark;
+	};
+	function echo(mark: string) {
+		said = twice(mark);
+	}`,
+			`{ echo('C'); }`,
+			'CC',
+		],
+	] as const) {
+		const result = await compile(`import { state } from '@markless/core';
+export function Tally() @{
+	let said = state('n');
+	${declarations}
+	<button onClick={() => ${call}}>{said}</button>
+}
+`);
+		expect(result.semanticGraph.diagnostics).toEqual([]);
+		expect(result.captureAnalysis.diagnostics).toEqual([]);
+		expect(result.symbolModules.diagnostics).toEqual([]);
+		const handler = result.symbolModules.modules.find(
+			(module) => module.kind === 'event-handler',
+		)!;
+		const { context, writes } = recordingContext({}, { 'state:said': 'n' });
+		await (
+			await load(handler.source)
+		)(context);
+		expect(writes).toEqual([{ graphNodeId: 'state:said', value: expected }]);
+	}
+});
+
+test('a row handler hands its item to a body function', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Shelf() @{
+	let books = state([{ id: 'a', title: 'Ay' }]);
+	let picked = state('');
+	function pick(title: string) {
+		picked = title.toUpperCase();
+	}
+	<ul>
+		@for (const book of books; key book.id) {
+			<li onClick={() => pick(book.title)}>{book.title}</li>
+		}
+	</ul>
+}
+`);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+	const handler = result.symbolModules.modules.find((module) => module.kind === 'event-handler')!;
+	expect(handler.source).toContain('context.locals?.book?.title');
+	const { context, writes } = recordingContext({});
+	await (
+		await load(handler.source)
+	)({ ...context, locals: { book: { id: 'a', title: 'Ay' } } });
+	expect(writes).toEqual([{ graphNodeId: 'state:picked', value: 'AY' }]);
+});
+
+test('a body function a handler cannot carry still fails the compile', async () => {
 	for (const declaration of [
-		'const bump = () => (ticks = ticks + 1);',
-		'function bump() { ticks = ticks + 1; }',
+		'let bump = () => (ticks = ticks + 1);',
+		'function bump(): void { ticks = ticks + 1; if (ticks < 3) bump(); }',
 	]) {
 		const result = await compile(`import { state } from '@markless/core';
 export function Dial() @{
@@ -215,12 +293,14 @@ export function Dial() @{
 	<button onClick={() => bump()}>{ticks}</button>
 }
 `);
-		expect(result.captureAnalysis.diagnostics).toEqual([
+		expect([
+			...result.semanticGraph.diagnostics,
+			...result.captureAnalysis.diagnostics,
+		]).toContainEqual(
 			expect.objectContaining({
-				code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 				severity: 'error',
-				message: expect.stringContaining('"bump"'),
+				message: expect.stringContaining('bump'),
 			}),
-		]);
+		);
 	}
 });

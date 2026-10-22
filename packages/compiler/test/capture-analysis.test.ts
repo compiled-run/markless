@@ -67,13 +67,13 @@ test('analyzeCaptures records extracted symbol sources without re-walking source
 	});
 });
 
-test('analyzeCaptures reports unsupported local function captures in lazy symbols', async () => {
+test('analyzeCaptures reports a reassignable local function a lazy symbol cannot carry', async () => {
 	const invalidSource = `
 import { state } from '@markless/core';
 
 export function App() @{
 	let count = state(0);
-	const format = () => count + 1;
+	let format = () => count + 1;
 
 	<button onClick={() => format()}>{count}</button>
 }
@@ -102,7 +102,7 @@ export function App() @{
 			suggestions: [
 				{
 					message:
-						'Move the helper to module scope, inline the derivation, or represent durable data with state()/computed().',
+						'Move the helper to module scope, or declare it once with `function` or `const` so an event handler can carry it; durable data belongs in state()/computed().',
 				},
 			],
 		}),

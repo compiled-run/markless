@@ -1952,7 +1952,7 @@ function suggestionForBinding(kind: SemanticLocalBinding['kind']): string {
 		return 'Keep captured constants serializable, move functions to module scope, or represent durable data with state()/computed().';
 	}
 
-	return 'Move the helper to module scope, inline the derivation, or represent durable data with state()/computed().';
+	return 'Move the helper to module scope, or declare it once with `function` or `const` so an event handler can carry it; durable data belongs in state()/computed().';
 }
 
 function symbolSource(symbol: PlannedSymbol): string {

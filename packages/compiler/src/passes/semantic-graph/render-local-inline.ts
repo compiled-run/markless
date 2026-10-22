@@ -54,6 +54,8 @@ export function inlineRenderLocals(
 		readonly leaveRowItems?: boolean;
 		// Only locals declared where this answers true are spliced; any other is left as written.
 		readonly inlineOnly?: (declarationStart: number) => boolean;
+		// A body function the expression names or calls is spliced in as its own definition.
+		readonly inlineFunctions?: boolean;
 	} = {},
 ): RenderLocalInline {
 	const definitions: AnyNode[] = [];
@@ -61,6 +63,7 @@ export function inlineRenderLocals(
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
 		inlineOnly: options.inlineOnly,
+		inlineFunctions: options.inlineFunctions === true,
 	});
 	return 'source' in result ? { kind: 'inlined', source: result.source, definitions } : result;
 }
@@ -74,6 +77,7 @@ function inlineWithin(
 		readonly leaveCaptureOwned: boolean;
 		readonly leaveRowItems: boolean;
 		readonly inlineOnly: ((declarationStart: number) => boolean) | undefined;
+		readonly inlineFunctions: boolean;
 	},
 ):
 	| { readonly source: string; readonly freeNames: ReadonlySet<string> }
@@ -91,6 +95,7 @@ function inlineWithin(
 
 	const visit = (candidate: AnyNode, parent: AnyNode | null): void => {
 		if (refusal) return;
+		if (parent?.type === 'FunctionDeclaration' && parent.id === candidate) return;
 		if (candidate.type === 'Identifier' && typeof candidate.start === 'number') {
 			const name = getIdentifierName(candidate);
 			const symbolId = name ? resolvedSymbolAt(semantic, candidate.start) : null;
@@ -114,7 +119,13 @@ function inlineWithin(
 				) {
 					freeNames.add(name);
 				} else {
-					const local = classifyLocal(symbolId, name, state);
+					const classified = classifyLocal(symbolId, name, state);
+					const local: LocalKind =
+						classified.kind === 'function'
+							? options.inlineFunctions
+								? { kind: 'definition', init: classified.init }
+								: { kind: 'capture-owned' }
+							: classified;
 					if (
 						local.kind === 'graph' ||
 						(local.kind === 'capture-owned' && options.leaveCaptureOwned) ||
@@ -231,6 +242,7 @@ export function inlineHandlerRenderLocals(
 	const inlined = inlineRenderLocals(node, state, {
 		leaveCaptureOwned: true,
 		leaveRowItems: true,
+		inlineFunctions: true,
 	});
 	if (inlined.kind !== 'inlined') {
 		state.graph.diagnostics.push(
@@ -389,7 +401,8 @@ function readsGraph(name: string, state: WalkState): boolean {
 
 type LocalKind =
 	| { readonly kind: 'graph' | 'capture-owned' | 'row-binding' | 'opaque' }
-	| { readonly kind: 'definition'; readonly init: AnyNode };
+	| { readonly kind: 'definition'; readonly init: AnyNode }
+	| { readonly kind: 'function'; readonly init: AnyNode };
 
 // What a component-body local is, from its declaration: a graph cell declared later in the
 // body, a value the capture pass owns, a @for row binding, a `const` definition to recompute,
@@ -397,9 +410,15 @@ type LocalKind =
 function classifyLocal(symbolId: number, name: string, state: WalkState): LocalKind {
 	const semantic = state.semantic();
 	if (semantic.bindings[symbolId]!.declarations.length !== 1) return { kind: 'opaque' };
-	if (state.graph.localBindings.some((binding) => binding.name === name))
-		return { kind: 'capture-owned' };
 	const declarationStart = semantic.bindings[symbolId]!.declarations[0]!.start;
+	const declared = state.graph.localBindings.find((binding) => binding.name === name);
+	if (declared) {
+		const definition =
+			declared.kind === 'function' && declared.sourceSpan?.start === declarationStart
+				? bodyFunctionDefinition(declarationStart, state)
+				: null;
+		return definition ? { kind: 'function', init: definition } : { kind: 'capture-owned' };
+	}
 	let found: LocalKind | null = null;
 	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
 		if (found) return;
@@ -436,6 +455,27 @@ function classifyLocal(symbolId: number, name: string, state: WalkState): LocalK
 		}
 	});
 	return found ?? { kind: 'opaque' };
+}
+
+// A `const` function value or a function declaration: written once, so a handler can carry its definition.
+function bodyFunctionDefinition(declarationStart: number, state: WalkState): AnyNode | null {
+	let found: AnyNode | null = null;
+	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
+		if (found) return;
+		if (candidate.type === 'FunctionDeclaration') {
+			if ((candidate.id as AnyNode | undefined)?.start === declarationStart)
+				found = candidate;
+			return;
+		}
+		if (candidate.type !== 'VariableDeclaration' || candidate.kind !== 'const') return;
+		for (const declarator of (candidate.declarations as AnyNode[] | undefined) ?? []) {
+			if ((declarator.id as AnyNode | undefined)?.start !== declarationStart) continue;
+			const init = unwrapTypeAssertion(declarator.init as AnyNode | undefined);
+			if (init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression')
+				found = init;
+		}
+	});
+	return found;
 }
 
 function declaredIn(node: unknown, start: number): boolean {

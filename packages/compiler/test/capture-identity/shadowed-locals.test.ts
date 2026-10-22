@@ -80,12 +80,12 @@ import { state } from '@markless/core';
 
 export default function Panel() @{
 	const s = state({ label: 'a', seen: '' });
-	const decorate = (text) => text + '!';
+	let decorate = (text) => text + '!';
 	<button data-panel onClick={() => { s.seen = decorate(s.label); }}>{s.seen}</button>
 }
 `;
 
-test('a handler reading a component-scope local function is still refused', async () => {
+test('a handler reading a reassignable component-scope local function is still refused', async () => {
 	const compiled = await compileOne('src/panel.tsrx', HANDLER_CAPTURES_COMPONENT_LOCAL);
 	const refusals = errors(compiled);
 	expect(refusals.map((item) => item.code)).toEqual(['MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED']);
@@ -119,7 +119,7 @@ import { state } from '@markless/core';
 
 export default function Panel() @{
 	const s = state({ label: 'a', seen: '' });
-	const decorate = (text) => text + '!';
+	let decorate = (text) => text + '!';
 	<div data-panel>
 		<button data-shadow onClick={() => { const decorate = (text) => text; s.seen = decorate(s.label); }}>one</button>
 		<button data-capture onClick={() => { s.seen = decorate(s.label); }}>two</button>

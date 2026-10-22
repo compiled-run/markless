@@ -3156,30 +3156,75 @@ export const errorEntries: readonly ErrorEntry[] = [
 			what: [
 				{
 					id: 's0',
-					text: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a function, a class instance, a DOM node, or another value that is not plain data.',
+					text: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a class instance, a DOM node, a function stored in a ',
+				},
+				{
+					id: 's1',
+					text: 'let',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', or another value that is not plain data. A function declared with ',
+				},
+				{
+					id: 's3',
+					text: 'function',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' or ',
+				},
+				{
+					id: 's5',
+					text: 'const',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' is fine: the handler carries its definition.',
 				},
 			],
 			how: [
 				{
 					id: 's0',
-					text: 'Move the function to the top of the file. Keep plain data in the local, or make it ',
+					text: 'Declare the function with ',
 				},
 				{
 					id: 's1',
-					text: 'state()',
+					text: 'function',
 					code: true,
 				},
 				{
 					id: 's2',
-					text: '. For an element, use ',
+					text: ' or ',
 				},
 				{
 					id: 's3',
-					text: 'element()',
+					text: 'const',
 					code: true,
 				},
 				{
 					id: 's4',
+					text: ', or move it to the top of the file. Keep plain data in the local, or make it ',
+				},
+				{
+					id: 's5',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: '. For an element, use ',
+				},
+				{
+					id: 's7',
+					text: 'element()',
+					code: true,
+				},
+				{
+					id: 's8',
 					text: '.',
 				},
 			],

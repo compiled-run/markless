@@ -6,6 +6,7 @@ import { Note } from './reading-tsrx/statement-container.tsrx';
 import { Steps } from './reading-tsrx/for-index.tsrx';
 import { Bags } from './reading-tsrx/const-times-state.tsrx';
 import { NameCounters } from './reading-tsrx/name-counters.tsrx';
+import { Shop } from './reading-tsrx/body-function-calls.tsrx';
 
 // The constructs the "Reading a .tsrx file" guide teaches, each served and client-rendered.
 
@@ -14,6 +15,17 @@ afterEach(cleanup);
 async function bodyFunction(c: HTMLElement) {
 	(c.querySelector('[data-add]') as HTMLButtonElement).click();
 	await expect.poll(() => c.querySelector('output')?.textContent).toBe('2');
+}
+
+async function bodyFunctionCalls(c: HTMLElement) {
+	const text = (selector: string) => c.querySelector(selector)?.textContent;
+	(c.querySelector('[data-add]') as HTMLButtonElement).click();
+	await expect.poll(() => text('[data-bags]')).toBe('3');
+	expect(text('[data-log]')).toBe('added 2');
+	(c.querySelector('[data-add-one]') as HTMLButtonElement).click();
+	await expect.poll(() => text('[data-bags]')).toBe('4');
+	(c.querySelector('[data-item="dark"]') as HTMLElement).click();
+	await expect.poll(() => text('[data-log]')).toBe('added 2, added 1, dark roast');
 }
 
 async function forConst(c: HTMLElement) {
@@ -60,6 +72,10 @@ test('CSR: onClick names a function declared in the body', async () =>
 	bodyFunction((await render(Counter)).container as HTMLElement));
 test('SSR: onClick names a function declared in the body', async () =>
 	bodyFunction((await renderSSR(Counter)).container as HTMLElement));
+test('CSR: handlers call body functions that read, write and call each other', async () =>
+	bodyFunctionCalls((await render(Shop)).container as HTMLElement));
+test('SSR: handlers call body functions that read, write and call each other', async () =>
+	bodyFunctionCalls((await renderSSR(Shop)).container as HTMLElement));
 test('CSR: a const at the top of an @for body renders in served and added rows', async () =>
 	forConst((await render(Basket)).container as HTMLElement));
 test('SSR: a const at the top of an @for body renders in served and added rows', async () =>
