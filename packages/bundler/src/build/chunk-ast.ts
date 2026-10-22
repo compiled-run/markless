@@ -84,6 +84,7 @@ export async function prefetchChunkParses(
 
 export function clearParsedChunkCode(): void {
 	parsedByExtension.clear();
+	clearChunkFactCaches();
 	codeByFile.clear();
 	cachedCodeLength = 0;
 }
@@ -203,6 +204,41 @@ export function chunkDynamicImports(
 	fileName: string,
 	code: string,
 ): readonly ChunkDynamicImport[] | undefined {
+	const known = dynamicImportsFor(fileName);
+	if (known.has(code)) return known.get(code);
+	return readChunkDynamicImports(fileName, code);
+}
+
+export function clearChunkFactCaches(): void {
+	dynamicImportsByExtension.clear();
+	localExportsByExtension.clear();
+}
+
+// Answers read on a chunk worker, keyed by exact code like the parse cache.
+const dynamicImportsByExtension = new Map<
+	string,
+	Map<string, readonly ChunkDynamicImport[] | undefined>
+>();
+
+function dynamicImportsFor(fileName: string) {
+	const extension = fileName.slice(fileName.lastIndexOf('.'));
+	let known = dynamicImportsByExtension.get(extension);
+	if (!known) dynamicImportsByExtension.set(extension, (known = new Map()));
+	return known;
+}
+
+export function rememberChunkDynamicImports(
+	fileName: string,
+	code: string,
+	found: readonly ChunkDynamicImport[] | undefined,
+): void {
+	dynamicImportsFor(fileName).set(code, found);
+}
+
+export function readChunkDynamicImports(
+	fileName: string,
+	code: string,
+): readonly ChunkDynamicImport[] | undefined {
 	const parsed = parseChunkCode(fileName, code);
 	if (parsed.errors.length) return undefined;
 	const found: ChunkDynamicImport[] = [];
@@ -233,6 +269,32 @@ export function chunkDynamicImports(
 // `export { local as exported }` bindings without a source, read from the module record.
 // Undefined when the chunk has parse errors or an export this reader cannot classify without the tree.
 export function chunkLocalExportSpecifiers(
+	fileName: string,
+	code: string,
+): Map<string, string> | undefined {
+	const known = localExportsFor(fileName);
+	if (known.has(code)) return known.get(code);
+	return readChunkLocalExportSpecifiers(fileName, code);
+}
+
+const localExportsByExtension = new Map<string, Map<string, Map<string, string> | undefined>>();
+
+function localExportsFor(fileName: string) {
+	const extension = fileName.slice(fileName.lastIndexOf('.'));
+	let known = localExportsByExtension.get(extension);
+	if (!known) localExportsByExtension.set(extension, (known = new Map()));
+	return known;
+}
+
+export function rememberChunkLocalExportSpecifiers(
+	fileName: string,
+	code: string,
+	bindings: Map<string, string> | undefined,
+): void {
+	localExportsFor(fileName).set(code, bindings);
+}
+
+export function readChunkLocalExportSpecifiers(
 	fileName: string,
 	code: string,
 ): Map<string, string> | undefined {

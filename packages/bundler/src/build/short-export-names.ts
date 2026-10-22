@@ -1,7 +1,8 @@
 import { dirname, join, normalize } from 'pathe';
 import { RolldownMagicString, type Plugin } from 'rolldown';
 import { parseChunkCode, renderedChunkCount } from './chunk-ast.ts';
-import { PACK_LOAD, PACK_LOADER_PREFIX } from './lazy-module-facades.ts';
+import { forgetChunkTaskResults, runChunkTask } from './chunk-workers.ts';
+import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 
 // Packs keep Rolldown's unminified cross-chunk names so a name never depends on emission order;
 // this pass shortens each to a prefix of a hash of that name, unique within its own chunk.
@@ -28,22 +29,57 @@ export type ShortNamePlan = {
 
 type Edit = { readonly start: number; readonly end: number; readonly source: string };
 type Syntax = { type?: string; start: number; end: number; [key: string]: unknown };
+type Span = { readonly start: number; readonly end: number };
+type NameSpan = Span & { readonly name: string };
 type Reference = {
 	readonly chunk: string;
 	readonly target: string;
 	readonly name: string;
-	readonly node: Syntax;
+	readonly node: Span;
 	readonly shorthand: boolean;
 	readonly removed: boolean;
 };
 type OwnExport = {
 	readonly name: string;
-	readonly node: Syntax;
-	readonly local: Syntax;
+	readonly node: Span;
+	readonly local: Span;
 	readonly shorthand: boolean;
 	// A plain `export{...}` clause, which can drop names; a re-export clause cannot.
-	readonly clause: Syntax | undefined;
+	readonly clause: Span | undefined;
 };
+
+/** What one chunk's code says about its cross-chunk names; plain data, so a chunk worker can read it. */
+export type ShortNameChunkFacts =
+	| { readonly errors: true }
+	| {
+			readonly errors: false;
+			readonly imports: readonly {
+				readonly source: string | undefined;
+				readonly exportAll: boolean;
+				// Undefined: a default or namespace specifier, which reads every name.
+				readonly specifiers: readonly (
+					| ({ readonly name: string; readonly shorthand: boolean } & Span)
+					| undefined
+				)[];
+			}[];
+			readonly pins: readonly string[];
+			readonly exports: readonly {
+				readonly source: string | undefined;
+				readonly reExport: boolean;
+				readonly clause: Span;
+				readonly specifiers: readonly {
+					readonly local: NameSpan;
+					readonly exported: NameSpan;
+					readonly shorthand: boolean;
+				}[];
+			}[];
+			readonly dynamicImports: readonly {
+				readonly source: string;
+				readonly members: readonly NameSpan[] | undefined;
+			}[];
+			readonly words: readonly string[];
+			readonly strings: readonly string[];
+	  };
 
 const MIN_LENGTH = 2;
 // Later bundle passes find the Vite preload helper by these export names in importers.
@@ -59,7 +95,83 @@ const RESERVED = new Set(
 	),
 );
 
-export function planShortExportNames(chunks: readonly ShortNameChunk[]): ShortNamePlan {
+export function shortNameChunkFacts(fileName: string, code: string): ShortNameChunkFacts {
+	const parsed = parseChunkCode(fileName, code);
+	if (parsed.errors.length) return { errors: true };
+	const imports: Extract<ShortNameChunkFacts, { errors: false }>['imports'][number][] = [];
+	const exports: Extract<ShortNameChunkFacts, { errors: false }>['exports'][number][] = [];
+	const pins: string[] = [];
+	for (const node of parsed.program.body as unknown as Syntax[]) {
+		if (node.type === 'ImportDeclaration' || node.type === 'ExportAllDeclaration') {
+			imports.push({
+				source: sourceOf(node),
+				exportAll: node.type === 'ExportAllDeclaration',
+				specifiers:
+					node.type === 'ExportAllDeclaration'
+						? []
+						: ((node.specifiers as Syntax[] | undefined) ?? []).map((specifier) => {
+								if (specifier.type !== 'ImportSpecifier') return undefined;
+								const imported = specifier.imported as Syntax;
+								return {
+									name: nameOf(imported),
+									start: imported.start,
+									end: imported.end,
+									shorthand: imported.start === (specifier.local as Syntax).start,
+								};
+							}),
+			});
+			continue;
+		}
+		if (node.type === 'ExportDefaultDeclaration') {
+			pins.push('default');
+			continue;
+		}
+		if (node.type !== 'ExportNamedDeclaration') continue;
+		if (node.declaration) {
+			pins.push(...declaredNames(node.declaration as Syntax));
+			continue;
+		}
+		exports.push({
+			source: node.source ? sourceOf(node) : undefined,
+			reExport: !!node.source,
+			clause: { start: node.start, end: node.end },
+			specifiers: (node.specifiers as Syntax[]).map((specifier) => {
+				const local = specifier.local as Syntax;
+				const exported = specifier.exported as Syntax;
+				return {
+					local: { name: nameOf(local), start: local.start, end: local.end },
+					exported: { name: nameOf(exported), start: exported.start, end: exported.end },
+					shorthand: local.start === exported.start,
+				};
+			}),
+		});
+	}
+	const words = new Set<string>();
+	const strings: string[] = [];
+	const dynamicImports: { source: string; members: NameSpan[] | undefined }[] = [];
+	scanReads(
+		parsed.program as unknown as Syntax,
+		words,
+		(source, members) => {
+			dynamicImports.push({
+				source,
+				members: members?.map((node) => ({
+					name: node.name as string,
+					start: node.start,
+					end: node.end,
+				})),
+			});
+		},
+		strings,
+	);
+	return { errors: false, imports, pins, exports, dynamicImports, words: [...words], strings };
+}
+
+export function planShortExportNames(
+	chunks: readonly ShortNameChunk[],
+	factsOf: (chunk: ShortNameChunk) => ShortNameChunkFacts = (chunk) =>
+		shortNameChunkFacts(chunk.fileName, chunk.code),
+): ShortNamePlan {
 	const byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
 	const references: Reference[] = [];
 	const own = new Map<string, OwnExport[]>();
@@ -74,66 +186,54 @@ export function planShortExportNames(chunks: readonly ShortNameChunk[]): ShortNa
 		pinned.set(fileName, set);
 	};
 	for (const chunk of chunks) {
-		const parsed = parseChunkCode(chunk.fileName, chunk.code);
-		if (parsed.errors.length)
+		const facts = factsOf(chunk);
+		if (facts.errors)
 			return { renames: new Map(), edits: new Map(), pruned: new Map(), exports: new Map() };
 		const removed = !!chunk.removed;
 		const exports: OwnExport[] = [];
-		for (const node of parsed.program.body as unknown as Syntax[]) {
-			if (node.type === 'ImportDeclaration' || node.type === 'ExportAllDeclaration') {
-				const target = targetOf(chunk.fileName, node, byName);
-				if (!target) continue;
-				if (node.type === 'ExportAllDeclaration') {
+		for (const item of facts.imports) {
+			const target = targetOf(chunk.fileName, item.source, byName);
+			if (!target) continue;
+			if (item.exportAll) {
+				opaque.add(target);
+				continue;
+			}
+			for (const specifier of item.specifiers) {
+				if (!specifier) {
 					opaque.add(target);
 					continue;
 				}
-				for (const specifier of (node.specifiers as Syntax[] | undefined) ?? []) {
-					if (specifier.type !== 'ImportSpecifier') {
-						opaque.add(target);
-						continue;
-					}
-					const imported = specifier.imported as Syntax;
-					const local = specifier.local as Syntax;
-					references.push({
-						chunk: chunk.fileName,
-						target,
-						name: nameOf(imported),
-						node: imported,
-						shorthand: imported.start === local.start,
-						removed,
-					});
-				}
-				continue;
+				references.push({
+					chunk: chunk.fileName,
+					target,
+					name: specifier.name,
+					node: specifier,
+					shorthand: specifier.shorthand,
+					removed,
+				});
 			}
-			if (node.type === 'ExportDefaultDeclaration') {
-				pin(chunk.fileName, 'default');
-				continue;
-			}
-			if (node.type !== 'ExportNamedDeclaration') continue;
-			if (node.declaration) {
-				for (const name of declaredNames(node.declaration as Syntax))
-					pin(chunk.fileName, name);
-				continue;
-			}
-			const target = node.source ? targetOf(chunk.fileName, node, byName) : undefined;
-			for (const specifier of node.specifiers as Syntax[]) {
-				const local = specifier.local as Syntax;
-				const exported = specifier.exported as Syntax;
-				const shorthand = local.start === exported.start;
-				if (node.source) {
+		}
+		for (const name of facts.pins) pin(chunk.fileName, name);
+		for (const item of facts.exports) {
+			const target = item.reExport
+				? targetOf(chunk.fileName, item.source, byName)
+				: undefined;
+			for (const specifier of item.specifiers) {
+				const { local, exported, shorthand } = specifier;
+				if (item.reExport) {
 					if (target)
 						references.push({
 							chunk: chunk.fileName,
 							target,
-							name: nameOf(local),
+							name: local.name,
 							node: local,
 							shorthand,
 							removed,
 						});
-					if (shorthand && target) pin(chunk.fileName, nameOf(exported));
+					if (shorthand && target) pin(chunk.fileName, exported.name);
 					else
 						exports.push({
-							name: nameOf(exported),
+							name: exported.name,
 							node: exported,
 							local,
 							shorthand: false,
@@ -141,38 +241,37 @@ export function planShortExportNames(chunks: readonly ShortNameChunk[]): ShortNa
 						});
 				} else
 					exports.push({
-						name: nameOf(exported),
+						name: exported.name,
 						node: exported,
 						local,
 						shorthand,
-						clause: node,
+						clause: item.clause,
 					});
 			}
 		}
 		own.set(chunk.fileName, exports);
-		scanReads(
-			parsed.program as unknown as Syntax,
-			words,
-			(source, members) => {
-				const target = resolveChunk(chunk.fileName, source, byName);
-				if (!target) return false;
-				if (!members) {
-					escaping.add(target);
-					return true;
-				}
-				for (const node of members)
-					references.push({
-						chunk: chunk.fileName,
-						target,
-						name: node.name as string,
-						node,
-						shorthand: false,
-						removed,
-					});
-				return true;
-			},
-			strings,
-		);
+		for (const word of facts.words) words.add(word);
+		for (const { source, members } of facts.dynamicImports) {
+			const target = resolveChunk(chunk.fileName, source, byName);
+			if (!target) {
+				strings.push(source);
+				continue;
+			}
+			if (!members) {
+				escaping.add(target);
+				continue;
+			}
+			for (const node of members)
+				references.push({
+					chunk: chunk.fileName,
+					target,
+					name: node.name,
+					node,
+					shorthand: false,
+					removed,
+				});
+		}
+		strings.push(...facts.strings);
 	}
 
 	// A chunk named in a string can be imported by a URL built at runtime.
@@ -241,7 +340,7 @@ export function planShortExportNames(chunks: readonly ShortNameChunk[]): ShortNa
 	for (const [fileName, exports] of own) {
 		const names = renames.get(fileName) ?? new Map<string, string>();
 		const unused = pruned.get(fileName);
-		const rewritten = new Set<Syntax>();
+		const rewritten = new Set<Span>();
 		for (const item of exports) {
 			if (!item.clause || !unused?.has(item.name) || rewritten.has(item.clause)) continue;
 			rewritten.add(item.clause);
@@ -358,11 +457,44 @@ export function shortExportNamesPlugin(
 		string,
 		{
 			chunk: ShortNameChunk;
+			facts: Promise<ShortNameChunkFacts>;
 			resolve: (result: { code: string; map: string | null } | null) => void;
 			reject: (error: unknown) => void;
 		}
 	>();
 	let exports = new Map<string, readonly string[]>();
+	const planWhenAnalyzed = async (
+		batch: typeof pending,
+		options: { readonly sourcemap?: unknown },
+	) => {
+		pending = new Map();
+		try {
+			const facts = new Map<string, ShortNameChunkFacts>();
+			for (const [fileName, item] of batch) facts.set(fileName, await item.facts);
+			const plan = planShortExportNames(
+				[...batch.values()].map((item) => item.chunk),
+				(chunk) => facts.get(chunk.fileName)!,
+			);
+			exports = new Map(plan.exports);
+			forgetChunkTaskResults();
+			for (const [fileName, item] of batch) {
+				const list = plan.edits.get(fileName);
+				if (!list?.length) {
+					item.resolve(null);
+					continue;
+				}
+				const source = new RolldownMagicString(item.chunk.code);
+				for (const change of list)
+					source.overwrite(change.start, change.end, change.source);
+				item.resolve({
+					code: source.toString(),
+					map: options.sourcemap ? source.generateMap({ hires: true }).toString() : null,
+				});
+			}
+		} catch (error) {
+			for (const item of batch.values()) item.reject(error);
+		}
+	};
 	return {
 		name: 'markless-short-export-names',
 		renderStart() {
@@ -382,35 +514,12 @@ export function shortExportNamesPlugin(
 						signature: facade?.exports,
 						removed: removedChunks().has(chunk.fileName),
 					},
+					facts: handled(runChunkTask('shortNameChunkFacts', chunk.fileName, code)),
 					resolve,
 					reject,
 				});
 				if (pending.size !== renderedChunkCount(meta.chunks)) return;
-				try {
-					const plan = planShortExportNames(
-						[...pending.values()].map((item) => item.chunk),
-					);
-					exports = new Map(plan.exports);
-					for (const [fileName, item] of pending) {
-						const list = plan.edits.get(fileName);
-						if (!list?.length) {
-							item.resolve(null);
-							continue;
-						}
-						const source = new RolldownMagicString(item.chunk.code);
-						for (const change of list)
-							source.overwrite(change.start, change.end, change.source);
-						item.resolve({
-							code: source.toString(),
-							map: options.sourcemap
-								? source.generateMap({ hires: true }).toString()
-								: null,
-						});
-					}
-				} catch (error) {
-					for (const item of pending.values()) item.reject(error);
-				}
-				pending.clear();
+				void planWhenAnalyzed(pending, options);
 			});
 		},
 		renderError(error) {
@@ -432,11 +541,15 @@ export function shortExportNamesPlugin(
 
 function targetOf(
 	importer: string,
-	node: Syntax,
+	source: string | undefined,
 	chunks: ReadonlyMap<string, ShortNameChunk>,
 ): string | undefined {
+	return source === undefined ? undefined : resolveChunk(importer, source, chunks);
+}
+
+function sourceOf(node: Syntax): string | undefined {
 	const value = (node.source as { value?: unknown } | undefined)?.value;
-	return typeof value === 'string' ? resolveChunk(importer, value, chunks) : undefined;
+	return typeof value === 'string' ? value : undefined;
 }
 
 function resolveChunk(
@@ -485,7 +598,7 @@ function scanReads(
 	root: Syntax,
 	words: Set<string>,
 	// Members: the names Rolldown's `import(x).then(m=>(m.init(),m.name))` reads; otherwise the chunk escapes.
-	imports: (source: string, members: Syntax[] | undefined) => boolean,
+	imports: (source: string, members: Syntax[] | undefined) => void,
 	strings: string[],
 ): void {
 	// A node's parent and grandparent travel with it: an import is classified by those two alone.
@@ -515,12 +628,8 @@ function scanReads(
 							  !(source.expressions as unknown[]).length
 							? ((source.quasis as Syntax[])[0]?.value as { cooked?: string })?.cooked
 							: undefined;
-				if (
-					typeof value === 'string' &&
-					!packerImport(syntax, parent, grandparent) &&
-					!imports(value, namespaceReads(syntax, parent, grandparent))
-				)
-					strings.push(value);
+				if (typeof value === 'string' && !packerImport(syntax, parent, grandparent))
+					imports(value, namespaceReads(syntax, parent, grandparent));
 				if (typeof value !== 'string') pending.push([source, syntax, parent]);
 				pending.push([syntax.options, syntax, parent]);
 				continue;
@@ -679,4 +788,10 @@ function identifierHash(text: string): string {
 		hash /= BigInt(PART.length);
 	}
 	return name;
+}
+
+// Awaited once every chunk arrives; until then a rejection must not surface as unhandled.
+function handled<T>(promise: Promise<T>): Promise<T> {
+	promise.catch(() => {});
+	return promise;
 }
