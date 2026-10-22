@@ -83,7 +83,8 @@ function outlineMarkup(headings: readonly Heading[]): string {
 		.join('');
 	return (
 		'<markless-outline><nav class="on-this-page" aria-label="On this page">' +
-		'<details class="on-this-page-fold"><summary class="on-this-page-title">On this page</summary>' +
+		'<p class="on-this-page-title on-this-page-heading" aria-hidden="true">On this page</p>' +
+		'<details class="on-this-page-fold"><summary class="on-this-page-title on-this-page-toggle">On this page</summary>' +
 		`<ul class="on-this-page-list">${items}</ul></details></nav></markless-outline>`
 	);
 }
