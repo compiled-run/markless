@@ -18,8 +18,6 @@ import { siteBase } from './site-base.ts';
 export default {
 	base: siteBase,
 	nitro: { baseURL: siteBase },
-	// Measured: /concepts/state is 854 kB in the browser and 914 kB on the server, 487 kB of it drawing data.
-	build: { chunkSizeWarningLimit: 1000 },
 	// pageProps, codeBlocks and uiDemos run before router(): they rewrite the .mdx source router() parses.
 	// highlightMdx runs after router(): it rewrites the module router() emits.
 	lint: {

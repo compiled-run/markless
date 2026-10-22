@@ -17,19 +17,30 @@ export const GUARDED_BUILDS = [
 	'demos/static-router',
 ];
 
-/** Patterns for stderr lines a build may print; each entry needs a one-line reason the warned behaviour is intended. */
-export const ALLOWED_WARNINGS = [];
+/** Warnings a build may print, each with the one-line reason it stays. */
+export const ALLOWED_WARNINGS = [
+	{
+		build: 'website',
+		pattern: /^\(!\) Some chunks are larger than \d+ kB after minification/,
+		reason:
+			'Open owner decision: figure drawings ship in page packs (home 2.0 MB, 623 kB gzip) and the <Code> compile worker is 3.4 MB.',
+	},
+];
 
 // Rolldown's timing report: how long plugin callbacks took, not a defect in the build.
 const TIMING_REPORT_START = /^\[PLUGIN_TIMINGS\]/;
 const TIMING_REPORT_END = /InputOptions\.checks#bundlertimings/;
+// Vite's reporter prints its plugin name, the warning, then advice lines starting with "- ".
+const REPORTER_HEADER = /^\[plugin builtin:vite-reporter\]\s*$/;
 
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 
-/** The warning lines in one build's stderr, timing reports and blank lines left out. */
-export function buildWarnings(stderr) {
+/** The warnings in one build's stderr, one entry per warning, timing reports left out. */
+export function buildWarnings(stderr, build = '') {
 	const warnings = [];
 	let inTimingReport = false;
+	let inReporterAdvice = false;
+	let header = '';
 	for (const raw of stderr.split('\n')) {
 		const line = raw.replace(ANSI, '').trimEnd();
 		if (inTimingReport) {
@@ -40,10 +51,22 @@ export function buildWarnings(stderr) {
 			inTimingReport = !TIMING_REPORT_END.test(line);
 			continue;
 		}
+		if (inReporterAdvice && line.startsWith('- ')) continue;
+		inReporterAdvice = false;
 		if (!line.trim()) continue;
-		if (ALLOWED_WARNINGS.some((allowed) => allowed.test(line))) continue;
-		warnings.push(line);
+		if (REPORTER_HEADER.test(line)) {
+			header = line;
+			continue;
+		}
+		const warning = header ? `${header} ${line}` : line;
+		inReporterAdvice = header !== '';
+		header = '';
+		const allowed = ALLOWED_WARNINGS.some(
+			(entry) => entry.build === build && entry.pattern.test(line),
+		);
+		if (!allowed) warnings.push(warning);
 	}
+	if (header) warnings.push(header);
 	return warnings;
 }
 
@@ -71,13 +94,13 @@ async function main() {
 	for (const dir of builds) {
 		console.log(`build-warnings: building ${dir}`);
 		const { code, stderr } = await run(dir);
-		const warnings = buildWarnings(stderr);
+		const warnings = buildWarnings(stderr, dir);
 		if (code !== 0) {
 			failed = true;
 			console.error(`build-warnings: ${dir} build exited with ${code}\n${stderr.slice(-4000)}`);
 		} else if (warnings.length) {
 			failed = true;
-			console.error(`build-warnings: ${dir} printed ${warnings.length} warning lines:`);
+			console.error(`build-warnings: ${dir} printed ${warnings.length} warnings:`);
 			for (const line of warnings) console.error(`  ${line}`);
 		} else {
 			console.log(`build-warnings: ${dir} built with no warnings`);
