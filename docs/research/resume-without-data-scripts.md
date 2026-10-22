@@ -567,3 +567,36 @@ time, with no evaluator risk.
   a real phone.
 - The Next-dashboard and Remix signed-in crawls used the demo accounts. RealWorld signed-in routes used
   `demo@conduit.test`.
+
+## 11. Implementation result: parked (2026-10-22)
+
+The design was implemented on a local branch and measured; it is parked, and pages keep
+`markless/state` and `markless/view`. The branch: each compiled module names its records as a record
+table, the server writes a page's records against those tables as one `markless/values` residual (each
+record verified by decoding it back, so parity holds by construction), and the browser decodes the
+residual on the first trigger with no render code and no extra fetch. Only MDX pages used it.
+
+Measured on markless.dev (main vs branch, same base commit): 4x CPU, 150 ms RTT, 5 Mbps, 11 paired
+cold visits per side, 95% bootstrap interval of the median difference in brackets.
+
+HTML on MDX pages shrinks a lot: `/` 675.6 to 664.2 KB gz (payload 20.8 to 9.7), `/ui/accordion`
+61.1 to 47.3 (payload 27.7 to 13.7), `/ui/select` 49.8 to 38.7, typical doc pages 36-50 to 30-40 KB gz.
+Component (`.tsrx`) pages are unchanged.
+
+No variant was free on both load-time JS and the first click:
+
+| Where the tables live | Landing JS, `/ui/accordion` | First click |
+| --- | --- | --- |
+| JSON-text constants loaded with the page | 475.2 to 489.5 KB gz (+3.0%) | within noise (UI nav +2 ms [-4, 6]) |
+| The render data's own record objects | 475.2 to 478.5 KB gz (+0.7%) | UI nav +33 ms [25, 37] settled, +32 [26, 42] before idle; item trigger +36 [11, 69] |
+| Page-local records on component pages | interaction benchmark +5.8 KB gz JS vs -1.2 KB gz HTML | early clicks +15 ms |
+
+With the render-data variant the page loads faster (load event -443 ms [-628, -311] on
+`/ui/accordion`) because the HTML is smaller, but the first click pays for evaluating the islands'
+render-data modules (about 16 ms at 4x) and spelling and parsing the records (about 17 ms). The site
+preloads all first-click code at load, so fetching the decoder lazily would add a network round trip
+to the first click instead.
+
+Why it is parked: a slower first click is never acceptable, which rules out the render-data and
+component-page variants, and the text-constant variant's +3% load-time JS roughly cancels its HTML
+saving. Reopen only with a layout whose tables cost neither landing JS nor first-click work.
