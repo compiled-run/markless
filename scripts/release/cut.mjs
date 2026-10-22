@@ -343,7 +343,7 @@ export function main(argv) {
 			resumed: 'true',
 			push_tag: pushTag ? 'true' : 'false',
 		});
-		return refusals.length > 0 ? 1 : 0;
+		return dryRunVerdict(refusals);
 	}
 
 	const version = nextMinor(current);
@@ -443,13 +443,15 @@ export function main(argv) {
 		}
 	}
 
-	if (refusals.length > 0) {
-		console.error(
-			`release-cut: dry run finished, but the real cut would refuse:\n${refusalText(refusals)}`,
-		);
-		return 1;
-	}
-	return 0;
+	return dryRunVerdict(refusals);
+}
+
+function dryRunVerdict(refusals) {
+	if (refusals.length === 0) return 0;
+	console.error(
+		`release-cut: dry run finished, but the real cut would refuse:\n${refusalText(refusals)}`,
+	);
+	return 1;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
