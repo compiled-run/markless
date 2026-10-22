@@ -11,7 +11,11 @@ const config = JSON.parse(readFileSync(new URL('./budgets.json', import.meta.url
 const budgets = Object.fromEntries(
 	Object.entries(config.budgets).map(([name, budget]) => [name, budget.bytes ?? budget.value]),
 );
+const cpuPerPageBudget = config.budgets.buildCpuPerPageInReferenceRuns;
+budgets.buildCpuPerPageInReferenceRuns =
+	cpuPerPageBudget.byPlatform?.[`${process.platform}-${process.arch}`] ?? cpuPerPageBudget.value;
 const buildScript = new URL('./build.mjs', import.meta.url).pathname;
+const referenceScript = new URL('./reference.mjs', import.meta.url).pathname;
 const MB = 1024 * 1024;
 
 function run(command, args, options = {}) {
@@ -51,6 +55,17 @@ async function build(dir, pages) {
 }
 
 // Split server chunks load in an order the bundler chose, so the built server answers a real request.
+// The fastest of three runs, before and after the builds, so one busy moment does not set this runner's speed.
+async function referenceCpuMs() {
+	let fastest = Infinity;
+	for (let attempt = 0; attempt < 3; attempt++)
+		fastest = Math.min(
+			fastest,
+			JSON.parse(await run(process.execPath, [referenceScript])).cpuMs,
+		);
+	return fastest;
+}
+
 async function serves(dir, path, text) {
 	const server = spawn(process.execPath, [join(dir, '.output/server/index.mjs')], {
 		env: { ...process.env, PORT: '0', HOST: '127.0.0.1' },
@@ -83,8 +98,10 @@ const work = await mkdtemp(join(tmpdir(), 'markless-build-scale-'));
 try {
 	const [small, large] = config.pages;
 	const results = [];
+	const referenceBefore = await referenceCpuMs();
 	for (const pages of [small, large])
 		results.push(await build(join(work, `app-${pages}`), pages));
+	const referenceMs = Math.min(referenceBefore, await referenceCpuMs());
 	const [atSmall, atLarge] = results;
 	const perPage = (key) => (atLarge[key] - atSmall[key]) / (large - small);
 	const rows = [
@@ -112,13 +129,15 @@ try {
 		if (over) failures.push(name);
 	}
 	// Build time: CPU, which a busy runner moves far less than wall time, per page and as growth with page count.
+	// Per page it is read against a fixed workload on the same runner, because CI's runners differ in speed by 1.7x.
+	const perPageMs = perPage('buildCpuSeconds') * 1000;
 	const timeRows = [
 		[
-			'build CPU per page',
-			`${(perPage('buildCpuSeconds') * 1000).toFixed(0)} ms`,
-			perPage('buildCpuSeconds') * 1000,
-			budgets.buildCpuMsPerPage,
-			`${budgets.buildCpuMsPerPage} ms`,
+			'build CPU per page, in runs of the reference workload',
+			`${(perPageMs / referenceMs).toFixed(3)} (${perPageMs.toFixed(0)} ms; the reference took ${referenceMs.toFixed(0)} ms)`,
+			perPageMs / referenceMs,
+			budgets.buildCpuPerPageInReferenceRuns,
+			`${budgets.buildCpuPerPageInReferenceRuns}`,
 		],
 		[
 			`build CPU growth for ${large / small}x the pages`,

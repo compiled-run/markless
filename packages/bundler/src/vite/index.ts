@@ -257,7 +257,13 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			rolldownOptions.dev = serve;
 			rolldownOptions.rootDir = resolvedConfig.root;
 			rolldownOptions.publicPath = (fileName) => joinURL(resolvedConfig.base, fileName);
-			if (!serve && options.compileCache !== false && persistentCompileCacheAvailable()) {
+			// A hand-built config without a cacheDir would otherwise put the store in the working directory.
+			if (
+				!serve &&
+				resolvedConfig.cacheDir &&
+				options.compileCache !== false &&
+				persistentCompileCacheAvailable()
+			) {
 				compileCache = createPersistentCompileCache({
 					directory: resolve(resolvedConfig.cacheDir, 'markless-compile'),
 					fingerprint: compilerFingerprint(),
