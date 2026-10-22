@@ -18,11 +18,11 @@ import MigrateAnatomy from '../../components/figures/migrate/migrate-anatomy.tsr
 
 ## How it works
 
-Your coding agent rewrites a page. markless-migrate checks the old and new page side by side: what people see, what search engines and screen readers get, and how fast it loads. The page switches only when they match. Until then, your old app keeps serving it.
+Your coding agent rewrites one page. markless-migrate then opens the old page and the new one side by side and checks them like a picky tester: what people see, what search engines and screen readers get, and how fast it loads. If anything differs, the page doesn't switch, and your old app keeps serving it. So you can move a big app bit by bit without ever shipping a broken page.
 
 <MigrateAnatomy />
 
-## Start
+## Set it up
 
 Works with Claude Code, Codex, Cursor and other coding agents:
 
@@ -30,7 +30,7 @@ Works with Claude Code, Codex, Cursor and other coding agents:
 npx @markless/migrate setup
 ```
 
-It is a preview and not on npm yet. MIT licensed, [source on GitHub](https://github.com/compiled-run/markless-migrate).
+It's a preview, so it's not on npm yet. MIT licensed, [source on GitHub](https://github.com/compiled-run/markless-migrate).
 
 ## Will it work for my app?
 
