@@ -299,13 +299,31 @@ export function runFragmentNavigation(
 			d.head.appendChild(link);
 		}
 	};
+	// DOMParser parses with scripting off, where <noscript> holds elements (and, in <head>, spills them into <body>); a load parses it as raw text.
+	const parseAsLoaded = (html: string): Document => {
+		const raw: string[] = [];
+		const emptied = html.replace(
+			/<!--[\s\S]*?-->|<(script|style|textarea|title)\b[^>]*>[\s\S]*?<\/\1\s*>|<noscript\b([^>]*)>([\s\S]*?)<\/noscript\s*>/gi,
+			(match, _rawText, attributes: string | undefined, content: string | undefined) => {
+				if (content === undefined) return match;
+				raw.push(content);
+				return `<noscript${attributes ?? ''}></noscript>`;
+			},
+		);
+		if (!raw.length) return new DOMParser().parseFromString(html, 'text/html');
+		const doc = new DOMParser().parseFromString(emptied, 'text/html');
+		const tags = doc.getElementsByTagName('noscript');
+		if (tags.length !== raw.length) return new DOMParser().parseFromString(html, 'text/html');
+		for (let index = 0; index < tags.length; index++) tags[index]!.textContent = raw[index]!;
+		return doc;
+	};
 	const parse = (url: string, text: string): FragmentFetched => {
 		const at = text.indexOf(config.regionEndMarker);
 		const prefix = at === -1 ? text : text.slice(0, at);
 		return {
 			url,
 			prefix,
-			doc: new DOMParser().parseFromString(prefix, 'text/html'),
+			doc: parseAsLoaded(prefix),
 			tail: at === -1 ? '' : text.slice(at + config.regionEndMarker.length),
 		};
 	};

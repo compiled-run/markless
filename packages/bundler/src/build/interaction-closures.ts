@@ -17,10 +17,22 @@ import {
 } from './undemanded-runtime.ts';
 import { symbolVirtualModuleId, symbolVirtualModuleSourceFile } from '../source-module.ts';
 import {
+	isCompilerStatefulModuleId,
+	isMarklessRuntimeModule,
 	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
 	normalizeVirtualId,
 } from '../virtual-ids.ts';
+
+// An import() into plain script the author wrote: code they chose to fetch when reached, never first-use code.
+function isAuthoredLazyImport(id: string): boolean {
+	return (
+		!isCompilerStatefulModuleId(id) &&
+		!isMarklessRuntimeModule(id) &&
+		!/^\0|^virtual:|\.mdx(?:$|\?)|[\\/]@markless[\\/]/.test(id) &&
+		runtimeModuleIdFromOrigin(id.split('?')[0]!) === undefined
+	);
+}
 
 export const MARKLESS_INTERACTION_CLOSURES_VERSION = 2;
 
@@ -202,6 +214,7 @@ export function computeInteractionClosures(input: {
 			for (const dependency of module.dependencies) pending.push([dependency, inside]);
 			for (const target of module.dynamicDependencies ?? []) {
 				if (routeOf.has(target) && routeOf.get(target) !== (inside ?? route)) continue;
+				if (!routeOf.has(target) && isAuthoredLazyImport(target)) continue;
 				if (!bound) {
 					pending.push([target, inside]);
 					continue;
