@@ -100,9 +100,15 @@ function receiptFile(root: string, path: string): string {
 	return file;
 }
 
+/** Folders whose receipts came back from a CI lane cache, keyed by the lane's inputs rather than by this commit. */
+export type ReceiptCheckOptions = { readonly laneRestored?: readonly string[] };
+
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+
 export async function checkReceiptSet(
 	manifestValue: unknown,
 	receiptRoot: string,
+	options: ReceiptCheckOptions = {},
 ): Promise<{ readonly checked: number }> {
 	const manifest = validateManifest(manifestValue);
 	assertUnique(manifest.entries);
@@ -129,7 +135,18 @@ export async function checkReceiptSet(
 		if (report.results.some((result) => result.status !== 'pass'))
 			throw new Error(`Required receipt ${entry.receiptPath} contains a non-pass result`);
 		const metadata = report.metadata;
+		const restored =
+			entry.commitSha === 'git:HEAD' &&
+			(options.laneRestored ?? []).some((folder) => entry.receiptPath.startsWith(folder));
 		for (const field of ['consumer', 'commitSha', 'buildArtifactHash'] as const) {
+			// A lane skipped because its inputs hash matched a green run brings that run's receipts, written at that run's commit.
+			if (field === 'commitSha' && restored) {
+				if (typeof metadata?.commitSha !== 'string' || !COMMIT_SHA.test(metadata.commitSha))
+					throw new Error(
+						`Required receipt ${entry.receiptPath} metadata commitSha is not a commit, so the lane cache cannot vouch for it`,
+					);
+				continue;
+			}
 			const expected =
 				field === 'commitSha' || field === 'buildArtifactHash'
 					? await resolveReceiptIdentityValue(entry[field], receiptRoot)
@@ -148,7 +165,11 @@ export async function checkReceiptSet(
 	return { checked: manifest.entries.length };
 }
 
-export async function checkReceiptManifestFile(manifestPath: string, receiptRoot: string) {
+export async function checkReceiptManifestFile(
+	manifestPath: string,
+	receiptRoot: string,
+	options: ReceiptCheckOptions = {},
+) {
 	const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown;
-	return checkReceiptSet(manifest, receiptRoot);
+	return checkReceiptSet(manifest, receiptRoot, options);
 }
