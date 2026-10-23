@@ -24,7 +24,12 @@ export default defineConfig({
 		browser: {
 			enabled: true,
 			headless: true,
-			provider: playwright(),
+			// CI reads with the runner's own Chrome: one Chromium download per family job failed a different family each run.
+			provider: playwright(
+				process.env.MARKLESS_SR_BROWSER_CHANNEL
+					? { launchOptions: { channel: process.env.MARKLESS_SR_BROWSER_CHANNEL } }
+					: undefined,
+			),
 			screenshotDirectory: 'test/__screenshots__',
 			instances: [{ browser: 'chromium' }],
 		},
