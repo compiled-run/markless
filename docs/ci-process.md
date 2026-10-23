@@ -157,6 +157,25 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
 
+### The Actions cache is a budget
+
+Restoring a cache counts against the repository's cache egress limit. On 2026-10-23 it ran out: restores failed with `Egress is over the account limit`, and pnpm restores in unrelated jobs stalled until the job was cancelled. Most of the traffic was restores, not saves:
+
+| Restore | Size | Jobs per run | Per run |
+| --- | --- | --- | --- |
+| pnpm store, screen-reader family jobs | about 215 MB | 102 | about 22 GB |
+| pnpm store, CI jobs | 219 MB | about 25 | about 5.5 GB |
+| Playwright Chromium and WebKit | 394 MB | 14 | about 5.5 GB |
+| Playwright system packages | 119 MB | 13 | about 1.5 GB |
+
+What changed, and the rule going forward:
+
+- The screen-reader family jobs install from the npm registry with no pnpm store cache. Their virtual lane reads with the runner's Chrome and downloads no browser.
+- Box lanes whose boxes only use witness's browser (router, both music players) restore no Playwright browser or system packages: witness drives the runner image's Google Chrome. `boxes-bundler` (its analyzer measurement), `website-boxes` (the mug studio box), `demo-boxes`, `perf-guards`, `unit` and `browser` launch Playwright's Chromium and keep the restore.
+- `prepare-playwright` looks the browser cache up instead of restoring it, and skips the pnpm store cache.
+- `cache-cleanup.yml` deletes a pull request's caches when it closes, and a daily sweep deletes caches of closed pull requests and deleted branches and every main tool cache but the newest per key. Dry run against 2026-10-23: 232 of 722 entries, 6.6 of 10.6 GB.
+- A new cache step needs a reason it pays for itself: what one restore costs, how many jobs restore it per run, and what it saves over downloading. A cache restored by a large matrix is the first suspect.
+
 ## 8. Cutting a release
 
 Markless releases **minor versions only**: 0.6.0, 0.7.0, and so on. There are no patch releases. A fix ships in the next minor, so the way to ship a fix sooner is to cut the next minor sooner. No script or workflow accepts a release type; the next version is always the current one with the middle number raised by one.

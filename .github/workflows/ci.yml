@@ -172,10 +172,8 @@ jobs:
             key_build_warnings: ${{ steps.build_warnings.outputs.cache-primary-key }}
             run_build_warnings: ${{ steps.build_warnings.outputs.cache-hit != 'true' }}
             run_playwright:
-                ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' || steps.boxes_bundler.outputs.cache-hit
-                != 'true' || steps.boxes_router.outputs.cache-hit != 'true' ||
-                steps.boxes_music_player.outputs.cache-hit != 'true' ||
-                steps.boxes_music_player_ssr.outputs.cache-hit != 'true' ||
+                ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' ||
+                steps.boxes_bundler.outputs.cache-hit != 'true' ||
                 steps.website_boxes.outputs.cache-hit != 'true' ||
                 steps.perf_guards.outputs.cache-hit != 'true' ||
                 steps.demo_boxes.outputs.cache-hit != 'true' }}
@@ -428,17 +426,19 @@ jobs:
               with:
                   version: 10.33.2
 
+            # No pnpm store cache: this job installs only when a lockfile change missed the browser cache.
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
-                  cache: pnpm
 
-            - name: Restore the Playwright browser cache
+            # Only whether the entry exists is needed here; restoring it would move 394 MB for nothing.
+            - name: Look up the Playwright browser cache
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
+                  lookup-only: true
 
             # Every lane installs Playwright's system libraries from these packages instead of the runner's
             # apt mirror, which has stalled lanes for up to 20 minutes downloading the same 119 MB.
@@ -774,12 +774,11 @@ jobs:
 
     # Router pipeline boxes.
     boxes-router:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_router == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -804,32 +803,7 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Restore the Playwright browser cache
-              id: playwright-cache
-              uses: actions/cache/restore@v4
-              with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: ${{ github.workspace }}-ms-playwright
-
-            - name: Restore the Playwright system packages
-              id: apt-cache
-              uses: actions/cache/restore@v4
-              with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: ${{ github.workspace }}-playwright-apt
-
-            - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
-              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
-
-            - name: Install Playwright system dependencies
-              run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
-
-            - name: Install Playwright browsers for the pipeline boxes
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
-              timeout-minutes: 10
-              run: pnpm --dir packages/vitest-browser exec playwright install chromium
-
+            # Witness drives the runner image's Google Chrome, so this lane restores no Playwright browser.
             - name: Warm the runner's Chrome before the first timed launch
               run: node scripts/ci/warm-chrome.mjs
 
@@ -858,12 +832,11 @@ jobs:
 
     # music-player demo: analyzer gate tests then boxes, same order as before.
     boxes-music-player:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_music_player == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -888,35 +861,10 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Restore the Playwright browser cache
-              id: playwright-cache
-              uses: actions/cache/restore@v4
-              with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: ${{ github.workspace }}-ms-playwright
-
-            - name: Restore the Playwright system packages
-              id: apt-cache
-              uses: actions/cache/restore@v4
-              with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: ${{ github.workspace }}-playwright-apt
-
-            - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
-              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
-
-            - name: Install Playwright system dependencies
-              run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
-
-            - name: Install Playwright browsers for the pipeline boxes
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
-              timeout-minutes: 10
-              run: pnpm --dir packages/vitest-browser exec playwright install chromium
-
             - name: Run music-player demo analyzer gate tests
               run: pnpm --dir demos/music-player test:analyzer
 
+            # Witness drives the runner image's Google Chrome, so this lane restores no Playwright browser.
             - name: Warm the runner's Chrome before the first timed launch
               run: node scripts/ci/warm-chrome.mjs
 
@@ -945,12 +893,11 @@ jobs:
 
     # music-player-ssr demo: analyzer gate tests then boxes.
     boxes-music-player-ssr:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_music_player_ssr == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
-            PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
             NPM_CONFIG_PREFER_OFFLINE: 'true'
@@ -975,35 +922,10 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Restore the Playwright browser cache
-              id: playwright-cache
-              uses: actions/cache/restore@v4
-              with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: ${{ github.workspace }}-ms-playwright
-
-            - name: Restore the Playwright system packages
-              id: apt-cache
-              uses: actions/cache/restore@v4
-              with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-                  path: ${{ github.workspace }}-playwright-apt
-
-            - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
-              run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
-
-            - name: Install Playwright system dependencies
-              run: pnpm --dir packages/vitest-browser exec playwright install-deps chromium
-
-            - name: Install Playwright browsers for the pipeline boxes
-              if: steps.playwright-cache.outputs.cache-hit != 'true'
-              timeout-minutes: 10
-              run: pnpm --dir packages/vitest-browser exec playwright install chromium
-
             - name: Run music-player-ssr demo analyzer gate tests
               run: pnpm --dir demos/music-player-ssr test:analyzer
 
+            # Witness drives the runner image's Google Chrome, so this lane restores no Playwright browser.
             - name: Warm the runner's Chrome before the first timed launch
               run: node scripts/ci/warm-chrome.mjs
 
