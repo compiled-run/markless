@@ -14,8 +14,8 @@
 			"reason": "800 MB: measured 732 and 733 MB held after a full collection at 180 pages; origin/main before: 843 MB."
 		},
 		"retainedHeapBytesPerPage": {
-			"bytes": 3040870,
-			"reason": "2.9 MB: measured 2.62 and 2.63 MB per page between 60 and 180 pages; origin/main before: 3.25 MB. Each page compiles about 70 symbol modules of its own, which is what this grows with."
+			"bytes": 3460301,
+			"reason": "3.3 MB: reading rendered chunks on worker threads measured 3.00 MB per page on CI between 60 and 180 pages against main's 2.62 MB, while the absolute held heap fell at every size (623 MB against main's 732 MB at 180 pages on CI). Main's parse cache is already full at 60 pages, so its fixed cost drops out of main's slope but not out of this one; the full 498-page ui.shadcn.com build peaks at the same memory as main (main 22 to 24 GB, this tree 21.9 to 24.5 GB, cold and warm, 2026-10-22). Each page compiles about 70 symbol modules of its own, which is what this grows with."
 		},
 		"largestClientChunkBytes": {
 			"bytes": 262144,
