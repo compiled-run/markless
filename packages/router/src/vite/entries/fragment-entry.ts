@@ -456,31 +456,25 @@ function syncHtmlAttributes(d: Document, next: Document, servedProperty: string)
 	servedAttributes.html.set(d, incoming);
 }
 
-// A shell <body> the swap morphs in place takes only the server's changes to its attributes.
-function syncBodyAttributes(d: Document, next: Document, servedProperty: string): void {
-	const incoming = attributePairs(next.body);
+// A <body> kept in place takes only the server's changes to its attributes; its own container attributes are as served.
+function syncBodyAttributes(
+	d: Document,
+	served: Element,
+	servedProperty: string,
+	own: readonly string[] = [],
+): void {
+	const incoming = attributePairs(served);
 	applyServedChanges(d, d.body, servedBefore(d, 'body', servedProperty), incoming);
+	syncOwnAttributes(d.body, served, own);
 	servedAttributes.body.set(d, incoming);
 }
 
-// A container <body> is replaced whole: the incoming one takes the outgoing's attributes plus the server's changes, its own container attributes as served.
-function carryBodyAttributes(
-	d: Document,
-	from: HTMLElement,
-	to: HTMLElement,
-	own: readonly string[],
-	servedProperty: string,
-): void {
-	const incoming = attributePairs(to);
-	const merged = d.createElement(from.localName);
-	for (const attribute of from.attributes) merged.setAttribute(attribute.name, attribute.value);
-	applyServedChanges(d, merged, servedBefore(d, 'body', servedProperty), incoming);
-	for (const name of to.getAttributeNames())
-		if (!own.includes(name) && !merged.hasAttribute(name)) to.removeAttribute(name);
-	for (const attribute of merged.attributes)
-		if (!own.includes(attribute.name) && to.getAttribute(attribute.name) !== attribute.value)
-			to.setAttribute(attribute.name, attribute.value);
-	servedAttributes.body.set(d, incoming);
+function syncOwnAttributes(element: Element, served: Element, own: readonly string[]): void {
+	for (const name of own) {
+		const value = served.getAttribute(name);
+		if (value === null) element.removeAttribute(name);
+		else if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+	}
 }
 
 // class and style are merged a token and a declaration at a time, so a script's own tokens are never dropped.
@@ -548,15 +542,14 @@ function pageStart(host: Node, data: string): Comment | undefined {
 	return undefined;
 }
 
-function nodesBefore(d: Document, node: Node): DocumentFragment {
-	const nodes = d.createDocumentFragment();
-	while (node.previousSibling) nodes.prepend(node.previousSibling);
-	return nodes;
-}
-
-function nodesAfter(d: Document, node: Node): DocumentFragment {
-	const nodes = d.createDocumentFragment();
-	while (node.nextSibling) nodes.append(node.nextSibling);
+function nodesBetween(parent: Node, after: Node | undefined, before: Node | null): ChildNode[] {
+	const nodes: ChildNode[] = [];
+	for (
+		let node = after ? after.nextSibling : parent.firstChild;
+		node && node !== before;
+		node = node.nextSibling
+	)
+		nodes.push(node);
 	return nodes;
 }
 
@@ -565,81 +558,131 @@ const scriptsIn = (element: Element): Element[] =>
 
 const serverHostAttributes = new WeakMap<Document, Set<string>>();
 
-// The incoming container is a fresh element; attributes a script set on the outgoing one stay.
-function carryHostAttributes(
+// A container kept in place takes the server's attributes; one a script set on it, and the server never served, stays.
+function syncHostAttributes(
 	d: Document,
-	from: Element,
-	to: Element,
+	host: Element,
+	served: Element,
 	own: readonly string[],
 ): void {
 	const server = serverHostAttributes.get(d);
-	serverHostAttributes.set(d, new Set(to.getAttributeNames()));
-	for (const attribute of from.attributes)
-		if (
-			!to.hasAttribute(attribute.name) &&
-			!server?.has(attribute.name) &&
-			!own.includes(attribute.name)
-		)
-			to.setAttribute(attribute.name, attribute.value);
+	serverHostAttributes.set(d, new Set(served.getAttributeNames()));
+	for (const name of host.getAttributeNames())
+		if (!served.hasAttribute(name) && (server?.has(name) || own.includes(name)))
+			host.removeAttribute(name);
+	for (const attribute of served.attributes)
+		if (host.getAttribute(attribute.name) !== attribute.value)
+			host.setAttribute(attribute.name, attribute.value);
 }
 
-// A document app's shell has no runtime, so it is morphed in place: unchanged chrome keeps its nodes.
-// Containers are always replaced whole: their DOM is the new page's resume payload's to locate.
-function morphChildren(d: Document, from: Node, to: Node, fresh: Element[]): void {
-	let cursor = from.firstChild;
-	const skipContainers = () => {
-		while (cursor && isContainer(cursor)) {
-			const next: ChildNode | null = cursor.nextSibling;
-			cursor.remove();
-			cursor = next;
+// Kept nodes keep hover, focus, scroll and running transitions; inside a container scripts are always fresh, so the page boots again.
+function morphChildren(d: Document, from: Node, to: Node, fresh: Element[], page = false): void {
+	morphRange(d, from, from.firstChild, null, Array.from(to.childNodes), fresh, page);
+}
+
+const sameKind = (from: ChildNode, to: ChildNode): boolean =>
+	from.nodeType === to.nodeType &&
+	from.nodeName === to.nodeName &&
+	isContainer(from) === isContainer(to) &&
+	(from.nodeType !== 1 || (from as Element).id === (to as Element).id);
+
+function morphRange(
+	d: Document,
+	parent: Node,
+	cursor: ChildNode | null,
+	stop: Node | null,
+	incoming: readonly ChildNode[],
+	fresh: Element[],
+	page: boolean,
+): void {
+	for (const next of incoming) {
+		// A node the next page dropped from a list: the one after it is the match.
+		if (cursor && cursor !== stop && !sameKind(cursor, next)) {
+			const after = cursor.nextSibling;
+			if (after && after !== stop && sameKind(after, next)) {
+				cursor.remove();
+				cursor = after;
+			}
 		}
-	};
-	for (const incoming of Array.from(to.childNodes)) {
-		skipContainers();
-		if (
-			cursor &&
-			cursor.nodeType === incoming.nodeType &&
-			cursor.nodeName === incoming.nodeName &&
-			!isContainer(cursor) &&
-			!isContainer(incoming)
-		) {
-			const next = cursor.nextSibling;
-			morphNode(d, cursor, incoming, fresh);
-			cursor = next;
+		if (cursor && cursor !== stop && sameKind(cursor, next)) {
+			const after = cursor.nextSibling;
+			morphNode(d, cursor, next, fresh, page);
+			cursor = after;
 			continue;
 		}
-		const node = d.adoptNode(incoming);
-		from.insertBefore(node, cursor);
+		const node = d.adoptNode(next);
+		parent.insertBefore(node, cursor && cursor !== stop ? cursor : stop);
 		if (node.nodeType === 1) fresh.push(node as Element);
 	}
-	while (cursor) {
-		const next = cursor.nextSibling;
+	while (cursor && cursor !== stop) {
+		const after: ChildNode | null = cursor.nextSibling;
 		cursor.remove();
-		cursor = next;
+		cursor = after;
 	}
 }
 
-function morphNode(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): void {
+function morphNode(
+	d: Document,
+	from: ChildNode,
+	to: ChildNode,
+	fresh: Element[],
+	page: boolean,
+): void {
 	if (from.nodeType !== 1) {
 		if ((from as CharacterData).data !== (to as CharacterData).data)
 			(from as CharacterData).data = (to as CharacterData).data;
 		return;
 	}
-	if (from.isEqualNode(to)) return;
 	const element = from as Element;
 	const incoming = to as Element;
-	if (element.localName === 'script' || element.localName.includes('-')) {
+	const name = element.localName;
+	page ||= isContainer(element);
+	// A template's content is not its children, so a morph cannot see it; a custom element owns its own state.
+	if (
+		name === 'template' ||
+		(name === 'script' && (page || !element.isEqualNode(incoming))) ||
+		(name.includes('-') && !element.isEqualNode(incoming))
+	) {
 		const node = d.adoptNode(incoming);
 		element.replaceWith(node);
 		fresh.push(node);
 		return;
 	}
-	for (const name of element.getAttributeNames())
-		if (!incoming.hasAttribute(name)) element.removeAttribute(name);
+	if (!page && element.isEqualNode(incoming)) return;
+	for (const attribute of element.getAttributeNames())
+		if (!incoming.hasAttribute(attribute)) element.removeAttribute(attribute);
 	for (const attribute of incoming.attributes)
 		if (element.getAttribute(attribute.name) !== attribute.value)
 			element.setAttribute(attribute.name, attribute.value);
-	morphChildren(d, element, incoming, fresh);
+	if (page) resetControl(element);
+	if (name !== 'script') morphChildren(d, element, incoming, fresh, page);
+}
+
+// A kept control shows what the server rendered for the next page, as a landing would.
+function resetControl(element: Element): void {
+	const name = element.localName;
+	if (name === 'input') {
+		const input = element as HTMLInputElement;
+		if (input.checked !== input.defaultChecked) input.checked = input.defaultChecked;
+		if (input.value !== input.defaultValue) input.value = input.defaultValue;
+	} else if (name === 'textarea') {
+		const area = element as HTMLTextAreaElement;
+		if (area.value !== area.defaultValue) area.value = area.defaultValue;
+	} else if (name === 'option') {
+		const option = element as HTMLOptionElement;
+		if (option.selected !== option.defaultSelected) option.selected = option.defaultSelected;
+	}
+}
+
+// Leaves no state of the leaving page's runtime on nodes the next page keeps: the framework names its own with `__m`.
+function forgetRuntimeState(root: Element): void {
+	const forget = (node: Node) => {
+		for (const key of Object.keys(node))
+			if (key.startsWith('__m')) delete (node as unknown as Record<string, unknown>)[key];
+	};
+	forget(root);
+	const walker = root.ownerDocument.createTreeWalker(root, 129);
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) forget(node);
 }
 
 // Scrolled boxes (a sidebar) keep their offset when the same box is there after the swap:
@@ -727,61 +770,6 @@ async function streamAppends(
 	return signal.aborted ? undefined : all;
 }
 
-// Inserting a big page whole lays it out in one long task; the swap lays it out this many elements at a time and yields between.
-const CHUNK_ELEMENTS = 800;
-
-type HeldPage = [parent: Node, before: Node | null, nodes: ChildNode[]][];
-
-function holdPage(parent: Element, after: Node | undefined, before: Node | null): HeldPage {
-	const nodes: ChildNode[] = [];
-	for (let node = after ? after.nextSibling : parent.firstChild; node && node !== before;) {
-		const next: ChildNode | null = node.nextSibling;
-		nodes.push(node);
-		node.remove();
-		node = next;
-	}
-	return [[parent, before, nodes]];
-}
-
-const elementsIn = (node: Node) =>
-	node.nodeType === 1 ? (node as Element).getElementsByTagName('*').length + 1 : 0;
-
-// Runs while the leaving page is held on screen; each chunk is laid out before yielding and an element that fits in one goes in whole.
-function fillPage(
-	w: Window,
-	held: HeldPage,
-	budget: number,
-	current: () => boolean,
-): true | Promise<boolean> {
-	const laidOut = () => {
-		void w.document.documentElement.offsetHeight;
-		return new Promise<boolean>((resolve) => {
-			const channel = new MessageChannel();
-			channel.port1.onmessage = () => resolve(current());
-			channel.port2.postMessage(0);
-		});
-	};
-	const nextChunk = () => laidOut().then((still) => still && fillPage(w, held, budget, current));
-	let used = 0;
-	while (held.length) {
-		const [parent, before, nodes] = held[0]!;
-		const size = elementsIn(nodes[0]!);
-		if (used > 0 && used + size > budget && size <= budget) return nextChunk();
-		const node = nodes.shift()!;
-		if (!nodes.length) held.shift();
-		if (size > budget && node.firstChild) {
-			const children = [...node.childNodes];
-			(node as Element).replaceChildren();
-			held.unshift([node, null, children]);
-			used += 1;
-		} else used += size;
-		parent.insertBefore(node, before);
-		if (used >= budget && held.length) return nextChunk();
-	}
-	// The last chunk is laid out in its own task too, so what runs once the page is in starts on a laid-out page.
-	return budget === Infinity ? true : laidOut();
-}
-
 export async function navigate(
 	d: Document,
 	url: URL,
@@ -853,17 +841,10 @@ export async function navigate(
 		if (mode === 'push') w.history.pushState(entry, '', landed.href);
 		else w.history.replaceState(entry, '', landed.href);
 	}
-	// A scroll target or a restored position needs the whole page in place before it is applied; a page that fits in a chunk goes in at once.
-	const progressive =
-		restore === 'reset' &&
-		!url.hash &&
-		d.visibilityState !== 'hidden' &&
-		typeof d.startViewTransition === 'function' &&
-		incoming.getElementsByTagName('*').length > CHUNK_ELEMENTS;
 	let region!: Element;
 	let end!: Comment;
 	let scripts: Element[] = [];
-	const commit = async (): Promise<boolean> => {
+	const commit = (): boolean => {
 		if (id !== session.navigation) return false;
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
@@ -879,82 +860,79 @@ export async function navigate(
 		}
 		state.scrolled.clear();
 		retire(state, outgoing);
+		forgetRuntimeState(outgoing);
 		(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
 		for (const element of d.querySelectorAll(state.config.streamedArmSelector))
 			element.remove();
 		state.shown = pageKey(new URL(w.location.href));
 		if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
-		if (documentLoads && !isContainer(d.body))
-			syncBodyAttributes(d, next, state.config.servedBodyAttributesProperty);
-		let start: Comment | undefined;
-		let held: HeldPage | undefined;
+		const fresh: Element[] = [];
+		region = outgoing;
 		if (documentLoads && !isContainer(d.body)) {
-			const fresh: Element[] = [];
-			region = d.body;
+			syncBodyAttributes(d, next.body, state.config.servedBodyAttributesProperty);
 			morphChildren(d, region, incoming, fresh);
-			scripts = fresh.flatMap(scriptsIn);
 			region.append((end = d.createComment('')));
 		} else {
-			region = d.adoptNode(incoming);
+			const own = state.config.containerAttributes;
 			if (outgoing === d.body)
-				carryBodyAttributes(
-					d,
-					outgoing as HTMLElement,
-					region as HTMLElement,
-					state.config.containerAttributes,
-					state.config.servedBodyAttributesProperty,
-				);
+				syncBodyAttributes(d, incoming, state.config.servedBodyAttributesProperty, own);
+			else syncHostAttributes(d, outgoing, incoming, own);
 			const leavingEnd = pageEnd(outgoing, state.config.pageEndComment);
 			if (leavingEnd) {
-				if (outgoing !== d.body)
-					carryHostAttributes(d, outgoing, region, state.config.containerAttributes);
-				end =
-					pageEnd(region, state.config.pageEndComment) ??
-					region.appendChild(d.createComment(state.config.pageEndComment));
-				// The document's own nodes after the page stay; a document app morphs them to its next shell.
-				const focused = d.activeElement as HTMLElement | null;
-				const kept = nodesAfter(d, leavingEnd);
-				const arriving = nodesAfter(d, end);
-				const fresh: Element[] = [];
-				if (documentLoads) morphChildren(d, kept, arriving, fresh);
-				const leavingStart = pageStart(outgoing, state.config.pageStartComment);
-				start = pageStart(region, state.config.pageStartComment);
-				if (leavingStart || start) {
-					start ??= region.insertBefore(
+				const arrivingEnd = pageEnd(incoming, state.config.pageEndComment) ?? null;
+				const arrivingStart = pageStart(incoming, state.config.pageStartComment);
+				let leavingStart = pageStart(outgoing, state.config.pageStartComment);
+				if (!leavingStart && arrivingStart)
+					leavingStart = outgoing.insertBefore(
 						d.createComment(state.config.pageStartComment),
-						region.firstChild,
+						outgoing.firstChild,
 					);
-					const keptBefore = leavingStart
-						? nodesBefore(d, leavingStart)
-						: d.createDocumentFragment();
-					const arrivingBefore = nodesBefore(d, start);
-					if (documentLoads) morphChildren(d, keptBefore, arrivingBefore, fresh);
-					region.insertBefore(keptBefore, start);
+				morphRange(
+					d,
+					outgoing,
+					leavingStart ? leavingStart.nextSibling : outgoing.firstChild,
+					leavingEnd,
+					nodesBetween(incoming, arrivingStart, arrivingEnd),
+					fresh,
+					true,
+				);
+				end = leavingEnd;
+				// The document's own nodes around the page stay; a document app morphs them to its next shell.
+				if (documentLoads) {
+					morphRange(
+						d,
+						outgoing,
+						leavingEnd.nextSibling,
+						null,
+						arrivingEnd ? nodesBetween(incoming, arrivingEnd, null) : [],
+						fresh,
+						false,
+					);
+					if (leavingStart)
+						morphRange(
+							d,
+							outgoing,
+							outgoing.firstChild,
+							leavingStart,
+							arrivingStart ? nodesBetween(incoming, undefined, arrivingStart) : [],
+							fresh,
+							false,
+						);
 				}
-				scripts = [...scriptsIn(region), ...fresh.flatMap(scriptsIn)];
-				region.append(kept);
-				held = holdPage(region, start, end);
-				outgoing.replaceWith(region);
-				// The document's own nodes moved to the new element; focus inside them stays put.
-				if (focused && focused !== d.activeElement && region.contains(focused))
-					focused.focus({ preventScroll: true });
 			} else {
-				scripts = scriptsIn(region);
-				held = holdPage(region, undefined, null);
-				outgoing.replaceWith(region);
-				region.after((end = d.createComment('')));
+				morphRange(
+					d,
+					outgoing,
+					outgoing.firstChild,
+					null,
+					Array.from(incoming.childNodes),
+					fresh,
+					true,
+				);
+				outgoing.after((end = d.createComment('')));
 			}
 		}
-		const filled =
-			held &&
-			fillPage(
-				w,
-				held,
-				progressive ? CHUNK_ELEMENTS : Infinity,
-				() => id === session.navigation,
-			);
-		if (filled instanceof Promise && !(await filled)) return false;
-		if (progressive) w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+		scripts = fresh.flatMap(scriptsIn);
 		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
 		for (const box of offsets)
 			sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
@@ -962,18 +940,7 @@ export async function navigate(
 		if (next.title && d.title !== next.title) d.title = next.title;
 		return true;
 	};
-	let committed: boolean;
-	if (progressive) {
-		// The leaving page stays on screen while the next one is laid out a chunk at a time; it then paints in one frame, with no animation.
-		let result = false;
-		const transition = d.startViewTransition(async () => {
-			result = await commit();
-		});
-		transition.ready.catch(() => {});
-		transition.finished.catch(() => {});
-		await transition.updateCallbackDone.then(() => transition.skipTransition(), reportAsync);
-		committed = result;
-	} else committed = await commit();
+	const committed = commit();
 	if (!committed) return;
 	const ran = runScripts(
 		d,
@@ -987,7 +954,7 @@ export async function navigate(
 	if (restore === 'reset') {
 		const target = url.hash ? d.getElementById(decodeURIComponent(url.hash.slice(1))) : null;
 		if (target) target.scrollIntoView({ behavior: 'instant' });
-		else if (!progressive) w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
 	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));

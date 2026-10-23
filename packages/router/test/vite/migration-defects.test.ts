@@ -544,7 +544,7 @@ test('a page whose body is only text renders it', async () => {
 	expect(await response.text()).toContain('only text');
 });
 
-test('a long page navigated to in place is laid out over several tasks but paints whole, then resumes', async () => {
+test('a long page navigated to in place paints whole in one frame, then resumes', async () => {
 	const { page, errors } = await open('/long-link');
 	await page.evaluate(() => {
 		const host = globalThis as {
@@ -594,7 +594,7 @@ test('a long page navigated to in place is laid out over several tasks but paint
 		),
 	).toEqual([]);
 	expect(seen.at(-1)).toEqual([0, 300]);
-	expect(batches).toBeGreaterThan(1);
+	expect(batches).toBe(1);
 	expect(await page.evaluate(() => (globalThis as { __stayed?: boolean }).__stayed)).toBe(true);
 	expect(errors).toEqual([]);
 	await page.close();
