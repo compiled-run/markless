@@ -741,6 +741,9 @@ jobs:
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
+            - name: Warm the runner's Chrome before the first timed launch
+              run: node scripts/ci/warm-chrome.mjs
+
             - name: Run bundler pipeline boxes
               run: pnpm --dir packages/bundler test:boxes
 
@@ -824,6 +827,9 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
+
+            - name: Warm the runner's Chrome before the first timed launch
+              run: node scripts/ci/warm-chrome.mjs
 
             - name: Run router pipeline boxes
               run: pnpm --dir packages/router test:boxes
@@ -909,6 +915,9 @@ jobs:
             - name: Run music-player demo analyzer gate tests
               run: pnpm --dir demos/music-player test:analyzer
 
+            - name: Warm the runner's Chrome before the first timed launch
+              run: node scripts/ci/warm-chrome.mjs
+
             - name: Run music-player demo boxes
               run: pnpm --dir demos/music-player test:boxes
 
@@ -992,6 +1001,9 @@ jobs:
 
             - name: Run music-player-ssr demo analyzer gate tests
               run: pnpm --dir demos/music-player-ssr test:analyzer
+
+            - name: Warm the runner's Chrome before the first timed launch
+              run: node scripts/ci/warm-chrome.mjs
 
             - name: Run music-player-ssr demo boxes
               run: pnpm --dir demos/music-player-ssr test:boxes
@@ -1079,6 +1091,9 @@ jobs:
             # The website tooling tests ride this lane: its key hashes website/ and the UI API manifest they read.
             - name: Run website tooling tests
               run: pnpm --dir website exec vp test run --config vitest.tooling.config.ts
+
+            - name: Warm the runner's Chrome before the first timed launch
+              run: node scripts/ci/warm-chrome.mjs
 
             - name: Run website boxes
               run: pnpm --dir website test:boxes
@@ -1225,6 +1240,9 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
+
+            - name: Warm the runner's Chrome before the first timed launch
+              run: node scripts/ci/warm-chrome.mjs
 
             - name: Run live-feed demo boxes
               run: pnpm --dir demos/live-feed test:boxes
@@ -1779,6 +1797,9 @@ jobs:
             # Baseline and current run back-to-back per benchmark so both sides
             # of each guard ratio see the same runner speed; separated passes
             # drift several percent on hosted runners and flake the guard.
+            - name: Warm the runner's Chrome before the first timed launch
+              run: node scripts/ci/warm-chrome.mjs
+
             - name: Run interleaved baseline/current benchmark pairs
               if: steps.bundle.outputs.identical != 'true'
               working-directory: ${{ env.JSFB_ROOT }}
