@@ -1,5 +1,4 @@
 import type { Keys, Vocabulary } from './driver.ts';
-import type { VoiceOverPlaywright } from '@guidepup/playwright';
 import { commaSegments, wordRunSegments, type RealDriverSpec } from './page-driver.ts';
 
 /**
@@ -178,16 +177,6 @@ export const voiceOverSpec: RealDriverSpec = {
 	vocabulary: voiceOverVocabulary,
 	// Observed on macOS 26: "3 of 5 selected radio button, 3 of 5", and no state word for an unchosen radio.
 	roleStates: { radio: { checked: 'selected', notChecked: '' } },
-	// The runner's VoiceOver neither moves keyboard focus with its cursor nor reports what it says when focus moves.
-	focusCursor: (reader) =>
-		(reader as VoiceOverPlaywright).perform(
-			(reader as VoiceOverPlaywright).commanderCommands.MOVE_KEYBOARD_FOCUS_TO_VOICEOVER_CURSOR,
-			{ capture: false },
-		),
-	speakFocus: (reader) =>
-		(reader as VoiceOverPlaywright).perform(
-			(reader as VoiceOverPlaywright).commanderCommands.MOVE_VOICEOVER_CURSOR_TO_KEYBOARD_FOCUS,
-		),
 	keys,
 	segments: wordRunSegments,
 };

@@ -13,7 +13,6 @@ import type { Keys, RoleStates, ScreenReaderDriver, Vocabulary } from './driver.
  */
 export type RealReader = NVDAPlaywright | VoiceOverPlaywright;
 
-
 export type RealDriverSpec = {
 	readonly name: string;
 	readonly vocabulary: Vocabulary;
@@ -21,10 +20,6 @@ export type RealDriverSpec = {
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
-	/** Move the page's keyboard focus to the reader's cursor, for a reader whose cursor walks apart from it. */
-	focusCursor?: (reader: RealReader) => Promise<void>;
-	/** Make the reader speak the focused element, for a reader whose own focus-following speech is not captured. */
-	speakFocus?: (reader: RealReader) => Promise<void>;
 };
 
 /**
@@ -35,8 +30,6 @@ export type RealDriverSpec = {
  * would fight the fixture. Everything else forwards to the real reader.
  */
 export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenReaderDriver {
-	// A walk moves the reader's cursor and leaves keyboard focus behind; a key goes where the person is reading.
-	let cursorAhead = false;
 	return {
 		name: spec.name,
 		vocabulary: spec.vocabulary,
@@ -45,19 +38,9 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 		segments: spec.segments,
 		start: async () => {},
 		stop: async () => {},
-		async next() {
-			await reader.next();
-			cursorAhead = true;
-		},
-		async previous() {
-			await reader.previous();
-			cursorAhead = true;
-		},
-		async press(key) {
-			if (cursorAhead) await spec.focusCursor?.(reader);
-			cursorAhead = false;
-			await reader.press(key);
-		},
+		next: () => reader.next(),
+		previous: () => reader.previous(),
+		press: (key) => reader.press(key),
 		async reannounce() {
 			// Neither reader has a "read the current item again" command that is
 			// guaranteed to re-read from the live DOM, so this steps off the item
@@ -66,11 +49,12 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 			await reader.next();
 			return reader.lastSpokenPhrase();
 		},
-		async settleOnFocus() {
-			cursorAhead = false;
-			await spec.speakFocus?.(reader);
-			return reader.lastSpokenPhrase();
-		},
+		// Nothing to drain over this seam: NVDA and VoiceOver follow the focus
+		// themselves and speak it in their own process, and guidepup's
+		// `lastSpokenPhrase()` reads the speech that came out. The virtual lane
+		// needs a wait here because its reader announces from a listener inside the
+		// page, one task-queue turn behind the gesture.
+		settleOnFocus: () => reader.lastSpokenPhrase(),
 		lastSpokenPhrase: () => reader.lastSpokenPhrase(),
 		// The reader hands back its own log array, which keeps growing under the
 		// caller's feet; a copy is what a test can hold on to.
