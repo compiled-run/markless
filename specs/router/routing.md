@@ -70,13 +70,22 @@ render of a `#/` route.
   `<div data-async-container>` around the page.
 - A navigation response carries only the page and the start comment, never the
   document content before it.
-- A navigation swap replaces the container element with a fresh one, so
-  nothing the leaving page attached to it survives. Attributes a script set on
-  it, and the document's nodes before the start comment and after the end
-  comment, move to the new one: they are the same nodes, so their listeners and
-  state stay, and focus inside them is put back. A script holding a reference to
-  the old `<body>` element holds a detached one, and an `<iframe>` among the
-  moved nodes reloads.
+- A navigation swap keeps the container element and every node the two pages
+  share, and changes only what differs, in one task: a node of the leaving page
+  stays when the next page has a node of the same kind at the same place (same
+  tag and `id`), and takes the next page's attributes, text and children.
+  What both pages render alike (a header, a sidebar) is therefore the same
+  nodes afterwards, so the hover under a resting pointer, focus, scroll offsets,
+  running CSS transitions and a loaded `<iframe>` survive the swap. The page's
+  scripts are always fresh nodes and run again, `<template>` elements are always
+  replaced, a custom element is replaced unless it is unchanged, and a form
+  control shows the value the server rendered for the next page.
+- Nothing of the leaving page's runtime survives on the kept nodes: the swap
+  retires its runtime, its startup scripts' listeners go quiet, and the state
+  the framework kept on the container and on any node of it is dropped before
+  the next page starts, exactly as on a landing. Attributes a script set on the
+  container stay, and the document's nodes before the start comment and after
+  the end comment are not touched.
 
 ## Page request and response
 

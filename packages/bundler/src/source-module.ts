@@ -984,7 +984,8 @@ export function emitQueuedResumeContainerEvent(
 			? "\tif (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));"
 			: '',
 		'\tif (!root.__marklessDispatch) {',
-		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined, seen = new WeakMap();',
+		// A navigation that keeps the container in place starts a new page lifetime; what this queue still holds belongs to the page that left.
+		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), done = tail, lastEvent = null, lastEventTime = undefined, seen = new WeakMap(), life = root.__mL;',
 		'\t\troot.__marklessRegisterDispatch = next => {',
 		'\t\t\tconst fallback = handler;',
 		'\t\t\thandler = input => next(input, fallback);',
@@ -1001,7 +1002,7 @@ export function emitQueuedResumeContainerEvent(
 		'\t\t\tlastEventTime = eventTime;',
 		'\t\t\tlet release;',
 		'\t\t\tconst started = new Promise(resolve => release = resolve);',
-		'\t\t\tconst run = () => (root.__marklessReleaseDispatch = release, handler(next));',
+		'\t\t\tconst run = () => root.__mL === life ? (root.__marklessReleaseDispatch = release, handler(next)) : release();',
 		'\t\t\tdone = tail.then(run, run);',
 		'\t\t\tdone.then(release, release);',
 		'\t\t\ttail = started;',
