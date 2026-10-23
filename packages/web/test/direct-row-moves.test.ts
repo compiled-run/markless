@@ -142,3 +142,14 @@ test('any reorder moves only the rows outside the longest run already in order',
 		);
 	}
 });
+
+test('a reversed list moves every row but one', () => {
+	for (const length of [2, 3, 6, 9]) {
+		const keys = Array.from({ length }, (_, index) => `k${index}`);
+		const { parent, rows } = rowsOf(keys);
+		const next = keys.slice().reverse();
+		replaceMarklessPublicRows(parent as never, { rows, keys } as never, next);
+		expect(parent.childNodes.map((row) => row.key)).toEqual(next);
+		expect(parent.moves).toHaveLength(length - 1);
+	}
+});
