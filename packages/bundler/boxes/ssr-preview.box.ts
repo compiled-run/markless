@@ -23,8 +23,7 @@ const INDEX = `${FIXTURE}/dist/index.html`;
 const COUNTER = '[data-counter]';
 const REQUESTS = '/__markless-fixture-requests';
 const WAIT = { timeoutMs: 10_000 };
-// 2,175 -> 2,186: the dispatch queue drops what a page a navigation retired left in it (+11 B gzip, measured).
-const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_186;
+const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
 const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_092;
 // INTERIM 2026-08-12: 3,250 -> 3,350 covers measured 3,300 (darwin; CI unmeasured, box was
 // skipped behind red unit steps for weeks). Growth origin awaits owner review; tighten-only stands.

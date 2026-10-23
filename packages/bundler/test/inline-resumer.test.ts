@@ -181,9 +181,8 @@ test('the prerender boot compiles deterministically and costs far less than its 
 		createInlineResumerSelfWakeSource(url);
 	const minified = renderPrerenderInlineResumerSource(first.prerenderSelfWake, eventNames);
 	// The authored boot lost its load-time census and locator lookup, so it shrank faster than the minified one.
-	// 0.51 -> 0.515: the page-lifetime guard is property reads a minifier cannot shorten (3,388 of 6,636 bytes).
 	expect(Buffer.byteLength(minified, 'utf8')).toBeLessThan(
-		Buffer.byteLength(authored, 'utf8') * 0.515,
+		Buffer.byteLength(authored, 'utf8') * 0.51,
 	);
 	expect(minified).not.toContain(PRERENDER_INLINE_EVENT_NAMES_TOKEN);
 });
