@@ -9,6 +9,7 @@ import { NameCounters } from './reading-tsrx/name-counters.tsrx';
 import { ShopPage } from './reading-tsrx/body-function-calls.tsrx';
 import { Sizes } from './reading-tsrx/body-map.tsrx';
 import { Shelf } from './reading-tsrx/body-value-reads.tsrx';
+import { Ledger } from './reading-tsrx/body-value-flow.tsrx';
 
 // The constructs the "Reading a .tsrx file" guide teaches, each served and client-rendered.
 
@@ -133,3 +134,21 @@ test('CSR: a handler reading body values through methods that only read them', a
 	bodyValueReads((await render(Shelf)).container as HTMLElement));
 test('SSR: a handler reading body values through methods that only read them', async () =>
 	bodyValueReads((await renderSSR(Shelf)).container as HTMLElement));
+
+// Every click rebuilds the body values, so reads through other names and helpers see them unchanged.
+async function bodyValueFlow(c: HTMLElement) {
+	const shown = () => c.querySelector('output')?.textContent;
+	for (let run = 0; run < 2; run++) {
+		(c.querySelector('[data-alias]') as HTMLButtonElement).click();
+		await expect.poll(shown).toBe('desk:ab:pens:3');
+		(c.querySelector('[data-helpers]') as HTMLButtonElement).click();
+		await expect.poll(shown).toBe('5:DESK/2');
+		(c.querySelector('[data-copy]') as HTMLButtonElement).click();
+		await expect.poll(shown).toBe('INK,PENS,END');
+	}
+}
+
+test('CSR: a handler reads body values through aliases, destructuring and helpers, imported ones too', async () =>
+	bodyValueFlow((await render(Ledger)).container as HTMLElement));
+test('SSR: a handler reads body values through aliases, destructuring and helpers, imported ones too', async () =>
+	bodyValueFlow((await renderSSR(Ledger)).container as HTMLElement));

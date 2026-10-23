@@ -13,6 +13,8 @@ import type {
 	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticGraphDiagnostic,
+	ImportedModuleSources,
+	ImportedSourceRequest,
 	ModuleGraphInterfaceArtifact,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
@@ -70,6 +72,7 @@ export type MutableSemanticGraphArtifact = {
 	// the exact key set it had before roster positions existed.
 	elementRosterPositions?: SemanticElementRosterPosition[];
 	elementRosterCounts?: SemanticElementRosterCount[];
+	importedSourceRequests?: ImportedSourceRequest[];
 	localBindings: SemanticLocalBinding[];
 	localDeclarations: SemanticLocalDeclaration[];
 	aliases: SemanticGraphAlias[];
@@ -121,6 +124,7 @@ export type WalkState = {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly importedModuleSources: ImportedModuleSources;
 	readonly hostIds: WeakMap<object, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
 	readonly handledTemplateValues: WeakSet<object>;
@@ -256,6 +260,7 @@ export function createWalkState(input: {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly importedModuleSources?: ImportedModuleSources;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -270,6 +275,7 @@ export function createWalkState(input: {
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		importedModuleConstants: input.importedModuleConstants ?? {},
+		importedModuleSources: input.importedModuleSources ?? {},
 		hostIds: new WeakMap<object, string>(),
 		handledTemplateValues: new WeakSet<object>(),
 		currentComponentName: null,

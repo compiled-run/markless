@@ -140,7 +140,13 @@ function you declared in the component body, with `function` or `const`, and pas
 functions it calls. A `const` built with `new Map(...)`, `new Set(...)`, `new Date(...)` or another
 built-in, or any other body `const`, is built again for each click, so it is read-only there: a
 handler that changes it, as in `list.push(3)` or `box.count = 1`, stops the build with
-`MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`. It cannot read other variables from the component body. Those exist only while the
+`MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. The same goes for a change made through another name
+(`const copy = box`), a destructured part (`const { items } = box`), an item (`for (const row of
+rows)`), or a function you hand it to, in this file or an imported one. Handing it to a function
+whose source the compiler cannot see, such as one from a package, counts as a change too; hand that
+function a copy, such as `structuredClone(box)`. Keep changing data in `state()`.
+
+A handler cannot read other variables from the component body. Those exist only while the
 component sets up the page, and the click comes later. The build stops with
 `MARKLESS_HANDLER_READS_RENDER_LOCAL`, or with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` for an
 instance of your own class, and names the variable.

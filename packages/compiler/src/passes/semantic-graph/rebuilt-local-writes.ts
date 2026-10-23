@@ -1,9 +1,8 @@
-import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 
-// A body const a handler reads is rebuilt from its definition for every run, so any change made to it is lost.
 // Fail closed: a method is a read only when the receiver's kind is known and the method is on that kind's read list.
 
-type ValueKind =
+export type ValueKind =
 	| 'array'
 	| 'object'
 	| 'map'
@@ -17,7 +16,7 @@ type ValueKind =
 	| 'regexp'
 	| 'unknown';
 
-const ARRAY_READS = new Set([
+export const ARRAY_READS = new Set([
 	'at',
 	'concat',
 	'entries',
@@ -57,7 +56,7 @@ const OBJECT_READS = new Set([
 	'toString',
 	'valueOf',
 ]);
-const READS: Record<Exclude<ValueKind, 'primitive' | 'regexp' | 'unknown' | 'date'>, Set<string>> =
+export const READS: Record<Exclude<ValueKind, 'primitive' | 'regexp' | 'unknown' | 'date'>, Set<string>> =
 	{
 		array: ARRAY_READS,
 		object: OBJECT_READS,
@@ -105,7 +104,7 @@ const CONSTRUCTED: Record<string, ValueKind> = {
 	BigUint64Array: 'array',
 };
 // Built-ins that change their first argument.
-const MUTATING_STATICS = new Set([
+export const MUTATING_STATICS = new Set([
 	'Object.assign',
 	'Object.defineProperty',
 	'Object.defineProperties',
@@ -120,112 +119,51 @@ const MUTATING_STATICS = new Set([
 	'Reflect.preventExtensions',
 ]);
 
-/** How `reference` (a read of a rebuilt body const defined by `init`) changes it, as written source, or null for a read. */
-export function rebuiltLocalWrite(
-	reference: AnyNode,
-	ancestors: ReadonlyArray<AnyNode>,
-	init: AnyNode,
-	source: string,
-): string | null {
-	let node = reference;
-	let depth = ancestors.length - 1;
-	const path: Array<string | null> = [];
-	for (; depth >= 0; depth--) {
-		const parent = ancestors[depth]!;
-		if (isTransparent(parent)) {
-			node = parent;
-			continue;
-		}
-		if (parent.type !== 'MemberExpression' || parent.object !== node) break;
-		path.push(parent.computed === true ? null : getIdentifierName(parent.property as AnyNode));
-		node = parent;
-	}
-	const parent = depth >= 0 ? ancestors[depth] : undefined;
-	const written = () => source.slice(parent?.start ?? node.start, parent?.end ?? node.end);
-	if (!parent) return null;
-	if (path.length > 0) {
-		if (
-			(parent.type === 'AssignmentExpression' && parent.left === node) ||
-			(parent.type === 'UpdateExpression' && parent.argument === node) ||
-			(parent.type === 'UnaryExpression' && parent.operator === 'delete')
-		)
-			return written();
-		if (parent.type === 'CallExpression' && parent.callee === node) {
-			const method = path[path.length - 1];
-			const receiver = kindAtPath(valueKind(init), init, path.slice(0, -1));
-			return method && isRead(receiver, method) ? null : written();
-		}
-		return null;
-	}
-	const callee = parent.callee as AnyNode | undefined;
-	if (
-		parent.type === 'CallExpression' &&
-		callee &&
-		asNodes(parent.arguments)[0] === node &&
-		MUTATING_STATICS.has(source.slice(callee.start, callee.end))
-	)
-		return written();
-	return null;
-}
-
-function isTransparent(node: AnyNode): boolean {
+export function isTransparent(node: AnyNode): boolean {
 	return (
 		node.type === 'ParenthesizedExpression' ||
 		node.type === 'ChainExpression' ||
 		node.type === 'TSNonNullExpression' ||
 		node.type === 'TSAsExpression' ||
-		node.type === 'TSSatisfiesExpression'
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'TSTypeAssertion' ||
+		node.type === 'TSInstantiationExpression'
 	);
 }
 
-function isRead(kind: ValueKind, method: string): boolean {
+export function isRead(kind: ValueKind, method: string): boolean {
 	if (kind === 'primitive' || kind === 'regexp') return true;
 	if (kind === 'unknown') return false;
 	if (kind === 'date') return method.startsWith('get') || method.startsWith('to') || method === 'valueOf';
 	return READS[kind].has(method) || OBJECT_READS.has(method);
 }
 
-// The kind of the value at `path` inside a literal, as far as the literal shows it.
-function kindAtPath(kind: ValueKind, init: AnyNode, path: ReadonlyArray<string | null>): ValueKind {
-	let current: AnyNode | undefined = unwrap(init);
-	let currentKind = kind;
-	for (const key of path) {
-		if (currentKind === 'primitive') return 'primitive';
-		if (!current || key === null) return 'unknown';
-		if (current.type === 'ObjectExpression') {
-			current = unwrap(
-				asNodes(current.properties).find(
-					(property) =>
-						property.type === 'Property' &&
-						property.computed !== true &&
-						(getIdentifierName(property.key as AnyNode) ?? (property.key as AnyNode).value) === key,
-				)?.value as AnyNode | undefined,
-			);
-		} else if (current.type === 'ArrayExpression' && /^\d+$/.test(key)) {
-			current = unwrap(asNodes(current.elements)[Number(key)]);
-		} else if (currentKind === 'array' && key === 'length') {
-			return 'primitive';
-		} else {
-			return 'unknown';
-		}
-		currentKind = current ? valueKind(current) : 'unknown';
-	}
-	return currentKind;
-}
-
-function valueKind(input: AnyNode): ValueKind {
+export function valueKind(input: AnyNode): ValueKind {
 	const node = unwrap(input);
 	if (!node) return 'unknown';
 	if (node.type === 'ArrayExpression') return 'array';
 	if (node.type === 'ObjectExpression') return 'object';
 	if (node.type === 'Literal') return node.regex ? 'regexp' : 'primitive';
-	if (node.type === 'TemplateLiteral') return 'primitive';
+	if (PRIMITIVE_RESULTS.has(node.type ?? '')) return 'primitive';
+	if (node.type === 'CallExpression') {
+		const callee = getIdentifierName(node.callee as AnyNode);
+		return callee && PRIMITIVE_CALLS.has(callee) ? 'primitive' : 'unknown';
+	}
 	if (node.type === 'NewExpression')
 		return CONSTRUCTED[getIdentifierName(node.callee as AnyNode) ?? ''] ?? 'unknown';
 	return 'unknown';
 }
 
-function unwrap(node: AnyNode | undefined): AnyNode | undefined {
+// Expressions that always evaluate to a string, number, boolean, bigint or undefined.
+const PRIMITIVE_RESULTS = new Set([
+	'TemplateLiteral',
+	'BinaryExpression',
+	'UnaryExpression',
+	'UpdateExpression',
+]);
+const PRIMITIVE_CALLS = new Set(['String', 'Number', 'Boolean', 'BigInt', 'parseInt', 'parseFloat']);
+
+export function unwrap(node: AnyNode | undefined): AnyNode | undefined {
 	let current = node;
 	while (current && isTransparent(current)) current = current.expression as AnyNode | undefined;
 	return current;

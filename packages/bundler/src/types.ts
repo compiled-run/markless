@@ -83,6 +83,12 @@ export interface TransformTsrxModuleInput {
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
+	importedModuleSources?: SemanticGraphInput['importedModuleSources'];
+	/** Reads an imported module a handler check asks for; without it the check refuses what it cannot see. */
+	readImportedSource?: (
+		importer: string,
+		specifier: string,
+	) => Promise<{ readonly filename: string; readonly source: string } | null>;
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
 	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
@@ -124,6 +130,8 @@ export interface TransformTsrxModuleResult {
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
 	artifactChildren: ReadonlyArray<ArtifactChildCandidate>;
+	/** The imported sources the compile read; a later edit to one of them invalidates this result. */
+	importedModuleSources?: SemanticGraphInput['importedModuleSources'];
 	/** Imported constants a prop reads that this compile was not given. */
 	importedConstantRequests?: ReadonlyArray<{
 		readonly source: string;

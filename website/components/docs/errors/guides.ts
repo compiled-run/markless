@@ -170,8 +170,8 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	},
 	MARKLESS_HANDLER_WRITES_RENDER_LOCAL: {
 		summary: 'An event handler changes a value from the component body, and the change would be lost.',
-		what: 'A handler that reads a `const` from the component body builds a fresh copy of it each time it runs. Changing that copy, with `list.push(...)`, `names.set(...)` or `box.count = 1`, would be lost before the next run. A method the compiler cannot prove only reads the value counts as a change.',
-		how: 'Keep data that changes in `state()`, and assign it a new value: a copy with the change applied.',
+		what: 'A handler that reads a `const` from the component body builds a fresh copy of it each time it runs. Changing that copy, with `list.push(...)`, `names.set(...)` or `box.count = 1`, would be lost before the next run. The compiler follows the value wherever the handler takes it: another name (`const copy = box`), a destructured part (`const { items } = box`), an element (`for (const row of rows)`, `rows.forEach((row) => ...)`), and the functions it is handed to, in the same file or in an imported file. A method the compiler cannot prove only reads the value counts as a change, and so does handing the value to a function whose source the compiler cannot see, such as one from a package.',
+		how: 'Keep data that changes in `state()`, and assign it a new value: a copy with the change applied. To hand the value to a function the compiler cannot see, hand it a copy: `structuredClone(box)`, or `[...list]` when the items are numbers or strings.',
 		example: [
 			'let list = state([1, 2]);',
 			'<button onClick={() => (list = [...list, list.length + 1])}>Add</button>',

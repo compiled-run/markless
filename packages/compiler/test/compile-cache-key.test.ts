@@ -33,3 +33,16 @@ test('a child interface that differs gives a different key', () => {
 	expect(compileCacheKey(inputWith({}))).not.toBe(compileCacheKey({ ...inputWith({}), importedModuleInterfaces: undefined }));
 	expect(compileCacheKey(inputWith({ './a.tsrx': undefined }))).not.toBe(compileCacheKey(inputWith({})));
 });
+
+test('an imported source that differs gives a different key', () => {
+	const key = (source: string | null) =>
+		compileCacheKey({
+			...inputWith({}),
+			importedModuleSources: {
+				'/app/Page.tsrx': { './helpers.ts': source === null ? null : { filename: '/app/helpers.ts', source } },
+			},
+		});
+	expect(key('export const a = 1;')).not.toBe(key('export const a = 2;'));
+	expect(key(null)).not.toBe(key('export const a = 1;'));
+	expect(key(null)).not.toBe(compileCacheKey(inputWith({})));
+});

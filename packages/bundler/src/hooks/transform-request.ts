@@ -4,6 +4,7 @@ import { linkedRenderDataReachRoot, planTransformRequest } from '@markless/compi
 import type { TransformPluginContext } from 'rolldown';
 import { withQuery } from 'ufo';
 import { normalizeExecutionLogMode } from '../execution-log.ts';
+import { importedSourceReader } from '../imported-sources.ts';
 import { moduleIsEntry } from '../link-driver.ts';
 import { moduleIdFor } from '../module-id.ts';
 import { nativePackingEnabled } from '../packing-option.ts';
@@ -183,6 +184,11 @@ export function planTransformHookRequest(
 		devResumeReexport: plan.devResumeReexport,
 		prerenderRecordData:
 			currentEnvironment === 'client' ? ctx.prerenderRecordsBySource?.get(source) : undefined,
+		readImportedSource: importedSourceReader(
+			async (specifier, importer) =>
+				(await pluginContext.resolve(specifier, importer, { skipSelf: true }))?.id,
+			(filename) => pluginContext.addWatchFile(filename),
+		),
 	};
 	return {
 		ctx,

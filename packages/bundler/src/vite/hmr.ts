@@ -11,6 +11,7 @@ import type {
 import type { FetchFunctionOptions } from 'vite/module-runner';
 import type { MarklessEnvironment } from '../types.ts';
 import { preflightTsrxModuleDiagnostics } from '../transform.ts';
+import { importedSourceReader } from '../imported-sources.ts';
 import { createDevErrorClientAsset } from '../dev-error/client-asset.ts';
 import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
@@ -193,11 +194,26 @@ export function createViteHmr(options: ViteHmrOptions) {
 		}
 	}
 
+	// A preflight resolves imported helpers the way the client build does.
+	function readImportedSource() {
+		const environment = server?.environments?.[options.clientEnvironment];
+		return environment
+			? importedSourceReader(
+					async (specifier, importer) =>
+						(await environment.pluginContainer.resolveId(specifier, importer))?.id,
+				)
+			: undefined;
+	}
+
 	function preflight(sourceId: string, source: string) {
 		const cached = preflightByFile.get(sourceId);
 		if (cached?.source === source) return cached.verdict;
 
-		const verdict = preflightTsrxModuleDiagnostics({ filename: sourceId, source }).then(
+		const verdict = preflightTsrxModuleDiagnostics({
+			filename: sourceId,
+			source,
+			readImportedSource: readImportedSource(),
+		}).then(
 			(): PreflightVerdict => ({ messagesSent: false }),
 			(error): PreflightVerdict => ({
 				error: normalizeMarklessDevError(error, { id: sourceId }),
@@ -251,7 +267,11 @@ export function createViteHmr(options: ViteHmrOptions) {
 				}
 
 				try {
-					await preflightTsrxModuleDiagnostics({ filename: id, source });
+					await preflightTsrxModuleDiagnostics({
+						filename: id,
+						source,
+						readImportedSource: readImportedSource(),
+					});
 				} catch {
 					continue;
 				}

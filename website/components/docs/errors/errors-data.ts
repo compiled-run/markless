@@ -3960,9 +3960,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'An event handler changes a value from the component body, and the change would be lost.',
 		printed: [
-			'MARKLESS_HANDLER_WRITES_RENDER_LOCAL: The `<handlerLabel>` handler changes `<localName>` with `<write>`. `<localName>` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so the change would be lost before the next run.',
-			'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A method the compiler cannot prove only reads the value counts as a change.',
-			'Keep data that changes in state(): `const <localName> = state(...)`, and assign a new value to it, for example a copy with the change applied.',
+			'MARKLESS_HANDLER_WRITES_RENDER_LOCAL: A handler changes a component-body value the browser rebuilds for every run',
+			'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A change made through another name for the value, or by a function it is handed to, is lost the same way. A method the compiler cannot prove only reads the value counts as a change, and so does handing the value to a function whose source the compiler cannot see.',
+			'Keep data that changes in state(): `const <localName> = state(...)`, and assign a new value to it, for example a copy with the change applied. A function the compiler cannot see can be handed a copy, such as `structuredClone(<localName>)`.',
 			'https://markless.dev/errors/MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 		],
 		structured: true,
@@ -4008,7 +4008,43 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's8',
-					text: ', would be lost before the next run. A method the compiler cannot prove only reads the value counts as a change.',
+					text: ', would be lost before the next run. The compiler follows the value wherever the handler takes it: another name (',
+				},
+				{
+					id: 's9',
+					text: 'const copy = box',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: '), a destructured part (',
+				},
+				{
+					id: 's11',
+					text: 'const { items } = box',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: '), an element (',
+				},
+				{
+					id: 's13',
+					text: 'for (const row of rows)',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ', ',
+				},
+				{
+					id: 's15',
+					text: 'rows.forEach((row) => ...)',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: '), and the functions it is handed to, in the same file or in an imported file. A method the compiler cannot prove only reads the value counts as a change, and so does handing the value to a function whose source the compiler cannot see, such as one from a package.',
 				},
 			],
 			how: [
@@ -4023,7 +4059,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's2',
-					text: ', and assign it a new value: a copy with the change applied.',
+					text: ', and assign it a new value: a copy with the change applied. To hand the value to a function the compiler cannot see, hand it a copy: ',
+				},
+				{
+					id: 's3',
+					text: 'structuredClone(box)',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', or ',
+				},
+				{
+					id: 's5',
+					text: '[...list]',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' when the items are numbers or strings.',
 				},
 			],
 			example: [
