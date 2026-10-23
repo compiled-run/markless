@@ -1,0 +1,68 @@
+name: Cache cleanup
+
+# Deletes Actions caches no run can restore: a closed pull request's (reachable only from its own
+# merge ref), a deleted branch's, and on main every tool cache (pnpm store, Playwright) but the newest
+# per key family. Lane markers are kept: they are what lets a lane skip.
+
+on:
+    pull_request:
+        types: [closed]
+    schedule:
+        - cron: '17 4 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: cache-cleanup-${{ github.event.pull_request.number || 'sweep' }}
+    cancel-in-progress: false
+
+jobs:
+    cleanup:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        permissions:
+            contents: read
+            actions: write
+            pull-requests: read
+        env:
+            GH_TOKEN: ${{ github.token }}
+            REPO: ${{ github.repository }}
+        steps:
+            - name: Delete the closed pull request's caches
+              if: github.event_name == 'pull_request'
+              env:
+                  REF: refs/pull/${{ github.event.pull_request.number }}/merge
+              run: |
+                  gh api --paginate "repos/$REPO/actions/caches?ref=$REF&per_page=100" --jq '.actions_caches[] | "\(.id) \(.size_in_bytes) \(.key)"' |
+                    while read -r id size key; do
+                      echo "delete $key ($size B) on $REF"
+                      gh api -X DELETE "repos/$REPO/actions/caches/$id" > /dev/null
+                    done
+
+            - name: Sweep caches no run can restore
+              if: github.event_name != 'pull_request'
+              run: |
+                  gh api --paginate "repos/$REPO/actions/caches?per_page=100" \
+                    --jq '.actions_caches[] | "\(.id)\t\(.ref)\t\(.created_at)\t\(.size_in_bytes)\t\(.key)"' > caches.tsv
+                  echo "$(wc -l < caches.tsv) entries before"
+                  gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].number' > open-prs.txt
+                  gh api --paginate "repos/$REPO/branches?per_page=100" --jq '.[].name' > branches.txt
+                  # Tool caches on main: the newest entry per key family (the key minus its content hash).
+                  sort -t$'\t' -k3,3r caches.tsv | awk -F'\t' '
+                    $2 == "refs/heads/main" && $5 ~ /^(node-cache-|playwright-|ecosystem-|jsfb-npm-)/ {
+                      family = $5; sub(/-[0-9a-f]+$/, "", family)
+                      if (seen[family]++) print $1 "\t" $2 "\t" $4 "\t" $5
+                    }' > delete.tsv
+                  # Refs that no run can restore from any more.
+                  awk -F'\t' 'FILENAME == "open-prs.txt" { open["refs/pull/" $1 "/merge"] = 1; next }
+                    FILENAME == "branches.txt" { branch["refs/heads/" $1] = 1; next }
+                    $2 ~ /^refs\/pull\// && !($2 in open) { print $1 "\t" $2 "\t" $4 "\t" $5 }
+                    $2 ~ /^refs\/heads\// && !($2 in branch) { print $1 "\t" $2 "\t" $4 "\t" $5 }' \
+                    open-prs.txt branches.txt caches.tsv >> delete.tsv
+                  sort -u delete.tsv | while IFS=$'\t' read -r id ref size key; do
+                    echo "delete $key ($size B) on $ref"
+                    gh api -X DELETE "repos/$REPO/actions/caches/$id" > /dev/null || true
+                  done
+                  echo "$(sort -u delete.tsv | wc -l) entries deleted"
