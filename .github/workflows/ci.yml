@@ -8,11 +8,9 @@ on:
     # Manual runs only: main's ruleset does not count required checks from a dispatched run.
     workflow_dispatch:
 
-# On main a running run always finishes; a newer push replaces only a run still waiting its turn,
-# and tests the whole tree that run would have tested.
-# A main push gets a group of its own, so every merge commit gets a complete run: a shared group
-# keeps one pending run and cancels the one queued before it, which is how back-to-back merges
-# left main without a finished run. A pull request still cancels its superseded run.
+# Every main commit gets a complete run: in a shared group a newer push cancelled the run still
+# waiting, so back-to-back merges left main with no finished run. A pull request still cancels its
+# superseded run.
 concurrency:
     group: ci-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -1643,8 +1641,8 @@ jobs:
                   persist-credentials: false
                   fetch-depth: 0
 
-            # On main the base is the last commit whose CI run passed, not the previous push: a newer
-            # push replaces a waiting run, and the commits that run would have benchmarked still need it.
+            # On main the base is the last commit whose CI run passed, not the previous push: a red or
+            # unfinished run before this one leaves commits that still need benchmarking.
             - name: Decide whether benchmarks can be affected
               id: filter
               env:
