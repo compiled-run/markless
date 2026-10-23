@@ -605,7 +605,8 @@ function parse(code: string): Node | undefined {
 
 function childNodes(node: Node): Node[] {
 	const children: Node[] = [];
-	for (const [key, value] of Object.entries(node)) {
+	for (const key in node) {
+		const value = (node as Record<string, unknown>)[key];
 		if (key === 'parent') continue;
 		if (Array.isArray(value)) {
 			for (const item of value) if (isNode(item)) children.push(item);

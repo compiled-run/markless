@@ -67,7 +67,8 @@ function staticSpecifier(source: unknown): string | undefined {
 
 function childNodes(node: JavaScriptAstNode): JavaScriptAstNode[] {
 	const children: JavaScriptAstNode[] = [];
-	for (const [key, value] of Object.entries(node)) {
+	for (const key in node) {
+		const value = (node as Record<string, unknown>)[key];
 		if (key === 'loc' || key === 'span' || key === 'range') continue;
 		if (Array.isArray(value)) {
 			for (const item of value) {

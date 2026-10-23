@@ -631,7 +631,8 @@ function tryParseJavaScriptModule(code: string): JavaScriptAstNode | undefined {
 
 function childNodes(node: JavaScriptAstNode): JavaScriptAstNode[] {
 	const children: JavaScriptAstNode[] = [];
-	for (const [key, value] of Object.entries(node)) {
+	for (const key in node) {
+		const value = (node as Record<string, unknown>)[key];
 		if (ignoredAstKeys.has(key)) continue;
 		if (Array.isArray(value)) {
 			for (const item of value) {
