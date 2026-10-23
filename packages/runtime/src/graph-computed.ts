@@ -59,79 +59,58 @@ export function readComputedNode(
 	return readPath(computed.value, path);
 }
 
-export function markComputedDirty(input: {
-	readonly graphNodeId: string;
-	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
-	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
-	readonly dirtyPaths: DirtyPath[];
-	readonly reconcile?: { readonly invalidateComputed: ReconcileInvalidate };
-	readonly invalidateAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
-	readonly visited: Set<string>;
-}): void {
-	if (input.visited.has(input.graphNodeId)) return;
-	input.visited.add(input.graphNodeId);
+type Dependent = readonly [
+	node: RuntimeComputedNode | RuntimeAsyncComputedNode,
+	path: ReadonlyArray<string>,
+	isAsync: boolean,
+];
 
-	const computed = input.computedNodes.get(input.graphNodeId);
-	if (!computed?.compute) return;
-	computed.dirty = true;
-	// With a plane installed the changed paths are unknown until the node
-	// recomputes, so the plane defers the invalidation rather than dirtying the
-	// whole node here.
-	if (input.reconcile) input.reconcile.invalidateComputed(computed);
-	else input.dirtyPaths.push({ graphNodeId: input.graphNodeId, path: [] });
+/** Per source node, every computed then every async computed that reads it. */
+export type RuntimeDependents = ReadonlyMap<string, ReadonlyArray<Dependent>>;
 
-	for (const dependent of input.computedNodes.values()) {
-		if (!dependent.compute) continue;
-		const dirty = dependent.dependencies.some(
-			(dependency) => dependency.graphNodeId === input.graphNodeId,
-		);
-		if (dirty) {
-			markComputedDirty({
-				...input,
-				graphNodeId: dependent.graphNodeId,
-			});
+export function indexRuntimeDependents(
+	computedNodes: ReadonlyMap<string, RuntimeComputedNode>,
+	asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>,
+): RuntimeDependents {
+	const index = new Map<string, Dependent[]>();
+	const add = (node: RuntimeComputedNode | RuntimeAsyncComputedNode, isAsync: boolean) => {
+		for (const dependency of node.dependencies) {
+			let readers = index.get(dependency.graphNodeId);
+			if (!readers) index.set(dependency.graphNodeId, (readers = []));
+			readers.push([node, dependency.path ?? [], isAsync]);
 		}
-	}
-
-	for (const dependent of input.asyncComputedNodes.values()) {
-		const dirty = dependent.dependencies.some(
-			(dependency) => dependency.graphNodeId === input.graphNodeId,
-		);
-		if (dirty) input.invalidateAsyncComputed(dependent);
-	}
+	};
+	for (const computed of computedNodes.values()) if (computed.compute) add(computed, false);
+	for (const asyncComputed of asyncComputedNodes.values()) add(asyncComputed, true);
+	return index;
 }
 
-export function markDirtyComputedDependencies(input: {
-	readonly graphNodeId: string;
-	readonly path: ReadonlyArray<string>;
-	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
-	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
-	readonly dirtyPaths: DirtyPath[];
-	readonly reconcile?: { readonly invalidateComputed: ReconcileInvalidate };
-	readonly invalidateAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
-}): void {
-	for (const computed of input.computedNodes.values()) {
-		if (!computed.compute) continue;
-		const dirty = computed.dependencies.some(
-			(dependency) =>
-				dependency.graphNodeId === input.graphNodeId &&
-				pathsIntersect(input.path, dependency.path ?? []),
-		);
-		if (dirty) {
-			markComputedDirty({
-				...input,
-				graphNodeId: computed.graphNodeId,
-				visited: new Set(),
-			});
+export function markDirtyComputedDependencies(
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+	dependents: RuntimeDependents,
+	dirtyPaths: DirtyPath[],
+	reconcile: { readonly invalidateComputed: ReconcileInvalidate } | undefined,
+	invalidateAsyncComputed: (node: RuntimeAsyncComputedNode) => void,
+): void {
+	const visited = new Set<RuntimeComputedNode>();
+	const invalidated = new Set<RuntimeAsyncComputedNode>();
+	const mark = (sourceId: string, sourcePath?: ReadonlyArray<string>): void => {
+		for (const [node, dependencyPath, isAsync] of dependents.get(sourceId) ?? []) {
+			if (sourcePath && !pathsIntersect(sourcePath, dependencyPath)) continue;
+			if (isAsync) invalidated.add(node as RuntimeAsyncComputedNode);
+			else if (!visited.has(node as RuntimeComputedNode)) {
+				const computed = node as RuntimeComputedNode;
+				visited.add(computed);
+				computed.dirty = true;
+				// With a plane the changed paths are unknown until the node recomputes.
+				if (reconcile) reconcile.invalidateComputed(computed);
+				else dirtyPaths.push({ graphNodeId: computed.graphNodeId, path: [] });
+				mark(computed.graphNodeId);
+			}
 		}
-	}
-
-	for (const asyncComputed of input.asyncComputedNodes.values()) {
-		const dirty = asyncComputed.dependencies.some(
-			(dependency) =>
-				dependency.graphNodeId === input.graphNodeId &&
-				pathsIntersect(input.path, dependency.path ?? []),
-		);
-		if (dirty) input.invalidateAsyncComputed(asyncComputed);
-	}
+	};
+	mark(graphNodeId, path);
+	// After every computed is marked, so no runner reads a stale key.
+	for (const asyncComputed of invalidated) invalidateAsyncComputed(asyncComputed);
 }
