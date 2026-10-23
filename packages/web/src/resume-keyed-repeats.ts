@@ -491,13 +491,11 @@ function censusBlockEnd(census: ResumeDomElement[], at: number): number {
 function censusInsertionSlot(census: ResumeDomElement[], first: ResumeDomNode): number {
 	const parent = (first as ResumeDomElement).parentElement;
 	if (!parent) return census.length;
-	let slot = -1;
-	for (const child of parent.childNodes ?? []) {
-		if (child === first) break;
-		const at = census.indexOf(child as ResumeDomElement);
-		if (at >= 0) slot = censusBlockEnd(census, at);
+	const nodes = Array.from(parent.childNodes ?? []);
+	for (let index = nodes.indexOf(first); index-- > 0; ) {
+		const at = census.indexOf(nodes[index] as ResumeDomElement);
+		if (at >= 0) return censusBlockEnd(census, at);
 	}
-	if (slot >= 0) return slot;
 	const at = census.indexOf(parent);
 	return at >= 0 ? at + 1 : census.length;
 }
