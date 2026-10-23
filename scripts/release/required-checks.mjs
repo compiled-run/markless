@@ -50,8 +50,52 @@ export function contextsMissingFromWorkflow(required, workflow) {
 	return required.map(({ context }) => context).filter((context) => !names.has(context));
 }
 
-function gh(path) {
-	return JSON.parse(execFileSync('gh', ['api', path], { encoding: 'utf8' }));
+export const repository = process.env.GITHUB_REPOSITORY ?? 'compiled-run/markless';
+
+/** The bot GitHub Actions posts as; its commit statuses count for checks required from the Actions app. */
+export const ACTIONS_BOT = 'github-actions[bot]';
+
+export function gh(path) {
+	return JSON.parse(
+		execFileSync('gh', ['api', path], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }),
+	);
+}
+
+/**
+ * Why `statuses` do not satisfy `required`; empty when each required context's newest commit status
+ * is a success. A context required from an app counts only a status the GitHub Actions bot posted.
+ */
+export function statusProblems(required, statuses) {
+	const problems = [];
+	for (const { context, app_id: appId } of required) {
+		const newest = statuses.find((status) => status.context === context);
+		if (!newest) problems.push(`${context}: no commit status on this commit`);
+		else if (appId && newest.creator?.login !== ACTIONS_BOT)
+			problems.push(
+				`${context}: the commit status was posted by ${newest.creator?.login ?? 'nobody'}, not ${ACTIONS_BOT}`,
+			);
+		else if (newest.state !== 'success')
+			problems.push(`${context}: ${newest.state} (${newest.target_url ?? 'no link'})`);
+	}
+	return problems;
+}
+
+/** Every latest check run on `sha`, across pages. */
+export function checkRunsFor(sha) {
+	const runs = [];
+	for (let page = 1; ; page += 1) {
+		const batch = gh(
+			`repos/${repository}/commits/${sha}/check-runs?filter=latest&per_page=100&page=${page}`,
+		).check_runs;
+		runs.push(...batch);
+		if (batch.length < 100) break;
+	}
+	return runs;
+}
+
+/** Commit statuses on `sha`, newest first. */
+export function statusesFor(sha) {
+	return gh(`repos/${repository}/commits/${sha}/statuses?per_page=100`);
 }
 
 /** Required checks from main's active rulesets and any classic branch protection, deduplicated. */
@@ -70,7 +114,7 @@ export function requiredChecksFrom(rules, protection) {
 	});
 }
 
-function requiredChecks(repository) {
+export function requiredChecks() {
 	const checks = requiredChecksFrom(
 		gh(`repos/${repository}/rules/branches/main`),
 		gh(`repos/${repository}/branches/main`).protection,
@@ -82,8 +126,7 @@ function requiredChecks(repository) {
 }
 
 function main(argv) {
-	const repository = process.env.GITHUB_REPOSITORY ?? 'compiled-run/markless';
-	const required = requiredChecks(repository);
+	const required = requiredChecks();
 	console.log(`required on main: ${required.map((check) => check.context).join(', ')}`);
 	if (argv[0] === '--names') {
 		const workflow = parse(readFileSync(`${repoRoot}/.github/workflows/ci.yml`, 'utf8'));
@@ -98,14 +141,7 @@ function main(argv) {
 		return 0;
 	}
 	if (argv[0] === '--sha' && argv[1]) {
-		const runs = [];
-		for (let page = 1; ; page += 1) {
-			const batch = gh(
-				`repos/${repository}/commits/${argv[1]}/check-runs?filter=latest&per_page=100&page=${page}`,
-			).check_runs;
-			runs.push(...batch);
-			if (batch.length < 100) break;
-		}
+		const runs = checkRunsFor(argv[1]);
 		const pullRequestSuites = new Set(
 			gh(
 				`repos/${repository}/actions/runs?head_sha=${argv[1]}&event=pull_request&per_page=100`,

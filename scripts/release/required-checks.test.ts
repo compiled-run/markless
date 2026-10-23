@@ -7,6 +7,7 @@ import {
 	checkRunProblems,
 	contextsMissingFromWorkflow,
 	requiredChecksFrom,
+	statusProblems,
 } from './required-checks.mjs';
 
 const required = [
@@ -60,10 +61,42 @@ test('green checks from a CI run main does not count are reported, not accepted'
 	expect(
 		checkRunProblems(
 			required,
-			[inSuite('test', 1), inSuite('test', 2), inSuite('typecheck', 2), inSuite('agent-files', 2)],
+			[
+				inSuite('test', 1),
+				inSuite('test', 2),
+				inSuite('typecheck', 2),
+				inSuite('agent-files', 2),
+			],
 			pullRequestSuite,
 		),
 	).toEqual([]);
+});
+
+test('a commit status counts only when it is the newest for its context, a success, and from the Actions bot', () => {
+	const status = (context: string, state = 'success', login = 'github-actions[bot]') => ({
+		context,
+		state,
+		creator: { login },
+		target_url: `https://ci.example/${context}`,
+	});
+	expect(
+		statusProblems(required, [
+			status('test'),
+			status('typecheck'),
+			status('agent-files', 'success', 'someone'),
+		]),
+	).toEqual([]);
+	expect(
+		statusProblems(required, [
+			status('test', 'failure'),
+			status('test'),
+			status('typecheck', 'success', 'someone'),
+		]),
+	).toEqual([
+		'test: failure (https://ci.example/test)',
+		'typecheck: the commit status was posted by someone, not github-actions[bot]',
+		'agent-files: no commit status on this commit',
+	]);
 });
 
 test('a later successful rerun of a failed check counts', () => {

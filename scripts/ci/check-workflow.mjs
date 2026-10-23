@@ -132,6 +132,15 @@ const usesAction = (step, action) =>
 
 const withOf = (step) => (typeof step.with === 'object' && step.with !== null ? step.with : {});
 
+const pathList = (step) =>
+	step === undefined
+		? ''
+		: String(withOf(step).path ?? '')
+				.split('\n')
+				.map((line) => line.trim())
+				.filter(Boolean)
+				.join(', ');
+
 // The job-level `if:` expression, and only that: a step's `if:` answers a
 // different question and must never satisfy a check about the job.
 const ifOf = (name) => String((jobs[name] && jobs[name].if) ?? '');
@@ -285,6 +294,17 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 		);
 		if (saver === undefined)
 			fail(`No job saves a marker under \`needs.lanes.outputs.key_${slug}\`, so lane \`${lane}\` re-runs forever on an unchanged tree.`);
+		// actions/cache versions an entry by its path list, so a probe naming other paths never finds it.
+		const probe = stepsOf(LANES_JOB).find((step) => step.id === slug);
+		const probePaths = pathList(probe);
+		for (const name of jobNames) {
+			for (const step of stepsOf(name)) {
+				if (!usesAction(step, 'actions/cache/save')) continue;
+				if (!new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(String(withOf(step).key ?? ''))) continue;
+				if (probe !== undefined && pathList(step) !== probePaths)
+					fail(`\`${step.name ?? 'a cache save'}\` in \`${name}\` saves lane \`${lane}\`'s marker under paths [${pathList(step)}] but its probe in \`${LANES_JOB}\` looks up [${probePaths}], so the probe never finds it and the lane re-runs on every tree.`);
+			}
+		}
 	}
 	// Every probe reads: a restore without `lookup-only` would unpack a marker
 	// into the workspace, and one that ever wrote would mark work green that

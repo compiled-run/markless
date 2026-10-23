@@ -98,13 +98,20 @@ function isPublished(name) {
 	return result.status === 0;
 }
 
+// Attempts per package for an answer that says nothing about the package: on 0.9.0 npm answered
+// E401 "token is invalid", E503 and E404 on PUT between packages the same trusted publisher published.
+const PUBLISH_ATTEMPTS = 4;
+const PUBLISH_RETRY_DELAY_MS = Number(process.env.MARKLESS_PUBLISH_RETRY_DELAY_MS ?? 15_000);
+
 /** What one `pnpm publish` attempt's exit status and output say happened on the registry. */
 function publishOutcome(status, output) {
 	if (status === 0) return 'published';
 	if (/\bE409\b/u.test(output) && /previously staged version/iu.test(output)) return 'staged';
 	if (/\bE403\b/u.test(output) && /cannot publish over the previously published/iu.test(output))
 		return 'exists';
-	if (/\bE401\b/u.test(output)) return 'unauthorized';
+	// npm answers a PUT whose OIDC exchange it did not accept with E401, or with E404 on a package that exists.
+	if (/\bE401\b/u.test(output) || /\b404 Not Found - PUT\b/u.test(output)) return 'unauthorized';
+	if (/\bE(?:429|502|503|504)\b/u.test(output)) return 'unavailable';
 	return 'failed';
 }
 
@@ -134,7 +141,9 @@ function waitUntilVisible(names) {
 	for (;;) {
 		for (const name of pending) {
 			if (isPublished(name)) {
-				console.log(`publish-workspace: ${name}@${version} is now visible on the registry.`);
+				console.log(
+					`publish-workspace: ${name}@${version} is now visible on the registry.`,
+				);
 				pending.delete(name);
 			}
 		}
@@ -167,7 +176,9 @@ const processing = [];
 
 for (const entry of packages) {
 	if (!dryRun && isPublished(entry.name)) {
-		console.log(`publish-workspace: ${entry.name}@${version} already on the registry — skipping.`);
+		console.log(
+			`publish-workspace: ${entry.name}@${version} already on the registry — skipping.`,
+		);
 		skipped += 1;
 		continue;
 	}
@@ -188,14 +199,26 @@ for (const entry of packages) {
 	}
 
 	let attempt = publishOnce(entry, args);
-	// One retry, never more. On 0.6.0 the registry answered one package's publish with
-	// "E401 token is invalid" between packages that published with the same trusted publisher,
-	// so the token it refused was valid. Each npm run mints a new GitHub OIDC token and trades
-	// it again, so the retry is a fresh exchange; a real trust misconfiguration fails both.
-	if (!dryRun && attempt.outcome === 'unauthorized') {
+	// Each npm run mints a new GitHub OIDC token and trades it again, so a retry is a fresh
+	// exchange; a real trust misconfiguration fails every attempt and stops the run.
+	for (
+		let number = 2, delay = PUBLISH_RETRY_DELAY_MS;
+		!dryRun &&
+		number <= PUBLISH_ATTEMPTS &&
+		['unauthorized', 'unavailable'].includes(attempt.outcome);
+		number += 1, delay *= 2
+	) {
 		console.log(
-			`publish-workspace: ${entry.name}@${version} got E401 from the registry; retrying once with a fresh OIDC exchange.`,
+			`publish-workspace: ${entry.name}@${version} got ${attempt.outcome === 'unauthorized' ? 'E401 or E404' : 'a busy or unavailable answer'} from the registry; retrying in ${(delay / 1000).toFixed(0)} s with a fresh OIDC exchange (attempt ${number} of ${PUBLISH_ATTEMPTS}).`,
 		);
+		sleep(delay);
+		if (isPublished(entry.name)) {
+			attempt = { status: 0, outcome: 'published' };
+			console.log(
+				`publish-workspace: ${entry.name}@${version} reached the registry after all.`,
+			);
+			break;
+		}
 		attempt = publishOnce(entry, args);
 	}
 	if (!dryRun && (attempt.outcome === 'staged' || attempt.outcome === 'exists')) {

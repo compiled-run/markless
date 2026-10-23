@@ -20,9 +20,11 @@
 #
 # Modes:
 #   cut          One click (`gh workflow run release.yml -f mode=cut` on main):
-#                the `cut` job bumps to the next minor, writes the CHANGELOG
-#                section, commits and tags vX.Y.0, runs CI on that commit as a pull
-#                request, and moves main to it and pushes the tag once main's required checks pass;
+#                the `cut` job bumps the newest main commit whose push CI run
+#                passed to the next minor, writes the CHANGELOG section, commits
+#                and tags vX.Y.0, inherits that run's checks when the commit only
+#                changed versions and the changelog (else runs CI on it as a pull
+#                request), and moves main to it and pushes the tag once main's required checks pass;
 #                the `release` job publishes that tag; the `announce` job creates
 #                the GitHub Release. See docs/ci-process.md, "Cutting a release".
 #   cut-dry-run  The cut's bump, changelog, hooked commit and pack checks, with no
@@ -85,6 +87,8 @@ jobs:
             actions: write
             # Read the release commit's check runs.
             checks: read
+            # Post the required checks a release commit inherits from the green run it was cut from.
+            statuses: write
         outputs:
             version: ${{ steps.cut.outputs.version }}
             tag: ${{ steps.cut.outputs.tag }}
@@ -177,7 +181,8 @@ jobs:
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
-              run: git push origin "HEAD:refs/heads/release/${TAG}"
+                  SHA: ${{ steps.cut.outputs.sha }}
+              run: git push origin "${SHA}:refs/heads/release/${TAG}"
 
             # The sites migrated to Markless, built on the release commit (ecosystem-ci.yml). The cut never waits for
             # it and nothing here fails on it: the GitHub Release links its result, and a regression opens an issue.
@@ -207,10 +212,23 @@ jobs:
                   echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
                   echo "Ecosystem CI run ${run_id} checks ${SHA}"
 
+            # The release commit changes nothing but versions and CHANGELOG.md on a main commit whose
+            # push CI run passed, so running ci.yml again would test a tree CI already passed. This
+            # proves that by diffing the two trees, then posts each check main requires as a commit
+            # status linking that run; anything else prints inherited=false and CI runs below.
+            - name: Inherit the green CI run of the commit the release was cut from
+              id: inherit
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              env:
+                  SHA: ${{ steps.cut.outputs.sha }}
+                  BASE: ${{ steps.cut.outputs.base }}
+                  RUN_ID: ${{ steps.cut.outputs.base_run_id }}
+              run: node scripts/release/inherit-ci.mjs --release "$SHA" --base "$BASE" --run "$RUN_ID"
+
             # A pull request opened with this token gets a pull_request run that waits for approval
             # (action_required); approve exactly that run, for this commit and branch, then watch it.
             - name: Run CI on the release pull request
-              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true' && steps.inherit.outputs.inherited != 'true'
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
                   SHA: ${{ steps.cut.outputs.sha }}
@@ -241,29 +259,56 @@ jobs:
                     echo "Approved CI run ${run_id}: it waited for approval because this workflow's token opened ${pr}"
                   fi
                   echo "Watching CI run ${run_id} on ${SHA}"
-                  gh run watch "$run_id" --exit-status --interval 30
+                  gh run watch "$run_id" --interval 30 >/dev/null
+                  echo "CI run ${run_id} ended $(gh run view "$run_id" --json conclusion --jq .conclusion); the next step decides on the checks main requires"
 
+            # The same checks main's ruleset requires for any merge: a job outside them (the npm-installing
+            # package-manager-matrix timed out on the 0.9.0 release commit) does not block a release either.
             - name: Require every check main's protection names on the release commit
-              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
+              if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true' && steps.inherit.outputs.inherited != 'true'
               env:
                   SHA: ${{ steps.cut.outputs.sha }}
               run: node scripts/release/required-checks.mjs --sha "$SHA"
 
-            # A fast-forward to exactly the commit CI checked, which marks the pull request merged;
-            # the pull request's green CI run on that commit is what the next cut finds for main.
+            # Fast-forwards main when it is still the commit the release was cut from. When main has
+            # moved on, the release pull request is merged with a merge commit instead: main never
+            # moves backwards, and the checks main requires are read on the release commit itself.
             - name: Move main to the release commit
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
+                  TAG: ${{ steps.cut.outputs.tag }}
                   SHA: ${{ steps.cut.outputs.sha }}
               run: |
                   set -euo pipefail
                   base="$(git rev-parse "${SHA}^")"
                   main="$(git ls-remote origin refs/heads/main | cut -f1)"
-                  if [ "$main" != "$base" ]; then
-                    echo "::error::main moved from ${base} to ${main} during the cut; nothing was released, run the cut again."
-                    exit 1
+                  if [ "$main" = "$base" ] && git push origin "${SHA}:refs/heads/main"; then
+                    echo "Fast-forwarded main from ${base} to ${SHA}"
+                    exit 0
                   fi
-                  git push origin "${SHA}:refs/heads/main"
+                  echo "main is at ${main}, past ${base} the release was cut from; merging the release commit into it"
+                  pr="$(gh pr list --base main --head "release/${TAG}" --state open --json url --jq '.[0].url // empty')"
+                  if [ -z "$pr" ]; then
+                    pr="$(gh pr create --base main --head "release/${TAG}" --title "chore(release): ${TAG}" \
+                      --body "The release cut's commit for ${TAG}, cut from ${base}. main moved past it, so the cut merges it.")"
+                  fi
+                  for attempt in $(seq 1 12); do
+                    if gh pr merge "$pr" --merge --match-head-commit "$SHA"; then
+                      echo "Merged ${pr} into main"
+                      # An inherited release never approves the pull request's waiting CI run.
+                      { gh run list --workflow ci.yml --event pull_request --commit "$SHA" --json databaseId,conclusion \
+                        --jq '.[] | select(.conclusion == "action_required") | .databaseId' |
+                        while read -r id; do gh run cancel "$id"; done; } || true
+                      exit 0
+                    fi
+                    if [ "$(gh pr view "$pr" --json mergeable --jq .mergeable)" = CONFLICTING ]; then
+                      echo "::error::${pr} conflicts with main: main changed package.json or CHANGELOG.md since ${base}. Nothing was released; run the cut again."
+                      exit 1
+                    fi
+                    sleep 10
+                  done
+                  echo "::error::Could not merge ${pr} into main. Nothing was released; run the cut again."
+                  exit 1
 
             - name: Push the tag
               if: inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'
@@ -280,10 +325,13 @@ jobs:
                     git push origin --delete "release/${TAG}"
                   fi
 
-    # Runs after `release` has published the tag the cut pushed.
+    # Runs after `release` has published the tag the cut pushed, or the tag a publish-mode recovery
+    # published, so a recovered release gets its GitHub Release too.
     announce:
         needs: [cut, release]
-        if: inputs.mode == 'cut' && needs.release.result == 'success'
+        if: >-
+            always() && needs.release.result == 'success' &&
+            (inputs.mode == 'cut' || inputs.mode == 'publish')
         runs-on: ubuntu-latest
         timeout-minutes: 10
         permissions:
@@ -292,12 +340,24 @@ jobs:
             actions: read
         env:
             GH_TOKEN: ${{ github.token }}
-            TAG: ${{ needs.cut.outputs.tag }}
+            TAG: ${{ needs.cut.outputs.tag || format('v{0}', inputs.version) }}
+            DIST_TAG: ${{ inputs.dist_tag }}
         steps:
             - uses: actions/download-artifact@v4
+              if: inputs.mode == 'cut'
               with:
                   name: release-notes
                   path: ${{ runner.temp }}
+
+            - uses: actions/checkout@v4
+              if: inputs.mode == 'publish'
+              with:
+                  ref: ${{ format('refs/tags/v{0}', inputs.version) }}
+                  persist-credentials: false
+
+            - name: Take the release notes from the tag's CHANGELOG.md
+              if: inputs.mode == 'publish'
+              run: node scripts/release/changelog-section.mjs "${TAG#v}" "$RUNNER_TEMP/release-notes.md"
 
             - name: Link the ecosystem CI run in the release notes
               if: needs.cut.outputs.ecosystem_run != ''
@@ -322,8 +382,11 @@ jobs:
                   if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
                     echo "GitHub Release ${TAG} already exists."
                   else
+                    # Latest on GitHub only when npm's latest dist-tag moved too.
+                    latest=--latest
+                    if [ -n "$DIST_TAG" ] && [ "$DIST_TAG" != latest ]; then latest=--latest=false; fi
                     gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" \
-                      --notes-file "$RUNNER_TEMP/release-notes.md" --latest --verify-tag
+                      --notes-file "$RUNNER_TEMP/release-notes.md" "$latest" --verify-tag
                   fi
 
     # The only job that can publish. It must stay the last job in this file: its
