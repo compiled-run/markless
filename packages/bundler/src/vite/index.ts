@@ -140,6 +140,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	rolldownOptions.productionPrerenderWakeModuleUrls = new Map();
 	let prerenderEntry: string | null = null;
 	let resolvedRoot = '';
+	let chunkSizeWarningBytes: number | undefined;
 	let clientOutDir = 'dist';
 	rolldownOptions.bundleGraphAdders = bundleGraphAdders;
 	const hmrOptions = {
@@ -194,6 +195,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				() => basePlugin.api.runtimeDemandMaps(),
 				() => basePlugin.api.runtimeDemandSources(),
 				() => basePlugin.api.directCsrOnly(),
+				() => chunkSizeWarningBytes,
 			)
 		: undefined;
 	const packOwnership = packingPlugins?.[0]?.api;
@@ -271,6 +273,10 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			if (options.experimentalNativePacking !== undefined)
 				resolvedConfig.logger.warn(DEPRECATED_NATIVE_PACKING_WARNING);
 			resolvedRoot = resolvedConfig.root;
+			// Vite warns past this many kB of a chunk's code, counting a kB as 1000 bytes.
+			const warningKb = (resolvedConfig.environments?.client ?? resolvedConfig).build
+				?.chunkSizeWarningLimit;
+			chunkSizeWarningBytes = warningKb === undefined ? undefined : warningKb * 1000;
 			clientOutDir = resolvedConfig.build?.outDir ?? 'dist';
 			const serve = resolvedConfig.command === 'serve';
 			hmrOptions.base = resolvedConfig.base;

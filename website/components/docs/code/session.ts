@@ -249,7 +249,9 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 
 	const [{ createEditor }, highlighter] = await Promise.all([
 		import('./editor.ts'),
-		import('./highlight.ts').then((code) => code.loadHighlighter()),
+		import('./highlight.ts').then((code) =>
+			code.loadHighlighter(starters.map((file) => file.name)),
+		),
 	]);
 	const typedEarly: HTMLTextAreaElement[] = [];
 	for (const host of box.querySelectorAll<HTMLElement>('[data-code-file]')) {

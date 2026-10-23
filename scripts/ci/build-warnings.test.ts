@@ -20,8 +20,6 @@ test('every warning is reported once, with the timing report and reporter advice
 	]);
 });
 
-test('an allowed warning stays allowed only for the build it names', () => {
-	expect(buildWarnings(stderr, 'website')).toEqual([
-		'[INEFFECTIVE_DYNAMIC_IMPORT] a.js is dynamically imported by b.js',
-	]);
+test('the docs site is held to every warning, the chunk-size warning included', () => {
+	expect(buildWarnings(stderr, 'website')).toEqual(buildWarnings(stderr));
 });
