@@ -778,8 +778,63 @@ function addEventHostEntry(marks: EventHostMarks, index: number, entry: Protocol
 	if (!entries) return void marks.set(index, [entry]);
 	const same = entries.findIndex((candidate) => candidate.name === entry.name);
 	// One entry per event name: the element's own record outranks a scope it also is.
-	if (same < 0) entries.push(entry);
-	else if (entries[same]!.ref === undefined && entry.ref !== undefined) entries[same] = entry;
+	if (same < 0) return void entries.push(entry);
+	const held = entries[same]!;
+	entries[same] = {
+		...held,
+		...(held.ref === undefined && entry.ref !== undefined ? { ref: entry.ref } : {}),
+		...(held.policy === undefined && entry.policy !== undefined
+			? { policy: entry.policy }
+			: {}),
+	};
+}
+
+type ServedRepeat = {
+	readonly parentHostNodeId: string;
+	readonly rowStartOffset?: number;
+	readonly rowEndOffset?: number;
+	readonly rowEvents: ReadonlyArray<{
+		readonly hostPath: ReadonlyArray<number>;
+		readonly eventName: string;
+		readonly syncPolicy?: ProtocolSyncPolicy;
+	}>;
+};
+
+const childLists = new WeakMap<object, number[][]>();
+
+// A row's submit or keydown is cancelled before any code loads only if every served row host carries its policy.
+function addRowPolicyMarks(
+	marks: EventHostMarks,
+	tree: ReturnType<typeof servedElementTree>,
+	parent: number,
+	repeat: ServedRepeat,
+	policyTable: ReturnType<typeof createSyncPolicyTable>,
+) {
+	if (repeat.rowEndOffset === undefined) return;
+	const events = repeat.rowEvents.flatMap((event) => {
+		const policy = policyTable.entry(event.syncPolicy);
+		return policy === undefined ? [] : [{ ...event, policy }];
+	});
+	if (!events.length) return;
+	let lists = childLists.get(tree);
+	if (!lists) {
+		lists = tree.elements.map(() => [] as number[]);
+		tree.elements.forEach((element, index) => index && lists!.at(element.parent)!.push(index));
+		childLists.set(tree, lists);
+	}
+	const children = (of: number) => lists![of]!;
+	const rows = children(parent);
+	for (const row of rows.slice(repeat.rowStartOffset ?? 0, rows.length - repeat.rowEndOffset))
+		for (const event of events) {
+			let host: number | undefined = row;
+			for (const step of event.hostPath)
+				host =
+					host === undefined
+						? undefined
+						: children(host).find((child) => tree.elements[child]!.node === step);
+			if (host !== undefined)
+				addEventHostEntry(marks, host, { name: event.eventName, policy: event.policy });
+		}
 }
 
 function writeEventHostMarks(html: string, nameEnds: ReadonlyArray<number>, marks: EventHostMarks) {
@@ -831,6 +886,7 @@ export function withEventHostMarks(
 		if (index === undefined) continue;
 		for (const event of repeat.rowEvents)
 			addEventHostEntry(marks, index, { name: event.eventName });
+		addRowPolicyMarks(marks, tree, index, repeat, policyTable);
 	}
 	for (const [anchor, records] of [
 		...view.asyncBoundaries.map(
@@ -850,6 +906,11 @@ export function withEventHostMarks(
 			const index = arm.get(event.hostNodeId);
 			if (policy === undefined || index === undefined) continue;
 			addEventHostEntry(marks, offset + index, { name: event.eventName, policy });
+		}
+		for (const repeat of set.keyedRepeats ?? []) {
+			const index = arm.get(repeat.parentHostNodeId);
+			if (index !== undefined)
+				addRowPolicyMarks(marks, tree, offset + index, repeat, policyTable);
 		}
 	}
 	return writeEventHostMarks(html, tree.nameEnds, marks);
