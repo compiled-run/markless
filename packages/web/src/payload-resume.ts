@@ -76,16 +76,13 @@ export async function resumeFromPayloadScriptsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	if (!root.__mStart) {
-		const started: Promise<ResumePayloadScriptsResult> = startPayloadResume(
-			input,
-			decode,
-		).finally(() => {
-			if (root.__mStart === started) delete root.__mStart;
-		});
-		root.__mStart = started;
-	}
-	return containWakeBoot(root, root.__mStart);
+	const life = pageLifetime(root);
+	return containWakeBoot(
+		root,
+		(root.__mStart ??= startPayloadResume(input, decode).finally(() => {
+			if (pageLifetime(root) === life) delete root.__mStart;
+		})),
+	);
 }
 
 export async function resumeFromPrerenderRecordsImpl(
@@ -98,16 +95,13 @@ export async function resumeFromPrerenderRecordsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	if (!root.__mStart) {
-		const started: Promise<ResumePayloadScriptsResult> = startDecodedResume(
-			input,
-			input,
-		).finally(() => {
-			if (root.__mStart === started) delete root.__mStart;
-		});
-		root.__mStart = started;
-	}
-	return containWakeBoot(root, root.__mStart);
+	const life = pageLifetime(root);
+	return containWakeBoot(
+		root,
+		(root.__mStart ??= startDecodedResume(input, input).finally(() => {
+			if (pageLifetime(root) === life) delete root.__mStart;
+		})),
+	);
 }
 
 // The inline resumer keeps dispatch for the page's life and reads its key policies
@@ -126,10 +120,9 @@ async function startPayloadResume(
 ): Promise<ResumePayloadScriptsResult> {
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
-	const life = pageLifetime(input.root);
 	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
 	const result = await startDecodedResume(input, decoded);
-	if (pageLifetime(input.root) === life) registerLiveDispatch(input, result.runtime);
+	registerLiveDispatch(input, result.runtime);
 	return result;
 }
 
@@ -243,16 +236,11 @@ async function startDecodedResume(
 		renderData: input.renderData,
 	});
 	const retiring = runtime;
-	if (pageLifetime(input.root) !== life) {
-		runtime.dispose();
-		return { decoded, graph, runtime };
-	}
 	(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
 		deleteResumedPayload(input.root);
 		retiring.dispose();
 	};
 	await runtime.start();
-	// A navigation retired this page while it started: it keeps no claim on the container the next page now owns.
 	if (pageLifetime(input.root) !== life) {
 		runtime.dispose();
 		return { decoded, graph, runtime };
