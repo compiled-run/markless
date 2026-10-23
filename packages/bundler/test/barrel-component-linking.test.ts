@@ -210,8 +210,7 @@ test('static barrel reads are watched per importing transform including cached l
 		appFilename,
 		[{ source: './throwing-barrel.ts' }],
 		artifacts,
-		undefined,
-		fixtures,
+		(filename, source) => ({ filename, source, symbols: [] }),
 	);
 	expect(result.children.some((child) => child.source === leaf)).toBe(true);
 	for (const dependency of [
@@ -227,8 +226,7 @@ test('static barrel reads are watched per importing transform including cached l
 		appFilename,
 		[{ source: './mixed-barrel.ts' }],
 		artifacts,
-		undefined,
-		fixtures,
+		(filename, source) => ({ filename, source, symbols: [] }),
 	);
 	expect(addWatchFile).toHaveBeenCalledWith(`${fixtures}/mixed-barrel.ts`);
 	expect(addWatchFile).not.toHaveBeenCalledWith(`${fixtures}/throwing-barrel.ts`);

@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import {
 	type ArtifactChildMaterialization,
 	type CaptureAnalysisArtifact,
+	type CompileTsrxModuleInput,
 	type CompilerDiagnostic,
 	type DelegateImportFailure,
 	type LinkedArtifactChild,
@@ -20,7 +21,7 @@ import {
 	type ModuleGraphInterfaceArtifact,
 	type ModuleLinkRequest,
 	type ModuleLinkResolutionTable,
-	compileTsrxModuleLinkArtifact,
+	compileTsrxModule,
 	computeLinkedInterfaces,
 	delegateChildRenderPlan,
 	delegateChildRendering,
@@ -44,7 +45,6 @@ import { withQuery } from 'ufo';
 import type { BuildDelegateLoader, DelegateSpecifierResolve } from './build/delegate-loader.ts';
 import { yieldToEventLoop } from './event-loop.ts';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
-import { moduleIdFor } from './module-id.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import type {
 	MarklessEnvironment,
@@ -199,8 +199,7 @@ export async function linkBarrelComponentInterfaces(
 	parent: string,
 	moduleImports: ReadonlyArray<{ readonly source: string }>,
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
-	buildId: string | undefined,
-	root: string | undefined,
+	compileInput: (filename: string, source: string) => CompileTsrxModuleInput,
 	resolvedImports: ReadonlyArray<LinkedModuleChildResolution> = [],
 ): Promise<{
 	readonly interfaces: Record<string, ModuleGraphInterfaceArtifact>;
@@ -270,7 +269,7 @@ export async function linkBarrelComponentInterfaces(
 			artifact.pendingInterfaces.map(async (filename) => {
 				interfacesByFile.set(
 					filename,
-					await barrelModuleInterface(filename, artifacts, buildId, root, watchFile),
+					await barrelModuleInterface(filename, artifacts, compileInput, watchFile),
 				);
 			}),
 		);
@@ -377,11 +376,11 @@ function shipsMarklessSource(directory: string): boolean {
 	return ships;
 }
 
+// Compiled with the input this module's own transform compiles it with, so the two share one compile.
 async function barrelModuleInterface(
 	filename: string,
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
-	buildId: string | undefined,
-	root: string | undefined,
+	compileInput: (filename: string, source: string) => CompileTsrxModuleInput,
 	watchFile?: (filename: string) => void,
 ): Promise<ModuleGraphInterfaceArtifact | null> {
 	const known = artifacts.get(filename)?.moduleGraphInterface;
@@ -392,13 +391,8 @@ async function barrelModuleInterface(
 	if (!existsSync(filename) || !statSync(filename).isFile()) return null;
 	watchFile?.(filename);
 	await yieldToEventLoop();
-	const linked = await compileTsrxModuleLinkArtifact({
-		filename,
-		moduleId: moduleIdFor(filename, root),
-		source: readFileSync(filename, 'utf8'),
-		buildId,
-	});
-	return linked.moduleGraphInterface;
+	const compiled = await compileTsrxModule(compileInput(filename, readFileSync(filename, 'utf8')));
+	return compiled.moduleGraphInterface;
 }
 
 export async function resolveImportedChildren(

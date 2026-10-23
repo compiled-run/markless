@@ -7,6 +7,7 @@ import { normalizeExecutionLogMode } from '../execution-log.ts';
 import { moduleIsEntry } from '../link-driver.ts';
 import { moduleIdFor } from '../module-id.ts';
 import { nativePackingEnabled } from '../packing-option.ts';
+import { transformCompileInput } from '../transform.ts';
 import type { MarklessEnvironment, TransformTsrxModuleInput } from '../types.ts';
 import {
 	MARKLESS_ROUTE_SOURCE_QUERY_RE,
@@ -203,4 +204,21 @@ export function planTransformHookRequest(
 // Render data and route artifacts are facades that never publish the source's claims.
 export function tracksSourcePublication(request: TransformRequest): boolean {
 	return !request.renderDataRequest && !request.clientRouteArtifact;
+}
+
+/** What a module's own first transform compiles it with, for readers that need only its interface. */
+export function interfaceCompileInput(ctx: MarklessHookContext) {
+	const { internalOptions } = ctx;
+	return (filename: string, source: string) => {
+		const moduleId = moduleIdFor(filename, ctx.getRoot());
+		return transformCompileInput({
+			filename,
+			moduleId,
+			source,
+			buildId: internalOptions.buildId,
+			serverOnlyProps: internalOptions.serverOnlyProps?.(moduleId),
+			routeRoot: internalOptions.unimportedRouteModule?.(moduleId) === true,
+			executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
+		});
+	};
 }
