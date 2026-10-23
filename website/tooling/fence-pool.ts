@@ -11,7 +11,11 @@ export type FencePoolOptions = {
 	readonly workers: number;
 };
 
-export type FencePool = { readonly render: FenceRenderer };
+export type FencePool = {
+	readonly render: FenceRenderer;
+	/** The same colours with no hover docs: the worker never starts the type checker for these. */
+	readonly colour: FenceRenderer;
+};
 
 type Reply = { readonly id: number; readonly html?: string | null; readonly error?: string };
 
@@ -62,24 +66,30 @@ export function createFencePool(options: FencePoolOptions): FencePool {
 		);
 	};
 
-	const send = (code: string, fenceLanguage: string): Promise<string | undefined> =>
+	const send = (
+		code: string,
+		fenceLanguage: string,
+		hovers: boolean,
+	): Promise<string | undefined> =>
 		new Promise((resolve, reject) => {
 			const lane = laneFor();
 			const id = nextId++;
 			// A pending reply keeps the process alive; an idle pool never does.
 			if (lane.waiting.size === 0) lane.worker.ref();
 			lane.waiting.set(id, { resolve, reject });
-			lane.worker.postMessage({ id, code, fenceLanguage });
+			lane.worker.postMessage({ id, code, fenceLanguage, hovers });
 		});
 
-	return {
-		render(code, fenceLanguage) {
-			const key = `${fenceLanguage}\0${code}`;
+	const renderer =
+		(hovers: boolean): FenceRenderer =>
+		(code, fenceLanguage) => {
+			const key = `${hovers}\0${fenceLanguage}\0${code}`;
 			let html = rendered.get(key);
-			if (!html) rendered.set(key, (html = send(code, fenceLanguage)));
+			if (!html) rendered.set(key, (html = send(code, fenceLanguage, hovers)));
 			return html;
-		},
-	};
+		};
+
+	return { render: renderer(true), colour: renderer(false) };
 }
 
 let shared: FencePool | undefined;

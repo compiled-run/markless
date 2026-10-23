@@ -88,3 +88,19 @@ fixtureValue();</code></pre><pre><code class="language-css">a { color: red; }</c
 	expect(edited).toContain('Second wording.');
 	expect(edited).not.toContain('First wording.');
 }, 60000);
+
+const HOVER =
+	/<span class="tsrx-hover"[^>]*>([^<]*)<span class="tsrx-tip"[^>]*><span class="tsrx-tip-title">[^<]*<\/span><span class="tsrx-tip-body">[^<]*<\/span><\/span><\/span>/g;
+
+test('a colour-only fence is the hovered fence without its hover docs, cached apart from it', async () => {
+	const cacheDir = temporaryDirectory();
+	const html = `<pre><code class="language-tsrx">import { state } from '@markless/core';
+let count = state(0);</code></pre>`;
+	const pool = createFencePool({ cacheDir, workers: 1 });
+	const hovered = await replaceFences(html, pool.render);
+	const coloured = await replaceFences(html, pool.colour);
+	expect(hovered).toContain('tsrx-hover');
+	expect(coloured).not.toContain('tsrx-hover');
+	expect(coloured).toBe(hovered.replace(HOVER, '$1').replace(' data-lang="tsrx"', ''));
+	expect(readdirSync(join(cacheDir, 'entries'))).toHaveLength(2);
+}, 60000);

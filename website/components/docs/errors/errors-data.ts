@@ -1639,7 +1639,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A Markless build tooling error from @markless/bundler.',
 		printed: [
-			'MARKLESS_CHILD_SYMBOL_MISSING: Linked child <missingSymbolSource> does not provide requested symbol module <normalized>. Rebuild the child with the current Markless compiler and clear any stale build cache.',
+			'MARKLESS_CHILD_SYMBOL_MISSING: Linked child <missingSymbolSource> does not provide requested symbol module <normalizedId>. Rebuild the child with the current Markless compiler and clear any stale build cache.',
 		],
 		structured: false,
 		sources: [
@@ -2506,6 +2506,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f1',
 				file: 'packages/bundler/src/dev-error/client-asset.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/dev-error/client-asset.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_DEV_TRANSFORM_STALLED',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_DEV_TRANSFORM_STALLED: Markless waited <stallMs> ms for the <environment> transform of <url> and it has not finished. A transform that waits, through another request, on one that waits on it never settles.<value> Set MARKLESS_DEV_TRANSFORM_STALL_MS to wait longer on a slow machine.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/dev-transform-stall.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/dev-transform-stall.ts',
 			},
 		],
 		moreSources: 0,

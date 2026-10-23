@@ -5,7 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { parentPort, workerData } from 'node:worker_threads';
 import { createFenceInputs, fenceKey, openFenceCache, recordRead } from './fence-cache.ts';
 
-type Request = { readonly id: number; readonly code: string; readonly fenceLanguage: string };
+type Request = {
+	readonly id: number;
+	readonly code: string;
+	readonly fenceLanguage: string;
+	readonly hovers: boolean;
+};
 
 const inputs = createFenceInputs();
 const cacheDir = (workerData as { cacheDir: string | false }).cacheDir;
@@ -56,11 +61,14 @@ const loadTooling = () =>
 		return code;
 	})());
 
-async function render({ code, fenceLanguage }: Request): Promise<string | null> {
-	const key = fenceKey(code, fenceLanguage);
+async function render({ code, fenceLanguage, hovers }: Request): Promise<string | null> {
+	const key = fenceKey(code, fenceLanguage, hovers);
 	const cached = cache?.lookup(key);
 	if (cached !== undefined) return cached;
-	const html = (await (await loadTooling()).renderFence(code, fenceLanguage)) ?? null;
+	const tooling = await loadTooling();
+	const html =
+		(await (hovers ? tooling.renderFence : tooling.renderColouredFence)(code, fenceLanguage)) ??
+		null;
 	cache?.store(key, html, inputs);
 	return html;
 }

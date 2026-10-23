@@ -248,15 +248,22 @@ export const pool = (poly: P[], toward: P, keep: number): P[] => poly.map(([x, y
 
 export function hull(points: P[]): P[] {
 	const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-	const cross = (o: P, a: P, b: P) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+	// Points collinear in exact maths come out a last bit apart on arm64 and x64 (measured under 1e-13 relative, nothing up to 1e-5), so they count as collinear.
+	const turnsLeft = (o: P, a: P, b: P) => {
+		const ax = a[0] - o[0];
+		const ay = a[1] - o[1];
+		const bx = b[0] - o[0];
+		const by = b[1] - o[1];
+		return ax * by - ay * bx > 1e-9 * Math.hypot(ax, ay) * Math.hypot(bx, by);
+	};
 	const lower: P[] = [];
 	for (const p of pts) {
-		while (lower.length >= 2 && cross(lower.at(-2)!, lower.at(-1)!, p) <= 0) lower.pop();
+		while (lower.length >= 2 && !turnsLeft(lower.at(-2)!, lower.at(-1)!, p)) lower.pop();
 		lower.push(p);
 	}
 	const upper: P[] = [];
 	for (const p of pts.reverse()) {
-		while (upper.length >= 2 && cross(upper.at(-2)!, upper.at(-1)!, p) <= 0) upper.pop();
+		while (upper.length >= 2 && !turnsLeft(upper.at(-2)!, upper.at(-1)!, p)) upper.pop();
 		upper.push(p);
 	}
 	return [...lower.slice(0, -1), ...upper.slice(0, -1)];

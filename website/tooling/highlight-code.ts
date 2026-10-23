@@ -261,8 +261,8 @@ export async function replaceFences(html: string, render: FenceRenderer): Promis
 	return out + html.slice(cursor);
 }
 
-/** One fence through shiki and the type checker, on the calling thread. */
-export async function renderFence(
+/** One fence coloured as the site colours it, with no hover docs: shiki only, no type checker. */
+export async function renderColouredFence(
 	code: string,
 	fenceLanguage: string,
 ): Promise<string | undefined> {
@@ -276,14 +276,24 @@ export async function renderFence(
 		// single-theme output with one extra custom property beside it.
 		defaultColor: 'light',
 	});
+	return useSiteSurface(
+		rendered,
+		highlighter.getTheme(LIGHT_THEME).fg,
+		highlighter.getTheme(DARK_THEME).fg,
+	);
+}
+
+/** One fence through shiki and the type checker, on the calling thread. */
+export async function renderFence(
+	code: string,
+	fenceLanguage: string,
+): Promise<string | undefined> {
+	const coloured = await renderColouredFence(code, fenceLanguage);
+	if (coloured === undefined) return undefined;
 	// Real types first: the quick-info pass reads the rendered code by counting
 	// characters, and the tooltip text `addTsrxHovers` injects is not code.
 	const typed = addQuickInfoHovers(
-		useSiteSurface(
-			rendered,
-			highlighter.getTheme(LIGHT_THEME).fg,
-			highlighter.getTheme(DARK_THEME).fg,
-		),
+		coloured,
 		code,
 		hasQuickInfo(fenceLanguage) ? quickInfo().queryFence(code, fenceLanguage) : [],
 	);
@@ -305,4 +315,9 @@ export function highlightFencesInProcess(html: string): Promise<string> {
  */
 export function highlightFences(html: string): Promise<string> {
 	return replaceFences(html, sharedFencePool().render);
+}
+
+/** `highlightFences` without hover docs. */
+export function colourFences(html: string): Promise<string> {
+	return replaceFences(html, sharedFencePool().colour);
 }

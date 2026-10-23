@@ -441,8 +441,8 @@ function routerConfigPlugin(
 			markless?.api.enableChunkImportMap?.();
 			routePreloads.chunkSpecifiers = markless?.api.chunkImportMap() === true;
 		},
-		configEnvironment(_name, config) {
-			configureRouteInputs(config);
+		configEnvironment(name, config) {
+			configureRouteInputs(name, config);
 		},
 		async buildStart() {
 			if (!productionBuild) return;
@@ -648,16 +648,19 @@ function routerConfigPlugin(
 	};
 }
 
-function configureRouteInputs(config: EnvironmentOptions): void {
-	config.build ??= {};
-	config.build.rolldownOptions ??= {};
+// Nitro adopts every server environment with an input as a service, so only ssr, where pages render, gets the server entry.
+function configureRouteInputs(name: string, config: EnvironmentOptions): void {
 	if (config.consumer === 'client') {
+		config.build ??= {};
+		config.build.rolldownOptions ??= {};
 		config.build.rolldownOptions.input = routerClientInput(
 			config.build.rolldownOptions.input,
 			configRoot(config),
 		);
 		config.build.rolldownOptions.preserveEntrySignatures ??= 'exports-only';
-	} else {
+	} else if (name === 'ssr') {
+		config.build ??= {};
+		config.build.rolldownOptions ??= {};
 		config.build.rolldownOptions.input ??= scopedVirtualEntryId(
 			SERVER_ENTRY_ID,
 			configRoot(config),

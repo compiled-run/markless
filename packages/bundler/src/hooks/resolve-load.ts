@@ -49,27 +49,19 @@ export async function resolveIdHook(
 			moduleSideEffects: true,
 		};
 	}
-	const virtualModule = await virtualModuleForRequest(
-		ctx,
-		normalized,
-		ctx.getEnvironment(pluginContext),
-	);
-	if (virtualModule) {
-		const directQuery =
-			virtualModule.type === 'style' && /(?:[?&])direct(?:[=&]|$)/.test(source)
-				? '?direct'
-				: '';
+	// Resolving never compiles: Vite shares one pending resolve per url, and the owner's compile resolves this same id.
+	const virtualModule = ctx.state.virtualModules.get(normalized);
+	if (virtualModule || loadRegeneratesVirtualModule(ctx, normalized)) {
+		const style =
+			virtualModule?.type === 'style' ||
+			normalized.startsWith(`${MARKLESS_VIRTUAL_PREFIX}style:`);
+		const directQuery = style && /(?:[?&])direct(?:[=&]|$)/.test(source) ? '?direct' : '';
 		return {
 			id: `${resolveVirtualId(normalized)}${directQuery}`,
 			moduleSideEffects: true,
 		};
 	}
-	const missingSymbolSource = symbolVirtualModuleSourceFile(normalized);
-	if (missingSymbolSource && importedChildSources.has(missingSymbolSource)) {
-		throw new Error(
-			`MARKLESS_CHILD_SYMBOL_MISSING: Linked child ${JSON.stringify(missingSymbolSource)} does not provide requested symbol module ${JSON.stringify(normalized)}. Rebuild the child with the current Markless compiler and clear any stale build cache.`,
-		);
-	}
+	throwIfChildSymbolMissing(importedChildSources, normalized);
 
 	const sharedReach = sharedReachedRenderDataRequest(source);
 	if (sharedReach) return await pluginContext.resolve(sharedReach, importer, { skipSelf: true });
@@ -144,14 +136,7 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 		);
 		await moduleMetadata.sealSourceSymbolClaims('client', resolverSource);
 	}
-	const module = await virtualModuleForRequest(
-		ctx,
-		normalizedId,
-		ctx.getEnvironment(pluginContext),
-		{
-			waitForRegeneration: true,
-		},
-	);
+	const module = await virtualModuleForLoad(ctx, normalizedId, ctx.getEnvironment(pluginContext));
 	if (module?.provisional === true) {
 		const kind =
 			module.type === 'symbol'
@@ -169,27 +154,41 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 			publicPath: internalOptions.publicPath,
 		});
 	}
+	throwIfChildSymbolMissing(ctx.state.importedChildSources, normalizedId);
 	return null;
 }
 
-export async function virtualModuleForRequest(
+// In dev a load recompiles the owner of a virtual id the build state no longer holds.
+function loadRegeneratesVirtualModule(ctx: MarklessHookContext, normalizedId: string): boolean {
+	if (ctx.internalOptions.dev !== true) return false;
+	const source = marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot());
+	return source !== null && TSRX_SOURCE_FILE.test(source);
+}
+
+function throwIfChildSymbolMissing(
+	importedChildSources: ReadonlySet<string>,
+	normalizedId: string,
+) {
+	const missingSymbolSource = symbolVirtualModuleSourceFile(normalizedId);
+	if (missingSymbolSource && importedChildSources.has(missingSymbolSource)) {
+		throw new Error(
+			`MARKLESS_CHILD_SYMBOL_MISSING: Linked child ${JSON.stringify(missingSymbolSource)} does not provide requested symbol module ${JSON.stringify(normalizedId)}. Rebuild the child with the current Markless compiler and clear any stale build cache.`,
+		);
+	}
+}
+
+async function virtualModuleForLoad(
 	ctx: MarklessHookContext,
 	normalizedId: string,
 	currentEnvironment: MarklessEnvironment,
-	options: { readonly waitForRegeneration: boolean } = { waitForRegeneration: false },
 ) {
 	const { internalOptions } = ctx;
 	const { virtualModules, regeneratingVirtualModules } = ctx.state;
 	if (internalOptions.dev !== true) return virtualModules.get(normalizedId);
 
-	// A load arriving while this id regenerates waits for that pass: handing it
-	// the registration of the moment served the browser a server-flavour
-	// render-data module, which Vite then cached for the client for good. Only a
-	// load waits - a resolve needs nothing but the id, and the pass's own
-	// pipeline resolves this id re-entrantly (the module re-exports its render
-	// data), so a waiting resolve would wait on itself.
+	// The registration of the moment would serve the browser a server-flavour render-data module that Vite then caches.
 	const inFlight = regeneratingVirtualModules.get(normalizedId);
-	if (inFlight && options.waitForRegeneration) await inFlight;
+	if (inFlight) await inFlight;
 	const registered = virtualModules.get(normalizedId);
 	const source = marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot());
 	const awaitsClientEmission =
