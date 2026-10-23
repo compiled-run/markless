@@ -42,13 +42,20 @@ async function click(testId: string, regions: Regions): Promise<void> {
 	await quietWatches(regions.all);
 }
 
+// The first gesture wakes the runtime, so quiet regions prove nothing until its own write has landed.
+async function firstGesture(regions: Regions): Promise<void> {
+	el('idle').click();
+	await expect.poll(() => el('aside').textContent).toBe('1');
+	await quietWatches(regions.all);
+}
+
 for (const mode of ['csr', 'ssr'] as const) {
 	const lane = mode.toUpperCase();
 
 	test(`${lane}: the first gesture leaves an unchanged branch region silent`, async () => {
 		const regions = await mounted(mode);
 		try {
-			await click('idle', regions);
+			await firstGesture(regions);
 			expect(el('aside').textContent).toBe('1');
 			expect(regions.branch.counts()).toEqual(SILENT);
 			expect(regions.flip.counts()).toEqual(SILENT);
@@ -61,7 +68,7 @@ for (const mode of ['csr', 'ssr'] as const) {
 	test(`${lane}: only the region whose value moved records anything`, async () => {
 		const regions = await mounted(mode);
 		try {
-			await click('idle', regions);
+			await firstGesture(regions);
 			regions.reset();
 
 			await click('tap', regions);
@@ -87,7 +94,7 @@ for (const mode of ['csr', 'ssr'] as const) {
 	test(`${lane}: a genuine arm flip rewrites its region and no other`, async () => {
 		const regions = await mounted(mode);
 		try {
-			await click('idle', regions);
+			await firstGesture(regions);
 			regions.reset();
 
 			await click('flip', regions);
