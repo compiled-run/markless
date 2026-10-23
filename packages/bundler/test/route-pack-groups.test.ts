@@ -1332,3 +1332,30 @@ test('keeps a startup pack whole when its app or framework half is too small for
 		expect(groups.get('runtime')).toBe('shared');
 	}
 });
+
+test('an app module importing several deferred targets gets one deferred pack per target', () => {
+	const groups = planRoutePackGroups({
+		modules: new Map([
+			['page', { dependencies: ['table'], source: 'page', app: true }],
+			['table', { dependencies: [], dynamicDependencies: ['one', 'two', 'runtime-a', 'runtime-b'], source: 'table', app: true }],
+			['one', { dependencies: ['one-part', 'common'], source: 'one', app: true }],
+			['one-part', { dependencies: [], source: 'one-part', app: true }],
+			['two', { dependencies: ['common'], source: 'two', app: true }],
+			['common', { dependencies: [], source: 'common', app: true }],
+			['runtime-a', { dependencies: [], source: 'runtime-a' }],
+			['runtime-b', { dependencies: [], source: 'runtime-b' }],
+		]),
+		routes: new Map([['/page', ['page']]]),
+		undemandedDynamicTargets: new Set(['one', 'two', 'runtime-a', 'runtime-b']),
+	});
+	const one = groups.get('one');
+	expect(isMarklessDeferredPack(one)).toBe(true);
+	expect(one).not.toBe(MARKLESS_DEFERRED_PACK);
+	expect(groups.get('one-part')).toBe(one);
+	expect(isMarklessDeferredPack(groups.get('two'))).toBe(true);
+	expect(groups.get('two')).not.toBe(one);
+	// Code both targets share, and framework code, stay in the deferred pack every target shares.
+	expect(groups.get('common')).toBe(MARKLESS_DEFERRED_PACK);
+	expect(groups.get('runtime-a')).toBe(MARKLESS_DEFERRED_PACK);
+	expect(groups.get('runtime-b')).toBe(MARKLESS_DEFERRED_PACK);
+});

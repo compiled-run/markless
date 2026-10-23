@@ -313,6 +313,7 @@ export function planRoutePackGroups(input: {
 			}
 		}
 	}
+	for (const [id, pack] of alternativeDeferredPacks(input.modules, groups)) groups.set(id, pack);
 	// Entry-rooted builds resolve symbols through their source's symbol chunk, so their packs stay whole.
 	return splitOversizedLazyPacks(
 		input.pagesLoadOneRoute
@@ -540,4 +541,60 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
 	const values = map.get(key);
 	if (values) values.push(value);
 	else map.set(key, [value]);
+}
+
+/**
+ * An app module that imports several deferred targets picks one per run (a table of loaders), so
+ * each target, with the code only it reaches, gets a deferred pack of its own instead of the one
+ * every deferred module shares: choosing one never downloads the others.
+ */
+function alternativeDeferredPacks(
+	modules: ReadonlyMap<
+		string,
+		{
+			readonly dependencies: readonly string[];
+			readonly dynamicDependencies?: readonly string[];
+			readonly app?: boolean;
+		}
+	>,
+	groups: ReadonlyMap<string, string>,
+): Map<string, string> {
+	const deferred = (id: string) => groups.get(id) === MARKLESS_DEFERRED_PACK;
+	const alternatives = new Set<string>();
+	const entries = new Set<string>();
+	for (const [id, module] of modules) {
+		const targets = (module.dynamicDependencies ?? []).filter(deferred);
+		for (const target of targets) if (!deferred(id)) entries.add(target);
+		if (!module.app || targets.length < 2) continue;
+		for (const target of targets) if (modules.get(target)?.app) alternatives.add(target);
+	}
+	const packs = new Map<string, string>();
+	if (alternatives.size === 0) return packs;
+	const closure = (from: string, stop: (id: string) => boolean) => {
+		const reached = new Set<string>();
+		const pending = [from];
+		for (let id = pending.pop(); id !== undefined; id = pending.pop()) {
+			if (reached.has(id) || !deferred(id) || (id !== from && stop(id))) continue;
+			reached.add(id);
+			const module = modules.get(id);
+			pending.push(...(module?.dependencies ?? []), ...(module?.dynamicDependencies ?? []));
+		}
+		return reached;
+	};
+	// Deferred code another entry also reaches stays in the shared deferred pack.
+	const shared = new Set<string>();
+	for (const entry of entries)
+		if (!alternatives.has(entry))
+			for (const id of closure(entry, (id) => alternatives.has(id))) shared.add(id);
+	const owner = new Map<string, string | null>();
+	for (const root of alternatives)
+		for (const id of closure(root, (id) => alternatives.has(id)))
+			owner.set(id, owner.has(id) && owner.get(id) !== root ? null : root);
+	const labels = new Map<string, string>();
+	for (const [id, root] of owner) {
+		if (root === null || shared.has(id) || !modules.get(id)?.app) continue;
+		if (!labels.has(root)) labels.set(root, `${MARKLESS_DEFERRED_PACK}-alt${labels.size}`);
+		packs.set(id, labels.get(root)!);
+	}
+	return packs;
 }
