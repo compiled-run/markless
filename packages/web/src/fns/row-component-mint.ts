@@ -178,6 +178,8 @@ export function marklessRowComponentMint(
 	primeSurface();
 	void Promise.resolve(loadEvaluator()).catch(() => undefined);
 	void Promise.resolve(loadInstanceScope()).catch(() => undefined);
+	void Promise.resolve(loadCommitArm()).catch(() => undefined);
+	void Promise.resolve(loadComposition()).catch(() => undefined);
 	return {
 		renderEmptyArm,
 		servedEmptyArm,
@@ -335,6 +337,21 @@ function loadEvaluator(): Awaitable<EvaluatorModule> {
 		(evaluatorLoad ??= import('../prerender/row-component-render.ts').then(
 			(module) => (evaluatorModule = module),
 		))
+	);
+}
+
+// A row's arrival and the renumbering behind it land in one update only if nothing between them waits a task.
+let commitArmModule: typeof import('../resume-commit-arm.ts') | undefined;
+let compositionModule: typeof import('./composition.ts') | undefined;
+function loadCommitArm() {
+	return (
+		commitArmModule ??
+		import('../resume-commit-arm.ts').then((module) => (commitArmModule = module))
+	);
+}
+function loadComposition() {
+	return (
+		compositionModule ?? import('./composition.ts').then((module) => (compositionModule = module))
 	);
 }
 
@@ -922,7 +939,7 @@ async function commitMintedRow(
 			if (element === replaced || replaced.contains?.(element)) deps.disposeHost(hostNodeId);
 	await seedMintedGraphNodes(deps, rendered.state);
 	await mergeMintedWidgetRoots(deps, rendered.state, repeat, row.rowSegment);
-	const { registerArmRecordSet } = await import('../resume-commit-arm.ts');
+	const { registerArmRecordSet } = await loadCommitArm();
 	await registerArmRecordSet(
 		deps,
 		registration.installArmEventType,
@@ -1079,10 +1096,8 @@ async function mergeMintedWidgetRoots(
 	const definitions = (state.sharedDefinitions ?? []).filter(
 		(definition) => definition.scope === 'widget',
 	);
-	const [{ marklessComposedWidgetRegistry }, instanceScope] = await Promise.all([
-		import('./composition.ts'),
-		import('./instance-scope.ts'),
-	]);
+	const { marklessComposedWidgetRegistry } = await loadComposition();
+	const instanceScope = await loadInstanceScope();
 	const composed = marklessComposedWidgetRegistry(state);
 	if (!composed && definitions.length === 0) return;
 	const registry = instanceScope.marklessGraphWidgetRegistry(deps.graph);
