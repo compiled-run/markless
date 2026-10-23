@@ -43,7 +43,7 @@ Vercel builds it from this monorepo. `vercel.json` in this folder is the whole b
 ```
 
 The install runs at the repository root, because the site consumes `@markless/*` through
-`workspace:*`. The build runs `scripts/generate-seo.ts` and then `vp build`; nitro's `vercel` preset
+`workspace:*`. The build is `vp build`; nitro's `vercel` preset
 writes `.vercel/output/` (Build Output API v3): `static/**` for the files the CDN serves and one
 `__server` function for everything else.
 
@@ -61,9 +61,9 @@ carries a `description`; `headFor(pathname)` turns an entry into the `<title>` a
 `<meta name="description">` that `document.tsrx` renders, along with `lang="en"`, a canonical link,
 the Open Graph tags and the favicon. An unknown path falls back to the site's own name and sentence.
 
-`scripts/generate-seo.ts` writes `public/robots.txt`, `public/sitemap.xml` and `public/llms.txt`
-from the same array, and `npm run build` runs it before `vp build` so the files are copied into the
-output. `npm run seo` runs it on its own. The site owns the root of `markless.dev`, so all three are
+`tooling/seo-files.ts` writes `robots.txt`, `sitemap.xml` and `llms.txt` from the same array straight
+into the build output, and the dev server answers them from the same code. They are not in `public/`,
+so a build never rewrites a tracked file. The site owns the root of `markless.dev`, so all three are
 served from there and `robots.txt` names the sitemap. Adding a page still means adding one entry to
 `nav.ts` and nothing else.
 
@@ -132,8 +132,8 @@ screenshots into the markless repo's goal notes.
   palette, the hover-doc box and the dark theme. Below `70rem` the sidebar's list is collapsed
   behind a `<details>` and the "On this page" outline is laid on its side as a strip of chips, so
   the first phone screenful is the article rather than the navigation.
-- `public/favicon.svg`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt` — the head and
-  crawler files. The last three are generated; `scripts/generate-seo.ts` is what writes them.
+- `public/favicon.svg` — the head icon. The crawler files `robots.txt`, `sitemap.xml` and
+  `llms.txt` are not in `public/`; `tooling/seo-files.ts` writes them into the build output.
 - `public/theme/sun.png`, `public/theme/moon.png` — the two drawings on the theme toggle, cut from
   the top pair of `theme-icons-sheet.png` by `tooling/cut-sprites.ts theme`. Each button carries the
   drawing of the theme it is standing in, so the sun is only ever painted on paper and the moon only
