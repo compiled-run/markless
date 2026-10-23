@@ -25,7 +25,7 @@ import {
 	handlerReadsRenderLocalDiagnostic,
 	handlerWritesRenderLocalDiagnostic,
 } from './diagnostics.ts';
-import { rebuiltLocalWrite } from './rebuilt-local-writes.ts';
+import { findRebuiltValueChange, type RebuiltValueFlowHost } from './rebuilt-value-flow.ts';
 import { findSharedInstance, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './imports.ts';
@@ -46,8 +46,7 @@ export type RenderLocalInline =
 			readonly definitions: ReadonlyArray<AnyNode>;
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
-	| { readonly kind: 'render-local'; readonly name: string }
-	| { readonly kind: 'writes-render-local'; readonly name: string; readonly write: string };
+	| { readonly kind: 'render-local'; readonly name: string };
 
 type Replacement = { readonly start: number; readonly end: number; readonly text: string };
 
@@ -99,7 +98,6 @@ function inlineWithin(
 	const boundInside = new Set<string>();
 	let refusal: Exclude<RenderLocalInline, { readonly kind: 'inlined' }> | null = null;
 
-	const ancestors: AnyNode[] = [];
 	const visit = (candidate: AnyNode, parent: AnyNode | null): void => {
 		if (refusal) return;
 		if (candidate.type === 'Identifier' && typeof candidate.start === 'number') {
@@ -138,16 +136,6 @@ function inlineWithin(
 						refusal = { kind: 'row-item', name };
 					} else if (local.kind !== 'definition' || inlining.has(symbolId)) {
 						refusal = { kind: 'render-local', name };
-					} else if (
-						options.inlineFunctions &&
-						!isFunctionNode(local.init) &&
-						rebuiltLocalWrite(candidate, ancestors, local.init, state.source)
-					) {
-						refusal = {
-							kind: 'writes-render-local',
-							name,
-							write: rebuiltLocalWrite(candidate, ancestors, local.init, state.source)!,
-						};
 					} else {
 						const definition = local.init;
 						definitions.push(definition);
@@ -185,11 +173,9 @@ function inlineWithin(
 			}
 		}
 		// A shorthand property's key and value are one identifier; only the value reads it.
-		ancestors.push(candidate);
 		if (candidate.type === 'Property' && candidate.shorthand === true)
 			visit(candidate.value as AnyNode, candidate);
 		else for (const child of childNodes(candidate)) visit(child, candidate);
-		ancestors.pop();
 	};
 	visit(node, null);
 	if (refusal) return refusal;
@@ -256,23 +242,27 @@ export function inlineHandlerRenderLocals(
 		leaveRowItems: true,
 		inlineFunctions: true,
 	});
-	if (inlined.kind === 'writes-render-local') {
+	if (inlined.kind !== 'inlined') {
 		state.graph.diagnostics.push(
-			handlerWritesRenderLocalDiagnostic({
+			handlerReadsRenderLocalDiagnostic({
 				handlerLabel,
 				localName: inlined.name,
-				write: inlined.write,
 				handler: node,
 				filename: state.filename,
 			}),
 		);
 		return null;
 	}
-	if (inlined.kind !== 'inlined') {
+	const change =
+		inlined.definitions.length > 0 ? findRebuiltValueChange(semanticNode(node, state), flowHost(state)) : null;
+	if (change) {
 		state.graph.diagnostics.push(
-			handlerReadsRenderLocalDiagnostic({
+			handlerWritesRenderLocalDiagnostic({
 				handlerLabel,
-				localName: inlined.name,
+				localName: change.name,
+				write: change.write,
+				place: change.place,
+				callee: change.callee,
 				handler: node,
 				filename: state.filename,
 			}),
@@ -286,6 +276,53 @@ export function inlineHandlerRenderLocals(
 			(definition) => sourceSpan(definition, state.filename) ?? [],
 		),
 	};
+}
+
+const flowHosts = new WeakMap<WalkState, RebuiltValueFlowHost>();
+
+// The rebuilt-value check reads the analyzer's own tree, so the walk's nodes are found there by span.
+function flowHost(state: WalkState): RebuiltValueFlowHost {
+	const known = flowHosts.get(state);
+	if (known) return known;
+	const bodyLocals = new Map<number, ReturnType<RebuiltValueFlowHost['bodyLocal']>>();
+	const host: RebuiltValueFlowHost = {
+		filename: state.filename,
+		source: state.source,
+		semantic: state.semantic(),
+		bodyLocal: (binding) => {
+			if (bodyLocals.has(binding.id)) return bodyLocals.get(binding.id)!;
+			let found: ReturnType<RebuiltValueFlowHost['bodyLocal']> = null;
+			if (!readsGraph(binding.name, state) && !repeatRowBindsName(binding.name, state)) {
+				const local = classifyLocal(binding.id, binding.name, state, true);
+				if (local.kind === 'definition')
+					found = {
+						kind: isFunctionNode(local.init) ? 'function' : 'value',
+						init: semanticNode(local.init, state),
+					};
+			}
+			bodyLocals.set(binding.id, found);
+			return found;
+		},
+		isFrameworkImport: (name) => state.frameworkApiImports.has(name),
+		importedModuleSources: state.importedModuleSources,
+		requestSource: (importer, specifier) => {
+			const requests = (state.graph.importedSourceRequests ??= []);
+			if (!requests.some((request) => request.importer === importer && request.specifier === specifier))
+				requests.push({ importer, specifier });
+		},
+	};
+	flowHosts.set(state, host);
+	return host;
+}
+
+function semanticNode(node: AnyNode, state: WalkState): AnyNode {
+	const semantic = state.semantic();
+	const innermost = semantic.nodeAt(node.start as number);
+	if (innermost)
+		for (const candidate of semantic.ancestors(innermost) as Iterable<AnyNode>)
+			if (candidate.start === node.start && candidate.end === node.end && candidate.type === node.type)
+				return candidate;
+	return node;
 }
 
 // An expression combining graph reads with body consts derives from their definitions, so a write moves it.

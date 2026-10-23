@@ -2,6 +2,7 @@ import { factorRenderDataLiterals } from './render-data-literals.ts';
 import { dirname, isAbsolute, resolve } from 'pathe';
 import { parseSync, transformSync } from 'rolldown/experimental';
 import { sourceForModuleId } from './module-id.ts';
+import { relativeImportedSourceReader } from './imported-sources.ts';
 import {
 	artifactChildCandidates,
 	collectTsrxModuleDiagnostics,
@@ -22,6 +23,7 @@ import {
 	type RenderDataArtifact,
 	type RuntimeDemandMapArtifact,
 	type RuntimeDemandMapRecordKind,
+	type ImportedModuleSources,
 } from '@markless/compiler';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
@@ -275,8 +277,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
 	const settleId = settleVirtualModuleId(input.filename);
-	const { compiled: compiledForAllClasses, blockingDiagnostics } =
-		await compileWithBlockingDiagnostics(input, resolverId);
+	const {
+		compiled: compiledForAllClasses,
+		blockingDiagnostics,
+		importedModuleSources,
+	} = await compileWithBlockingDiagnostics(input, resolverId);
 	throwIfBlocked(input, blockingDiagnostics);
 	const runtimeDemandClass = input.runtimeDemandClass ?? 'prerender';
 	const servedScalarPlans =
@@ -808,6 +813,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
 		artifactChildren: artifactChildCandidates(compiled),
+		...(importedModuleSources ? { importedModuleSources } : {}),
 		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],
@@ -1068,7 +1074,7 @@ async function prerenderDataModuleSource(
 }
 
 export async function preflightTsrxModuleDiagnostics(
-	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId' | 'readImportedSource'>,
 ): Promise<void> {
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`;
 	const { blockingDiagnostics } = await compileWithBlockingDiagnostics(input, resolverId);
@@ -1122,6 +1128,8 @@ function fulfilledEscalationSymbolIds(
 	);
 }
 
+const MAX_IMPORTED_SOURCE_ROUNDS = 4;
+
 async function compileWithBlockingDiagnostics(
 	input: Pick<
 		TransformTsrxModuleInput,
@@ -1132,6 +1140,8 @@ async function compileWithBlockingDiagnostics(
 		| 'symbols'
 		| 'importedModuleInterfaces'
 		| 'importedModuleConstants'
+		| 'importedModuleSources'
+		| 'readImportedSource'
 		| 'artifactChildMaterializations'
 		| 'executionLog'
 		| 'serverOnlyProps'
@@ -1139,25 +1149,57 @@ async function compileWithBlockingDiagnostics(
 	>,
 	resolverId: string,
 ) {
-	const compiled = await compileTsrxModule({
-		filename: input.filename,
-		moduleId: input.moduleId,
-		source: input.source,
-		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
-		...(input.routeRoot ? { routeRoot: true } : {}),
-		buildId: input.buildId,
-		resolverId,
-		symbols: input.symbols ?? [],
-		importedModuleInterfaces: input.importedModuleInterfaces,
-		importedModuleConstants: input.importedModuleConstants,
-		artifactChildMaterializations: input.artifactChildMaterializations,
-		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
-		// default 'auto' keeps the authored-source strings for dev tooling.
-		omitAuthoredSource: normalizeExecutionLogMode(input.executionLog) === 'never',
-	});
+	const compile = (importedModuleSources: ImportedModuleSources | undefined) =>
+		compileTsrxModule({
+			filename: input.filename,
+			moduleId: input.moduleId,
+			source: input.source,
+			...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
+			...(input.routeRoot ? { routeRoot: true } : {}),
+			buildId: input.buildId,
+			resolverId,
+			symbols: input.symbols ?? [],
+			importedModuleInterfaces: input.importedModuleInterfaces,
+			importedModuleConstants: input.importedModuleConstants,
+			...(importedModuleSources ? { importedModuleSources } : {}),
+			artifactChildMaterializations: input.artifactChildMaterializations,
+			// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
+			// default 'auto' keeps the authored-source strings for dev tooling.
+			omitAuthoredSource: normalizeExecutionLogMode(input.executionLog) === 'never',
+		});
+	let importedModuleSources = input.importedModuleSources;
+	let compiled = await compile(importedModuleSources);
+	const read = input.readImportedSource ?? relativeImportedSourceReader;
+	// Each round reads the helpers the last compile asked for; a helper importing another asks one round later.
+	for (let round = 0; round < MAX_IMPORTED_SOURCE_ROUNDS; round++) {
+		const missing = (compiled.semanticGraph.importedSourceRequests ?? []).filter(
+			(request) => importedModuleSources?.[request.importer]?.[request.specifier] === undefined,
+		);
+		if (missing.length === 0) break;
+		const next: Record<
+			string,
+			Record<string, { readonly filename: string; readonly source: string } | null>
+		> = Object.fromEntries(
+			Object.entries(importedModuleSources ?? {}).map(([importer, entries]) => [
+				importer,
+				{ ...entries },
+			]),
+		);
+		await Promise.all(
+			missing.map(async (request) => {
+				(next[request.importer] ??= {})[request.specifier] = await read(
+					request.importer,
+					request.specifier,
+				);
+			}),
+		);
+		importedModuleSources = next;
+		compiled = await compile(importedModuleSources);
+	}
 	const fulfilled = fulfilledEscalationSymbolIds(compiled, input, resolverId);
 	return {
 		compiled,
+		importedModuleSources,
 		blockingDiagnostics: moduleDiagnostics(compiled).filter(
 			(diagnostic) =>
 				diagnostic.severity === 'error' &&

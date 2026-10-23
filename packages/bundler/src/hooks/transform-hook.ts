@@ -3,6 +3,7 @@
 import { compileTsrxModuleLinkArtifact, overlayBarrelInterfaces } from '@markless/compiler';
 import type { TransformPluginContext } from 'rolldown';
 import { importedModuleConstants, missingConstantSources } from './module-constants.ts';
+import { importedSourcesUnchanged } from '../imported-sources.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	injectExecutionLogModuleHook,
@@ -236,6 +237,7 @@ async function runFirstPassTransform(
 			cached.importedInterfaceHashes === cachedLink.signature &&
 			cached.importedSymbolClaims === cachedLink.claimSignature &&
 			(await importedConstantsUnchanged(pluginContext, manifestSource, cached.input)) &&
+			importedSourcesUnchanged(cached.result.importedModuleSources) &&
 			childStyleModuleIds.join('\n') ===
 				[...cached.linkedStyleModuleIds].toSorted().join('\n')
 		) {

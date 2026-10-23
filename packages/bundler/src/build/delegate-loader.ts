@@ -3,6 +3,7 @@
 // so such a dependency has no `import()` route at all: it is compiled here
 // through the pipeline's own two entry points and evaluated in process against
 // Vite's module-runner protocol.
+import { importedSourceReader } from '../imported-sources.ts';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { dirname, isAbsolute, join } from 'pathe';
@@ -108,6 +109,7 @@ export function createBuildDelegateLoader(): BuildDelegateLoader {
 			source,
 			environment: 'server',
 			importedModuleInterfaces,
+			readImportedSource: importedSourceReader(resolve),
 		});
 		for (const module of transformed.virtualModules) {
 			// A stylesheet is CSS, not a module this process can evaluate, and render data carries it.

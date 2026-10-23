@@ -205,16 +205,23 @@ export function handlerWritesRenderLocalDiagnostic(input: {
 	readonly handlerLabel: string;
 	readonly localName: string;
 	readonly write: string;
+	/** The function the change is written in, when it is not the handler. */
+	readonly place?: string | null;
+	/** The code the value is handed to, when the compiler cannot see what it does. */
+	readonly callee?: string | null;
 	readonly handler: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
+	const where = input.place ? `, in \`${input.place}\`` : '';
+	const changed = `The \`${input.handlerLabel}\` handler changes \`${input.localName}\` with \`${input.write}\`${where}. \`${input.localName}\` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so the change would be lost before the next run.`;
+	const handed = `The \`${input.handlerLabel}\` handler hands \`${input.localName}\` to \`${input.callee}\` in \`${input.write}\`${where}. The compiler cannot see what \`${input.callee}\` does with it, so it counts as a change: \`${input.localName}\` is a const of the component body, and the browser builds it again from its definition each time the handler runs.`;
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 		title: 'A handler changes a component-body value the browser rebuilds for every run',
-		message: `The \`${input.handlerLabel}\` handler changes \`${input.localName}\` with \`${input.write}\`. \`${input.localName}\` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so the change would be lost before the next run.`,
-		why: 'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A method the compiler cannot prove only reads the value counts as a change.',
+		message: input.callee ? handed : changed,
+		why: 'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A change made through another name for the value, or by a function it is handed to, is lost the same way. A method the compiler cannot prove only reads the value counts as a change, and so does handing the value to a function whose source the compiler cannot see.',
 		span: sourceSpan(input.handler, input.filename),
-		suggestion: `Keep data that changes in state(): \`const ${input.localName} = state(...)\`, and assign a new value to it, for example a copy with the change applied.`,
+		suggestion: `Keep data that changes in state(): \`const ${input.localName} = state(...)\`, and assign a new value to it, for example a copy with the change applied. A function the compiler cannot see can be handed a copy, such as \`structuredClone(${input.localName})\`.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 	});
 }

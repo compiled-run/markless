@@ -26,6 +26,13 @@ export type SemanticGraphInput = {
 	 * `importedConstants` on this module's props.
 	 */
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	/**
+	 * Sources of imported modules, by importing file and then by the specifier it
+	 * wrote, or null where there is none to read. A handler that hands a rebuilt
+	 * component-body value to an imported function is checked against its source.
+	 * The bundler fills this for the modules named by `importedSourceRequests`.
+	 */
+	readonly importedModuleSources?: ImportedModuleSources;
 	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly additionalFrameworkApiSources?: readonly string[];
 	/**
@@ -40,6 +47,12 @@ export type SemanticGraphInput = {
 	 */
 	readonly routeRoot?: boolean;
 };
+
+export type ImportedModuleSources = Readonly<
+	Record<string, Readonly<Record<string, { readonly filename: string; readonly source: string } | null>>>
+>;
+
+export type ImportedSourceRequest = { readonly importer: string; readonly specifier: string };
 
 export type ServerOnlyProp = {
 	/** How the module exports the component: `default` or the export name. */
@@ -1263,6 +1276,8 @@ export type SemanticGraphArtifact = {
 	readonly elementRosterPositions?: ReadonlyArray<SemanticElementRosterPosition>;
 	// Omitted when empty, for the same byte-equality reason as the positions above.
 	readonly elementRosterCounts?: ReadonlyArray<SemanticElementRosterCount>;
+	/** Imported modules whose source a handler check needs and the input did not carry. Omitted when empty. */
+	readonly importedSourceRequests?: ReadonlyArray<ImportedSourceRequest>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
