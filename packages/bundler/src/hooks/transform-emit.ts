@@ -11,10 +11,8 @@ import { parseSync } from 'rolldown/experimental';
 import { invalidateAllGeneratedModules } from '../dev-invalidation.ts';
 import {
 	delegateLoadOptions,
-	linkedInterfaceClaims,
 	linkedInterfaces,
 	materializeDelegateChildren,
-	mergeLinkedModuleChildren,
 	moduleLinkArtifact,
 	publishModuleLinkArtifact,
 	warnDelegateImportFailures,
@@ -136,15 +134,10 @@ export function recordLinkedTransform(
 	linked: LinkedTransformChildren,
 ) {
 	const { ctx, code, source, plan, currentEnvironment } = request;
-	const { moduleMetadata, linkedTransformCache } = ctx.state;
+	const { linkedTransformCache } = ctx.state;
 	const moduleLinkArtifacts = ctx.state.moduleLinkArtifacts(currentEnvironment);
 	const { cacheKey, manifestSource } = plan;
-	const {
-		resolvedInterfaceImports,
-		resolvedChildren,
-		linkedChildHasBrowserTriggers,
-		unawaitedSources,
-	} = linked;
+	const { resolvedInterfaceImports, resolvedChildren, linkedChildHasBrowserTriggers } = linked;
 	linkedTransformCache.set(cacheKey, {
 		source,
 		manifestSource,
@@ -154,12 +147,7 @@ export function recordLinkedTransform(
 		importedSymbolClaims: linkedInterfaces(
 			resolvedInterfaceImports,
 			moduleLinkArtifacts,
-			linkedInterfaceClaims(
-				mergeLinkedModuleChildren(resolvedInterfaceImports, resolvedChildren),
-				moduleMetadata,
-				currentEnvironment,
-				unawaitedSources,
-			),
+			linked.importedClaims,
 		).claimSignature,
 		input: linkedTransformInput,
 		result: transformed,

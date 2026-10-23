@@ -496,16 +496,21 @@ export async function awaitChildClaimPublications(
 	children: ReadonlyArray<LinkedModuleChildResolution>,
 	environment: MarklessEnvironment,
 ): Promise<Set<string>> {
-	const unawaited = new Set<string>();
-	for (const child of children) {
-		const awaited = await metadata.awaitSourceClaimsPublished(
-			environment,
-			child.source,
-			pathname(child.parent),
-		);
-		if (!awaited) unawaited.add(child.source);
+	// Waiting on one child lets a sibling of another start, so the pass repeats until none waits.
+	for (let waited = true; waited;) {
+		waited = false;
+		for (const child of children) {
+			const waiter = pathname(child.parent);
+			if (!metadata.claimsStillPublishing(environment, child.source, waiter)) continue;
+			waited = true;
+			await metadata.awaitSourceClaimsPublished(environment, child.source, waiter);
+		}
 	}
-	return unawaited;
+	return new Set(
+		children
+			.filter((child) => metadata.waitsOn(environment, child.source, pathname(child.parent)))
+			.map((child) => child.source),
+	);
 }
 
 export function mergeLinkedModuleChildren(
