@@ -35,6 +35,20 @@ afterEach(async () => {
 const items = (within?: string) =>
 	[...document.querySelectorAll(`${within ?? ''} [data-ic-item]`.trim())];
 const positions = (within?: string) => items(within).map((one) => one.getAttribute('ui-pos'));
+// Every ui-pos value written under `within` from now on, so a row can say "never -1" about the whole change.
+const watchPositions = (within: string) => {
+	const written: string[] = [];
+	const observer = new MutationObserver((records) => {
+		for (const record of records)
+			written.push((record.target as Element).getAttribute('ui-pos') ?? 'null');
+	});
+	observer.observe(document.querySelector(within)!, {
+		attributes: true,
+		attributeFilter: ['ui-pos'],
+		subtree: true,
+	});
+	return () => (observer.disconnect(), written);
+};
 const roots = () => [...document.querySelectorAll('[data-ic-root]')];
 const seen = (at = 0) => roots()[at]?.getAttribute('ui-seen');
 const maxes = () => roots().map((one) => one.getAttribute('ui-max'));
@@ -249,37 +263,45 @@ test('SSR: flat items in two instances each count from zero at first paint', asy
 
 test('CSR: a flat item behind an arrival renumbers and never answers -1', async () => {
 	await render(FlatPage);
+	const written = watchPositions('[data-ic-first]');
 	await userEvent.click(flatAdd());
-	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(4);
+	// The row lands before the roster renumbers it, so the renumbering is what is waited for.
+	await expect.poll(() => positions('[data-ic-first]'), { timeout: 5000 }).toEqual(['0', '1', '2', '3']);
 
-	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2', '3']);
+	expect(written()).not.toContain('-1');
 	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
 });
 
 test('SSR: a flat item behind an arrival renumbers and never answers -1', async () => {
 	await renderSSR(FlatPage);
+	const written = watchPositions('[data-ic-first]');
 	await userEvent.click(flatAdd());
-	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(4);
+	// The row lands before the roster renumbers it, so the renumbering is what is waited for.
+	await expect.poll(() => positions('[data-ic-first]'), { timeout: 5000 }).toEqual(['0', '1', '2', '3']);
 
-	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2', '3']);
+	expect(written()).not.toContain('-1');
 	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
 });
 
 test('CSR: a flat item behind a removal renumbers and never answers -1', async () => {
 	await render(FlatPage);
+	const written = watchPositions('[data-ic-first]');
 	await userEvent.click(flatDrop());
-	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(2);
+	// The row lands before the roster renumbers it, so the renumbering is what is waited for.
+	await expect.poll(() => positions('[data-ic-first]'), { timeout: 5000 }).toEqual(['0', '1']);
 
-	expect(positions('[data-ic-first]')).toEqual(['0', '1']);
+	expect(written()).not.toContain('-1');
 	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
 });
 
 test('SSR: a flat item behind a removal renumbers and never answers -1', async () => {
 	await renderSSR(FlatPage);
+	const written = watchPositions('[data-ic-first]');
 	await userEvent.click(flatDrop());
-	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(2);
+	// The row lands before the roster renumbers it, so the renumbering is what is waited for.
+	await expect.poll(() => positions('[data-ic-first]'), { timeout: 5000 }).toEqual(['0', '1']);
 
-	expect(positions('[data-ic-first]')).toEqual(['0', '1']);
+	expect(written()).not.toContain('-1');
 	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
 });
 
