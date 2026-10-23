@@ -22,19 +22,24 @@ name: Screen reader
 # If that step fails the lane falls back to the drivability smoke, which is the
 # proof no developer machine can reproduce and the one worth keeping either way.
 
+# Pull requests run the readers only when they can change what is heard; main is read nightly (one run is
+# 102 jobs, 29 on the org's five macOS runners). No check here is required, so a skipped PR has none pending.
 on:
     pull_request:
         paths:
             - 'packages/headless/**'
-            - 'packages/headless/sr-app/**'
+            - 'packages/runtime/**'
+            - 'packages/web/**'
+            - 'packages/compiler/src/passes/public-render/**'
+            - 'packages/compiler/src/passes/semantic-graph/collect-markup.ts'
+            - 'packages/compiler/src/passes/semantic-graph/collect-components.ts'
+            - 'packages/compiler/src/passes/semantic-graph/idref-attributes.ts'
+            - 'packages/compiler/src/passes/emit-codegen.ts'
+            - 'packages/compiler/src/passes/spread-forwarding.ts'
+            - 'pnpm-lock.yaml'
             - '.github/workflows/screen-reader.yml'
-    push:
-        branches:
-            - main
-        paths:
-            - 'packages/headless/**'
-            - 'packages/headless/sr-app/**'
-            - '.github/workflows/screen-reader.yml'
+    schedule:
+        - cron: '41 3 * * *'
     workflow_dispatch:
 
 permissions:
