@@ -7,6 +7,9 @@ export default defineConfig({
 		// One chunk holds the 100 nested components a client mount renders: 1,019 kB, linear in depth (computed-chain-growth.test.ts).
 		chunkSizeWarningLimit: 1050,
 		minify: 'oxc',
+		// The demo's own dist, where the build-warnings guard scans browser output.
+		outDir: '../dist',
+		emptyOutDir: true,
 		target: 'es2022',
 	},
 });
