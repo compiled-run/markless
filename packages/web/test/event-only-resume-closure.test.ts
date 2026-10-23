@@ -112,7 +112,10 @@ const resumeOnDemandEntries = [
 // 2026-10-21: a runtime an onIdle or onVisible handler starts leaves its rows' code until the reader's first input (shadcn-admin
 // /settings/account ran 1.5 MB at load without it): 26,457 -> 27,145 raw; minified+gzip 3,495 -> 3,595 bytes (rolldown, same
 // method both sides), under the 4,800 gzip wall.
-const sourceByteLimit = 27145;
+// 2026-10-23: the first-click row match climbs from the target once per list instead of scanning every row per ancestor
+// (1,000 rows: 0.8 -> 0.17 ms on a handler, 2.4 -> 0.15 ms on a cell no handler owns): 27,145 -> 27,457 raw; resume-keyed-repeats
+// minified 8,662 -> 8,772, gzip 3,542 -> 3,603 bytes (rolldown, same method both sides), under the 4,800 gzip wall.
+const sourceByteLimit = 27457;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

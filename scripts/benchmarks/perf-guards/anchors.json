@@ -1522,6 +1522,14 @@
 			"from": 8906,
 			"to": 9858,
 			"reason": "dependents index + per-node subscriptions: one write wakes only its readers (50us->1us at 1000 nodes); minified graph modules 88 B smaller, rendered +952 B"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 17266,
+			"to": 17565,
+			"reason": "first-click row match climbs once per list (1,000 rows: 0.8->0.17 ms on a handler, 2.4->0.15 ms elsewhere); minified 8,662->8,772 B, gzip 3,542->3,603 B"
 		}
 	],
 	"runtimeModules": {
@@ -1623,7 +1631,7 @@
 		"web/resume-events": 16645,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 17266,
+		"web/resume-keyed-repeats": 17565,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,
