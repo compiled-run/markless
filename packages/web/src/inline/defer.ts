@@ -145,8 +145,8 @@ export function createMarklessDefer(
 			pending++;
 			(queue
 				? Promise.resolve(queue(input))
-				: (root.__mResume ||= loadModule(url)).then((module) =>
-						module.resumeContainerEvent(input),
+				: (root.__mResume ||= loadModule(url)).then(
+						(module) => root.__mL === life && module.resumeContainerEvent(input),
 					)
 			).then(() => {
 				if (root.__asyncResumeRuntimeStarted) return;

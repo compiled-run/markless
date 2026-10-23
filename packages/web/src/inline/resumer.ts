@@ -418,8 +418,8 @@ function runPrerenderSettleBoot(
 	const resume = (
 		input: InlineDispatchInput | { readonly root: InlineRoot; readonly event: 0 },
 	) =>
-		(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
-			module.resumeContainerEvent(input as never),
+		(loaded ||= loadModule(resumeModuleUrl)).then(
+			(module) => root.__mL === life && module.resumeContainerEvent(input as never),
 		);
 	const dispatch = (event: Event): unknown => {
 		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
@@ -730,8 +730,15 @@ function runPrerenderInlineResumer(
 		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
 		root.__marklessDelegatedDispatch = true;
 		if (!root.__marklessCensus) census(root, pathsAttribute);
-		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
-			module.resumeContainerEvent({ root, event, element: event.target, eventRecord: null }),
+		return (loaded ||= loadModule(resumeModuleUrl)).then(
+			(module) =>
+				root.__mL === life &&
+				module.resumeContainerEvent({
+					root,
+					event,
+					element: event.target,
+					eventRecord: null,
+				}),
 		);
 	};
 	eventNames.map(
@@ -757,7 +764,7 @@ function runInlineResumerSelfWake(
 		if (root.__asyncResumeRuntimeStarted || root.__mL !== life) return;
 		root.__marklessDelegatedDispatch = true;
 		const module = await (root.__mResume ||= loadModule(resumeModuleUrl));
-		await module.resumeContainerEvent({ root, event: 0 });
+		if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
 	});
 }
 
@@ -794,8 +801,8 @@ function runInlineResumerOverlayPrimer(
 		setTimeout(() => {
 			if (root.__marklessDelegatedDispatch === true || root.__mL !== life) return;
 			root.__marklessDelegatedDispatch = true;
-			loadModule(resumeModuleUrl).then((module) =>
-				module.resumeContainerEvent({ root, event: 0 }),
+			loadModule(resumeModuleUrl).then(
+				(module) => root.__mL === life && module.resumeContainerEvent({ root, event: 0 }),
 			);
 		});
 	};
@@ -868,8 +875,8 @@ function runInlineResumer(
 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
 		root.__marklessDelegatedDispatch = true;
 		pin();
-		return (root.__mResume ||= loadModule(resumeModuleUrl)).then((module) =>
-			module.resumeContainerEvent({ root, ...input }),
+		return (root.__mResume ||= loadModule(resumeModuleUrl)).then(
+			(module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }),
 		);
 	};
 	// The entry for this event name on one element: [ref, policy], either possibly undefined.
