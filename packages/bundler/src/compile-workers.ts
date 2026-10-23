@@ -21,6 +21,8 @@ type Job = {
 				readonly linkedChildHasBrowserTriggers: boolean;
 		  };
 	readonly store: CompileStore | undefined;
+	/** The worker whose compile memo already holds this file's other requests. */
+	readonly worker: PooledWorker | undefined;
 	readonly resolve: (result: unknown) => void;
 	readonly written: (write: Promise<void>) => void;
 };
@@ -121,8 +123,12 @@ function addWorker(): void {
 function dispatch(): void {
 	for (const entry of workers) {
 		if (!entry.online || entry.job) continue;
-		const job = queue.shift();
-		if (!job) break;
+		const index = queue.findIndex(
+			(queued) =>
+				!queued.worker || queued.worker === entry || !workers.includes(queued.worker),
+		);
+		if (index === -1) continue;
+		const [job] = queue.splice(index, 1) as [Job];
 		entry.job = job;
 		entry.worker.ref();
 		try {
@@ -148,17 +154,20 @@ export function createCompileWorkerPool(options: {
 	};
 	const writes = new Set<Promise<void>>();
 	let closed = false;
-	const submit = (message: Job['message']): Promise<unknown> | undefined => {
+	const submit = (message: Job['message'], affinity?: string): Promise<unknown> | undefined => {
 		if (closed || options.size === 0) return undefined;
 		if (!workers.length || (workers.length < size && workers.every((entry) => entry.online)))
 			addWorker();
 		// Until a worker is online the calling thread works, so booting never idles the build.
-		if (!workers.some((entry) => entry.online)) return undefined;
+		const online = workers.filter((entry) => entry.online);
+		if (!online.length) return undefined;
 		return new Promise((resolve) => {
 			queue.push({
 				id: nextId++,
 				message,
 				store,
+				worker:
+					affinity === undefined ? undefined : online[hashOf(affinity) % online.length],
 				resolve,
 				written: (write) => {
 					writes.add(write);
@@ -176,13 +185,21 @@ export function createCompileWorkerPool(options: {
 			>;
 		},
 		runTransform(input, linkedChildHasBrowserTriggers) {
-			return submit({ kind: 'transform', input, linkedChildHasBrowserTriggers }) as Promise<
-				TransformTsrxModuleResult | undefined
-			>;
+			return submit(
+				{ kind: 'transform', input, linkedChildHasBrowserTriggers },
+				input.filename,
+			) as Promise<TransformTsrxModuleResult | undefined>;
 		},
 		async close() {
 			closed = true;
 			while (writes.size) await Promise.all(writes);
 		},
 	};
+}
+
+function hashOf(text: string): number {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < text.length; index++)
+		hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193);
+	return hash >>> 0;
 }
