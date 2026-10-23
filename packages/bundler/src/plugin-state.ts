@@ -4,7 +4,7 @@
 import {
 	linkedResolverClaimVerdict,
 	planEmittedClaimOwnership,
-	planRenderDataModule,
+	renderDataContentHash,
 } from '@markless/compiler';
 import type { LinkedModuleChildResolution } from '@markless/compiler';
 import type { createMarklessDevGraph } from './dev.ts';
@@ -205,18 +205,8 @@ export function registerTransformArtifacts(
 		owners.add(input.owner);
 		state.virtualModuleOwners.set(module.id, owners);
 		if (module.type === 'render-data') {
-			// The hash is the `render-data-module` pass's field, not a local one:
-			// the dev prerender feed and a published component read the same value.
-			const renderData = planRenderDataModule({
-				source: input.source,
-				emittedModule: input.manifestSource,
-				moduleSource: module.source,
-				styleModules: input.result.virtualModules.flatMap((candidate) =>
-					candidate.type === 'style' ? [candidate.id] : [],
-				),
-				manifest: input.result.manifest,
-			});
-			renderDataHashes.set(resolveVirtualId(module.id), renderData.contentHash);
+			// The `render-data-module` pass's own hash, so the dev prerender feed and a published component agree.
+			renderDataHashes.set(resolveVirtualId(module.id), renderDataContentHash(module.source));
 		}
 		if (isClientSymbol && published) {
 			state.executionLogEstimatedSizes.set(logId, stored.source.length);
