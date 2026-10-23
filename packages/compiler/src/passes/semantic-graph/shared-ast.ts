@@ -100,7 +100,5 @@ const moduleSemanticsMemo = createSourceMemo<ModuleSemantics>(256);
 
 /** The analyzer's scope tables for a whole module. Callers only read the view. */
 export function moduleSemantics(source: string, filename: string): ModuleSemantics {
-	return moduleSemanticsMemo(filename, source, () =>
-		analyze(source, parserLanguageFor(filename)),
-	);
+	return moduleSemanticsMemo(filename, source, () => analyze(source, parserLanguageFor(filename)));
 }

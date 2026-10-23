@@ -702,9 +702,7 @@ function jsonNode(value: JsonValue): EmissionNode {
 	if (Array.isArray(value)) return arrayNode(value.map((item) => jsonNode(item)));
 	if (typeof value === 'object') {
 		return objectNode(
-			Object.entries(value).map(([key, child]) =>
-				stringKeyPropertyNode(key, jsonNode(child)),
-			),
+			Object.entries(value).map(([key, child]) => stringKeyPropertyNode(key, jsonNode(child))),
 		);
 	}
 	return literalNode(value);
@@ -728,6 +726,7 @@ export function shorthandPropertyNode(name: string): EmissionNode {
 		value: identifierNode(name),
 	};
 }
+
 
 /** A method-shorthand property: `update(value) { ... }`. */
 export function methodPropertyNode(
@@ -766,7 +765,9 @@ export function constDeclarationNode(name: string, init: EmissionNode): Emission
 	return {
 		type: 'VariableDeclaration',
 		kind: 'const',
-		declarations: [{ type: 'VariableDeclarator', id: identifierNode(name), init }],
+		declarations: [
+			{ type: 'VariableDeclarator', id: identifierNode(name), init },
+		],
 	};
 }
 
@@ -778,7 +779,9 @@ export function letDeclarationNode(name: string, init: EmissionNode): EmissionNo
 	return {
 		type: 'VariableDeclaration',
 		kind: 'let',
-		declarations: [{ type: 'VariableDeclarator', id: identifierNode(name), init }],
+		declarations: [
+			{ type: 'VariableDeclarator', id: identifierNode(name), init },
+		],
 	};
 }
 
@@ -860,9 +863,7 @@ export function moduleImportNode(moduleImport: ModuleImportShape): EmissionNode 
 				? { type: 'ImportNamespaceSpecifier', local }
 				: {
 						type: 'ImportSpecifier',
-						imported: identifierNode(
-							moduleImport.importedName ?? moduleImport.localName,
-						),
+						imported: identifierNode(moduleImport.importedName ?? moduleImport.localName),
 						local,
 					};
 
