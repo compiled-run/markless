@@ -13,8 +13,6 @@ import type { Keys, RoleStates, ScreenReaderDriver, Vocabulary } from './driver.
  */
 export type RealReader = NVDAPlaywright | VoiceOverPlaywright;
 
-const SPEECH_TIMEOUT_MS = 10_000;
-const SPEECH_POLL_MS = 100;
 
 export type RealDriverSpec = {
 	readonly name: string;
@@ -23,6 +21,10 @@ export type RealDriverSpec = {
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
+	/** Move the page's keyboard focus to the reader's cursor, for a reader whose cursor walks apart from it. */
+	focusCursor?: (reader: RealReader) => Promise<void>;
+	/** Make the reader speak the focused element, for a reader whose own focus-following speech is not captured. */
+	speakFocus?: (reader: RealReader) => Promise<void>;
 };
 
 /**
@@ -33,6 +35,8 @@ export type RealDriverSpec = {
  * would fight the fixture. Everything else forwards to the real reader.
  */
 export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenReaderDriver {
+	// A walk moves the reader's cursor and leaves keyboard focus behind; a key goes where the person is reading.
+	let cursorAhead = false;
 	return {
 		name: spec.name,
 		vocabulary: spec.vocabulary,
@@ -41,9 +45,19 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 		segments: spec.segments,
 		start: async () => {},
 		stop: async () => {},
-		next: () => reader.next(),
-		previous: () => reader.previous(),
-		press: (key) => reader.press(key),
+		async next() {
+			await reader.next();
+			cursorAhead = true;
+		},
+		async previous() {
+			await reader.previous();
+			cursorAhead = true;
+		},
+		async press(key) {
+			if (cursorAhead) await spec.focusCursor?.(reader);
+			cursorAhead = false;
+			await reader.press(key);
+		},
 		async reannounce() {
 			// Neither reader has a "read the current item again" command that is
 			// guaranteed to re-read from the live DOM, so this steps off the item
@@ -52,15 +66,10 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 			await reader.next();
 			return reader.lastSpokenPhrase();
 		},
-		// A reader speaks a focus move on its own schedule; until it has, its last phrase is empty.
 		async settleOnFocus() {
-			const deadline = Date.now() + SPEECH_TIMEOUT_MS;
-			let phrase = await reader.lastSpokenPhrase();
-			while (!phrase && Date.now() < deadline) {
-				await new Promise((settled) => setTimeout(settled, SPEECH_POLL_MS));
-				phrase = await reader.lastSpokenPhrase();
-			}
-			return phrase;
+			cursorAhead = false;
+			await spec.speakFocus?.(reader);
+			return reader.lastSpokenPhrase();
 		},
 		lastSpokenPhrase: () => reader.lastSpokenPhrase(),
 		// The reader hands back its own log array, which keeps growing under the
