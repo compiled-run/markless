@@ -93,6 +93,8 @@ export function createResumeRuntime(
 		if (disposed) release();
 		else containerSubscriptionReleases.push(release);
 	};
+	// Held: an evaluated module's import() still costs a task, and a row's renumbering waits on this.
+	let syncDemand: typeof import('./resume-sync-demand.ts') | undefined;
 	const registerComputedRefreshes = async (
 		records: ProtocolStatePayload['computed'],
 		sharedSeeds?: ProtocolStatePayload['sharedSeeds'],
@@ -108,9 +110,7 @@ export function createResumeRuntime(
 			registeredComputedRefreshIds.add(record.graphNodeId);
 			graphNodeIds?.add(record.graphNodeId);
 		}
-		(
-			await import('./resume-sync-demand.ts')
-		).wireSyncComputedDemandRecordsWithoutLoadingCapability({
+		(syncDemand ??= await import('./resume-sync-demand.ts')).wireSyncComputedDemandRecordsWithoutLoadingCapability({
 			graph: input.graph,
 			computed: fresh,
 			allComputed: records,

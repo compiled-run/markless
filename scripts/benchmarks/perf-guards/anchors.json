@@ -1522,6 +1522,38 @@
 			"from": 8906,
 			"to": 9858,
 			"reason": "dependents index + per-node subscriptions: one write wakes only its readers (50us->1us at 1000 nodes); minified graph modules 88 B smaller, rendered +952 B"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/fns/roster-resume",
+			"from": 5123,
+			"to": 6318,
+			"reason": "a row's arrival and its renumbering land in one update: loads the symbols a row arrival queues before the keyed commit; loaded only on pages that derive a roster place (minified 3,210->3,842 B)"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 17266,
+			"to": 17403,
+			"reason": "a row's arrival and its renumbering land in one update: held symbol loader beneath instance scoping and keyed commit waits for roster symbols (see commit for minified sizes)"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 8874,
+			"to": 9062,
+			"reason": "a row's arrival and its renumbering land in one update: held symbol loader beneath instance scoping and keyed commit waits for roster symbols (see commit for minified sizes)"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/resume-sync-demand",
+			"from": 1099,
+			"to": 1379,
+			"reason": "a row's arrival and its renumbering land in one update: held symbol loader beneath instance scoping and keyed commit waits for roster symbols (see commit for minified sizes)"
 		}
 	],
 	"runtimeModules": {
@@ -1578,7 +1610,7 @@
 		"web/fns/instance-scope": 17232,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
-		"web/fns/roster-resume": 5123,
+		"web/fns/roster-resume": 6318,
 		"web/fns/row-locals": 942,
 		"web/fns/row-mint": 7614,
 		"web/fns/row-slot-mint": 2633,
@@ -1623,18 +1655,18 @@
 		"web/resume-events": 16645,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 17266,
+		"web/resume-keyed-repeats": 17403,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,
 		"web/resume-resettle-hold": 2572,
 		"web/resume-runtime": 14982,
 		"web/resume-runtime-shared": 2089,
-		"web/resume-runtime-start": 8874,
+		"web/resume-runtime-start": 9062,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2260,
 		"web/resume-sync-computed": 1976,
-		"web/resume-sync-demand": 1099,
+		"web/resume-sync-demand": 1379,
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,

@@ -183,7 +183,10 @@ async function startDecodedResume(
 	decoded: DecodedPayloadScripts,
 ): Promise<ResumePayloadScriptsResult> {
 	// Composed children's symbols answer on their own instance's graph nodes.
-	const loadSymbol = heldSymbolLoader(marklessInstanceScopedLoadSymbol(input.loadSymbol));
+	// Held twice: a row's instance id is new, but the symbol beneath it was already loaded for its siblings.
+	const loadSymbol = heldSymbolLoader(
+		marklessInstanceScopedLoadSymbol(heldSymbolLoader(input.loadSymbol)),
+	);
 	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,
