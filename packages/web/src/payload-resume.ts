@@ -76,12 +76,16 @@ export async function resumeFromPayloadScriptsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	return containWakeBoot(
-		root,
-		(root.__mStart ??= startPayloadResume(input, decode).finally(() => {
-			delete root.__mStart;
-		})),
-	);
+	if (!root.__mStart) {
+		const started: Promise<ResumePayloadScriptsResult> = startPayloadResume(
+			input,
+			decode,
+		).finally(() => {
+			if (root.__mStart === started) delete root.__mStart;
+		});
+		root.__mStart = started;
+	}
+	return containWakeBoot(root, root.__mStart);
 }
 
 export async function resumeFromPrerenderRecordsImpl(
@@ -94,12 +98,16 @@ export async function resumeFromPrerenderRecordsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	return containWakeBoot(
-		root,
-		(root.__mStart ??= startDecodedResume(input, input).finally(() => {
-			delete root.__mStart;
-		})),
-	);
+	if (!root.__mStart) {
+		const started: Promise<ResumePayloadScriptsResult> = startDecodedResume(
+			input,
+			input,
+		).finally(() => {
+			if (root.__mStart === started) delete root.__mStart;
+		});
+		root.__mStart = started;
+	}
+	return containWakeBoot(root, root.__mStart);
 }
 
 // The inline resumer keeps dispatch for the page's life and reads its key policies
@@ -110,15 +118,18 @@ function liveSyncPolicyCells(graph: RuntimeGraph): Map<string, unknown> {
 	return cells;
 }
 
+const pageLifetime = (root: object): unknown => (root as { readonly __mL?: object }).__mL;
+
 async function startPayloadResume(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
 ): Promise<ResumePayloadScriptsResult> {
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
+	const life = pageLifetime(input.root);
 	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
 	const result = await startDecodedResume(input, decoded);
-	registerLiveDispatch(input, result.runtime);
+	if (pageLifetime(input.root) === life) registerLiveDispatch(input, result.runtime);
 	return result;
 }
 
@@ -182,6 +193,7 @@ async function startDecodedResume(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'>,
 	decoded: DecodedPayloadScripts,
 ): Promise<ResumePayloadScriptsResult> {
+	const life = pageLifetime(input.root);
 	// Composed children's symbols answer on their own instance's graph nodes.
 	const loadSymbol = heldSymbolLoader(marklessInstanceScopedLoadSymbol(input.loadSymbol));
 	const graph = await createRuntimeGraphFromResumePayload({
@@ -190,7 +202,8 @@ async function startDecodedResume(
 		root: input.root,
 		loadSymbol,
 	});
-	input.root.__marklessEventOnlyGraph = liveSyncPolicyCells(graph);
+	if (pageLifetime(input.root) === life)
+		input.root.__marklessEventOnlyGraph = liveSyncPolicyCells(graph);
 	let runtime: ResumeRuntime | undefined;
 	const applyDomJournal =
 		input.applyDomJournal ??
@@ -230,11 +243,20 @@ async function startDecodedResume(
 		renderData: input.renderData,
 	});
 	const retiring = runtime;
+	if (pageLifetime(input.root) !== life) {
+		runtime.dispose();
+		return { decoded, graph, runtime };
+	}
 	(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
 		deleteResumedPayload(input.root);
 		retiring.dispose();
 	};
 	await runtime.start();
+	// A navigation retired this page while it started: it keeps no claim on the container the next page now owns.
+	if (pageLifetime(input.root) !== life) {
+		runtime.dispose();
+		return { decoded, graph, runtime };
+	}
 	// Reuse the existing streamed or staged dispatch authority.
 	input.root.__marklessDispatch ??= (handoff) =>
 		runtime!.dispatch(handoff.event, {

@@ -138,12 +138,14 @@ type EventResumeContainerState = EventResumeContainer & {
 	readonly elementsByHostId: ReadonlyMap<string, EventResumeDomElement>;
 };
 
-const containers = new WeakMap<EventResumeDomElement, Promise<EventResumeContainerState>>();
+// Keyed by the container's page lifetime: a navigation that keeps the container in place starts a new one.
+const containers = new WeakMap<object, Promise<EventResumeContainerState>>();
 
 export async function resumeEventFromPayloadDocument(
 	input: ResumeEventFromPayloadDocumentInput,
 ): Promise<EventResumeContainer> {
-	let container = containers.get(input.root);
+	const page = (input.root as { __mL?: object }).__mL ?? input.root;
+	let container = containers.get(page);
 	if (!container) {
 		const state = readPayloadJson<ProtocolStatePayload>(input.document, 'markless/state');
 		const view = readPayloadJson<ProtocolViewPayload>(input.document, 'markless/view');
@@ -153,7 +155,7 @@ export async function resumeEventFromPayloadDocument(
 			root: input.root,
 			loadSymbol: input.loadSymbol,
 		});
-		containers.set(input.root, container);
+		containers.set(page, container);
 	}
 
 	const resumed = await container;

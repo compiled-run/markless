@@ -674,11 +674,12 @@ function resetControl(element: Element): void {
 	}
 }
 
-// Leaves no state of the leaving page's runtime on nodes the next page keeps: the framework names its own with `__m`.
+// Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.
 function forgetRuntimeState(root: Element): void {
 	const forget = (node: Node) => {
 		for (const key of Object.keys(node))
 			if (key.startsWith('__m')) delete (node as unknown as Record<string, unknown>)[key];
+		if (isContainer(node)) (node as unknown as Record<string, unknown>).__mL = {};
 	};
 	forget(root);
 	const walker = root.ownerDocument.createTreeWalker(root, 129);

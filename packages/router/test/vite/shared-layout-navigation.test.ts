@@ -211,25 +211,53 @@ test('a text field the layout keeps shows what the server rendered for the next 
 	await page.close();
 });
 
-test('the destination paints no later than inserting the same page whole would', async () => {
+// From the moment the destination's nodes are in the document to the next frame: a swap that holds
+// the leaving page on screen while it fills the next one in pieces shows up here as extra frames.
+async function insertToFrame(page: Page, insert: () => Promise<unknown>): Promise<number> {
+	await page.evaluate(() => {
+		const host = globalThis as { __inserted?: number; __shown?: Promise<number> };
+		host.__shown = new Promise((resolve) => {
+			const observer = new MutationObserver(() => {
+				if (document.querySelector('[data-title]')?.textContent !== 'Beta') return;
+				observer.disconnect();
+				host.__inserted = performance.now();
+				requestAnimationFrame(() => resolve(performance.now() - host.__inserted!));
+			});
+			observer.observe(document, { childList: true, subtree: true, characterData: true });
+		});
+	});
+	await insert();
+	return page.evaluate(() => (globalThis as { __shown?: Promise<number> }).__shown!);
+}
+
+test('the destination paints within two frames of a plain whole-page insert, with no view transition', async () => {
 	const { page } = await open('/alpha');
 	const fragment = await page.evaluate(async () =>
 		(await fetch('/_markless/fragment/beta')).text(),
 	);
-	const plain = await page.evaluate(async (html) => {
-		const parsed = new DOMParser().parseFromString(html, 'text/html');
-		const start = performance.now();
-		document.body.replaceWith(document.adoptNode(parsed.body));
-		await new Promise((resolve) => requestAnimationFrame(resolve));
-		return performance.now() - start;
-	}, fragment);
-	await page.close();
-	const { page: navigating } = await open('/alpha');
-	const frames = await clickAndRecord(navigating, '[data-side="1"]', 'Beta');
-	const clickAt = await navigating.evaluate(
-		() => (globalThis as { __clickAt?: number }).__clickAt!,
+	const plain = await insertToFrame(page, () =>
+		page.evaluate((html) => {
+			const parsed = new DOMParser().parseFromString(html, 'text/html');
+			document.body.replaceWith(document.adoptNode(parsed.body));
+		}, fragment),
 	);
-	const painted = frames.find((frame) => frame.title === 'Beta')!.at - clickAt;
-	expect(painted).toBeLessThanOrEqual(plain + 34);
+	await page.close();
+	const { page: navigating, errors } = await open('/alpha');
+	await navigating.evaluate(() => {
+		const host = globalThis as { __transitions?: number };
+		host.__transitions = 0;
+		const start = document.startViewTransition?.bind(document);
+		if (start)
+			document.startViewTransition = ((update?: () => unknown) => {
+				host.__transitions!++;
+				return start(update as never);
+			}) as typeof document.startViewTransition;
+	});
+	const swapped = await insertToFrame(navigating, () => navigating.click('[data-side="1"]'));
+	expect(swapped).toBeLessThanOrEqual(plain + 34);
+	expect(
+		await navigating.evaluate(() => (globalThis as { __transitions?: number }).__transitions),
+	).toBe(0);
+	expect(errors).toEqual([]);
 	await navigating.close();
 });
