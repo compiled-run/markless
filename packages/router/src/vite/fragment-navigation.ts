@@ -357,7 +357,7 @@ export function runFragmentNavigation(
 		} as ReadableStreamDefaultReader<Uint8Array>;
 	};
 	// One request: the destination's region document and its resume payload, parsed on arrival (no script runs), so the click only swaps.
-	const request = (url: URL, speculative: boolean, started?: FragmentEarly): FragmentPrefetch => {
+	const request = (url: URL, speculative: boolean | 'idle', started?: FragmentEarly): FragmentPrefetch => {
 		const controller = started?.controller ?? new AbortController();
 		const read = async (): Promise<FragmentFetched> => {
 			const prefix = config.requestPrefix;
@@ -368,7 +368,8 @@ export function runFragmentNavigation(
 				w.fetch(target.href, {
 					credentials: 'same-origin',
 					headers: speculative ? { purpose: 'prefetch' } : {},
-					priority: speculative ? 'auto' : 'high',
+					// The idle tier never competes with what the page itself still loads.
+					priority: speculative === 'idle' ? 'low' : speculative ? 'auto' : 'high',
 					signal: controller.signal,
 				} as RequestInit));
 			const type = response.headers.get('content-type') ?? '';
@@ -417,7 +418,7 @@ export function runFragmentNavigation(
 	};
 	// An unused prefetch still streaming holds a connection: drop it once stale, and keep only a few open,
 	// or an HTTP/1.1 origin's per-host connection limit stalls the next click behind them.
-	const prefetch = (url: URL, code = true, started?: FragmentEarly) => {
+	const prefetch = (url: URL, code = true, started?: FragmentEarly, idle = false) => {
 		const key = pageKey(url);
 		// A hover timer can fire after its link's page is already shown.
 		if (!config.prefetch || key === state.shown) return;
@@ -434,7 +435,7 @@ export function runFragmentNavigation(
 			state.prefetches.delete(stale);
 			entry.abort();
 		}
-		const entry = request(url, true, started);
+		const entry = request(url, idle ? 'idle' : true, started);
 		state.prefetches.set(key, entry);
 		w.setTimeout(() => {
 			if (state.prefetches.get(key) !== entry) return;
@@ -454,7 +455,7 @@ export function runFragmentNavigation(
 			if (open >= config.prefetchConnections) return;
 			const url = idleQueue.shift()!;
 			if (state.prefetches.has(pageKey(url))) continue;
-			prefetch(url, false);
+			prefetch(url, false, undefined, true);
 			// Low priority and never evaluated: a modulepreload only fills the cache before a press.
 			preloadCode(url, true);
 		}
