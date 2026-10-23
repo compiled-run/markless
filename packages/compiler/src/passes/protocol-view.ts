@@ -3,6 +3,7 @@ import {
 	ASYNC_PROTOCOL_VERSION,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
+import { repeatRowSiblingElements } from './render-data/row-position.ts';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
@@ -426,6 +427,19 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				}]
 				: [];
 		});
+		const rowEvents = oneRecordPerEvent(input.payloadArena.view.events)
+			.filter((event) => rowHostPaths.has(event.hostNodeId))
+			.map((event) => ({
+				hostPath: rowHostPaths.get(event.hostNodeId)!,
+				eventName: event.eventName,
+				symbolIds: eventSymbolsForHost(input, event.hostNodeId, event.eventName).map(
+					(symbolId) => boundEventSymbols.get(symbolId) ?? symbolId,
+				),
+				// Cloned rows dispatch through the row record, not the template
+				// host's, so dropping the policy here left every row past the
+				// first with no synchronous preventDefault.
+				...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
+			}));
 		return [
 			{
 				id: repeat.id,
@@ -458,22 +472,32 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 							),
 							...mintableRowComponent(liveRowComponentMint(input, repeat, render)),
 						}),
-				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
-					.filter((event) => rowHostPaths.has(event.hostNodeId))
-					.map((event) => ({
-						hostPath: rowHostPaths.get(event.hostNodeId)!,
-						eventName: event.eventName,
-						symbolIds: eventSymbolsForHost(input, event.hostNodeId, event.eventName).map(
-							(symbolId) => boundEventSymbols.get(symbolId) ?? symbolId,
-						),
-						// Cloned rows dispatch through the row record, not the template
-						// host's, so dropping the policy here left every row past the
-						// first with no synchronous preventDefault.
-						...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
-					})),
+				rowEvents,
+				...rowSuffixField(input, repeat.id, render, enclosingRow, rowEvents),
 			},
 		];
 	});
+}
+
+// A served page marks every row host whose event carries a policy, which needs the rows' end as well as their start.
+function rowSuffixField(
+	input: ProtocolViewPayloadInput,
+	repeatId: string,
+	render: { readonly rowStartOffset?: number | 'unknown'; readonly rowEndOffset?: number },
+	enclosingRow: unknown,
+	rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown }>,
+): { readonly rowEndOffset?: number } {
+	const chunks = input.semanticGraph?.markup.chunks;
+	if (
+		!chunks ||
+		enclosingRow ||
+		render.rowEndOffset !== undefined ||
+		render.rowStartOffset === 'unknown' ||
+		!rowEvents.some((event) => event.syncPolicy)
+	)
+		return {};
+	const after = repeatRowSiblingElements(chunks, repeatId, 'after');
+	return after === 'unknown' ? {} : { rowEndOffset: after };
 }
 
 // Rows written straight into a branch arm stand between its anchors only while that arm is shown.
