@@ -1101,6 +1101,8 @@ export function App() @{
 		const broken = source.replace('</button>', '</button>>');
 		const send = vi.fn();
 		const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+		// Other suites' timers share this process, so the recheck is followed by its own handle, not by a call count.
+		const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
 		const environment = {
 			config: { consumer: 'client' },
 			hot: { send },
@@ -1151,8 +1153,13 @@ export function App() @{
 				],
 				[{ type: 'full-reload' }],
 			]);
-			expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+			const recheck = setIntervalSpy.mock.results.find(
+				(_result, index) => setIntervalSpy.mock.calls[index]![1] === 10,
+			)?.value;
+			expect(recheck).toBeDefined();
+			expect(clearIntervalSpy.mock.calls.filter(([handle]) => handle === recheck)).toHaveLength(1);
 		} finally {
+			setIntervalSpy.mockRestore();
 			clearIntervalSpy.mockRestore();
 			await rm(fixtureRoot, { force: true, recursive: true });
 		}
