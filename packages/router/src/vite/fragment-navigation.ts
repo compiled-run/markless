@@ -58,7 +58,8 @@ export function startFragmentNavigation(
 		const url = new URL(anchor.href, d.baseURI);
 		return url.origin === w.location.origin ? url : undefined;
 	};
-	const here = (url: URL) => url.pathname + url.search === w.location.pathname + w.location.search;
+	const here = (url: URL) =>
+		url.pathname + url.search === w.location.pathname + w.location.search;
 	// A press, or a mouse resting on a link, fetches its page and code at once, alongside the run half.
 	const press = (anchor: HTMLAnchorElement) => {
 		const intent = intentOf();
@@ -114,7 +115,10 @@ export function startFragmentNavigation(
 				if (event.type !== 'pointerover') press(anchor);
 				void wake(event);
 			} else if (anchor.hasAttribute(linkAttributeOf())) early(event);
-			else d.addEventListener('click', (later) => later === event && early(later), { once: true });
+			else
+				d.addEventListener('click', (later) => later === event && early(later), {
+					once: true,
+				});
 		}
 	};
 	for (const type of [
@@ -205,6 +209,8 @@ export function runFragmentNavigation(
 		}
 	).connection;
 	const pageKey = (url: URL) => url.pathname + url.search;
+	// Pages this tab already fetched, for any reason: the idle tier never downloads one again; a hover or a press still does.
+	const fetched = new Set<string>();
 	let module: Promise<FragmentEntryModule> | undefined;
 	// Even a loaded module's import() resolves a task later, after the next paint: a click on a pressed link calls it directly.
 	let loaded: FragmentEntryModule | undefined;
@@ -358,6 +364,7 @@ export function runFragmentNavigation(
 	};
 	// One request: the destination's region document and its resume payload, parsed on arrival (no script runs), so the click only swaps.
 	const request = (url: URL, speculative: boolean, started?: FragmentEarly): FragmentPrefetch => {
+		fetched.add(pageKey(url));
 		const controller = started?.controller ?? new AbortController();
 		const read = async (): Promise<FragmentFetched> => {
 			const prefix = config.requestPrefix;
@@ -453,7 +460,7 @@ export function runFragmentNavigation(
 			for (const entry of state.prefetches.values()) if (entry.open) open += 1;
 			if (open >= config.prefetchConnections) return;
 			const url = idleQueue.shift()!;
-			if (state.prefetches.has(pageKey(url))) continue;
+			if (state.prefetches.has(pageKey(url)) || fetched.has(pageKey(url))) continue;
 			prefetch(url, false);
 			// Low priority and never evaluated: a modulepreload only fills the cache before a press.
 			preloadCode(url, true);
@@ -478,7 +485,11 @@ export function runFragmentNavigation(
 			}
 			idleQueue = [];
 			for (const [key, url] of visible)
-				if (idleQueue.length < config.idleFragments && !state.prefetches.has(key))
+				if (
+					idleQueue.length < config.idleFragments &&
+					!state.prefetches.has(key) &&
+					!fetched.has(key)
+				)
 					idleQueue.push(url);
 			pumpIdle();
 		};

@@ -225,7 +225,10 @@ for (const [name, browserType] of [
 			const page = await browser.newPage();
 			const lazyLoads: string[] = [];
 			page.on('response', async (response) => {
-				if (response.request().resourceType() !== 'script' && !response.url().endsWith('.js'))
+				if (
+					response.request().resourceType() !== 'script' &&
+					!response.url().endsWith('.js')
+				)
 					return;
 				const body = await response.text().catch(() => '');
 				if (body.includes('tools ready')) lazyLoads.push(new URL(response.url()).pathname);
@@ -993,6 +996,33 @@ for (const [name, browserType] of [
 				'/slow fragment',
 			]);
 			expect(cancelled).toEqual([]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('the idle tier fetches each page at most once a session, even after its fetch was used or a page was left', async () => {
+			const { page, errors } = await open(browser);
+			// Requests made while the page sits idle after landing: the idle tier's, not a hover's or a click's.
+			const idle: string[] = [];
+			let idling = true;
+			page.on('request', (request) => {
+				const url = fragmentPageUrl(new URL(request.url()));
+				if (idling && url) idle.push(url.pathname);
+			});
+			await page.waitForTimeout(3500);
+			for (const [link, name] of [
+				['other', 'other'],
+				['home', 'home'],
+				['other', 'other'],
+				['home', 'home'],
+			] as const) {
+				idling = false;
+				await page.locator(`[data-nav="${link}"]`).first().click();
+				await landedOn(page, name);
+				idling = true;
+				await page.waitForTimeout(3500);
+			}
+			expect(idle.toSorted()).toEqual(['/', '/form', '/other', '/slow']);
 			expect(errors).toEqual([]);
 			await page.close();
 		});
