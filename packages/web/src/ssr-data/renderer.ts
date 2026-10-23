@@ -1150,12 +1150,12 @@ function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<stri
 	return html;
 }
 
-function escapeHtml(value: unknown): string {
-	return (value == null ? '' : String(value))
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;');
+
+const MARKUP_CHARACTER = /[&<>"]/;
+const MARKUP_ENTITY: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+
+function escapeHtml(value: string): string {
+	return MARKUP_CHARACTER.test(value) ? value.replace(/[&<>"]/g, (character) => MARKUP_ENTITY[character]!) : value;
 }
 
 function comparePath(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
