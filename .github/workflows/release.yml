@@ -134,11 +134,16 @@ jobs:
 
             # The release commit runs the pre-commit hook, which runs CI's fast jobs; their unit
             # tests launch Chromium and WebKit.
+            # Same key as ci.yml's lanes job: the browsers depend only on the Playwright version.
+            - name: Name the Playwright browser cache
+              id: playwright
+              run: echo "version=$(grep -oE '^  playwright-core@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2 | sort -u | paste -sd+ -)" >> "$GITHUB_OUTPUT"
+
             - name: Restore the Playwright browser cache
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ steps.playwright.outputs.version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Install Playwright system dependencies

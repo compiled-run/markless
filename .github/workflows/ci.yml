@@ -145,6 +145,10 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 10
         outputs:
+            # The browsers are a function of the Playwright version, the system packages of that and the runner image:
+            # a lockfile change elsewhere keeps both caches, so no job downloads them from the CDN or the apt mirror.
+            playwright_version: ${{ steps.playwright.outputs.version }}
+            image_os: ${{ steps.playwright.outputs.image }}
             key_unit: ${{ steps.unit.outputs.cache-primary-key }}
             run_unit: ${{ steps.unit.outputs.cache-hit != 'true' }}
             key_browser: ${{ steps.browser.outputs.cache-primary-key }}
@@ -182,6 +186,14 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
+
+            - name: Name the Playwright caches
+              id: playwright
+              run: |
+                  version=$(grep -oE '^  playwright-core@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2 | sort -u | paste -sd+ -)
+                  if [ -z "$version" ]; then echo 'pnpm-lock.yaml names no playwright-core version'; exit 1; fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+                  echo "image=${ImageOS:-${{ runner.os }}}" >> "$GITHUB_OUTPUT"
 
             # Shared inputs every lane depends on. Its evaluated key is written
             # to a file so the per-lane keys below layer on top of it.
@@ -436,7 +448,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
                   lookup-only: true
 
@@ -446,7 +458,7 @@ jobs:
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
                   lookup-only: true
 
@@ -459,16 +471,17 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true' || steps.apt-cache.outputs.cache-hit != 'true'
               run: printf 'Acquire::http::Timeout "10";\nAcquire::Retries "5";\n' | sudo tee /etc/apt/apt.conf.d/99stalled-mirror
 
+            # Browsers only: the system packages come from the apt mirror in their own step below.
             - name: Install the pinned Chromium and WebKit
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
-              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium webkit
+              run: pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 
             - name: Save the Playwright browser cache
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               uses: actions/cache/save@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Download the Playwright system packages
@@ -484,7 +497,7 @@ jobs:
               if: steps.apt-cache.outputs.cache-hit != 'true'
               uses: actions/cache/save@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
 
     # The steps that used to run back-to-back inside one 30-minute `test` job
@@ -534,14 +547,14 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -602,14 +615,14 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -1071,14 +1084,14 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -1143,14 +1156,14 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
