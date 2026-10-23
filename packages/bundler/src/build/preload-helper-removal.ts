@@ -96,18 +96,26 @@ async function planHelperRemoval(
 		(chunk) => chunk !== helperChunk && chunk.code.includes(helperBase),
 	);
 	const context = { helperFileName: helperChunk.fileName, exported };
-	const importerRewrites = await Promise.all(
-		importers.map((chunk) =>
-			runChunkTask('helperImporterRewrite', chunk.fileName, chunk.code, context),
-		),
-	);
+	// In bundle order, a window ahead: one importer that keeps the helper ends the plan, so the rest never run.
+	const pending: Promise<ChunkRewrite | undefined | false>[] = [];
+	const launch = (index: number) => {
+		const chunk = importers[index]!;
+		const rewrite = runChunkTask('helperImporterRewrite', chunk.fileName, chunk.code, context);
+		rewrite.catch(() => {});
+		pending[index] = rewrite;
+	};
+	let next = 0;
+	for (; next < Math.min(IMPORTER_WINDOW, importers.length); next++) launch(next);
 	for (const [index, chunk] of importers.entries()) {
-		const rewrite = importerRewrites[index]!;
+		const rewrite = await pending[index]!;
 		if (rewrite === false) return undefined;
+		if (next < importers.length) launch(next++);
 		if (rewrite) rewrites.set(chunk, rewrite);
 	}
 	return rewrites;
 }
+
+const IMPORTER_WINDOW = 16;
 
 export function helperImporterRewrite(
 	fileName: string,
