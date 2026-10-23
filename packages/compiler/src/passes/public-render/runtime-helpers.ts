@@ -15,10 +15,19 @@ export function emitCatalogHelperImports(
 	});
 }
 
+const WORD = /\w/;
+
+// `\bname\b` without compiling a regex per name: indexOf, then a word-boundary check at each hit.
 function referencesIdentifier(source: string, name: string): boolean {
 	// Aliased entries ('imported as local') are used under the LOCAL name.
 	const local = name.includes(' as ') ? name.split(' as ')[1]! : name;
-	return new RegExp(`\\b${local}\\b`).test(source);
+	if (!/^\w+$/.test(local)) return new RegExp(`\\b${local}\\b`).test(source);
+	for (let at = source.indexOf(local); at !== -1; at = source.indexOf(local, at + 1)) {
+		const before = at === 0 ? '' : source[at - 1]!;
+		const after = source[at + local.length] ?? '';
+		if (!WORD.test(before) && !WORD.test(after)) return true;
+	}
+	return false;
 }
 
 export const stateRuntimeImports = {
