@@ -493,6 +493,8 @@ export function createEventWiring(input: {
 		// A field's own events stay in order: its edit hold judges each write against non-overlapping dispatches.
 		const options = {
 			...dispatchOptions,
+			// A key the browser would have sent to an element with no handler does nothing there.
+			...(moved ? { ignoreUnmatched: true } : {}),
 			releaseQueue: marklessEditableControl(target)
 				? undefined
 				: input.root.__marklessReleaseDispatch,
