@@ -413,11 +413,7 @@ function syncDirectRepeat(
 		parent.appendChild?.(newRows);
 	} else if (reusedRows === 0) {
 		parent.replaceChildren(newRows);
-	} else if (
-		!sameMarklessPublicKeys(state.keys, nextKeys) &&
-		!removeMarklessPublicMissingKey(parent, state, nextKeys) &&
-		!swapMarklessPublicRows(parent, state, nextKeys)
-	) {
+	} else if (!sameMarklessPublicKeys(state.keys, nextKeys)) {
 		replaceMarklessPublicRows(parent, state, nextKeys);
 	}
 	if (state.rows.size !== nextKeys.length) pruneMarklessPublicRows(state, nextKeys);
@@ -686,16 +682,48 @@ export function replaceMarklessPublicRows(
 	state: DirectRepeatState,
 	keys: ReadonlyArray<unknown>,
 ) {
-	// Rows already in order stay attached: re-inserting a focused row drops its focus.
+	const staying = new Set(keys);
+	const oldIndex = new Map<unknown, number>();
+	state.keys.forEach((key, index) => {
+		const root = state.rows.get(key)?.root;
+		if (root?.parentElement !== parent) return;
+		if (staying.has(key)) oldIndex.set(key, index);
+		else parent.removeChild(root);
+	});
+	// Rows on the longest run already in order stay attached; re-inserting a focused row drops its focus.
+	const inPlace = marklessRowsInPlace(keys.map((key) => oldIndex.get(key) ?? -1));
 	let after: Node | null = null;
-	for (let index = keys.length; index--;) {
+	for (let index = keys.length; index--; ) {
 		const root = state.rows.get(keys[index])?.root;
 		if (!root) continue;
-		if (root.nextSibling !== after || root.parentNode !== parent)
-			parent.insertBefore(root, after);
+		if (!inPlace[index]) parent.insertBefore(root, after);
 		after = root;
 	}
 	while (parent.firstChild && parent.firstChild !== after) parent.removeChild(parent.firstChild);
+}
+/** Marks the entries of one longest strictly increasing run of `positions`; `-1` never joins it. */
+export function marklessRowsInPlace(positions: ReadonlyArray<number>): Uint8Array {
+	const inPlace = new Uint8Array(positions.length);
+	const previous = new Int32Array(positions.length);
+	const tails: number[] = [];
+	for (let index = 0; index < positions.length; index++) {
+		const position = positions[index]!;
+		if (position < 0) continue;
+		let low = 0;
+		let high = tails.length;
+		if (high && positions[tails[high - 1]!]! < position) low = high;
+		else
+			while (low < high) {
+				const middle = (low + high) >> 1;
+				if (positions[tails[middle]!]! < position) low = middle + 1;
+				else high = middle;
+			}
+		previous[index] = low ? tails[low - 1]! : -1;
+		tails[low] = index;
+	}
+	for (let index = tails.length ? tails[tails.length - 1]! : -1; index >= 0; index = previous[index]!)
+		inPlace[index] = 1;
+	return inPlace;
 }
 export function pruneMarklessPublicRows(state: DirectRepeatState, keys: ReadonlyArray<unknown>) {
 	const retainedKeys = new Set(keys);
@@ -754,61 +782,4 @@ export function clearMarklessPublicSingleClassRows(parent: Element, state: Direc
 	state.rows.clear();
 	state.keys = [];
 	state.classValue = undefined;
-}
-export function removeMarklessPublicMissingKey(
-	parent: Element,
-	state: DirectRepeatState,
-	nextKeys: ReadonlyArray<unknown>,
-) {
-	if (state.keys.length !== nextKeys.length + 1) return false;
-	let missingKey: unknown;
-	let nextIndex = 0;
-	for (const key of state.keys) {
-		if (nextKeys[nextIndex] === key) {
-			nextIndex++;
-			continue;
-		}
-		if (missingKey !== undefined) return false;
-		missingKey = key;
-	}
-	if (missingKey === undefined || nextIndex !== nextKeys.length) return false;
-	const record = state.rows.get(missingKey);
-	if (!record) return false;
-	if (record.root.remove) record.root.remove();
-	else parent.removeChild?.(record.root);
-	record.c?.();
-	state.rows.delete(missingKey);
-	return true;
-}
-export function swapMarklessPublicRows(
-	parent: Element,
-	state: DirectRepeatState,
-	nextKeys: ReadonlyArray<unknown>,
-) {
-	if (state.keys.length !== nextKeys.length) return false;
-	let firstIndex = -1;
-	let secondIndex = -1;
-	for (let index = 0; index < nextKeys.length; index++) {
-		if (state.keys[index] === nextKeys[index]) continue;
-		if (firstIndex < 0) {
-			firstIndex = index;
-			continue;
-		}
-		if (secondIndex >= 0) return false;
-		secondIndex = index;
-	}
-	if (secondIndex < 0) return false;
-	if (
-		state.keys[firstIndex] !== nextKeys[secondIndex] ||
-		state.keys[secondIndex] !== nextKeys[firstIndex]
-	)
-		return false;
-	const first = state.rows.get(state.keys[firstIndex]);
-	const second = state.rows.get(state.keys[secondIndex]);
-	if (!first || !second || !parent.insertBefore) return false;
-	const afterSecond = second.root.nextSibling;
-	parent.insertBefore(second.root, first.root);
-	if (afterSecond) parent.insertBefore(first.root, afterSecond);
-	else parent.appendChild?.(first.root);
-	return true;
 }
