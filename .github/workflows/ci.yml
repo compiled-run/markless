@@ -1372,11 +1372,22 @@ jobs:
                       boxes-music-player-ssr-completed.txt
                       demos/music-player-ssr/.witness/receipts
 
+            - name: List the receipt folders the lane caches restored
+              run: |
+                  : > "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_bundler }}' = true ] || echo packages/bundler/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_router }}' = true ] || echo packages/router/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_music_player }}' = true ] || echo demos/music-player/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_music_player_ssr }}' = true ] || echo demos/music-player-ssr/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  cat "$RUNNER_TEMP/lane-restored-receipts"
+
             - name: Generate analyzer unit-contract receipts
               run: pnpm receipts:generate
 
             - name: Validate required analyzer consumer receipts
-              run: pnpm receipts:check
+              run: |
+                  if [ -f "$RUNNER_TEMP/lane-restored-receipts" ]; then export MARKLESS_LANE_RESTORED_RECEIPTS="$RUNNER_TEMP/lane-restored-receipts"; fi
+                  pnpm receipts:check
 
             - name: Upload analyzer contract receipts
               if: always()

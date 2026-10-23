@@ -109,6 +109,35 @@ describe('receipt-set checker', () => {
 		await expectRed(input);
 	});
 
+	test('a receipt a lane cache restored carries the commit that ran the lane, not this one', async () => {
+		const input = await fixture(
+			{ 'lane-example.json': report({ metadata: { ...identity, commitSha: 'a'.repeat(40) } }) },
+			[{ receiptPath: 'lane-example.json', ...identity, commitSha: 'git:HEAD' }],
+		);
+		await expect(checkReceiptSet(input.manifest, input.directory)).rejects.toThrow();
+		expect(
+			await checkReceiptSet(input.manifest, input.directory, { laneRestored: ['lane-'] }),
+		).toEqual({ checked: 1 });
+	});
+
+	test.each([
+		['a value that is not a commit', 'commit-old'],
+		['an artifact hash mismatch', 'a'.repeat(40)],
+	])('a lane-restored receipt with %s stays red', async (name, commitSha) => {
+		const artifact = name.includes('artifact') ? 'artifact-old' : identity.buildArtifactHash;
+		const input = await fixture(
+			{
+				'lane-example.json': report({
+					metadata: { ...identity, commitSha, buildArtifactHash: artifact },
+				}),
+			},
+			[{ receiptPath: 'lane-example.json', ...identity, commitSha: 'git:HEAD' }],
+		);
+		await expect(
+			checkReceiptSet(input.manifest, input.directory, { laneRestored: ['lane-'] }),
+		).rejects.toThrow();
+	});
+
 	test.each([
 		['receipt path', { receiptPath: 'example.json', ...identity }],
 		['consumer fixture identity', { receiptPath: 'duplicate.json', ...identity }],
