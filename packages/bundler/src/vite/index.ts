@@ -24,6 +24,7 @@ import {
 	type BuiltPrerenderRecords,
 } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
+import { usePersistentStrippedCode } from '../transform.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
@@ -151,6 +152,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		if (!cache) return;
 		compileCache = undefined;
 		usePersistentCompileStore(undefined);
+		usePersistentStrippedCode(undefined);
 		await cache.flush();
 	};
 	const devTags = createDevTags();
@@ -269,6 +271,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					fingerprint: compilerFingerprint(),
 				});
 				usePersistentCompileStore(compileCache);
+				usePersistentStrippedCode(compileCache.strippedCode);
 			}
 			if (serve) {
 				devTags.registerViteTags(resolvedConfig.base);
