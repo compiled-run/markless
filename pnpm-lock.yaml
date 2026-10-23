@@ -655,6 +655,25 @@ importers:
         specifier: npm:@voidzero-dev/vite-plus-core@1.3.0
         version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1)'
 
+  packages/bundler/fixtures/vite-csr-direct:
+    dependencies:
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../..
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../../../web
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@1.3.0
+        version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1)'
+
   packages/bundler/fixtures/vite-csr-preloader:
     dependencies:
       '@markless/bundler':
