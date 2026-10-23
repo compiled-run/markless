@@ -305,8 +305,14 @@ export async function narrowConstantImports(
 export function constantSlicesPlugin(): Plugin {
 	return {
 		name: 'markless:constant-slices',
+		// After the Markless plugin, which turns a render-data source request's .tsrx into its module,
+		// and before Vite's import analysis, which must see the slice imports this adds.
+		enforce: 'post',
 		applyToEnvironment(environment) {
 			return environment.config.consumer === 'client';
+		},
+		buildEnd() {
+			if (this.environment?.mode !== 'dev') evaluated.clear();
 		},
 		resolveId: {
 			filter: { id: /^virtual:markless:constant-slice:/ },
@@ -341,8 +347,6 @@ export function constantSlicesPlugin(): Plugin {
 			},
 		},
 		transform: {
-			// A render-data source request holds .tsrx until the Markless transform has emitted its module.
-			order: 'post',
 			filter: { id: SLICED_MODULE },
 			async handler(code, id) {
 				const limitKb = this.environment?.config.build.chunkSizeWarningLimit;
