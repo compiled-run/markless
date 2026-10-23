@@ -1,0 +1,4 @@
+main main
+base perf/r2-base
+cw0 perf/compile-workers MARKLESS_COMPILE_WORKERS=0
+cw perf/compile-workers
