@@ -558,7 +558,9 @@ jobs:
             - name: Run unit and integration tests
               run: pnpm exec vp test --project node --shard=${{ matrix.shard }}
 
-    # Real-Chromium vitest project, split by test file across two runners.
+    # The real-Chromium browser and @markless/ui projects, each split by test file across three runners.
+    # @markless/ui runs 670 s of files serially, 125 s of it in one conformance file; on one shard it
+    # made that shard a 15-minute run while the other took under 3.
     browser:
         needs: [typecheck, lanes, prepare-playwright]
         if: needs.lanes.outputs.run_browser == 'true'
@@ -567,7 +569,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                shard: ['1/2', '2/2']
+                shard: ['1/3', '2/3', '3/3']
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
             NPM_CONFIG_AUDIT: 'false'
@@ -627,12 +629,11 @@ jobs:
               run: pnpm exec vp test --project browser --shard=${{ matrix.shard }}
 
             - name: Run the @markless/ui browser project
-              if: matrix.shard == '1/2'
-              run: pnpm exec vp test --project ui
+              run: pnpm exec vp test --project ui --shard=${{ matrix.shard }}
 
             # The checked-in @markless/ui API manifest matches the family sources; the lane key hashes packages/headless/**.
             - name: Check the @markless/ui API manifest
-              if: matrix.shard == '1/2'
+              if: matrix.shard == '1/3'
               run: pnpm --dir packages/headless/components api:check
 
     # Packaged editor completion matrix: builds the CJS plugin bundles, so it
