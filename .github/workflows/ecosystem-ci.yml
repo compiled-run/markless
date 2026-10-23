@@ -61,9 +61,10 @@ on:
                 type: boolean
                 default: false
 
+# One complete run per main commit; see the same block in ci.yml.
 concurrency:
-    group: ecosystem-ci-${{ github.event_name == 'push' && 'main' || github.event.issue.number || inputs.pr || inputs.ref }}
-    cancel-in-progress: ${{ github.event_name == 'push' }}
+    group: ecosystem-ci-${{ github.event_name == 'push' && format('main-{0}', github.sha) || github.event.issue.number || inputs.pr || inputs.ref }}
+    cancel-in-progress: false
 
 permissions: {}
 
