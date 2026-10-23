@@ -52,7 +52,7 @@ jobs:
                   # Tool caches on main: the newest entry per key family (the key minus its content hash).
                   sort -t$'\t' -k3,3r caches.tsv | awk -F'\t' '
                     $2 == "refs/heads/main" && $5 ~ /^(node-cache-|playwright-|ecosystem-|jsfb-npm-)/ {
-                      family = $5; sub(/-[0-9a-f]+$/, "", family)
+                      family = $5; sub(/-[0-9a-f]+$/, "", family); sub(/-[0-9][0-9.+]*$/, "", family)
                       if (seen[family]++) print $1 "\t" $2 "\t" $4 "\t" $5
                     }' > delete.tsv
                   # Refs that no run can restore from any more.
