@@ -123,33 +123,33 @@ export function findKeyedRepeatRowEventMatch(input: {
 			readonly match: import('./resume-events.ts').ResumeRowEventMatch;
 	  }
 	| undefined {
-	for (let element = input.target; element; element = element.parentElement ?? null) {
-		for (const repeat of input.view.keyedRepeats ?? []) {
-			const rowEvents = repeat.rowEvents.filter(
-				(rowEvent) => rowEvent.eventName === input.eventName,
+	const lists = (input.view.keyedRepeats ?? []).flatMap((repeat) => {
+		const rowEvents = repeat.rowEvents.filter(
+			(rowEvent) => rowEvent.eventName === input.eventName,
+		);
+		if (rowEvents.length === 0) return [];
+		validateOneRepeat(input.graph, repeat);
+		const parent =
+			input.elementsByHostId.get(repeat.parentHostNodeId) ??
+			input.materializeHost(repeat.parentHostNodeId);
+		if (!parent || (repeat.branchArm && armRows?.hiddenBranchArm(parent, repeat))) return [];
+		const items = readKeyedRepeatCollection(input.graph, repeat);
+		const rows = repeatRowElements(parent, repeat, items.length);
+		return [[repeat, rowEvents, parent, items, rows] as const];
+	});
+	for (let element = input.target; element; element = element.parentElement ?? null)
+		for (const [repeat, rowEvents, parent, items, rows] of lists) {
+			let rowRoot: ResumeDomElement | null | undefined = element;
+			while (rowRoot && rowRoot.parentElement !== parent) rowRoot = rowRoot.parentElement;
+			const rowIndex = rowRoot ? rows.indexOf(rowRoot) : -1;
+			const rowEvent = rowEvents.find(
+				(event) => rowIndex >= 0 && marklessElementAt(rowRoot!, event.hostPath) === element,
 			);
-			if (rowEvents.length === 0) continue;
-			validateOneRepeat(input.graph, repeat);
-			const parent =
-				input.elementsByHostId.get(repeat.parentHostNodeId) ??
-				input.materializeHost(repeat.parentHostNodeId);
-			if (!parent) continue;
-			if (repeat.branchArm && armRows?.hiddenBranchArm(parent, repeat)) continue;
-			const items = readKeyedRepeatCollection(input.graph, repeat);
-			for (const [rowIndex, rowRoot] of repeatRowElements(
-				parent,
-				repeat,
-				items.length,
-			).entries()) {
+			if (rowEvent) {
 				const rowKey = repeatItemKey(items[rowIndex], repeat, rowIndex);
-				for (const rowEvent of rowEvents) {
-					if (marklessElementAt(rowRoot, rowEvent.hostPath) === element) {
-						return { element, match: { repeat, parent, rowRoot, rowKey, rowEvent } };
-					}
-				}
+				return { element, match: { repeat, parent, rowRoot: rowRoot!, rowKey, rowEvent } };
 			}
 		}
-	}
 }
 export function wireKeyedRepeats(
 	input: {
