@@ -113,12 +113,27 @@ export function createMarklessRolldownPlugin(input: {
 		environment === 'client' &&
 		nativePackingEnabled(internalOptions) &&
 		!internalOptions.dev
-			? nativePackingPlugins(() => getRoot() ?? '', runtimeDemandMaps, runtimeDemandSources)
+			? nativePackingPlugins(
+					() => getRoot() ?? '',
+					runtimeDemandMaps,
+					runtimeDemandSources,
+					directCsrOnly,
+				)
 			: [];
 
 	function* runtimeDemandMaps() {
 		for (const manifest of state.moduleMetadata.symbolClaimManifests())
 			yield manifest.runtimeDemandMap;
+	}
+
+	// Every compiled module of this build mounts through the direct-DOM renderer.
+	function directCsrOnly() {
+		let compiled = false;
+		for (const manifest of state.moduleMetadata.symbolClaimManifests()) {
+			if (manifest.directCsr !== true) return false;
+			compiled = true;
+		}
+		return compiled;
 	}
 
 	function* runtimeDemandSources() {
@@ -169,6 +184,7 @@ export function createMarklessRolldownPlugin(input: {
 			},
 			runtimeDemandMaps,
 			runtimeDemandSources,
+			directCsrOnly,
 			chunkImportMap: () => chunkImportMapEnabled(internalOptions),
 			enableChunkImportMap: () => {
 				internalOptions.chunkImportMap = true;
