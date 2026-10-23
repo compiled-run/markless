@@ -399,22 +399,29 @@ export function uiDemos(): Plugin {
 			server.watcher.on('add', invalidate);
 			server.watcher.on('unlink', invalidate);
 		},
-		resolveId(source) {
-			if (!source.startsWith(PREFIX)) return;
-			const family = source.slice(PREFIX.length);
-			if (!FAMILY.test(family))
-				throw new Error(`ui-demos: '${family}' is not a family folder name.`);
-			return VIRTUAL + family;
+		resolveId: {
+			filter: { id: /^ui-demos:/ },
+			handler(source) {
+				if (!source.startsWith(PREFIX)) return;
+				const family = source.slice(PREFIX.length);
+				if (!FAMILY.test(family))
+					throw new Error(`ui-demos: '${family}' is not a family folder name.`);
+				return VIRTUAL + family;
+			},
 		},
-		load(id) {
-			if (!id.startsWith(VIRTUAL)) return;
-			const family = id.slice(VIRTUAL.length);
-			const demos = readFamily(root, family);
-			for (const demo of demos) this.addWatchFile(demo.file);
-			return moduleSource(demos);
+		load: {
+			filter: { id: /^\0ui-demos:/ },
+			handler(id) {
+				if (!id.startsWith(VIRTUAL)) return;
+				const family = id.slice(VIRTUAL.length);
+				const demos = readFamily(root, family);
+				for (const demo of demos) this.addWatchFile(demo.file);
+				return moduleSource(demos);
+			},
 		},
 		transform: {
 			order: 'pre',
+			filter: { id: /\.mdx(?:$|\?)/ },
 			async handler(code: string, id: string) {
 				if (!id.split('?', 1)[0].endsWith('.mdx')) return;
 				const watch = (file: string) => this.addWatchFile(file);

@@ -1,4 +1,4 @@
-import type { IconsOptions } from '@markless/icons/vite';
+import { ICON_SOURCE_ID, type IconsOptions } from '@markless/icons/vite';
 import type { Plugin } from 'vite';
 import { iconTransform } from './transforms/icons.ts';
 
@@ -29,6 +29,7 @@ export function ui(options: UiOptions = {}): Plugin {
 		},
 		transform: {
 			order: 'pre',
+			filter: { id: ICON_SOURCE_ID },
 			async handler(code, id, transformOptions) {
 				if (!transform) return;
 				const handler = typeof transform === 'function' ? transform : transform.handler;

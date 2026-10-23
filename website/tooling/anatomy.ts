@@ -32,12 +32,15 @@ export function anatomy(): Plugin {
 	return {
 		name: 'compiled-website:anatomy',
 		enforce: 'pre',
-		transform(source, id) {
-			if (!id.split('?', 1)[0]?.endsWith('.tsrx') || (!source.includes(directive) && !source.includes(treeDirective))) return;
-			this.addWatchFile(manifestFile);
-			const metadata = JSON.parse(readFileSync(manifestFile, 'utf8')) as ApiManifest;
-			const parts = Object.values(metadata).flatMap((family) => family.parts.map((part) => part.part));
-			return { code: expandAnatomyStyles(source, parts, Object.entries(scenes).flatMap(([family, scene]) => scene.shapes.map((_, index) => `${family}-${index}`))), map: null };
+		transform: {
+			filter: { id: /\.tsrx(?:$|\?)/ },
+			handler(source, id) {
+				if (!id.split('?', 1)[0]?.endsWith('.tsrx') || (!source.includes(directive) && !source.includes(treeDirective))) return;
+				this.addWatchFile(manifestFile);
+				const metadata = JSON.parse(readFileSync(manifestFile, 'utf8')) as ApiManifest;
+				const parts = Object.values(metadata).flatMap((family) => family.parts.map((part) => part.part));
+				return { code: expandAnatomyStyles(source, parts, Object.entries(scenes).flatMap(([family, scene]) => scene.shapes.map((_, index) => `${family}-${index}`))), map: null };
+			},
 		},
 	};
 }

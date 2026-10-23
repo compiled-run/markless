@@ -16,8 +16,8 @@ export function expandKeyboardStyles(source: string): string {
 }
 
 export function keyboard(): Plugin {
- return {name:'compiled-website:keyboard',enforce:'pre',transform(source,id){
+ return {name:'compiled-website:keyboard',enforce:'pre',transform:{filter:{id:/\.tsrx(?:$|\?)/},handler(source,id){
   if(!id.split('?',1)[0]?.endsWith('.tsrx') || !source.includes('@keyboard-highlights;')) return;
   return {code:expandKeyboardStyles(source),map:null};
- }};
+ }}};
 }

@@ -180,6 +180,7 @@ export function highlightMdx(): Plugin {
 	return {
 		name: 'compiled-website:highlight-mdx',
 		transform: {
+			filter: { id: /\.mdx(?:$|\?)/ },
 			async handler(code: string, id: string) {
 				if (!isMdxRoute(id)) return;
 				const fenced = code.includes(FENCE_MARKER);
