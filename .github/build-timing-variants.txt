@@ -1,2 +1,3 @@
-main main
-cwm perf/compile-on-workers
+base perf/r2-base
+cw perf/compile-workers
+tw perf/transform-on-workers
