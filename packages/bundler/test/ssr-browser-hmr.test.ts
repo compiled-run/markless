@@ -144,10 +144,9 @@ describe('SSR browser HMR', () => {
 						(message as { type?: string; event?: string }).type === 'custom' &&
 						(message as { event?: string }).event === MARKLESS_DEV_ERROR_CLEAR_EVENT,
 				);
+				// The on-disk recheck can recover the file first and send its own untriggered reload; the edit's reload still follows.
 				const reloadIndex = send.mock.calls.findIndex(
-					([message], index) =>
-						index > clearIndex &&
-						(message as HotPayload | undefined)?.type === 'full-reload',
+					([message], index) => index > clearIndex && isEditDrivenReload(message, fixture.root),
 				);
 				expect(clearIndex).toBeGreaterThan(-1);
 				expect(reloadIndex).toBeGreaterThan(clearIndex);
