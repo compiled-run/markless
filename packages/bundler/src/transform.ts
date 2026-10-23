@@ -81,19 +81,29 @@ import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundle
 const STRIPPED_CODE_LIMIT = 4096;
 const strippedCode = new Map<string, string>();
 
+// Strips and fragment verdicts outlive the process through the host's store, so a warm build redoes neither.
+let persistentStrippedCode:
+	| { get(key: string): string | undefined; set(key: string, value: string): void }
+	| undefined;
+
+export function usePersistentStrippedCode(memo: typeof persistentStrippedCode): void {
+	persistentStrippedCode = memo;
+}
+
 export async function stripEmittedTypes(
 	code: string,
 	moduleId: string,
 	onlyRemoveTypeImports = false,
 ): Promise<string> {
 	const key = `${onlyRemoveTypeImports ? 1 : 0}${code}`;
-	const cached = strippedCode.get(key);
+	const cached = strippedCode.get(key) ?? persistentStrippedCode?.get(key);
 	if (cached !== undefined) {
 		strippedCode.delete(key);
 		strippedCode.set(key, cached);
 		return cached;
 	}
 	const stripped = await stripEmittedTypesUncached(code, moduleId, onlyRemoveTypeImports);
+	persistentStrippedCode?.set(key, stripped);
 	strippedCode.set(key, stripped);
 	if (strippedCode.size > STRIPPED_CODE_LIMIT) {
 		const oldest = strippedCode.keys().next();
@@ -159,7 +169,10 @@ const FRAGMENT_VERDICT_LIMIT = 4096;
 async function fragmentCarriesTypeScript(code: string): Promise<boolean> {
 	const known = fragmentVerdicts.get(code);
 	if (known !== undefined) return known;
-	const verdict = await fragmentCarriesTypeScriptUncached(code);
+	const stored = persistentStrippedCode?.get(`t${code}`);
+	const verdict =
+		stored === undefined ? await fragmentCarriesTypeScriptUncached(code) : stored === 'true';
+	if (stored === undefined) persistentStrippedCode?.set(`t${code}`, String(verdict));
 	if (fragmentVerdicts.size >= FRAGMENT_VERDICT_LIMIT)
 		fragmentVerdicts.delete(fragmentVerdicts.keys().next().value!);
 	fragmentVerdicts.set(code, verdict);

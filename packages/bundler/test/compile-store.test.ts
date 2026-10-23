@@ -99,3 +99,22 @@ test('past its size budget the store drops results this process did not use', as
 test('the fingerprint is stable for one compiler build', () => {
 	expect(compilerFingerprint()).toBe(compilerFingerprint());
 });
+
+test('a stored type strip comes back in a later process, and only what a build used is kept', async () => {
+	const directory = join(scratch, 'stripped-code');
+	const first = createPersistentCompileCache({ directory, fingerprint: 'one' });
+	first.strippedCode.set('0const a: number = 1;', 'const a = 1;');
+	first.strippedCode.set('0let b: string;', 'let b;');
+	await first.flush();
+
+	const second = createPersistentCompileCache({ directory, fingerprint: 'one' });
+	expect(second.strippedCode.get('0const a: number = 1;')).toBe('const a = 1;');
+	expect(second.strippedCode.get('1const a: number = 1;')).toBeUndefined();
+	await second.flush();
+
+	const third = createPersistentCompileCache({ directory, fingerprint: 'one' });
+	expect(third.strippedCode.get('0const a: number = 1;')).toBe('const a = 1;');
+	expect(third.strippedCode.get('0let b: string;')).toBeUndefined();
+	const otherCompiler = createPersistentCompileCache({ directory, fingerprint: 'two' });
+	expect(otherCompiler.strippedCode.get('0const a: number = 1;')).toBeUndefined();
+});
