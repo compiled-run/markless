@@ -1,6 +1,10 @@
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
-import { mayContainDynamicImport, rememberChunkDynamicImports } from './chunk-ast.ts';
+import {
+	knowsChunkDynamicImports,
+	mayContainDynamicImport,
+	rememberChunkDynamicImports,
+} from './chunk-ast.ts';
 import type { ChunkTaskName, ChunkTaskResult } from './chunk-tasks.ts';
 import { runChunkTaskInline } from './chunk-tasks.ts';
 
@@ -18,6 +22,7 @@ type Job = {
 
 type PooledWorker = { readonly worker: Worker; job: Job | undefined; gone: boolean };
 
+// Shared by every build in the process, whose builds can overlap, so it is never torn down: idle workers are unreferenced.
 let pool: PooledWorker[] | undefined;
 let unavailable = false;
 let poolSize = 0;
@@ -113,31 +118,12 @@ function dispatch(): void {
 	for (const entry of pool) if (!entry.job) entry.worker.unref();
 }
 
-// Answers a worker already gave for the exact code, from a read that served several passes at once.
-const knownResults = new Map<ChunkTaskName, Map<string, unknown>>();
-
-export function rememberChunkTaskResult<T extends ChunkTaskName>(
-	task: T,
-	code: string,
-	result: ChunkTaskResult<T>,
-): void {
-	let known = knownResults.get(task);
-	if (!known) knownResults.set(task, (known = new Map()));
-	known.set(code, result);
-}
-
-export function forgetChunkTaskResults(): void {
-	knownResults.clear();
-}
-
 /** Runs a chunk analysis off the main thread when the chunk is large enough to pay for the trip. */
 export function runChunkTask<T extends ChunkTaskName>(
 	task: T,
 	fileName: string,
 	code: string,
 ): Promise<ChunkTaskResult<T>> {
-	const known = knownResults.get(task);
-	if (known?.has(code)) return Promise.resolve(known.get(code) as ChunkTaskResult<T>);
 	if (code.length < CHUNK_WORKER_MIN_CODE_LENGTH || !startPool()) {
 		try {
 			return Promise.resolve(runChunkTaskInline(task, fileName, code));
@@ -151,11 +137,6 @@ export function runChunkTask<T extends ChunkTaskName>(
 	});
 }
 
-// Idle workers are unreferenced, so they never keep the process alive. The pool is shared by every build in the
-// process and builds can overlap, so a build that ends forgets its answers but leaves the workers running.
-export function releaseChunkWorkers(): void {
-	forgetChunkTaskResults();
-}
 
 /** Reads the dynamic imports of every large chunk on the workers, so later passes find them cached. */
 export async function prefetchChunkDynamicImports(
@@ -166,7 +147,8 @@ export async function prefetchChunkDynamicImports(
 			.filter(
 				(chunk) =>
 					chunk.code.length >= CHUNK_WORKER_MIN_CODE_LENGTH &&
-					mayContainDynamicImport(chunk.code),
+					mayContainDynamicImport(chunk.code) &&
+					!knowsChunkDynamicImports(chunk.fileName, chunk.code),
 			)
 			.map((chunk) =>
 				runChunkTask('chunkDynamicImports', chunk.fileName, chunk.code).then(
