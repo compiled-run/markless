@@ -402,7 +402,14 @@ for (const [name, browserType] of [
 			await expect.poll(() => text(page, '[data-late]')).toBe('waiting');
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
-			await page.waitForTimeout(700);
+			await page.evaluate(() =>
+				((window as unknown as Record<string, () => void>).__releaseLateWrite)(),
+			);
+			await page.waitForFunction(
+				() => (window as unknown as Record<string, unknown>).__lateWriteRan === true,
+			);
+			// A storage write that did land would persist through a module it loads first.
+			await page.waitForLoadState('networkidle');
 			expect(await page.evaluate(() => localStorage.getItem('fragment-theme'))).not.toBe(
 				'late',
 			);
