@@ -18,6 +18,8 @@ export const PACK_COST_MODEL = {
 	minDeferredGzipKb: 1,
 	// Pre-tree-shake module source to shipped gzip bytes, for planning before output exists.
 	sourceGzipRatio: 0.25,
+	// Raw bytes a pack adds around each module (init function, bindings, export entry); docs site slice packs: ~55.
+	packedModuleWrapperBytes: 64,
 } as const;
 
 export type PackCostModel = typeof PACK_COST_MODEL;

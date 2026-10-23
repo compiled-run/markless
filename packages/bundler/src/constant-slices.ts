@@ -3,11 +3,12 @@
 import { readFileSync } from 'node:fs';
 import { evaluateModuleConstants, parseJavaScriptModule } from '@markless/compiler';
 import type { Plugin } from 'vite';
+import { PACK_COST_MODEL } from './build/pack-cost-model.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './source-module.ts';
 
 const SLICE_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}constant-slice:`;
 const SLICED_MODULE =
-	/^\0virtual:markless:(?:symbol|symbol-bundle|render-data|render-data-served):/;
+	/^\0virtual:markless:(?:symbol|symbol-bundle|render-data|render-data-served):|[?&]markless-render-data(?:[&#]|$)/;
 const AUTHORED_IMPORT = /\bimport\s*\{[^}]*\}\s*from\s*["'](?!@markless\/|virtual:)/;
 const PLAIN_SCRIPT_FILE = /\.[cm]?[jt]sx?$/;
 const MUTATING_METHODS = new Set([
@@ -173,10 +174,32 @@ function references(program: Node, local: string, value: unknown): Reference[] |
 	return found;
 }
 
+// Slices replace the whole value when they ship fewer bytes, counting each read's property path they
+// drop, or when the whole would not fit one chunk.
+function slicingPays(
+	value: unknown,
+	roots: ReadonlyArray<ReadonlyArray<string | number>>,
+	droppedPathBytes: number,
+	maxModuleBytes: number,
+): boolean {
+	const sliced = roots.reduce(
+		(sum, path) =>
+			sum +
+			JSON.stringify(sliceAt(value, path)).length +
+			PACK_COST_MODEL.packedModuleWrapperBytes,
+		0,
+	);
+	// A data module renders a little larger than its value's JSON: docs term-art.ts 30,511 B for 30,044.
+	const whole =
+		JSON.stringify(value).length * 1.015 + PACK_COST_MODEL.packedModuleWrapperBytes;
+	return sliced - droppedPathBytes < whole || whole > maxModuleBytes;
+}
+
 /** The module with each imported constant it reads only in slices narrowed to those slices, or null when nothing narrows. */
 export async function narrowConstantImports(
 	code: string,
 	resolve: (specifier: string) => Promise<string | null>,
+	maxModuleBytes = Infinity,
 ): Promise<{ readonly code: string; readonly files: ReadonlyArray<string> } | null> {
 	if (!AUTHORED_IMPORT.test(code)) return null;
 	let program: Node;
@@ -227,7 +250,21 @@ export async function narrowConstantImports(
 						.slice(0, index)
 						.some((shorter) => shorter.every((segment, at) => path[at] === segment)),
 			);
-			if (!uses || roots.some((path) => !plainJson(sliceAt(value, path)))) {
+			if (
+				!uses ||
+				roots.some((path) => !plainJson(sliceAt(value, path))) ||
+				!slicingPays(
+					value,
+					roots,
+					uses.reduce((sum, use) => {
+						const root = roots.find((path) =>
+							path.every((segment, at) => use.path[at] === segment),
+						)!;
+						return sum + use.chain[root.length]!.end - use.chain[0]!.start - local.length;
+					}, 0),
+					maxModuleBytes,
+				)
+			) {
 				kept.push(entry);
 				continue;
 			}
@@ -285,17 +322,38 @@ export function constantSlicesPlugin(): Plugin {
 					.split(':')
 					.map(decodeURIComponent) as [string, string, string];
 				this.addWatchFile(file);
-				const value = sliceAt(moduleConstants(file)[exportName], JSON.parse(path));
-				return `export default ${JSON.stringify(value)};`;
+				const at = JSON.parse(path) as Array<string | number>;
+				const value = sliceAt(moduleConstants(file)[exportName], at);
+				const json = JSON.stringify(value);
+				const limitKb = this.environment?.config.build.chunkSizeWarningLimit;
+				// A slice bigger than one chunk may be is its parts, each its own module the packer can place apart.
+				if (limitKb === undefined || json.length <= limitKb * 1000 || !value || typeof value !== 'object')
+					return `export default ${json};`;
+				const keys = Array.isArray(value) ? value.map((_, index) => index) : Object.keys(value);
+				const parts = keys.map(
+					(key, index) =>
+						`import marklessSlicePart${index} from ${JSON.stringify(constantSliceId(file, exportName, [...at, key]))};`,
+				);
+				const body = Array.isArray(value)
+					? `[${keys.map((_, index) => `marklessSlicePart${index}`).join(',')}]`
+					: `{${keys.map((key, index) => `${JSON.stringify(key)}:marklessSlicePart${index}`).join(',')}}`;
+				return `${parts.join('\n')}\nexport default ${body};`;
 			},
 		},
 		transform: {
+			// A render-data source request holds .tsrx until the Markless transform has emitted its module.
+			order: 'post',
 			filter: { id: SLICED_MODULE },
 			async handler(code, id) {
-				const narrowed = await narrowConstantImports(code, async (specifier) => {
-					const resolved = await this.resolve(specifier, id, { skipSelf: true });
-					return resolved && !resolved.external ? resolved.id.split('?')[0]! : null;
-				});
+				const limitKb = this.environment?.config.build.chunkSizeWarningLimit;
+				const narrowed = await narrowConstantImports(
+					code,
+					async (specifier) => {
+						const resolved = await this.resolve(specifier, id, { skipSelf: true });
+						return resolved && !resolved.external ? resolved.id.split('?')[0]! : null;
+					},
+					limitKb === undefined ? Infinity : limitKb * 1000,
+				);
 				if (!narrowed) return null;
 				for (const file of narrowed.files) this.addWatchFile(file);
 				return { code: narrowed.code, map: null };

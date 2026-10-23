@@ -256,6 +256,29 @@ test('code only a client render needs leaves the landing packs for navigation pa
 	expect(isMarklessNavigationPack(MARKLESS_DEFERRED_PACK)).toBe(false);
 });
 
+test('a navigation or deferred pack over the size cap splits into parts under it, one source per part', () => {
+	const input = tierInput(undefined, 300_000);
+	const modules = new Map(input.modules);
+	modules.set('a-draw', { ...modules.get('a-draw')!, dependencies: ['chrome', 'a-chrome', 'a-draw-art'] });
+	modules.set('a-draw-art', { dependencies: [], source: 'a-draw-art', size: 300_000 });
+	const groups = planRoutePackGroups({ ...input, modules, maxPackBytes: 500_000 });
+	const parts = new Map<string, { size: number; sources: Set<string> }>();
+	for (const [id, name] of groups) {
+		if (isStartupPack(name)) continue;
+		const part = parts.get(name) ?? { size: 0, sources: new Set<string>() };
+		part.size += modules.get(id)!.size!;
+		part.sources.add(modules.get(id)!.source!);
+		parts.set(name, part);
+	}
+	expect(parts.size).toBeGreaterThan(2);
+	for (const part of parts.values()) expect(part.size <= 500_000 || part.sources.size === 1).toBe(true);
+	expect(isMarklessDeferredPack(groups.get('idle-helper'))).toBe(true);
+	expect(groups.get('idle-helper')).not.toBe(groups.get('a-idle'));
+	expect(isMarklessNavigationPack(groups.get('a-draw'))).toBe(true);
+	expect(isMarklessNavigationPack(groups.get('chrome'))).toBe(true);
+	expect(groups.get('a')).toBe(planRoutePackGroups(input).get('a'));
+});
+
 test('code no boot, first use or render needs is deferred', () => {
 	const groups = planRoutePackGroups(tierInput());
 	expect(groups.get('a-idle')).toBe(MARKLESS_DEFERRED_PACK);

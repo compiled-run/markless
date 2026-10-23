@@ -44,7 +44,7 @@ function runsOf(markup: string): { text: string; style?: string }[] {
 
 describe('browser highlighter', () => {
 	it('paints each line of a .tsrx file as the build does, and returns one entry per line', async () => {
-		const highlighter = await loadHighlighter();
+		const highlighter = await loadHighlighter(['counter.tsrx']);
 		const pane = await codePane({ name: 'counter.tsrx', code: counter });
 		const lines = highlighter.lines(pane.code, 'counter.tsrx');
 		expect(lines).toHaveLength(pane.code.split('\n').length);
@@ -54,7 +54,16 @@ describe('browser highlighter', () => {
 	});
 
 	it('keeps a trailing empty line, so a new last line has a row under the caret', async () => {
-		const highlighter = await loadHighlighter();
+		const highlighter = await loadHighlighter(['x.ts']);
 		expect(highlighter.lines('a\n', 'x.ts')).toHaveLength(2);
+	});
+
+	it('paints a .ts file as the build does, loading its grammar only for a block that has one', async () => {
+		const code = 'const cast = <T,>(value: unknown) => value as T;\nexport type Pair = [number, string];\n';
+		const pane = await codePane({ name: 'pair.ts', code });
+		const highlighter = await loadHighlighter(['pair.ts']);
+		expect(highlighter.lines(pane.code, 'pair.ts').map((line) => painted(runsOf(line)))).toEqual(
+			pane.lines.map((line) => painted(line.runs)),
+		);
 	});
 });
