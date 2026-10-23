@@ -10,8 +10,11 @@ on:
 
 # On main a running run always finishes; a newer push replaces only a run still waiting its turn,
 # and tests the whole tree that run would have tested.
+# A main push gets a group of its own, so every merge commit gets a complete run: a shared group
+# keeps one pending run and cancels the one queued before it, which is how back-to-back merges
+# left main without a finished run. A pull request still cancels its superseded run.
 concurrency:
-    group: ci-${{ github.ref }}
+    group: ci-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # No job here pushes, comments, or publishes, so the token every job gets is

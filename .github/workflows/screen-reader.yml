@@ -40,8 +40,9 @@ on:
 permissions:
     contents: read
 
+# One complete run per main commit; see the same block in ci.yml.
 concurrency:
-    group: screen-reader-${{ github.ref }}
+    group: screen-reader-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

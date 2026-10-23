@@ -82,11 +82,11 @@ describe('ecosystem-ci.yml', () => {
 		expect(resolve.run).not.toContain('grep -Eq');
 	});
 
-	test('a newer push to main cancels the run of an older one', () => {
-		expect(workflow.concurrency.group).toContain("github.event_name == 'push' && 'main'");
-		expect(workflow.concurrency['cancel-in-progress']).toBe(
-			"${{ github.event_name == 'push' }}",
+	test('every push to main gets a complete run of its own', () => {
+		expect(workflow.concurrency.group).toContain(
+			"github.event_name == 'push' && format('main-{0}', github.sha)",
 		);
+		expect(workflow.concurrency['cancel-in-progress']).toBe(false);
 	});
 
 	test('notifies on runs for main and the release, and shows a non-required status on a pull request', () => {
