@@ -1133,21 +1133,24 @@ export function App() @{
 			).toEqual([]);
 
 			send.mockClear();
+			// The recheck clears its interval before it reports, so the reload is its last word.
+			const reloaded = new Promise<void>((resolve) =>
+				send.mockImplementation((payload: { readonly type?: string }) => {
+					if (payload.type === 'full-reload') resolve();
+				}),
+			);
 			await writeFile(filename, source);
-			await vi.waitFor(() => {
-				expect(send.mock.calls).toEqual([
-					[
-						{
-							type: 'custom',
-							event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
-							data: { id: filename },
-						},
-					],
-					[{ type: 'full-reload' }],
-				]);
-			});
-			await new Promise((resolve) => setTimeout(resolve, 30));
-			expect(send).toHaveBeenCalledTimes(2);
+			await reloaded;
+			expect(send.mock.calls).toEqual([
+				[
+					{
+						type: 'custom',
+						event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+						data: { id: filename },
+					},
+				],
+				[{ type: 'full-reload' }],
+			]);
 			expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
 		} finally {
 			clearIntervalSpy.mockRestore();
