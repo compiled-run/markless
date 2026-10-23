@@ -8,6 +8,7 @@ import { Bags } from './reading-tsrx/const-times-state.tsrx';
 import { NameCounters } from './reading-tsrx/name-counters.tsrx';
 import { ShopPage } from './reading-tsrx/body-function-calls.tsrx';
 import { Sizes } from './reading-tsrx/body-map.tsrx';
+import { Shelf } from './reading-tsrx/body-value-reads.tsrx';
 
 // The constructs the "Reading a .tsrx file" guide teaches, each served and client-rendered.
 
@@ -117,3 +118,18 @@ test('CSR: a handler, a body function and a computed read a body Map', async () 
 	bodyMap((await render(Sizes)).container as HTMLElement));
 test('SSR: a handler, a body function and a computed read a body Map', async () =>
 	bodyMap((await renderSSR(Sizes)).container as HTMLElement));
+
+async function bodyValueReads(c: HTMLElement) {
+	const shown = () => c.querySelector('output')?.textContent;
+	(c.querySelector('[data-sort]') as HTMLButtonElement).click();
+	await expect.poll(shown).toBe('1,2,3');
+	(c.querySelector('[data-describe]') as HTMLButtonElement).click();
+	await expect.poll(shown).toBe('shelf:true:two:6');
+	(c.querySelector('[data-sort]') as HTMLButtonElement).click();
+	await expect.poll(shown).toBe('1,2,3');
+}
+
+test('CSR: a handler reading body values through methods that only read them', async () =>
+	bodyValueReads((await render(Shelf)).container as HTMLElement));
+test('SSR: a handler reading body values through methods that only read them', async () =>
+	bodyValueReads((await renderSSR(Shelf)).container as HTMLElement));

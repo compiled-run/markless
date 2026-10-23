@@ -168,6 +168,15 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'The handler reads a local from the component body. The body runs only for the first render, so the browser has no value for that local.',
 		how: 'Build the local only from props, state, and imported values. Or move it to the top of the file. Or make it `state()`.',
 	},
+	MARKLESS_HANDLER_WRITES_RENDER_LOCAL: {
+		summary: 'An event handler changes a value from the component body, and the change would be lost.',
+		what: 'A handler that reads a `const` from the component body builds a fresh copy of it each time it runs. Changing that copy, with `list.push(...)`, `names.set(...)` or `box.count = 1`, would be lost before the next run. A method the compiler cannot prove only reads the value counts as a change.',
+		how: 'Keep data that changes in `state()`, and assign it a new value: a copy with the change applied.',
+		example: [
+			'let list = state([1, 2]);',
+			'<button onClick={() => (list = [...list, list.length + 1])}>Add</button>',
+		],
+	},
 	MARKLESS_TEMPLATE_AS_VALUE: {
 		summary: 'Markup is stored in a variable, in state, or in an array.',
 		what: 'In Markless, markup is not a value. You cannot store it in a variable, in state, or in an array.',

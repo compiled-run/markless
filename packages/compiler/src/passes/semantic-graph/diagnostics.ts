@@ -201,6 +201,24 @@ export function handlerReadsRenderLocalDiagnostic(input: {
 	});
 }
 
+export function handlerWritesRenderLocalDiagnostic(input: {
+	readonly handlerLabel: string;
+	readonly localName: string;
+	readonly write: string;
+	readonly handler: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
+		title: 'A handler changes a component-body value the browser rebuilds for every run',
+		message: `The \`${input.handlerLabel}\` handler changes \`${input.localName}\` with \`${input.write}\`. \`${input.localName}\` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so the change would be lost before the next run.`,
+		why: 'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A method the compiler cannot prove only reads the value counts as a change.',
+		span: sourceSpan(input.handler, input.filename),
+		suggestion: `Keep data that changes in state(): \`const ${input.localName} = state(...)\`, and assign a new value to it, for example a copy with the change applied.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
+	});
+}
+
 export function callbackPropArityUnsupportedDiagnostic(input: {
 	readonly propName: string;
 	readonly parameterCount: number;
