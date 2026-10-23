@@ -199,9 +199,11 @@ function walk(
 		const node = item as Syntax;
 		const typed = typeof node.type === 'string';
 		if (typed) visit(node, parent, grandparent);
-		for (const [key, value] of Object.entries(node))
+		for (const key in node) {
+			const value = node[key];
 			if (key !== 'type' && value && typeof value === 'object')
 				pending.push(typed ? [value, node, parent] : [value, parent, grandparent]);
+		}
 	}
 }
 

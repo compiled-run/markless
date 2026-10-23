@@ -488,24 +488,23 @@ function scanReads(
 	imports: (source: string, members: Syntax[] | undefined) => boolean,
 	strings: string[],
 ): void {
-	const parents = new Map<Syntax, Syntax | undefined>();
-	const pending: [unknown, Syntax | undefined][] = [[root, undefined]];
+	// A node's parent and grandparent travel with it: an import is classified by those two alone.
+	const pending: [unknown, Syntax | undefined, Syntax | undefined][] = [[root, undefined, undefined]];
 	while (pending.length) {
-		const [item, parent] = pending.pop()!;
+		const [item, parent, grandparent] = pending.pop()!;
 		if (!item || typeof item !== 'object') continue;
 		if (Array.isArray(item)) {
-			for (const child of item) pending.push([child, parent]);
+			for (const child of item) pending.push([child, parent, grandparent]);
 			continue;
 		}
 		const syntax = item as Syntax;
 		if (typeof syntax.type !== 'string') continue;
-		parents.set(syntax, parent);
 		switch (syntax.type) {
 			case 'ImportDeclaration':
 			case 'ExportAllDeclaration':
 				continue;
 			case 'ExportNamedDeclaration':
-				pending.push([syntax.declaration, syntax]);
+				pending.push([syntax.declaration, syntax, parent]);
 				continue;
 			case 'ImportExpression': {
 				const source = syntax.source as Syntax;
@@ -518,12 +517,12 @@ function scanReads(
 							: undefined;
 				if (
 					typeof value === 'string' &&
-					!packerImport(syntax, parents) &&
-					!imports(value, namespaceReads(syntax, parents))
+					!packerImport(syntax, parent, grandparent) &&
+					!imports(value, namespaceReads(syntax, parent, grandparent))
 				)
 					strings.push(value);
-				if (typeof value !== 'string') pending.push([source, syntax]);
-				pending.push([syntax.options, syntax]);
+				if (typeof value !== 'string') pending.push([source, syntax, parent]);
+				pending.push([syntax.options, syntax, parent]);
 				continue;
 			}
 			case 'CallExpression':
@@ -531,7 +530,7 @@ function scanReads(
 					(syntax.callee as Syntax).type === 'Identifier' &&
 					(syntax.callee as Syntax).name === PACK_LOAD
 				) {
-					pending.push([(syntax.arguments as Syntax[])[2], syntax]);
+					pending.push([(syntax.arguments as Syntax[])[2], syntax, parent]);
 					continue;
 				}
 				break;
@@ -557,17 +556,19 @@ function scanReads(
 				continue;
 			}
 		}
-		for (const [key, value] of Object.entries(syntax))
-			if (key !== 'type' && value && typeof value === 'object') pending.push([value, syntax]);
+		for (const key in syntax) {
+			const value = syntax[key];
+			if (key !== 'type' && value && typeof value === 'object')
+				pending.push([value, syntax, parent]);
+		}
 	}
 }
 
 function namespaceReads(
 	node: Syntax,
-	parents: ReadonlyMap<Syntax, Syntax | undefined>,
+	parent: Syntax | undefined,
+	grandparent: Syntax | undefined,
 ): Syntax[] | undefined {
-	const parent = parents.get(node);
-	const grandparent = parent && parents.get(parent);
 	if (
 		parent?.type !== 'MemberExpression' ||
 		parent.object !== node ||
@@ -609,9 +610,11 @@ function namespaceReads(
 	return reads;
 }
 
-function packerImport(node: Syntax, parents: ReadonlyMap<Syntax, Syntax | undefined>): boolean {
-	const parent = parents.get(node);
-	const grandparent = parent && parents.get(parent);
+function packerImport(
+	node: Syntax,
+	parent: Syntax | undefined,
+	grandparent: Syntax | undefined,
+): boolean {
 	// load("./pack.js","<loader>",()=>import("./pack.js"))
 	if (
 		parent?.type === 'ArrowFunctionExpression' &&
