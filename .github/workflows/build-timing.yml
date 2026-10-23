@@ -21,7 +21,7 @@ jobs:
               run: nproc; free -g; node -e "console.log(require('os').availableParallelism())"
             - name: Prepare one worktree per variant
               run: |
-                  while read -r name ref; do
+                  while read -r name ref rest; do
                     [ -z "$name" ] && continue
                     git worktree add -q "../v-$name" "origin/$ref" || git worktree add -q "../v-$name" "$ref"
                     (cd "../v-$name" && pnpm install --frozen-lockfile --prefer-offline > /dev/null)
