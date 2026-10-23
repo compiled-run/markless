@@ -323,3 +323,43 @@ function answered(value: unknown, answer: (text: string) => string): unknown {
 	if (!held.some(([key, one]) => one !== (value as Record<string, unknown>)[key])) return value;
 	return Array.isArray(value) ? held.map(([, one]) => one) : Object.fromEntries(held);
 }
+
+// The symbols a row's arrival queues: derives reading a roster, what derives from them, and the
+// DOM updates showing any of them. Loaded now so the renumbering lands in the update that places the row.
+export function loadRosterSymbols(input: {
+	readonly state?: { readonly computed?: ReadonlyArray<RosterComputedRecord & { readonly deriveSymbolId?: string }> };
+	readonly view: { readonly domUpdates: ReadonlyArray<{ readonly graphNodeId: string; readonly symbolId?: string }> };
+	readonly loadSymbol: (symbolId: string) => unknown;
+}): Promise<unknown> | undefined {
+	const computed = input.state?.computed ?? [];
+	const reach = new Set<string>();
+	for (let grew = true; grew; ) {
+		grew = false;
+		for (const record of computed)
+			if (
+				!reach.has(record.graphNodeId) &&
+				record.dependencies?.some(
+					(dependency) =>
+						isElementBinding(dependency.graphNodeId) ||
+						reach.has(dependency.graphNodeId),
+				)
+			) {
+				reach.add(record.graphNodeId);
+				grew = true;
+			}
+	}
+	if (reach.size === 0) return undefined;
+	const symbolIds = new Set<string>();
+	for (const record of computed)
+		if (reach.has(record.graphNodeId) && typeof record.deriveSymbolId === 'string')
+			symbolIds.add(record.deriveSymbolId);
+	for (const domUpdate of input.view.domUpdates)
+		if (domUpdate.symbolId && reach.has(domUpdate.graphNodeId)) symbolIds.add(domUpdate.symbolId);
+	const loading: unknown[] = [];
+	for (const symbolId of symbolIds) {
+		const loaded = input.loadSymbol(symbolId);
+		if (typeof (loaded as PromiseLike<unknown> | undefined)?.then === 'function')
+			loading.push(Promise.resolve(loaded).catch(() => undefined));
+	}
+	return loading.length ? Promise.all(loading) : undefined;
+}

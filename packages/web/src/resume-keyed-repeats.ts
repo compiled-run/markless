@@ -146,6 +146,8 @@ export function wireKeyedRepeats(
 		readonly renderData?: ResumeRenderDataThunk;
 		readonly root?: ResumeDomElement;
 		readonly pageRepeats?: ReadonlyArray<ResumeKeyedRepeatRecord>;
+		/** Settles once the symbols a row's arrival queues are loaded. */
+		readonly rosterSymbols?: Promise<unknown>;
 	},
 	rowComponentHost?: RowComponentHost,
 	onRow?: ResumeRepeatRowHook,
@@ -320,10 +322,15 @@ export function wireKeyedRepeats(
 					const settled = settledMint(),
 						held = pending;
 					pending = undefined;
-					if (settled)
-						return () => (apply(settled.mint), typeof held === 'function' ? held() : undefined);
+					// A row lands only when its parts' renumbering can follow it in the same update.
+					const roster = input.rosterSymbols;
+					if (settled) {
+						const commit = () => (apply(settled.mint), typeof held === 'function' ? held() : undefined);
+						return roster ? roster.then(() => commit) : commit;
+					}
 					return (
 						readyMint()?.then(async (mint) => {
+							await roster;
 							const commit = await (held ??
 								mint.rows?.(repeat, parent, rowRootsByKey, served, registerRowEvents));
 							return () => (apply(mint), commit?.());

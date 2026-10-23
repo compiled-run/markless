@@ -112,7 +112,10 @@ const resumeOnDemandEntries = [
 // 2026-10-21: a runtime an onIdle or onVisible handler starts leaves its rows' code until the reader's first input (shadcn-admin
 // /settings/account ran 1.5 MB at load without it): 26,457 -> 27,145 raw; minified+gzip 3,495 -> 3,595 bytes (rolldown, same
 // method both sides), under the 4,800 gzip wall.
-const sourceByteLimit = 27145;
+// 2026-10-23: a row's arrival and the renumbering behind it land in one update: the symbol loader is held beneath the
+// instance scoping too, and a keyed commit waits for the roster's symbols: 27,145 -> 27,483 raw; minified
+// resume-keyed-repeats 8,805 -> 8,870 and resume-runtime-start 5,262 -> 5,372 (rolldown, same method both sides).
+const sourceByteLimit = 27483;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

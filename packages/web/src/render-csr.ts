@@ -61,7 +61,7 @@ export async function renderCsrRuntime(input: {
 	const loadSymbol = withCsrCallbackSymbols(
 		heldSymbolLoader(
 			marklessInstanceScopedLoadSymbol(
-				output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+				heldSymbolLoader(output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol),
 			),
 		),
 		view,

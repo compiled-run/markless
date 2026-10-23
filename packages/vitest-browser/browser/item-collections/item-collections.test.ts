@@ -888,3 +888,86 @@ test('SSR: the count follows an @if arm applying and dropping', async () => {
 	await expect.poll(maxes, { timeout: 5000 }).toEqual(['3', '2']);
 	expect(totals()).toEqual(['3', '2']);
 });
+
+// --- no in-between state ----------------------------------------------------
+
+// A row's arrival or departure and the renumbering it causes are one update. A browser paints only between
+// tasks, so the DOM is read at every task boundary and every frame while the change runs: each state a frame
+// could show numbers the items 0..n-1 in order.
+async function statesDuring(within: string, change: () => Promise<void>, settledCount: number) {
+	const states: string[] = [];
+	const record = () => {
+		const now = positions(within).join(',');
+		if (states.at(-1) !== now) states.push(now);
+	};
+	record();
+	let watching = true;
+	const channel = new MessageChannel();
+	channel.port1.onmessage = () => {
+		record();
+		if (watching) channel.port2.postMessage(0);
+	};
+	channel.port2.postMessage(0);
+	const frame = () => {
+		record();
+		if (watching) requestAnimationFrame(frame);
+	};
+	requestAnimationFrame(frame);
+	await change();
+	await expect.poll(() => items(within).length, { timeout: 5000 }).toBe(settledCount);
+	await new Promise((done) => setTimeout(done, 100));
+	watching = false;
+	channel.port1.close();
+	record();
+	return states;
+}
+
+const consistent = (state: string) =>
+	state === '' || state.split(',').every((position, at) => position === `${at}`);
+
+const flatArrival = () => statesDuring('[data-ic-first]', () => userEvent.click(flatAdd()), 4);
+const flatRemoval = () => statesDuring('[data-ic-first]', () => userEvent.click(flatDrop()), 2);
+const keyedArrival = () =>
+	statesDuring('', () => userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement), 4);
+
+test('CSR: a flat arrival and the renumbering behind it land in one update', async () => {
+	await render(FlatPage);
+	const states = await flatArrival();
+	expect(states.filter((state) => !consistent(state))).toEqual([]);
+	expect(states.at(-1)).toBe('0,1,2,3');
+});
+
+test('SSR: a flat arrival and the renumbering behind it land in one update', async () => {
+	await renderSSR(FlatPage);
+	const states = await flatArrival();
+	expect(states.filter((state) => !consistent(state))).toEqual([]);
+	expect(states.at(-1)).toBe('0,1,2,3');
+});
+
+test('CSR: a flat removal and the renumbering behind it land in one update', async () => {
+	await render(FlatPage);
+	const states = await flatRemoval();
+	expect(states.filter((state) => !consistent(state))).toEqual([]);
+	expect(states.at(-1)).toBe('0,1');
+});
+
+test('SSR: a flat removal and the renumbering behind it land in one update', async () => {
+	await renderSSR(FlatPage);
+	const states = await flatRemoval();
+	expect(states.filter((state) => !consistent(state))).toEqual([]);
+	expect(states.at(-1)).toBe('0,1');
+});
+
+test('CSR: a keyed arrival takes its position in the update that adds it', async () => {
+	await render(MutatingPage);
+	const states = await keyedArrival();
+	expect(states.filter((state) => !consistent(state))).toEqual([]);
+	expect(states.at(-1)).toBe('0,1,2,3');
+});
+
+test('SSR: a keyed arrival takes its position in the update that adds it', async () => {
+	await renderSSR(MutatingPage);
+	const states = await keyedArrival();
+	expect(states.filter((state) => !consistent(state))).toEqual([]);
+	expect(states.at(-1)).toBe('0,1,2,3');
+});
