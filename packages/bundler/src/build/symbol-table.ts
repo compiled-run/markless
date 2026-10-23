@@ -416,7 +416,7 @@ function chunkOrReexportChainContainsSymbol(
 		const chunk = pending.shift()!;
 		if (visited.has(chunk.fileName)) continue;
 		visited.add(chunk.fileName);
-		if (virtualIds(chunk).includes(virtualId) && (chunk.exports ?? []).includes(exportName)) {
+		if (namesVirtualId(chunk, virtualId) && (chunk.exports ?? []).includes(exportName)) {
 			return true;
 		}
 		if (!(chunk.exports ?? []).includes(exportName)) continue;
@@ -437,10 +437,31 @@ function chunkOrReexportChainContainsSymbol(
 	return false;
 }
 
+// Every symbol of every resolver asks its chunks again, so each chunk's ids are normalized once.
+const renderedExportsByModules = new WeakMap<object, Map<string, readonly string[]>>();
+const normalizedIdsByModuleIds = new WeakMap<readonly string[], ReadonlySet<string>>();
+
 function symbolRenderedExports(chunk: GeneratedChunk, virtualId: string): readonly string[] {
-	for (const [rawId, module] of Object.entries(chunk.modules ?? {}))
-		if (normalizeVirtualId(rawId) === virtualId) return module.renderedExports;
-	return [];
+	if (!chunk.modules) return [];
+	let byId = renderedExportsByModules.get(chunk.modules);
+	if (!byId) {
+		byId = new Map();
+		for (const [rawId, module] of Object.entries(chunk.modules)) {
+			const id = normalizeVirtualId(rawId);
+			if (!byId.has(id)) byId.set(id, module.renderedExports);
+		}
+		renderedExportsByModules.set(chunk.modules, byId);
+	}
+	return byId.get(virtualId) ?? [];
+}
+
+function holdsModule(chunk: GeneratedChunk, normalizedId: string): boolean {
+	let ids = normalizedIdsByModuleIds.get(chunk.moduleIds);
+	if (!ids) {
+		ids = new Set(chunk.moduleIds.map(normalizeVirtualId));
+		normalizedIdsByModuleIds.set(chunk.moduleIds, ids);
+	}
+	return ids.has(normalizedId);
 }
 
 // Rolldown leaves a pure re-export facade for an entry it packed into another chunk; the route is the chunk holding it.
@@ -450,10 +471,10 @@ function findSourceChunk(
 ): GeneratedChunk | undefined {
 	const chunk = findChunkForVirtualId(chunks, source);
 	const normalized = normalizeVirtualId(source);
-	if (!chunk || chunk.moduleIds.map(normalizeVirtualId).includes(normalized)) return chunk;
+	if (!chunk || holdsModule(chunk, normalized)) return chunk;
 	return (
 		[...chunks.values()].find((candidate) =>
-			candidate.moduleIds.map(normalizeVirtualId).includes(normalized),
+			holdsModule(candidate, normalized),
 		) ?? chunk
 	);
 }
@@ -490,7 +511,7 @@ function findChunkForVirtualId(
 				!!chunk.facadeModuleId && normalizeVirtualId(chunk.facadeModuleId) === normalized,
 		) ??
 		[...chunks.values()].find((chunk) =>
-			chunk.moduleIds.map(normalizeVirtualId).includes(normalized),
+			holdsModule(chunk, normalized),
 		)
 	);
 }
@@ -503,11 +524,11 @@ function findResolverRouteChunk(
 ): GeneratedChunk | undefined {
 	const normalized = normalizeVirtualId(virtualId);
 	const candidates = [...chunks.values()].filter((chunk) =>
-		virtualIds(chunk).includes(normalized),
+		namesVirtualId(chunk, normalized),
 	);
 	return (
 		candidates.find((chunk) => !!findSymbolTable(chunk.code, symbols, virtualId, root)) ??
-		candidates.find((chunk) => chunk.moduleIds.map(normalizeVirtualId).includes(normalized)) ??
+		candidates.find((chunk) => holdsModule(chunk, normalized)) ??
 		candidates[0]
 	);
 }
@@ -517,10 +538,11 @@ function resolveChunkSpecifier(importerFileName: string, specifier: string): str
 	return normalize(join(dirname(importerFileName), specifier));
 }
 
-function virtualIds(chunk: GeneratedChunk): string[] {
-	return [chunk.facadeModuleId ?? undefined, ...chunk.moduleIds]
-		.filter((id): id is string => !!id)
-		.map(normalizeVirtualId);
+function namesVirtualId(chunk: GeneratedChunk, normalizedId: string): boolean {
+	return (
+		(!!chunk.facadeModuleId && normalizeVirtualId(chunk.facadeModuleId) === normalizedId) ||
+		holdsModule(chunk, normalizedId)
+	);
 }
 
 function rewriteSymbolVirtualStrings(

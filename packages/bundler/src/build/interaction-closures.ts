@@ -34,6 +34,16 @@ function isAuthoredLazyImport(id: string): boolean {
 	);
 }
 
+function memoById<T>(read: (id: string) => T): (id: string) => T {
+	const known = new Map<string, T>();
+	return (id) => {
+		if (known.has(id)) return known.get(id) as T;
+		const value = read(id);
+		known.set(id, value);
+		return value;
+	};
+}
+
 export const MARKLESS_INTERACTION_CLOSURES_VERSION = 2;
 
 // Records whose code can run on a landing page before any input: boot holds their symbols.
@@ -152,6 +162,9 @@ export function computeInteractionClosures(input: {
 	readonly landingArmsServed?: boolean;
 }): RouteInteractionClosures[] {
 	const { modules } = input;
+	// Every route's walks ask both of the same few thousand ids, and each answer normalizes a path.
+	const authoredLazy = memoById(isAuthoredLazyImport);
+	const runtimeIdOf = memoById((id: string) => runtimeModuleIdFromOrigin(id.split('?')[0]!));
 	const sources = [...input.demand];
 	const demand = mergeDemand(sources, input.landingArmsServed === true);
 	const byRuntimeId = new Map<string, string[]>();
@@ -214,7 +227,7 @@ export function computeInteractionClosures(input: {
 			for (const dependency of module.dependencies) pending.push([dependency, inside]);
 			for (const target of module.dynamicDependencies ?? []) {
 				if (routeOf.has(target) && routeOf.get(target) !== (inside ?? route)) continue;
-				if (!routeOf.has(target) && isAuthoredLazyImport(target)) continue;
+				if (!routeOf.has(target) && authoredLazy(target)) continue;
 				if (!bound) {
 					pending.push([target, inside]);
 					continue;
@@ -227,7 +240,7 @@ export function computeInteractionClosures(input: {
 					!demand.get(symbolFile)!.missing
 				)
 					continue;
-				const runtimeId = runtimeModuleIdFromOrigin(target.split('?')[0]!);
+				const runtimeId = runtimeIdOf(target);
 				if (
 					bound.runtimeIds &&
 					runtimeId &&
