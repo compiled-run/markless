@@ -1,18 +1,19 @@
-// The reading time / prerequisite line under every H1, plus the sprite
-// that sits beside the title. MDX cannot nest a component inside a markdown
-// heading, so the sprite rides here and CSS lifts it up next to the H1.
-import Sprite from './sprite.tsrx';
-import { assumesFor } from '../nav.ts';
+// The reading time / prerequisite line under every H1, plus the page's ink mark beside the title.
+import { assumesFor, iconFor } from '../nav.ts';
+import { asset } from '../site-base.ts';
+import { INK_MARKS } from './docs/ink-marks.ts';
 
 export default function PageMeta({
 	time,
 	assumes,
-	sprite,
+	pathname,
 }: {
 	readonly time: string;
 	readonly assumes: string;
-	readonly sprite?: string;
+	/** The page's route; a `.mdx` page gets it filled in from its file path. */
+	readonly pathname: string;
 }) @{
+	const mark = iconFor(pathname);
 	// `assumes` stays a plain comma-separated string of concept keys, so an MDX
 	// page passes a literal, and nav.ts turns the keys into titles and hrefs.
 	const items = assumesFor(assumes);
@@ -34,11 +35,14 @@ export default function PageMeta({
 				opacity: 0.5;
 			}
 
-			/* The page sprite rides in .page-meta, because MDX cannot nest a component
-			   inside a markdown heading; it is lifted back up beside the H1 here. */
-			.page-meta-sprite {
-				display: inline-flex;
+			/* MDX cannot nest a component inside a markdown heading, so the mark rides here and is lifted up beside the H1. */
+			.page-meta-mark {
+				width: 2.6em;
+				height: 2.6em;
+				flex: none;
+				align-self: center;
 				margin-top: -0.9em;
+				overflow: visible;
 			}
 
 			/* The assumes line: one link per concept, and the slots a page does not use. */
@@ -54,9 +58,11 @@ export default function PageMeta({
 				display: none;
 			}
 		</style>
-		<span class="page-meta-sprite">
-			<Sprite name={sprite ?? 'sparkle'} size="2.6em" />
-		</span>
+		@if (mark) {
+			<svg class="page-meta-mark" viewBox="0 0 108 108" aria-hidden="true">
+				<use href={asset(INK_MARKS) + '#' + mark} />
+			</svg>
+		}
 		<span class="page-meta-time">{time}</span>
 		<span class="page-meta-sep">·</span>
 		<span>

@@ -387,3 +387,69 @@ export function Shop() @{
 		expect(values.get('state:total')).toBe(4);
 	}
 });
+
+// A built-in value the capture plane can carry is rebuilt from its definition, like any body const.
+test('a handler and a body function reading a body Map, Set or Date rebuild it', async () => {
+	for (const [declaration, read] of [
+		['const names = new Map([[1, "one"], [2, "two"]]);', 'names.get(2)'],
+		['const names = new Set(["two"]);', '[...names][0]'],
+		['const names = new Date(Date.UTC(2020, 0, 2));', '"tw" + "o".repeat(names.getUTCDate() - 1)'],
+	]) {
+		for (const handler of [`() => (said = ${read})`, `() => say()`]) {
+			const { values } = await runHandler(
+				`import { state } from '@markless/core';
+export function Dial() @{
+	let said = state('');
+	${declaration}
+	function say() { said = ${read}; }
+	<button onClick={${handler}}>{said}</button>
+}
+`,
+				{ said: '' },
+			);
+			expect(values.get('state:said')).toBe('two');
+		}
+	}
+});
+
+test('a computed reading a body Map rebuilds it', async () => {
+	const result = await compile(`import { state, computed } from '@markless/core';
+export function Dial() @{
+	let ticks = state(1);
+	const names = new Map([[1, 'one'], [2, 'two']]);
+	const label = computed(() => names.get(ticks) ?? 'none');
+	<button onClick={() => (ticks = ticks + 1)}>{label}</button>
+}
+`);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+	const derive = result.symbolModules.modules.find((module) => module.kind === 'sync-computed-derive')!;
+	const { context } = graphContext({ ticks: 2 });
+	expect(await (await load(derive.source))(context)).toBe('two');
+});
+
+test('a handler reading a body value built by a constructor the browser cannot rebuild fails the compile, naming it', async () => {
+	for (const declaration of [
+		'const util = new tools.Registry();',
+		'class Registry { set() {} }\n\tconst util = new Registry();',
+	]) {
+		const result = await compile(`import { state } from '@markless/core';
+import * as tools from './tools.ts';
+export function Dial() @{
+	let ticks = state(0);
+	${declaration}
+	function bump() { util.set(); ticks = ticks + 1; }
+	<>
+		<button onClick={() => util.set()}>{ticks}</button>
+		<button onClick={() => bump()}>{ticks}</button>
+	</>
+}
+`);
+		const errors = [...result.semanticGraph.diagnostics, ...result.captureAnalysis.diagnostics];
+		expect(errors.length).toBeGreaterThan(0);
+		for (const error of errors) {
+			expect(error).toMatchObject({ code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED', severity: 'error' });
+			expect(error.message).toContain('"util"');
+		}
+	}
+});

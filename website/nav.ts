@@ -1,21 +1,16 @@
 import type { LinkProps } from '@markless/core/router';
+import type { Mark } from './components/docs/ink-logos.ts';
 
 /**
- * One page. `sprite` and `number` are what the sidebar paints beside the title;
+ * One page. `icon` and `number` are what the sidebar paints beside the title;
  * they are optional because the `concepts` map below reuses this type for links
  * that never appear in the sidebar.
  */
 export type NavEntry = {
 	readonly title: string;
 	readonly href: NonNullable<Extract<LinkProps, { readonly params?: never }>['href']>;
-	readonly sprite?: string;
-	/**
-	 * The hand-drawn icon the sidebar paints for this entry, cut in a light and a
-	 * dark variant into `public/sidebar/<icon>-{light,dark}.png`. It is the href's
-	 * last segment for every sidebar page; entries that never reach the sidebar
-	 * leave it out.
-	 */
-	readonly icon?: string;
+	/** The ink mark the sidebar and the page's title show for this page; one per page, never shared. */
+	readonly icon?: Mark;
 	readonly number?: string;
 	/**
 	 * One sentence about the page, for the document head, `sitemap.xml` and
@@ -27,7 +22,6 @@ export type NavEntry = {
 };
 export type NavSection = {
 	readonly title: string;
-	readonly sprite: string;
 	/** The colour of the hand-drawn underline under this section's title. */
 	readonly stroke?: string;
 	readonly entries: readonly NavEntry[];
@@ -39,13 +33,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'Start here',
 		stroke: 'pink',
-		sprite: 'star-face',
 		entries: [
 			{
 				title: 'What is Markless',
 				href: '/',
-				sprite: 'crown',
-				icon: 'what-is-markless',
+				icon: 'devices',
 				number: '1',
 				description:
 					'What Markless is: elements and events in TypeScript, with an API designed to compile to any device. The browser, server rendering and tests work today, and iOS and macOS are early proofs.',
@@ -53,8 +45,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Create an app',
 				href: '/start/new-app',
-				sprite: 'plus',
-				icon: 'first-app',
+				icon: 'new-app',
 				number: '2',
 				description:
 					'Make a new app with one command, open it in your browser, and change it.',
@@ -62,8 +53,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Migrate an app',
 				href: '/start/migrate',
-				sprite: 'arrow-curve',
-				icon: 'first-app',
+				icon: 'migrate',
 				number: '3',
 				description:
 					'Your coding agent moves your app to Markless one page at a time, and Markless Migrate checks each page against the original before it switches over.',
@@ -71,8 +61,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Reading a .tsrx file',
 				href: '/start/reading-tsrx',
-				sprite: 'bookmark',
-				icon: 'reading-tsrx',
+				icon: 'tsrx-file',
 				number: '4',
 				description:
 					'Every part of a .tsrx file, line by line, then the other files in a starter app.',
@@ -82,13 +71,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'Core concepts',
 		stroke: 'purple',
-		sprite: 'bolt',
 		entries: [
 			{
 				title: 'State',
 				href: '/concepts/state',
-				sprite: 'sparkle',
-				icon: 'state',
+				icon: 'jar',
 				number: '1',
 				description:
 					'state() tells the page to watch a variable. You read it and assign to it like any other let.',
@@ -96,8 +83,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Computed',
 				href: '/concepts/computed',
-				sprite: 'spiral',
-				icon: 'computed',
+				icon: 'funnel',
 				number: '2',
 				description:
 					'A value you work out is never out of date. computed() derives one value from others and works it out again when one of them changes.',
@@ -105,8 +91,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Events',
 				href: '/concepts/events',
-				sprite: 'bolt',
-				icon: 'events',
+				icon: 'click',
 				number: '3',
 				description:
 					'An event prop is on plus the DOM event name, and the browser hands your handler its own typed event object.',
@@ -114,8 +99,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Conditionals',
 				href: '/concepts/conditionals',
-				sprite: 'corner-bracket',
-				icon: 'conditionals',
+				icon: 'fork',
 				number: '4',
 				description:
 					'@if puts real elements on the page and takes them off again, so a value that must outlive the branch is declared above it.',
@@ -123,8 +107,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Lists',
 				href: '/concepts/lists',
-				sprite: 'dashes',
-				icon: 'lists',
+				icon: 'list',
 				number: '5',
 				description:
 					'A key answers the question of which row is which. Once a row has one, its state, its DOM and its event wiring move with it through a sort.',
@@ -132,8 +115,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Async',
 				href: '/concepts/async',
-				sprite: 'arrow-loop',
-				icon: 'async',
+				icon: 'hourglass',
 				number: '6',
 				description:
 					'Waiting is a block, not a flag: @try, @pending and @catch are the whole status vocabulary, so there is no loading boolean to forget.',
@@ -141,8 +123,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Styling',
 				href: '/concepts/styling',
-				sprite: 'flower',
-				icon: 'styling',
+				icon: 'brush',
 				number: '7',
 				description:
 					'A style block written inside a component styles that component and nothing else, so two components can both call something .card.',
@@ -152,13 +133,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'Building an app',
 		stroke: 'yellow',
-		sprite: 'crown',
 		entries: [
 			{
 				title: 'Components',
 				href: '/build/components',
-				sprite: 'crown',
-				icon: 'components',
+				icon: 'brick',
 				number: '1',
 				description:
 					'A component is a function and props are its parameters, callbacks and children included, with the parent value read through live.',
@@ -166,8 +145,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Elements',
 				href: '/build/elements',
-				sprite: 'bolt',
-				icon: 'elements',
+				icon: 'crosshair',
 				number: '2',
 				description:
 					'An element is not state. element() gives you a handle, bound with el, that points at one real element once it is on the page.',
@@ -175,8 +153,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Storage',
 				href: '/build/storage',
-				sprite: 'bookmark',
-				icon: 'storage',
+				icon: 'disk',
 				number: '3',
 				description:
 					'storage() is a variable you read and write like any other, saved in the browser and applied before the first paint.',
@@ -184,8 +161,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Shared',
 				href: '/build/shared',
-				sprite: 'spiral',
-				icon: 'shared',
+				icon: 'tag',
 				number: '4',
 				description:
 					'shared() gives a piece of data a name, so a component that wants it calls the name instead of having it threaded down through props.',
@@ -195,13 +171,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'Router',
 		stroke: 'green',
-		sprite: 'arrow-straight',
 		entries: [
 			{
 				title: 'Pages',
 				href: '/router/pages',
-				sprite: 'square',
-				icon: 'pages',
+				icon: 'folder',
 				number: '1',
 				description:
 					'A file under pages/ is a URL, brackets in the file name are parameters, and the path on disk is the path in the address bar.',
@@ -209,8 +183,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Links',
 				href: '/router/links',
-				sprite: 'arrow-curve',
-				icon: 'links',
+				icon: 'chain',
 				number: '2',
 				description:
 					'Link to a route pattern and pass its params, and the build checks both, so a link with a typo stops the build instead of shipping a 404.',
@@ -218,8 +191,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Page data',
 				href: '/router/data',
-				sprite: 'drops',
-				icon: 'data',
+				icon: 'database',
 				number: '3',
 				description:
 					'There is no loader: a page loads data with an async computed() inside @try, and the slow part arrives later in the same response.',
@@ -227,8 +199,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'API routes',
 				href: '/router/api-routes',
-				icon: 'data',
-				sprite: 'arrow-straight',
+				icon: 'braces',
 				number: '4',
 				description:
 					'A file in api/ is an endpoint: the address comes from the path, the HTTP method from the file name, and the file default-exports one function.',
@@ -236,8 +207,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Deploying',
 				href: '/router/deploying',
-				icon: 'pages',
-				sprite: 'rays',
+				icon: 'cloud-up',
 				number: '5',
 				description:
 					'Build once into .output/ for a Node server, or pick another host with a Nitro preset. Your files stay the same.',
@@ -247,13 +217,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'Tooling',
 		stroke: 'pink',
-		sprite: 'cursor',
 		entries: [
 			{
 				title: 'Editor setup',
 				href: '/tooling/editor-setup',
-				icon: 'elements',
-				sprite: 'cursor',
+				icon: 'editor',
 				number: '1',
 				description:
 					'An editor extension colours .tsrx files; a TypeScript plugin named in tsconfig.json adds Markless suggestions, hints and errors.',
@@ -261,8 +229,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Type checking',
 				href: '/tooling/type-checking',
-				icon: 'reading-tsrx',
-				sprite: 'check',
+				icon: 'typecheck',
 				number: '2',
 				description:
 					'TypeScript checks a TSX copy of each .tsrx file, and every error points back to the line you wrote.',
@@ -270,8 +237,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Testing',
 				href: '/tooling/testing',
-				icon: 'events',
-				sprite: 'star-badge',
+				icon: 'flask',
 				number: '3',
 				description:
 					'@markless/vitest-browser mounts a component in a real browser or renders it on a test server, and your test clicks it.',
@@ -279,8 +245,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Diagnostics',
 				href: '/tooling/diagnostics',
-				icon: 'how-it-works',
-				sprite: 'speech-bubble',
+				icon: 'warning',
 				number: '4',
 				description:
 					'Each Markless error names a code, says why, suggests a fix and links to its page; markless-allow silences one warning.',
@@ -290,13 +255,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'How it works',
 		stroke: 'yellow',
-		sprite: 'rays',
 		entries: [
 			{
 				title: 'Design choices',
 				href: '/how-it-works',
-				sprite: 'rays',
-				icon: 'how-it-works',
+				icon: 'balance',
 				number: '1',
 				description:
 					'The design choices behind Markless on one page, for contributors and agents who want to weigh how it works.',
@@ -304,7 +267,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'The big idea',
 				href: '/how-it-works/the-big-idea',
-				sprite: 'rays',
+				icon: 'bulb',
 				number: '2',
 				description:
 					'Markless reads a component at build time instead of running it, so the plan is written before anything renders, anywhere.',
@@ -312,7 +275,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'The compiler',
 				href: '/how-it-works/compiler',
-				sprite: 'rays',
+				icon: 'gear',
 				number: '3',
 				description:
 					'The real output the compiler makes from a counter: its state, its updates and the code each event runs.',
@@ -320,7 +283,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'The payload',
 				href: '/how-it-works/payload',
-				sprite: 'rays',
+				icon: 'envelope',
 				number: '4',
 				description:
 					'What a server adds to its HTML so the browser can carry on: the state values, which element does what, and a small script that waits for the first interaction.',
@@ -328,7 +291,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Resuming',
 				href: '/how-it-works/resuming',
-				sprite: 'rays',
+				icon: 'play',
 				number: '5',
 				description:
 					'Who hears the first click on each of the three paths a page can take: the browser with a direct module, the browser on the general path, or a server-rendered page.',
@@ -336,7 +299,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'The state graph',
 				href: '/how-it-works/state-graph',
-				sprite: 'rays',
+				icon: 'graph',
 				number: '6',
 				description:
 					'The compiler writes down who reads what before the page exists, so one write touches one text node.',
@@ -344,7 +307,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Lazy chunks',
 				href: '/how-it-works/lazy-chunks',
-				sprite: 'rays',
+				icon: 'puzzle',
 				number: '7',
 				description:
 					'Where the small functions behind each handler and update live, and when the browser gets and runs them.',
@@ -352,7 +315,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Native targets',
 				href: '/how-it-works/native-targets',
-				sprite: 'rays',
+				icon: 'phone',
 				number: '8',
 				description:
 					'The same counter on a phone: the state graph and its functions are data, so a browser is not the only place they run.',
@@ -362,12 +325,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'Contributing',
 		stroke: 'green',
-		sprite: 'hash',
 		entries: [
 			{
 				title: 'Repo tour',
 				href: '/contributing',
-				sprite: 'hash',
+				icon: 'map',
 				number: '1',
 				description:
 					'Where each package lives and its job, from compile time to rendering anywhere.',
@@ -375,14 +337,14 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Dev setup',
 				href: '/contributing/dev-setup',
-				sprite: 'plus',
+				icon: 'wrench',
 				number: '2',
 				description: 'Clone, install with pnpm, and the root scripts you run every day.',
 			},
 			{
 				title: 'Your first PR',
 				href: '/contributing/first-pr',
-				sprite: 'arrow-straight',
+				icon: 'pull-request',
 				number: '3',
 				description:
 					'The path from a branch to a merged change, with the checks you run first.',
@@ -390,21 +352,21 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'CI and checks',
 				href: '/contributing/ci',
-				sprite: 'check',
+				icon: 'check-circle',
 				number: '4',
 				description: 'What each CI job runs and how pnpm ci:local runs the same commands.',
 			},
 			{
 				title: 'Specs and rules',
 				href: '/contributing/specs-and-rules',
-				sprite: 'bookmark',
+				icon: 'ruler',
 				number: '5',
 				description: 'Where the behavior contract and contributor rules live.',
 			},
 			{
 				title: 'Improve the docs',
 				href: '/contributing/improve-the-docs',
-				sprite: 'sparkle',
+				icon: 'pencil',
 				number: '6',
 				description: 'How to fix a page on this site, or add a new one.',
 			},
@@ -412,34 +374,32 @@ export const nav: readonly NavSection[] = [
 	},
 	{
 		title: 'Reference',
-		sprite: 'hash',
 		entries: [
 			{
 				title: 'Packages',
 				href: '/reference',
-				sprite: 'hash',
+				icon: 'parcel',
 				number: '1',
 				description: 'Every Markless package, what it does, and its npm version.',
 			},
 			{
 				title: 'Glossary',
 				href: '/reference/glossary',
-				sprite: 'speech-bubble',
+				icon: 'book',
 				number: '2',
 				description: 'One meaning for each word these docs use.',
 			},
 			{
 				title: 'CLI',
 				href: '/reference/cli',
-				sprite: 'star-face',
+				icon: 'terminal',
 				number: '3',
 				description: 'The create-markless flags, starters and new-app scripts.',
 			},
 			{
 				title: 'Error codes',
 				href: '/errors',
-				icon: 'data',
-				sprite: 'hash',
+				icon: 'stop',
 				number: '4',
 				description:
 					'Every MARKLESS_ code Markless can print, grouped by the package that raises it, each with its own page.',
@@ -449,12 +409,11 @@ export const nav: readonly NavSection[] = [
 	{
 		title: 'Extras',
 		stroke: 'purple',
-		sprite: 'smiley',
 		entries: [
 			{
 				title: 'The mug',
 				href: '/mascot',
-				sprite: 'smiley',
+				icon: 'mug',
 				number: '1',
 				description:
 					'Meet the Markless coffee mug: explore its expressions, choose a glaze, and try its playful animations.',
@@ -639,19 +598,18 @@ export const uiNav: readonly NavSection[] = [
 	{
 		title: 'Start here',
 		stroke: 'pink',
-		sprite: 'star-face',
 		entries: [
 			{
 				title: 'Overview',
 				href: '/ui',
-				sprite: 'star-face',
+				icon: 'shapes',
 				number: '1',
 				description: 'Families that handle the keyboard, focus and screen readers. The look is yours.',
 			},
 			{
 				title: 'Styling',
 				href: '/ui/styling',
-				sprite: 'flower',
+				icon: 'palette',
 				number: '2',
 				description: 'Parts write their state as ui-* attributes, so plain CSS can style them.',
 			},
@@ -660,12 +618,11 @@ export const uiNav: readonly NavSection[] = [
 	{
 		title: 'Forms',
 		stroke: 'purple',
-		sprite: 'pill',
 		entries: [
 			{
 				title: 'checkbox',
 				href: '/ui/checkbox',
-				sprite: 'check',
+				icon: 'checkbox',
 				number: '1',
 				description:
 					'A box that is on, off or mixed, with a hidden native input carrying it into a form under the name the root declares.',
@@ -673,7 +630,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'checklist',
 				href: '/ui/checklist',
-				sprite: 'dashes',
+				icon: 'checklist',
 				number: '2',
 				description:
 					'A group of checkboxes with a select-all that works its own value out from the group rather than being told what it is.',
@@ -681,7 +638,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'combobox',
 				href: '/ui/combobox',
-				sprite: 'cursor',
+				icon: 'combobox',
 				number: '3',
 				description:
 					'A text field with a list attached. Focus never leaves the input, and the highlighted option is family state rather than the focused element.',
@@ -689,7 +646,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'otp',
 				href: '/ui/otp',
-				sprite: 'hash',
+				icon: 'otp',
 				number: '4',
 				description:
 					'One real input stretched over a row of boxes, so paste, one-time-code autofill, undo and a single tab stop all come free.',
@@ -697,7 +654,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'radiogroup',
 				href: '/ui/radiogroup',
-				sprite: 'oval',
+				icon: 'radio',
 				number: '5',
 				description:
 					'A fieldset whose legend names it natively, one tab stop for the whole group, and the arrow keys walking the options.',
@@ -705,7 +662,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'select',
 				href: '/ui/select',
-				sprite: 'triangle',
+				icon: 'select',
 				number: '6',
 				description:
 					'A button that opens a listbox, with typeahead over the options and a hidden native select carrying the choice into a form.',
@@ -713,7 +670,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'textbox',
 				href: '/ui/textbox',
-				sprite: 'pill',
+				icon: 'textbox',
 				number: '7',
 				description:
 					'A labelled field over one line or many, where a restriction set on the root or on the control stands either way.',
@@ -721,7 +678,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'toggle',
 				href: '/ui/toggle',
-				sprite: 'bolt',
+				icon: 'switch',
 				number: '8',
 				description:
 					'A switch that reads as on or off, with a thumb to move and a hidden native input carrying it into a form.',
@@ -731,12 +688,11 @@ export const uiNav: readonly NavSection[] = [
 	{
 		title: 'Show and hide',
 		stroke: 'yellow',
-		sprite: 'corner-bracket',
 		entries: [
 			{
 				title: 'accordion',
 				href: '/ui/accordion',
-				sprite: 'arrow-curve',
+				icon: 'accordion',
 				number: '1',
 				description:
 					'Sections that open one at a time, or several at once, with every panel staying in the page when it closes.',
@@ -744,7 +700,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'collapsible',
 				href: '/ui/collapsible',
-				sprite: 'plus',
+				icon: 'disclosure',
 				number: '2',
 				description:
 					'One button that shows and hides the panel below it, and a closed panel the browser can still find text inside.',
@@ -752,7 +708,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'modal',
 				href: '/ui/modal',
-				sprite: 'square',
+				icon: 'modal',
 				number: '3',
 				description:
 					'A dialog over a backdrop that marks the rest of the page inert, and puts focus back where it found it on the way out.',
@@ -760,7 +716,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'navbar',
 				href: '/ui/navbar',
-				sprite: 'arrow-straight',
+				icon: 'hamburger',
 				number: '4',
 				description:
 					'A navigation landmark whose entries show and hide dropdowns. It is a disclosure, deliberately never a menubar.',
@@ -768,7 +724,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'tabs',
 				href: '/ui/tabs',
-				sprite: 'bookmark',
+				icon: 'tabs',
 				number: '5',
 				description:
 					'A row of tabs over panels that stay in the page, so focus, scroll position and form state survive a tab change.',
@@ -776,7 +732,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'tree',
 				href: '/ui/tree',
-				sprite: 'spiral',
+				icon: 'tree',
 				number: '6',
 				description:
 					'Rows that open and close, with one tab stop for the whole tree and a typeahead that matches on the row labels.',
@@ -786,12 +742,11 @@ export const uiNav: readonly NavSection[] = [
 	{
 		title: 'Overlays',
 		stroke: 'pink',
-		sprite: 'square',
 		entries: [
 			{
 				title: 'drawer',
 				href: '/ui/drawer',
-				sprite: 'corner-bracket',
+				icon: 'drawer',
 				number: '1',
 				description:
 					'A dialog that arrives from one edge and can be swiped back out, with its surface staying in the page while closed.',
@@ -799,7 +754,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'hovercard',
 				href: '/ui/hovercard',
-				sprite: 'speech-bubble',
+				icon: 'hovercard',
 				number: '2',
 				description:
 					'A preview that appears while the pointer rests on a link, and leaves when it moves on. Pointer only, on purpose.',
@@ -807,7 +762,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'popover',
 				href: '/ui/popover',
-				sprite: 'plus',
+				icon: 'popover',
 				number: '3',
 				description:
 					'A surface anchored to the button that opened it, dismissed by Escape or a press anywhere beyond it.',
@@ -815,7 +770,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'tooltip',
 				href: '/ui/tooltip',
-				sprite: 'dashes',
+				icon: 'tooltip',
 				number: '4',
 				description:
 					'A short label that appears on hover or focus and names the control it points at, for a screen reader too.',
@@ -825,12 +780,11 @@ export const uiNav: readonly NavSection[] = [
 	{
 		title: 'Collections',
 		stroke: 'purple',
-		sprite: 'dots',
 		entries: [
 			{
 				title: 'gridlist',
 				href: '/ui/gridlist',
-				sprite: 'dashes',
+				icon: 'gridlist',
 				number: '1',
 				description:
 					'Rows of rich content with one tab stop for the grid and the arrow keys walking rows and the cells inside them.',
@@ -838,7 +792,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'table',
 				href: '/ui/table',
-				sprite: 'hash',
+				icon: 'table',
 				number: '2',
 				description:
 					'A real table with sortable column headers, where the sort state lives on the family and lands in the elements.',
@@ -846,7 +800,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'resizable',
 				href: '/ui/resizable',
-				sprite: 'arrow-straight',
+				icon: 'resizable',
 				number: '3',
 				description:
 					'Panels split by draggable separators, each one reporting its share to a screen reader as it moves.',
@@ -856,12 +810,11 @@ export const uiNav: readonly NavSection[] = [
 	{
 		title: 'Display',
 		stroke: 'green',
-		sprite: 'rays',
 		entries: [
 			{
 				title: 'carousel',
 				href: '/ui/carousel',
-				sprite: 'arrow-loop',
+				icon: 'carousel',
 				number: '1',
 				description:
 					'Slides you drag, step through or play, each one named by a value rather than counted by its position.',
@@ -869,7 +822,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'pagination',
 				href: '/ui/pagination',
-				sprite: 'dots',
+				icon: 'pagination',
 				number: '2',
 				description:
 					'A navigation landmark of page controls, where the page number is written once on the item and read back by the control inside it.',
@@ -877,7 +830,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'progress',
 				href: '/ui/progress',
-				sprite: 'drops',
+				icon: 'progress',
 				number: '3',
 				description:
 					'A bar over a range you name, or over an amount nobody knows yet, with the numbers reported to a screen reader.',
@@ -885,7 +838,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'qrcode',
 				href: '/ui/qrcode',
-				sprite: 'star-badge',
+				icon: 'qrcode',
 				number: '4',
 				description:
 					'A scannable code drawn as one SVG path, with a quiet zone around it and room for a logo on top.',
@@ -893,7 +846,7 @@ export const uiNav: readonly NavSection[] = [
 			{
 				title: 'toaster',
 				href: '/ui/toaster',
-				sprite: 'speech-bubble',
+				icon: 'bell',
 				number: '5',
 				description:
 					'A live region that is on the page before the first message, with a queue your own handler writes to.',
@@ -908,6 +861,11 @@ export const flatUiNav: readonly NavEntry[] = uiNav.flatMap((section) => section
 /** Both sections, for the lookups that only need to find a page by its href. */
 const allNav: readonly NavSection[] = [...nav, ...uiNav];
 const allFlat: readonly NavEntry[] = [...flatNav, ...flatUiNav];
+
+/** The ink mark of the page at a pathname, if it is a docs page. */
+export function iconFor(pathname: string): Mark | undefined {
+	return allFlat.find((entry) => entry.href === pathname)?.icon;
+}
 
 /** Which of the two sets of pages a pathname belongs to. */
 export function modeOf(pathname: string): ModeKey {

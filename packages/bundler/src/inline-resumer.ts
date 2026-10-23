@@ -13,19 +13,9 @@ import {
 import { __marklessDebugBootstrapSource } from '../../web/src/debug-channel.ts';
 import { createMarklessDefer } from '../../web/src/inline/defer.ts';
 import type { MarklessExecutionLogMode } from './types.ts';
+import { minifySync, transformSync } from 'rolldown/experimental';
 
-type OxcTools = Pick<typeof import('rolldown/experimental'), 'minifySync' | 'transformSync'>;
-
-let oxcToolsPromise: Promise<OxcTools> | undefined;
 const compiledSources = new Map<string, Promise<InlineResumerSourceVariants>>();
-
-function loadOxcTools(): Promise<OxcTools> {
-	oxcToolsPromise ??= import('rolldown/experimental').then(({ minifySync, transformSync }) => ({
-		minifySync,
-		transformSync,
-	}));
-	return oxcToolsPromise;
-}
 
 export function compileInlineResumerSources(options: {
 	readonly debug: boolean;
@@ -78,7 +68,6 @@ async function compileInlineResumerSourceVariants(options: {
 // The factory is an expression, so it is minified as a named binding the mangler must keep and then unwrapped.
 export async function compileDeferFactorySource(): Promise<string> {
 	const binding = 'var __marklessDeferFactory=';
-	const { minifySync, transformSync } = await loadOxcTools();
 	const transformed = transformSync(
 		'markless-defer.js',
 		`${binding}${createMarklessDefer.toString()};`,
@@ -108,7 +97,6 @@ export async function compileInlineResumerSource(
 				}
 			: {}),
 	});
-	const { minifySync, transformSync } = await loadOxcTools();
 	const transformed = transformSync('markless-inline-resumer.js', source, {
 		lang: 'js',
 		sourceType: 'script',
@@ -182,7 +170,6 @@ export async function compilePrerenderInlineResumerSource(
 	selfWake: boolean | 'settle',
 ): Promise<string> {
 	const source = parameterizedPrerenderInlineResumerSource(selfWake);
-	const { minifySync, transformSync } = await loadOxcTools();
 	const transformed = transformSync('markless-prerender-inline-resumer.js', source, {
 		lang: 'js',
 		sourceType: 'script',

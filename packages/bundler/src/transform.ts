@@ -1,5 +1,6 @@
 import { factorRenderDataLiterals } from './render-data-literals.ts';
 import { dirname, isAbsolute, resolve } from 'pathe';
+import { parseSync, transformSync } from 'rolldown/experimental';
 import { sourceForModuleId } from './module-id.ts';
 import {
 	artifactChildCandidates,
@@ -76,21 +77,6 @@ import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundle
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
 // virtual modules) parse it as JS. Strip types at emission — Rolldown-native.
-// Loaded lazily: rolldown/experimental binds native code that must never enter
-// the browser module graph (dev client imports this file's module scope).
-let oxcExperimentalPromise: Promise<typeof import('rolldown/experimental') | undefined> | undefined;
-function loadOxcExperimental() {
-	oxcExperimentalPromise ??= import('rolldown/experimental').then(
-		(mod) => mod,
-		() => undefined,
-	);
-	return oxcExperimentalPromise;
-}
-
-async function loadOxcTransformSync() {
-	return (await loadOxcExperimental())?.transformSync;
-}
-
 // Each module is compiled once per query variant, so the same emitted code is stripped many times.
 const STRIPPED_CODE_LIMIT = 4096;
 const strippedCode = new Map<string, string>();
@@ -133,13 +119,9 @@ async function stripEmittedTypesUncached(
 	moduleId: string,
 	onlyRemoveTypeImports: boolean,
 ): Promise<string> {
-	const oxcTransformSync = await loadOxcTransformSync();
-	if (!oxcTransformSync) {
-		throw typeStripError(moduleId, 'rolldown/experimental exposes no transformSync.');
-	}
-	let out: ReturnType<typeof oxcTransformSync>;
+	let out: ReturnType<typeof transformSync>;
 	try {
-		out = oxcTransformSync(
+		out = transformSync(
 			'markless-emitted.ts',
 			code,
 			onlyRemoveTypeImports ? { typescript: { onlyRemoveTypeImports: true } } : undefined,
@@ -200,8 +182,6 @@ async function fragmentCarriesTypeScript(code: string): Promise<boolean> {
 // A tree that will not parse as TypeScript is answered `true`, not `false`: the
 // verdict then belongs to the fail-closed strip, never to a silent pass-through.
 async function fragmentCarriesTypeScriptUncached(code: string): Promise<boolean> {
-	const parseSync = (await loadOxcExperimental())?.parseSync;
-	if (!parseSync) return true;
 	try {
 		const parsed = parseSync('markless-emitted.ts', code, { lang: 'ts' });
 		if ((parsed.errors?.length ?? 0) > 0) return true;

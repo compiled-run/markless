@@ -1,7 +1,7 @@
 import { showcaseApps } from './apps.data.ts';
 import type { BytesRange, ShowcaseApp } from './types.ts';
 import { shotPlacement, sketchFile } from './sketch.ts';
-import type { Mark } from '../ink-logos.ts';
+import type { LogoMark as Mark } from '../ink-logos.ts';
 
 /** Plain words for the check report's dimensions, in the order the report lists them. */
 export const checkNames: Readonly<Record<string, string>> = {

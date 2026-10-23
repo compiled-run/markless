@@ -16,7 +16,7 @@ export default function ErrorIndex() @{
 	<div class="error-index">
 		<Sidebar pathname="/errors" />
 		<h1>Error codes</h1>
-		<PageMeta time="1 min" assumes="nothing" sprite="hash" />
+		<PageMeta pathname="/errors" time="1 min" assumes="nothing" />
 		<ThemeToggle />
 		<p class="summary">Every code Markless can print, grouped by the package that raises it.</p>
 		<p>

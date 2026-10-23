@@ -69,8 +69,8 @@ served from there and `robots.txt` names the sitemap. Adding a page still means 
 
 ## Page metadata
 
-Every page carries one `<PageMeta time assumes sprite />` line under its `H1`. Two of those
-three are judgement calls; `time` is not, because a per-page guess is what made the old numbers
+Every page carries one `<PageMeta time assumes />` line under its `H1`, with the page's ink mark
+beside the title. `assumes` is a judgement call; `time` is not, because a per-page guess is what made the old numbers
 wrong by up to four minutes.
 
 **The formula.** `words` is the whitespace-separated token count of the page's `.mdx` source with
@@ -84,11 +84,15 @@ believes. Every page sets its `time` from it.
 sed '/^import /d' pages/concepts/state.mdx | wc -w
 ```
 
-Rewriting a page means recomputing its `time` in the same change set. The other two props:
-`assumes` is a
+Rewriting a page means recomputing its `time` in the same change set. `assumes` is a
 comma-separated list of keys from the `concepts` map in `nav.ts`, or the word `nothing`, and a key
-with no entry behind it prints as plain text and warns during the build; `sprite` names a file in
-`public/sprites/`.
+with no entry behind it prints as plain text and warns during the build.
+
+**Page marks.** Each `nav.ts` entry names its `icon`, one ink mark per page that the sidebar and the
+title both show. The marks are drawn in `components/docs/ink-icons.ts` on the same grid and with the
+same pen as the logos in `ink-logos.ts`, and `ink-logos.test.ts` freezes them into
+`public/ink-marks.svg`, one `<symbol>` per mark that a page links with `<use>`. Add a new mark at
+the end of `ICONS`, so the marks before it keep their drawings, then refresh with `-u`.
 
 Under the meta line, a page whose reader may already know it carries one italic skip line, so a
 reader who has done this before has a way up and out rather than only the way down into the

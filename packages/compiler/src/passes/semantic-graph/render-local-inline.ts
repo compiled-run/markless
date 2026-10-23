@@ -13,6 +13,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectGraphDependencies } from './collect-async.ts';
+import { isClassInstanceValue } from './collect-state.ts';
 import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
 import {
 	isCompositeTemplateExpression,
@@ -463,7 +464,7 @@ function classifyDeclaration(
 							? { kind: 'definition', init }
 							: init.type === 'ArrowFunctionExpression' ||
 								  init.type === 'FunctionExpression' ||
-								  init.type === 'NewExpression'
+								  isClassInstanceValue(init)
 								? { kind: 'capture-owned' }
 							: candidate.kind === 'const'
 								? { kind: 'definition', init: declarator.init as AnyNode }

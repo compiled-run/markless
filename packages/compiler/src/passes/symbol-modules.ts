@@ -6275,7 +6275,7 @@ function eventHandlerAuthoredStatements(
 
 	// Narrowed by the handler's own bindings before the first statement is walked:
 	// a parameter or declaration named like the row local is that binding.
-	const rewrite = scopedEventHandlerRewrite(fn, eventHandlerRewrite(input, source));
+	const rewrite = scopedEventHandlerRewrite(fn, eventHandlerRewrite(input, source), true);
 	return statements.map((statement) => rewriteEventHandlerNode(statement, undefined, rewrite));
 }
 
@@ -6355,14 +6355,26 @@ function isFunctionLikeNode(node: AnyNode): boolean {
 }
 
 // Nested bindings shadow component handles without changing the shared claim sets.
-function scopedEventHandlerRewrite(fn: AnyNode, rewrite: EventHandlerRewrite): EventHandlerRewrite {
+function scopedEventHandlerRewrite(
+	fn: AnyNode,
+	rewrite: EventHandlerRewrite,
+	isHandler = false,
+): EventHandlerRewrite {
 	const localNames = localNamesVisibleIn(fn, rewrite.localNames);
 	const boundHandleNames = new Set(rewrite.boundHandleNames);
 	for (const parameter of asNodes(fn.params)) collectPatternNames(parameter, boundHandleNames);
 	if (isNode(fn.body)) collectOwnScopeBindingNames(fn.body, boundHandleNames);
+	// A nested function's own binding shadows the handler's parameter; the emitted module still declares that parameter, so a kept name stays correct.
+	const shadowed = isHandler ? new Set<string>() : boundHandleNames;
+	const eventParameters = rewrite.eventParameters.filter((name) => !shadowed.has(name));
+	const writeEventParameters = rewrite.writeValueInput.eventParameters.filter(
+		(name) => !shadowed.has(name),
+	);
 	if (
 		localNames === rewrite.localNames &&
-		boundHandleNames.size === rewrite.boundHandleNames.size
+		boundHandleNames.size === rewrite.boundHandleNames.size &&
+		eventParameters.length === rewrite.eventParameters.length &&
+		writeEventParameters.length === rewrite.writeValueInput.eventParameters.length
 	)
 		return rewrite;
 
@@ -6370,7 +6382,12 @@ function scopedEventHandlerRewrite(fn: AnyNode, rewrite: EventHandlerRewrite): E
 		...rewrite,
 		localNames,
 		boundHandleNames,
-		writeValueInput: { ...rewrite.writeValueInput, localNames },
+		eventParameters,
+		writeValueInput: {
+			...rewrite.writeValueInput,
+			localNames,
+			eventParameters: writeEventParameters,
+		},
 	};
 }
 

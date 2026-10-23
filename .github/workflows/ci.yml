@@ -166,6 +166,8 @@ jobs:
             run_demo_boxes: ${{ steps.demo_boxes.outputs.cache-hit != 'true' }}
             key_build_scale: ${{ steps.build_scale.outputs.cache-primary-key }}
             run_build_scale: ${{ steps.build_scale.outputs.cache-hit != 'true' }}
+            key_build_warnings: ${{ steps.build_warnings.outputs.cache-primary-key }}
+            run_build_warnings: ${{ steps.build_warnings.outputs.cache-hit != 'true' }}
             run_playwright:
                 ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' || steps.boxes_bundler.outputs.cache-hit
                 != 'true' || steps.boxes_router.outputs.cache-hit != 'true' ||
@@ -335,6 +337,18 @@ jobs:
                   path: build-scale-completed.txt
                   key: build-scale-${{ hashFiles('ci-base-key.txt') }}
 
+            # The guard script lives in scripts/ci/, which the base key leaves out.
+            - name: Probe the build-warnings lane
+              id: build_warnings
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  path: build-warnings-completed.txt
+                  key:
+                      build-warnings-${{ hashFiles('ci-base-key.txt', 'website/**/*', 'demos/**/*',
+                      'packages/headless/**/*', 'scripts/ci/build-warnings.mjs', '!**/node_modules/**',
+                      '!**/dist/**', '!**/.witness/**', '!**/.output/**') }}
+
             # The receipt set is the union of what the box lanes wrote, so every
             # box key feeds this one: a box lane that re-runs re-runs receipts.
             - name: Record the box lane keys
@@ -371,6 +385,7 @@ jobs:
                   echo "perf-guards=${{ steps.perf_guards.outputs.cache-hit != 'true' }}"
                   echo "demo-boxes=${{ steps.demo_boxes.outputs.cache-hit != 'true' }}"
                   echo "build-scale=${{ steps.build_scale.outputs.cache-hit != 'true' }}"
+                  echo "build-warnings=${{ steps.build_warnings.outputs.cache-hit != 'true' }}"
 
     # One browser download for the whole run: the unit, browser and box lanes
     # restore this cache instead of each fetching its own copy, which is what
@@ -1426,6 +1441,7 @@ jobs:
                 perf-guards,
                 demo-boxes,
                 build-scale,
+                build-warnings,
             ]
         if: always()
         runs-on: ubuntu-latest
@@ -1525,6 +1541,42 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_build_scale }}
                   path: build-scale-completed.txt
+
+    # The docs site and the demo apps build without a single warning on stderr
+    # (scripts/ci/build-warnings.mjs); the starters are held to the same in the unit lane.
+    build-warnings:
+        needs: [typecheck, lanes]
+        if: needs.lanes.outputs.run_build_warnings == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build the docs site and demos and fail on any warning
+              run: pnpm build-warnings:guard
+
+            - name: Mark the build-warnings lane complete
+              run: echo ok > build-warnings-completed.txt
+
+            - name: Save the build-warnings lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_build_warnings }}
+                  path: build-warnings-completed.txt
 
     changes:
         runs-on: ubuntu-latest

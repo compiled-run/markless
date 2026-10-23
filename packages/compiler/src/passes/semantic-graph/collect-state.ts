@@ -1223,7 +1223,7 @@ export function isClassInstanceValue(node: AnyNode): boolean {
 	const constructorName = getNewConstructorName(node);
 	if (constructorName) return !isSerializableBuiltInConstructorName(constructorName);
 
-	return false;
+	return node.type === 'NewExpression';
 }
 
 function getNewConstructorName(node: AnyNode): string | null {

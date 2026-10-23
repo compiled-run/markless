@@ -3,9 +3,9 @@ import type { Plugin } from 'vite';
 // The page file already names the family and the route, so a docs tag may leave
 // them out: in pages/ui/accordion.mdx `<ApiTable />` reads as
 // `<ApiTable family="accordion" />`, `scenario="basic"` as
-// `scenario="accordion/basic"`, and `<Sidebar />` gets the page's pathname.
+// `scenario="accordion/basic"`, and `<Sidebar />` and `<PageMeta />` get the page's pathname.
 const PAGES = '/pages/';
-const TAG = /<(ApiTable|AnatomyTable|KeyboardTable|Sidebar)(\s[^>]*?)?\s*\/>/g;
+const TAG = /<(ApiTable|AnatomyTable|KeyboardTable|Sidebar|PageMeta)(\s[^>]*?)?\s*\/>/g;
 const BARE_SCENARIO = /\sscenario="([a-z0-9-]+)"/g;
 
 function routeOf(file: string): { pathname: string; stem: string } | undefined {
@@ -24,7 +24,7 @@ function fillTag(
 	route: { pathname: string; stem: string },
 ): string {
 	const rest = attrs ?? '';
-	const [name, value] = tag === 'Sidebar' ? ['pathname', route.pathname] : ['family', route.stem];
+	const [name, value] = tag === 'Sidebar' || tag === 'PageMeta' ? ['pathname', route.pathname] : ['family', route.stem];
 	if (new RegExp(`\\s${name}=`).test(rest)) return `<${tag}${rest} />`;
 	return `<${tag} ${name}="${value}"${rest.trimEnd()} />`;
 }

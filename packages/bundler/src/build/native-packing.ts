@@ -6,6 +6,7 @@ import { entryReachableModuleIds } from './bundle-graph.ts';
 import { lazyModuleFacadesPlugin } from './lazy-module-facades.ts';
 import { shortExportNamesPlugin } from './short-export-names.ts';
 import { packTopLevelPlugin } from './pack-top-level.ts';
+import { dynamicImportersOf, isPlannedCoLocation } from './planned-co-location.ts';
 import { MARKLESS_INTERACTION_CLOSURES_ASSET } from './planned-landing.ts';
 import {
 	isReExportDoor,
@@ -48,6 +49,7 @@ type NativePackingPlugin = Pick<
 	| 'renderChunk'
 	| 'renderError'
 	| 'generateBundle'
+	| 'onLog'
 > & { readonly api?: PackOwnership };
 
 /** The pack each module was planned into, and the routes a shared pack serves. */
@@ -66,6 +68,7 @@ export function nativePackingPlugins(
 	let eagerLazyRoutes = new Map<string, ReadonlyArray<string>>();
 	let closures: RouteInteractionClosures[] | undefined;
 	let partitioned = false;
+	let dynamicImporters = new Map<string, readonly string[]>();
 	const facades = lazyModuleFacadesPlugin(
 		root,
 		(id) => groups.get(id),
@@ -85,6 +88,7 @@ export function nativePackingPlugins(
 				eagerLazyRoutes = new Map();
 				closures = undefined;
 				partitioned = false;
+				dynamicImporters = new Map();
 				if (error) return;
 				const modules = new Map<
 					string,
@@ -183,6 +187,10 @@ export function nativePackingPlugins(
 						}),
 					),
 				});
+				dynamicImporters = dynamicImportersOf(modules);
+			},
+			onLog(_level, log) {
+				if (isPlannedCoLocation(log, (id) => groups.get(id), dynamicImporters)) return false;
 			},
 			outputOptions(output) {
 				if (output.format && !['es', 'esm', 'module'].includes(output.format))
@@ -212,6 +220,7 @@ export function nativePackingPlugins(
 						...output.codeSplitting,
 						groups: [
 							{
+								debugName: 'markless-native-packs',
 								name: (id) =>
 									normalizeVirtualId(id) === MARKLESS_EXECUTION_LOG_MODULE_ID
 										? null

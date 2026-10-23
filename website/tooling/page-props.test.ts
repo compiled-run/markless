@@ -21,6 +21,12 @@ describe('fillPageProps', () => {
 		);
 	});
 
+	it('gives the line under the title the route path, so it can show the page mark', () => {
+		expect(fillPageProps('<PageMeta time="4 min" assumes="nothing" />', page('/concepts/state.mdx'))).toBe(
+			'<PageMeta pathname="/concepts/state" time="4 min" assumes="nothing" />',
+		);
+	});
+
 	it('leaves a tag that names its own family or pathname alone', () => {
 		const source = '<ApiTable family="tabs" part="root" />\n<Sidebar pathname="/" />\n';
 		expect(fillPageProps(source, page('/ui/_derive-proof.mdx'))).toBe(source);

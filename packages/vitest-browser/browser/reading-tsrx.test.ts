@@ -7,6 +7,7 @@ import { Steps } from './reading-tsrx/for-index.tsrx';
 import { Bags } from './reading-tsrx/const-times-state.tsrx';
 import { NameCounters } from './reading-tsrx/name-counters.tsrx';
 import { ShopPage } from './reading-tsrx/body-function-calls.tsrx';
+import { Sizes } from './reading-tsrx/body-map.tsrx';
 
 // The constructs the "Reading a .tsrx file" guide teaches, each served and client-rendered.
 
@@ -102,3 +103,17 @@ test('CSR: handlers call body functions with arguments, from rows and callback p
 	bodyFunctionCalls((await render(ShopPage)).container as HTMLElement));
 test('SSR: handlers call body functions with arguments, from rows and callback props', async () =>
 	bodyFunctionCalls((await renderSSR(ShopPage)).container as HTMLElement));
+
+async function bodyMap(c: HTMLElement) {
+	const text = (selector: string) => c.querySelector(selector)?.textContent;
+	expect(text('[data-label]')).toBe('small');
+	(c.querySelector('[data-grow]') as HTMLButtonElement).click();
+	await expect.poll(() => text('[data-label]')).toBe('medium');
+	(c.querySelector('[data-pick]') as HTMLButtonElement).click();
+	await expect.poll(() => text('[data-picked]')).toBe('medium');
+}
+
+test('CSR: a handler, a body function and a computed read a body Map', async () =>
+	bodyMap((await render(Sizes)).container as HTMLElement));
+test('SSR: a handler, a body function and a computed read a body Map', async () =>
+	bodyMap((await renderSSR(Sizes)).container as HTMLElement));
