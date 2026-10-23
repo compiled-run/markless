@@ -21,10 +21,11 @@ export default box(
 		});
 
 		const page = await browser.visit('/');
-		await expect.page.exists(page, '#app', WAIT);
+		await expect.page.text(page, '[data-counter]', '0', WAIT);
 
+		// The edit shows on the page, so only the reloaded page can answer the wait below.
 		const change = await project.edit(`${FIXTURE}/src/root.tsrx`, {
-			replace: ['count++', 'count = count + 1'],
+			replace: ['>{count}</button>', '>edited {count}</button>'],
 		});
 
 		await expect.edit(
@@ -37,8 +38,7 @@ export default box(
 			},
 			WAIT,
 		);
-		await sleep(250);
-		await expect.page.text(page, '#hmr-status', 'ready', WAIT);
+		await expect.page.text(page, '[data-counter]', 'edited 0', WAIT);
 		await expect.page.outcome(
 			page,
 			{
@@ -49,7 +49,3 @@ export default box(
 		await receipt.capture('after browser hmr edit');
 	},
 );
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
