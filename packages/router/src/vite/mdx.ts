@@ -37,6 +37,7 @@ export function mdxTransformPlugin(): Plugin {
 		},
 		transform: {
 			order: 'pre',
+			filter: { id: /\.mdx(?:$|[?#])/ },
 			async handler(code, id) {
 				if (!isMdxFile(id)) {
 					return;

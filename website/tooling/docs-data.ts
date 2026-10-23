@@ -257,6 +257,7 @@ export function docsData(): Plugin {
 		},
 		transform: {
 			order: 'pre',
+			filter: { id: /\.mdx(?:$|\?)/ },
 			async handler(code, id) {
 				if (!id.split('?', 1)[0]?.endsWith('.mdx')) return;
 				this.addWatchFile(manifestFile);

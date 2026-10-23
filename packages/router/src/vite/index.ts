@@ -674,17 +674,23 @@ function requestFileTransformPlugin(): Plugin {
 		configResolved(config: ResolvedConfig) {
 			root = config.root;
 		},
-		transform(code, id) {
-			const fileId = requestFileIdForTransform(root, id);
-			if (!fileId) {
-				return undefined;
-			}
+		transform: {
+			filter: { id: REQUEST_FILE_ID_FILTER },
+			handler(code, id) {
+				const fileId = requestFileIdForTransform(root, id);
+				if (!fileId) {
+					return undefined;
+				}
 
-			const transform = transformRequestFileSource(fileId, code);
-			return transform ? { code: transform.code, map: null } : undefined;
+				const transform = transformRequestFileSource(fileId, code);
+				return transform ? { code: transform.code, map: null } : undefined;
+			},
 		},
 	};
 }
+
+// A superset of requestFileIdForTransform: every request file sits under an api/ or middleware/ directory.
+const REQUEST_FILE_ID_FILTER = /[\\/](?:api|middleware)[\\/]/;
 
 function requestFileIdForTransform(root: string, id: string): string | undefined {
 	if (id.startsWith('\0')) {
@@ -711,14 +717,17 @@ function requestFileIdForTransform(root: string, id: string): string | undefined
 function requestFileBuildTransformPlugin(root: string): Plugin {
 	return {
 		name: 'markless-router:nitro-request-files',
-		transform(code, id) {
-			const fileId = requestFileIdForTransform(root, id);
-			if (!fileId) {
-				return undefined;
-			}
+		transform: {
+			filter: { id: REQUEST_FILE_ID_FILTER },
+			handler(code, id) {
+				const fileId = requestFileIdForTransform(root, id);
+				if (!fileId) {
+					return undefined;
+				}
 
-			const transform = transformRequestFileSource(fileId, code);
-			return transform ? { code: transform.code, map: null } : undefined;
+				const transform = transformRequestFileSource(fileId, code);
+				return transform ? { code: transform.code, map: null } : undefined;
+			},
 		},
 	};
 }
@@ -1000,49 +1009,52 @@ function virtualModulesPlugin(
 				return `${join(VIRTUAL_ENTRY_DIR, entryFile)}${rootScopeQuery(root, id)}`;
 			},
 		},
-		load(id) {
-			if (id.startsWith(`\0${SERVER_ENTRY_ID}`)) {
-				return serverEntrySource(root, options);
-			}
-			if (id.startsWith(`\0${RESUME_ENTRY_PATH_ID}`)) {
-				return entryPathSource('resumeEntryPath', resumeEntry, RESUME_ENTRY_ID, root);
-			}
-			if (id.startsWith(`\0${PRERENDER_WAKE_ENTRY_PATH_ID}`)) {
-				// Unlike the resume entry, there is no dev @id fallback here: a
-				// truthy path with no emitted entry would flip every served page
-				// to the empty-delta container with a dead wake URL.
-				if (!prerenderWakeChannelEnabled() || !prerenderWakeEntry.fileName) {
-					return 'export const prerenderWakeEntryPath = undefined;';
+		load: {
+			filter: { id: /^\0/ },
+			handler(id) {
+				if (id.startsWith(`\0${SERVER_ENTRY_ID}`)) {
+					return serverEntrySource(root, options);
 				}
-				return entryPathSource(
-					'prerenderWakeEntryPath',
-					prerenderWakeEntry,
-					PRERENDER_WAKE_ENTRY_ID,
-					root,
-				);
-			}
-			if (id.startsWith(`\0${NAVIGATION_ENTRY_PATH_ID}`)) {
-				return entryPathSource(
-					'navigationEntryPath',
-					navigationEntry,
-					NAVIGATION_ENTRY_ID,
-					root,
-				);
-			}
-			if (id.startsWith(`\0${FRAGMENT_ENTRY_PATH_ID}`)) {
-				return entryPathSource('fragmentEntryPath', fragmentEntry, FRAGMENT_ENTRY_ID, root);
-			}
-			if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
-				return routePreloadsSource(
-					routePreloads,
-					this?.environment?.config.consumer === 'client',
-				);
-			}
-			if (id.startsWith(`\0${ROUTER_OPTIONS_ID}`)) {
-				const documentFile = join(root, 'document.tsrx');
-				this?.addWatchFile?.(documentFile);
-				return routerOptionsSource(options, documentFile);
-			}
+				if (id.startsWith(`\0${RESUME_ENTRY_PATH_ID}`)) {
+					return entryPathSource('resumeEntryPath', resumeEntry, RESUME_ENTRY_ID, root);
+				}
+				if (id.startsWith(`\0${PRERENDER_WAKE_ENTRY_PATH_ID}`)) {
+					// Unlike the resume entry, there is no dev @id fallback here: a
+					// truthy path with no emitted entry would flip every served page
+					// to the empty-delta container with a dead wake URL.
+					if (!prerenderWakeChannelEnabled() || !prerenderWakeEntry.fileName) {
+						return 'export const prerenderWakeEntryPath = undefined;';
+					}
+					return entryPathSource(
+						'prerenderWakeEntryPath',
+						prerenderWakeEntry,
+						PRERENDER_WAKE_ENTRY_ID,
+						root,
+					);
+				}
+				if (id.startsWith(`\0${NAVIGATION_ENTRY_PATH_ID}`)) {
+					return entryPathSource(
+						'navigationEntryPath',
+						navigationEntry,
+						NAVIGATION_ENTRY_ID,
+						root,
+					);
+				}
+				if (id.startsWith(`\0${FRAGMENT_ENTRY_PATH_ID}`)) {
+					return entryPathSource('fragmentEntryPath', fragmentEntry, FRAGMENT_ENTRY_ID, root);
+				}
+				if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
+					return routePreloadsSource(
+						routePreloads,
+						this?.environment?.config.consumer === 'client',
+					);
+				}
+				if (id.startsWith(`\0${ROUTER_OPTIONS_ID}`)) {
+					const documentFile = join(root, 'document.tsrx');
+					this?.addWatchFile?.(documentFile);
+					return routerOptionsSource(options, documentFile);
+				}
+			},
 		},
 	};
 }

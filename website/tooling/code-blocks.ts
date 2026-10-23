@@ -257,6 +257,7 @@ export function codeBlocks(): Plugin {
 		},
 		transform: {
 			order: 'pre',
+			filter: { id: /\.mdx(?:$|\?)/ },
 			async handler(code: string, id: string) {
 				const file = id.split('?', 1)[0] ?? id;
 				if (!file.endsWith('.mdx') || !code.includes('<Code')) return;

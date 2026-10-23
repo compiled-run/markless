@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import type { IconifyJSON } from '@iconify/types';
 import { compileTsrxModule } from '../../../compiler/src/index.ts';
-import { icons } from '../src/vite.ts';
+import { ICON_SOURCE_ID, icons } from '../src/vite.ts';
 import { lucide } from '../src/index.ts';
 import { mayContainIconTags } from '../src/transform/tsrx.ts';
 
@@ -33,6 +33,37 @@ function transformer(loadCollection = vi.fn(async () => collection)) {
 }
 
 describe('icons transform', () => {
+	test('each query variant of one file gets the same answer and the same warnings', async () => {
+		const dirty: IconifyJSON = {
+			...collection,
+			icons: { 'arrow-down': { body: '<path d="M1 2" style="a{b}"/>' } },
+		};
+		const { transform, warn } = transformer(vi.fn(async () => dirty));
+		const source = `
+import { testpack as glyphs } from '@markless/icons';
+export function App() @{
+	<glyphs.arrowdown />
+}
+`;
+		const plain = await transform(source, '/src/App.tsrx');
+		const symbols = await transform(source, '/src/App.tsrx?markless-symbols');
+		const renderData = await transform(source, '/src/App.tsrx?markless-render-data');
+		expect(plain?.code).toContain('<svg');
+		expect(symbols).toEqual(plain);
+		expect(renderData).toEqual(plain);
+		expect(warn).toHaveBeenCalledTimes(3);
+		expect(new Set(warn.mock.calls.map(([message]) => message)).size).toBe(1);
+		const edited = await transform(source.replace('<glyphs.arrowdown />', '<p />'), '/src/App.tsrx');
+		expect(edited).toBeUndefined();
+	});
+
+	test('its native filter admits .tsrx and .mdx ids and their query variants only', () => {
+		for (const id of ['/a/App.tsrx', '/a/App.tsrx?markless-symbols', '/p/index.mdx', '/p/index.mdx?markless-route'])
+			expect(ICON_SOURCE_ID.test(id), id).toBe(true);
+		for (const id of ['/a/app.ts', '/a/App.tsrx.css', '/p/index.md', '\0virtual:markless:style:%2Fa%2FApp.tsrx.css'])
+			expect(ICON_SOURCE_ID.test(id), id).toBe(false);
+	});
+
 	test('rewrites TSRX member tags, aliases, attributes, children, and imports', async () => {
 		const { transform } = transformer();
 		const source = `
