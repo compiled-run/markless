@@ -106,4 +106,18 @@ describe('CI benchmark workflow', () => {
 		expect(baseline.env).toEqual({ BASE: '${{ needs.changes.outputs.base }}' });
 		expect(baseline.run).toBe('echo "MARKLESS_BASE_SHA=$BASE" >> "$GITHUB_ENV"');
 	});
+
+	test('a merge-queue run benchmarks against the main commit the queued change goes on top of', async () => {
+		const workflow = parse(await readFile(workflowPath, 'utf8')) as {
+			on: Record<string, unknown>;
+			jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>;
+		};
+		expect(Object.keys(workflow.on)).toContain('merge_group');
+		const filter = workflow.jobs.changes!.steps.find(
+			(step) => step.name === 'Decide whether benchmarks can be affected',
+		)!.run!;
+		expect(filter).toMatch(
+			/"\$GITHUB_EVENT_NAME" = "merge_group" \]; then\n\s+base="\$\{\{ github\.event\.merge_group\.base_sha \}\}"/,
+		);
+	});
 });
