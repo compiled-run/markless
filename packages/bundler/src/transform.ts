@@ -442,6 +442,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		},
 		symbols: manifestOwnsSymbolRoutes ? symbolManifestEntries : [],
 		runtimeDemandMap: compiled.runtimeDemandMap,
+		...(input.directCsr === true && compiled.publicRenderModule.moduleSource
+			? { directCsr: true }
+			: {}),
 	};
 	// The settle module and the fill plan travel together: both exist only for a
 	// prerendered page whose wake variant is emitted, so a page that never ships
