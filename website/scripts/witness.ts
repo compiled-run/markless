@@ -625,28 +625,37 @@ try {
 		// --- the Code block on the state page --------------------------------------
 		{
 			const codePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-			const codeRequests: string[] = [];
-			codePage.on('request', (request) => codeRequests.push(request.url()));
-			const editorAssets = /\.wasm|compile-worker|_code-frame|code-session/;
 			await codePage.goto(`${origin}/concepts/state`, { waitUntil: 'networkidle' });
 			const block = codePage.locator('.code-block');
+			// A block downloads its boot when it scrolls into view or the page goes idle; none of it runs before the reader touches it.
+			const states = await codePage
+				.locator('[data-code]')
+				.evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement).dataset.code));
 			check(
-				!codeRequests.some((url) => editorAssets.test(url)),
-				'Code: the page fetches no editor, compiler, wasm or result frame before the reader interacts',
-				codeRequests.filter((url) => editorAssets.test(url)).join(', ') || 'none',
+				states.length > 0 &&
+					states.every((state) => state === 'idle') &&
+					codePage.workers().length === 0 &&
+					!codePage.frames().some((frame) => frame.url().includes('_code-frame')),
+				'Code: before the reader interacts, no editor boots, no compile worker starts and no result frame loads',
+				`blocks ${states.join(', ')}; ${codePage.workers().length} workers; frames ${codePage
+					.frames()
+					.map((frame) => frame.url())
+					.join(', ')}`,
 			);
-			const preloads = await codePage
-				.locator('link[rel="modulepreload"]')
-				.evaluateAll((links) => links.map((link) => (link as HTMLLinkElement).href));
+			const servedHtml = await (await fetch(`${origin}/concepts/state`)).text();
+			const servedPreloads = [...servedHtml.matchAll(/<link\b[^>]*>/g)]
+				.map((match) => match[0])
+				.filter((tag) => /\brel="modulepreload"/.test(tag))
+				.map((tag) => new URL(/\bhref="([^"]+)"/.exec(tag)![1]!, origin).href);
 			const preloadedCode: string[] = [];
-			for (const href of preloads) {
+			for (const href of servedPreloads) {
 				const body = await (await fetch(href)).text();
 				if (/insertText|code:run|yuku|getTheme/.test(body)) preloadedCode.push(href);
 			}
 			check(
 				preloadedCode.length === 0,
-				'Code: no modulepreload carries the editor, the highlighter, the session or the compiler',
-				preloadedCode.join(', ') || `${preloads.length} preloads checked`,
+				'Code: the served page preloads no editor, highlighter, session or compiler module',
+				preloadedCode.join(', ') || `${servedPreloads.length} preloads checked`,
 			);
 			const input = block.locator('[data-code-input]').first();
 			check(
@@ -2751,11 +2760,20 @@ try {
 		await page.goto(`${origin}/ui`, { waitUntil: 'load' });
 		const addressCard = card('edit-address');
 		await addressCard.getByRole('button', { name: 'Edit address' }).click();
-		await page.keyboard.press('Tab');
-		await page.keyboard.press('Tab');
+		const focusInDialog = () =>
+			page.evaluate(() => document.activeElement?.closest('[role="dialog"]') != null);
+		// The first press loads the dialog's code; keys pressed before focus lands would go to the page.
+		await page.waitForFunction(() => document.activeElement?.closest('[role="dialog"]') != null);
+		const tabbedOut: string[] = [];
+		for (let press = 0; press < 3; press += 1) {
+			await page.keyboard.press('Tab');
+			if (!(await focusInDialog()))
+				tabbedOut.push(await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80) ?? ''));
+		}
+		check(tabbedOut.length === 0, 'Tab never moves focus out of the open dialog', tabbedOut.join(' | '));
 		await settleInner(
 			watchOf('edit-address'),
-			(text) => text.includes('inside the dialog') && text.includes('Tab pressed 2 times'),
+			(text) => text.includes('inside the dialog') && text.includes('Tab pressed 3 times'),
 			'Tab keeps focus inside the dialog, and the card counts the presses',
 		);
 		await page.keyboard.press('Escape');
