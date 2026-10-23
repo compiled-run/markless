@@ -486,7 +486,9 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			const armEnd = e;
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
+			const life = (r.__mL ||= {});
 			const forward = async (e) => {
+				if (r.__mL !== life) return r.removeEventListener(e.type, forward, true);
 				const t = e.type;
 				let applied = false;
 				// A ref indexes this arm's own events, so only an element between the arm's anchors is read.

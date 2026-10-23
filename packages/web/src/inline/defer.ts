@@ -30,6 +30,7 @@ type DeferRoot = Element & {
 	__marklessShifted?: number;
 	__marklessDispatch?: (input: Parameters<DeferModule['resumeContainerEvent']>[0]) => unknown;
 	__mResume?: Promise<DeferModule>;
+	__mL?: object;
 };
 
 type DeferModule = {
@@ -121,12 +122,13 @@ export function createMarklessDefer(
 		const root = target as DeferRoot | null | undefined;
 		const url = document.currentScript?.getAttribute('data-markless-resume-module');
 		if (!root || !url) return;
+		const life = (root.__mL ||= {});
 		const fired = (root.__mFired ||= new WeakSet());
 		const claimed = new WeakSet<Element>();
 		let pending = 0;
 		// A visible handler a started runtime would run itself is marked fired only once a lean run has.
 		const claim = (host: Element): void => {
-			if (fired.has(host) || claimed.has(host)) return;
+			if (fired.has(host) || claimed.has(host) || root.__mL !== life) return;
 			const input = {
 				root,
 				event: { type: eventName, target: host, bubbles: false as const },
@@ -161,6 +163,7 @@ export function createMarklessDefer(
 		);
 		if (lane === 'idle') return idle(root, () => hosts.forEach(claim));
 		const observer = new IntersectionObserver((entries) => {
+			if (root.__mL !== life) return observer.disconnect();
 			for (const entry of entries)
 				if (entry.isIntersecting) {
 					observer.unobserve(entry.target);

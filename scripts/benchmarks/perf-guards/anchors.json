@@ -1522,6 +1522,22 @@
 			"from": 8906,
 			"to": 9858,
 			"reason": "dependents index + per-node subscriptions: one write wakes only its readers (50us->1us at 1000 nodes); minified graph modules 88 B smaller, rendered +952 B"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/payload-resume",
+			"from": 4842,
+			"to": 5155,
+			"reason": "a resume a navigation retired while it was starting disposes itself instead of claiming the container the next page keeps (+313 B rendered, runs at first interaction, not at load)"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 26155,
+			"to": 24610,
+			"reason": "an in-place navigation morphs the next page into the kept container in one task: the view transition and chunked fill are gone, -1,545 B rendered"
 		}
 	],
 	"runtimeModules": {
@@ -1534,7 +1550,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 26155,
+		"router/vite/entries/fragment-entry": 24610,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 9858,
@@ -1597,7 +1613,7 @@
 		"web/payload-document-common": 2608,
 		"web/payload-full-storage-free": 773,
 		"web/payload-graph-construct": 4384,
-		"web/payload-resume": 4842,
+		"web/payload-resume": 5155,
 		"web/payload-resume-lazy": 203,
 		"web/payload-resume-registry": 1916,
 		"web/pending-timing": 521,

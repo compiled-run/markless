@@ -144,6 +144,8 @@ type InlineRoot = HTMLElement &
 		__marklessEventOnlyGraph?: Map<string, unknown>;
 		__marklessEventOnlyGraphInitialized?: boolean;
 		__mFired?: WeakSet<Element>;
+		// This page's lifetime: a navigation that keeps the container in place replaces it, and every listener of the leaving page goes quiet.
+		__mL?: object;
 		// The control a crossing woke this page on. A resting pointer sends no
 		// second crossing, so the runtime's own preload would otherwise miss it.
 		__marklessPrimedHover?: Element;
@@ -374,6 +376,7 @@ function runPrerenderSettleBoot(
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
+	const life = (root.__mL ||= {});
 	const settleModuleUrl = currentScript?.getAttribute?.('data-markless-settle-module');
 	const planScript = root.querySelector('script[type="markless/fill-plan"]');
 	const filled: Array<readonly [Node, Node]> = [];
@@ -418,7 +421,8 @@ function runPrerenderSettleBoot(
 		(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
 			module.resumeContainerEvent(input as never),
 		);
-	const dispatch = (event: Event) => {
+	const dispatch = (event: Event): unknown => {
+		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
 		root.__marklessDelegatedDispatch = true;
 		if (!root.__marklessCensus) census(root, pathsAttribute);
 		replay(event.target as Element);
@@ -434,7 +438,7 @@ function runPrerenderSettleBoot(
 	// Only the failure paths reach the runtime without a gesture: no plan, no
 	// settle module, a rejected runner, or a filler that refused to place a hole.
 	const wake = () => {
-		if (root.__marklessDelegatedDispatch) return;
+		if (root.__marklessDelegatedDispatch || root.__mL !== life) return;
 		root.__marklessDelegatedDispatch = true;
 		resume({ root, event: 0 });
 	};
@@ -458,6 +462,7 @@ function runPrerenderSettleBoot(
 				// to the runtime and let it render the arm from the live graph. The
 				// event-less wake is what owns a boundary — the trigger group the
 				// gesture matched does not.
+				if (root.__mL !== life) return;
 				if (root.__marklessDelegatedDispatch) return resume({ root, event: 0 });
 				const anchors = [
 					comments[`markless:async:${boundary.id}`]!,
@@ -717,10 +722,12 @@ function runPrerenderInlineResumer(
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
+	const life = (root.__mL ||= {});
 	// One import promise for this root, not one per event: same FIFO rule the
 	// classic resumer's `forward` follows.
 	let loaded: Promise<InlineResumeModule> | undefined;
-	const dispatch = (event: Event) => {
+	const dispatch = (event: Event): unknown => {
+		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
 		root.__marklessDelegatedDispatch = true;
 		if (!root.__marklessCensus) census(root, pathsAttribute);
 		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
@@ -745,8 +752,9 @@ function runInlineResumerSelfWake(
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
+	const life = (root.__mL ||= {});
 	defer.idle(root, async () => {
-		if (root.__asyncResumeRuntimeStarted) return;
+		if (root.__asyncResumeRuntimeStarted || root.__mL !== life) return;
 		root.__marklessDelegatedDispatch = true;
 		const module = await (root.__mResume ||= loadModule(resumeModuleUrl));
 		await module.resumeContainerEvent({ root, event: 0 });
@@ -763,8 +771,9 @@ function runInlineResumerOverlayPrimer(
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
+	const life = (root.__mL ||= {});
 	const prime = (event: Event) => {
-		if (root.__marklessOverlayInstalled) {
+		if (root.__marklessOverlayInstalled || root.__mL !== life) {
 			removeEventListener('keydown', prime, true);
 			removeEventListener('pointerdown', prime, true);
 			return;
@@ -783,7 +792,7 @@ function runInlineResumerOverlayPrimer(
 			root.__marklessCensus = census;
 		}
 		setTimeout(() => {
-			if (root.__marklessDelegatedDispatch === true) return;
+			if (root.__marklessDelegatedDispatch === true || root.__mL !== life) return;
 			root.__marklessDelegatedDispatch = true;
 			loadModule(resumeModuleUrl).then((module) =>
 				module.resumeContainerEvent({ root, event: 0 }),
@@ -840,12 +849,14 @@ function runInlineResumer(
 		currentScript?.getAttribute?.('data-markless-resume-module') ??
 		__MARKLESS_INLINE_RESUME_MODULE_URL__;
 	if (!root || !resumeModuleUrl) return;
+	const life = (root.__mL ||= {});
 	const [eventNames, nestedEventNames, flags] = page;
 	let forwardsUnknownElements = !!(flags & 1);
 	// Reuse the import promise to preserve native event arrival order.
 	// The shell's DOM order, pinned once the page is idle or at the first forward, before any arm commits.
 	const pin = () => {
 		if (
+			root.__mL === life &&
 			!root.__marklessCensus &&
 			!__MARKLESS_INLINE_CENSUS__(root, __MARKLESS_INLINE_PATHS_ATTRIBUTE__)[0]
 		)
@@ -1089,7 +1100,7 @@ function runInlineResumer(
 	);
 	if (primeEventNames.length > 0) {
 		const prime = (event: Event) => {
-			if (root.__marklessDelegatedDispatch) return;
+			if (root.__marklessDelegatedDispatch || root.__mL !== life) return;
 			const hover = event.type === 'pointerover';
 			const wanted = hover ? pressPreloadEventNames : focusWakeEventNames;
 			let primed: Element | undefined;
@@ -1141,7 +1152,8 @@ function runInlineResumer(
 		for (const primeEventName of primeEventNames)
 			root.addEventListener(primeEventName, prime, true);
 	}
-	const dispatch = (event: Event) => {
+	const dispatch = (event: Event): unknown => {
+		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
 		let policyApplied = false;
 		let scoped = false;
 		// The press-time path, so a target an earlier listener took out still reaches its host; a replayed early event has none.
