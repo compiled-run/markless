@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { createDomUpdateEntry } from '../src/dom-update.ts';
+import { hostIdsInsideRange } from '../src/dom-journal.ts';
 import { applyDomJournalEntries } from '../src/index.ts';
 
 type FakeElement = {
@@ -513,4 +514,22 @@ test('createDomUpdateEntry maps DOM update targets to concrete DOM operations', 
 			value: 'color: red;',
 		}),
 	).toEqual({ type: 'setAttr', locator: 'button:style', name: 'style', value: 'color: red;' });
+});
+
+test('range host lookup reads only the anchors parent, not the whole page', () => {
+	type Node = { nodeType: number; parentNode?: Node | null; childNodes: Node[]; contains?: (n: Node) => boolean };
+	const el = (...childNodes: Node[]): Node => {
+		const node: Node = { nodeType: 1, childNodes, contains: (n) => n === node || node.childNodes.some((c) => c.contains?.(n)) };
+		for (const child of childNodes) child.parentNode = node;
+		return node;
+	};
+	const comment = (): Node => ({ nodeType: 8, childNodes: [] });
+	const start = comment(), end = comment();
+	const nested = el(), inside = el(nested), outside = el(), after = el();
+	const parent = el(outside, start, inside, end, after);
+	let rootWalks = 0;
+	const root = { nodeType: 1, tagName: 'DIV', get childNodes() { rootWalks++; return [parent]; } };
+	const hosts = new Map<string, unknown>([['in', inside], ['nested', nested], ['out', outside], ['after', after]]);
+	expect(hostIdsInsideRange(root as never, start as never, end as never, hosts as never)).toEqual(['in', 'nested']);
+	expect(rootWalks).toBe(0);
 });
