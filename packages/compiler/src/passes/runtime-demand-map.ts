@@ -691,7 +691,9 @@ function eventHandlerBodyAllowsScalarLeaf(
 	if (!authoredWrite || !fn || !isNode(fn.body)) return false;
 	const body = fn.body as AnyNode;
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
-	const parameters = new Set(asNodes(fn.params).flatMap((param) => getIdentifierName(param) ?? []));
+	const parameters = new Set(
+		asNodes(fn.params).flatMap((param) => getIdentifierName(param) ?? []),
+	);
 	let wrote = false;
 	return statements.every((statement) => {
 		if (statement.type === 'EmptyStatement') return true;
@@ -933,7 +935,7 @@ function payloadDemandRecords(
 			runtimeModuleIds: unique([
 				...rowDispatchCore,
 				...KEYED_REPEAT,
-				...(record.rowTemplate ?? record.emptyArm ? ROW_MINT : []),
+				...((record.rowTemplate ?? record.emptyArm) ? ROW_MINT : []),
 				...(record.rowComponent ? ROW_COMPONENT_MINT : []),
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
 				...(record.enclosingRow ? NESTED_REPEATS : []),
@@ -1108,9 +1110,7 @@ function armActionDemandRecords(
 	scope: FirstUseScope,
 	dispatchCore: ReadonlyArray<string>,
 ): RuntimeDemandMapAction[] {
-	type Arm =
-		| ProtocolArmRecordSet
-		| NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
+	type Arm = ProtocolArmRecordSet | NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
 	type Repeat = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
 	const { view, records, symbolDemand } = scope;
 	const actions: RuntimeDemandMapAction[] = [];
@@ -1148,7 +1148,9 @@ function armActionDemandRecords(
 			action(
 				containerId,
 				kind,
-				'hostNodeId' in event ? event.hostNodeId : `${containerId}/${event.hostPath.join('.')}`,
+				'hostNodeId' in event
+					? event.hostNodeId
+					: `${containerId}/${event.hostPath.join('.')}`,
 				event,
 				protocolEventActionKind(event),
 			);
@@ -1889,7 +1891,9 @@ function firstUsePage(scope: FirstUseScope): RuntimeDemandMapFirstUsePage {
 						new Set(),
 						new Map(
 							boundaries.flatMap((boundary) =>
-								boundary.asyncReads.map((read) => [read.graphNodeId, null] as const),
+								boundary.asyncReads.map(
+									(read) => [read.graphNodeId, null] as const,
+								),
 							),
 						),
 						[],
@@ -2100,34 +2104,54 @@ function transitiveSymbolDemand(
 	return result;
 }
 
+// Built once per capture analysis: every closure below walks the same two maps.
+const symbolGraphs = new WeakMap<
+	CaptureAnalysisArtifact,
+	{
+		readonly baseByBound: ReadonlyMap<string, string>;
+		readonly callbacksBySymbol: ReadonlyMap<string, ReadonlyArray<string>>;
+	}
+>();
+
+function symbolGraph(captureAnalysis: CaptureAnalysisArtifact) {
+	let graph = symbolGraphs.get(captureAnalysis);
+	if (!graph) {
+		graph = {
+			baseByBound: new Map(
+				(captureAnalysis.boundResolverRows ?? []).map((row) => [row.id, row.baseSymbolId]),
+			),
+			callbacksBySymbol: new Map(
+				captureAnalysis.extractedSymbols.map((symbol) => [
+					symbol.symbolId,
+					symbol.captureSlots.flatMap((slot) =>
+						slot.routes.flatMap((route) =>
+							route.kind === 'callback-route' ? [route.callbackSymbolId] : [],
+						),
+					),
+				]),
+			),
+		};
+		symbolGraphs.set(captureAnalysis, graph);
+	}
+	return graph;
+}
+
 function transitiveSymbolIds(
 	symbolIds: ReadonlyArray<string>,
 	captureAnalysis?: CaptureAnalysisArtifact,
 ): string[] {
 	if (!captureAnalysis) return [...symbolIds];
-	const baseByBound = new Map(
-		(captureAnalysis.boundResolverRows ?? []).map((row) => [row.id, row.baseSymbolId]),
-	);
-	const callbacksBySymbol = new Map(
-		captureAnalysis.extractedSymbols.map((symbol) => [
-			symbol.symbolId,
-			symbol.captureSlots.flatMap((slot) =>
-				slot.routes.flatMap((route) =>
-					route.kind === 'callback-route' ? [route.callbackSymbolId] : [],
-				),
-			),
-		]),
-	);
-	const result: string[] = [];
+	const { baseByBound, callbacksBySymbol } = symbolGraph(captureAnalysis);
+	const reached = new Set<string>();
 	const pending = [...symbolIds];
-	while (pending.length > 0) {
-		const requested = pending.shift()!;
-		const symbolId = baseByBound.get(requested) ?? requested;
-		if (result.includes(symbolId)) continue;
-		result.push(symbolId);
-		pending.push(...(callbacksBySymbol.get(symbolId) ?? []));
+	for (let index = 0; index < pending.length; index++) {
+		const symbolId = baseByBound.get(pending[index]!) ?? pending[index]!;
+		if (reached.has(symbolId)) continue;
+		reached.add(symbolId);
+		const callbacks = callbacksBySymbol.get(symbolId);
+		if (callbacks) pending.push(...callbacks);
 	}
-	return result;
+	return [...reached];
 }
 
 function eventKey(hostNodeId: string, eventName: string): string {
