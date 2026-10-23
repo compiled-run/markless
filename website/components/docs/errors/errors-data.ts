@@ -6626,6 +6626,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET',
+		packageName: '@markless/router',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/router.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/vite/fragment-navigation.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/fragment-navigation.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE',
 		packageName: '@markless/router',
 		stage: 'build',

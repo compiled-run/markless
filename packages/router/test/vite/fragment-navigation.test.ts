@@ -1060,6 +1060,23 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('the idle tier stops a page whose region passes its byte budget, and a hover fetches that page whole', async () => {
+			const whole = await (await fetch(`${origin}/_markless/fragment/large`)).arrayBuffer();
+			expect(whole.byteLength).toBeGreaterThan(256 * 1024);
+			const { page, errors, requests } = await open(browser, '/form');
+			const largeFetches = () =>
+				requests.filter((request) => request === '/large fragment').length;
+			await page.waitForTimeout(3500);
+			expect(largeFetches()).toBe(1);
+			await page.locator('[data-large-link]').hover();
+			await expect.poll(largeFetches).toBe(2);
+			await page.locator('[data-large-link]').click();
+			await landedOn(page, 'large');
+			expect(await page.locator('[data-row="3999"]').count()).toBe(1);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('at idle on a fast connection, the swap module and the code of each page in view download', async () => {
 			const { page, errors } = await open(browser);
 			const scripts: string[] = [];

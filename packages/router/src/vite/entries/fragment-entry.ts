@@ -33,6 +33,8 @@ export interface FragmentNavigationConfig {
 	readonly endpointPrefixes: readonly string[];
 	// At most this many visible-link fragments are fetched at idle on fast connections, in document order; 0 keeps HTML to intent only.
 	readonly idleFragments: number;
+	// An idle fetch stops once a page's region passes this many bytes, and that page waits for intent.
+	readonly idleFragmentBytes: number;
 	readonly idleWithoutConnectionInfo: boolean;
 	// false: nothing is fetched before a click.
 	readonly prefetch: boolean;
