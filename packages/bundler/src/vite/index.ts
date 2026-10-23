@@ -35,7 +35,7 @@ import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
 import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
-import { prefetchChunkParses } from '../build/chunk-ast.ts';
+import { prefetchChunkDynamicImports } from '../build/chunk-workers.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
 import { excludeSourceShippedDeps, includeOptimizedDeps } from '../optimized-deps.ts';
@@ -496,7 +496,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			generateBundle: {
 				order: 'post',
 				async handler(_options, bundle) {
-					await prefetchChunkParses(
+					await prefetchChunkDynamicImports(
 						Object.values(bundle).filter(
 							(output) => output.type === 'chunk' && output.code.includes('import('),
 						) as Array<{ readonly fileName: string; readonly code: string }>,
