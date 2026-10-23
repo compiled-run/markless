@@ -1,6 +1,6 @@
 import type { NVDAPlaywright, VoiceOverPlaywright } from '@guidepup/playwright';
 import type { Page } from '@playwright/test';
-import type { Keys, ScreenReaderDriver, Vocabulary } from './driver.ts';
+import type { Keys, RoleStates, ScreenReaderDriver, Vocabulary } from './driver.ts';
 
 /**
  * The half of a driver a real screen reader supplies: the commands.
@@ -13,9 +13,13 @@ import type { Keys, ScreenReaderDriver, Vocabulary } from './driver.ts';
  */
 export type RealReader = NVDAPlaywright | VoiceOverPlaywright;
 
+const SPEECH_TIMEOUT_MS = 10_000;
+const SPEECH_POLL_MS = 100;
+
 export type RealDriverSpec = {
 	readonly name: string;
 	readonly vocabulary: Vocabulary;
+	readonly roleStates?: RoleStates;
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
@@ -32,6 +36,7 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 	return {
 		name: spec.name,
 		vocabulary: spec.vocabulary,
+		...(spec.roleStates ? { roleStates: spec.roleStates } : {}),
 		keys: spec.keys,
 		segments: spec.segments,
 		start: async () => {},
@@ -47,12 +52,16 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 			await reader.next();
 			return reader.lastSpokenPhrase();
 		},
-		// Nothing to drain over this seam: NVDA and VoiceOver follow the focus
-		// themselves and speak it in their own process, and guidepup's
-		// `lastSpokenPhrase()` reads the speech that came out. The virtual lane
-		// needs a wait here because its reader announces from a listener inside the
-		// page, one task-queue turn behind the gesture.
-		settleOnFocus: () => reader.lastSpokenPhrase(),
+		// A reader speaks a focus move on its own schedule; until it has, its last phrase is empty.
+		async settleOnFocus() {
+			const deadline = Date.now() + SPEECH_TIMEOUT_MS;
+			let phrase = await reader.lastSpokenPhrase();
+			while (!phrase && Date.now() < deadline) {
+				await new Promise((settled) => setTimeout(settled, SPEECH_POLL_MS));
+				phrase = await reader.lastSpokenPhrase();
+			}
+			return phrase;
+		},
 		lastSpokenPhrase: () => reader.lastSpokenPhrase(),
 		// The reader hands back its own log array, which keeps growing under the
 		// caller's feet; a copy is what a test can hold on to.
@@ -76,20 +85,19 @@ export function commaSegments(phrase: string): string[] {
 
 /**
  * VoiceOver speaks a name, its states and its role as one run of words with no
- * separator ("Checkbox Label unchecked checkbox"), so every contiguous run of
- * words inside a comma segment is a candidate fact. Its negative states are
- * single words ("unchecked", "collapsed", "dimmed"); a run that starts right
- * after "not" is still dropped, so "not checked" can never satisfy "checked".
+ * separator ("Checkbox Label unchecked checkbox"), and a name can hold commas of
+ * its own ("Monday, August 3, 2026 toggle button"), so every contiguous run of
+ * words is a candidate fact. Its negative states are single words ("unchecked",
+ * "collapsed", "dimmed"); a run that starts right after "not" is still dropped,
+ * so "not checked" can never satisfy "checked".
  */
 export function wordRunSegments(phrase: string): string[] {
+	const words = phrase.split(/\s+/).filter((word) => word.length > 0);
 	const runs = new Set<string>();
-	for (const segment of commaSegments(phrase)) {
-		const words = segment.split(/\s+/);
-		for (let start = 0; start < words.length; start++) {
-			if (start > 0 && words[start - 1]!.toLowerCase() === 'not') continue;
-			for (let end = start + 1; end <= words.length; end++)
-				runs.add(words.slice(start, end).join(' '));
-		}
+	for (let start = 0; start < words.length; start++) {
+		if (start > 0 && words[start - 1]!.replace(/,$/, '').toLowerCase() === 'not') continue;
+		for (let end = start + 1; end <= words.length; end++)
+			runs.add(words.slice(start, end).join(' ').replace(/,$/, ''));
 	}
 	return [...runs];
 }
