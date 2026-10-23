@@ -414,8 +414,7 @@ test('an externalized source-declared package does not publish compiled barrel t
 		join(directory, 'App.tsrx'),
 		[{ source: name }],
 		new Map(),
-		undefined,
-		directory,
+		(filename, source) => ({ filename, source, symbols: [] }),
 	);
 	expect(result.interfaces).toEqual({});
 	expect(result.children).toEqual([]);
