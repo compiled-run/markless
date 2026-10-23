@@ -63,19 +63,37 @@ export function usePersistentCompileStore(store: PersistentCompileStore | undefi
 	persistent = store;
 }
 
+/**
+ * Compiles somewhere else, such as a worker thread, and writes the result to the persistent store itself when
+ * one is set. Returns undefined, or resolves undefined, to have the compile run here instead.
+ */
+export type CompileRunner = (
+	input: CompileTsrxModuleInput,
+	key: string,
+) => Promise<CompileTsrxModuleResult | undefined> | undefined;
+
+let runner: CompileRunner | undefined;
+
+export function useCompileRunner(next: CompileRunner | undefined): void {
+	runner = next;
+}
+
 function compileThroughStore(
 	input: CompileTsrxModuleInput,
 	key: string,
 	compile: () => Promise<CompileTsrxModuleResult>,
 ): Promise<CompileTsrxModuleResult> {
 	const store = persistent;
-	if (!store) return compile();
-	const stored = store.read(input.source, key);
+	const stored = store?.read(input.source, key);
 	if (stored) return Promise.resolve(stored);
-	return compile().then((result) => {
-		store.write(input.source, key, result);
-		return result;
-	});
+	const compileHere = () =>
+		compile().then((result) => {
+			store?.write(input.source, key, result);
+			return result;
+		});
+	const elsewhere = runner?.(input, key);
+	// A compile that throws elsewhere runs again here, so the error the caller sees is the compiler's own.
+	return elsewhere ? elsewhere.then((result) => result ?? compileHere()) : compileHere();
 }
 
 export function memoizedCompile(
