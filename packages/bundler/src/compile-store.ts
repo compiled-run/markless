@@ -122,8 +122,16 @@ function persistentTextMemo(path: string, fingerprint: string) {
 	return {
 		get(key: string) {
 			const hash = hashOf(key);
-			const value = kept.get(hash) ?? load().get(hash);
-			if (value !== undefined) kept.set(hash, value);
+			let value = kept.get(hash);
+			if (value === undefined) {
+				const loaded = load();
+				value = loaded.get(hash);
+				// Moved, not copied: the build holds the text it reads, so the loaded map must not hold it too.
+				if (value !== undefined) {
+					loaded.delete(hash);
+					kept.set(hash, value);
+				}
+			}
 			return value;
 		},
 		set(key: string, value: string) {
@@ -131,7 +139,7 @@ function persistentTextMemo(path: string, fingerprint: string) {
 			changed = true;
 		},
 		async save() {
-			if (!changed && kept.size === load().size) return;
+			if (!changed && load().size === 0) return;
 			const packed = await promisify(zlib.zstdCompress)(serialize([...kept]));
 			await mkdir(dirname(path), { recursive: true });
 			const partial = `${path}.${process.pid}.tmp`;
