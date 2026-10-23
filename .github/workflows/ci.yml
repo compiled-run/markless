@@ -472,6 +472,16 @@ jobs:
               run: printf 'Acquire::http::Timeout "10";\nAcquire::Retries "5";\n' | sudo tee /etc/apt/apt.conf.d/99stalled-mirror
 
             # Browsers only: the system packages come from the apt mirror in their own step below.
+            # Playwright skips a browser it finds already installed, so an older entry holding the same build saves the download.
+            - name: Restore the previous Playwright browsers
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-${{ runner.os }}-chromium-webkit-
+                  path: ${{ github.workspace }}-ms-playwright
+
             - name: Install the pinned Chromium and WebKit
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
@@ -484,11 +494,22 @@ jobs:
                   key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
+            # A new key starts from the newest older entry, so the mirror only serves what changed.
+            - name: Restore the previous Playwright system packages
+              if: steps.apt-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-apt-${{ runner.os }}-
+                  path: ${{ github.workspace }}-playwright-apt
+
             - name: Download the Playwright system packages
               if: steps.apt-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
               run: |
                   echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99keep-downloaded-packages
+                  if compgen -G '${{ github.workspace }}-playwright-apt/*.deb' > /dev/null; then sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/; fi
                   pnpm --dir packages/vitest-browser exec playwright install-deps chromium webkit
                   mkdir -p ${{ github.workspace }}-playwright-apt
                   cp /var/cache/apt/archives/*.deb ${{ github.workspace }}-playwright-apt/
@@ -734,14 +755,14 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -1003,14 +1024,14 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
               id: apt-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
