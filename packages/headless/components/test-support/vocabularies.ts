@@ -1,5 +1,5 @@
 import type { Keys, Vocabulary } from './driver.ts';
-import { commaSegments, type RealDriverSpec } from './page-driver.ts';
+import { commaSegments, wordRunSegments, type RealDriverSpec } from './page-driver.ts';
 
 /**
  * What NVDA and VoiceOver call the facts a checkbox announcement has to convey.
@@ -177,5 +177,5 @@ export const voiceOverSpec: RealDriverSpec = {
 	name: 'VoiceOver',
 	vocabulary: voiceOverVocabulary,
 	keys,
-	segments: commaSegments,
+	segments: wordRunSegments,
 };
