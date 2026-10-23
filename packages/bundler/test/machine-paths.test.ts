@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { expect, test } from 'vitest';
-import { machinePathLeaks } from '../src/build/machine-paths.ts';
+import { machinePathLeaks, withoutMachinePaths } from '../src/build/machine-paths.ts';
 import { rootRelativeId } from '../src/module-id.ts';
 
 const root = '/checkout/app';
@@ -25,6 +25,19 @@ test('rootRelativeId respells every id shape a build writes into output', () => 
 	).toBe(`imported:${encodeURIComponent('b.tsrx')}:symbol:1`);
 	expect(rootRelativeId('web/dev-log', root)).toBe('web/dev-log');
 	expect(rootRelativeId('virtual:markless:dev-log', root)).toBe('virtual:markless:dev-log');
+});
+
+test('withoutMachinePaths drops a root spelled bare, as a query value or inside a chunk name', () => {
+	const id = (at: string) =>
+		`/node_modules/@markless/router/src/vite/entries/client-entry.ts?markless-router-root=${encodeURIComponent(at)}&lang.ts`;
+	const chunkName = (at: string) =>
+		`client-entry.ts_markless-router-root_${encodeURIComponent(at).replaceAll('%', '_')}_lang.ts_lang`;
+	expect(withoutMachinePaths(id('/one/app'), '/one/app')).toBe(
+		withoutMachinePaths(id('/two/app'), '/two/app'),
+	);
+	expect(withoutMachinePaths(chunkName('/one/app'), '/one/app')).toBe(
+		withoutMachinePaths(chunkName('/two/app'), '/two/app'),
+	);
 });
 
 test('machinePathLeaks names every emitted file that spells a checkout path, raw or encoded', () => {
