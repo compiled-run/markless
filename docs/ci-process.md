@@ -12,12 +12,14 @@ The process below answers each one.
 
 ## 1. `pnpm ci:local`: run exactly what CI runs
 
+For a write task only `--fast` runs locally; heavier jobs run on the pull request (section 3).
+
 `scripts/ci/local.mjs` reads `.github/workflows/ci.yml` at run time and runs each job's `run:` steps. Nothing is copied from the YAML by hand, so a step added to the workflow is picked up automatically. The only thing the script owns is a small table saying, for each job with checks, whether it belongs to the fast set, the full set, or runs only in CI. A new job without an entry makes the script exit with an error that names it, so the table cannot fall behind silently.
 
 ```sh
 pnpm ci:local --list      # every job and step in ci.yml, and what runs locally
 pnpm ci:local             # fast mode (same as --fast)
-pnpm ci:local --full      # every job this machine can run
+pnpm ci:local --full      # every job this machine can run (debugging only: the PR's CI run is the receipt)
 pnpm ci:local --job browser --job boxes-router   # just these jobs
 pnpm ci:local --clean     # same, in a throwaway worktree of HEAD
 pnpm ci:local --linux     # each job in its own Linux container (needs docker)
@@ -95,14 +97,15 @@ Why not `act`: it replays the whole workflow including `actions/cache`, artifact
 
 When to use it: before pushing anything that touches the HMR/dev server, native dependencies, keyboard or focus handling in browser tests, or the workflow's install steps. Otherwise, a PR run is the Linux check.
 
-## 3. Before pushing to `main` (agents and PM)
+## 3. What runs where (agents and PM)
 
-A push to `main` needs all of these, run on the exact commit being pushed:
+Heavy verification runs on GitHub Actions, not on this Mac. The org's plan runs 60 jobs at once; this Mac runs about three heavy commands before everything on it slows down, and the load itself made tests flaky.
 
-1. `pnpm ci:local --fast --clean` is green. `--clean` makes it the committed tree, so an untracked helper file or a leftover build cannot make it pass. This is 70 seconds.
-2. `pnpm ci:local --full` is green for every job whose inputs the change touches, and always when the change touches `packages/bundler`, `packages/router`, `packages/web`, `packages/runtime`, the demos, or anything a box reads. When in doubt, run `--full`.
-3. If the change is Linux-sensitive (list above) and `--linux` is not available, push to a branch and open a PR. Wait for its CI instead of pushing to `main` directly.
-4. The receipt says which `ci:local` mode ran, on which commit, and the result line it printed. "Green on N runs" in prose is not a receipt.
+1. **Locally, every write task:** `pnpm run typecheck` and `pnpm ci:local --fast` (agent files, typecheck, unit). The pre-commit hook runs the fast jobs on every commit too.
+2. **On GitHub, through the pull request:** everything heavier. That means browser, the `boxes-*` lanes, build-scale, perf-guards, the benchmark, demo and website boxes, and the migrate checks. Push the branch, open the PR, and let CI run.
+3. **The receipt is the PR's green CI run** on the exact commit: its run URL, or the commit's check summary. No task is reported done before that run is green. "Green on N local runs" in prose is not a receipt.
+4. **Local heavy runs are for debugging one specific failure:** `pnpm ci:local --job <id>`, or the single test file. They do not replace the PR run.
+5. **A/B build timings** go through the `Build timing` workflow (`gh workflow run build-timing.yml -f base=<ref> -f head=<ref> -f app=<dir> -f rounds=<n>`), which interleaves both refs on one runner. No scratch branches.
 
 Multi-commit series (for example a migration done unit by unit) go on a branch with a PR. `main` gets the series after the PR is green, not one red commit at a time. The vite-plus migration put 21 consecutive red commits on `main` this way.
 
