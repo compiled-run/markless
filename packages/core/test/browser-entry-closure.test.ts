@@ -36,9 +36,17 @@ function forbiddenReason(specifier: string): string | null {
 
 async function packageExportsMap(packageName: string): Promise<Record<string, string>> {
 	const raw = await readFile(new URL(`${packageName}/package.json`, packagesRoot), 'utf8');
-	const parsed = JSON.parse(raw) as { exports?: Record<string, string> };
+	const parsed = JSON.parse(raw) as {
+		exports?: Record<string, string | { readonly browser?: string; readonly default?: string }>;
+	};
 	if (!parsed.exports) throw new Error(`packages/${packageName} has no exports map`);
-	return parsed.exports;
+	// A browser build takes the `browser` condition where an export declares one.
+	return Object.fromEntries(
+		Object.entries(parsed.exports).map(([subpath, target]) => [
+			subpath,
+			typeof target === 'string' ? target : (target.browser ?? target.default ?? ''),
+		]),
+	);
 }
 
 function resolveExportSubpath(

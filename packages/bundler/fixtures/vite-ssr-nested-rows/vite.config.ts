@@ -13,7 +13,14 @@ const coreFromSource: Plugin = {
 	resolveId(id) {
 		const match = /^@markless\/core(\/.*)?$/.exec(id);
 		const target = match ? coreExports[`.${match[1] ?? ''}`] : undefined;
-		return typeof target === 'string' ? fileURLToPath(new URL(target, core)) : undefined;
+		// A client build takes a conditional export's browser target, as package resolution would.
+		const file =
+			typeof target === 'string'
+				? target
+				: (target as { readonly browser?: string; readonly default?: string } | undefined)?.[
+						this.environment?.config.consumer === 'client' ? 'browser' : 'default'
+					];
+		return file ? fileURLToPath(new URL(file, core)) : undefined;
 	},
 };
 
