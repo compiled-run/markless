@@ -328,7 +328,9 @@ export function samePath(a: ReadonlyArray<string>, b: ReadonlyArray<string>): bo
 export type DerivedReconcileInternals = {
 	readonly cells: Map<string, unknown>;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
-	readonly subscriptions: ReadonlyArray<RuntimeGraphSubscription>;
+	readonly hasSubscription: (graphNodeId: string) => boolean;
+	/** Registers a subscription; a wrapper installed before the first subscribe sees each one. */
+	addSubscription: (subscription: RuntimeGraphSubscription) => void;
 	readonly dirtyPaths: DirtyPath[];
 	readonly readGraph: RuntimeGraphRead;
 	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
@@ -366,7 +368,7 @@ export type DerivedReconcilePlaneFactory = (
 ) => DerivedReconcilePlane;
 
 export const createDerivedReconcilePlane: DerivedReconcilePlaneFactory = (internals) => {
-	const { cells, computedNodes, subscriptions, dirtyPaths } = internals;
+	const { cells, computedNodes, hasSubscription, dirtyPaths } = internals;
 	const { readGraph, markDirtyPath, scheduleFlush } = internals;
 	// Objects a state write mutated in place during this flush, mapped to the
 	// paths written beneath them. Reconciliation needs it because a derived
@@ -476,13 +478,7 @@ export const createDerivedReconcilePlane: DerivedReconcilePlaneFactory = (intern
 					dirtyComputed.delete(computed);
 					continue;
 				}
-				if (
-					!subscriptions.some(
-						(subscription) => subscription.graphNodeId === computed.graphNodeId,
-					)
-				) {
-					continue;
-				}
+				if (!hasSubscription(computed.graphNodeId)) continue;
 
 				dirtyComputed.delete(computed);
 				// Recompute, reconcile and swap before any subscription of this

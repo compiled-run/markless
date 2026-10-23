@@ -1,11 +1,11 @@
 {
 	"@fixtures/vite-csr": {
-		"runtime/graph": 8894,
+		"runtime/graph": 9846,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
-		"runtime/graph-computed": 2301,
+		"runtime/graph-computed": 2224,
 		"runtime/graph-core": 2219,
-		"runtime/graph-scheduler": 567,
+		"runtime/graph-scheduler": 299,
 		"runtime/graph-shared": 3646,
 		"runtime/index": 140,
 		"serializer/async-boundary-arm": 291,
@@ -85,12 +85,12 @@
 		"web/storage-plane": 1920
 	},
 	"@fixtures/vite-plus": {
-		"runtime/graph": 8894,
+		"runtime/graph": 9846,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
-		"runtime/graph-computed": 2301,
+		"runtime/graph-computed": 2224,
 		"runtime/graph-core": 2219,
-		"runtime/graph-scheduler": 567,
+		"runtime/graph-scheduler": 299,
 		"runtime/graph-shared": 3646,
 		"runtime/index": 140,
 		"serializer/async-boundary-arm": 291,

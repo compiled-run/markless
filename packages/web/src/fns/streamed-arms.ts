@@ -48,7 +48,7 @@ type GraphSubscription = {
 
 type Internals = {
 	readonly cells: ReadonlyMap<string, unknown>;
-	readonly subscriptions: Array<GraphSubscription>;
+	addSubscription: (subscription: GraphSubscription) => void;
 	readonly dirtyPaths: Array<{
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;
@@ -166,25 +166,21 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 		installDerivedReconcilePlane((captured) => {
 			installDerivedReconcilePlane(inner);
 			const graph = (internals = captured as unknown as Internals);
-			const push = graph.subscriptions.push;
-			graph.subscriptions.push = function (...added) {
-				for (const subscription of added) {
-					if (adopting) {
-						const run = subscription.run;
-						subscription.run = (value) =>
-							adopting && !affected(subscription.graphNodeId)
-								? undefined
-								: run(value);
-					}
-					if ((refreshing || adopting) && affected(subscription.graphNodeId)) {
-						graph.dirtyPaths.push({
-							graphNodeId: subscription.graphNodeId,
-							path: subscription.path ?? [],
-						});
-						graph.scheduleFlush();
-					}
+			const add = graph.addSubscription;
+			graph.addSubscription = (subscription) => {
+				if (adopting) {
+					const run = subscription.run;
+					subscription.run = (value) =>
+						adopting && !affected(subscription.graphNodeId) ? undefined : run(value);
 				}
-				return push.apply(this, added);
+				if ((refreshing || adopting) && affected(subscription.graphNodeId)) {
+					graph.dirtyPaths.push({
+						graphNodeId: subscription.graphNodeId,
+						path: subscription.path ?? [],
+					});
+					graph.scheduleFlush();
+				}
+				add(subscription);
 			};
 			const plane = inner(captured);
 			return {

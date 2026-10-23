@@ -20,14 +20,16 @@ import {
 } from './graph-async.ts';
 import {
 	createRuntimeComputedNodes,
+	indexRuntimeDependents,
 	markDirtyComputedDependencies,
 	readComputedNode,
 } from './graph-computed.ts';
 import type {
+	DerivedReconcileInternals,
 	DerivedReconcilePlaneFactory,
 	RuntimeGraphReconcileOptions,
 } from './graph-reconcile.ts';
-import { appendJournalResult, scheduleMicrotask, type DirtyPath } from './graph-scheduler.ts';
+import { appendJournalResult, type DirtyPath } from './graph-scheduler.ts';
 import { createSharedGraphPlane } from './graph-shared.ts';
 
 declare const __MARKLESS_DEBUG_ENABLED__: boolean;
@@ -300,7 +302,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const readInitializers = new Map<string, () => unknown>();
 	const computedNodes = createRuntimeComputedNodes(input.computed);
 	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
-	const subscriptions: RuntimeGraphSubscription[] = [];
+	const dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
+	// Per node, in subscribe order; the sequence number restores that order across nodes.
+	const subscriptionsByNode = new Map<string, RuntimeGraphSubscription[]>();
+	const subscriptionOrder = new Map<RuntimeGraphSubscription, number>();
+	let subscriptionSequence = 0;
 	const writeObservers: RuntimeGraphWriteObserver[] = [];
 	const journalListeners: DomJournalListener[] = [];
 	const dirtyPaths: DirtyPath[] = [];
@@ -335,11 +341,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const current = cells.get(graphNodeId);
 			try {
 				const value = initialize();
-				if (!Object.is(current, value)) {
-					cells.set(graphNodeId, value);
-					markDirtyPath(graphNodeId, dirtyPathForGraphWrite(current, []));
-					scheduleFlush();
-				}
+				if (!Object.is(current, value)) commitCell(graphNodeId, [], value);
 			} catch {}
 		}
 
@@ -349,18 +351,17 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const markDirtyPath = (graphNodeId: string, path: ReadonlyArray<string>): void => {
 		dirtyPaths.push({ graphNodeId, path });
 		plane?.recordWrite(graphNodeId, path);
-		markDirtyComputedDependencies({
-			graphNodeId,
-			path,
-			computedNodes,
-			asyncComputedNodes,
-			dirtyPaths,
-			reconcile: plane,
-			invalidateAsyncComputed,
-		});
+		markDirtyComputedDependencies(graphNodeId, path, dependents, dirtyPaths, plane, invalidateAsyncComputed);
 		// Last, so an observer that reads back finds every computed this write
 		// invalidated already marked and answering afresh.
 		notifyWriteObservers(graphNodeId, path);
+		scheduleFlush();
+	};
+
+	const commitCell = (graphNodeId: string, path: ReadonlyArray<string>, value: unknown): void => {
+		const current = cells.get(graphNodeId);
+		cells.set(graphNodeId, writePath(current, path, value));
+		markDirtyPath(graphNodeId, dirtyPathForGraphWrite(current, path));
 	};
 
 	/**
@@ -414,25 +415,30 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (flushScheduled || flushing) return;
 
 		flushScheduled = true;
-		scheduleMicrotask(runScheduledFlush);
+		queueMicrotask(runScheduledFlush);
 	};
 
 	const runScheduledFlush = (): void => {
 		if (!flushHolds) void flush();
 	};
 
-	// The plane holds every piece of reconcile bookkeeping, so a graph without
-	// one behaves as it did before reconciliation existed. It is built here
-	// because it closes over the hooks declared above.
-	const plane = input.reconcile?.({
+	const internals: DerivedReconcileInternals = {
 		cells,
 		computedNodes,
-		subscriptions,
 		dirtyPaths,
 		readGraph,
 		markDirtyPath,
 		scheduleFlush,
-	});
+		hasSubscription: (graphNodeId) => !!subscriptionsByNode.get(graphNodeId)?.length,
+		addSubscription(subscription) {
+			let bucket = subscriptionsByNode.get(subscription.graphNodeId);
+			if (!bucket) subscriptionsByNode.set(subscription.graphNodeId, (bucket = []));
+			bucket.push(subscription);
+			subscriptionOrder.set(subscription, subscriptionSequence++);
+		},
+	};
+	// Without a plane a graph behaves as it did before reconciliation existed.
+	const plane = input.reconcile?.(internals);
 
 	const asyncComputedInput = () => ({
 		computedNodes,
@@ -460,7 +466,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const flush = (): Promise<void> => {
 		if (activeFlush) return activeFlush;
 
-		activeFlush = runFlush();
+		// Published before the pass runs: synchronous subscriptions reach the journal before runFlush returns.
+		let settle!: (pass: Promise<void>) => void;
+		activeFlush = new Promise<void>((resolve) => (settle = resolve));
+		settle(runFlush());
 		return activeFlush;
 	};
 
@@ -475,23 +484,19 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					const pending = dirtyPaths.splice(0);
 					const ranSubscriptions = new Set<string>();
 					const commits: RuntimeGraphCommit[] = [];
-
-					for (const subscription of subscriptions) {
-						const subscriptionPath = subscription.path ?? [];
-						const dirty = pending.some(
-							(path) =>
-								path.graphNodeId === subscription.graphNodeId &&
-								pathsIntersect(path.path, subscriptionPath),
-						);
-						if (!dirty || ranSubscriptions.has(subscription.id)) continue;
-
-						ranSubscriptions.add(subscription.id);
-						const entries = await subscription.run(
-							readGraph(subscription.graphNodeId, subscriptionPath),
-						);
-						if (typeof entries === 'function') commits.push(entries);
-						else appendJournalResult(journal, entries);
-					}
+					// A subscription added mid-pass runs after every older one, as an appended entry would.
+					for (let floor = 0, ceiling; floor < (ceiling = subscriptionSequence); floor = ceiling)
+						for (const subscription of dueSubscriptions(pending, floor, ceiling)) {
+							if (!subscriptionOrder.has(subscription) || ranSubscriptions.has(subscription.id))
+								continue;
+							ranSubscriptions.add(subscription.id);
+							const ran = subscription.run(
+								readGraph(subscription.graphNodeId, subscription.path ?? []),
+							);
+							const entries = typeof (ran as PromiseLike<unknown>)?.then === 'function' ? await ran : ran;
+							if (typeof entries === 'function') commits.push(entries);
+							else appendJournalResult(journal, entries as DomJournalResult | void);
+						}
 					if (commits.length > 0) {
 						const landing = commits.map((commit) => commit());
 						await notifyJournalListeners();
@@ -517,6 +522,17 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				scheduleFlush();
 			}
 		}
+	};
+
+	const dueSubscriptions = (pending: DirtyPath[], floor: number, ceiling: number) => {
+		const due = new Set<RuntimeGraphSubscription>();
+		for (const { graphNodeId, path } of pending)
+			for (const subscription of subscriptionsByNode.get(graphNodeId) ?? []) {
+				const order = subscriptionOrder.get(subscription)!;
+				if (order >= floor && order < ceiling && pathsIntersect(path, subscription.path ?? []))
+					due.add(subscription);
+			}
+		return [...due].sort((left, right) => subscriptionOrder.get(left)! - subscriptionOrder.get(right)!);
 	};
 
 	const notifyJournalListeners = async (): Promise<void> => {
@@ -550,20 +566,13 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const seeded = cells.has(write.graphNodeId);
 			if (seeded && plane?.commitDerived(write, path)) return;
 			if (seeded && Object.is(readPath(current, path), write.value)) return;
-			cells.set(write.graphNodeId, writePath(current, path, write.value));
-			markDirtyPath(write.graphNodeId, dirtyPathForGraphWrite(current, path));
-			scheduleFlush();
+			commitCell(write.graphNodeId, path, write.value);
 		},
 		update(update) {
 			const path = update.path ?? [];
 			const currentValue = readPath(cells.get(update.graphNodeId), path);
 			const nextValue = update.update(currentValue);
-			if (!Object.is(currentValue, nextValue)) {
-				const current = cells.get(update.graphNodeId);
-				cells.set(update.graphNodeId, writePath(current, path, nextValue));
-				markDirtyPath(update.graphNodeId, dirtyPathForGraphWrite(current, path));
-				scheduleFlush();
-			}
+			if (!Object.is(currentValue, nextValue)) commitCell(update.graphNodeId, path, nextValue);
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
 		},
@@ -575,7 +584,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 			if (collectionCallMutated(call.method, result, beforeMutation)) {
 				markDirtyPath(call.graphNodeId, path);
-				scheduleFlush();
 			}
 
 			return result;
@@ -584,18 +592,20 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const outcome = deletePath(cells.get(deletion.graphNodeId), deletion.path);
 			if (outcome.mutated) {
 				markDirtyPath(deletion.graphNodeId, deletion.path);
-				scheduleFlush();
 			}
 
 			return outcome.result;
 		},
 		subscribe(subscription) {
-			subscriptions.push(subscription);
+			internals.addSubscription(subscription);
 			// Disposal contract: removed scopes unsubscribe their graph wiring
 			// (spec 01-tsrx-host-contract "branch scope disposal").
 			return () => {
-				const index = subscriptions.indexOf(subscription);
-				if (index >= 0) subscriptions.splice(index, 1);
+				const bucket = subscriptionsByNode.get(subscription.graphNodeId)!;
+				const index = bucket.indexOf(subscription);
+				if (index < 0) return;
+				bucket.splice(index, 1);
+				subscriptionOrder.delete(subscription);
 			};
 		},
 		subscribeWrite(observer) {
@@ -609,7 +619,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		holdFlush() {
 			flushHolds++;
 			return () => {
-				if (!--flushHolds && flushScheduled) scheduleMicrotask(runScheduledFlush);
+				if (!--flushHolds && flushScheduled) queueMicrotask(runScheduledFlush);
 			};
 		},
 		settleWriteObservers() {
@@ -634,3 +644,4 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 	};
 }
+
