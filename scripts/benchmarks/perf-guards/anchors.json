@@ -1692,6 +1692,14 @@
 			"reason": "first-click row match climbs once per list (1,000 rows: 0.8->0.17 ms on a handler, 2.4->0.15 ms elsewhere); +299 B rendered, loads at the first event"
 		},
 		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 18670,
+			"to": 19362,
+			"reason": "resumed keyed reorder keeps rows on the longest run in order (move-to-front n-1 moves -> 1); +692 B rendered, loads at the first event"
+		},
+		{
 			"date": "2026-10-24",
 			"guard": "runtime",
 			"subject": "web/fns/row-mint",
@@ -1815,7 +1823,7 @@
 		"web/resume-events": 17992,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 18670,
+		"web/resume-keyed-repeats": 19362,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,

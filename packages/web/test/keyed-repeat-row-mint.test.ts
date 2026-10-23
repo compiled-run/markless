@@ -609,3 +609,24 @@ test('an expression slot reads through the page reader, and refreshes on its out
 		host.__marklessRowMint = previous;
 	}
 });
+
+test('a resumed reorder moves only the rows outside the longest run already in order', async () => {
+	const served = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, label: id }));
+	const { write, list, labels, census, root } = fixture({ served });
+	const insert = list.insertBefore!;
+	const moved: string[] = [];
+	list.insertBefore = (node, before) => {
+		moved.push(textOf(node));
+		return insert(node, before);
+	};
+
+	await write([served[5]!, ...served.slice(0, 5)]);
+	expect(labels()).toEqual(['header', 'f', 'a', 'b', 'c', 'd', 'e', 'footer']);
+	expect(moved).toEqual(['f']);
+
+	moved.length = 0;
+	await write([served[5]!, served[3]!, served[1]!, served[2]!, served[0]!, served[4]!]);
+	expect(labels()).toEqual(['header', 'f', 'd', 'b', 'c', 'a', 'e', 'footer']);
+	expect(moved).toHaveLength(2);
+	expect(census()).toEqual(elementsUnder(root));
+});
