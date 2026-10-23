@@ -76,11 +76,10 @@ export async function resumeFromPayloadScriptsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	const life = pageLifetime(root);
 	return containWakeBoot(
 		root,
 		(root.__mStart ??= startPayloadResume(input, decode).finally(() => {
-			if (pageLifetime(root) === life) delete root.__mStart;
+			delete root.__mStart;
 		})),
 	);
 }
@@ -95,11 +94,10 @@ export async function resumeFromPrerenderRecordsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	const life = pageLifetime(root);
 	return containWakeBoot(
 		root,
 		(root.__mStart ??= startDecodedResume(input, input).finally(() => {
-			if (pageLifetime(root) === life) delete root.__mStart;
+			delete root.__mStart;
 		})),
 	);
 }
@@ -111,8 +109,6 @@ function liveSyncPolicyCells(graph: RuntimeGraph): Map<string, unknown> {
 	cells.get = (graphNodeId) => graph.read(graphNodeId, []);
 	return cells;
 }
-
-const pageLifetime = (root: object): unknown => (root as { readonly __mL?: object }).__mL;
 
 async function startPayloadResume(
 	input: ResumePayloadScriptsInput,
@@ -186,7 +182,6 @@ async function startDecodedResume(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'>,
 	decoded: DecodedPayloadScripts,
 ): Promise<ResumePayloadScriptsResult> {
-	const life = pageLifetime(input.root);
 	// Composed children's symbols answer on their own instance's graph nodes.
 	const loadSymbol = heldSymbolLoader(marklessInstanceScopedLoadSymbol(input.loadSymbol));
 	const graph = await createRuntimeGraphFromResumePayload({
@@ -195,8 +190,7 @@ async function startDecodedResume(
 		root: input.root,
 		loadSymbol,
 	});
-	if (pageLifetime(input.root) === life)
-		input.root.__marklessEventOnlyGraph = liveSyncPolicyCells(graph);
+	input.root.__marklessEventOnlyGraph = liveSyncPolicyCells(graph);
 	let runtime: ResumeRuntime | undefined;
 	const applyDomJournal =
 		input.applyDomJournal ??
@@ -241,10 +235,6 @@ async function startDecodedResume(
 		retiring.dispose();
 	};
 	await runtime.start();
-	if (pageLifetime(input.root) !== life) {
-		runtime.dispose();
-		return { decoded, graph, runtime };
-	}
 	// Reuse the existing streamed or staged dispatch authority.
 	input.root.__marklessDispatch ??= (handoff) =>
 		runtime!.dispatch(handoff.event, {

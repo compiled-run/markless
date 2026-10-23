@@ -88,8 +88,7 @@ type StagedContainer = {
 	dispatchRegistered: boolean;
 };
 
-// Keyed by the container's page lifetime: a navigation that keeps the container in place starts a new one.
-const stagedContainers = new WeakMap<object, StagedContainer>();
+const stagedContainers = new WeakMap<ResumeDomElement, StagedContainer>();
 
 export function mergePrerenderPayloadRecords(
 	derived: ResumeRecordSet,
@@ -105,8 +104,7 @@ export function mergePrerenderPayloadRecords(
 export function resumePrerenderTriggerGroup(
 	input: TriggerGroupInput,
 ): Promise<ResumePayloadScriptsResult> {
-	const page = (input.root as { __mL?: object }).__mL ?? input.root;
-	let container = stagedContainers.get(page);
+	let container = stagedContainers.get(input.root);
 	if (!container) {
 		container = {
 			activation: Promise.resolve(),
@@ -118,7 +116,7 @@ export function resumePrerenderTriggerGroup(
 			bornLate: new Set(),
 			dispatchRegistered: false,
 		};
-		stagedContainers.set(page, container);
+		stagedContainers.set(input.root, container);
 		attachPrerenderBoundaryAuthority(input.root);
 	}
 	const existing = container.groups.get(input.groupId);
