@@ -87,9 +87,15 @@ export type Keys = {
 	readonly arrowRight: string;
 };
 
+/** A state word a reader speaks differently for one role than the vocabulary's word for every role. */
+export type RoleStates = Readonly<
+	Partial<Record<keyof Vocabulary, Readonly<Partial<Record<keyof Vocabulary, string>>>>>
+>;
+
 export type ScreenReaderDriver = {
 	readonly name: string;
 	readonly vocabulary: Vocabulary;
+	readonly roleStates?: RoleStates;
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts the reader announced. */
 	segments(phrase: string): string[];
@@ -156,9 +162,9 @@ export function missingFacts(
 		missing.push(`name "${conveys.name}"`);
 	}
 	for (const state of conveys.state ?? []) {
-		if (absent(driver.vocabulary[state])) {
-			missing.push(`state "${driver.vocabulary[state]}"`);
-		}
+		const word =
+			(conveys.role && driver.roleStates?.[conveys.role]?.[state]) ?? driver.vocabulary[state];
+		if (absent(word)) missing.push(`state "${word}"`);
 	}
 	return missing;
 }

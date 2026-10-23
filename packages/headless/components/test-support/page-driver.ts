@@ -1,5 +1,6 @@
 import type { NVDAPlaywright, VoiceOverPlaywright } from '@guidepup/playwright';
-import type { Keys, ScreenReaderDriver, Vocabulary } from './driver.ts';
+import type { Page } from '@playwright/test';
+import type { Keys, RoleStates, ScreenReaderDriver, Vocabulary } from './driver.ts';
 
 /**
  * The half of a driver a real screen reader supplies: the commands.
@@ -15,6 +16,7 @@ export type RealReader = NVDAPlaywright | VoiceOverPlaywright;
 export type RealDriverSpec = {
 	readonly name: string;
 	readonly vocabulary: Vocabulary;
+	readonly roleStates?: RoleStates;
 	readonly keys: Keys;
 	/** Split one spoken phrase into the separate facts this reader announced. */
 	segments: (phrase: string) => string[];
@@ -31,6 +33,7 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 	return {
 		name: spec.name,
 		vocabulary: spec.vocabulary,
+		...(spec.roleStates ? { roleStates: spec.roleStates } : {}),
 		keys: spec.keys,
 		segments: spec.segments,
 		start: async () => {},
@@ -71,4 +74,39 @@ export function commaSegments(phrase: string): string[] {
 		.split(/[,\n]/)
 		.map((segment) => segment.trim())
 		.filter((segment) => segment.length > 0);
+}
+
+/**
+ * VoiceOver speaks a name, its states and its role as one run of words with no
+ * separator ("Checkbox Label unchecked checkbox"), and a name can hold commas of
+ * its own ("Monday, August 3, 2026 toggle button"), so every contiguous run of
+ * words is a candidate fact. Its negative states are single words ("unchecked",
+ * "collapsed", "dimmed"); a run that starts right after "not" is still dropped,
+ * so "not checked" can never satisfy "checked".
+ */
+export function wordRunSegments(phrase: string): string[] {
+	const words = phrase.split(/\s+/).filter((word) => word.length > 0);
+	const runs = new Set<string>();
+	for (let start = 0; start < words.length; start++) {
+		if (start > 0 && words[start - 1]!.replace(/,$/, '').toLowerCase() === 'not') continue;
+		for (let end = start + 1; end <= words.length; end++)
+			runs.add(words.slice(start, end).join(' ').replace(/,$/, ''));
+	}
+	return [...runs];
+}
+
+/**
+ * Put the reading cursor on the section the page's URL fragment names.
+ *
+ * Entering web content starts the cursor at the top of the document, and the
+ * gallery holds every family; VoiceOver's cursor follows keyboard focus, so
+ * focusing the section starts the walk where the family is.
+ */
+export async function startAtFragment(page: Page): Promise<void> {
+	const id = decodeURIComponent(new URL(page.url()).hash.slice(1));
+	if (!id) throw new Error(`${page.url()} names no section to start reading at.`);
+	await page.locator(`[id="${id}"]`).evaluate((section: HTMLElement) => {
+		section.tabIndex = -1;
+		section.focus();
+	});
 }

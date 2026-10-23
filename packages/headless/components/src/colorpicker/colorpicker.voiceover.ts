@@ -1,5 +1,5 @@
 import { voiceOverTest } from '@guidepup/playwright';
-import { realDriver } from '../../test-support/page-driver.ts';
+import { realDriver, startAtFragment } from '../../test-support/page-driver.ts';
 import { voiceOverSpec } from '../../test-support/vocabularies.ts';
 import {
 	COLORPICKER_ANCHOR,
@@ -20,6 +20,7 @@ voiceOverTest('VoiceOver conveys the plane as two adjustable axis controls, the 
 		'no colorpicker section on the gallery yet',
 	);
 	await voiceOver.navigateToWebContent();
+	await startAtFragment(page);
 
 	await readColorpickerTranscript(realDriver(voiceOver, voiceOverSpec), page);
 });

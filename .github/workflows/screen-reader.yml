@@ -126,16 +126,19 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Install Playwright browsers for the vitest browser project
-              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
-
             - name: Typecheck the screen-reader lanes
               run: pnpm typecheck:sr
 
             - name: Typecheck the real-reader lane
               run: pnpm typecheck:sr-real
 
+            # The runner image's Google Chrome, not a downloaded Chromium: about a hundred
+            # downloads a push failed a different family whenever one CDN edge served the wrong
+            # certificate for cdn.playwright.dev, and caching the download instead throttled the
+            # repository's cache egress for every other job.
             - name: Read the ${{ matrix.family }} family with the virtual screen reader
+              env:
+                  MARKLESS_SR_BROWSER_CHANNEL: chrome
               run: pnpm test:sr src/${{ matrix.family }}/${{ matrix.family }}.sr.ts
 
     # Real NVDA on a real Windows desktop session. guidepup/setup-action

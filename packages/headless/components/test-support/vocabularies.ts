@@ -1,5 +1,5 @@
 import type { Keys, Vocabulary } from './driver.ts';
-import { commaSegments, type RealDriverSpec } from './page-driver.ts';
+import { commaSegments, wordRunSegments, type RealDriverSpec } from './page-driver.ts';
 
 /**
  * What NVDA and VoiceOver call the facts a checkbox announcement has to convey.
@@ -106,17 +106,16 @@ export const voiceOverVocabulary: Vocabulary = {
 	invalid: 'invalid data',
 	// unverified against our markup
 	switch: 'switch',
-	// unverified against our markup; the radio-group research note records
-	// aria-at's own transcript for this role as "group"
-	radiogroup: 'group',
+	// observed on macOS 26: "Billing Period radio group"
+	radiogroup: 'radio group',
 	// unverified against our markup; aria-at's radiogroup plan says "radio button"
 	radio: 'radio button',
-	// unverified against our markup; aria-at's tabs plan says "tab list"
-	tablist: 'tab list',
+	// observed on macOS 26: walking into the tabs reads each tab and never names the list
+	tablist: '',
 	// unverified against our markup
 	tab: 'tab',
-	// unverified against our markup; aria-at's tabs plan says "tab panel"
-	tabpanel: 'tab panel',
+	// observed on macOS 26: the panel's text is read with no role word
+	tabpanel: '',
 	// unverified against our markup
 	combobox: 'combo box',
 	// unverified against our markup
@@ -127,8 +126,8 @@ export const voiceOverVocabulary: Vocabulary = {
 	button: 'button',
 	// unverified against our markup
 	progressbar: 'progress indicator',
-	// unverified against our markup
-	textbox: 'text field',
+	// observed on macOS 26: "Username edit text"
+	textbox: 'edit text',
 	// unverified against our markup
 	navigation: 'navigation',
 	// unverified against our markup
@@ -176,6 +175,8 @@ export const nvdaSpec: RealDriverSpec = {
 export const voiceOverSpec: RealDriverSpec = {
 	name: 'VoiceOver',
 	vocabulary: voiceOverVocabulary,
+	// Observed on macOS 26: "3 of 5 selected radio button, 3 of 5", and no state word for an unchosen radio.
+	roleStates: { radio: { checked: 'selected', notChecked: '' } },
 	keys,
-	segments: commaSegments,
+	segments: wordRunSegments,
 };
