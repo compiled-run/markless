@@ -173,6 +173,7 @@ const buildOrder: PackUserConfig[] = [
 		packageName: 'core',
 		entry: {
 			index: './src/index.ts',
+			'index.browser': './src/index.browser.ts',
 			preload: './src/preload.ts',
 			rolldown: './src/rolldown.ts',
 			runtime: './src/runtime.ts',

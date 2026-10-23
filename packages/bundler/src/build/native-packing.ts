@@ -150,9 +150,11 @@ export function nativePackingPlugins(
 				// that framework code stays out of the startup packs and loads only if something does reach it.
 				const renderFallbacks = new Set<string>();
 				if (!routeSources.size && directCsrOnly()) {
-					const render = await this.resolve('@markless/web/render');
-					for (const target of (render && modules.get(render.id)?.dynamicDependencies) ?? [])
-						renderFallbacks.add(target);
+					for (const entry of ['@markless/web/render', '@markless/core']) {
+						const resolved = await this.resolve(entry);
+						for (const target of (resolved && modules.get(resolved.id)?.dynamicDependencies) ?? [])
+							renderFallbacks.add(target);
+					}
 					for (const module of modules.values())
 						if (module.app)
 							for (const target of module.dynamicDependencies)

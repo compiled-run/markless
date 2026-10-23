@@ -15,7 +15,10 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
-		".": "./src/index.ts",
+		".": {
+			"browser": "./src/index.browser.ts",
+			"default": "./src/index.ts"
+		},
 		"./preload": "./src/preload.ts",
 		"./rolldown": "./src/rolldown.ts",
 		"./runtime": "./src/runtime.ts",
@@ -44,6 +47,7 @@
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
+				"browser": "./dist/index.browser.js",
 				"default": "./dist/index.js"
 			},
 			"./preload": {
