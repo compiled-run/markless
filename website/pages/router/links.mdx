@@ -72,6 +72,17 @@ start early. If the request fails, the browser loads the address the normal way.
 
 Plain `<a>` links to your pages navigate the same way.
 
+A page fetched early is shown for up to 30 seconds, and only while it can still match what the
+server would send:
+
+- After a write from this page, every page fetched early is dropped and the next click asks the
+  server again. A write is a submitted form, or a `fetch` to your own site that is not a `GET` or
+  `HEAD`. Back and Forward ask again too. To see these writes, the router wraps `window.fetch` once
+  it starts. The wrapper passes your arguments to the browser's `fetch` unchanged and returns its
+  promise as is.
+- A page that answers `Cache-Control: no-store` or `no-cache` is fetched again at the click, unless
+  the early request is still arriving. One that answers `max-age=N` is shown for at most `N` seconds.
+
 In a built app, the code that handles these clicks is one small file the browser downloads once and
 caches for every page. It starts when the browser finishes reading the page. A link clicked before
 that, while a long page is still loading, loads the whole new page the normal way. Nothing is lost;
