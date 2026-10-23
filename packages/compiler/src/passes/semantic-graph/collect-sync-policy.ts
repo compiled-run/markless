@@ -50,6 +50,9 @@ export function unextractableSyncPolicyDiagnostic(
 		};
 	}
 
+	const shadowed = handlers.map((handler) => shadowedSyncPolicyCall(handler)).find(Boolean);
+	if (shadowed) return secondSyncPolicyCancelDiagnostic(attributeName, shadowed, state);
+
 	const actionCall =
 		handlers.map((handler) => firstSyncPolicyActionCall(handler)).find(Boolean) ??
 		firstSyncPolicyActionCall(value);
@@ -102,6 +105,10 @@ export function secondSyncPolicyCancelDiagnostic(
 			message: `This ${stray.action}() for ${attributeName} is guarded by state that an earlier statement in the handler can change, and the cancels run before the handler does, so the guard would be read before that change.`,
 			fix: `Guard it with event fields only (\`if (${stray.eventParam}.key === 'ArrowUp') ${call}\`), or move it above the statement that changes the state.`,
 		},
+		'shadowed-event-name': {
+			message: `This ${stray.action}() for ${attributeName} is called on a \`${stray.eventParam}\` that a nested function, block or catch declares again, so the compiler cannot tell whether it is the event, and a cancel that is would run after the event has finished.`,
+			fix: `Rename the inner \`${stray.eventParam}\` so it no longer shares the event parameter's name, or cancel the event itself in a top-level statement, \`if (condition) ${call}\`.`,
+		},
 		'not-a-guard': {
 			message: `This ${stray.action}() for ${attributeName} is not the body of a top-level \`if\` in the handler (it sits in a loop, switch, try, nested function or after other code decides whether it runs), so it cannot run before the handler loads, and it would never reach the event.`,
 			fix: `Move it to its own top-level statement, \`if (condition) ${call}\`, with a condition built from event fields, state, props and constants.`,
@@ -152,12 +159,28 @@ export function uncoveredSyncPolicyCall(
 	const stray = syncActionCallNodes(body, eventParam, ALL_SYNC_POLICY_ACTIONS).find(
 		(call) => !covered.has(call),
 	);
-	if (!stray) return null;
+	if (!stray) return shadowedSyncPolicyCall(node);
 
 	const action = syncActionCall(stray, eventParam);
 	return action
 		? { action, node: stray, eventParam, reason: located.refused.get(stray) ?? 'not-a-guard' }
 		: null;
+}
+
+// A cancel on a nested binding that reuses the event parameter's name: it may or may not be the event, so it is refused.
+function shadowedSyncPolicyCall(node: AnyNode | undefined): StraySyncPolicyCall | null {
+	if (!node) return null;
+	const eventParam = getIdentifierName(asNodes(node.params)[0]) ?? 'event';
+	const body = node.body as AnyNode | undefined;
+	const own = new Set(syncActionCallNodes(body, eventParam, ALL_SYNC_POLICY_ACTIONS));
+	let found: StraySyncPolicyCall | null = null;
+	walkNode(body, (candidate) => {
+		if (found || own.has(candidate)) return;
+		const action = syncActionCall(candidate, eventParam);
+		if (action)
+			found = { action, node: candidate, eventParam, reason: 'shadowed-event-name' };
+	});
+	return found;
 }
 
 const ALL_SYNC_POLICY_ACTIONS: ReadonlySet<SemanticSyncPolicyAction> = new Set([
@@ -258,7 +281,11 @@ type SyncPolicyLocation = {
 	readonly refused: ReadonlyMap<AnyNode, SyncPolicyRefusal>;
 };
 
-export type SyncPolicyRefusal = 'unextractable-guard' | 'guard-reads-written-state' | 'not-a-guard';
+export type SyncPolicyRefusal =
+	| 'unextractable-guard'
+	| 'guard-reads-written-state'
+	| 'not-a-guard'
+	| 'shadowed-event-name';
 
 type SyncPolicyScan = {
 	readonly eventParam: string;
@@ -277,7 +304,7 @@ function locateSyncPolicy(
 	eventParam: string,
 	state: Pick<WalkState, 'graph' | 'source'>,
 ): SyncPolicyLocation | undefined {
-	if (!body) return undefined;
+	if (!body || rebindsName(body, eventParam)) return undefined;
 
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
 	const scan: SyncPolicyScan = {
@@ -398,13 +425,14 @@ function readsGraph(condition: SemanticSyncPolicyCondition): boolean {
 // updates, deletes, and any call other than the event's own cancel methods.
 function mayWrite(node: AnyNode | undefined, eventParam: string): boolean {
 	let writes = false;
+	const cancels = new Set(syncActionCallNodes(node, eventParam, ALL_SYNC_POLICY_ACTIONS));
 	walkNode(node, (candidate) => {
 		if (writes) return;
 		if (
 			candidate.type === 'AssignmentExpression' ||
 			candidate.type === 'UpdateExpression' ||
 			(candidate.type === 'UnaryExpression' && candidate.operator === 'delete') ||
-			(candidate.type === 'CallExpression' && !syncActionCall(candidate, eventParam)) ||
+			(candidate.type === 'CallExpression' && !cancels.has(candidate)) ||
 			candidate.type === 'NewExpression' ||
 			candidate.type === 'AwaitExpression'
 		)
@@ -499,6 +527,90 @@ function exitsAtEnd(node: AnyNode | undefined): boolean {
 	return body.slice(0, -1).every((statement) => !mayExitEarly(statement));
 }
 
+// Visits the nodes where `name` still means the handler's event: a nested function, block, loop or catch that binds it holds its own value.
+function walkEventScope(
+	node: AnyNode | undefined,
+	name: string,
+	visit: (node: AnyNode) => void,
+): void {
+	if (!node || typeof node !== 'object' || rebindsName(node, name)) return;
+	visit(node);
+	for (const child of childNodes(node)) walkEventScope(child, name, visit);
+}
+
+function rebindsName(node: AnyNode, name: string): boolean {
+	if (isFunctionNode(node) || node.type === 'ArrowFunctionExpression')
+		return (
+			asNodes(node.params).some((parameter) => patternBindsName(parameter, name)) ||
+			declaresName(node.body as AnyNode | undefined, name, true)
+		);
+	if (node.type === 'BlockStatement' || node.type === 'StaticBlock' || node.type === 'Program')
+		return declaresName(node, name, false);
+	if (node.type === 'SwitchStatement')
+		return asNodes(node.cases).some((switchCase) =>
+			asNodes(switchCase.consequent).some((statement) =>
+				declaresName(statement, name, false, true),
+			),
+		);
+	if (node.type === 'CatchClause') return patternBindsName(node.param as AnyNode | undefined, name);
+	if (node.type === 'ForStatement')
+		return declaresName(node.init as AnyNode | undefined, name, false, true);
+	if (node.type === 'ForInStatement' || node.type === 'ForOfStatement')
+		return declaresName(node.left as AnyNode | undefined, name, false, true);
+	return false;
+}
+
+// Whether a scope's own statements declare `name`; `var` declarations count through nested blocks of a function body.
+function declaresName(
+	node: AnyNode | undefined,
+	name: string,
+	functionBody: boolean,
+	direct = false,
+): boolean {
+	if (!node) return false;
+	const statements = direct
+		? [node]
+		: node.type === 'BlockStatement' || node.type === 'StaticBlock' || node.type === 'Program'
+			? asNodes(node.body)
+			: [];
+	if (
+		statements.some(
+			(statement) =>
+				((statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') &&
+					getIdentifierName(statement.id as AnyNode | undefined) === name) ||
+				(statement.type === 'VariableDeclaration' &&
+					asNodes(statement.declarations).some((declarator) =>
+						patternBindsName(declarator.id as AnyNode | undefined, name),
+					)),
+		)
+	)
+		return true;
+	if (!functionBody) return false;
+	let hoisted = false;
+	const visit = (candidate: AnyNode): void => {
+		if (hoisted || (candidate !== node && isFunctionNode(candidate))) return;
+		if (
+			candidate.type === 'VariableDeclaration' &&
+			candidate.kind === 'var' &&
+			asNodes(candidate.declarations).some((declarator) =>
+				patternBindsName(declarator.id as AnyNode | undefined, name),
+			)
+		)
+			hoisted = true;
+		for (const child of childNodes(candidate)) visit(child);
+	};
+	visit(node);
+	return hoisted;
+}
+
+function patternBindsName(pattern: AnyNode | undefined, name: string): boolean {
+	let binds = false;
+	walkNode(pattern, (candidate) => {
+		if (candidate.type === 'Identifier' && getIdentifierName(candidate) === name) binds = true;
+	});
+	return binds;
+}
+
 function isFunctionNode(node: AnyNode): boolean {
 	return (
 		node.type === 'FunctionExpression' ||
@@ -513,7 +625,7 @@ function extractSyncActions(
 ): SemanticSyncPolicyAction[] {
 	const actions: SemanticSyncPolicyAction[] = [];
 
-	walkNode(node, (candidate) => {
+	walkEventScope(node, eventParam, (candidate) => {
 		if (candidate.type !== 'CallExpression') return;
 
 		const callee = unwrapParens(candidate.callee as AnyNode | undefined);
@@ -537,7 +649,7 @@ function syncActionCallNodes(
 ): AnyNode[] {
 	const calls: AnyNode[] = [];
 
-	walkNode(node, (candidate) => {
+	walkEventScope(node, eventParam, (candidate) => {
 		if (candidate.type !== 'CallExpression') return;
 
 		const callee = unwrapParens(candidate.callee as AnyNode | undefined);

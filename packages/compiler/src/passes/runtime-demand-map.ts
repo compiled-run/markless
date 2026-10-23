@@ -36,6 +36,8 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
+import { asNodes, getIdentifierName, isNode, type AnyNode } from '../ast/nodes.ts';
+import { parseJavaScriptModule } from '../js-ast.ts';
 import { LEAN_DISPATCH_MARKER_MODULES } from '../lean-dispatch-modules.ts';
 import { closureActionPlan } from './closure-action-plan.ts';
 import { moduleReachesStorageCells } from './link/storage-cells.ts';
@@ -675,32 +677,52 @@ function eventHandlerBodyAllowsScalarLeaf(
 		Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']
 	>[number],
 ): boolean {
-	const body = eventHandlerBodySource(symbol.source);
 	const authoredWrite = authoredWriteSource(write);
-	if (!body || !authoredWrite) return false;
-	let remainder = body.replace(authoredWrite, '');
-	for (const parameter of symbol.parameters) {
-		remainder = remainder.replaceAll(`${parameter}.preventDefault();`, '');
-		remainder = remainder.replaceAll(`${parameter}.stopPropagation();`, '');
+	const prefix = 'const __marklessHandler = ';
+	const wrapped = `${prefix}${symbol.source};`;
+	let program: AnyNode;
+	try {
+		program = parseJavaScriptModule(wrapped, 'markless-handler.js') as unknown as AnyNode;
+	} catch {
+		return false;
 	}
-	remainder = remainder.replace(/\breturn\b/g, '');
-	return remainder.replace(/[;\s]/g, '') === '';
+	const declarator = asNodes(asNodes(program.body)[0]?.declarations)[0];
+	const fn = declarator?.init as AnyNode | undefined;
+	if (!authoredWrite || !fn || !isNode(fn.body)) return false;
+	const body = fn.body as AnyNode;
+	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
+	const parameters = new Set(asNodes(fn.params).flatMap((param) => getIdentifierName(param) ?? []));
+	let wrote = false;
+	return statements.every((statement) => {
+		if (statement.type === 'EmptyStatement') return true;
+		if (statement.type === 'ReturnStatement' && !statement.argument) return true;
+		const expression =
+			statement.type === 'ExpressionStatement'
+				? (statement.expression as AnyNode | undefined)
+				: statement.type === 'ReturnStatement'
+					? (statement.argument as AnyNode | undefined)
+					: body.type === 'BlockStatement'
+						? undefined
+						: statement;
+		if (!expression) return false;
+		if (!wrote && wrapped.slice(expression.start, expression.end) === authoredWrite)
+			return (wrote = true);
+		return parameterCancel(expression, parameters);
+	});
 }
 
-function eventHandlerBodySource(source: string): string | null {
-	const arrowIndex = source.indexOf('=>');
-	if (arrowIndex === -1) return null;
-
-	const bodyStart = arrowIndex + 2 + leadingWhitespaceLength(source.slice(arrowIndex + 2));
-	if (bodyStart >= source.length) return null;
-
-	if (source[bodyStart] === '{') {
-		const bodyEnd = source.lastIndexOf('}');
-		if (bodyEnd === -1) return null;
-		return source.slice(bodyStart + 1, bodyEnd).trim();
-	}
-
-	return `return ${source.slice(bodyStart).trim()};`;
+// `<handler parameter>.preventDefault()` or `.stopPropagation()` as a statement of the handler's own body, where the name can only be the parameter.
+function parameterCancel(node: AnyNode, parameters: ReadonlySet<string>): boolean {
+	if (node.type !== 'CallExpression' || asNodes(node.arguments).length > 0) return false;
+	const callee = node.callee as AnyNode | undefined;
+	if (callee?.type !== 'MemberExpression' || callee.computed === true) return false;
+	const object = getIdentifierName(callee.object as AnyNode | undefined);
+	const method = getIdentifierName(callee.property as AnyNode | undefined);
+	return (
+		object !== null &&
+		parameters.has(object) &&
+		(method === 'preventDefault' || method === 'stopPropagation')
+	);
 }
 
 function authoredWriteSource(
@@ -721,11 +743,6 @@ function authoredWriteSource(
 	}
 
 	return null;
-}
-
-function leadingWhitespaceLength(source: string): number {
-	const match = /^\s*/.exec(source);
-	return match ? match[0].length : 0;
 }
 
 function literalValueSource(source: string | undefined): string | null {
