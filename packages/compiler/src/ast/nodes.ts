@@ -54,6 +54,17 @@ export function childNodes(node: AnyNode): AnyNode[] {
 	return children;
 }
 
+/** Calls `visit` on each child `childNodes` would list, in the same order, without building the list. */
+export function forEachChildNode(node: AnyNode, visit: (child: AnyNode) => void): void {
+	for (const key in node) {
+		if (ignoredWalkKeys.has(key)) continue;
+		const value = node[key];
+		if (Array.isArray(value)) {
+			for (const item of value) if (isNode(item)) visit(item);
+		} else if (isNode(value)) visit(value);
+	}
+}
+
 export function asNodes(value: unknown): AnyNode[] {
 	return Array.isArray(value) ? value.filter(isNode) : [];
 }
