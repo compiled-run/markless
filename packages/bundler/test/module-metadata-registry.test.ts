@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { sourceSymbolManifest } from '../src/link-driver.ts';
+import { awaitChildClaimPublications, sourceSymbolManifest } from '../src/link-driver.ts';
 import { ModuleMetadataRegistry } from '../src/module-metadata-registry.ts';
 import type { MarklessTransformManifest } from '../src/types.ts';
 
@@ -131,6 +131,46 @@ describe('module metadata identity registry', () => {
 		await waiting;
 
 		expect(sourceSymbolManifest(registry, source, 'client')?.symbols).toContainEqual(imported);
+	});
+
+	test('a child whose sibling starts while the reader waits on another child is waited on again', async () => {
+		const parent = '/workspace/app/routes/index.tsrx';
+		const first = '/workspace/app/components/Tabs.tsrx';
+		const second = '/workspace/app/components/Tooltip.tsrx';
+		const firstSymbols = `${first}?markless-symbols`;
+		const resolver = `virtual:markless:resolver:${encodeURIComponent(first)}`;
+		const registry = new ModuleMetadataRegistry();
+		const imported = symbol(first, 'symbol:1', 'event-handler');
+		const child = (source: string) => ({
+			parent,
+			specifier: source,
+			source,
+			externalized: false,
+		});
+		registry.beginSourceSymbolClaims('client', first, first);
+		registry.beginSourceSymbolClaims('client', second, second);
+
+		let settled = false;
+		const waiting = awaitChildClaimPublications(
+			registry,
+			[child(first), child(second)],
+			'client',
+		).then(() => {
+			settled = true;
+		});
+		registry.recordSymbolClaims(first, manifest(first, resolver, []));
+		registry.finishSourceSymbolClaims('client', first, first);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		// The reader now waits on the second child; the first child's symbols sibling starts meanwhile.
+		registry.beginSourceSymbolClaims('client', first, firstSymbols);
+		registry.finishSourceSymbolClaims('client', second, second);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(settled).toBe(false);
+
+		registry.recordSymbolClaims(firstSymbols, manifest(firstSymbols, resolver, [imported]));
+		registry.finishSourceSymbolClaims('client', first, firstSymbols);
+		await waiting;
+		expect(sourceSymbolManifest(registry, first, 'client')?.symbols).toContainEqual(imported);
 	});
 
 	test('the publication ledger is per environment', async () => {

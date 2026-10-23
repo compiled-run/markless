@@ -3,6 +3,7 @@
 // the wake aggregate the resolver ships.
 import {
 	type ArtifactChildMaterialization,
+	type LinkedInterfaceClaim,
 	type LinkedModuleChildResolution,
 	delegateMaterializationScope,
 	linkedChildrenHaveBrowserTriggers,
@@ -20,6 +21,7 @@ import {
 	forceImportedModules,
 	linkBarrelComponentInterfaces,
 	linkModuleGraph,
+	linkedInterfaceClaims,
 	linkedInterfaces,
 	materializeDelegateChildren,
 	mergeLinkedModuleChildren,
@@ -52,6 +54,8 @@ export type LinkedTransformChildren = {
 	readonly resolvedInterfaceImports: ReadonlyArray<LinkedModuleChildResolution>;
 	readonly linkedChildHasBrowserTriggers: boolean;
 	readonly unawaitedSources: ReadonlySet<string>;
+	/** The imported claims as the link read them, behind the same barrier. */
+	readonly importedClaims: ReadonlyArray<LinkedInterfaceClaim>;
 };
 
 // A delegate child renders at build time only where the `delegate-children`
@@ -244,13 +248,20 @@ export async function linkTransformChildren(
 	}
 	// Last await before the claim reads below; a sibling must not start compiling
 	// between the barrier and the read.
+	const claimedImports = mergeLinkedModuleChildren(resolvedInterfaceImports, resolvedChildren);
 	for (const source of await awaitChildClaimPublications(
 		moduleMetadata,
-		resolvedChildren,
+		claimedImports,
 		currentEnvironment,
 	)) {
 		unawaitedSources.add(source);
 	}
+	const importedClaims = linkedInterfaceClaims(
+		claimedImports,
+		moduleMetadata,
+		currentEnvironment,
+		unawaitedSources,
+	);
 	const symbolClaimsForSource = (source: string) =>
 		sourceSymbolManifest(moduleMetadata, source, currentEnvironment, unawaitedSources);
 	const linkedChildHasBrowserTriggers = linkedChildrenHaveBrowserTriggers({
@@ -318,6 +329,7 @@ export async function linkTransformChildren(
 		resolvedInterfaceImports,
 		linkedChildHasBrowserTriggers,
 		unawaitedSources,
+		importedClaims,
 	};
 }
 

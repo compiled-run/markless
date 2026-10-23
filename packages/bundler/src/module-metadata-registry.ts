@@ -292,6 +292,17 @@ export class ModuleMetadataRegistry {
 		return true;
 	}
 
+	/** Whether `awaitSourceClaimsPublished` would wait right now. */
+	claimsStillPublishing(
+		environment: MarklessEnvironment,
+		source: string,
+		waiter: string,
+	): boolean {
+		if (this.waitsOn(environment, source, waiter)) return false;
+		const publication = this.#sourceClaimPublications.get(publicationKey(environment, source));
+		return publication !== undefined && ModuleMetadataRegistry.#awaited(publication);
+	}
+
 	// Every variant this environment began has published, and at least one began.
 	sourceClaimsPublished(environment: MarklessEnvironment, source: string): boolean {
 		const publication = this.#sourceClaimPublications.get(publicationKey(environment, source));
