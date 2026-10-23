@@ -155,7 +155,7 @@ export async function invalidateEditedGeneratedModules(
 				: {}),
 		});
 		for (const module of next.virtualModules) {
-			if (module.type !== 'render-data') continue;
+			if (module.type !== 'render-data' && module.type !== 'render-data-served') continue;
 			virtualModules.set(module.id, module);
 			renderDataIds.add(resolveVirtualId(module.id));
 		}

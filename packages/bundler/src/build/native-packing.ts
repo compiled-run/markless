@@ -23,6 +23,8 @@ import type { RuntimeDemandMapManifest } from '../types.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../execution-log.ts';
 import {
 	MARKLESS_ROUTE_SOURCE_QUERY_RE,
+	isClientRenderDataEntry,
+	isRenderDataSourceRequest,
 	isResumeSourceRequest,
 	isRouteNavigationSourceRequest,
 	isSymbolOnlySourceRequest,
@@ -35,6 +37,7 @@ import {
 	sourceForSettleVirtualImporter,
 	sourceForTriggerGroupVirtualImporter,
 } from '../virtual-ids.ts';
+import { isServedRenderDataRequest } from '../served-render-data.ts';
 
 // Leading V8 compile hint: the browser compiles the whole pack while streaming it, not at first use.
 export const EAGER_COMPILE_HINT = '//# allFunctionsCalledOnLoad';
@@ -124,6 +127,9 @@ export function nativePackingPlugins(
 						eventSource ??
 						resolverVirtualModuleSourceFile(normalizeVirtualId(id)) ??
 						(isAbsolute(id) ? id.split('?')[0] : undefined);
+					// Full render data only a client render imports is no sibling of its source: a page that runs the source's handlers never loads it.
+					const clientRenderOnly =
+						isRenderDataSourceRequest(id) && !isServedRenderDataRequest(id);
 					modules.set(id, {
 						firstEvent:
 							!!eventSource ||
@@ -133,7 +139,7 @@ export function nativePackingPlugins(
 						handler: !!handlerSource,
 						dependencies: info.importedIds,
 						dynamicDependencies: info.dynamicallyImportedIds,
-						source,
+						source: clientRenderOnly ? undefined : source,
 						reachedFrom: renderDataReachedFromQuery(id),
 						size: info.code?.length ?? 0,
 						app: isAppModule(id, root()),
@@ -200,13 +206,15 @@ export function nativePackingPlugins(
 								moduleIds: modules.keys(),
 							}),
 							...renderFallbacks,
+							...[...modules.keys()].filter(isClientRenderDataEntry),
 						]),
 					),
 				});
 				dynamicImporters = dynamicImportersOf(modules);
 			},
 			onLog(_level, log) {
-				if (isPlannedCoLocation(log, (id) => groups.get(id), dynamicImporters)) return false;
+				if (isPlannedCoLocation(log, (id) => groups.get(id), dynamicImporters))
+					return false;
 			},
 			outputOptions(output) {
 				if (output.format && !['es', 'esm', 'module'].includes(output.format))
