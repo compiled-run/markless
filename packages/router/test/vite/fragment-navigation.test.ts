@@ -930,19 +930,31 @@ for (const [name, browserType] of [
 
 		test('a scrolled box the next page wraps differently keeps its offset, and the page lands without a smooth scroll', async () => {
 			const { page, errors } = await open(browser, '/', docOrigin);
-			await page.evaluate(() => {
-				document.querySelector('[data-side]')!.scrollTop = 900;
-				window.scrollTo({ top: 1200, behavior: 'instant' });
-				const seen: Array<{ y: number; side: number }> = [];
-				(window as unknown as Record<string, unknown>).__landed = seen;
-				document.addEventListener('marklessrouterrendered', () =>
-					seen.push({
-						y: window.scrollY,
-						side: document.querySelector('[data-side]')!.scrollTop,
+			// The router learns a box scrolled from its scroll event, which fires a frame after the write.
+			await page.evaluate(
+				() =>
+					new Promise<void>((settled) => {
+						const side = document.querySelector('[data-side]')!;
+						const pending = new Set<EventTarget>([side, document]);
+						const heard = (event: Event) => {
+							pending.delete(event.target!);
+							if (pending.size) return;
+							window.removeEventListener('scroll', heard, true);
+							settled();
+						};
+						window.addEventListener('scroll', heard, true);
+						side.scrollTop = 900;
+						window.scrollTo({ top: 1200, behavior: 'instant' });
+						const seen: Array<{ y: number; side: number }> = [];
+						(window as unknown as Record<string, unknown>).__landed = seen;
+						document.addEventListener('marklessrouterrendered', () =>
+							seen.push({
+								y: window.scrollY,
+								side: document.querySelector('[data-side]')!.scrollTop,
+							}),
+						);
 					}),
-				);
-			});
-			await page.waitForTimeout(100);
+			);
 			await page
 				.locator('[data-side-link="gamma"]')
 				.evaluate((link) => (link as HTMLElement).click());
