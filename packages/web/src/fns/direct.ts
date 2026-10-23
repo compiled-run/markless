@@ -413,9 +413,7 @@ function syncDirectRepeat(
 		parent.appendChild?.(newRows);
 	} else if (reusedRows === 0) {
 		parent.replaceChildren(newRows);
-	} else if (!sameMarklessPublicKeys(state.keys, nextKeys)) {
-		replaceMarklessPublicRows(parent, state, nextKeys);
-	}
+	} else replaceMarklessPublicRows(parent, state, nextKeys);
 	if (state.rows.size !== nextKeys.length) pruneMarklessPublicRows(state, nextKeys);
 	if (hadRows && classDirty) patchDirectRepeatClasses(repeat, state, nextClassValues);
 	state.classValues = nextClassValues;
@@ -668,41 +666,63 @@ export function writeMarklessPublicDirtyArrayIndexes(
 export function stringifyMarklessPublicValue(value: unknown) {
 	return value == null ? '' : String(value);
 }
-export function sameMarklessPublicKeys(
-	previous: ReadonlyArray<unknown>,
-	next: ReadonlyArray<unknown>,
-) {
-	if (previous.length !== next.length) return false;
-	for (let index = 0; index < next.length; index++)
-		if (previous[index] !== next[index]) return false;
-	return true;
-}
 export function replaceMarklessPublicRows(
 	parent: Element,
 	state: DirectRepeatState,
 	keys: ReadonlyArray<unknown>,
 ) {
-	const staying = new Set(keys);
-	const oldIndex = new Map<unknown, number>();
-	state.keys.forEach((key, index) => {
-		const root = state.rows.get(key)?.root;
-		if (root?.parentElement !== parent) return;
-		if (staying.has(key)) oldIndex.set(key, index);
-		else parent.removeChild(root);
-	});
+	const previous = state.keys;
+	// Every old row still in place unless the parent's element count says otherwise.
+	const intact = parent.childElementCount === previous.length;
+	const attached = (key: unknown) => intact || state.rows.get(key)?.root.parentElement === parent;
+	// Rows at matching ends never move, and two swapped ends cost two moves, so only the middle is matched by key.
+	let start = 0;
+	let end = keys.length;
+	let previousEnd = previous.length;
+	const rootAt = (index: number) => (index < keys.length ? state.rows.get(keys[index])!.root : null);
+	while (start < end && start < previousEnd) {
+		const first = keys[start];
+		const last = keys[end - 1];
+		if (previous[start] === first && attached(first)) start++;
+		else if (previous[previousEnd - 1] === last && attached(last)) {
+			end--;
+			previousEnd--;
+		} else if (
+			end - start > 2 &&
+			previous[start] === last &&
+			previous[previousEnd - 1] === first &&
+			attached(first) &&
+			attached(last)
+		) {
+			parent.insertBefore(rootAt(start)!, rootAt(end - 1));
+			parent.insertBefore(rootAt(end - 1)!, rootAt(end));
+			start++;
+			end--;
+			previousEnd--;
+		} else break;
+	}
+	const newIndex = new Map<unknown, number>();
+	for (let index = start; index < end; index++) newIndex.set(keys[index], index - start);
+	const positions = new Int32Array(end - start).fill(-1);
+	for (let index = start; index < previousEnd; index++) {
+		const key = previous[index];
+		if (!attached(key)) continue;
+		const at = newIndex.get(key);
+		if (at === undefined) parent.removeChild(state.rows.get(key)!.root);
+		else positions[at] = index;
+	}
 	// Rows on the longest run already in order stay attached; re-inserting a focused row drops its focus.
-	const inPlace = marklessRowsInPlace(keys.map((key) => oldIndex.get(key) ?? -1));
-	let after: Node | null = null;
-	for (let index = keys.length; index--; ) {
+	const inPlace = marklessRowsInPlace(positions);
+	let after: Node | null = rootAt(end);
+	for (let index = end; index-- > start; ) {
 		const root = state.rows.get(keys[index])?.root;
 		if (!root) continue;
-		if (!inPlace[index]) parent.insertBefore(root, after);
+		if (!inPlace[index - start]) parent.insertBefore(root, after);
 		after = root;
 	}
-	while (parent.firstChild && parent.firstChild !== after) parent.removeChild(parent.firstChild);
 }
 /** Marks the entries of one longest strictly increasing run of `positions`; `-1` never joins it. */
-export function marklessRowsInPlace(positions: ReadonlyArray<number>): Uint8Array {
+export function marklessRowsInPlace(positions: ArrayLike<number>): Uint8Array {
 	const inPlace = new Uint8Array(positions.length);
 	const previous = new Int32Array(positions.length);
 	const tails: number[] = [];
@@ -711,17 +731,15 @@ export function marklessRowsInPlace(positions: ReadonlyArray<number>): Uint8Arra
 		if (position < 0) continue;
 		let low = 0;
 		let high = tails.length;
-		if (high && positions[tails[high - 1]!]! < position) low = high;
-		else
-			while (low < high) {
-				const middle = (low + high) >> 1;
-				if (positions[tails[middle]!]! < position) low = middle + 1;
-				else high = middle;
-			}
+		while (low < high) {
+			const middle = (low + high) >> 1;
+			if (positions[tails[middle]!]! < position) low = middle + 1;
+			else high = middle;
+		}
 		previous[index] = low ? tails[low - 1]! : -1;
 		tails[low] = index;
 	}
-	for (let index = tails.length ? tails[tails.length - 1]! : -1; index >= 0; index = previous[index]!)
+	for (let index = tails.at(-1) ?? -1; index >= 0; index = previous[index]!)
 		inPlace[index] = 1;
 	return inPlace;
 }
