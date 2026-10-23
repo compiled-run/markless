@@ -64,6 +64,8 @@ jobs:
         timeout-minutes: 15
         strategy:
             fail-fast: false
+            # The org runs 60 jobs at once; a pull request's readers leave room for every other workflow.
+            max-parallel: 12
             matrix:
                 # Every family with a src/<family>/<family>.sr.ts. One job per
                 # family, so a red lane names the family in its own job title.
@@ -155,6 +157,7 @@ jobs:
         timeout-minutes: 25
         strategy:
             fail-fast: false
+            max-parallel: 8
             matrix:
                 # Only families with a real-reader spec. A family joins this list
                 # when its src/<family>/<family>.nvda.ts exists, not before: a
@@ -297,6 +300,8 @@ jobs:
         continue-on-error: true
         strategy:
             fail-fast: false
+            # The org has five macOS runners in all.
+            max-parallel: 3
             matrix:
                 # See the nvda job: only families with a real-reader spec.
                 family:
