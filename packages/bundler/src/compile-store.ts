@@ -6,6 +6,7 @@ import { mkdir, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/pro
 import { createRequire } from 'node:module';
 import { deserialize, serialize } from 'node:v8';
 import { promisify } from 'node:util';
+import { threadId } from 'node:worker_threads';
 import * as zlib from 'node:zlib';
 import { dirname, join } from 'pathe';
 import type { CompileTsrxModuleResult, PersistentCompileStore } from '@markless/compiler';
@@ -16,6 +17,8 @@ export const DEFAULT_COMPILE_CACHE_MAX_BYTES = 1024 * 1024 * 1024;
 export type PersistentCompileCache = PersistentCompileStore & {
 	/** Waits for every write this process started, then trims the store to its size budget. */
 	flush(): Promise<void>;
+	/** Holds `flush` until a write started elsewhere, such as on a compile worker, has finished. */
+	track(write: Promise<void>): void;
 	/** Type-stripped emitted code, by the exact text and mode that was stripped. */
 	readonly strippedCode: PersistentTextMemo;
 };
@@ -42,15 +45,9 @@ export function createPersistentCompileCache(input: {
 		`${input.fingerprint}\0${stripperVersion()}`,
 	);
 	const pathOf = (source: string, key: string) => {
-		const hash = createHash('sha256')
-			.update(input.fingerprint)
-			.update('\0')
-			.update(key)
-			.update('\0')
-			.update(source)
-			.digest('hex');
-		used.add(hash);
-		return join(input.directory, hash.slice(0, 2), `${hash}.bin`);
+		const entry = compileStoreEntry(input.directory, input.fingerprint, source, key);
+		used.add(entry.hash);
+		return entry.path;
 	};
 	return {
 		read(source, key) {
@@ -80,15 +77,13 @@ export function createPersistentCompileCache(input: {
 			} catch {
 				return;
 			}
-			const pending = (async () => {
-				const packed = await promisify(zlib.zstdCompress)(bytes);
-				await mkdir(dirname(path), { recursive: true });
-				const partial = `${path}.${process.pid}.tmp`;
-				await writeFile(partial, packed);
-				await rename(partial, path);
-			})()
-				.catch(() => {})
-				.finally(() => writes.delete(pending));
+			const pending = writeCompileStoreEntry(path, bytes).finally(() =>
+				writes.delete(pending),
+			);
+			writes.add(pending);
+		},
+		track(write) {
+			const pending = write.finally(() => writes.delete(pending));
 			writes.add(pending);
 		},
 		strippedCode,
@@ -98,6 +93,34 @@ export function createPersistentCompileCache(input: {
 			await trim(input.directory, input.maxBytes ?? DEFAULT_COMPILE_CACHE_MAX_BYTES, used);
 		},
 	};
+}
+
+/** Where one compile result lives: a hash of the compiler's fingerprint and the whole compile input. */
+export function compileStoreEntry(
+	directory: string,
+	fingerprint: string,
+	source: string,
+	key: string,
+): { readonly hash: string; readonly path: string } {
+	const hash = createHash('sha256')
+		.update(fingerprint)
+		.update('\0')
+		.update(key)
+		.update('\0')
+		.update(source)
+		.digest('hex');
+	return { hash, path: join(directory, hash.slice(0, 2), `${hash}.bin`) };
+}
+
+/** Writes one serialized result; a failed write only costs a recompile next time. */
+export async function writeCompileStoreEntry(path: string, bytes: Uint8Array): Promise<void> {
+	try {
+		const packed = await promisify(zlib.zstdCompress)(bytes);
+		await mkdir(dirname(path), { recursive: true });
+		const partial = `${path}.${process.pid}.${threadId}.tmp`;
+		await writeFile(partial, packed);
+		await rename(partial, path);
+	} catch {}
 }
 
 // One file for every entry: thousands of small strips cost more to open one by one than to strip again.
