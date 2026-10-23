@@ -100,12 +100,38 @@ export function marklessSsrSpreadAttributes(values: MarklessAttributeValues, sco
 	if (scopeClass && !classSeen) html += ` class="${scopeClass}"`;
 	return html;
 }
-export function marklessSsrEscape(value: string) {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;');
+const MARKUP_CHARACTER = /[&<>"]/;
+
+/** Escapes `&`, `<`, `>` and `"`; a string with none of them is returned as is, unallocated. */
+export function marklessSsrEscape(value: string): string {
+	const first = MARKUP_CHARACTER.exec(value);
+	if (!first) return value;
+	let html = '';
+	let last = 0;
+	let at = first.index;
+	for (; at < value.length; at++) {
+		let entity: string;
+		switch (value.charCodeAt(at)) {
+			case 38:
+				entity = '&amp;';
+				break;
+			case 60:
+				entity = '&lt;';
+				break;
+			case 62:
+				entity = '&gt;';
+				break;
+			case 34:
+				entity = '&quot;';
+				break;
+			default:
+				continue;
+		}
+		if (last !== at) html += value.slice(last, at);
+		html += entity;
+		last = at + 1;
+	}
+	return last !== at ? html + value.slice(last, at) : html;
 }
 export function readMarklessPublicPath(value: unknown, path: MarklessPublicPath): unknown {
 	let current = value;
