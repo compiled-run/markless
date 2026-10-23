@@ -11,11 +11,14 @@ export async function resumeContainerEvent(input: {
 	readonly [key: string]: unknown;
 }) {
 	const file = routeFileFromRoot(input.root);
+	// The page this event belongs to: a navigation that keeps the container starts a new one while the route module loads.
+	const life = (input.root as { readonly __mL?: object }).__mL;
 	try {
 		const loadRouteResumeModule = file && routeResumeModuleLoader(file);
 		const routeResumeModule = loadRouteResumeModule
 			? await loadRouteModuleOnce(loadRouteResumeModule)
 			: undefined;
+		if ((input.root as { readonly __mL?: object }).__mL !== life) return;
 		const resume = (routeResumeModule as RouteResumeModule | undefined)?.resumeContainerEvent;
 		if (typeof resume !== 'function') {
 			throw new Error(

@@ -29,17 +29,19 @@ type BoundaryAuthorityState = {
 
 type BoundaryAuthority = Map<string, BoundaryAuthorityState>;
 
-const authorities = new WeakMap<ResumeDomElement, BoundaryAuthority>();
+// Keyed by the container's page lifetime: a navigation that keeps the container in place starts a new one.
+const authorities = new WeakMap<object, BoundaryAuthority>();
+const pageOf = (root: ResumeDomElement): object => (root as { __mL?: object }).__mL ?? root;
 
 export function attachPrerenderBoundaryAuthority(root: ResumeDomElement): void {
-	authorities.set(root, new Map());
+	authorities.set(pageOf(root), new Map());
 }
 
 export function resolvePrerenderBoundaryAuthority<T extends BoundaryLike>(
 	root: ResumeDomElement,
 	boundary: T,
 ): T {
-	const authority = authorities.get(root);
+	const authority = authorities.get(pageOf(root));
 	if (!authority) return boundary;
 	const current = authority.get(boundary.id);
 	if (current) return current.boundary as T;
@@ -55,7 +57,7 @@ export async function claimPrerenderBoundaryArmRegistration(
 	root: ResumeDomElement,
 	boundary: BoundaryLike,
 ): Promise<PrerenderBoundaryArmRegistration | undefined> {
-	const state = authorities.get(root)?.get(boundary.id);
+	const state = authorities.get(pageOf(root))?.get(boundary.id);
 	if (!state) return { boundaryId: boundary.id, revision: -1 };
 	for (;;) {
 		if (state.registeredRevision === state.revision) return undefined;
@@ -74,7 +76,7 @@ export function beginPrerenderBoundaryArmCommit(
 	boundary: BoundaryLike,
 	armRecords: ResumeArmRecordSet,
 ): PrerenderBoundaryArmRegistration | undefined {
-	const state = authorities.get(root)?.get(boundary.id);
+	const state = authorities.get(pageOf(root))?.get(boundary.id);
 	if (!state) return undefined;
 	state.revision += 1;
 	(state.boundary as { armRecords?: ResumeArmRecordSet }).armRecords = armRecords;
@@ -87,7 +89,7 @@ export function completePrerenderBoundaryArmRegistration(
 	claim: PrerenderBoundaryArmRegistration,
 	succeeded: boolean,
 ): void {
-	const state = authorities.get(root)?.get(claim.boundaryId);
+	const state = authorities.get(pageOf(root))?.get(claim.boundaryId);
 	if (!state || state.registering?.revision !== claim.revision) return;
 	if (succeeded) state.registeredRevision = claim.revision;
 	const pending = state.registering;
