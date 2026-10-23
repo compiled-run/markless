@@ -9,7 +9,11 @@ import type {
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
 import { resolve } from 'pathe';
-import { DEBUGGING_PLAYBOOK_HINT, usePersistentCompileStore } from '@markless/compiler';
+import {
+	DEBUGGING_PLAYBOOK_HINT,
+	useCompileRunner,
+	usePersistentCompileStore,
+} from '@markless/compiler';
 import {
 	compilerFingerprint,
 	createPersistentCompileCache,
@@ -25,6 +29,8 @@ import {
 } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { usePersistentStrippedCode } from '../transform.ts';
+import { createCompileWorkerPool, type CompileWorkerPool } from '../compile-workers.ts';
+import { availableParallelism } from 'node:os';
 import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
@@ -147,7 +153,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	};
 	let devPrerender: ReturnType<typeof createDevPrerender> | undefined;
 	let compileCache: PersistentCompileCache | undefined;
+	let compileWorkers: CompileWorkerPool | undefined;
 	const flushCompileCache = async () => {
+		const workers = compileWorkers;
+		compileWorkers = undefined;
+		useCompileRunner(undefined);
+		await workers?.close();
 		const cache = compileCache;
 		if (!cache) return;
 		compileCache = undefined;
@@ -266,13 +277,18 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				options.compileCache !== false &&
 				persistentCompileCacheAvailable()
 			) {
-				compileCache = createPersistentCompileCache({
-					directory: resolve(resolvedConfig.cacheDir, 'markless-compile'),
-					fingerprint: compilerFingerprint(),
-				});
+				const directory = resolve(resolvedConfig.cacheDir, 'markless-compile');
+				const fingerprint = compilerFingerprint();
+				compileCache = createPersistentCompileCache({ directory, fingerprint });
 				usePersistentCompileStore(compileCache);
 				usePersistentStrippedCode(compileCache.strippedCode);
-			}
+				compileWorkers = createCompileWorkerPool({
+					size: compileWorkerCount(),
+					store: { cache: compileCache, directory, fingerprint },
+				});
+			} else if (!serve)
+				compileWorkers = createCompileWorkerPool({ size: compileWorkerCount() });
+			if (compileWorkers) useCompileRunner(compileWorkers.run);
 			if (serve) {
 				devTags.registerViteTags(resolvedConfig.base);
 				if (prerender && prerenderEntry) {
@@ -748,3 +764,9 @@ function getBuildEnvironment(context: unknown): MarklessEnvironment {
 }
 
 export type MarklessVitePlugin = ReturnType<typeof markless>[number];
+
+function compileWorkerCount(): number {
+	const configured = Number(process.env.MARKLESS_COMPILE_WORKERS);
+	if (Number.isInteger(configured) && configured >= 0) return configured;
+	return Math.max(0, Math.min(availableParallelism() - 1, 7));
+}
