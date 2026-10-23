@@ -13,6 +13,7 @@ import { anatomy } from './tooling/anatomy.ts';
 import { keyboard } from './tooling/keyboard.ts';
 import { codeBlocks } from './tooling/code-blocks.ts';
 import { codeClient } from './tooling/code-client.ts';
+import { seoFiles } from './tooling/seo-files.ts';
 import { siteBase } from './site-base.ts';
 
 export default {
@@ -57,5 +58,6 @@ export default {
 		markless(),
 		router(),
 		highlightMdx(),
+		seoFiles(),
 	],
 } satisfies UserConfig & { nitro: NitroConfig; lint: OxlintConfig };

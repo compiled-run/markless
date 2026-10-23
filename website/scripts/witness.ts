@@ -510,7 +510,7 @@ try {
 		);
 
 		// --- what a crawler and an agent look for before any page ---------------
-		// `public/` is served at the site root; scripts/generate-seo.ts writes all three from nav.ts.
+		// tooling/seo-files.ts writes all three from nav.ts into the build output.
 		for (const [path, wanted] of [
 			['/robots.txt', `Sitemap: ${siteOrigin}/sitemap.xml`],
 			['/sitemap.xml', `<loc>${siteOrigin}/concepts/state</loc>`],
