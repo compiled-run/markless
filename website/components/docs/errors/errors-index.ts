@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 285,
-	guided: 42,
+	total: 286,
+	guided: 43,
 	groups: [
 		{
 			packageName: '@markless/compiler',
