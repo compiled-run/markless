@@ -6,15 +6,22 @@ import type {
 	CompileTsrxModuleResult,
 } from '@markless/compiler';
 import type { PersistentCompileCache } from './compile-store.ts';
+import type { TransformRunner } from './transform.ts';
+import type { TransformTsrxModuleInput, TransformTsrxModuleResult } from './types.ts';
 
 type CompileStore = { readonly directory: string; readonly fingerprint: string };
 
 type Job = {
 	readonly id: number;
-	readonly input: CompileTsrxModuleInput;
-	readonly key: string;
+	readonly message:
+		| { readonly kind: 'compile'; readonly input: CompileTsrxModuleInput; readonly key: string }
+		| {
+				readonly kind: 'transform';
+				readonly input: TransformTsrxModuleInput;
+				readonly linkedChildHasBrowserTriggers: boolean;
+		  };
 	readonly store: CompileStore | undefined;
-	readonly resolve: (result: CompileTsrxModuleResult | undefined) => void;
+	readonly resolve: (result: unknown) => void;
 	readonly written: (write: Promise<void>) => void;
 };
 
@@ -27,6 +34,7 @@ type PooledWorker = {
 
 export type CompileWorkerPool = {
 	readonly run: CompileRunner;
+	readonly runTransform: TransformRunner;
 	/** Waits for every result a worker is still writing to this build's store. */
 	close(): Promise<void>;
 };
@@ -87,9 +95,7 @@ function addWorker(): void {
 				if (job.store)
 					job.written(new Promise((resolve) => entry.writes.set(job.id, resolve)));
 				job.resolve(
-					deserialize(
-						new Uint8Array(message.buffer!, message.offset, message.length),
-					) as CompileTsrxModuleResult,
+					deserialize(new Uint8Array(message.buffer!, message.offset, message.length)),
 				);
 			}
 			dispatch();
@@ -120,12 +126,7 @@ function dispatch(): void {
 		entry.job = job;
 		entry.worker.ref();
 		try {
-			entry.worker.postMessage({
-				id: job.id,
-				input: job.input,
-				key: job.key,
-				store: job.store,
-			});
+			entry.worker.postMessage({ ...job.message, id: job.id, store: job.store });
 		} catch {
 			// An input that cannot be cloned compiles on the calling thread.
 			entry.job = undefined;
@@ -147,31 +148,37 @@ export function createCompileWorkerPool(options: {
 	};
 	const writes = new Set<Promise<void>>();
 	let closed = false;
+	const submit = (message: Job['message']): Promise<unknown> | undefined => {
+		if (closed || options.size === 0) return undefined;
+		if (!workers.length || (workers.length < size && workers.every((entry) => entry.online)))
+			addWorker();
+		// Until a worker is online the calling thread works, so booting never idles the build.
+		if (!workers.some((entry) => entry.online)) return undefined;
+		return new Promise((resolve) => {
+			queue.push({
+				id: nextId++,
+				message,
+				store,
+				resolve,
+				written: (write) => {
+					writes.add(write);
+					void write.finally(() => writes.delete(write));
+					options.store?.cache.track(write);
+				},
+			});
+			dispatch();
+		});
+	};
 	return {
 		run(input, key) {
-			if (closed || options.size === 0) return undefined;
-			if (
-				!workers.length ||
-				(workers.length < size && workers.every((entry) => entry.online))
-			)
-				addWorker();
-			// Until a worker is online the calling thread compiles, so booting never idles the build.
-			if (!workers.some((entry) => entry.online)) return undefined;
-			return new Promise((resolve) => {
-				queue.push({
-					id: nextId++,
-					input,
-					key,
-					store,
-					resolve,
-					written: (write) => {
-						writes.add(write);
-						void write.finally(() => writes.delete(write));
-						options.store?.cache.track(write);
-					},
-				});
-				dispatch();
-			});
+			return submit({ kind: 'compile', input, key }) as Promise<
+				CompileTsrxModuleResult | undefined
+			>;
+		},
+		runTransform(input, linkedChildHasBrowserTriggers) {
+			return submit({ kind: 'transform', input, linkedChildHasBrowserTriggers }) as Promise<
+				TransformTsrxModuleResult | undefined
+			>;
 		},
 		async close() {
 			closed = true;

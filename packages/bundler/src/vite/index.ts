@@ -29,6 +29,7 @@ import {
 } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { createCompileWorkerPool, type CompileWorkerPool } from '../compile-workers.ts';
+import { useTransformRunner } from '../transform.ts';
 import { availableParallelism } from 'node:os';
 import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
@@ -158,6 +159,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		const workers = compileWorkers;
 		compileWorkers = undefined;
 		useCompileRunner(undefined);
+		useTransformRunner(undefined);
 		await workers?.close();
 		const cache = compileCache;
 		if (!cache) return;
@@ -286,7 +288,10 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				});
 			} else if (!serve)
 				compileWorkers = createCompileWorkerPool({ size: compileWorkerCount() });
-			if (compileWorkers) useCompileRunner(compileWorkers.run);
+			if (compileWorkers) {
+				useCompileRunner(compileWorkers.run);
+				useTransformRunner(compileWorkers.runTransform);
+			}
 			if (serve) {
 				devTags.registerViteTags(resolvedConfig.base);
 				if (prerender && prerenderEntry) {

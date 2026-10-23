@@ -17,6 +17,8 @@ export const DEFAULT_COMPILE_CACHE_MAX_BYTES = 1024 * 1024 * 1024;
 export type PersistentCompileCache = PersistentCompileStore & {
 	/** Waits for every write this process started, then trims the store to its size budget. */
 	flush(): Promise<void>;
+	/** Waits for every write this process started, without trimming. */
+	settle(): Promise<void>;
 	/** Holds `flush` until a write started elsewhere, such as on a compile worker, has finished. */
 	track(write: Promise<void>): void;
 };
@@ -74,6 +76,9 @@ export function createPersistentCompileCache(input: {
 		track(write) {
 			const pending = write.finally(() => writes.delete(pending));
 			writes.add(pending);
+		},
+		async settle() {
+			while (writes.size) await Promise.all(writes);
 		},
 		async flush() {
 			while (writes.size) await Promise.all(writes);

@@ -248,9 +248,32 @@ export function marklessVirtualModuleSourceFile(moduleId: string, root?: string)
 	}
 }
 
+/** Runs a whole transform elsewhere, such as on a worker thread; undefined, or a promise of undefined, runs it here. */
+export type TransformRunner = (
+	input: TransformTsrxModuleInput,
+	linkedChildHasBrowserTriggers: boolean,
+) => Promise<TransformTsrxModuleResult | undefined> | undefined;
+
+let transformRunner: TransformRunner | undefined;
+
+export function useTransformRunner(runner: TransformRunner | undefined): void {
+	transformRunner = runner;
+}
+
 // Rolldown owns linked child manifests. Keep their capability closure internal
 // instead of adding it to the consumer-facing transform input contract.
 export async function transformTsrxModuleWithPrerenderWakeClosure(
+	input: TransformTsrxModuleInput,
+	linkedChildHasBrowserTriggers: boolean,
+): Promise<TransformTsrxModuleResult> {
+	const elsewhere = transformRunner?.(input, linkedChildHasBrowserTriggers);
+	// A transform that throws elsewhere runs again here, so the caller sees the transform's own error.
+	const result = elsewhere && (await elsewhere);
+	return result ?? transformTsrxModuleHere(input, linkedChildHasBrowserTriggers);
+}
+
+/** The transform itself, on whichever thread calls it. */
+export async function transformTsrxModuleHere(
 	input: TransformTsrxModuleInput,
 	linkedChildHasBrowserTriggers: boolean,
 ): Promise<TransformTsrxModuleResult> {

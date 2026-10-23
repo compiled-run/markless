@@ -10,6 +10,7 @@ import {
 } from '@markless/compiler';
 import { compilerFingerprint, createPersistentCompileCache } from '../src/compile-store.ts';
 import { createCompileWorkerPool } from '../src/compile-workers.ts';
+import { transformTsrxModuleHere } from '../src/transform.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'markless-compile-workers-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -101,4 +102,14 @@ test('a compile a runner hands back is compiled here, once', async () => {
 	expect(asked).toBe(1);
 	expect(right).toBe(left);
 	expect(left).toEqual(here);
+});
+
+test('a transform on a worker thread equals the same transform on this thread', async () => {
+	const pool = await onlinePool({ size: 2 });
+	const transformInput = { ...input('Transformed'), buildId: 'transform-on-worker' };
+	const here = await transformTsrxModuleHere(transformInput, false);
+	clearCompileCache();
+	const elsewhere = await pool.runTransform(transformInput, false);
+	await pool.close();
+	expect(elsewhere).toEqual(here);
 });
