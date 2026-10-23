@@ -407,6 +407,11 @@ export function runFragmentNavigation(
 					priority: speculative ? 'auto' : 'high',
 					signal: controller.signal,
 				} as RequestInit));
+			const cacheControl = response.headers.get('cache-control') ?? '';
+			const maxAge = /(?:^|,)\s*max-age\s*=\s*"?(\d+)/i.exec(cacheControl);
+			if (/(?:^|,)\s*no-(?:store|cache)\b/i.test(cacheControl))
+				entry.expires = w.performance.now();
+			else if (maxAge) entry.expires = entry.at + Number(maxAge[1]) * 1000;
 			const type = response.headers.get('content-type') ?? '';
 			if (!response.ok || !type.includes('text/html') || !response.body)
 				throw new Error(`MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: ${response.status}`);
@@ -449,6 +454,7 @@ export function runFragmentNavigation(
 		};
 		const entry: FragmentPrefetch = {
 			at: started?.at ?? w.performance.now(),
+			writes: state.writes,
 			result: read(),
 			open: true,
 			abort: () => {
@@ -467,7 +473,7 @@ export function runFragmentNavigation(
 		if (!config.prefetch || key === state.shown) return;
 		const existing = state.prefetches.get(key);
 		// An idle-fetched page still needs its code on intent, or the swap fetches it a round late.
-		if (existing && w.performance.now() - existing.at < config.prefetchTtlMs)
+		if (existing && fresh(existing, w.performance.now()))
 			return void (code && preloadCode(url, false));
 		existing?.abort();
 		const open = [...state.prefetches].filter(([, entry]) => entry.open);
@@ -541,11 +547,17 @@ export function runFragmentNavigation(
 		if (d.readyState === 'complete') idle();
 		else w.addEventListener('load', idle, { once: true });
 	};
+	const fresh = (entry: FragmentPrefetch, now: number) =>
+		entry.writes === state.writes &&
+		now - entry.at < config.prefetchTtlMs &&
+		(entry.expires === undefined || now < entry.expires);
 	const state: FragmentNavigationState = {
 		config,
 		routes,
 		prefetches: new Map(),
 		visited: new Map(),
+		writes: 0,
+		fresh,
 		shown: pageKey(new URL(location.href)),
 		eligible,
 		preloadCode,
@@ -563,6 +575,36 @@ export function runFragmentNavigation(
 	};
 	host.__marklessFragmentNav = state;
 	if (early) prefetch(new URL(early.url), true, early);
+
+	// A write may change any page, so a submitted form or a fetch that is not a read, as it starts and as it ends, drops every page fetched ahead.
+	const wrote = () => {
+		state.writes++;
+		for (const entry of state.prefetches.values()) entry.abort();
+		state.prefetches.clear();
+		state.visited.clear();
+	};
+	d.addEventListener('submit', wrote, true);
+	const read = new Set(['GET', 'HEAD', 'OPTIONS']);
+	const send = w.fetch;
+	// The page's own fetch, unchanged: the same arguments go to the browser's fetch and its promise comes back as is.
+	w.fetch = function fetch(input: RequestInfo | URL, init?: RequestInit) {
+		const response = send.call(w, input, init);
+		const request = input instanceof Request ? input : undefined;
+		const method = (init?.method ?? request?.method ?? 'GET').toUpperCase();
+		if (!read.has(method)) {
+			let same = false;
+			try {
+				same =
+					new URL(request?.url ?? String(input), location.href).origin ===
+					location.origin;
+			} catch {}
+			if (same) {
+				wrote();
+				response.then(wrote, wrote);
+			}
+		}
+		return response;
+	};
 
 	// Intent: press, touch and keyboard focus fetch at once. A mouse fetches once it rests on a link:
 	// a pointer crossing a list of links on its way somewhere never rests on the ones it crosses.
