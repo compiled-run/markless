@@ -1,5 +1,8 @@
-import { callsImportedOrFreeName, type JavaScriptAstNode } from '@markless/compiler';
-import { parseSync } from 'rolldown/experimental';
+import {
+	callsImportedOrFreeName,
+	parseJavaScriptModule,
+	type JavaScriptAstNode,
+} from '@markless/compiler';
 import { calleeOffsets, parseChunkCode, spansAnyOffset } from './chunk-ast.ts';
 import { PACK_LOADER_PREFIX } from './lazy-module-facades.ts';
 
@@ -620,10 +623,10 @@ function sourceText(code: string, node: JavaScriptAstNode): string {
 	return code.slice(start, end);
 }
 
+// The compiler's parser builds the same tree as Rolldown's without its JSON round trip, and throws where Rolldown reports errors.
 function tryParseJavaScriptModule(code: string): JavaScriptAstNode | undefined {
 	try {
-		const parsed = parseSync('chunk.js', code);
-		return parsed.errors.length ? undefined : (parsed.program as unknown as JavaScriptAstNode);
+		return parseJavaScriptModule(code, 'chunk.js');
 	} catch {
 		return undefined;
 	}
