@@ -23,8 +23,13 @@ export function walkNode(node: AnyNode | null | undefined, visit: (node: AnyNode
 
 	visit(node);
 
-	for (const child of childNodes(node)) {
-		walkNode(child, visit);
+	// Same order as childNodes, without building its array at every node.
+	for (const key in node) {
+		if (ignoredWalkKeys.has(key)) continue;
+		const value = node[key];
+		if (Array.isArray(value)) {
+			for (const item of value) if (isNode(item)) walkNode(item, visit);
+		} else if (isNode(value)) walkNode(value, visit);
 	}
 }
 
