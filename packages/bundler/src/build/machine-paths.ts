@@ -35,16 +35,19 @@ export function withoutMachinePaths(text: string, root: string | undefined): str
 	if (!root) return text;
 	const asIdentifier = (value: string) => value.replace(/[^\w$]/g, '_');
 	let stripped = text;
-	for (const path of machinePathRoots(root)) {
-		const encoded = encodeURIComponent(`${path}/`);
-		for (const spelling of [
-			`${path}/`,
-			encoded,
-			encoded.replaceAll('%', '_'),
-			asIdentifier(encoded),
-			asIdentifier(`${path}/`),
-		])
-			stripped = stripped.split(spelling).join('');
+	// Paths under a root first, then a root spelled bare, as a query value like `?markless-router-root=<root>&` carries it.
+	for (const suffix of ['/', '']) {
+		for (const path of machinePathRoots(root)) {
+			const encoded = encodeURIComponent(`${path}${suffix}`);
+			for (const spelling of [
+				`${path}${suffix}`,
+				encoded,
+				encoded.replaceAll('%', '_'),
+				asIdentifier(encoded),
+				asIdentifier(`${path}${suffix}`),
+			])
+				stripped = stripped.split(spelling).join('');
+		}
 	}
 	return stripped;
 }
