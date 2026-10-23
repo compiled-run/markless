@@ -1,4 +1,2 @@
 main main
-cwm0 perf/compile-on-workers MARKLESS_COMPILE_WORKERS=0
 cwm perf/compile-on-workers
-dd perf/barrel-compile-once

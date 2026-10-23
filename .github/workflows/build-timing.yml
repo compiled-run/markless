@@ -29,3 +29,9 @@ jobs:
                   done < .github/build-timing-variants.txt
             - name: Interleaved cold and warm builds of markless.dev
               run: node .github/build-timing.mjs
+              env:
+                  PROFILE: '1'
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: profiles
+                  path: profiles/

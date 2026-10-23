@@ -62,6 +62,15 @@ function build(variant, mode) {
 	});
 }
 
+if (process.env.PROFILE) {
+	for (const variant of variants) {
+		variant.env.NODE_OPTIONS = `--import ${resolve('.github/prof-main.mjs')}`;
+		variant.env.MAIN_PROF_DIR = resolve(`profiles/${variant.name}`);
+		await build(variant, 'cold');
+		delete variant.env.NODE_OPTIONS;
+		delete variant.env.MAIN_PROF_DIR;
+	}
+}
 for (let round = 1; round <= rounds; round++)
 	for (const variant of variants) for (const mode of ['cold', 'warm']) await build(variant, mode);
 
