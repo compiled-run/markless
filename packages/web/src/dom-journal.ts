@@ -310,11 +310,13 @@ export function hostIdsInsideRange(
 	endAnchor: ResumeDomComment,
 	elementsByHostId: Map<string, ResumeDomElement>,
 ): string[] {
-	const inside = elementsBetweenAnchors(root, startAnchor, endAnchor);
+	const inside = (startAnchor as DomRangeNode).parentNode
+		? rangeContents(startAnchor as DomRangeNode, endAnchor as DomRangeNode)
+		: elementsBetweenAnchors(root, startAnchor, endAnchor);
 	const ids: string[] = [];
 	for (const [id, element] of elementsByHostId)
 		for (const removed of inside)
-			if (containsElement(removed, element)) {
+			if (containsElement(removed as ResumeDomElement, element)) {
 				ids.push(id);
 				break;
 			}
@@ -346,6 +348,7 @@ function elementsBetweenAnchors(
 
 function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
 	if (root === target) return true;
+	if (root.contains) return root.contains(target);
 	for (const child of root.childNodes ?? [])
 		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
 	return false;
