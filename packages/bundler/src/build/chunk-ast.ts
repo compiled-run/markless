@@ -1,6 +1,36 @@
+import { parseJavaScriptModule } from '@markless/compiler';
 import { parse, parseSync } from 'rolldown/experimental';
 
-type ParseResult = ReturnType<typeof parseSync>;
+type NativeParse = ReturnType<typeof parseSync>;
+type ParseResult = Pick<NativeParse, 'program' | 'module' | 'errors' | 'comments'>;
+
+// The tree comes from the compiler's parser, which builds the same ESTree several times faster than decoding
+// Rolldown's JSON; the module record and errors still come from Rolldown, parsed only when a pass asks for them.
+function chunkParse(fileName: string, code: string, native?: NativeParse): ParseResult {
+	let program: NativeParse['program'] | undefined;
+	const nativeParse = () => (native ??= parseSync(fileName, code));
+	return {
+		get program() {
+			if (program === undefined) {
+				try {
+					program = parseJavaScriptModule(code, fileName) as unknown as NativeParse['program'];
+				} catch {
+					program = nativeParse().program;
+				}
+			}
+			return program;
+		},
+		get module() {
+			return nativeParse().module;
+		},
+		get errors() {
+			return nativeParse().errors;
+		},
+		get comments() {
+			return nativeParse().comments;
+		},
+	};
+}
 
 // Callers that hold a chunk's code but not its name pass this placeholder.
 const UNNAMED_CHUNK = 'chunk.js';
@@ -52,7 +82,7 @@ function remember(fileName: string, code: string, result: ParseResult): void {
 export function parseChunkCode(fileName: string, code: string): ParseResult {
 	const cached = parsedFor(fileName).get(code);
 	if (cached) return cached;
-	const result = parseSync(fileName, code);
+	const result = chunkParse(fileName, code);
 	if (admits(fileName, code)) remember(fileName, code, result);
 	return result;
 }
@@ -73,7 +103,7 @@ export async function prefetchChunkParses(
 		reserved += code.length;
 		pending.push(
 			parse(fileName, code).then(
-				(result) => remember(fileName, code, result),
+				(result) => remember(fileName, code, chunkParse(fileName, code, result)),
 				// A parse that throws is left to the synchronous path, which reports it where it did.
 				() => {},
 			),

@@ -1,3 +1,4 @@
+import { parseSync } from 'rolldown/experimental';
 import { describe, expect, test } from 'vitest';
 import {
 	calleeOffsets,
@@ -18,6 +19,37 @@ describe('chunk syntax trees shared across post-bundle passes', () => {
 		expect(parseChunkCode('a.js', 'export const a=2;')).not.toBe(first);
 		clearParsedChunkCode();
 		expect(parseChunkCode('a.js', code)).not.toBe(first);
+	});
+
+	// Every pass was written against Rolldown's tree; the faster parser has to hand them the same one.
+	test('builds the tree Rolldown builds, node for node, for the syntax a chunk carries', () => {
+		clearParsedChunkCode();
+		const code = [
+			'import{a as b}from"./x.js";',
+			'const re=/a+b/gi,big=10n,t=`x${b}y`,o={...b,["k"]:1,m(){return this?.p??(b)}};',
+			'class C{#p=1;static s;get q(){return this.#p}}',
+			'export const lazy=()=>import("./y.js").then(m=>m.default);',
+			'for await(const v of b)v;',
+			'label:for(;;){break label}',
+			'export{C as D,re};export default (0,b)(o);',
+		].join('\n');
+		const strip = (value: unknown): unknown =>
+			JSON.parse(
+				JSON.stringify(value, (key, item) =>
+					typeof item === 'bigint' ? `${item}n` : item instanceof RegExp ? String(item) : item,
+				),
+			);
+		const ours = parseChunkCode('chunk.js', code);
+		expect(strip(ours.program)).toEqual(strip(parseSync('chunk.js', code).program));
+		expect(ours.module.dynamicImports).toHaveLength(1);
+		expect(ours.errors).toHaveLength(0);
+	});
+
+	test('a chunk the faster parser rejects still gets Rolldown\'s tree and errors', () => {
+		clearParsedChunkCode();
+		const parsed = parseChunkCode('broken.js', 'export const a = ;');
+		expect(parsed.errors.length).toBeGreaterThan(0);
+		expect(parsed.program.type).toBe('Program');
 	});
 
 	// Every chunk's tree, and each superseded version of it, stayed held until the next build started.
