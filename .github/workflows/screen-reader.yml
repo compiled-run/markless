@@ -48,12 +48,90 @@ env:
     NPM_CONFIG_AUDIT: 'false'
     NPM_CONFIG_FUND: 'false'
     NPM_CONFIG_PREFER_OFFLINE: 'true'
+    # Beside the checkout, as in ci.yml, so a lint of the tree never sees the browsers.
+    PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
 jobs:
+    # One Chromium download per operating system per lockfile, restored by every
+    # family below. Each family used to download its own copy, so about a hundred
+    # downloads ran per push and one CDN error (a TLS name mismatch on
+    # cdn.playwright.dev, a DNS miss on the Microsoft mirror) failed a
+    # different family each run.
+    prepare-playwright:
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 15
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Restore the Chromium cache
+              id: playwright-cache
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+
+            - name: Look up the cached Playwright system packages
+              id: apt-cache
+              if: runner.os == 'Linux'
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-sr-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+                  lookup-only: true
+
+            - name: Install Markless dependencies
+              if: steps.playwright-cache.outputs.cache-hit != 'true' || (runner.os == 'Linux' && steps.apt-cache.outputs.cache-hit != 'true')
+              run: pnpm install --frozen-lockfile
+
+            - name: Download the pinned Chromium
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm exec playwright install chromium
+
+            - name: Save the Chromium cache
+              if: steps.playwright-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                  key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+
+            - name: Download the Playwright system packages
+              if: runner.os == 'Linux' && steps.apt-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: |
+                  echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99keep-downloaded-packages
+                  pnpm exec playwright install-deps chromium
+                  mkdir -p ${{ github.workspace }}-playwright-apt
+                  cp /var/cache/apt/archives/*.deb ${{ github.workspace }}-playwright-apt/
+
+            - name: Save the Playwright system packages
+              if: runner.os == 'Linux' && steps.apt-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                  key: playwright-sr-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+
     # The always-on lane. Same transcript expectations the real readers will
     # run, driven by @guidepup/virtual-screen-reader inside the existing
     # Chromium browser project, so it needs nothing a Linux runner lacks.
     virtual:
+        needs: prepare-playwright
         runs-on: ubuntu-latest
         timeout-minutes: 15
         strategy:
@@ -126,8 +204,24 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: Install Playwright browsers for the vitest browser project
-              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
+            - name: Restore the Chromium the prepare job downloaded
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+                  fail-on-cache-miss: true
+
+            - name: Restore the Playwright system packages
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-sr-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-playwright-apt
+                  fail-on-cache-miss: true
+
+            - name: Install Playwright system dependencies from the cached packages
+              run: |
+                  sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
+                  pnpm exec playwright install-deps chromium
 
             - name: Typecheck the screen-reader lanes
               run: pnpm typecheck:sr
@@ -141,6 +235,7 @@ jobs:
     # Real NVDA on a real Windows desktop session. guidepup/setup-action
     # installs NVDA and the keyboard automation it needs.
     nvda:
+        needs: prepare-playwright
         runs-on: windows-latest
         timeout-minutes: 25
         strategy:
@@ -206,8 +301,12 @@ jobs:
             - name: Install the screen reader assets guidepup drives
               run: pnpm dlx @guidepup/setup@0.28.0 install
 
-            - name: Install the browser the reader reads through
-              run: pnpm exec playwright install --with-deps chromium
+            - name: Restore the Chromium the prepare job downloaded
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+                  fail-on-cache-miss: true
 
             # Its own step, and allowed to fail: this is the gate that decides
             # whether the reader gets a page to read. It serves the gallery,
@@ -283,6 +382,7 @@ jobs:
     # the failure is a real announcement regression it blocks the change, and if
     # it is the setup step it goes in the ledger with the runner image version.
     voiceover:
+        needs: prepare-playwright
         runs-on: macos-latest
         timeout-minutes: 25
         continue-on-error: true
@@ -347,8 +447,12 @@ jobs:
             - name: Install the screen reader assets guidepup drives
               run: pnpm dlx @guidepup/setup@0.28.0 install
 
-            - name: Install the browser the reader reads through
-              run: pnpm exec playwright install --with-deps chromium
+            - name: Restore the Chromium the prepare job downloaded
+              uses: actions/cache/restore@v4
+              with:
+                  key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+                  path: ${{ github.workspace }}-ms-playwright
+                  fail-on-cache-miss: true
 
             - name: Serve and render the screen-reader gallery
               id: gallery
