@@ -18,7 +18,8 @@ const USAGE = `usage: node scripts/ci/local.mjs [--list] [--fast | --full] [--jo
 
   --list            print every job and step the workflow defines, and what runs locally
   --fast            run the fast jobs (default)
-  --full            run every job that can run on this machine
+  --full            run every job that can run on this machine; for debugging, since heavy
+                    jobs are verified by the pull request's CI run (docs/ci-process.md)
   --job <id>        run only this job (repeatable); overrides --fast/--full
   --workflow <file> workflow to read (default .github/workflows/ci.yml)
   --install         also run the setup steps (pnpm install, Playwright browsers) first

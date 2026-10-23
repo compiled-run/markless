@@ -1,0 +1,71 @@
+name: Build timing
+
+# A/B build times without scratch branches: both refs build the same app on one runner, interleaved,
+# so runner-to-runner speed differences cannot show up as a difference between the refs.
+on:
+    workflow_dispatch:
+        inputs:
+            base:
+                description: Ref to compare against (branch, tag or commit)
+                required: true
+                default: main
+            head:
+                description: Ref to measure (branch, tag or commit)
+                required: true
+            app:
+                description: App directory whose `build` script is timed
+                required: true
+                default: website
+            rounds:
+                description: Rounds; each builds both refs cold and warm
+                required: true
+                default: '3'
+
+permissions:
+    contents: read
+
+concurrency:
+    group: build-timing-${{ inputs.base }}-${{ inputs.head }}-${{ inputs.app }}
+    cancel-in-progress: false
+
+jobs:
+    timing:
+        # The standard runner for a public repository: 4 cores, the machine the CI build budgets assume.
+        runs-on: ubuntu-latest
+        timeout-minutes: 120
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+
+            - name: Check out both refs side by side
+              env:
+                  BASE: ${{ inputs.base }}
+                  HEAD_REF: ${{ inputs.head }}
+              run: |
+                  nproc
+                  for side in base head; do
+                    ref=$([ "$side" = base ] && echo "$BASE" || echo "$HEAD_REF")
+                    sha=$(git rev-parse --verify "origin/$ref^{commit}" 2>/dev/null || git rev-parse --verify "$ref^{commit}")
+                    git worktree add -q "$RUNNER_TEMP/$side" "$sha"
+                    (cd "$RUNNER_TEMP/$side" && pnpm install --frozen-lockfile > /dev/null)
+                    echo "$side: $(git -C "$RUNNER_TEMP/$side" log --oneline -1)"
+                  done
+
+            - name: Interleaved cold and warm builds
+              env:
+                  APP: ${{ inputs.app }}
+                  ROUNDS: ${{ inputs.rounds }}
+              run: node scripts/ci/build-timing.mjs "$RUNNER_TEMP/base" "$RUNNER_TEMP/head" "$APP" "$ROUNDS"
