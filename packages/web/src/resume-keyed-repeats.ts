@@ -432,14 +432,16 @@ function applyKeyedRepeatRowOrder(
 		// Past the page's last node: before the page-end comment when an author's element is the container.
 		(pageNodes(parent).at(-1) as Sibling | undefined)?.nextSibling ??
 		undefined;
-	// A row already in place stays attached: re-inserting a focused row drops its focus.
-	let after = anchor;
-	for (let at = nextRows.length; at--; after = nextRows[at]) {
-		let next = (nextRows[at] as Sibling).nextSibling;
-		while (next && next !== after && next.nodeType !== 1) next = next.nextSibling;
-		if (nextRows[at]!.parentElement !== parent || next != after)
-			insertRepeatNode(mutableParent, nextRows[at]!, after);
+	// Rows on the longest run in order ahead of the anchor stay attached: re-inserting a focused row drops its focus.
+	const position = new Map<ResumeDomNode, number>();
+	for (const child of parent.childNodes ?? []) {
+		if (child === anchor) break;
+		if (knownRows.has(child as ResumeDomElement)) position.set(child, position.size);
 	}
+	const inPlace = rowsInPlace(nextRows.map((row) => position.get(row) ?? -1));
+	let after = anchor;
+	for (let at = nextRows.length; at--; after = nextRows[at])
+		if (!inPlace[at]) insertRepeatNode(mutableParent, nextRows[at]!, after);
 	mint?.refocus?.(parent, focused);
 	if (census && (currentRows.length > 0 || nextRows.length > 0))
 		spliceDomOrderCensus(census, currentRows, nextRows);
@@ -450,6 +452,26 @@ function applyKeyedRepeatRowOrder(
 	arm.mounted = true;
 	arm.nodes = nodes;
 	if (census) spliceDomOrderCensus(census, [], nodes);
+}
+// A local copy of fns/direct's longest-increasing-run marks: importing it pulls the client renderer into resume.
+function rowsInPlace(positions: number[]): Uint8Array {
+	const inPlace = new Uint8Array(positions.length);
+	const previous: number[] = [];
+	const tails: number[] = [];
+	positions.forEach((position, index) => {
+		if (position < 0) return;
+		let low = 0;
+		let high = tails.length;
+		while (low < high) {
+			const middle = (low + high) >> 1;
+			if (positions[tails[middle]!]! < position) low = middle + 1;
+			else high = middle;
+		}
+		previous[index] = tails[low - 1] ?? -1;
+		tails[low] = index;
+	});
+	for (let index = tails.at(-1) ?? -1; index >= 0; index = previous[index]!) inPlace[index] = 1;
+	return inPlace;
 }
 type MountedEmptyArm = { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> };
 type MutableRepeatParent = ResumeDomElement & {

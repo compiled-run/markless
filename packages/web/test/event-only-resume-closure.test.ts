@@ -115,7 +115,10 @@ const resumeOnDemandEntries = [
 // 2026-10-23: the first-click row match climbs from the target once per list instead of scanning every row per ancestor
 // (1,000 rows: 0.8 -> 0.17 ms on a handler, 2.4 -> 0.15 ms on a cell no handler owns): 27,145 -> 27,457 raw; resume-keyed-repeats
 // minified 8,662 -> 8,772, gzip 3,542 -> 3,603 bytes (rolldown, same method both sides), under the 4,800 gzip wall.
-const sourceByteLimit = 27457;
+// 2026-10-23: a resumed keyed reorder keeps the rows on the longest run already in order (moving the last of n rows to the front
+// costs one move, not n-1): 27,457 -> 28,327 raw; resume-keyed-repeats minified 8,772 -> 9,035, gzip 3,603 -> 3,730 bytes
+// (rolldown, same method both sides), under the 4,800 gzip wall.
+const sourceByteLimit = 28327;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

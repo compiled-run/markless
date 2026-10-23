@@ -1530,6 +1530,14 @@
 			"from": 17266,
 			"to": 17565,
 			"reason": "first-click row match climbs once per list (1,000 rows: 0.8->0.17 ms on a handler, 2.4->0.15 ms elsewhere); minified 8,662->8,772 B, gzip 3,542->3,603 B"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 17565,
+			"to": 18257,
+			"reason": "resumed keyed reorder keeps rows on the longest run in order (move-to-front n-1 moves -> 1); minified 8,772->9,035 B, gzip 3,603->3,730 B, loads at first event"
 		}
 	],
 	"runtimeModules": {
@@ -1631,7 +1639,7 @@
 		"web/resume-events": 16645,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 17565,
+		"web/resume-keyed-repeats": 18257,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,
