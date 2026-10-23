@@ -323,13 +323,36 @@ export function runFragmentNavigation(
 		for (let index = 0; index < tags.length; index++) tags[index]!.textContent = raw[index]!;
 		return doc;
 	};
+	// A stylesheet the next page adds is preloaded once its HTML arrives: the swap waits for it, a click should not.
+	const preloadStyles = (doc: Document) => {
+		for (const link of doc.head.querySelectorAll<HTMLLinkElement>(
+			'link[rel="stylesheet"][href]',
+		)) {
+			const href = new URL(link.getAttribute('href')!, d.baseURI).href;
+			if (
+				[...d.querySelectorAll<HTMLLinkElement>('link[href]')].some(
+					(own) => own.href === href,
+				)
+			)
+				continue;
+			const preload = d.createElement('link');
+			preload.rel = 'preload';
+			preload.as = 'style';
+			preload.href = href;
+			for (const name of ['media', 'crossorigin', 'integrity'])
+				if (link.hasAttribute(name)) preload.setAttribute(name, link.getAttribute(name)!);
+			d.head.append(preload);
+		}
+	};
 	const parse = (url: string, text: string): FragmentFetched => {
 		const at = text.indexOf(config.regionEndMarker);
 		const prefix = at === -1 ? text : text.slice(0, at);
+		const doc = parseAsLoaded(prefix);
+		preloadStyles(doc);
 		return {
 			url,
 			prefix,
-			doc: parseAsLoaded(prefix),
+			doc,
 			tail: at === -1 ? '' : text.slice(at + config.regionEndMarker.length),
 		};
 	};
