@@ -1,7 +1,7 @@
 import { dirname, join, normalize } from 'pathe';
 import { RolldownMagicString, type Plugin } from 'rolldown';
 import { parseChunkCode, renderedChunkCount } from './chunk-ast.ts';
-import { forgetChunkTaskResults, runChunkTask } from './chunk-workers.ts';
+import { runChunkTask } from './chunk-workers.ts';
 import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 
 // Packs keep Rolldown's unminified cross-chunk names so a name never depends on emission order;
@@ -476,7 +476,6 @@ export function shortExportNamesPlugin(
 				(chunk) => facts.get(chunk.fileName)!,
 			);
 			exports = new Map(plan.exports);
-			forgetChunkTaskResults();
 			for (const [fileName, item] of batch) {
 				const list = plan.edits.get(fileName);
 				if (!list?.length) {

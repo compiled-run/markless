@@ -16,13 +16,7 @@ import {
 	textOffsets,
 } from './chunk-ast.ts';
 import { RolldownMagicString, type Plugin } from 'rolldown';
-import {
-	CHUNK_WORKER_MIN_CODE_LENGTH,
-	rememberChunkTaskResult,
-	runChunkTask,
-} from './chunk-workers.ts';
-import { packTopLevelEdits } from './pack-top-level.ts';
-import { shortNameChunkFacts } from './short-export-names.ts';
+import { CHUNK_WORKER_MIN_CODE_LENGTH, runChunkTask } from './chunk-workers.ts';
 import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 import { rootRelativeId } from '../module-id.ts';
 import { withoutMachinePaths } from './machine-paths.ts';
@@ -743,10 +737,7 @@ export function readChunkTopLevelAwait(fileName: string, code: string): boolean 
 	);
 }
 
-/**
- * Everything the facade collapse reads from one chunk's code, from a single parse, plus what the later
- * renderChunk passes read: a chunk the collapse leaves unchanged reaches them with this same code.
- */
+/** Everything the facade collapse reads from one chunk's code, from a single parse. */
 export function facadeChunkFacts(fileName: string, code: string) {
 	return {
 		dynamicImports: mayContainDynamicImport(code)
@@ -755,8 +746,6 @@ export function facadeChunkFacts(fileName: string, code: string) {
 		localExportSpecifiers: readChunkLocalExportSpecifiers(fileName, code),
 		inertness: readChunkInertness(fileName, code),
 		topLevelAwait: readChunkTopLevelAwait(fileName, code),
-		packTopLevelEdits: packTopLevelEdits(fileName, code),
-		shortNameChunkFacts: shortNameChunkFacts(fileName, code),
 	};
 }
 
@@ -779,12 +768,6 @@ export async function prefetchFacadeChunkFacts(
 						);
 						inertnessByCode.set(chunk.code, facts.inertness);
 						topLevelAwaitByCode.set(chunk.code, facts.topLevelAwait);
-						rememberChunkTaskResult('packTopLevelEdits', chunk.code, facts.packTopLevelEdits);
-						rememberChunkTaskResult(
-							'shortNameChunkFacts',
-							chunk.code,
-							facts.shortNameChunkFacts,
-						);
 					},
 					// A read that throws is left to the synchronous path, which reports it where it did.
 					() => {},

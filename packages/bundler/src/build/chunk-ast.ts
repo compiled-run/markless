@@ -227,6 +227,10 @@ function dynamicImportsFor(fileName: string) {
 	return known;
 }
 
+export function knowsChunkDynamicImports(fileName: string, code: string): boolean {
+	return dynamicImportsFor(fileName).has(code);
+}
+
 export function rememberChunkDynamicImports(
 	fileName: string,
 	code: string,
