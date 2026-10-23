@@ -6,6 +6,7 @@ import {
 } from '../../artifact-helpers/addressed-hosts.ts';
 import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
+import { collectServedRenderData } from './browser-rendered.ts';
 import { collectPublicRenderComponentDefinitions } from './component-definitions.ts';
 import { collectSsrDeriveSetDiagnostics } from './derive-set.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
@@ -124,6 +125,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
 		ssrComponentExports,
 		componentDefinitions,
+		...(root ? { servedRenderData: collectServedRenderData(input, root.componentName) } : {}),
 		diagnostics: [
 			...input.publicRenderPlan.diagnostics,
 			...(ssrModuleSource ? collectSsrDeriveSetDiagnostics(input) : []),

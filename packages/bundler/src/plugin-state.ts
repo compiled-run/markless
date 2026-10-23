@@ -192,7 +192,8 @@ export function registerTransformArtifacts(
 			...(input.finalPublication === false &&
 			(module.type === 'resolver' ||
 				module.type === 'symbol' ||
-				(module.type === 'render-data' && input.devServer !== true))
+				((module.type === 'render-data' || module.type === 'render-data-served') &&
+					input.devServer !== true))
 				? { provisional: true }
 				: {}),
 		};
@@ -277,8 +278,8 @@ function publishesVirtualModule(
 	}
 	// Parallel sibling transforms share this id: canonical render data must not be replaced.
 	return !(
-		next.type === 'render-data' &&
-		current.type === 'render-data' &&
+		(next.type === 'render-data' || next.type === 'render-data-served') &&
+		current.type === next.type &&
 		current.canonicalRenderData === true &&
 		next.canonicalRenderData !== true
 	);
