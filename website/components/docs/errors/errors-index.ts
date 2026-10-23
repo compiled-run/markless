@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 285,
-	guided: 42,
+	total: 286,
+	guided: 43,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -847,6 +847,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_INLINE_RESUMER_TRANSFORM_FAILED',
 					kind: 'build error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_NODE_IN_BROWSER',
+					kind: 'build error',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_PRERENDER_CONTAINER_MISSING',

@@ -51,7 +51,8 @@
 		"@markless/web": "workspace:*",
 		"@thi.ng/dgraph": "catalog:",
 		"pathe": "catalog:",
-		"ufo": "catalog:"
+		"ufo": "catalog:",
+		"yuku": "0.20.1"
 	},
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*"

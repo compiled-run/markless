@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Builds the docs site and the demo apps and fails on anything a build prints to stderr: bundler, Vite, Nitro and Node all warn there.
+// Builds the docs site and the demo apps and fails on anything a build prints to stderr (bundler, Vite, Nitro and Node all warn there) or on Node-only code in what it wrote for the browser.
 
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { clientOutputDir, scanBrowserOutput } from './browser-output-scan.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -105,10 +106,18 @@ async function main() {
 		} else {
 			console.log(`build-warnings: ${dir} built with no warnings`);
 		}
+		if (code !== 0) continue;
+		const buildDir = resolve(repoRoot, dir);
+		const nodeCode = scanBrowserOutput(clientOutputDir(buildDir), buildDir);
+		if (nodeCode.length) {
+			failed = true;
+			console.error(`build-warnings: ${dir} ships Node-only code to the browser:`);
+			for (const finding of nodeCode) console.error(`  ${finding}`);
+		}
 	}
 	if (failed) {
 		console.error(
-			'build-warnings: fix each warning at its cause (docs/ci-process.md, "Build warnings").',
+			'build-warnings: fix each warning and each Node-only finding at its cause (docs/ci-process.md, "Build warnings").',
 		);
 		process.exit(1);
 	}

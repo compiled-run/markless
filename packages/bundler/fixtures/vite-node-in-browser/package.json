@@ -1,0 +1,16 @@
+{
+	"name": "@fixtures/vite-node-in-browser",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "vp build"
+	},
+	"dependencies": {
+		"@markless/bundler": "workspace:*",
+		"@markless/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vite": "8.3.4"
+	}
+}

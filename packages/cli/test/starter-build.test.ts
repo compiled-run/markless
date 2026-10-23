@@ -7,6 +7,7 @@ import { join, resolve } from 'pathe';
 import { createServer } from 'vite';
 import { afterEach, expect, test } from 'vitest';
 import { buildWarnings } from '../../../scripts/ci/build-warnings.mjs';
+import { clientOutputDir, scanBrowserOutput } from '../../../scripts/ci/browser-output-scan.mjs';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { CreateProgram, STARTER_CHOICES, STARTER_DEV_PORTS, type Starter } from '../src/index.ts';
 import { createNodeRuntime } from '../src/node-runtime.ts';
@@ -144,6 +145,7 @@ test.each(STARTER_CHOICES.map((choice) => choice.value))(
 		const appRoot = await scaffold(starter);
 		await check(appRoot);
 		expect(await build(appRoot)).toEqual([]);
+		expect(scanBrowserOutput(clientOutputDir(appRoot), appRoot)).toEqual([]);
 		await check(appRoot);
 
 		const server = await startBuiltServer(join(appRoot, '.output/server/index.mjs'), {

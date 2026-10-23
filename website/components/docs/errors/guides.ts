@@ -292,4 +292,15 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'The router sends the status and headers with the first bytes of the page. A page that waits on data keeps streaming after that. This write came later and tried to change what was already sent.',
 		how: 'Set `http.response.status` and `http.response.headers` in the page body, before anything the page waits on. Writing the same value again is fine.',
 	},
+	MARKLESS_NODE_IN_BROWSER: {
+		summary: 'Code that only runs in Node is reachable from code the browser loads.',
+		what: 'A module the browser loads imports a Node built-in like `node:fs` or `os`, directly or through other modules, or uses a global only Node has, like `__dirname` or `Buffer`. A browser has none of these. The build stops and lists every module from the page to the Node import.',
+		how: 'Follow the list to the module your page actually needs. Move what it needs, often one constant or type, into its own file that imports nothing from Node, and import that file instead. Keep the Node work in server-only files.',
+		example: [
+			'// starter-ports.ts imports nothing from Node',
+			'export const STARTER_DEV_PORTS = { minimal: 5173 } as const;',
+			'',
+			"import { STARTER_DEV_PORTS } from './starter-ports.ts';",
+		],
+	},
 };
