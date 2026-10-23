@@ -363,6 +363,19 @@ function splitStartupPacksByStaticReach(
 		return !!module && !module.navigationOnly && (!flagged || !!module.firstEvent);
 	};
 	const handler = (id: string) => !!input.modules.get(id)?.handler;
+	// Each source's first-event siblings, sorted once: every module visit of every route walked them again.
+	const seedSiblings = new Map<string, { readonly id: string; readonly handler: boolean }[]>();
+	const seedSiblingsOf = (source: string) => {
+		let list = seedSiblings.get(source);
+		if (!list)
+			seedSiblings.set(
+				source,
+				(list = (sources.get(source) ?? [])
+					.filter(seed)
+					.map((id) => ({ id, handler: handler(id) }))),
+			);
+		return list;
+	};
 	// Static imports and first-event siblings from `start`, outside `path`; handler siblings are only collected.
 	const closure = (route: string, start: readonly string[], path: ReadonlySet<string>) => {
 		const reached = new Set<string>();
@@ -376,10 +389,11 @@ function splitStartupPacksByStaticReach(
 			if (!module) continue;
 			reached.add(id);
 			pending.push(...module.dependencies);
-			for (const sibling of module.source ? (sources.get(module.source) ?? []) : [])
-				if (seed(sibling) && sibling !== id)
-					if (handler(sibling)) handlers.add(sibling);
-					else pending.push(sibling);
+			if (!module.source) continue;
+			for (const sibling of seedSiblingsOf(module.source))
+				if (sibling.id !== id)
+					if (sibling.handler) handlers.add(sibling.id);
+					else pending.push(sibling.id);
 		}
 		return { reached, handlers };
 	};
