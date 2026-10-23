@@ -57,7 +57,7 @@ jobs:
     # family below. Each family used to download its own copy, so about a hundred
     # downloads ran per push and one CDN error (a TLS name mismatch on
     # cdn.playwright.dev, a DNS miss on the Microsoft mirror) failed a
-    # different family each run.
+    # different family each run. A family whose restore fails downloads instead.
     prepare-playwright:
         runs-on: ${{ matrix.os }}
         timeout-minutes: 15
@@ -205,22 +205,28 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Restore the Chromium the prepare job downloaded
+              id: browser-cache
               uses: actions/cache/restore@v4
               with:
                   key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
-                  fail-on-cache-miss: true
+
+            # The cache and the CDN fail independently (cache egress throttling, CDN TLS and DNS errors), so one covers the other.
+            - name: Download Chromium when the cache could not be restored
+              if: steps.browser-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm exec playwright install chromium
 
             - name: Restore the Playwright system packages
+              id: apt-cache
               uses: actions/cache/restore@v4
               with:
                   key: playwright-sr-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-playwright-apt
-                  fail-on-cache-miss: true
 
-            - name: Install Playwright system dependencies from the cached packages
+            - name: Install Playwright system dependencies
               run: |
-                  sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
+                  if [ '${{ steps.apt-cache.outputs.cache-hit }}' = true ]; then sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/; fi
                   pnpm exec playwright install-deps chromium
 
             - name: Typecheck the screen-reader lanes
@@ -302,11 +308,17 @@ jobs:
               run: pnpm dlx @guidepup/setup@0.28.0 install
 
             - name: Restore the Chromium the prepare job downloaded
+              id: browser-cache
               uses: actions/cache/restore@v4
               with:
                   key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
-                  fail-on-cache-miss: true
+
+            # The cache and the CDN fail independently (cache egress throttling, CDN TLS and DNS errors), so one covers the other.
+            - name: Download Chromium when the cache could not be restored
+              if: steps.browser-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm exec playwright install chromium
 
             # Its own step, and allowed to fail: this is the gate that decides
             # whether the reader gets a page to read. It serves the gallery,
@@ -448,11 +460,17 @@ jobs:
               run: pnpm dlx @guidepup/setup@0.28.0 install
 
             - name: Restore the Chromium the prepare job downloaded
+              id: browser-cache
               uses: actions/cache/restore@v4
               with:
                   key: playwright-sr-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
                   path: ${{ github.workspace }}-ms-playwright
-                  fail-on-cache-miss: true
+
+            # The cache and the CDN fail independently (cache egress throttling, CDN TLS and DNS errors), so one covers the other.
+            - name: Download Chromium when the cache could not be restored
+              if: steps.browser-cache.outputs.cache-hit != 'true'
+              timeout-minutes: 10
+              run: pnpm exec playwright install chromium
 
             - name: Serve and render the screen-reader gallery
               id: gallery
