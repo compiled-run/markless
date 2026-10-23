@@ -1101,6 +1101,8 @@ export function App() @{
 		const broken = source.replace('</button>', '</button>>');
 		const send = vi.fn();
 		const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+		// Other suites' timers share this process, so the recheck is followed by its own handle, not by a call count.
+		const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
 		const environment = {
 			config: { consumer: 'client' },
 			hot: { send },
@@ -1133,23 +1135,31 @@ export function App() @{
 			).toEqual([]);
 
 			send.mockClear();
+			// The recheck clears its interval before it reports, so the reload is its last word.
+			const reloaded = new Promise<void>((resolve) =>
+				send.mockImplementation((payload: { readonly type?: string }) => {
+					if (payload.type === 'full-reload') resolve();
+				}),
+			);
 			await writeFile(filename, source);
-			await vi.waitFor(() => {
-				expect(send.mock.calls).toEqual([
-					[
-						{
-							type: 'custom',
-							event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
-							data: { id: filename },
-						},
-					],
-					[{ type: 'full-reload' }],
-				]);
-			});
-			await new Promise((resolve) => setTimeout(resolve, 30));
-			expect(send).toHaveBeenCalledTimes(2);
-			expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+			await reloaded;
+			expect(send.mock.calls).toEqual([
+				[
+					{
+						type: 'custom',
+						event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+						data: { id: filename },
+					},
+				],
+				[{ type: 'full-reload' }],
+			]);
+			const recheck = setIntervalSpy.mock.results.find(
+				(_result, index) => setIntervalSpy.mock.calls[index]![1] === 10,
+			)?.value;
+			expect(recheck).toBeDefined();
+			expect(clearIntervalSpy.mock.calls.filter(([handle]) => handle === recheck)).toHaveLength(1);
 		} finally {
+			setIntervalSpy.mockRestore();
 			clearIntervalSpy.mockRestore();
 			await rm(fixtureRoot, { force: true, recursive: true });
 		}

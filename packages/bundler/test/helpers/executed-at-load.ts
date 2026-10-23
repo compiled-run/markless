@@ -75,6 +75,8 @@ export async function executedAtLoad(
 		if (options.settledSelector)
 			await page.waitForSelector(options.settledSelector, { state: 'attached' });
 		await page.waitForLoadState('networkidle');
+		// Idle callbacks run first-in first-out, so this one lands after the idle work the page queued at load.
+		await page.evaluate(() => new Promise<void>((settled) => requestIdleCallback(() => settled())));
 		const { result } = await cdp.send('Profiler.takePreciseCoverage');
 		let executed = 0;
 		for (const script of result) {

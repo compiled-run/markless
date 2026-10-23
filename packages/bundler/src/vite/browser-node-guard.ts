@@ -200,6 +200,15 @@ function displayId(id: string, root: string) {
 
 const FINDING_ORDER = { builtin: 0, 'browser-field': 1, global: 2 } as const;
 
+function compareFindings(a: NodeInBrowserViolation, b: NodeInBrowserViolation): number {
+	if (a.kind !== b.kind) return FINDING_ORDER[a.kind] - FINDING_ORDER[b.kind];
+	if (a.kind === 'global' && b.kind === 'global')
+		return a.use.line - b.use.line || a.use.column - b.use.column;
+	if (a.kind === 'builtin' && b.kind === 'builtin')
+		return a.specifier < b.specifier ? -1 : a.specifier > b.specifier ? 1 : 0;
+	return 0;
+}
+
 function describeFinding(violation: NodeInBrowserViolation) {
 	switch (violation.kind) {
 		case 'builtin':
@@ -229,11 +238,8 @@ export function nodeInBrowserMessage(
 			const arrow = index === 0 ? '  ' : link.dynamic ? '  → import() ' : '  → ';
 			return `${arrow}${displayId(link.id, root)}`;
 		});
-		const described = [...new Set(
-			findings
-				.toSorted((a, b) => FINDING_ORDER[a.kind] - FINDING_ORDER[b.kind])
-				.map(describeFinding),
-		)];
+		// Imports resolve concurrently, so findings are ordered by what they name, not by when they were recorded.
+		const described = [...new Set(findings.toSorted(compareFindings).map(describeFinding))];
 		return [...lines, ...described.map((finding) => `      ${finding}`)].join('\n');
 	});
 	return [
