@@ -1389,8 +1389,14 @@ function renderBranchArms(
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
 	const escalationCandidates: ArmEscalationCandidate[] = [];
+	// A branch each row flips from its own row template needs no page-level flip module.
+	const rowFlipped = new Set(
+		(input.protocolView?.keyedRepeats ?? []).flatMap((repeat) =>
+			(repeat.rowTemplate?.branchSlots ?? []).map((branch) => branch.branchId),
+		),
+	);
 	for (const branch of renderData.branches ?? []) {
-		if (branch.update === 'boundary') continue;
+		if (branch.update === 'boundary' || rowFlipped.has(branch.branchSiteId)) continue;
 		const refusals: ArmRefusal[] = [];
 		const context: ArmPartsContext = {
 			renderData,
@@ -1938,9 +1944,15 @@ function rowLocalNamesBySymbol(
 	if (renderData) {
 		for (const repeat of renderData.repeats) {
 			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);
+			const indexName = semanticGraph?.keyedRepeats.find(
+				(candidate) => candidate.id === repeat.repeatId,
+			)?.indexName;
 			for (const interaction of renderData.interactions) {
 				if (!rowHostIds.has(interaction.hostNodeId)) continue;
-				for (const symbolId of interaction.symbolIds) addLocal(symbolId, repeat.itemName);
+				for (const symbolId of interaction.symbolIds) {
+					addLocal(symbolId, repeat.itemName);
+					if (indexName) addLocal(symbolId, indexName);
+				}
 			}
 		}
 	}

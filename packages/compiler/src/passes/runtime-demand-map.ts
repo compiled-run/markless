@@ -112,6 +112,8 @@ const ROW_COMPONENT_MINT = ['web/fns/row-component-mint', ...ARM_COMMIT];
 const ROW_SLOT_MINT = ['web/fns/row-slot-mint'];
 // Per-enclosing-row wiring, folded only into a repeat written inside another's rows.
 const NESTED_REPEATS = ['web/fns/nested-repeats'];
+// The per-row @if flip, folded only into a repeat whose row template carries one.
+const ROW_BRANCH_MINT = ['web/fns/row-branch-mint'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -564,6 +566,7 @@ function isScalarOnlyKeyedRepeatModule(
 	if ((view.keyedRepeats?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0)
 		return false;
 	if ((view.branches?.length ?? 0) > 0) return false;
+	if (view.keyedRepeats!.some((repeat) => repeat.rowTemplate?.branchSlots)) return false;
 	if ((view.asyncBoundaries?.length ?? 0) > 0) return false;
 	if ((view.behaviors?.length ?? 0) > 0) return false;
 	if ((view.elementHandles?.length ?? 0) > 0) return false;
@@ -936,6 +939,7 @@ function payloadDemandRecords(
 				...(record.rowTemplate ?? record.emptyArm ? ROW_MINT : []),
 				...(record.rowComponent ? ROW_COMPONENT_MINT : []),
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
+				...(record.rowTemplate?.branchSlots ? ROW_BRANCH_MINT : []),
 				...(record.enclosingRow ? NESTED_REPEATS : []),
 				...(replacement.scalarRows || record.fixed ? [] : renderRuntimeModuleIds),
 			]),
@@ -1567,9 +1571,14 @@ function consequenceReach(
 	const branchFlips = (branch: NonNullable<ProtocolViewPayload['branches']>[number]) =>
 		reads(branch.testReads) || reads(branch.contentReads);
 	const repeatMoves = (repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]) => {
+		const branches = repeat.rowTemplate?.branchSlots ?? [];
 		const slotReads = [
 			...(repeat.rowTemplate?.textSlots ?? []),
 			...(repeat.rowTemplate?.attributeSlots ?? []),
+			...branches,
+			...branches.flatMap((branch) =>
+				branch.arms.flatMap((arm) => [...(arm.textSlots ?? []), ...(arm.attributeSlots ?? [])]),
+			),
 		].flatMap((slot): ReadonlyArray<AffectedRead> =>
 			'graphNodeId' in slot
 				? [{ graphNodeId: slot.graphNodeId, path: slot.graphPath }]

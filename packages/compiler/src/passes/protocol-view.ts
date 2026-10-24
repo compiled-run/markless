@@ -1,6 +1,7 @@
 import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
+	type ProtocolRowTemplateSlotValue,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
 import { repeatRowSiblingElements } from './render-data/row-position.ts';
@@ -73,6 +74,15 @@ export function createProtocolViewPayload(
 	// The consumer props a composed child's `{...rest}` carries onto its own
 	// elements. Joined here, at build time, they are ordinary view records.
 	const forwarded = forwardedSpreadViewRecords(input);
+	const keyedRepeats = resumableKeyedRepeats(input);
+	// A branch a row template flips is flipped per row; the page record would name one row's anchors.
+	const rowFlippedBranchIds = new Set(
+		keyedRepeats.flatMap((repeat) =>
+			('rowTemplate' in repeat ? (repeat.rowTemplate?.branchSlots ?? []) : []).map(
+				(branch) => branch.branchId,
+			),
+		),
+	);
 	return withAddressedLocators({
 		version: ASYNC_PROTOCOL_VERSION,
 		...optionalAsyncRunnerRegistry(input, asyncRunnerSymbols),
@@ -119,10 +129,10 @@ export function createProtocolViewPayload(
 		// Only gate-supported boundaries have SSR-emitted anchors; shipping
 		// records for ungated boundaries would make resume throw
 		// missingCommentAnchorError. Re-index contiguously over the emitted set.
-		keyedRepeats: resumableKeyedRepeats(input),
+		keyedRepeats,
 		// Branch and boundary anchor pairs share one document-order stream, so
 		// re-indexing allocates over the emitted union in anchorOrder.
-		branches: supportedBranchRecords(input),
+		branches: supportedBranchRecords(input).filter((branch) => !rowFlippedBranchIds.has(branch.id)),
 		asyncBoundaries: supportedAsyncBoundaries(input).map(
 			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
@@ -428,19 +438,52 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				}]
 				: [];
 		});
-		const rowEvents = oneRecordPerEvent(input.payloadArena.view.events)
-			.filter((event) => rowHostPaths.has(event.hostNodeId))
-			.map((event) => ({
-				hostPath: rowHostPaths.get(event.hostNodeId)!,
-				eventName: event.eventName,
-				symbolIds: eventSymbolsForHost(input, event.hostNodeId, event.eventName).map(
-					(symbolId) => boundEventSymbols.get(symbolId) ?? symbolId,
-				),
-				// Cloned rows dispatch through the row record, not the template
-				// host's, so dropping the policy here left every row past the
-				// first with no synchronous preventDefault.
-				...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
-			}));
+		const built = fixedRows(input, repeat, render)
+			? { fixed: true as const }
+			: {
+					...mintableEmptyArm(input, render),
+					...mintableRowTemplate(input, render, liveRowComponentMint(input, repeat, render)),
+					...mintableRowComponent(liveRowComponentMint(input, repeat, render)),
+				};
+		const rowEvent = (
+			event: ProtocolViewPayloadInput['payloadArena']['view']['events'][number],
+			hostPath: ReadonlyArray<number>,
+		) => ({
+			hostPath,
+			eventName: event.eventName,
+			symbolIds: eventSymbolsForHost(input, event.hostNodeId, event.eventName).map(
+				(symbolId) => boundEventSymbols.get(symbolId) ?? symbolId,
+			),
+			// Cloned rows dispatch through the row record, not the template
+			// host's, so dropping the policy here left every row past the
+			// first with no synchronous preventDefault.
+			...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
+		});
+		const events = oneRecordPerEvent(input.payloadArena.view.events);
+		const indexName = input.semanticGraph?.keyedRepeats.find(
+			(candidate) => candidate.id === repeat.id,
+		)?.indexName;
+		const branchSlots = 'rowTemplate' in built ? (built.rowTemplate?.branchSlots ?? []) : [];
+		const armEvents = branchSlots.flatMap(
+			(branch, slot) => {
+				const site = renderDataOf(input).branches.find(
+					(candidate) => candidate.branchSiteId === branch.branchId,
+				);
+				return (site?.armChunkIds ?? []).flatMap((chunkId, arm) => {
+					const hosts = branchArmHostPaths(input, chunkId);
+					return events.flatMap((event) => {
+						const path = hosts.get(event.hostNodeId)?.path;
+						return path ? [{ ...rowEvent(event, path), arm: { slot, arm } }] : [];
+					});
+				});
+			},
+		);
+		const rowEvents = [
+			...events
+				.filter((event) => rowHostPaths.has(event.hostNodeId))
+				.map((event) => rowEvent(event, rowHostPaths.get(event.hostNodeId)!)),
+			...armEvents,
+		];
 		return [
 			{
 				id: repeat.id,
@@ -462,17 +505,10 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
 				...(render.rowEndOffset !== undefined ? { rowEndOffset: render.rowEndOffset } : {}),
-				...(fixedRows(input, repeat, render)
-					? { fixed: true as const }
-					: {
-							...mintableEmptyArm(input, render),
-							...mintableRowTemplate(
-								input,
-								render,
-								liveRowComponentMint(input, repeat, render),
-							),
-							...mintableRowComponent(liveRowComponentMint(input, repeat, render)),
-						}),
+				...built,
+				...(rowEvents.some((event) => handlersRead(input, event.symbolIds, indexName))
+					? { indexName }
+					: {}),
 				rowEvents,
 				...rowSuffixField(input, repeat.id, render, enclosingRow, rowEvents),
 			},
@@ -499,6 +535,23 @@ function rowSuffixField(
 		return {};
 	const after = repeatRowSiblingElements(chunks, repeatId, 'after');
 	return after === 'unknown' ? {} : { rowEndOffset: after };
+}
+
+function handlersRead(
+	input: ProtocolViewPayloadInput,
+	symbolIds: ReadonlyArray<string>,
+	name: string | undefined,
+): boolean {
+	if (!name) return false;
+	const mention = new RegExp(`(^|[^\\w$.])${name}(?![\\w$])`);
+	return input.symbolResolver.symbols.some(
+		(symbol) =>
+			symbol.kind === 'event-handler' &&
+			symbolIds.some(
+				(id) => id === symbol.id || id.startsWith(`bound:${encodeURIComponent(symbol.id)}:`),
+			) &&
+			mention.test(symbol.source ?? ''),
+	);
 }
 
 // Rows written straight into a branch arm stand between its anchors only while that arm is shown.
@@ -702,38 +755,130 @@ function mintableRowTemplate(
 					),
 				}
 			: undefined;
-	let readsExpressions = false;
+	const slotValue = (slot: SemanticMarkupSlot) =>
+		mintableSlotValue(slot) ??
+		(expressionScope
+			? expressionSlotValue(
+					slot,
+					expressionScope.graph,
+					expressionScope.componentName,
+					expressionScope.rowNames,
+				)
+			: null);
+	const branchSlots: Array<RowTemplateBranchSlot> = [];
 	for (const slot of chunk.slots) {
 		if (slot === wrappedComponentSlot) continue;
 		if (slot.kind === 'repeat' && nestedRepeatMints(input, render, slot.repeatId)) continue;
+		if (slot.kind === 'branch' && !mint) {
+			const branch = rowBranchSlot(input, chunk, slot, slotValue);
+			if (!branch) return {};
+			branchSlots.push(branch);
+			continue;
+		}
 		// Every slot that is neither text nor an attribute is wiring the mint does
 		// not do, and a value only the render can produce has no channel at all.
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
-		const value =
-			mintableSlotValue(slot) ??
-			(expressionScope
-				? expressionSlotValue(
-						slot,
-						expressionScope.graph,
-						expressionScope.componentName,
-						expressionScope.rowNames,
-					)
-				: null);
+		const value = slotValue(slot);
 		if (!value) return {};
-		if ('source' in value) readsExpressions = true;
 		if (slot.kind === 'text') textSlots.push({ path: slot.coordinate.path, ...value });
 		else attributeSlots.push({ path: slot.coordinate.path, name: slot.name, ...value });
 	}
 	const html = chunk.statics.join('');
 	if (!html) return {};
+	const readsExpressions = [
+		...textSlots,
+		...attributeSlots,
+		...branchSlots,
+		...branchSlots.flatMap((branch) =>
+			branch.arms.flatMap((arm) => [...(arm.textSlots ?? []), ...(arm.attributeSlots ?? [])]),
+		),
+	].some((slot) => 'source' in slot);
 	return {
 		rowTemplate: {
 			html,
 			...(readsExpressions ? { componentName: chunk.componentName! } : {}),
 			...(textSlots.length > 0 ? { textSlots } : {}),
 			...(attributeSlots.length > 0 ? { attributeSlots } : {}),
+			...(branchSlots.length > 0 ? { branchSlots } : {}),
 		},
 	};
+}
+
+type RowTemplateBranchSlot = NonNullable<MintableRowTemplate['branchSlots']>[number];
+type RowTemplateArm = RowTemplateBranchSlot['arms'][number];
+
+// An arm holding more than elements, text, attributes and events is wiring a row cannot redo on a flip, so it refuses.
+function rowBranchSlot(
+	input: ProtocolViewPayloadInput,
+	rowChunk: SemanticMarkupChunk,
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }>,
+	slotValue: (slot: SemanticMarkupSlot) => ProtocolRowTemplateSlotValue | null,
+): RowTemplateBranchSlot | null {
+	const branch = renderDataOf(input).branches.find(
+		(candidate) => candidate.branchSiteId === slot.branchSiteId,
+	);
+	if (!branch || branch.update !== 'range' || branch.asyncBoundaryId) return null;
+	if (branch.kind === 'switch' && !branch.armTests) return null;
+	const test: ProtocolRowTemplateSlotValue | null =
+		branch.testReads.length === 1
+			? { graphNodeId: branch.testReads[0]!.graphNodeId, graphPath: branch.testReads[0]!.path }
+			: slotValue({
+					kind: 'text',
+					residue: { kind: 'authored-expression', source: branch.testSource },
+					coordinate: slot.coordinate,
+				} as SemanticMarkupSlot);
+	if (!test) return null;
+	const root = rowBranchIsRow(rowChunk, slot);
+	const unwired = new Set([
+		...input.payloadArena.view.behaviors.map((record) => record.hostNodeId),
+		...input.payloadArena.view.elementHandles.map((record) => record.hostNodeId),
+	]);
+	const arms: RowTemplateArm[] = [];
+	for (const chunkId of slot.armTemplateIds) {
+		const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
+		if (!chunk) return null;
+		if (root && !armRootsOneElement(chunk)) return null;
+		if (chunk.hosts.some((host) => unwired.has(host.hostNodeId))) return null;
+		const textSlots: Array<RowTemplateTextSlot> = [];
+		const attributeSlots: Array<RowTemplateAttributeSlot> = [];
+		for (const armSlot of chunk.slots) {
+			if (armSlot.kind !== 'text' && armSlot.kind !== 'attribute') return null;
+			const value = slotValue(armSlot);
+			if (!value) return null;
+			if (armSlot.kind === 'text') textSlots.push({ path: armSlot.coordinate.path, ...value });
+			else attributeSlots.push({ path: armSlot.coordinate.path, name: armSlot.name, ...value });
+		}
+		arms.push({
+			html: chunk.statics.join(''),
+			...(textSlots.length > 0 ? { textSlots } : {}),
+			...(attributeSlots.length > 0 ? { attributeSlots } : {}),
+		});
+	}
+	return {
+		path: slot.coordinate.path,
+		branchId: slot.branchSiteId,
+		...(branch.armTests ? { armTests: branch.armTests } : {}),
+		arms,
+		...test,
+	};
+}
+
+// The branch is everything the row renders, so the arm it shows is the row itself.
+function rowBranchIsRow(chunk: SemanticMarkupChunk, slot: SemanticMarkupSlot): boolean {
+	return (
+		chunk.slots.length === 1 &&
+		chunk.slots[0] === slot &&
+		chunk.statics.every((text) => text.replace(/<!--markless-slot:\d+-->/g, '').trim() === '')
+	);
+}
+
+// An arm that is a whole row renders exactly one element, first, and nothing beside it.
+function armRootsOneElement(chunk: SemanticMarkupChunk): boolean {
+	return (
+		chunk.hosts.filter((host) => host.coordinate.path.length === 1).length === 1 &&
+		chunk.hosts.every((host) => host.coordinate.path[0] === 0) &&
+		chunk.slots.every((slot) => slot.coordinate.path[0] === 0)
+	);
 }
 
 // A nested repeat in a minted row builds its own rows once the row is wired, so the row
@@ -787,7 +932,7 @@ function fixedRows(
 	if (!semantic || chunk?.componentName !== root || semantic.indexKey) return false;
 	if (rowComponentMint(input, render) || branchArmField(input, repeat).branchArm) return false;
 	const template = mintableRowTemplate(input, render, null).rowTemplate;
-	if (!template || template.componentName) return false;
+	if (!template || template.componentName || template.branchSlots) return false;
 	const slots = [...(template.textSlots ?? []), ...(template.attributeSlots ?? [])];
 	if (slots.some((slot) => !('itemPath' in slot))) return false;
 	return invariantInBrowser(
@@ -989,7 +1134,25 @@ function rowRootsOneElement(
 ): boolean {
 	if (render.rowElementCount > 0) return true;
 	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === render.rowChunkId);
-	return (chunk?.slots ?? []).some((slot) => slot.kind === 'child-component');
+	if ((chunk?.slots ?? []).some((slot) => slot.kind === 'child-component')) return true;
+	// A row that is one @if or @switch is the one element its shown arm renders.
+	const slot = chunk?.slots[0];
+	const branch = renderDataOf(input).branches.find(
+		(candidate) => slot?.kind === 'branch' && candidate.branchSiteId === slot.branchSiteId,
+	);
+	const alwaysShowsAnArm =
+		branch?.kind === 'switch'
+			? branch.armTests?.includes(null) === true
+			: (branch?.armChunkIds.length ?? 0) >= 2;
+	return (
+		slot?.kind === 'branch' &&
+		alwaysShowsAnArm &&
+		rowBranchIsRow(chunk!, slot) &&
+		slot.armTemplateIds.every((chunkId) => {
+			const arm = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
+			return arm !== undefined && armRootsOneElement(arm);
+		})
+	);
 }
 
 function hostPathsForChunk(

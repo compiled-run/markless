@@ -89,9 +89,23 @@ test('a row calling a method on that cell mints from the expression and stays si
 	]);
 });
 
-test('a row holding a construct over page state warns that the list can never grow', async () => {
+// A test over page state flips per row from the row template, so the row can grow too.
+test('a row holding an @if over page state mints and stays silent', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li>@if (chosen === 'a') { <em>on</em> } @else { <em>off</em> }</li> }</ul>`,
+	);
+
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	// The test is page state alone, so the computed the page already minted for it is what each row reads.
+	expect(rowRecord(compiled)?.rowTemplate?.branchSlots).toEqual([
+		expect.objectContaining({ graphNodeId: 'computed:templateExpression:0', graphPath: [] }),
+	]);
+	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
+});
+
+test('a row holding an @if over page state with a component in an arm warns that the list can never grow', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li>@if (chosen === 'a') { <Cell label={row.label} /> } @else { <em>off</em> }</li> }</ul>`,
 	);
 
 	expect(rowMintWarnings(compiled)).toEqual([

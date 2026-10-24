@@ -40,7 +40,8 @@ export type ComposeDomUpdate = ComposeGraphRead & {
 export type ComposeRowTemplate = MarklessRowTemplate;
 type RowTemplateSlot =
 	| NonNullable<ComposeRowTemplate['textSlots']>[number]
-	| NonNullable<ComposeRowTemplate['attributeSlots']>[number];
+	| NonNullable<ComposeRowTemplate['attributeSlots']>[number]
+	| NonNullable<ComposeRowTemplate['branchSlots']>[number];
 export type ComposeKeyedRepeat = {
 	readonly id: string;
 	readonly collectionGraphNodeId?: string;
@@ -975,19 +976,29 @@ function composedRowTemplate(
 		dropped ||= 'name' in slot ? slot.name : 'its text';
 		return slot;
 	};
-	const textSlots = rowTemplate.textSlots?.map(remap);
-	const attributeSlots = rowTemplate.attributeSlots?.map(remap);
+	const remapSlots = <T extends Pick<ComposeRowTemplate, 'textSlots' | 'attributeSlots'>>(
+		owner: T,
+	): T => ({
+		...owner,
+		...(owner.textSlots && { textSlots: owner.textSlots.map(remap) }),
+		...(owner.attributeSlots && { attributeSlots: owner.attributeSlots.map(remap) }),
+	});
+	const composed = {
+		...remapSlots(rowTemplate),
+		...(rowTemplate.branchSlots && {
+			branchSlots: rowTemplate.branchSlots.map((branch) => ({
+				...remap(branch),
+				arms: branch.arms.map(remapSlots),
+			})),
+		}),
+	};
 	if (dropped) {
 		console.warn(
 			`markless: ${repeatId} drops its row template - ${dropped} reads an unpassed prop`,
 		);
 		return undefined;
 	}
-	return {
-		...rowTemplate,
-		...(textSlots && { textSlots }),
-		...(attributeSlots && { attributeSlots }),
-	};
+	return composed;
 }
 
 export function marklessCsrRemapChildDomUpdate(

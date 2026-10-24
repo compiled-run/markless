@@ -662,7 +662,7 @@ export function createEventWiring(input: {
 				return {
 					locals: {
 						...(repeat as { readonly locals?: () => object }).locals?.(),
-						[repeat.itemName]: item(),
+						...repeats.rowLocals(input.graph, repeat, rowKey),
 					},
 				};
 			},

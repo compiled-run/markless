@@ -13,11 +13,13 @@ import {
 	mintableSlotValue,
 	resolveRowChunkMint,
 	resolveRowComponentMint,
+	rowBranchMints,
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
 import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	keyedRepeatRowsUnplacedDiagnostic,
+	rowBranchFlipUnsupportedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
 } from './diagnostics.ts';
 
@@ -38,6 +40,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly recordHostIds?: ReadonlySet<string>;
 	readonly liveHostIds?: ReadonlySet<string>;
+	readonly unregistrableHostIds?: ReadonlySet<string>;
 }): ReadonlyArray<CompilerDiagnostic> {
 	if (input.semanticGraph.keyedRepeats.length === 0) return [];
 	const componentNames = input.semanticGraph.components.map((component) => component.name);
@@ -67,6 +70,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 				: {}),
 			...(input.recordHostIds ? { recordHostIds: input.recordHostIds } : {}),
 			...(input.liveHostIds ? { liveHostIds: input.liveHostIds } : {}),
+			...(input.unregistrableHostIds ? { unregistrableHostIds: input.unregistrableHostIds } : {}),
 			repeatId: repeat.id,
 			itemName: repeat.itemName,
 			graph: input.semanticGraph,
@@ -83,6 +87,24 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 				filename: input.filename,
 			}),
 		);
+		const rowChunk = input.semanticGraph.markup.chunks.find(
+			(chunk) => chunk.id === `repeat:${repeat.id}:row`,
+		);
+		for (const slot of rowChunk?.slots ?? []) {
+			if (slot.kind !== 'branch') continue;
+			const site = input.semanticGraph.branchSites.find((candidate) => candidate.id === slot.branchSiteId);
+			if (!site) continue;
+			diagnostics.push(
+				rowBranchFlipUnsupportedDiagnostic({
+					itemName: repeat.itemName,
+					branchLabel: site.kind === 'switch' ? '@switch' : '@if',
+					testSource: site.testSource,
+					refusal,
+					node,
+					filename: input.filename,
+				}),
+			);
+		}
 	});
 	return diagnostics;
 }
@@ -115,6 +137,7 @@ function rowMintRefusal(input: {
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly recordHostIds?: ReadonlySet<string>;
 	readonly liveHostIds?: ReadonlySet<string>;
+	readonly unregistrableHostIds?: ReadonlySet<string>;
 	readonly repeatId: string;
 	readonly itemName: string;
 	readonly graph: SemanticGraphArtifact;
@@ -177,6 +200,18 @@ function rowMintRefusal(input: {
 			};
 		}
 		if (slot.kind === 'repeat' && nestedRepeatMints(input, slot.repeatId)) continue;
+		if (
+			slot.kind === 'branch' &&
+			!componentSlot &&
+			chunk.componentName &&
+			rowBranchMints(
+				{ ...input, semanticGraph: input.graph },
+				chunk.componentName,
+				slot,
+				input.rowNames,
+			)
+		)
+			continue;
 		return { kind: 'nested-construct', label: nestedConstructLabel(slot, input.branchSites) };
 	}
 	return null;

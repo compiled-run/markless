@@ -115,7 +115,11 @@ const resumeOnDemandEntries = [
 // 2026-10-23: arm and row records address an element by counting element children and @if/@try blocks, never text, through
 // one resolver in resume-anchor-census.ts that replaces the per-module child-node walks: 27,145 -> 27,756 raw; minified+gzip
 // 4,284 -> 4,373 bytes (rolldown, workspace packages external, same method both sides), under the 4,800 gzip wall.
-const sourceByteLimit = 27756;
+// 2026-10-24: an @if in a keyed row flips per row (arm events wired once row code is in, served rows' values carry the
+// arm they show) and a row handler is handed its row's index: resume-keyed-repeats.ts closure 27,756 -> 29,986 raw;
+// minified+gzip 4,373 -> 4,658 bytes (rolldown, workspace packages external, same method both sides), under the 4,800
+// gzip wall; the arm code itself is fns/row-branch-mint, which only a page whose rows hold an @if loads.
+const sourceByteLimit = 29986;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

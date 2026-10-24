@@ -541,6 +541,7 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		if (repeat.rowEndOffset !== undefined)
 			assertNonNegativeIntegerField(repeat, 'rowEndOffset', context);
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
+		assertOptionalStringField(repeat, 'indexName', context);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
 		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);
 		assertOptionalRowTemplate(repeat, `${context}.rowTemplate`);
@@ -595,15 +596,59 @@ function assertOptionalRowTemplate(record: Record<string, unknown>, context: str
 	assertOptionalStringField(template, 'componentName', context);
 	assertOptionalRowTemplateSlots(template.textSlots, `${context}.textSlots`);
 	assertOptionalRowTemplateSlots(template.attributeSlots, `${context}.attributeSlots`, true);
+	assertOptionalRowTemplateBranchSlots(template.branchSlots, `${context}.branchSlots`);
+	type Slot = Record<string, unknown>;
+	const slotsOf = (owner: Slot): Slot[] => [
+		...((owner.textSlots as Slot[] | undefined) ?? []),
+		...((owner.attributeSlots as Slot[] | undefined) ?? []),
+	];
+	const branchSlots = (template.branchSlots as Slot[] | undefined) ?? [];
 	const expressionSlots = [
-		...((template.textSlots as ReadonlyArray<Record<string, unknown>> | undefined) ?? []),
-		...((template.attributeSlots as ReadonlyArray<Record<string, unknown>> | undefined) ?? []),
+		...slotsOf(template),
+		...branchSlots,
+		...branchSlots.flatMap((branch) => (branch.arms as Slot[]).flatMap(slotsOf)),
 	].some((slot) => slot.source !== undefined);
 	if (expressionSlots !== (template.componentName !== undefined)) {
 		throw invalidPayloadShapeError(
 			contextPayloadType(context),
 			`Invalid ${context}: expected componentName exactly when a slot carries source.`,
 		);
+	}
+}
+
+function assertOptionalRowTemplateBranchSlots(slots: unknown, context: string): void {
+	if (slots === undefined) return;
+	if (!Array.isArray(slots)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected array.`,
+		);
+	}
+	for (const [index, slot] of slots.entries()) {
+		const slotContext = `${context}[${index}]`;
+		assertRecordShape(slot, slotContext);
+		assertNonNegativeIntegerArrayField(slot, 'path', slotContext);
+		assertStringField(slot, 'branchId', slotContext);
+		assertRowTemplateSlotValue(slot, slotContext);
+		if (slot.armTests !== undefined && !Array.isArray(slot.armTests)) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(slotContext),
+				`Invalid ${slotContext}: expected armTests array.`,
+			);
+		}
+		if (!Array.isArray(slot.arms)) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(slotContext),
+				`Invalid ${slotContext}: expected arms array.`,
+			);
+		}
+		for (const [armIndex, arm] of slot.arms.entries()) {
+			const armContext = `${slotContext}.arms[${armIndex}]`;
+			assertRecordShape(arm, armContext);
+			assertStringField(arm, 'html', armContext);
+			assertOptionalRowTemplateSlots(arm.textSlots, `${armContext}.textSlots`);
+			assertOptionalRowTemplateSlots(arm.attributeSlots, `${armContext}.attributeSlots`, true);
+		}
 	}
 }
 
@@ -813,6 +858,11 @@ function assertRowEvents(value: unknown, context: string): void {
 		assertStringArrayField(event, 'symbolIds', eventContext);
 		if (event.syncPolicy !== undefined) {
 			assertSyncPolicy(event.syncPolicy, `${eventContext}.syncPolicy`);
+		}
+		if (event.arm !== undefined) {
+			assertRecordShape(event.arm, `${eventContext}.arm`);
+			assertNonNegativeIntegerField(event.arm, 'slot', `${eventContext}.arm`);
+			assertNonNegativeIntegerField(event.arm, 'arm', `${eventContext}.arm`);
 		}
 	}
 }
