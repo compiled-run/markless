@@ -48,6 +48,8 @@ export default box(
 		await expect.page.text(home, HOME_COUNTER, 'Tap 0', WAIT);
 		await expect.page.outcome(home, { navigations: 1 }, WAIT);
 		await expect.edit(homeEdit, PAGE_EDIT, WAIT);
+		// The home edit must leave the docs page alone: a reload here would also swallow the click below.
+		await expect.page.outcome(docs, { navigations: 1 }, WAIT);
 		await docs.click(MDX_COUNTER, WAIT);
 		await expect.page.text(docs, MDX_COUNTER, 'MDX Clicks 1', WAIT);
 

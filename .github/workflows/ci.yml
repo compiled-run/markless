@@ -795,6 +795,16 @@ jobs:
                   include-hidden-files: true
                   if-no-files-found: error
 
+            # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
+            - name: Upload the box receipts of a failed run
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: box-receipts-bundler
+                  path: packages/bundler/.witness/receipts/
+                  include-hidden-files: true
+                  retention-days: 14
+
             # The marker and the receipts share one cache entry under this
             # lane's key, so a later run that skips the lane can still restore
             # the receipt set this lane is the only producer of.
@@ -855,6 +865,16 @@ jobs:
                   path: packages/router/.witness/receipts/*.json
                   include-hidden-files: true
                   if-no-files-found: error
+
+            # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
+            - name: Upload the box receipts of a failed run
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: box-receipts-router
+                  path: packages/router/.witness/receipts/
+                  include-hidden-files: true
+                  retention-days: 14
 
             - name: Mark the router box lane complete
               run: echo ok > boxes-router-completed.txt
@@ -917,6 +937,16 @@ jobs:
                   include-hidden-files: true
                   if-no-files-found: error
 
+            # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
+            - name: Upload the box receipts of a failed run
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: box-receipts-music-player
+                  path: demos/music-player/.witness/receipts/
+                  include-hidden-files: true
+                  retention-days: 14
+
             - name: Mark the music-player box lane complete
               run: echo ok > boxes-music-player-completed.txt
 
@@ -977,6 +1007,16 @@ jobs:
                   path: demos/music-player-ssr/.witness/receipts/*.json
                   include-hidden-files: true
                   if-no-files-found: error
+
+            # A failed box's receipt (its recorded page events, requests and HMR payloads) is the only evidence of what it saw.
+            - name: Upload the box receipts of a failed run
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: box-receipts-music-player-ssr
+                  path: demos/music-player-ssr/.witness/receipts/
+                  include-hidden-files: true
+                  retention-days: 14
 
             - name: Mark the music-player-ssr box lane complete
               run: echo ok > boxes-music-player-ssr-completed.txt
