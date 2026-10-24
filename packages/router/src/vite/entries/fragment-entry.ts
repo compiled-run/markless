@@ -22,6 +22,7 @@ export interface FragmentNavigationConfig {
 	readonly pageStartComment: string;
 	// The container's own attributes, never carried from the leaving page's element to the next one.
 	readonly containerAttributes: readonly [container: string, paths: string];
+	readonly keepAttributes: readonly [keep: string, own: string];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
 	readonly documentLoads: boolean;
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
@@ -606,6 +607,10 @@ function morphRange(
 	page: boolean,
 ): void {
 	for (const next of incoming) {
+		if (cursor && cursor !== stop && kept(d, cursor, next, fresh)) {
+			cursor = cursor.nextSibling;
+			continue;
+		}
 		// A node the next page dropped from a list: the one after it is the match.
 		if (cursor && cursor !== stop && !sameKind(cursor, next)) {
 			const after = cursor.nextSibling;
@@ -629,6 +634,30 @@ function morphRange(
 		cursor.remove();
 		cursor = after;
 	}
+}
+
+let keepAttributes: readonly [keep: string, own: string] = ['', ''];
+
+// Both pages render this element byte for byte: it stays, with what scripts did to it; only the page's own children inside are replaced.
+function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
+	const [keep, own] = keepAttributes;
+	const hash = keep && from.nodeType === 1 && (from as Element).getAttribute(keep);
+	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return false;
+	const slots = (root: Element) =>
+		root.hasAttribute(own)
+			? [root]
+			: [...root.querySelectorAll(`[${own}]`)].filter(
+					(slot) => !root.contains(slot.parentElement!.closest(`[${own}]`)),
+				);
+	const leaving = slots(from as Element);
+	const arriving = slots(to as Element);
+	if (leaving.length !== arriving.length) return false;
+	leaving.forEach((slot, index) => {
+		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
+		slot.replaceChildren(...nodes);
+		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
+	});
+	return true;
 }
 
 function morphNode(
@@ -873,6 +902,7 @@ export async function navigate(
 	const commit = (): boolean => {
 		if (id !== session.navigation) return false;
 		const settle = withoutTransitions(d);
+		keepAttributes = state.config.keepAttributes ?? ['', ''];
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
 			if (!element.isConnected || !scope.contains(element)) continue;
