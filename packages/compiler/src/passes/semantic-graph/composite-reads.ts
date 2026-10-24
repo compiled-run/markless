@@ -68,9 +68,9 @@ export function isCompositeTemplateExpression(
 		node.type === 'BinaryExpression' ||
 		node.type === 'LogicalExpression' ||
 		node.type === 'TemplateLiteral' ||
-		(node.type === 'MemberExpression' &&
-			node.computed === true &&
-			!isLiteralExpression(node.property as AnyNode | undefined)) ||
+		(node.type === 'ChainExpression' &&
+			isCompositeTemplateExpression(node.expression as AnyNode, options)) ||
+		readsThroughDynamicKey(node) ||
 		(options.methodCalls === true &&
 			(isMethodCallExpression(node) || isGlobalConversionCall(node))) ||
 		// `delete` mutates rather than reads; the read collector already refuses it,
@@ -110,7 +110,7 @@ export function pureCompositeReadSources(
 		const source = expressionSource(node, state.source);
 		return source === 'undefined' || readsModuleValue(node, source, state) ? [] : [source];
 	}
-	if (node.type === 'MemberExpression') return memberReadSources(node, state);
+	if (node.type === 'MemberExpression') return memberReadSources(node, state, options);
 	if (node.type === 'CallExpression') {
 		return options.methodCalls === true ? methodCallReadSources(node, state, options) : null;
 	}
@@ -166,16 +166,36 @@ function methodCallReadSources(
 	]);
 }
 
-function memberReadSources(node: AnyNode, state: WalkState): ReadonlyArray<string> | null {
-	if (node.computed === true && !isLiteralExpression(node.property as AnyNode | undefined)) {
-		// `LABELS[tone]` over a module value reads only its key.
-		const object = node.object as AnyNode;
-		const objectSource = expressionSource(object, state.source);
-		if (object?.type !== 'Identifier' || !objectSource || !readsModuleValue(object, objectSource, state))
-			return null;
-		return pureCompositeReadSources(node.property as AnyNode, state);
-	}
+// A member chain with a `[key]` whose key is not a literal: `LABELS[tone]`, `rows[index].label`.
+function readsThroughDynamicKey(node: AnyNode | undefined): boolean {
+	for (
+		let current = node;
+		current?.type === 'MemberExpression';
+		current = current.object as AnyNode
+	)
+		if (
+			current.computed === true &&
+			!isLiteralExpression(current.property as AnyNode | undefined)
+		)
+			return true;
+	return false;
+}
+
+function memberReadSources(
+	node: AnyNode,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<string> | null {
 	const object = node.object as AnyNode | undefined;
+	if (node.computed === true && !isLiteralExpression(node.property as AnyNode | undefined)) {
+		if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
+		// The receiver and the key are each read whole; `LABELS[tone]` over a module value reads only its key.
+		return joinReadSources([
+			pureCompositeReadSources(object, state, options),
+			pureCompositeReadSources(node.property as AnyNode, state, options),
+		]);
+	}
+	if (readsThroughDynamicKey(object)) return pureCompositeReadSources(object, state, options);
 	if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
 	const source = expressionSource(node, state.source);
 	if (!source) return null;

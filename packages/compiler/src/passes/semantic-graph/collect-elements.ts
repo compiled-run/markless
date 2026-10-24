@@ -42,6 +42,7 @@ import { overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	collectCompositeTemplateExpression,
 	type CompositeReadOptions,
+	isCompositeTemplateExpression,
 	joinReadSources,
 	liftArmModuleValue,
 	mintTemplateExpressionComputed,
@@ -400,7 +401,11 @@ function readsAsyncComputed(source: string, state: WalkState): boolean {
 function refuseUnroutedExpression(expression: AnyNode, target: string, state: WalkState): boolean {
 	if (state.currentKeyedRepeatScopeIds.length > 0) return false;
 	if (expression.type === 'Identifier') return false;
-	if (expression.type === 'MemberExpression' && pureCompositeReadSources(expression, state))
+	if (
+		expression.type === 'MemberExpression' &&
+		!isCompositeTemplateExpression(expression) &&
+		pureCompositeReadSources(expression, state)
+	)
 		return false;
 	let owned = false;
 	walkNode(expression, (node) => {
