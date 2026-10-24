@@ -1100,10 +1100,13 @@ function runInlineResumer(
 		(target as Element).closest?.(
 			defaultPrevented ? 'a[href][data-markless-router-link]' : 'a[href]',
 		);
-	const primeEventNames = ['focusin', 'pointerover'].filter((_name, hover) =>
-		(hover ? pressPreloadEventNames : focusWakeEventNames).some((eventName) =>
-			eventNames.includes(eventName),
-		),
+	const submits = eventNames.includes('submit') || nestedEventNames.includes('submit');
+	const primeEventNames = ['focusin', 'pointerover'].filter(
+		(_name, hover) =>
+			submits ||
+			(hover ? pressPreloadEventNames : focusWakeEventNames).some((eventName) =>
+				eventNames.includes(eventName),
+			),
 	);
 	if (primeEventNames.length > 0) {
 		const prime = (event: Event) => {
@@ -1121,6 +1124,18 @@ function runInlineResumer(
 					element.tagName === 'INPUT' ||
 					element.tagName === 'TEXTAREA' ||
 					element.tagName === 'SELECT';
+				// A form that handles its submit wakes on a pointer over its submit button or a focus inside it.
+				if (
+					submits &&
+					element.tagName === 'FORM' &&
+					entryOf(element, 'submit') &&
+					(!hover ||
+						(event.target as Element).closest?.<HTMLButtonElement>('button,input')?.type ===
+							'submit')
+				) {
+					primed = element;
+					break;
+				}
 				if (
 					wanted.some((eventName) => {
 						const ref = entryOf(element!, eventName)?.[0];
