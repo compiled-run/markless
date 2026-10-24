@@ -658,26 +658,36 @@ for (const [name, browserType] of [
 
 		test('a plain anchor to a page navigates by fragment; one to an unknown path loads normally', async () => {
 			const { page, errors, requests } = await open(browser, '/other');
+			// Every runtime start on the container from the press on, while the leaving page shows: an idle wake before
+			// the press is the page's own. The swap removes this recorder with the leaving page's state.
 			await page.evaluate(() => {
-				(window as unknown as Record<string, unknown>).__left =
-					document.querySelector('[data-async-container]');
+				const container = document.querySelector('[data-async-container]')!;
+				const log: string[] = [];
+				(window as unknown as Record<string, unknown>).__starts = log;
+				let pressed = false;
+				addEventListener('pointerdown', () => (pressed = true), { capture: true, once: true });
+				let value = (container as unknown as Record<string, unknown>).__marklessDelegatedDispatch;
+				Object.defineProperty(container, '__marklessDelegatedDispatch', {
+					configurable: true,
+					enumerable: true,
+					get: () => value,
+					set: (next) => {
+						value = next;
+						if (pressed)
+							log.push(document.querySelector('[data-page]')?.getAttribute('data-page') ?? '');
+					},
+				});
 			});
 			await page.locator('[data-plain-home]').click();
 			await landedOn(page, 'home');
+			const starts = await page.evaluate(
+				() => (window as unknown as Record<string, unknown>).__starts as string[],
+			);
 			expect(requests).toContain('/ fragment');
 			expect(requests).not.toContain('/');
-			// The page being left never starts its runtime for the click that leaves it.
-			expect(
-				await page.evaluate(
-					() =>
-						(
-							(window as unknown as Record<string, unknown>).__left as Record<
-								string,
-								unknown
-							>
-						).__marklessDelegatedDispatch,
-				),
-			).toBeUndefined();
+			// The page being left never starts its runtime for the click that leaves it; the swap drops the flag with the
+			// leaving page's state, so only a set made before it counts (the arriving page may start its own at idle).
+			expect(starts).toEqual([]);
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
 			await Promise.all([

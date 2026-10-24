@@ -3,6 +3,7 @@ import Layout from '../src/layout.tsrx';
 export default function BetaPage() @{
 	<Layout active="/beta">
 		<h1 data-title>{'Beta'}</h1>
+		<div class="panel panel-light" data-panel><span class="badge badge-outline" data-badge>{'Badge'}</span></div>
 		<section data-part><h2>{'Beta part 0'}</h2><p>{'Words for part 0 of beta, long enough to wrap and lay out like prose.'}</p><ul><li>{'a'}</li><li>{'b'}</li></ul></section>
 		<section data-part><h2>{'Beta part 1'}</h2><p>{'Words for part 1 of beta, long enough to wrap and lay out like prose.'}</p><ul><li>{'a'}</li><li>{'b'}</li></ul></section>
 		<section data-part><h2>{'Beta part 2'}</h2><p>{'Words for part 2 of beta, long enough to wrap and lay out like prose.'}</p><ul><li>{'a'}</li><li>{'b'}</li></ul></section>
