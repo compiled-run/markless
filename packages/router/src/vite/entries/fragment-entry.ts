@@ -685,15 +685,18 @@ function resetControl(element: Element): void {
 }
 
 // A kept node takes the next page's classes in one step: a CSS transition between two pages' styles shows as morphing.
-// Transitions are off while the swap's styles are computed once, then on again; that change itself starts none.
+// Transitions stay off until the frame after the swap has computed its styles; turning them on then starts none.
 function withoutTransitions(d: Document): () => void {
-	const sheet = new (d.defaultView as Window & typeof globalThis).CSSStyleSheet();
+	const w = d.defaultView as Window & typeof globalThis;
+	const sheet = new w.CSSStyleSheet();
 	sheet.replaceSync('*,*::before,*::after{transition:none!important}');
 	d.adoptedStyleSheets = [...d.adoptedStyleSheets, sheet];
-	return () => {
-		void d.documentElement.offsetHeight;
-		d.adoptedStyleSheets = d.adoptedStyleSheets.filter((own) => own !== sheet);
-	};
+	return () =>
+		w.requestAnimationFrame(() =>
+			w.requestAnimationFrame(() => {
+				d.adoptedStyleSheets = d.adoptedStyleSheets.filter((own) => own !== sheet);
+			}),
+		);
 }
 
 // Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.

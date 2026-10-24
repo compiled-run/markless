@@ -246,6 +246,41 @@ test('a content element whose class changes across a navigation never animates b
 	await page.close();
 });
 
+// A layout read in the task that swaps makes the browser lay out the whole page before it can paint it.
+test('the swap reads no layout while it commits, so the next page paints in the frame after the click task', async () => {
+	const { page, errors } = await open('/alpha');
+	await page.locator('[data-top="beta"]').hover();
+	await page.waitForTimeout(300);
+	await page.evaluate(() => {
+		const host = globalThis as { __reads?: number; __swapping?: boolean };
+		host.__reads = 0;
+		for (const name of ['offsetHeight', 'offsetWidth', 'offsetTop', 'offsetLeft'] as const) {
+			const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, name)!;
+			Object.defineProperty(HTMLElement.prototype, name, {
+				configurable: true,
+				get(this: HTMLElement) {
+					if (host.__swapping) host.__reads!++;
+					return own.get!.call(this);
+				},
+			});
+		}
+		// The swap commits in the task that pushes the history entry; it ends before the next task starts.
+		const push = history.pushState.bind(history);
+		history.pushState = (...args: Parameters<History['pushState']>) => {
+			host.__swapping = true;
+			setTimeout(() => (host.__swapping = false));
+			return push(...args);
+		};
+	});
+	await page.click('[data-top="beta"]');
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Beta',
+	);
+	expect(await page.evaluate(() => (globalThis as { __reads?: number }).__reads)).toBe(0);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 // From the moment the destination's nodes are in the document to the next frame: a swap that holds
 // the leaving page on screen while it fills the next one in pieces shows up here as extra frames.
 async function insertToFrame(page: Page, insert: () => Promise<unknown>): Promise<number> {
