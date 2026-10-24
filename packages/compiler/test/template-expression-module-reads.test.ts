@@ -210,3 +210,63 @@ export function Menu() @{
 		'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 	);
 });
+
+test('top-level markup indexing a body const by state is routed, as it is inside an @if', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+const SWATCHES: Record<string, { tone: string }> = { bar: { tone: 'warm' }, area: { tone: 'cool' } };
+export function Chart() @{
+	const classes: Record<string, string> = { bar: 'is-bar', area: 'is-area' };
+	const legends: Record<string, { caption: string }> = { bar: { caption: 'Bars' }, area: { caption: 'Areas' } };
+	const grid: Record<string, string[]> = { bar: ['b0', 'b1'], area: ['a0', 'a1'] };
+	const order = ['one', 'two'];
+	let kind = state('bar');
+	let index = state(0);
+	let picks = state(['x', 'y']);
+	<figure class={classes[kind]} title={legends[kind].caption} data-opt={classes?.[kind]} data-cell={grid[kind][index]} data-join={order[index] + '!'} data-tone={SWATCHES[kind].tone} data-pick={picks[index]} onClick={() => (kind = 'area')}>{classes[kind]}</figure>
+}
+`);
+	const expected: Record<string, ReadonlyArray<string>> = {
+		class: ['state:kind'],
+		title: ['state:kind'],
+		'data-opt': ['state:kind'],
+		'data-cell': ['state:kind', 'state:index'],
+		'data-join': ['state:index'],
+		'data-tone': ['state:kind'],
+		'data-pick': ['state:picks', 'state:index'],
+	};
+	const updates = result.protocolView.domUpdates;
+	for (const [name, dependencies] of Object.entries(expected)) {
+		const update = updates.find((candidate) =>
+			name === 'class'
+				? candidate.target?.kind === 'class'
+				: candidate.target?.kind === 'attribute' && candidate.target.name === name,
+		);
+		expect(update?.graphNodeId, name).toMatch(/^computed:templateExpression:/);
+		const computed = result.protocolState.computed?.find(
+			(record) => record.graphNodeId === update!.graphNodeId,
+		);
+		expect(
+			computed?.dependencies.map((dependency) => dependency.graphNodeId),
+			name,
+		).toEqual(dependencies);
+	}
+	expect(
+		deriveSourceOf(result, updates.find((u) => u.target?.kind === 'class')!.graphNodeId),
+	).toContain(`{ bar: 'is-bar', area: 'is-area' }[context.graph.read("state:kind")]`);
+	const text = updates.find((update) => update.target?.kind === 'text');
+	expect(text?.graphNodeId).toMatch(/^computed:templateExpression:/);
+});
+
+test('a reassignable body local indexed by state is still refused', async () => {
+	const found = await refusals(`import { state } from '@markless/core';
+export function Chart() @{
+	let classes: Record<string, string> = { bar: 'is-bar', area: 'is-area' };
+	let kind = state('bar');
+	<figure class={classes[kind]} data-caption={classes[kind].length} onClick={() => (kind = 'area')}>x</figure>
+}
+`);
+	expect(found.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining('`classes[kind]`'),
+		expect.stringContaining('`classes[kind].length`'),
+	]);
+});
