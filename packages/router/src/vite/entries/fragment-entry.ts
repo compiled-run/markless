@@ -687,24 +687,12 @@ function resetControl(element: Element): void {
 // A kept node takes the next page's classes in one step: a CSS transition between two pages' styles shows as morphing.
 // Transitions are off while the swap's styles are computed once, then on again; that change itself starts none.
 function withoutTransitions(d: Document): () => void {
-	const rule = '*,*::before,*::after{transition:none!important}';
-	const Sheet = d.defaultView?.CSSStyleSheet;
-	// A constructed sheet passes a strict style-src policy and adds no node a page script could observe.
-	if (Sheet && 'adoptedStyleSheets' in d) {
-		const sheet = new Sheet();
-		sheet.replaceSync(rule);
-		d.adoptedStyleSheets = [...d.adoptedStyleSheets, sheet];
-		return () => {
-			void d.documentElement.offsetHeight;
-			d.adoptedStyleSheets = d.adoptedStyleSheets.filter((own) => own !== sheet);
-		};
-	}
-	const style = d.createElement('style');
-	style.textContent = rule;
-	d.head.append(style);
+	const sheet = new (d.defaultView as Window & typeof globalThis).CSSStyleSheet();
+	sheet.replaceSync('*,*::before,*::after{transition:none!important}');
+	d.adoptedStyleSheets = [...d.adoptedStyleSheets, sheet];
 	return () => {
 		void d.documentElement.offsetHeight;
-		style.remove();
+		d.adoptedStyleSheets = d.adoptedStyleSheets.filter((own) => own !== sheet);
 	};
 }
 

@@ -1546,6 +1546,14 @@
 			"from": 16645,
 			"to": 17385,
 			"reason": "a key pressed while an earlier dispatch runs goes where that dispatch's handler put focus (dispatch-time code only)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 24610,
+			"to": 25013,
+			"reason": "the swap commits with CSS transitions off, so a node it keeps takes the next page's look in one step instead of morphing (shadcn badge-page tabs: 9 frames of transition on the port, 0 on the original)"
 		}
 	],
 	"runtimeModules": {
@@ -1558,7 +1566,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 24610,
+		"router/vite/entries/fragment-entry": 25013,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 9858,
