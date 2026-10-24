@@ -86,6 +86,8 @@ import {
 } from '../route-manifest.ts';
 import { routerLinkBridgeModules, type LinkBridgeModule } from './runtime/create-server-entry.ts';
 import { LINK_BRIDGE_DIR } from './runtime/link-bridge-module.ts';
+import { buildLayoutTemplates } from './layout-templates.ts';
+import { encodeLayoutTemplate, LAYOUT_TEMPLATE_DIR } from './runtime/layout-template.ts';
 
 // The compiler refuses browser code that reads these page props: they hold request data.
 const PAGE_SERVER_ONLY_PROPS = [
@@ -115,6 +117,7 @@ const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
 const LINK_BRIDGE_PATHS_PLACEHOLDER = '__MARKLESS_ROUTER_LINK_BRIDGE_PATHS__';
+const LAYOUT_TEMPLATES_PLACEHOLDER = '__MARKLESS_ROUTER_LAYOUT_TEMPLATES__';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
@@ -211,6 +214,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			fragmentEntry,
 		),
 		linkBridgeFilesPlugin(navigationEntry, fragmentEntry, options),
+		layoutTemplatesPlugin(),
 		devNitroClosePlugin(devNitro),
 		nitroPlugins,
 	];
@@ -775,6 +779,9 @@ function createNitroConfig(
 				[`/${LINK_BRIDGE_DIR}/**`]: {
 					headers: { 'cache-control': 'public, max-age=31536000, immutable' },
 				},
+				[`/${LAYOUT_TEMPLATE_DIR}/**`]: {
+					headers: { 'cache-control': 'public, max-age=31536000, immutable' },
+				},
 				...Object.fromEntries(
 					MARKLESS_PUBLIC_BUILD_METADATA_FILES.map((file) => [
 						`/${file}`,
@@ -1041,7 +1048,12 @@ function virtualModulesPlugin(
 					);
 				}
 				if (id.startsWith(`\0${FRAGMENT_ENTRY_PATH_ID}`)) {
-					return entryPathSource('fragmentEntryPath', fragmentEntry, FRAGMENT_ENTRY_ID, root);
+					return entryPathSource(
+						'fragmentEntryPath',
+						fragmentEntry,
+						FRAGMENT_ENTRY_ID,
+						root,
+					);
 				}
 				if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
 					return routePreloadsSource(
@@ -1167,6 +1179,64 @@ function linkBridgeFilesPlugin(
 	};
 }
 
+// Once the page server is written: render a sample of pages, write each shared layout as an immutable client file, and hand the server the templates.
+function layoutTemplatesPlugin(): Plugin {
+	let root = '';
+	let clientOutDir = '';
+	return {
+		name: 'markless-router:layout-templates',
+		apply: 'build',
+		sharedDuringBuild: true,
+		configResolved(config) {
+			root = config.root;
+			const client = Object.values(config.environments).find(
+				(environment) => environment.consumer === 'client',
+			);
+			if (client) clientOutDir = resolve(config.root, client.build.outDir);
+		},
+		async writeBundle(options, bundle) {
+			if (this.environment?.name !== 'ssr' || !options.dir || !clientOutDir) return;
+			const chunks = outputChunks(bundle);
+			const target = chunks.find((chunk) =>
+				chunk.code?.includes(LAYOUT_TEMPLATES_PLACEHOLDER),
+			);
+			const entry = chunks.find((chunk) =>
+				chunk.facadeModuleId?.startsWith(`\0${SERVER_ENTRY_ID}`),
+			);
+			if (!target || !entry) return;
+			const pathnames = buildRouteManifestFromFileIds(bundledPageFileIds(chunks, root))
+				.routes.map((route) => route.pathname)
+				.filter(
+					(pathname) =>
+						!/(?:^|\/)(?::|\*\*)/.test(pathname) && !/^\/api(?:\/|$)/.test(pathname),
+				);
+			const started = performance.now();
+			const { templates, pages, held } = await buildLayoutTemplates(
+				join(options.dir, entry.fileName),
+				pathnames,
+			);
+			for (const template of templates) {
+				const file = join(clientOutDir, LAYOUT_TEMPLATE_DIR, `${template.hash}.txt`);
+				await mkdir(dirname(file), { recursive: true });
+				await writeFile(file, encodeLayoutTemplate(template), 'utf8');
+			}
+			const file = join(options.dir, target.fileName);
+			const code = await readFile(file, 'utf8');
+			await writeFile(
+				file,
+				code.replace(
+					LAYOUT_TEMPLATES_PLACEHOLDER,
+					jsStringLiteralContent(JSON.stringify(templates)),
+				),
+				'utf8',
+			);
+			this.environment.logger.info(
+				`markless-router: ${templates.length} layout template${templates.length === 1 ? '' : 's'} hold ${held} of ${pages} rendered pages (${pathnames.length} without params) in ${Math.round(performance.now() - started)} ms`,
+			);
+		},
+	};
+}
+
 function bundledPageFileIds(chunks: readonly OutputChunkLike[], root: string): string[] {
 	const files = new Set<string>();
 	for (const chunk of chunks)
@@ -1193,9 +1263,11 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { documentNavigation } from ${JSON.stringify(`${ROUTER_OPTIONS_ID}${query}`)};`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
 		`const linkBridgePathsJson = globalThis.__marklessRouterLinkBridgePathsJson ?? ${JSON.stringify(LINK_BRIDGE_PATHS_PLACEHOLDER)};`,
+		`const layoutTemplatesJson = globalThis.__marklessRouterLayoutTemplatesJson ?? ${JSON.stringify(LAYOUT_TEMPLATES_PLACEHOLDER)};`,
 		`const entry = createServerEntry({`,
 		`  dev: import.meta.env.DEV,`,
 		`  linkBridgePaths: linkBridgePathsJson === ${JSON.stringify(LINK_BRIDGE_PATHS_PLACEHOLDER)} ? undefined : JSON.parse(linkBridgePathsJson),`,
+		`  layoutTemplates: layoutTemplatesJson === ${JSON.stringify(LAYOUT_TEMPLATES_PLACEHOLDER)} ? undefined : JSON.parse(layoutTemplatesJson),`,
 		`  base: import.meta.env.BASE_URL,`,
 		`  resumeEntryPath,`,
 		`  prerenderWakeEntryPath,`,

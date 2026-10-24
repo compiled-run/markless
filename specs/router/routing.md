@@ -182,6 +182,43 @@ URL itself answers the whole document.
 - The prefix is root-relative; apps served under a non-root base path are not
   covered yet.
 
+### Layout templates
+
+Pages that render the same layout (header, sidebar, footer) send it once, not
+with every navigation.
+
+- At build, after the page server is written, the router renders the region
+  document of up to 48 param-free pages, taken in turn from each first path
+  segment, and finds the text groups of them share. Each group of two or more
+  becomes a template: the shared text as segments, named by its hash. A group
+  is only merged into another when one fewer template download outweighs what
+  every page of both groups would stop sharing on each visit. Pages that fail,
+  time out or answer anything but 200 HTML at build are left out. A template
+  is written as an immutable client file, `/_markless/layouts/<hash>.txt`
+  (`LAYOUT_TEMPLATE_DIR` in
+  `packages/router/src/vite/runtime/layout-template.ts`), and the page server
+  receives the templates with its build.
+- A navigation fetch asks the content path, `/_markless/content` +
+  page path (`CONTENT_PATH_PREFIX`). The server renders the page as it does
+  for the fragment path. When a template holds the region document (its
+  segments occur in it, in order), the response is a comment naming the
+  template and the document's length, then the page's own text between the
+  segments, each piece prefixed with its length. Otherwise it is the region
+  document itself. Either way, settled `@pending` arms stream after the region
+  end marker as before. The answer is decided per request from the page's own
+  render, so a page that renders differently for a visitor than at build is
+  still answered exactly.
+- The browser downloads each template once per tab, starting as soon as a
+  content response names it, puts the region document back together, and
+  checks it against the length in the comment. The swap then runs on exactly
+  the text the fragment path would have answered. If the template cannot be
+  fetched or the text does not add up, the browser fetches the fragment path
+  instead.
+- The fragment path keeps answering the whole region document, so a tab from
+  an earlier deploy, which never asks the content path, keeps working.
+- A CDN or ISR cache needs the same rule for the content path as for the
+  fragment path; the content path depends on the page URL and the deploy alone.
+
 `navigate(href, { replace, scroll })` from `@markless/router` navigates from
 code exactly as a click on `<Link href={href} replace scroll>` does: a page of
 the app swaps in place, and anything the router cannot take (a path that names

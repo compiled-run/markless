@@ -6,6 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
@@ -706,7 +707,7 @@ test.each([
 	// The idle tier can fetch a visible link right after load, so the count starts before the page does.
 	const { page, errors } = await open('/hash-links', (page) =>
 		page.on('request', (request) => {
-			if (new URL(request.url()).pathname.startsWith('/_markless/fragment/')) fragments.push(request.url());
+			if (fragmentPageUrl(new URL(request.url()))) fragments.push(request.url());
 		}),
 	);
 	await page.evaluate(() => ((globalThis as { __stayed?: boolean }).__stayed = true));

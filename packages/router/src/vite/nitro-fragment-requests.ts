@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'pathe';
-import { FRAGMENT_PATH_PREFIX } from './fragment-navigation.ts';
+import { CONTENT_PATH_PREFIX, FRAGMENT_PATH_PREFIX } from './fragment-navigation.ts';
 
 interface FragmentRequestNitro {
 	readonly options: { readonly buildDir: string; plugins: string[] };
@@ -17,11 +17,12 @@ export function fragmentRequestModule() {
 			await writeFile(
 				plugin,
 				[
-					`const prefix = ${JSON.stringify(`${FRAGMENT_PATH_PREFIX}/`)};`,
+					`const prefixes = ${JSON.stringify([`${FRAGMENT_PATH_PREFIX}/`, `${CONTENT_PATH_PREFIX}/`])};`,
 					'export default function fragmentRequests(nitroApp) {',
 					"\tnitroApp.hooks?.hook('request', (event) => {",
 					'\t\tconst { pathname } = event.url;',
-					'\t\tif (!pathname.startsWith(prefix)) return;',
+					'\t\tconst prefix = prefixes.find((prefix) => pathname.startsWith(prefix));',
+					'\t\tif (!prefix) return;',
 					'\t\tconst page = new URL(event.url.href);',
 					'\t\tpage.pathname = pathname.slice(prefix.length - 1);',
 					'\t\tevent.url = page;',

@@ -23,6 +23,7 @@ import {
 import { warmPacksSuffix } from '../../bundler/src/build/warm-packs.ts';
 import { router } from '../src/vite/index.ts';
 import { LINK_BRIDGE_DIR } from '../src/vite/runtime/link-bridge-module.ts';
+import { LAYOUT_TEMPLATE_DIR } from '../src/vite/runtime/layout-template.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../src/navigation-polyfill.ts';
 
 const flattenPlugins = (plugins: unknown[]): Plugin[] =>
@@ -244,6 +245,7 @@ test('preserves user Nitro config while adding Markless request scanning default
 test('production Nitro config serves hashed Markless chunks immutable and fixed-name build metadata revalidated', () => {
 	const buildRoute = `/${MARKLESS_BUILD_PREFIX}**`;
 	const linkBridgeRoute = `/${LINK_BRIDGE_DIR}/**`;
+	const layoutRoute = `/${LAYOUT_TEMPLATE_DIR}/**`;
 	const immutable = { headers: { 'cache-control': 'public, max-age=31536000, immutable' } };
 	const revalidate = { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } };
 	const metadata = Object.fromEntries(
@@ -261,6 +263,7 @@ test('production Nitro config serves hashed Markless chunks immutable and fixed-
 	expect(nitroFor('build')?.routeRules).toEqual({
 		[buildRoute]: immutable,
 		[linkBridgeRoute]: immutable,
+		[layoutRoute]: immutable,
 		...metadata,
 	});
 	expect(
@@ -269,6 +272,7 @@ test('production Nitro config serves hashed Markless chunks immutable and fixed-
 	).toEqual({
 		[buildRoute]: immutable,
 		[linkBridgeRoute]: immutable,
+		[layoutRoute]: immutable,
 		...metadata,
 		'/health': { headers: { 'x-health': 'ok' } },
 	});
@@ -276,6 +280,7 @@ test('production Nitro config serves hashed Markless chunks immutable and fixed-
 	expect(nitroFor('build', { routeRules: { [buildRoute]: userRule } })?.routeRules).toEqual({
 		[buildRoute]: userRule,
 		[linkBridgeRoute]: immutable,
+		[layoutRoute]: immutable,
 		...metadata,
 	});
 	expect(nitroFor('serve')?.routeRules?.[buildRoute]).toBeUndefined();

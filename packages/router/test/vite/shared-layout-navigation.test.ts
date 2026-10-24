@@ -8,6 +8,11 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { CONTENT_PATH_PREFIX, FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
+import {
+	LAYOUT_CONTENT_OPEN,
+	LAYOUT_TEMPLATE_DIR,
+} from '../../src/vite/runtime/layout-template.ts';
 
 // Two long pages render the same layout (a header with a hover transition, a sidebar, a stateful button):
 // a navigation between them keeps what both pages share, as a person resting the pointer on a link sees it.
@@ -46,8 +51,14 @@ afterAll(async () => {
 	if (root) await rm(root, { recursive: true, force: true });
 });
 
-async function open(path: string): Promise<{ page: Page; errors: string[] }> {
+async function open(
+	path: string,
+	requests?: string[],
+	prepare?: (page: Page) => Promise<unknown>,
+): Promise<{ page: Page; errors: string[] }> {
 	const page = await browser!.newPage({ viewport: { width: 1000, height: 700 } });
+	page.on('request', (request) => requests?.push(new URL(request.url()).pathname));
+	await prepare?.(page);
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	page.on('console', (message) => {
@@ -260,4 +271,78 @@ test('the destination paints within two frames of a plain whole-page insert, wit
 	).toBe(0);
 	expect(errors).toEqual([]);
 	await navigating.close();
+});
+
+// Length-prefixed pieces, as a content body and a template file carry them.
+function pieces(text: string): string[] {
+	const out: string[] = [];
+	for (let at = 0; at < text.length;) {
+		const colon = text.indexOf(':', at);
+		const size = Number(text.slice(at, colon));
+		out.push(text.slice(colon + 1, colon + 1 + size));
+		at = colon + 1 + size;
+	}
+	return out;
+}
+
+test("a content request carries only the page's own text, and with its layout puts back the whole region document", async () => {
+	const origin = server!.origin;
+	const whole = await (await fetch(`${origin}${FRAGMENT_PATH_PREFIX}/beta`)).text();
+	const content = await (await fetch(`${origin}${CONTENT_PATH_PREFIX}/beta`)).text();
+	expect(content.startsWith(LAYOUT_CONTENT_OPEN)).toBe(true);
+	const header = content.slice(LAYOUT_CONTENT_OPEN.length, content.indexOf('-->'));
+	const [hash] = header.split(':');
+	const template = await fetch(`${origin}/${LAYOUT_TEMPLATE_DIR}/${hash}.txt`);
+	expect(template.headers.get('cache-control')).toContain('immutable');
+	const segments = pieces(await template.text());
+	const end = content.indexOf('<!--markless:region-end-->');
+	const fills = pieces(content.slice(content.indexOf('-->') + 3, end));
+	expect(fills).toHaveLength(segments.length + 1);
+	const rebuilt = fills.reduce((text, fill, index) => text + (segments[index - 1] ?? '') + fill);
+	expect(rebuilt + content.slice(end)).toBe(whole);
+	expect(content.length).toBeLessThan(whole.length / 2);
+});
+
+test("navigating between pages that share a layout downloads each page's own text, and the layout once", async () => {
+	const requests: string[] = [];
+	const { page, errors } = await open('/alpha', requests);
+	await page.click('[data-side="1"]');
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Beta',
+	);
+	await page.click('[data-top="alpha"]');
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Alpha',
+	);
+	const navigation = requests.filter(
+		(path) =>
+			path.startsWith(`${CONTENT_PATH_PREFIX}/`) ||
+			path.startsWith(`${FRAGMENT_PATH_PREFIX}/`) ||
+			path.startsWith(`/${LAYOUT_TEMPLATE_DIR}/`),
+	);
+	expect(navigation.filter((path) => path.startsWith(`${FRAGMENT_PATH_PREFIX}/`))).toEqual([]);
+	expect(navigation.filter((path) => path.startsWith(`${CONTENT_PATH_PREFIX}/`))).toContain(
+		`${CONTENT_PATH_PREFIX}/beta`,
+	);
+	expect(navigation.filter((path) => path.startsWith(`/${LAYOUT_TEMPLATE_DIR}/`))).toHaveLength(
+		1,
+	);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('when the layout cannot be fetched, the navigation takes the whole region document and still lands', async () => {
+	const requests: string[] = [];
+	const { page, errors } = await open('/alpha', requests, (page) =>
+		page.route(`**/${LAYOUT_TEMPLATE_DIR}/**`, (route) => route.abort()),
+	);
+	await page.click('[data-side="1"]');
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Beta',
+	);
+	expect(requests).toContain(`${FRAGMENT_PATH_PREFIX}/beta`);
+	await page.click('[data-layout-press]');
+	await expect.poll(() => page.textContent('[data-layout-press]')).toBe('pressed 1');
+	expect(errors.filter((error) => !error.includes('net::ERR_FAILED'))).toEqual([]);
+	await page.close();
 });

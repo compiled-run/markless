@@ -14,7 +14,13 @@ export interface FragmentNavigationConfig {
 	readonly retireProperty: string;
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
+	// Where a navigation fetch goes: the page's own text, cut against its layout's template when one holds it.
 	readonly requestPrefix: string;
+	// The whole region document, fetched when a cut one cannot be put back together.
+	readonly fragmentPrefix: string;
+	readonly layoutContentOpen: string;
+	// Each template is an immutable file under this path, named by its hash.
+	readonly layoutTemplatePrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
 	// Close and open the page's nodes when the document's own element is the container; what is outside is the document's.
@@ -40,7 +46,9 @@ export interface FragmentNavigationConfig {
 	readonly pages: readonly string[];
 }
 
-export type FragmentRouteCode = Record<string, readonly ModulePreloadInput[]>;
+// What a link's destination needs before it shows: its code, and the stylesheets the page that links it lacks.
+export type FragmentPreload = ModulePreloadInput | { readonly href: string; readonly as: 'style' };
+export type FragmentRouteCode = Record<string, readonly FragmentPreload[]>;
 
 export type FragmentFetched = {
 	readonly url: string;
@@ -61,7 +69,7 @@ export type FragmentPrefetch = {
 // What the inline bootstrap leaves on the document for the swap module (entries/fragment-entry.ts).
 export type FragmentNavigationState = {
 	readonly config: FragmentNavigationConfig;
-	readonly routes: Record<string, readonly ModulePreloadInput[]>;
+	readonly routes: FragmentRouteCode;
 	readonly prefetches: Map<string, FragmentPrefetch>;
 	readonly visited: Map<string, string>;
 	shown: string;

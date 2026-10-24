@@ -44,6 +44,12 @@ import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
 import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
+import {
+	LAYOUT_CONTENT_OPEN,
+	LAYOUT_TEMPLATE_DIR,
+	layoutContent,
+	type LayoutTemplate,
+} from './layout-template.ts';
 import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-region.ts';
 import {
 	FRAGMENT_APPEND_END,
@@ -53,12 +59,15 @@ import {
 	FRAGMENT_PREFETCH_TTL_MS,
 	FRAGMENT_PREFETCH_CONNECTIONS,
 	FRAGMENT_REGION_END,
+	CONTENT_PATH_PREFIX,
 	FRAGMENT_PATH_PREFIX,
 	fragmentPageUrl,
+	isContentRequestUrl,
 	runFragmentNavigation,
 	startFragmentNavigation,
 	type FragmentNavigationConfig,
 } from '../fragment-navigation.ts';
+import type { FragmentPreload } from '../entries/fragment-entry.ts';
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
@@ -98,6 +107,8 @@ export interface ServerEntryOptions {
 	readonly fragmentNavigationRunSource?: string;
 	// The link bridge files the build wrote into the client output; without them the entry derives the paths itself.
 	readonly linkBridgePaths?: readonly [withoutHashLinks: string, withHashLinks: string];
+	// What groups of pages' region documents share, from the build: a content request sends only the rest.
+	readonly layoutTemplates?: readonly LayoutTemplate[];
 }
 
 interface RenderOutput {
@@ -188,6 +199,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 	assertCurrentRouteAssets(options);
 	const fragmentBridge = fragmentBridgeFor(options, manifest);
 	const fragmentNavigation = fragmentBridge !== undefined;
+	const templates = options.layoutTemplates ?? [];
 	const linkBridgeModules =
 		options.dev || options.linkBridgePaths
 			? undefined
@@ -197,10 +209,42 @@ export function createServerEntry(options: ServerEntryOptions) {
 		: (options.linkBridgePaths ??
 			(linkBridgeModules && [linkBridgeModules[0].path, linkBridgeModules[1].path]));
 
+	// A press preloads the stylesheets a destination adds beside its page: its route's, and those its document writes for its URL.
+	const documentHeads = new Map<string, Promise<readonly string[]>>();
+	function pageStylesheetsAt(
+		url: URL,
+		match: NonNullable<ReturnType<typeof matchRouteManifest>>,
+		documentModule: DocumentModule | undefined,
+		request: Request,
+	): Promise<readonly string[]> {
+		const own = pageStylesheets(options, match.route.file) ?? [];
+		if (options.documentNavigation !== 'document' || !documentModule)
+			return Promise.resolve(own);
+		const key = url.pathname + url.search;
+		let head = documentHeads.get(key);
+		if (!head) {
+			if (documentHeads.size >= 1000)
+				documentHeads.delete(documentHeads.keys().next().value!);
+			const props: PageComponentProps = {
+				http: createPageHttp(request, url).context,
+				params: match.params,
+				url: { href: url.href, pathname: url.pathname, search: url.search },
+				status: 200,
+			};
+			head = renderDocumentShell(documentModule, props, '').then(stylesheetHrefs, () => []);
+			documentHeads.set(key, head);
+		}
+		return head.then((hrefs) => [...new Set([...own, ...hrefs])]);
+	}
+
 	async function fetch(request: Request): Promise<Response> {
 		const requestUrl = new URL(request.url);
 		const fragmentUrl = fragmentNavigation ? fragmentPageUrl(requestUrl) : undefined;
-		const fragment = fragmentUrl !== undefined;
+		const fragment: FragmentRequest = fragmentUrl
+			? isContentRequestUrl(requestUrl)
+				? 'content'
+				: 'fragment'
+			: false;
 		const url = fragmentUrl ?? requestUrl;
 		const match = matchRouteManifest(url.pathname, manifest);
 		// Under the endpoint prefix only a page file in pages/api/ answers; a root catch-all never does.
@@ -277,7 +321,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		file: string | undefined,
 		status: number,
 		fallbackText: string,
-		fragment: boolean,
+		fragment: FragmentRequest,
 		request: Request,
 	) {
 		if (!file) {
@@ -292,7 +336,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		file: string,
 		params: Readonly<Record<string, string>>,
 		status: number,
-		fragment: boolean,
+		fragment: FragmentRequest,
 		request: Request,
 	) {
 		const loadPageModule = options.pageModuleLoaders[file];
@@ -348,6 +392,15 @@ export function createServerEntry(options: ServerEntryOptions) {
 							manifest,
 							destinationPreloads,
 							fragmentNavigation,
+							fragmentNavigation
+								? (destination, match) =>
+										pageStylesheetsAt(
+											destination,
+											match,
+											documentModule,
+											request,
+										)
+								: undefined,
 						)
 				: undefined,
 			documentLoads,
@@ -402,7 +455,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				headStart,
 			);
 			return new Response(
-				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				wholeDocument(shell, pageHtml, fragment, documentLoads, templates),
 				http.commit(status, headers),
 			);
 		}
@@ -422,14 +475,14 @@ export function createServerEntry(options: ServerEntryOptions) {
 		);
 		if (stream.pendingArmCount === 0) {
 			return new Response(
-				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				wholeDocument(shell, pageHtml, fragment, documentLoads, templates),
 				http.commit(status, headers),
 			);
 		}
 		const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, pageHtml);
 		// A fragment is a whole region document first; each settled arm then follows on its own, delimited.
 		const prefix = fragment
-			? fragmentDocument(shell, pageHtml, documentLoads) + FRAGMENT_REGION_END
+			? regionDocument(fragment, fragmentDocument(shell, pageHtml, documentLoads), templates)
 			: placed.prefix;
 		const suffix = fragment ? '' : placed.suffix;
 		const appendEnd = fragment ? FRAGMENT_APPEND_END : '';
@@ -537,7 +590,7 @@ function routedPageArtifact(
 	navigationEntryPath: string | undefined,
 	stylesheetHrefs: readonly string[] | undefined,
 	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
-	intentPreloads?: (html: string) => Record<string, readonly ModulePreloadInput[]>,
+	intentPreloads?: (html: string) => Promise<Record<string, readonly FragmentPreload[]>>,
 	documentLoads = false,
 	fragment?: FragmentBridge,
 	linkBridgePaths?: readonly [string, string],
@@ -546,13 +599,11 @@ function routedPageArtifact(
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map(
-			(href): RenderHeadInjection => ({
-				tag: 'link',
-				location: 'head',
-				attributes: { rel: 'stylesheet', href },
-			}),
-		),
+		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
+			tag: 'link',
+			location: 'head',
+			attributes: { rel: 'stylesheet', href },
+		})),
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -571,7 +622,7 @@ function routedPageArtifact(
 			const linkBridge = navigationEntryPath
 				? renderLinkBridgeScript(
 						navigationEntryPath,
-						intentPreloads?.(output.html),
+						await intentPreloads?.(output.html),
 						documentLoads,
 						fragment,
 						output.html.includes('href="#/'),
@@ -647,27 +698,54 @@ function anchorHrefs(html: string): string[] {
 	);
 }
 
-function linkIntentPreloads(
+type StylesheetsOf = (
+	url: URL,
+	match: NonNullable<ReturnType<typeof matchRouteManifest>>,
+) => Promise<readonly string[]>;
+
+async function linkIntentPreloads(
 	html: string,
 	baseHref: string,
 	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
 	routes: ServerEntryOptions['routeModulePreloads'],
 	plainAnchors = false,
-): Record<string, readonly ModulePreloadInput[]> {
-	const destinations: Record<string, readonly ModulePreloadInput[]> = Object.create(null);
+	stylesheetsOf?: StylesheetsOf,
+): Promise<Record<string, readonly FragmentPreload[]>> {
+	const destinations: Record<string, readonly FragmentPreload[]> = Object.create(null);
+	const here = new URL(baseHref);
+	const herePage = stylesheetsOf && matchRouteManifest(here.pathname, manifest);
+	const have = new Set(herePage ? await stylesheetsOf(here, herePage) : []);
 	for (const href of plainAnchors ? anchorHrefs(html) : routerLinkHrefs(html)) {
 		const url = parseSameOriginUrl(href, baseHref);
 		const match = url && matchRouteManifest(url.pathname, manifest);
 		const preloads = match && routes?.[match.route.file];
 		// A fragment destination with nothing to preload is still listed, so the idle tier fetches its page.
-		if (url && preloads && (preloads.length > 0 || plainAnchors))
-			destinations[url.pathname] = preloads;
+		if (
+			!url ||
+			!preloads ||
+			(preloads.length === 0 && !plainAnchors) ||
+			url.pathname in destinations
+		)
+			continue;
+		const styles = stylesheetsOf
+			? (await stylesheetsOf(url, match)).filter((href) => !have.has(href))
+			: [];
+		destinations[url.pathname] = styles.length
+			? [...preloads, ...styles.map((href) => ({ href, as: 'style' as const }))]
+			: preloads;
 	}
 	return destinations;
 }
 
-function indexedPreloads(intentPreloads: Record<string, readonly ModulePreloadInput[]>): {
-	readonly preloads: ModulePreloadInput[];
+const STYLESHEET_LINK =
+	/<link\b(?=[^>]*\brel="(?:[^"]*\s)?stylesheet(?:\s[^"]*)?")(?=[^>]*\bhref="([^"]*)")[^>]*>/g;
+
+function stylesheetHrefs(html: string): string[] {
+	return [...html.matchAll(STYLESHEET_LINK)].map((match) => unescapeHtmlAttribute(match[1]!));
+}
+
+function indexedPreloads(intentPreloads: Record<string, readonly FragmentPreload[]>): {
+	readonly preloads: FragmentPreload[];
 	readonly destinations: Record<string, number[]>;
 } {
 	const preloads: ModulePreloadInput[] = [];
@@ -776,13 +854,29 @@ function fragmentDocument(shell: string, page: PageHtml, documentLoads: boolean)
 	return placed.prefix + placed.suffix;
 }
 
+type FragmentRequest = false | 'fragment' | 'content';
+
+// A content request names the template its body was cut against; a page no template holds goes whole.
+function regionDocument(
+	request: 'fragment' | 'content',
+	text: string,
+	templates: readonly LayoutTemplate[],
+): string {
+	return (
+		(request === 'content' ? (layoutContent(text, templates) ?? text) : text) +
+		FRAGMENT_REGION_END
+	);
+}
+
 function wholeDocument(
 	shell: string,
 	page: PageHtml,
-	fragment: boolean,
+	fragment: FragmentRequest,
 	documentLoads: boolean,
+	templates: readonly LayoutTemplate[],
 ): string {
-	if (fragment) return fragmentDocument(shell, page, documentLoads) + FRAGMENT_REGION_END;
+	if (fragment)
+		return regionDocument(fragment, fragmentDocument(shell, page, documentLoads), templates);
 	const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, page);
 	return placed.prefix + placed.suffix;
 }
@@ -841,7 +935,7 @@ function renderRouteScript(file: string): string {
 
 // Per page: the destinations this page links, and whether it links a '#/' route.
 interface LinkBridgePage {
-	readonly intentPreloads?: Record<string, readonly ModulePreloadInput[]>;
+	readonly intentPreloads?: Record<string, readonly FragmentPreload[]>;
 	readonly hashLinks: boolean;
 }
 
@@ -860,7 +954,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE }) : 'null'}));`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: CONTENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE }) : 'null'}));`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1009,7 +1103,7 @@ function contentHash(text: string): string {
 
 function renderLinkBridgeScript(
 	resumeEntryPath: string,
-	intentPreloads?: Record<string, readonly ModulePreloadInput[]>,
+	intentPreloads?: Record<string, readonly FragmentPreload[]>,
 	documentLoads = false,
 	fragment?: FragmentBridge,
 	hashLinks = false,
@@ -1080,7 +1174,10 @@ function fragmentConfig(
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
-		requestPrefix: FRAGMENT_PATH_PREFIX,
+		requestPrefix: CONTENT_PATH_PREFIX,
+		fragmentPrefix: FRAGMENT_PATH_PREFIX,
+		layoutContentOpen: LAYOUT_CONTENT_OPEN,
+		layoutTemplatePrefix: `/${LAYOUT_TEMPLATE_DIR}/`,
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,
 		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,

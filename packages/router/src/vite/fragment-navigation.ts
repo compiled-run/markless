@@ -1,6 +1,6 @@
-import type { ModulePreloadInput } from '@markless/web/render-to-string';
 import type {
 	FragmentEntryModule,
+	FragmentPreload,
 	FragmentFetched,
 	FragmentNavigationConfig,
 	FragmentNavigationState,
@@ -35,13 +35,19 @@ export function startFragmentNavigation(
 	let running: FragmentNavigationApi | undefined;
 	let starting: Promise<FragmentNavigationApi> | undefined;
 	let pressed: FragmentEarly | undefined;
-	const preload = (item: ModulePreloadInput) => {
+	const preload = (item: FragmentPreload) => {
 		const href = new URL(typeof item === 'string' ? item : item.href, d.baseURI).href;
 		if (arriving.has(href)) return;
 		const link = d.createElement('link');
-		link.rel = 'modulepreload';
+		// A destination stylesheet loads beside its page, not once the page has arrived.
+		if (typeof item !== 'string' && 'as' in item) {
+			link.rel = 'preload';
+			link.as = item.as;
+		} else {
+			link.rel = 'modulepreload';
+			link.crossOrigin = 'anonymous';
+		}
 		link.href = href;
-		link.crossOrigin = 'anonymous';
 		arriving.set(href, new Promise((done) => (link.onload = link.onerror = done)));
 		d.head.appendChild(link);
 	};
@@ -291,9 +297,14 @@ export function runFragmentNavigation(
 			if (present.has(href) || arriving.has(href)) continue;
 			present.add(href);
 			const link = d.createElement('link');
-			link.rel = 'modulepreload';
+			if ('as' in entry) {
+				link.rel = 'preload';
+				link.as = entry.as;
+			} else {
+				link.rel = 'modulepreload';
+				link.crossOrigin = entry.crossOrigin ?? 'anonymous';
+			}
 			link.href = href;
-			link.crossOrigin = entry.crossOrigin ?? 'anonymous';
 			if (low) link.fetchPriority = 'low';
 			arriving.set(
 				href,
@@ -385,16 +396,72 @@ export function runFragmentNavigation(
 			cancel: () => reader.cancel(),
 		} as ReadableStreamDefaultReader<Uint8Array>;
 	};
+	// Templates by hash: each is an immutable file, so one download serves every page cut against it.
+	const layouts = new Map<string, Promise<string[]>>();
+	// Length-prefixed pieces: each is its length, a colon, then its text.
+	const pieces = (text: string, from: number, to: number): string[] | undefined => {
+		const out: string[] = [];
+		for (let at = from; at < to;) {
+			const colon = text.indexOf(':', at);
+			const size = Number(text.slice(at, colon));
+			if (colon <= at || !(size >= 0) || colon + 1 + size > to) return undefined;
+			out.push(text.slice(colon + 1, colon + 1 + size));
+			at = colon + 1 + size;
+		}
+		return out;
+	};
+	const layout = (hash: string): Promise<string[]> => {
+		let segments = layouts.get(hash);
+		if (!segments) {
+			segments = w
+				.fetch(`${config.layoutTemplatePrefix}${hash}.txt`, { credentials: 'same-origin' })
+				.then((response) => {
+					if (!response.ok)
+						throw new Error(`MARKLESS_ROUTER_LAYOUT_UNAVAILABLE: ${response.status}`);
+					return response.text();
+				})
+				.then((text) => {
+					const out = pieces(text, 0, text.length);
+					if (!out) throw new Error('MARKLESS_ROUTER_LAYOUT_UNAVAILABLE: malformed');
+					return out;
+				});
+			segments.catch(() => layouts.delete(hash));
+			layouts.set(hash, segments);
+		}
+		return segments;
+	};
+	// The hash and length a content body opens with, or undefined for a whole region document.
+	const contentHeader = (text: string) => {
+		if (!text.startsWith(config.layoutContentOpen)) return;
+		const close = text.indexOf('-->', config.layoutContentOpen.length);
+		if (close === -1) return;
+		const [hash, length] = text.slice(config.layoutContentOpen.length, close).split(':');
+		return { hash: hash!, length: Number(length), from: close + 3 };
+	};
+	// The region document a content body was cut from, put back around its template; undefined when it does not add up.
+	const assemble = async (text: string, end: number): Promise<string | undefined> => {
+		const header = contentHeader(text);
+		if (!header) return text;
+		const fills = pieces(text, header.from, end);
+		const segments = await layout(header.hash).catch(() => undefined);
+		if (!fills || !segments || fills.length !== segments.length + 1) return;
+		let whole = fills[0]!;
+		for (let index = 0; index < segments.length; index++)
+			whole += segments[index]! + fills[index + 1]!;
+		return whole.length === header.length ? whole + text.slice(end) : undefined;
+	};
 	// One request: the destination's region document and its resume payload, parsed on arrival (no script runs), so the click only swaps.
 	const request = (url: URL, speculative: boolean, started?: FragmentEarly): FragmentPrefetch => {
 		fetched.add(pageKey(url));
 		const controller = started?.controller ?? new AbortController();
-		const read = async (): Promise<FragmentFetched> => {
-			const prefix = config.requestPrefix;
+		const read = async (
+			prefix: string,
+			early?: Promise<Response>,
+		): Promise<FragmentFetched> => {
 			const target = new URL(url.href);
 			target.hash = '';
 			target.pathname = prefix + target.pathname;
-			const response = await (started?.response ??
+			const response = await (early ??
 				w.fetch(target.href, {
 					credentials: 'same-origin',
 					headers: speculative ? { purpose: 'prefetch' } : {},
@@ -415,18 +482,25 @@ export function runFragmentNavigation(
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
 			let text = '';
+			const settle = async (end: number, rest?: ReadableStreamDefaultReader<Uint8Array>) => {
+				const whole = await assemble(text, end);
+				if (whole !== undefined) return { ...parse(finalUrl.href, whole), rest };
+				void reader.cancel().catch(() => {});
+				return read(config.fragmentPrefix);
+			};
 			for (;;) {
-				if (text.includes(config.regionEndMarker))
-					return {
-						...parse(finalUrl.href, text),
-						rest: speculative ? drain(reader, closed) : reader,
-					};
+				const end = text.indexOf(config.regionEndMarker);
+				if (end !== -1) return settle(end, speculative ? drain(reader, closed) : reader);
 				const chunk = await reader.read();
 				if (chunk.done) {
 					closed();
-					return parse(finalUrl.href, text + decoder.decode());
+					text += decoder.decode();
+					return settle(text.length);
 				}
 				text += decoder.decode(chunk.value, { stream: true });
+				// The template downloads while the page's own text still arrives.
+				const header = contentHeader(text);
+				if (header) void layout(header.hash).catch(() => {});
 			}
 		};
 		const closed = () => {
@@ -435,7 +509,7 @@ export function runFragmentNavigation(
 		};
 		const entry: FragmentPrefetch = {
 			at: started?.at ?? w.performance.now(),
-			result: read(),
+			result: read(config.requestPrefix, started?.response),
 			open: true,
 			abort: () => {
 				closed();
@@ -636,12 +710,22 @@ export function fragmentRequestUrl(url: string | URL): URL {
 	return target;
 }
 
-// The page URL a fragment request names, or undefined for any other request.
+// The same region document cut against its layout's template: only the page's own text, when a template holds the page.
+export const CONTENT_PATH_PREFIX = '/_markless/content';
+
+// The page URL a fragment or content request names, or undefined for any other request.
 export function fragmentPageUrl(url: URL): URL | undefined {
-	if (!url.pathname.startsWith(`${FRAGMENT_PATH_PREFIX}/`)) return undefined;
+	const prefix = [FRAGMENT_PATH_PREFIX, CONTENT_PATH_PREFIX].find((prefix) =>
+		url.pathname.startsWith(`${prefix}/`),
+	);
+	if (!prefix) return undefined;
 	const page = new URL(url);
-	page.pathname = url.pathname.slice(FRAGMENT_PATH_PREFIX.length);
+	page.pathname = url.pathname.slice(prefix.length);
 	return page;
+}
+
+export function isContentRequestUrl(url: URL): boolean {
+	return url.pathname.startsWith(`${CONTENT_PATH_PREFIX}/`);
 }
 
 // The response's region document ends here; each streamed @pending arm after it ends with the append marker.
