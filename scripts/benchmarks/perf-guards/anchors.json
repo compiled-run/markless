@@ -1546,6 +1546,22 @@
 			"from": 16645,
 			"to": 17385,
 			"reason": "a key pressed while an earlier dispatch runs goes where that dispatch's handler put focus (dispatch-time code only)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "serializer/protocol-page-markers",
+			"from": 377,
+			"to": 564,
+			"reason": "arm and row records address elements through one resolver that counts element children and @if/@try blocks, never text (controls after text or a nested block landed on the wrong element after resume); replaces the per-module walks in resume-branches/-keyed-repeats/-locators, resume chunk minified+gzip +95 B, runs at first interaction, not at load"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "web/resume-anchor-census",
+			"from": 1003,
+			"to": 1608,
+			"reason": "arm and row records address elements through one resolver that counts element children and @if/@try blocks, never text (controls after text or a nested block landed on the wrong element after resume); replaces the per-module walks in resume-branches/-keyed-repeats/-locators, resume chunk minified+gzip +95 B, runs at first interaction, not at load"
 		}
 	],
 	"runtimeModules": {
@@ -1578,7 +1594,7 @@
 		"serializer/protocol-event-names": 264,
 		"serializer/protocol-locator-paths": 292,
 		"serializer/protocol-locator-paths-format": 352,
-		"serializer/protocol-page-markers": 377,
+		"serializer/protocol-page-markers": 564,
 		"serializer/protocol-prop-prefix": 270,
 		"serializer/protocol-record-keys": 1134,
 		"serializer/protocol-record-templates": 1118,
@@ -1636,7 +1652,7 @@
 		"web/render-route-holder": 1005,
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
-		"web/resume-anchor-census": 1003,
+		"web/resume-anchor-census": 1608,
 		"web/resume-arm-records": 7741,
 		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 7339,
