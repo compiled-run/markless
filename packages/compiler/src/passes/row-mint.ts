@@ -236,6 +236,8 @@ function readsOnlyTheRow(
 export type RowMintInput = ConstructReachInput & {
 	/** Hosts a record names; absent, every host in a projection's nested row is refused. */
 	readonly recordHostIds?: ReadonlySet<string>;
+	/** Hosts carrying a behavior or an element handle, which a row cannot register again on a flip. */
+	readonly unregistrableHostIds?: ReadonlySet<string>;
 	/** Hosts a DOM update keeps current. */
 	readonly liveHostIds?: ReadonlySet<string>;
 	/** Answers which names a projected expression reads; absent, only live hosts admit one. */
@@ -252,8 +254,11 @@ type PayloadRecordView = {
 /** The record facts `RowMintInput` reads, off the module's payload. */
 export function payloadRecordHosts(
 	view: PayloadRecordView,
-): Pick<RowMintInput, 'recordHostIds' | 'liveHostIds'> {
+): Pick<RowMintInput, 'recordHostIds' | 'liveHostIds' | 'unregistrableHostIds'> {
 	return {
+		unregistrableHostIds: new Set(
+			[...view.behaviors, ...view.elementHandles].map((record) => record.hostNodeId),
+		),
 		recordHostIds: new Set(
 			[...view.events, ...view.domUpdates, ...view.behaviors, ...view.elementHandles].map(
 				(record) => record.hostNodeId,
@@ -261,6 +266,45 @@ export function payloadRecordHosts(
 		),
 		liveHostIds: new Set(view.domUpdates.map((update) => update.hostNodeId)),
 	};
+}
+
+/** Whether a row's own `@if`/`@switch` ships as a row template branch slot, answered for the diagnostics. */
+export function rowBranchMints(
+	input: RowMintInput & { readonly semanticGraph: SemanticGraphArtifact },
+	componentName: string,
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }>,
+	rowNames: ReadonlySet<string>,
+): boolean {
+	const graph = input.semanticGraph;
+	const site = graph.branchSites.find((candidate) => candidate.id === slot.branchSiteId);
+	if (!site || site.asyncBoundaryId || (site.kind === 'switch' && !site.armTests)) return false;
+	const expression = (source: string) =>
+		expressionSlotValue(
+			{ kind: 'text', residue: { kind: 'authored-expression', source } } as SemanticMarkupSlot,
+			graph,
+			componentName,
+			rowNames,
+		) !== null;
+	const testReadable =
+		site.testComputedGraphNodeId !== undefined ||
+		resolveGraphPath(
+			site.testSource,
+			graphBindingMap(graph, null, componentName),
+			semanticAliasMap(graph, null, componentName),
+		) !== null ||
+		expression(site.testSource);
+	if (!testReadable) return false;
+	return slot.armTemplateIds.every((chunkId) => {
+		const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
+		if (!chunk) return false;
+		if (chunk.hosts.some((host) => input.unregistrableHostIds?.has(host.hostNodeId))) return false;
+		return chunk.slots.every(
+			(armSlot) =>
+				(armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
+				(mintableSlotValue(armSlot) !== null ||
+					expressionSlotValue(armSlot, graph, componentName, rowNames) !== null),
+		);
+	});
 }
 
 /**

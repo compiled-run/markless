@@ -117,6 +117,7 @@ export { planSymbolResolver } from './passes/symbol-resolver.ts';
 export { componentExportPath, linkedComponentTarget } from './passes/link/component-target.ts';
 export {
 	importedNestedRepeats,
+	importedRowBranchMints,
 	importedRowComponentMints,
 	importedRowSlotReaders,
 	importedRowTemplateMints,

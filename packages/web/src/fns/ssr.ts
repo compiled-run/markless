@@ -2003,7 +2003,12 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 		...arm,
 		events: (arm.events ?? []).map((event) => ({
 			...event,
-			symbolIds: event.symbolIds.map((symbolId) => marklessBoundSymbolId(child, symbolId)),
+			// A child's own arm records already carry the bound ids its module minted for this edge.
+			symbolIds: event.symbolIds.map((symbolId) =>
+				Object.values(child.boundSymbols ?? {}).includes(symbolId)
+					? symbolId
+					: marklessBoundSymbolId(child, symbolId),
+			),
 			...(event.syncPolicy
 				? {
 						syncPolicy: marklessComposedSyncPolicy(

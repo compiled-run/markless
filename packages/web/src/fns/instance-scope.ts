@@ -18,7 +18,8 @@ export type MarklessRowTemplate = NonNullable<ResumeKeyedRepeatRecord['rowTempla
 type RowTemplate = MarklessRowTemplate;
 type RowTemplateSlot =
 	| NonNullable<RowTemplate['textSlots']>[number]
-	| NonNullable<RowTemplate['attributeSlots']>[number];
+	| NonNullable<RowTemplate['attributeSlots']>[number]
+	| NonNullable<RowTemplate['branchSlots']>[number];
 
 // A composed child's compiled symbols spell the child module's own graph node
 // ids, but composition merged that child's nodes into the page graph under its
@@ -86,7 +87,8 @@ export function marklessRecordRowScope(
 	hostNodeId: string,
 	graph?: RuntimeGraph,
 ): MarklessRowScope | undefined {
-	const path = marklessInstancePath(hostNodeId);
+	// An @if arm's host is `branch:<branch id>:arm:…`, and the branch id carries the instance.
+	const path = marklessInstancePath(hostNodeId.replace(/^branch:/, ''));
 	// No row to thread, but a bound symbol still spells widget ids against its
 	// projection site rather than the root that owns them, so a page carrying any
 	// widget root gets the adapter with no pairs: widget resolution, nothing else.
@@ -1057,11 +1059,18 @@ function composedBoundaryArmRecords(
 	// carries no graph id and rides through untouched.
 	const qualifyRowSlot = <S extends RowTemplateSlot>(slot: S): S =>
 		qualifyLooseRead(slot as unknown as Record<string, unknown>) as unknown as S;
+	const qualifySlots = <T extends Pick<RowTemplate, 'textSlots' | 'attributeSlots'>>(owner: T): T => ({
+		...owner,
+		...(owner.textSlots && { textSlots: owner.textSlots.map(qualifyRowSlot) }),
+		...(owner.attributeSlots && { attributeSlots: owner.attributeSlots.map(qualifyRowSlot) }),
+	});
 	const qualifyRowTemplate = (rowTemplate: RowTemplate): RowTemplate => ({
-		...rowTemplate,
-		...(rowTemplate.textSlots && { textSlots: rowTemplate.textSlots.map(qualifyRowSlot) }),
-		...(rowTemplate.attributeSlots && {
-			attributeSlots: rowTemplate.attributeSlots.map(qualifyRowSlot),
+		...qualifySlots(rowTemplate),
+		...(rowTemplate.branchSlots && {
+			branchSlots: rowTemplate.branchSlots.map((branch) => ({
+				...qualifyRowSlot(branch),
+				arms: branch.arms.map(qualifySlots),
+			})),
 		}),
 	});
 	return {

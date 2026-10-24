@@ -18,6 +18,8 @@ export type CorpusTemplate = {
 	readonly shows: number;
 	readonly interpolations: number;
 	readonly refused: boolean;
+	/** The rows hold an @if over page state that a [data-flip] button turns off and on again. */
+	readonly flips?: true;
 };
 
 type Piece = {
@@ -27,6 +29,7 @@ type Piece = {
 	readonly target?: CorpusTarget;
 	readonly show?: true;
 	readonly interpolation?: true;
+	readonly flips?: true;
 };
 
 function random(seed: number) {
@@ -50,7 +53,8 @@ type PieceKind =
 	| 'badge'
 	| 'pair'
 	| 'note'
-	| 'list';
+	| 'list'
+	| 'branch';
 
 function piece(kind: PieceKind, id: string, hit: string, value: string): Piece {
 	switch (kind) {
@@ -91,6 +95,13 @@ function piece(kind: PieceKind, id: string, hit: string, value: string): Piece {
 			return {
 				markup: '@for (const entry of ENTRIES; key entry.id) {\n\t\t\t\t<u>{entry.id}</u>\n\t\t\t}',
 				elements: null,
+			};
+		case 'branch':
+			return {
+				markup: `@if (open) { <button data-h="${id}" onClick={() => (hit = ${hit})}>${id} {${value}}</button> } @else { <em>closed ${id}</em> }`,
+				elements: 1,
+				target: { id, kind: 'click' },
+				flips: true,
 			};
 	}
 }
@@ -151,6 +162,7 @@ function describe(
 		shows: chosen.filter((candidate) => candidate.show).length,
 		interpolations: chosen.filter((candidate) => candidate.interpolation).length,
 		refused: !addressable(chosen),
+		...(chosen.some((candidate) => candidate.flips) ? { flips: true as const } : {}),
 	};
 }
 
@@ -287,6 +299,41 @@ ${body(chosen, '\t\t\t\t\t')}
 	return describe(`rows-${seed}`, 'rows', source, chosen);
 }
 
+// Each row flips its own @if arms over page state, with controls and values placed around them.
+function rowBranchesTemplate(seed: number): CorpusTemplate {
+	const next = random(seed);
+	const chosen = pieces(
+		next,
+		['text', 'interpolation', 'click', 'nested', 'branch', 'branch'],
+		'b',
+		(id) => `\`${id}-\${row.id}\``,
+		'row.name',
+	);
+	const source = `import { state } from '@markless/core';
+
+export default function Generated() @{
+	let rows = state([
+		{ id: 1, name: 'ada' },
+		{ id: 2, name: 'lin' },
+	]);
+	let hit = state('none');
+	let open = state(true);
+	<main>
+		<p data-hit>{hit}</p>
+		<button data-flip onClick={() => (open = !open)}>flip</button>
+		<ul>
+			@for (const row of rows; key row.id) {
+				<li data-row={row.id}>
+${body(chosen, '\t\t\t\t\t')}
+				</li>
+			}
+		</ul>
+	</main>
+}
+`;
+	return describe(`row-branches-${seed}`, 'rows', source, chosen);
+}
+
 export function elementAddressCorpus(): ReadonlyArray<CorpusTemplate> {
 	const seeds = Array.from({ length: 8 }, (_, index) => 101 + index * 7);
 	return [
@@ -294,5 +341,6 @@ export function elementAddressCorpus(): ReadonlyArray<CorpusTemplate> {
 		...seeds.map(decidedTemplate),
 		refusedTemplate(),
 		...seeds.slice(0, 6).map(rowsTemplate),
+		...seeds.slice(0, 6).map(rowBranchesTemplate),
 	];
 }
