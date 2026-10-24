@@ -44,6 +44,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Arm-record adoption censuses compiler-emitted branch anchors within an explicit range.',
 	"packages/web/src/resume-arm-records.ts :: const data = sibling.nodeType === 8 ? sibling.data! : '';":
 		"A CSR event's own target claims a painted arm's hosts: it reads only the target's ancestors and their preceding siblings for the arm's start anchor, never the page.",
+	'packages/web/src/resume-arm-records.ts :: next && !(next.nodeType === 8 && next.data === `/${data}`);':
+		"The same claim collects that arm's own nodes up to its end anchor, never the page.",
 	'packages/web/src/resume-branches.ts :: (value as { readonly nodeType?: number }).nodeType === 8':
 		'Branch adoption validates that a supplied live anchor is a comment node.',
 	'packages/web/src/resume-census.ts :: const walker = (node as Node).ownerDocument?.createTreeWalker?.(node as Node, 1);':
@@ -80,6 +82,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The streamed-arm census tells the page start and end comments from the elements it counts.',
 	'packages/web/src/resume-anchor-census.ts :: const data = child.nodeType === 8 ? (child as { data?: string }).data : undefined;':
 		"The page's top-level nodes are found by the start and end comments among the container's own children.",
+	'packages/web/src/resume-anchor-census.ts :: const data = child.nodeType === 8 ? (child as ResumeDomComment).data : undefined;':
+		"An element address step reads one parent's own children, telling a block's start and end comments from the elements it counts, never the page.",
 	'packages/web/src/resume-anchor-census.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		"Async-boundary and branch adoption map serialized indexes to compiler-emitted comment anchors among the page's nodes.",
 };

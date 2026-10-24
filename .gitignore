@@ -39,6 +39,7 @@ goals/
 # Vitest browser-mode failure artifacts (churn on every red run)
 packages/vitest-browser/.vitest-attachments/
 packages/vitest-browser/browser/__screenshots__/
+packages/vitest-browser/browser/element-address/generated/
 packages/headless/*/.vitest-attachments/
 packages/headless/*/test/__screenshots__/
 .fable-codex/

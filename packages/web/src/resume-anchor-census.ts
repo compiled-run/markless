@@ -1,8 +1,9 @@
 import {
+	PROTOCOL_BLOCK_START_COMMENT,
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 } from '../../serializer/src/protocol-page-markers.ts';
-import type { ResumeDomComment, ResumeDomNode } from './resume-types.ts';
+import type { ResumeDomComment, ResumeDomElement, ResumeDomNode } from './resume-types.ts';
 
 // Arm-branch anchors index in their owning boundary's census (T104): every
 // page-level comment walk must skip them. Own module: lean closures stay lean.
@@ -35,4 +36,26 @@ export function pageCommentCensus(root: ResumeDomNode): ResumeDomComment[] {
 		}
 	})(pageNodes(root));
 	return comments;
+}
+
+export const elementsOf = (nodes: readonly ResumeDomNode[]) =>
+	nodes.filter((node): node is ResumeDomElement => node.nodeType === 1);
+
+// Walks a ProtocolElementAddress.
+export function marklessElementAt(from: unknown, address: ReadonlyArray<number>) {
+	let node = from as ResumeDomNode | undefined;
+	for (const step of address) {
+		const steps: ResumeDomNode[] = [];
+		let end: string | undefined;
+		for (const child of Array.from(node?.childNodes ?? [])) {
+			const data = child.nodeType === 8 ? (child as ResumeDomComment).data : undefined;
+			if (end) end = data === end ? undefined : end;
+			else if (child.nodeType === 1 || (data && PROTOCOL_BLOCK_START_COMMENT.test(data))) {
+				steps.push(child);
+				if (data) end = `/${data}`;
+			}
+		}
+		node = steps.at(step);
+	}
+	return node?.nodeType === 1 ? (node as ResumeDomElement) : undefined;
 }

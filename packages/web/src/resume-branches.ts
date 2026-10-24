@@ -1,5 +1,5 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
-import { pageCommentCensus } from './resume-anchor-census.ts';
+import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
 import type {
 	ResumeBehaviorRecord,
 	ResumeBranchRecord,
@@ -359,7 +359,7 @@ function materializeBranchArmRecords(
 	const { elementHandles, graph } = input;
 	const armNodes = nodesBetweenAnchors(branch.startAnchor, branch.endAnchor);
 	const claim = (hostPath: ReadonlyArray<number>) => {
-		const element = armRecordHost(armNodes, hostPath);
+		const element = marklessElementAt({ childNodes: armNodes }, hostPath);
 		if (!element) return;
 		const hostNodeId = `branch:${branch.id}:arm:${String(armIndex)}:${hostPath.join('.')}`;
 		input.disposedHosts.delete(hostNodeId);
@@ -479,27 +479,6 @@ function nodesBetweenAnchors(startAnchor: ResumeDomNode, endAnchor: ResumeDomNod
 	for (let node = (startAnchor as Sibling).nextSibling; node && node !== endAnchor; node = node.nextSibling)
 		nodes.push(node);
 	return nodes;
-}
-
-function armRecordHost(
-	armNodes: ReadonlyArray<ResumeDomNode>,
-	hostPath: ReadonlyArray<number>,
-): ResumeDomElement | undefined {
-	const [firstIndex, ...childPath] = hostPath,
-		top = firstIndex === undefined ? undefined : armNodes[firstIndex];
-	return top?.nodeType === 1 ? rowEventHost(top as ResumeDomElement, childPath) : undefined;
-}
-
-function rowEventHost(
-	rowRoot: ResumeDomElement,
-	hostPath: ReadonlyArray<number>,
-): ResumeDomElement | undefined {
-	let current: ResumeDomNode | undefined = rowRoot;
-	for (const index of hostPath) {
-		current = current.childNodes?.[index];
-		if (!current) return;
-	}
-	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
 }
 
 function missingCommentAnchorError(
