@@ -133,6 +133,21 @@ test('a status write after the response started streaming raises the named error
 	expect(html).toContain('MARKLESS_ROUTER_RESPONSE_COMMITTED');
 });
 
+test('a branch decided by http serves its arm from the server and ships none of http', async () => {
+	const allowed = await fetch(`${origin}/admin`);
+	const html = await allowed.text();
+	expect(allowed.status).toBe(200);
+	expect(html).toContain('Signed in as mw-1.');
+	expect(html).not.toContain('data-forbidden');
+	expect(html).not.toMatch(/searchParams|"locals"|visit=mw-1/);
+
+	const refused = await fetch(`${origin}/admin?forbidden`);
+	const refusedHtml = await refused.text();
+	expect(refused.status).toBe(403);
+	expect(refusedHtml).toContain('Guides only');
+	expect(refusedHtml).not.toContain('Signed in as');
+});
+
 test('a page whose browser code reads http does not build', async () => {
 	const root = await fixtureCopy();
 	await writeFile(

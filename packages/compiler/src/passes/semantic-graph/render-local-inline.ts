@@ -1,3 +1,4 @@
+import { PROTOCOL_PROP_GRAPH_NODE_PREFIX, PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
 import {
 	childNodes,
 	getIdentifierName,
@@ -358,6 +359,9 @@ export function liftArmRenderLocalValue(
 		state.graph.graphBindings.flatMap((binding) => (binding.asyncCapable ? [binding.id] : [])),
 	);
 	if (dependencies.some((dependency) => asyncNodeIds.has(dependency.graphNodeId))) return null;
+	// Nothing the browser can change decides the arm or its value, so the server's render of it stands.
+	if (dependencies.length > 0 && dependencies.every((dependency) => readsServerOnlyProp(dependency, state)))
+		return null;
 	const lifted = mintTemplateExpressionComputed(
 		guard.source === null
 			? `() => ${inlined.source}`
@@ -534,5 +538,20 @@ function callsFrameworkApi(node: AnyNode, state: WalkState): boolean {
 		name &&
 		(isFrameworkApiName(name) ||
 			state.graph.sharedDefinitions.some((definition) => definition.name === name)),
+	);
+}
+
+function readsServerOnlyProp(
+	dependency: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	state: WalkState,
+): boolean {
+	const exportName = state.graph.components.find(
+		(component) => component.name === state.currentComponentName,
+	)?.exportName;
+	return state.serverOnlyProps.some(
+		({ exportName: owner, propName }) =>
+			owner === exportName &&
+			((dependency.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID && dependency.path[0] === propName) ||
+				dependency.graphNodeId === `${PROTOCOL_PROP_GRAPH_NODE_PREFIX}${propName}`),
 	);
 }
