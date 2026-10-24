@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve as pathResolve } from 'node:path';
 import { defineConfig } from 'vite-plus';
 import type { PackUserConfig } from 'vite-plus/pack';
+import { vitestInstallCacheKey } from './scripts/test-utils/vitest-install-cache-key.ts';
 
 // Per-package pack configs (QDS buildOrder shape): each package builds from
 // its own directory into its own ./dist so publishConfig.exports can target
@@ -258,6 +259,7 @@ export default defineConfig({
 		maxWorkers: '50%',
 		projects: [
 			{
+				plugins: [vitestInstallCacheKey()],
 				test: {
 					name: 'node',
 					environment: 'node',
