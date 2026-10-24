@@ -386,7 +386,13 @@ export function runFragmentNavigation(
 		} as ReadableStreamDefaultReader<Uint8Array>;
 	};
 	// One request: the destination's region document and its resume payload, parsed on arrival (no script runs), so the click only swaps.
-	const request = (url: URL, speculative: boolean, started?: FragmentEarly): FragmentPrefetch => {
+	// budget: an idle fetch stops once the page's region passes this many bytes, leaving that page to intent.
+	const request = (
+		url: URL,
+		speculative: boolean,
+		started?: FragmentEarly,
+		budget = Infinity,
+	): FragmentPrefetch => {
 		fetched.add(pageKey(url));
 		const controller = started?.controller ?? new AbortController();
 		const read = async (): Promise<FragmentFetched> => {
@@ -412,9 +418,12 @@ export function runFragmentNavigation(
 				throw new Error('MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: redirected');
 			finalUrl.pathname = finalUrl.pathname.slice(prefix.length);
 			finalUrl.hash = url.hash;
+			const declared = Number(response.headers.get('content-length') ?? 0);
+			if (declared > budget) throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
 			const reader = response.body.getReader();
 			const decoder = new TextDecoder();
 			let text = '';
+			let bytes = 0;
 			for (;;) {
 				if (text.includes(config.regionEndMarker))
 					return {
@@ -425,6 +434,11 @@ export function runFragmentNavigation(
 				if (chunk.done) {
 					closed();
 					return parse(finalUrl.href, text + decoder.decode());
+				}
+				bytes += chunk.value.byteLength;
+				if (bytes > budget) {
+					void reader.cancel();
+					throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
 				}
 				text += decoder.decode(chunk.value, { stream: true });
 			}
@@ -447,7 +461,7 @@ export function runFragmentNavigation(
 	};
 	// An unused prefetch still streaming holds a connection: drop it once stale, and keep only a few open,
 	// or an HTTP/1.1 origin's per-host connection limit stalls the next click behind them.
-	const prefetch = (url: URL, code = true, started?: FragmentEarly) => {
+	const prefetch = (url: URL, code = true, started?: FragmentEarly, budget = Infinity) => {
 		const key = pageKey(url);
 		// A hover timer can fire after its link's page is already shown.
 		if (!config.prefetch || key === state.shown) return;
@@ -464,7 +478,11 @@ export function runFragmentNavigation(
 			state.prefetches.delete(stale);
 			entry.abort();
 		}
-		const entry = request(url, true, started);
+		const entry = request(url, true, started, budget);
+		// A page over the idle budget is left for a hover or a press to fetch whole.
+		entry.result.catch(() => {
+			if (state.prefetches.get(key) === entry) state.prefetches.delete(key);
+		});
 		state.prefetches.set(key, entry);
 		w.setTimeout(() => {
 			if (state.prefetches.get(key) !== entry) return;
@@ -484,7 +502,7 @@ export function runFragmentNavigation(
 			if (open >= config.prefetchConnections) return;
 			const url = idleQueue.shift()!;
 			if (state.prefetches.has(pageKey(url)) || fetched.has(pageKey(url))) continue;
-			prefetch(url, false);
+			prefetch(url, false, undefined, config.idleFragmentBytes);
 			// Low priority and never evaluated: a modulepreload only fills the cache before a press.
 			preloadCode(url, true);
 		}
@@ -652,5 +670,7 @@ export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
 // Unused prefetches still streaming their @pending pieces; older ones are cancelled past this.
 export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
+// An idle fetch of a page whose region runs past this many bytes stops there; the page is fetched on intent instead.
+export const FRAGMENT_IDLE_FRAGMENT_BYTES = 256 * 1024;
 // Browsers without the Network Information API (WebKit, Firefox) say nothing about the connection; the idle tier's own gate bounds what they fetch.
 export const FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO = true;

@@ -1,4 +1,5 @@
 import { state } from '@markless/core';
+import { Link } from '@markless/router';
 import Nav from '../src/nav.tsrx';
 
 export default function FormPage() @{
@@ -8,6 +9,7 @@ export default function FormPage() @{
 	<main data-page="form">
 		<title>Form page</title>
 		<Nav />
+		<Link href="/large" data-large-link>Large</Link>
 		<form
 			data-form
 			onSubmit={(event) => {
