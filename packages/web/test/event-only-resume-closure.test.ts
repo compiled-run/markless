@@ -112,7 +112,10 @@ const resumeOnDemandEntries = [
 // 2026-10-21: a runtime an onIdle or onVisible handler starts leaves its rows' code until the reader's first input (shadcn-admin
 // /settings/account ran 1.5 MB at load without it): 26,457 -> 27,145 raw; minified+gzip 3,495 -> 3,595 bytes (rolldown, same
 // method both sides), under the 4,800 gzip wall.
-const sourceByteLimit = 27145;
+// 2026-10-23: arm and row records address an element by counting element children and @if/@try blocks, never text, through
+// one resolver in resume-anchor-census.ts that replaces the per-module child-node walks: 27,145 -> 27,756 raw; minified+gzip
+// 4,284 -> 4,373 bytes (rolldown, workspace packages external, same method both sides), under the 4,800 gzip wall.
+const sourceByteLimit = 27756;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

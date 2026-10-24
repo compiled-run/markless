@@ -819,7 +819,9 @@ function addRowPolicyMarks(
 	const rows = servedChildren(tree, parent);
 	for (const row of rows.slice(repeat.rowStartOffset ?? 0, rows.length - repeat.rowEndOffset))
 		for (const event of events) {
-			const host = servedHostAt(tree, row, event.hostPath, true);
+			const host = event.hostPath.length
+				? servedElementAt(tree, tree.addressSteps[row], event.hostPath)
+				: row;
 			if (host !== undefined)
 				addEventHostEntry(marks, host, { name: event.eventName, policy: event.policy });
 		}
@@ -835,27 +837,22 @@ function servedChildren(tree: ReturnType<typeof servedElementTree>, of: number):
 	return lists[of]!;
 }
 
-// The element a host path names from `from`, each step a place among child nodes; undefined at a text node.
-function servedHostAt(
+// The served element an element address names below `from`; see marklessElementAt.
+function servedElementAt(
 	tree: ReturnType<typeof servedElementTree>,
-	from: number | undefined,
-	path: ReadonlyArray<number>,
-	elementsOnly = false,
+	steps: ReadonlyArray<number> | undefined,
+	address: ReadonlyArray<number>,
 ): number | undefined {
-	let host = from;
-	for (const step of path) {
-		host =
-			host === undefined
-				? undefined
-				: servedChildren(tree, host).find((child) => tree.elements[child]!.node === step);
-		if (host !== undefined && elementsOnly && tree.elements[host]!.child !== step)
-			return undefined;
+	let host: number | undefined;
+	for (const step of address) {
+		host = steps?.at(step);
+		steps = host === undefined || host < 0 ? undefined : tree.addressSteps[host];
 	}
-	return host;
+	return host === undefined || host < 0 ? undefined : host;
 }
 
-// The painted arm of an @if whose records name hosts by their path from its start anchor.
-function addTakenArmPolicyMarks(
+// The arm a plain @if painted, whose records address hosts from the steps between its anchors.
+function addPaintedArmPolicyMarks(
 	marks: EventHostMarks,
 	tree: ReturnType<typeof servedElementTree>,
 	branch: NonNullable<ProtocolViewPayload['branches']>[number],
@@ -863,20 +860,13 @@ function addTakenArmPolicyMarks(
 ) {
 	const taken = (branch as { readonly takenArm?: number }).takenArm;
 	const set = taken === undefined ? undefined : branch.armRecords?.[taken];
-	const place = tree.commentPlaces[branch.startAnchor.index];
-	if (!set || !place) return;
+	const steps = tree.blockSteps.get(branch.startAnchor.index);
+	if (!set || !steps) return;
 	for (const event of set.events) {
 		const policy = policyTable.entry(event.syncPolicy);
-		if (policy === undefined) continue;
-		const [first, ...rest] = event.hostPath;
-		if (first === undefined) continue;
-		const siblings = servedChildren(tree, place.parent);
-		const before = siblings.filter((child) => tree.elements[child]!.node < place.node).length;
-		const top = siblings.find((child) => tree.elements[child]!.node === place.node + 1 + first);
-		// A path counts template positions; it names the served element only where every sibling before it is an element.
-		if (top === undefined || tree.elements[top]!.child - before !== first) continue;
-		const host = servedHostAt(tree, top, rest, true);
-		if (host !== undefined) addEventHostEntry(marks, host, { name: event.eventName, policy });
+		const host = servedElementAt(tree, steps, event.hostPath);
+		if (policy !== undefined && host !== undefined)
+			addEventHostEntry(marks, host, { name: event.eventName, policy });
 	}
 }
 
@@ -957,7 +947,7 @@ export function withEventHostMarks(
 		}
 	}
 	for (const branch of view.branches ?? [])
-		if (!branch.servedArmRecords) addTakenArmPolicyMarks(marks, tree, branch, policyTable);
+		if (!branch.servedArmRecords) addPaintedArmPolicyMarks(marks, tree, branch, policyTable);
 	return writeEventHostMarks(html, tree.nameEnds, marks);
 }
 

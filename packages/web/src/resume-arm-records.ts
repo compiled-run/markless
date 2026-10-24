@@ -4,7 +4,11 @@ import {
 	missingElementLocatorError,
 	runtimeResumeError,
 } from './inline/resume-errors.ts';
-import { isArmBranchAnchorComment, pageCommentCensus } from './resume-anchor-census.ts';
+import {
+	isArmBranchAnchorComment,
+	marklessElementAt,
+	pageCommentCensus,
+} from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -110,48 +114,43 @@ const BRANCH_ANCHOR_PREFIX = 'markless:branch:';
 type SiblingNode = ResumeDomNode & {
 	readonly data?: string;
 	readonly previousSibling?: SiblingNode | null;
+	readonly nextSibling?: SiblingNode | null;
 	readonly parentNode?: SiblingNode | null;
 };
 
-// Finds a painted arm's hosts from the event target up: each level's preceding siblings, never the page.
+// Finds a painted arm's hosts from the event target up: each level's siblings, never the page.
 function claimPaintedArmHosts(
 	target: unknown,
 	painted: Map<string, NonNullable<ServedBranchArm['events']>>,
 	register: (element: object, record: ResumeArmRecordSet['events'][number]) => void,
 ): void {
-	const chain: SiblingNode[] = [];
-	const path: number[] = [];
+	const chain: unknown[] = [];
 	for (
 		let node = target as SiblingNode | null | undefined;
 		node && painted.size;
 		node = node.parentNode
 	) {
-		chain.unshift(node);
-		let offset = 0;
-		for (
-			let sibling = node.previousSibling;
-			sibling;
-			sibling = sibling.previousSibling, offset++
-		) {
-			// An arm closed before this node cannot match: its records' first index is below the offset.
+		chain.push(node);
+		for (let sibling = node.previousSibling; sibling; sibling = sibling.previousSibling) {
 			const data = sibling.nodeType === 8 ? sibling.data! : '';
-			if (painted.has(data)) {
-				const armPath = [offset, ...path];
-				const left = painted.get(data)!.filter((record) => {
-					const host = chain[record.hostPath.length - 1];
-					if (
-						!record.hostPath.every((index, at) => armPath[at] === index) ||
-						host?.nodeType !== 1
-					)
-						return true;
-					register(host, { hostNodeId: '', ...record });
-					return false;
-				});
-				if (left.length) painted.set(data, left);
-				else painted.delete(data);
-			}
+			const events = painted.get(data);
+			if (!events) continue;
+			const armNodes: SiblingNode[] = [];
+			for (
+				let next = sibling.nextSibling;
+				next && !(next.nodeType === 8 && next.data === `/${data}`);
+				next = next.nextSibling
+			)
+				armNodes.push(next);
+			const left = events.filter((record) => {
+				const host = marklessElementAt({ childNodes: armNodes }, record.hostPath);
+				if (!host || !chain.includes(host)) return true;
+				register(host, { hostNodeId: '', ...record });
+				return false;
+			});
+			if (left.length) painted.set(data, left);
+			else painted.delete(data);
 		}
-		path.unshift(offset);
 	}
 }
 

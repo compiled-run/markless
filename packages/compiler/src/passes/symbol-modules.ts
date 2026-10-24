@@ -31,6 +31,7 @@ import {
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolElementHandleReadId,
 } from '@markless/serializer';
+import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
 import type { SourceSpan } from '../diagnostics.ts';
 import { staticAttributeText } from './semantic-graph/collect-markup.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
@@ -287,6 +288,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
+			...unaddressableElementDiagnostics(input),
 			...foreignScope.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
 			...sharedResolvingExportedFunctions(input.source).map(

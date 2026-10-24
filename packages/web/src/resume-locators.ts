@@ -10,7 +10,7 @@ import {
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
 } from './inline/resume-errors.ts';
-import { pageNodes } from './resume-anchor-census.ts';
+import { marklessElementAt, pageNodes } from './resume-anchor-census.ts';
 import { censusElements, spliceCensus } from './resume-census.ts';
 import { qualifiedElementHandleId } from './resume-handle-qualifier.ts';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../serializer/src/protocol-locator-paths.ts';
@@ -170,9 +170,8 @@ export function materializeElementHandles(
 			const parent = elementsByHostId.get(handle.repeat.parentHostNodeId);
 			for (const rowRoot of parent?.childNodes ?? []) {
 				if (rowRoot.nodeType !== 1) continue;
-				let node: ResumeDomNode | undefined = rowRoot;
-				for (const index of handle.hostPath) node = node?.childNodes?.[index];
-				if (node?.nodeType === 1) members.push(node as ResumeDomElement);
+				const member = marklessElementAt(rowRoot, handle.hostPath);
+				if (member) members.push(member);
 			}
 		}
 		return members;

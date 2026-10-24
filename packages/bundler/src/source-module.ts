@@ -920,6 +920,9 @@ export function emitResumeModule(input: {
 		scalarSpecializations.length > 0 || stagedPrerender
 			? "import { marklessFindElementAtDomOrderIndex } from '@markless/web/fns/dom-order';"
 			: '',
+		input.prerenderTriggerGroups?.some((group) => group.hostPath)
+			? "import { marklessElementAt } from '@markless/web/fns/element-address';"
+			: null,
 		'',
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
 		input.installResumeSummary && input.executionLog !== 'never'
@@ -1584,10 +1587,9 @@ function emitPrerenderTriggerGroupLoader(
 		'\tlet within = false, done = false;',
 		'\tconst between = node => { for (const child of node.childNodes ?? []) { if (child === start) { within = true; continue; } if (child === end) { done = true; return; } if (within) armNodes.push(child); else between(child); if (done) return; } };',
 		'\tbetween(input.root);',
-		'\tlet host = armNodes[hostPath[0]];',
-		'\tfor (let index = 1; host && index < hostPath.length; index++) host = host.childNodes?.[hostPath[index]];',
+		'\tconst host = marklessElementAt({ childNodes: armNodes }, hostPath);',
 		'\tconst target = input.event?.target;',
-		'\treturn host?.nodeType === 1 && (host === target || (!!target?.nodeType && typeof host.contains === "function" && host.contains(target)));',
+		'\treturn !!host && (host === target || (!!target?.nodeType && typeof host.contains === "function" && host.contains(target)));',
 		'}',
 		'function marklessLoadPrerenderTriggerGroup(input) {',
 		...groups.map((group) => {

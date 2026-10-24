@@ -300,7 +300,7 @@ test('keyed repeat enclosing row round-trips and refuses a malformed shape', () 
 
 	for (const enclosingRow of [
 		{ repeatId: 7, parentHostPath: [1] },
-		{ repeatId: 'repeat:0', parentHostPath: [-1] },
+		{ repeatId: 'repeat:0', parentHostPath: [0.5] },
 		{ repeatId: 'repeat:0', parentHostPath: [1], itemPath: [3] },
 	])
 		expect(() =>
