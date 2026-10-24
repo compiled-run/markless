@@ -423,8 +423,10 @@ test('render-data-only invalidation keeps the linked module graph intact', async
 		childSource,
 	);
 
+	// The served half is a second view of the same render data, so it refreshes with it.
 	expect(invalidated).toEqual([
 		`\0virtual:markless:render-data:${encodeURIComponent(moduleIdFor(childFilename, '/workspace/app'))}`,
+		`\0virtual:markless:render-data-served:${encodeURIComponent(moduleIdFor(childFilename, '/workspace/app'))}`,
 	]);
 	expect(invalidated).not.toContain(
 		`\0virtual:markless:resolver:${encodeURIComponent(importerFilename)}`,

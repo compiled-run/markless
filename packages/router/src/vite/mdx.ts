@@ -21,6 +21,7 @@ import {
 	emitRosterResumeLoaderInstall,
 } from '../../../bundler/src/source-module.ts';
 import { scalarPlanSourceReference } from '../../../bundler/src/scalar-plan-source.ts';
+import { servedRenderDataSourceReference } from '../../../bundler/src/served-render-data.ts';
 
 // Dev has to pre-bundle this or the first MDX route discovers it and Vite
 // re-optimizes mid-session.
@@ -121,7 +122,7 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 	return [
 		`import { createMdxRenderDataSurface, loadMdxSymbol${resume ? ', tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
-		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts)};`,
+		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts, resume)};`,
 		renderOverlayLoader(),
 		emitRosterResumeLoaderInstall(),
 		'const marklessMdxPage = {',
@@ -732,10 +733,12 @@ function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
 		.join(', ')}]`;
 }
 
+// A resumed page renders in the browser only what its graph can change, so it loads the served render data.
 function renderMdxRenderDataLoader(
 	components: ReadonlyArray<MdxComponent>,
 	id: string,
 	parts?: ReadonlyArray<MdxPart>,
+	served = false,
 ): string {
 	const reachedFrom = mdxMaterializedReachRoot(id);
 	const imports = components.map((component) => {
@@ -743,7 +746,7 @@ function renderMdxRenderDataLoader(
 			'markless-render-data': null,
 			...(reachedFrom ? { 'markless-reached-from': reachedFrom } : {}),
 		});
-		return `import(${JSON.stringify(source)})`;
+		return `import(${JSON.stringify(served ? servedRenderDataSourceReference(source) : source)})`;
 	});
 	const children = components.map(
 		(component, index) =>

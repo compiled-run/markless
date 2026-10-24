@@ -17,6 +17,7 @@ import {
 } from './undemanded-runtime.ts';
 import { symbolVirtualModuleId, symbolVirtualModuleSourceFile } from '../source-module.ts';
 import {
+	isClientRenderDataEntry,
 	isCompilerStatefulModuleId,
 	isMarklessRuntimeModule,
 	isRouteNavigationSourceRequest,
@@ -228,6 +229,7 @@ export function computeInteractionClosures(input: {
 			for (const target of module.dynamicDependencies ?? []) {
 				if (routeOf.has(target) && routeOf.get(target) !== (inside ?? route)) continue;
 				if (!routeOf.has(target) && authoredLazy(target)) continue;
+				if (isClientRenderDataEntry(target)) continue;
 				if (!bound) {
 					pending.push([target, inside]);
 					continue;
