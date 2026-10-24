@@ -60,6 +60,7 @@ import {
 	startFragmentNavigation,
 	type FragmentNavigationConfig,
 } from '../fragment-navigation.ts';
+import type { FragmentPreload } from '../entries/fragment-entry.ts';
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
@@ -197,6 +198,34 @@ export function createServerEntry(options: ServerEntryOptions) {
 		? undefined
 		: (options.linkBridgePaths ??
 			(linkBridgeModules && [linkBridgeModules[0].path, linkBridgeModules[1].path]));
+
+	// A press preloads the stylesheets a destination adds beside its page: its route's, and those its document writes for its URL.
+	const documentHeads = new Map<string, Promise<readonly string[]>>();
+	function pageStylesheetsAt(
+		url: URL,
+		match: NonNullable<ReturnType<typeof matchRouteManifest>>,
+		documentModule: DocumentModule | undefined,
+		request: Request,
+	): Promise<readonly string[]> {
+		const own = pageStylesheets(options, match.route.file) ?? [];
+		if (options.documentNavigation !== 'document' || !documentModule)
+			return Promise.resolve(own);
+		const key = url.pathname + url.search;
+		let head = documentHeads.get(key);
+		if (!head) {
+			if (documentHeads.size >= 1000)
+				documentHeads.delete(documentHeads.keys().next().value!);
+			const props: PageComponentProps = {
+				http: createPageHttp(request, url).context,
+				params: match.params,
+				url: { href: url.href, pathname: url.pathname, search: url.search },
+				status: 200,
+			};
+			head = renderDocumentShell(documentModule, props, '').then(stylesheetHrefs, () => []);
+			documentHeads.set(key, head);
+		}
+		return head.then((hrefs) => [...new Set([...own, ...hrefs])]);
+	}
 
 	async function fetch(request: Request): Promise<Response> {
 		const requestUrl = new URL(request.url);
@@ -349,6 +378,15 @@ export function createServerEntry(options: ServerEntryOptions) {
 							manifest,
 							destinationPreloads,
 							fragmentNavigation,
+							fragmentNavigation
+								? (destination, match) =>
+										pageStylesheetsAt(
+											destination,
+											match,
+											documentModule,
+											request,
+										)
+								: undefined,
 						)
 				: undefined,
 			documentLoads,
@@ -538,7 +576,7 @@ function routedPageArtifact(
 	navigationEntryPath: string | undefined,
 	stylesheetHrefs: readonly string[] | undefined,
 	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
-	intentPreloads?: (html: string) => Record<string, readonly ModulePreloadInput[]>,
+	intentPreloads?: (html: string) => Promise<Record<string, readonly FragmentPreload[]>>,
 	documentLoads = false,
 	fragment?: FragmentBridge,
 	linkBridgePaths?: readonly [string, string],
@@ -547,13 +585,11 @@ function routedPageArtifact(
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map(
-			(href): RenderHeadInjection => ({
-				tag: 'link',
-				location: 'head',
-				attributes: { rel: 'stylesheet', href },
-			}),
-		),
+		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
+			tag: 'link',
+			location: 'head',
+			attributes: { rel: 'stylesheet', href },
+		})),
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -572,7 +608,7 @@ function routedPageArtifact(
 			const linkBridge = navigationEntryPath
 				? renderLinkBridgeScript(
 						navigationEntryPath,
-						intentPreloads?.(output.html),
+						await intentPreloads?.(output.html),
 						documentLoads,
 						fragment,
 						output.html.includes('href="#/'),
@@ -648,27 +684,54 @@ function anchorHrefs(html: string): string[] {
 	);
 }
 
-function linkIntentPreloads(
+type StylesheetsOf = (
+	url: URL,
+	match: NonNullable<ReturnType<typeof matchRouteManifest>>,
+) => Promise<readonly string[]>;
+
+async function linkIntentPreloads(
 	html: string,
 	baseHref: string,
 	manifest: ReturnType<typeof buildRouteManifestFromFileIds>,
 	routes: ServerEntryOptions['routeModulePreloads'],
 	plainAnchors = false,
-): Record<string, readonly ModulePreloadInput[]> {
-	const destinations: Record<string, readonly ModulePreloadInput[]> = Object.create(null);
+	stylesheetsOf?: StylesheetsOf,
+): Promise<Record<string, readonly FragmentPreload[]>> {
+	const destinations: Record<string, readonly FragmentPreload[]> = Object.create(null);
+	const here = new URL(baseHref);
+	const herePage = stylesheetsOf && matchRouteManifest(here.pathname, manifest);
+	const have = new Set(herePage ? await stylesheetsOf(here, herePage) : []);
 	for (const href of plainAnchors ? anchorHrefs(html) : routerLinkHrefs(html)) {
 		const url = parseSameOriginUrl(href, baseHref);
 		const match = url && matchRouteManifest(url.pathname, manifest);
 		const preloads = match && routes?.[match.route.file];
 		// A fragment destination with nothing to preload is still listed, so the idle tier fetches its page.
-		if (url && preloads && (preloads.length > 0 || plainAnchors))
-			destinations[url.pathname] = preloads;
+		if (
+			!url ||
+			!preloads ||
+			(preloads.length === 0 && !plainAnchors) ||
+			url.pathname in destinations
+		)
+			continue;
+		const styles = stylesheetsOf
+			? (await stylesheetsOf(url, match)).filter((href) => !have.has(href))
+			: [];
+		destinations[url.pathname] = styles.length
+			? [...preloads, ...styles.map((href) => ({ href, as: 'style' as const }))]
+			: preloads;
 	}
 	return destinations;
 }
 
-function indexedPreloads(intentPreloads: Record<string, readonly ModulePreloadInput[]>): {
-	readonly preloads: ModulePreloadInput[];
+const STYLESHEET_LINK =
+	/<link\b(?=[^>]*\brel="(?:[^"]*\s)?stylesheet(?:\s[^"]*)?")(?=[^>]*\bhref="([^"]*)")[^>]*>/g;
+
+function stylesheetHrefs(html: string): string[] {
+	return [...html.matchAll(STYLESHEET_LINK)].map((match) => unescapeHtmlAttribute(match[1]!));
+}
+
+function indexedPreloads(intentPreloads: Record<string, readonly FragmentPreload[]>): {
+	readonly preloads: FragmentPreload[];
 	readonly destinations: Record<string, number[]>;
 } {
 	const preloads: ModulePreloadInput[] = [];
@@ -842,7 +905,7 @@ function renderRouteScript(file: string): string {
 
 // Per page: the destinations this page links, and whether it links a '#/' route.
 interface LinkBridgePage {
-	readonly intentPreloads?: Record<string, readonly ModulePreloadInput[]>;
+	readonly intentPreloads?: Record<string, readonly FragmentPreload[]>;
 	readonly hashLinks: boolean;
 }
 
@@ -1010,7 +1073,7 @@ function contentHash(text: string): string {
 
 function renderLinkBridgeScript(
 	resumeEntryPath: string,
-	intentPreloads?: Record<string, readonly ModulePreloadInput[]>,
+	intentPreloads?: Record<string, readonly FragmentPreload[]>,
 	documentLoads = false,
 	fragment?: FragmentBridge,
 	hashLinks = false,

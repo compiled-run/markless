@@ -127,6 +127,67 @@ async function open(browser: Browser, path = '/', base = origin): Promise<Sessio
 	return { page, errors, requests };
 }
 
+// Lands on `path` with the idle tier off, holds the destination page's answer, presses the link with no hover
+// before it, and returns, for each stylesheet the destination adds, whether it was requested before the page arrived.
+async function stylesheetsBeforePage(
+	browser: Browser,
+	base: string,
+	path: string,
+	selector: string,
+	destination: string,
+): Promise<boolean[]> {
+	// A slow connection turns the idle tier off, so nothing reaches the destination before the press.
+	const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+	await context.addInitScript(() =>
+		Object.defineProperty(navigator, 'connection', {
+			value: { effectiveType: '3g', saveData: false },
+		}),
+	);
+	const page = await context.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(String(error)));
+	await page.goto(base + path);
+	const own = await page.evaluate(async (destination) => {
+		const text = await (await fetch(`/_markless/fragment${destination}`)).text();
+		const doc = new DOMParser().parseFromString(text, 'text/html');
+		const have = new Set(
+			[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
+				(l) => l.href,
+			),
+		);
+		return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
+			.map((l) => new URL(l.getAttribute('href')!, location.href))
+			.filter((url) => !have.has(url.href))
+			.map((url) => url.pathname);
+	}, destination);
+	let released = Infinity;
+	await page.route(
+		(url) => url.pathname === `/_markless/fragment${destination}`,
+		async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 400));
+			released = Date.now();
+			await route.continue();
+		},
+	);
+	const requested = new Map<string, number>();
+	page.on('request', (request) => {
+		const pathname = new URL(request.url()).pathname;
+		if (own.includes(pathname) && !requested.has(pathname)) requested.set(pathname, Date.now());
+	});
+	await page.locator(selector).scrollIntoViewIfNeeded();
+	const box = (await page.locator(selector).boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.up();
+	await page.waitForFunction((destination) => location.pathname === destination, destination);
+	await expect.poll(() => released).toBeLessThan(Infinity);
+	await context.close();
+	expect(errors).toEqual([]);
+	return own.length
+		? own.map((pathname) => (requested.get(pathname) ?? Infinity) < released)
+		: [];
+}
+
 async function landedOn(page: Page, name: string): Promise<void> {
 	await page.waitForFunction(
 		(expected) => document.querySelector('[data-page]')?.getAttribute('data-page') === expected,
@@ -409,6 +470,18 @@ for (const [name, browserType] of [
 			await landedOn(page, 'other');
 			expect(errors).toEqual([]);
 			await page.close();
+		});
+
+		test('a press with no hover before it requests the destination stylesheets with its page, not after it', async () => {
+			expect(
+				await stylesheetsBeforePage(browser, origin, '/', '[data-nav="other"]', '/other'),
+			).toEqual([true]);
+		});
+
+		test('a press requests the stylesheets the document adds for the destination URL with its page', async () => {
+			expect(
+				await stylesheetsBeforePage(browser, docOrigin, '/', '[data-pager-next]', '/alpha'),
+			).toEqual([true]);
 		});
 
 		test('route stylesheets and the title follow the destination', async () => {
