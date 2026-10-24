@@ -11,7 +11,7 @@ export type CodePrefetchManifest = {
 	readonly live: readonly string[];
 	/** The compile worker and the result frame with its static imports, which load outside the page's module map. */
 	readonly cache: readonly string[];
-	/** Each block's runtime modules its result frame imports, by `codeBlockKey`. */
+	/** Each block's runtime modules its result frame imports, and the grammars its files need, by `codeBlockKey`. */
 	readonly blocks: Readonly<Record<string, readonly string[]>>;
 };
 

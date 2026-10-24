@@ -87,6 +87,8 @@ export function planRoutePackGroups(input: {
 	readonly pagesLoadOneRoute?: boolean;
 	// Filled with the routes whose first event needs a lazy sibling pack at once; their route pack imports it.
 	readonly eagerLazyRoutes?: Map<string, ReadonlyArray<string>>;
+	// The largest file a navigation or deferred pack may become; a bigger one splits by source.
+	readonly maxPackBytes?: number;
 }): Map<string, string> {
 	const sources = new Map<string, string[]>();
 	for (const [id, module] of input.modules) {
@@ -312,12 +314,45 @@ export function planRoutePackGroups(input: {
 		}
 	}
 	// Entry-rooted builds resolve symbols through their source's symbol chunk, so their packs stay whole.
-	return input.pagesLoadOneRoute
-		? splitFrameworkFromApp(
-				splitStartupPacksByStaticReach(groups, roots, sources, owners, input),
-				input,
-			)
-		: groups;
+	return splitOversizedLazyPacks(
+		input.pagesLoadOneRoute
+			? splitFrameworkFromApp(
+					splitStartupPacksByStaticReach(groups, roots, sources, owners, input),
+					input,
+				)
+			: groups,
+		input,
+	);
+}
+
+// Nothing preloads a navigation or deferred pack, so cutting one into files under the cap costs no extra round.
+function splitOversizedLazyPacks(
+	groups: Map<string, string>,
+	input: Parameters<typeof planRoutePackGroups>[0],
+): Map<string, string> {
+	const cap = input.maxPackBytes;
+	if (!cap) return groups;
+	const packs = new Map<string, string[]>();
+	for (const [id, group] of groups) if (!isStartupPack(group)) push(packs, group, id);
+	const sizeOf = (id: string) =>
+		(input.modules.get(id)?.size ?? 0) + PACK_COST_MODEL.packedModuleWrapperBytes;
+	for (const [group, ids] of packs) {
+		if (ids.reduce((sum, id) => sum + sizeOf(id), 0) <= cap) continue;
+		const bySource = new Map<string, string[]>();
+		for (const id of ids) push(bySource, input.modules.get(id)?.source ?? id, id);
+		let part = 0;
+		let filled = Infinity;
+		for (const [, members] of [...bySource].sort(([left], [right]) => left.localeCompare(right))) {
+			const size = members.reduce((sum, id) => sum + sizeOf(id), 0);
+			if (filled + size > cap) {
+				part++;
+				filled = 0;
+			}
+			filled += size;
+			for (const id of members) groups.set(id, part === 1 ? group : `${group}-part${part}`);
+		}
+	}
+	return groups;
 }
 
 function splitFrameworkFromApp(

@@ -66,6 +66,7 @@ export function nativePackingPlugins(
 	demandMaps: () => Iterable<RuntimeDemandMapManifest | undefined> = () => [],
 	demandSources: () => Iterable<InteractionDemandSource> = () => [],
 	directCsrOnly: () => boolean = () => false,
+	maxPackBytes: () => number | undefined = () => undefined,
 ): NativePackingPlugin[] {
 	let groups = new Map<string, string>();
 	let routeSets = new Map<string, ReadonlyArray<string>>();
@@ -196,6 +197,7 @@ export function nativePackingPlugins(
 					routes,
 					routeSets,
 					eagerLazyRoutes,
+					maxPackBytes: maxPackBytes(),
 					pagesLoadOneRoute: routeSources.size > 0,
 					closures: partitioned ? closures : [],
 					undemandedDynamicTargets: withUndemandedReExportDoors(
