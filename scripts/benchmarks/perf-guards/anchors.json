@@ -1560,7 +1560,7 @@
 			"guard": "runtime",
 			"subject": "router/vite/entries/fragment-entry",
 			"from": 25013,
-			"to": 26033,
+			"to": 26030,
 			"reason": "an in-place navigation keeps a part both pages render byte for byte as it is and replaces only the page's own children inside it (page regions, slice 1); re-measured on top of the transitions-off swap"
 		},
 		{
@@ -1582,7 +1582,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 26033,
+		"router/vite/entries/fragment-entry": 26030,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 9858,

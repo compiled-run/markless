@@ -380,9 +380,10 @@ test('a kept part stays exactly as it was, with what a script changed in it, whi
 				frame === document.querySelector('[data-frame]'),
 				title === document.querySelector('[data-title]'),
 				document.querySelectorAll('[data-title]').length,
+				document.querySelectorAll('[data-frame-body] > [data-part]').length,
 			];
 		}),
-	).toEqual([true, 'yes', ' (read)', true, false, 1]);
+	).toEqual([true, 'yes', ' (read)', true, false, 1, 600]);
 	await page.click('[data-layout-press]');
 	await expect.poll(() => page.textContent('[data-layout-press]')).toBe('pressed 1');
 	expect(errors).toEqual([]);
