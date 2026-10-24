@@ -208,8 +208,10 @@ function readMarklessSourceSymbol(mod, exportName) {
 
 
 async function marklessFullResumeHandoff(handoff) {
+	const marklessLife = handoff.root.__mL;
 	handoff.root.__asyncResumeRuntimeStarted = true;
 	const { resumeFromPayloadDocument } = await import('@markless/core/web/resume-storage-free');
+	if (handoff.root.__mL !== marklessLife) return;
 	const { runtime } = await resumeFromPayloadDocument({
 		document: handoff.document,
 		root: handoff.root,
