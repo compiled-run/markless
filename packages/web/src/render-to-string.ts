@@ -816,25 +816,68 @@ function addRowPolicyMarks(
 		return policy === undefined ? [] : [{ ...event, policy }];
 	});
 	if (!events.length) return;
+	const rows = servedChildren(tree, parent);
+	for (const row of rows.slice(repeat.rowStartOffset ?? 0, rows.length - repeat.rowEndOffset))
+		for (const event of events) {
+			const host = servedHostAt(tree, row, event.hostPath, true);
+			if (host !== undefined)
+				addEventHostEntry(marks, host, { name: event.eventName, policy: event.policy });
+		}
+}
+
+function servedChildren(tree: ReturnType<typeof servedElementTree>, of: number): number[] {
 	let lists = childLists.get(tree);
 	if (!lists) {
 		lists = tree.elements.map(() => [] as number[]);
 		tree.elements.forEach((element, index) => index && lists!.at(element.parent)!.push(index));
 		childLists.set(tree, lists);
 	}
-	const children = (of: number) => lists![of]!;
-	const rows = children(parent);
-	for (const row of rows.slice(repeat.rowStartOffset ?? 0, rows.length - repeat.rowEndOffset))
-		for (const event of events) {
-			let host: number | undefined = row;
-			for (const step of event.hostPath)
-				host =
-					host === undefined
-						? undefined
-						: children(host).find((child) => tree.elements[child]!.node === step);
-			if (host !== undefined)
-				addEventHostEntry(marks, host, { name: event.eventName, policy: event.policy });
-		}
+	return lists[of]!;
+}
+
+// The element a host path names from `from`, each step a place among child nodes; undefined at a text node.
+function servedHostAt(
+	tree: ReturnType<typeof servedElementTree>,
+	from: number | undefined,
+	path: ReadonlyArray<number>,
+	elementsOnly = false,
+): number | undefined {
+	let host = from;
+	for (const step of path) {
+		host =
+			host === undefined
+				? undefined
+				: servedChildren(tree, host).find((child) => tree.elements[child]!.node === step);
+		if (host !== undefined && elementsOnly && tree.elements[host]!.child !== step)
+			return undefined;
+	}
+	return host;
+}
+
+// The painted arm of an @if whose records name hosts by their path from its start anchor.
+function addTakenArmPolicyMarks(
+	marks: EventHostMarks,
+	tree: ReturnType<typeof servedElementTree>,
+	branch: NonNullable<ProtocolViewPayload['branches']>[number],
+	policyTable: ReturnType<typeof createSyncPolicyTable>,
+) {
+	const taken = (branch as { readonly takenArm?: number }).takenArm;
+	const set = taken === undefined ? undefined : branch.armRecords?.[taken];
+	const place = tree.commentPlaces[branch.startAnchor.index];
+	if (!set || !place) return;
+	for (const event of set.events) {
+		const policy = policyTable.entry(event.syncPolicy);
+		if (policy === undefined) continue;
+		const [first, ...rest] = event.hostPath;
+		if (first === undefined) continue;
+		const siblings = servedChildren(tree, place.parent);
+		const before = siblings.filter((child) => tree.elements[child]!.node < place.node).length;
+		const top = siblings.find((child) => tree.elements[child]!.node === place.node + 1 + first);
+		// A path counts template positions; it names the served element only where every sibling before it is an element.
+		if (top === undefined || tree.elements[top]!.child - before !== first) continue;
+		const host = servedHostAt(tree, top, rest, true);
+		if (host !== undefined) addEventHostEntry(marks, host, { name: event.eventName, policy });
+	}
 }
 
 function writeEventHostMarks(html: string, nameEnds: ReadonlyArray<number>, marks: EventHostMarks) {
@@ -913,6 +956,8 @@ export function withEventHostMarks(
 				addRowPolicyMarks(marks, tree, offset + index, repeat, policyTable);
 		}
 	}
+	for (const branch of view.branches ?? [])
+		if (!branch.servedArmRecords) addTakenArmPolicyMarks(marks, tree, branch, policyTable);
 	return writeEventHostMarks(html, tree.nameEnds, marks);
 }
 
@@ -1113,11 +1158,33 @@ function viewSyncPolicies(view: ProtocolViewPayload): ReadonlyArray<ProtocolSync
 		...view.events,
 		...(view.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
 		...view.asyncBoundaries.flatMap((boundary) => {
-			const armRecords = boundary.armRecords;
+			const armRecords = boundary.armRecords as
+				| {
+						readonly events?: ProtocolViewPayload['events'];
+						readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
+				  }
+				| ReadonlyArray<unknown>
+				| undefined;
 			return armRecords && !Array.isArray(armRecords)
-				? ((armRecords as { readonly events?: ProtocolViewPayload['events'] }).events ?? [])
+				? [
+						...((armRecords as { readonly events?: ProtocolViewPayload['events'] })
+							.events ?? []),
+						...(
+							(
+								armRecords as {
+									readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
+								}
+							).keyedRepeats ?? []
+						).flatMap((repeat) => repeat.rowEvents),
+					]
 				: [];
 		}),
+		// An @if arm's events cancel at once too, from its painted arm or its served records.
+		...(view.branches ?? []).flatMap((branch) => [
+			...(branch.armRecords ?? []).flatMap((arm) => arm.events),
+			...(branch.servedArmRecords?.events ?? []),
+			...(branch.servedArmRecords?.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
+		]),
 	].flatMap((event) => (event.syncPolicy ? [event.syncPolicy] : []));
 }
 
