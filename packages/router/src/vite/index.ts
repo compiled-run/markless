@@ -1041,7 +1041,12 @@ function virtualModulesPlugin(
 					);
 				}
 				if (id.startsWith(`\0${FRAGMENT_ENTRY_PATH_ID}`)) {
-					return entryPathSource('fragmentEntryPath', fragmentEntry, FRAGMENT_ENTRY_ID, root);
+					return entryPathSource(
+						'fragmentEntryPath',
+						fragmentEntry,
+						FRAGMENT_ENTRY_ID,
+						root,
+					);
 				}
 				if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
 					return routePreloadsSource(

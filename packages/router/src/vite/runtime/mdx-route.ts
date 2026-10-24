@@ -3,10 +3,7 @@ import {
 	marklessIslandSpacedSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
-import {
-	type StructureToken,
-	withProjectionSpan,
-} from '../../../../web/src/ssr-data/renderer.ts';
+import { type StructureToken, withProjectionSpan } from '../../../../web/src/ssr-data/renderer.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
@@ -345,7 +342,10 @@ async function renderWithMdxChildren(
 		tagName,
 	}));
 	const { result } = await withProjectionSpan(tokens, (mark) =>
-		component.renderSsr?.({ ...(props as object), children: mark + childrenHtml }, renderContext),
+		component.renderSsr?.(
+			{ ...(props as object), children: mark + childrenHtml },
+			renderContext,
+		),
 	);
 	return result;
 }

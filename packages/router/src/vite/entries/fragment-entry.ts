@@ -42,7 +42,9 @@ export interface FragmentNavigationConfig {
 	readonly pages: readonly string[];
 }
 
-export type FragmentRouteCode = Record<string, readonly ModulePreloadInput[]>;
+// What a link's destination needs before it shows: its code, and the stylesheets the page that links it lacks.
+export type FragmentPreload = ModulePreloadInput | { readonly href: string; readonly as: 'style' };
+export type FragmentRouteCode = Record<string, readonly FragmentPreload[]>;
 
 export type FragmentFetched = {
 	readonly url: string;
@@ -67,7 +69,7 @@ export type FragmentPrefetch = {
 // What the inline bootstrap leaves on the document for the swap module (entries/fragment-entry.ts).
 export type FragmentNavigationState = {
 	readonly config: FragmentNavigationConfig;
-	readonly routes: Record<string, readonly ModulePreloadInput[]>;
+	readonly routes: FragmentRouteCode;
 	readonly prefetches: Map<string, FragmentPrefetch>;
 	readonly visited: Map<string, string>;
 	// Writes this page has started or finished: each one makes every page fetched before it stale.
