@@ -1,15 +1,11 @@
 import type { RuntimeGraph } from '@markless/runtime';
+import { marklessElementAt } from '../resume-anchor-census.ts';
 import {
 	findRepeatItemByKey,
 	readKeyedRepeatCollection,
 	wireKeyedRepeats,
 } from '../resume-keyed-repeats.ts';
-import type {
-	ResumeDomElement,
-	ResumeDomNode,
-	ResumeKeyedRepeatRecord,
-	ResumeRepeatRowHook,
-} from '../resume-types.ts';
+import type { ResumeKeyedRepeatRecord, ResumeRepeatRowHook } from '../resume-types.ts';
 
 type WireInput = Parameters<typeof wireKeyedRepeats>[0];
 // `locals` answers the items of the rows enclosing an instance, for its row handlers;
@@ -73,7 +69,7 @@ export function wireNestedRepeats(
 		rows.get(rowKey)?.();
 		const releases: Array<() => void> = [];
 		for (const record of records) {
-			const parent = nodeAt(rowRoot, record.enclosingRow!.parentHostPath);
+			const parent = marklessElementAt(rowRoot, record.enclosingRow!.parentHostPath);
 			if (!parent) continue;
 			const item = () => findRepeatItemByKey(input.graph, enclosing, rowKey);
 			const instance = nestedInstance(input.graph, record, enclosing, item);
@@ -175,13 +171,4 @@ function instanceGraph(
 				}
 			: {}),
 	};
-}
-
-function nodeAt(
-	rowRoot: ResumeDomElement,
-	path: ReadonlyArray<number>,
-): ResumeDomElement | undefined {
-	let node: ResumeDomNode | undefined = rowRoot;
-	for (const index of path) node = node?.childNodes?.[index];
-	return node?.nodeType === 1 ? (node as ResumeDomElement) : undefined;
 }

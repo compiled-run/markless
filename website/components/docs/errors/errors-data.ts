@@ -3053,6 +3053,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ELEMENT_UNADDRESSABLE',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'The browser cannot find this element: a Markless build error.',
+		printed: [
+			'MARKLESS_ELEMENT_UNADDRESSABLE: This element sits inside an @if arm or a @for row, and its parent holds a @for, or a component whose element count is only known when the page renders, both before and after it. Its handler, update or element() handle would land on a neighbouring element, or on nothing, once the page loads.',
+			'After the page loads, the browser finds an element inside an arm or a row by counting its parent’s child elements, with each @if, @switch or @try block as one, from the start or from the end. That count needs every sibling on at least one side to be an element, text, a block, or a component of fixed size.',
+			'Wrap this element, or the construct beside it, in its own element, so one side of it holds only plain elements and text.',
+			'https://markless.dev/errors/MARKLESS_ELEMENT_UNADDRESSABLE',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/element-address-diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/element-address-diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_EMIT_CODEGEN_FAILED',
 		packageName: '@markless/compiler',
 		stage: 'build',

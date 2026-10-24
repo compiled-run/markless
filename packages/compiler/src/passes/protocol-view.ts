@@ -4,6 +4,7 @@ import {
 	type ProtocolViewPayload,
 } from '@markless/serializer';
 import { repeatRowSiblingElements } from './render-data/row-position.ts';
+import { elementAddress } from './semantic-graph/projection-placement.ts';
 import type {
 	PayloadKeyedRepeat,
 	PlannedSymbol,
@@ -961,8 +962,20 @@ function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 function branchArmHostPaths(
 	input: ProtocolViewPayloadInput,
 	chunkId: string,
-): ReadonlyMap<string, ArmHostPlacement> {
-	return armHostPaths(renderDataOf(input), input.semanticGraph, chunkId);
+): ReadonlyMap<string, ArmHostPlacement & { readonly path: ReadonlyArray<number> }> {
+	return addressedOnly(armHostPaths(renderDataOf(input), input.semanticGraph, chunkId));
+}
+
+// A host no address can name carries no record; the build refuses it with its own diagnostic.
+function addressedOnly<Placement extends { readonly path: ReadonlyArray<number> | null }>(
+	placements: ReadonlyMap<string, Placement>,
+): ReadonlyMap<string, Placement & { readonly path: ReadonlyArray<number> }> {
+	return new Map(
+		[...placements].filter(
+			(entry): entry is [string, Placement & { readonly path: ReadonlyArray<number> }] =>
+				entry[1].path !== null,
+		),
+	);
 }
 
 // Does one item of this repeat render one root element? Either the row chunk
@@ -985,13 +998,26 @@ function hostPathsForChunk(
 	relativeToRoot = false,
 ): ReadonlyMap<string, ReadonlyArray<number>> {
 	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk) return new Map();
+	// Render data folds unaddressed elements into counts, so siblings are counted from the full markup.
+	const chunks = input.semanticGraph?.markup.chunks ?? [];
+	const branchSites = input.semanticGraph?.branchSites ?? [];
 	return new Map(
-		(chunk?.hosts ?? []).map((host) => [
-			host.hostNodeId,
-			relativeToRoot && host.coordinate.path[0] === 0
-				? host.coordinate.path.slice(1)
-				: host.coordinate.path,
-		]),
+		chunk.hosts.flatMap((host) => {
+			const address = elementAddress({
+				chunks,
+				branchSites,
+				chunkId,
+				path: host.coordinate.path,
+			});
+			if (!address) return [];
+			return [
+				[
+					host.hostNodeId,
+					relativeToRoot && host.coordinate.path[0] === 0 ? address.slice(1) : address,
+				] as const,
+			];
+		}),
 	);
 }
 

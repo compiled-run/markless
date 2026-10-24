@@ -44,6 +44,8 @@ type Scope = {
 	readonly unattributedSwitch: boolean;
 	readonly chunkById: Map<string, SemanticMarkupChunk>;
 	readonly childIndexes: Map<SemanticMarkupChunk, ChildIndex>;
+	// The census one step of an element address takes: a host counts once, without its subtree, and a block once.
+	readonly siblingsOnly: boolean;
 };
 
 // What occupies each child index under one parent path: a host wins over an anchor slot at the same index.
@@ -131,8 +133,59 @@ export function projectionPlacementFields(
 	};
 }
 
-function scopeOf(input: ChunkScopeInput): Scope {
+/**
+ * Where one chunk position stands in the DOM the browser holds, server-sent or
+ * client-built alike, as a ProtocolElementAddress: per level, its place among
+ * the parent's elements and @if/@switch/@try blocks, negative when counted back
+ * from the end. Null when a sibling on each side (a @for, or a component whose
+ * element count only the render knows) leaves both counts open.
+ */
+export function elementAddress(
+	input: ChunkScopeInput & {
+		readonly chunkId: string;
+		readonly path: ReadonlyArray<number>;
+	},
+): ReadonlyArray<number> | null {
+	const scope = scopeOf(input, true);
+	const chunk = chunkOf(scope, input.chunkId);
+	if (!chunk) return null;
+	const seen = new Set([chunk.id]);
+	const address: number[] = [];
+	for (let depth = 0; depth < input.path.length; depth++) {
+		// A projection's top level shares its parent with the elements of the child it fills.
+		if (depth === 0 && chunk.kind === 'component-projection') return null;
+		const parentPath = input.path.slice(0, depth);
+		const own = input.path[depth]!;
+		const side = (keep: (index: number) => boolean) =>
+			countSiblings(scope, chunk, parentPath, keep, seen, UNKNOWN);
+		const before = side((index) => index < own);
+		if (before !== UNKNOWN) {
+			address.push(before);
+			continue;
+		}
+		const after = side((index) => index > own);
+		if (after === UNKNOWN) return null;
+		address.push(-(after + 1));
+	}
+	return address;
+}
+
+const scopes = new WeakMap<ReadonlyArray<SemanticMarkupChunk>, Scope>();
+
+function scopeOf(input: ChunkScopeInput, siblingsOnly = false): Scope {
+	if (siblingsOnly) {
+		const cached = scopes.get(input.chunks);
+		if (cached) return cached;
+		const scope = createScope(input, true);
+		scopes.set(input.chunks, scope);
+		return scope;
+	}
+	return createScope(input, false);
+}
+
+function createScope(input: ChunkScopeInput, siblingsOnly: boolean): Scope {
 	return {
+		siblingsOnly,
 		chunks: input.chunks,
 		switchComponents: new Set(
 			input.branchSites.flatMap((site) =>
@@ -173,12 +226,16 @@ function countChunk(
 ): ModuleGraphInterfaceElementCount {
 	// A chunk that reaches itself through an edge has no countable depth.
 	if (seen.has(chunkId)) return UNKNOWN;
+	const chunk = chunkOf(scope, chunkId);
+	if (!chunk) return UNKNOWN;
+	return countSiblings(scope, chunk, [], () => true, new Set(seen).add(chunkId), projection);
+}
+
+function chunkOf(scope: Scope, chunkId: string): SemanticMarkupChunk | undefined {
 	if (scope.chunkById.size === 0)
 		for (const candidate of scope.chunks)
 			if (!scope.chunkById.has(candidate.id)) scope.chunkById.set(candidate.id, candidate);
-	const chunk = scope.chunkById.get(chunkId);
-	if (!chunk) return UNKNOWN;
-	return countSiblings(scope, chunk, [], () => true, new Set(seen).add(chunkId), projection);
+	return scope.chunkById.get(chunkId);
 }
 
 function countSiblings(
@@ -243,6 +300,7 @@ function positionCount(
 	projection: ModuleGraphInterfaceElementCount,
 ): ModuleGraphInterfaceElementCount {
 	if (position.host) {
+		if (scope.siblingsOnly) return 1;
 		// A host is itself plus everything it renders beneath it, so a DOM census
 		// walking the served markup meets the same number.
 		const inside = countSiblings(
@@ -271,6 +329,8 @@ function slotCount(
 			// here, known when a parent's own projection chunk is being counted into it.
 			return slot.raw ? projection : 0;
 		case 'branch': {
+			// Its start and end comments make the whole block one step of an element address.
+			if (scope.siblingsOnly) return 1;
 			if (scope.unattributedSwitch || scope.switchComponents.has(chunk.componentName)) {
 				return UNKNOWN;
 			}
@@ -288,9 +348,10 @@ function slotCount(
 				: 0;
 			return countChunk(scope, slot.childTemplateId, projected, seen);
 		}
+		case 'async':
+			return scope.siblingsOnly ? 1 : UNKNOWN;
 		// Rows, arms, and an omittable host are all decided while rendering.
 		case 'repeat':
-		case 'async':
 		case 'dynamic-host':
 			return UNKNOWN;
 		default:
