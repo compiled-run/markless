@@ -476,8 +476,8 @@ export function createEventWiring(input: {
 			);
 	};
 	async function prepareSyncPolicy(
-		viewEvents: ReadonlyArray<ResumeEventRecord>,
-		rowEvents: ReadonlyArray<ResumeKeyedRepeatRowEvent>,
+		viewEvents: ReadonlyArray<{ readonly syncPolicy?: unknown }>,
+		rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown }>,
 	): Promise<void> {
 		if (![...viewEvents, ...rowEvents].some((record) => record.syncPolicy)) return;
 		runPolicy = (await import('./inline/sync-policy-core-lazy.ts'))
@@ -491,7 +491,7 @@ export function createEventWiring(input: {
 		if (moved) Object.defineProperty(event, 'target', { value: moved });
 		const target = event.target;
 		// A field's own events stay in order: its edit hold judges each write against non-overlapping dispatches.
-		const options = {
+		const options: { -readonly [Key in keyof ResumeDispatchOptions]: ResumeDispatchOptions[Key] } = {
 			...dispatchOptions,
 			// A key the browser would have sent to an element with no handler does nothing there.
 			...(moved ? { ignoreUnmatched: true } : {}),
@@ -557,6 +557,10 @@ export function createEventWiring(input: {
 			// not a routing defect, but the no-match still belongs in the log.
 			if (rowAnchor) return;
 			throw unmatchedDispatchError(event, selector);
+		}
+		if (!options.syncPolicyAlreadyApplied && runPolicy) {
+			applyPolicies(path, event);
+			options.syncPolicyAlreadyApplied = true;
 		}
 		const propagation = trackPropagationStops(event, options.propagationStopped);
 		let stopAfterElement: ResumeDomElement | undefined;
@@ -784,9 +788,24 @@ export function createEventWiring(input: {
 			});
 		}
 	}
+	// The browser reads defaultPrevented when the DOM dispatch returns; a forwarded dispatch runs after an await.
+	const applyPolicies = (path: ReturnType<typeof collectDispatchPath>, event: ResumeDomEvent) => {
+		for (const matched of path) {
+			const policy = ('rowMatch' in matched ? matched.rowMatch.rowEvent : matched.eventRecord).syncPolicy;
+			if (policy) runPolicy?.(policy, input.graph, event);
+		}
+	};
+	const applySyncPolicy = (event: ResumeDomEvent): void => {
+		if (event.target)
+			applyPolicies(
+				collectDispatchPath(event.target, event.type, eventRecords, rowEventRecords, event.bubbles !== false),
+				event,
+			);
+	};
 	return {
 		eventRecords,
 		rowEventRecords,
+		applySyncPolicy,
 		addEventRecord,
 		addRowEvent,
 		armFocusPreload,

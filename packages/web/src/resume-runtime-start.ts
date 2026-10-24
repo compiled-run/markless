@@ -116,7 +116,12 @@ export async function startResumeRuntime(input: {
 	} = input;
 	const events = await getEvents();
 	const rowEvents = (runtimeInput.view.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents);
-	await events.prepareSyncPolicy(runtimeInput.view.events, rowEvents);
+	const armEvents = (runtimeInput.view.branches ?? []).flatMap((branch) =>
+		[...(branch.armRecords ?? []), branch.servedArmRecords].flatMap(
+			(records): ReadonlyArray<{ readonly syncPolicy?: unknown }> => records?.events ?? [],
+		),
+	);
+	await events.prepareSyncPolicy(runtimeInput.view.events, [...rowEvents, ...armEvents]);
 	if (runtimeInput.applyDomJournal) {
 		storeContainerSubscription(
 			runtimeInput.graph.subscribeJournal(async (entries) => {
@@ -315,6 +320,14 @@ export async function startResumeRuntime(input: {
 	// including non-markless ones (router links): unmatched must pass through.
 	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) =>
 		events.dispatch(event, { ignoreUnmatched: true });
+	// Another listener owns dispatch and forwards after an await, so the policy runs from one of the runtime's own.
+	if (runtimeInput.root.__marklessDelegatedDispatch)
+		for (const eventType of eventTypes) {
+			runtimeInput.root.addEventListener?.(eventType, events.applySyncPolicy, { capture: true });
+			storeContainerSubscription(() =>
+				runtimeInput.root.removeEventListener?.(eventType, events.applySyncPolicy, { capture: true }),
+			);
+		}
 	if (!runtimeInput.root.__marklessDelegatedDispatch)
 		for (const eventType of eventTypes) {
 			runtimeInput.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
