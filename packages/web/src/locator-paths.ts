@@ -44,6 +44,8 @@ type ServedTree = {
 	readonly childCounts: ReadonlyArray<number>;
 	/** Per page-level comment anchor in DOM order, the index the next element takes. */
 	readonly commentElementIndexes: ReadonlyArray<number>;
+	/** Per page-level comment anchor, its parent element and its place among the parent's child nodes. */
+	readonly commentPlaces: ReadonlyArray<{ readonly parent: number; readonly node: number }>;
 	/** Per element, the html offset just past its tag name, where an attribute can be written. */
 	readonly nameEnds: ReadonlyArray<number>;
 };
@@ -61,6 +63,7 @@ export function servedElementTree(html: string): ServedTree {
 		inText[parent] = text;
 	};
 	const commentElementIndexes: number[] = [];
+	const commentPlaces: Array<{ parent: number; node: number }> = [];
 	const nameEnds = [0];
 	const stack: Array<{ readonly tag: string; readonly index: number }> = [];
 	let templateDepth = 0;
@@ -76,8 +79,10 @@ export function servedElementTree(html: string): ServedTree {
 			const end = html.indexOf('-->', open + 4);
 			at = end < 0 ? html.length : end + 3;
 			const data = html.slice(open + 4, end < 0 ? html.length : end);
-			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data }))
+			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data })) {
 				commentElementIndexes.push(elements.length);
+				commentPlaces.push({ parent: current(), node: nodeCounts[current()]! - 1 });
+			}
 			continue;
 		}
 		const next = html[open + 1] ?? '';
@@ -140,7 +145,7 @@ export function servedElementTree(html: string): ServedTree {
 		if (FOREIGN_ROOTS.has(lower)) foreignDepth++;
 		stack.push({ tag, index });
 	}
-	return { elements, childCounts, commentElementIndexes, nameEnds };
+	return { elements, childCounts, commentElementIndexes, commentPlaces, nameEnds };
 }
 
 /** Writes `attribute="value"` on each element the map names by its index in servedElementTree(html). */
@@ -219,7 +224,8 @@ export function servedLocatorPaths(
 /** The order the served elements' tags came in, which a script moving one changes without changing the count. */
 export function tagOrderSignature(tags: ReadonlyArray<string>): string {
 	let signature = 0;
-	for (const tag of tags) signature = (signature * 31 + tag.length * 32 + (tag.charCodeAt(0) | 32)) | 0;
+	for (const tag of tags)
+		signature = (signature * 31 + tag.length * 32 + (tag.charCodeAt(0) | 32)) | 0;
 	return (signature >>> 0).toString(36);
 }
 
