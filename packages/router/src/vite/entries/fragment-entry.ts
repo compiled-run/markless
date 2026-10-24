@@ -54,6 +54,10 @@ export type FragmentFetched = {
 
 export type FragmentPrefetch = {
 	readonly at: number;
+	// The writes this page had sent when the fetch began: a later write makes it stale.
+	readonly writes: number;
+	// When the response's Cache-Control ends its reuse (on arrival for no-store and no-cache).
+	expires?: number;
 	readonly result: Promise<FragmentFetched>;
 	// The response is still arriving, so it holds a connection.
 	open: boolean;
@@ -66,6 +70,9 @@ export type FragmentNavigationState = {
 	readonly routes: Record<string, readonly ModulePreloadInput[]>;
 	readonly prefetches: Map<string, FragmentPrefetch>;
 	readonly visited: Map<string, string>;
+	// Writes this page has started or finished: each one makes every page fetched before it stale.
+	writes: number;
+	readonly fresh: (entry: FragmentPrefetch, now: number) => boolean;
 	shown: string;
 	readonly eligible: (anchor: Element | null | undefined, forClick?: boolean) => URL | undefined;
 	readonly preloadCode: (url: URL, low: boolean) => void;
@@ -163,12 +170,13 @@ function take(
 		parsedVisits.get(state)?.delete(key);
 		return {
 			at: now,
+			writes: state.writes,
 			result: Promise.resolve(ready ?? state.parse(url.href, cached)),
 			open: false,
 			abort: () => {},
 		};
 	}
-	if (existing && now - existing.at < state.config.prefetchTtlMs) return existing;
+	if (existing && state.fresh(existing, now)) return existing;
 	existing?.abort();
 	state.preloadCode(url, false);
 	return state.request(url, false);
