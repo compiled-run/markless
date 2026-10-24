@@ -15,6 +15,7 @@ export default function SubmitForm() @{
 		<form data-native onSubmit={() => (sent = 'native')}>
 			<button type="submit">Send</button>
 		</form>
+		<button type="button" data-add onClick={() => (rows = [...rows, { id: `n${rows.length}` }])}>Add</button>
 		<ul>
 			@for (const row of rows; key row.id) {
 				<li>

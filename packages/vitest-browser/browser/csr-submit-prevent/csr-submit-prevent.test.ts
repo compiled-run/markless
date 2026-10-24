@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
-import { cleanup, render } from '../../src/index.ts';
+import { cleanup, render, renderSSR } from '../../src/index.ts';
 import SubmitForm from './submit-form.tsrx';
 
 afterEach(() => cleanup());
@@ -29,4 +29,22 @@ test('CSR: a handler that does not cancel leaves the submit to the browser', asy
 	const container = screen.container as HTMLElement;
 	expect(submit(container, 'form[data-native]')).toBe(false);
 	await expect.poll(() => container.querySelector('[data-sent]')!.textContent).toBe('native');
+});
+
+async function expectRowsCancel(container: HTMLElement) {
+	const sent = () => container.querySelector('[data-sent]')!.textContent;
+	expect(submit(container, 'form[data-row="a"]'), 'first row, first gesture').toBe(true);
+	await expect.poll(sent).toBe('row a');
+	container.querySelector<HTMLButtonElement>('[data-add]')!.click();
+	await expect.poll(() => container.querySelector('form[data-row="n2"]')).not.toBeNull();
+	expect(submit(container, 'form[data-row="n2"]'), 'row added in the browser').toBe(true);
+	await expect.poll(sent).toBe('row n2');
+}
+
+test('CSR: a submit handler on a list row cancels the submit inside the dispatch', async () => {
+	await expectRowsCancel((await render(SubmitForm)).container as HTMLElement);
+});
+
+test('SSR: a submit handler on a list row cancels the submit inside the dispatch', async () => {
+	await expectRowsCancel((await renderSSR(SubmitForm)).container as HTMLElement);
 });
