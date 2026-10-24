@@ -1650,6 +1650,14 @@
 			"from": 19772,
 			"to": 19974,
 			"reason": "composition routes the prop reads of a row template's @if branch slots and arm slots (+202 B rendered)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "serializer/protocol-constants",
+			"from": 697,
+			"to": 1171,
+			"reason": "bound symbol ids are spelled and read here now: nested ids wrap their base in parentheses instead of re-escaping it, and web/fns/bound-symbol dropped its own decoder"
 		}
 	],
 	"runtimeModules": {
@@ -1678,7 +1686,7 @@
 		"serializer/payload-scripts": 611,
 		"serializer/protocol": 570,
 		"serializer/protocol-client": 6652,
-		"serializer/protocol-constants": 697,
+		"serializer/protocol-constants": 1171,
 		"serializer/protocol-event-names": 264,
 		"serializer/protocol-locator-paths": 292,
 		"serializer/protocol-locator-paths-format": 352,
