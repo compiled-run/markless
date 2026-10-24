@@ -186,3 +186,26 @@ export function Ledger(input: { secret: { token: string }; http: string }) @{
 	expect(diagnostics[0]!.componentName).toBe('Ledger');
 	expect((await serverOnlyDiagnostics(source, [HTTP])).diagnostics).toEqual([]);
 });
+
+test('a branch decided by a server-only value, with no state in its test, stays in the server render', async () => {
+	const { diagnostics } = await serverOnlyDiagnostics(`
+function Forbidden() @{
+	<main><h1>Guides only</h1></main>
+}
+export default function Admin({ http }: { http: { locals: { forbidden?: boolean; user?: { name: string } }; response: { status?: number } } }) @{
+	const forbidden = http.locals.forbidden === true;
+	const name = http.locals.user?.name ?? 'guest';
+	if (forbidden) http.response.status = 403;
+	<div class="page">
+		@if (forbidden) {
+			<Forbidden />
+		} @else {
+			<main>
+				<p>Signed in as {name}.</p>
+			</main>
+		}
+	</div>
+}
+`);
+	expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual([]);
+});

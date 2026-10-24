@@ -102,7 +102,7 @@ changes the status or headers then throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
 <Callout
 	sprite="cross"
 	title="Why does my build stop on http?"
-	text="http holds the visitor's cookies and headers, so it only exists on the server. Event handlers, attach, a computed() and the parts of the page the browser redraws all run in the browser. Reading http there stops the build with MARKLESS_SERVER_ONLY_PROP_BROWSER_READ. Read it in the page body instead, and copy the one value the browser needs into state()."
+	text="http holds the visitor's cookies and headers, so it only exists on the server. Event handlers, attach, a computed() and the parts of the page the browser redraws all run in the browser. Reading http there stops the build with MARKLESS_SERVER_ONLY_PROP_BROWSER_READ. Read it in the page body instead, and copy the one value the browser needs into state(). An @if decided only by http is fine: nothing in the browser can change it, so the server renders the arm and the browser never redraws it."
 />
 
 ## One document around every page

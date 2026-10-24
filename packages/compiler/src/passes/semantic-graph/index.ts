@@ -99,6 +99,7 @@ export async function buildSemanticGraph(
 		frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		serverOnlyProps: input.serverOnlyProps,
 	});
 	state.walk = walk;
 	collectMemberTagTargets(statements, state);
