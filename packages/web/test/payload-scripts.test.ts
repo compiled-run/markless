@@ -2255,3 +2255,33 @@ test('a trigger group woken after the settle boot filled an arm adopts that arm'
 	expect(weighted.textContent).toBe('Weighted count 9');
 	expect(fallbackDispatches).toBe(0);
 });
+
+test('a resume whose page an in-place navigation swapped while it loaded leaves the new page alone', async () => {
+	// The DOM now holds the next page: no <input> where the leaving page's payload locates one.
+	const root = element('SECTION', [element('DIV')]);
+	const leaving = {};
+	let reads = 0;
+	Object.defineProperty(root, '__mL', { get: () => (reads++ === 0 ? leaving : {}) });
+	const state = createProtocolStatePayload({ cells: [] });
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'input' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'keydown', symbolIds: ['symbol:key'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state, view });
+	const resumed = await resumeFromPayloadScripts({
+		root,
+		stateScript: scripts.stateScript,
+		viewScript: scripts.viewScript,
+		loadSymbol: () => () => {},
+	});
+	expect(resumed.runtime).toBeDefined();
+	expect(root.listeners).toEqual([]);
+});
