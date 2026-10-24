@@ -17,15 +17,17 @@ export function marklessRowLocals(
 		while (child && child.parentElement !== parent) child = child.parentElement;
 		if (!parent || !child || !repeat.collectionGraphNodeId) continue;
 		const rows = Array.from(parent.childNodes ?? []).filter((node) => node.nodeType === 1);
-		const position = rows.indexOf(child) - (repeat.rowStartOffset ?? 0);
 		const items = Array.from(
 			(input.graph.read(repeat.collectionGraphNodeId, repeat.collectionPath) ??
 				[]) as Iterable<unknown>,
 		);
-		const item =
-			position < 0
-				? undefined
-				: items[Math.floor(position / Math.max(repeat.rowElementCount, 1))];
+		// Each row is one root element among the parent's element children, as resume-keyed-repeats places them.
+		const first =
+			repeat.rowEndOffset === undefined
+				? (repeat.rowStartOffset ?? 0)
+				: rows.length - repeat.rowEndOffset - items.length;
+		const position = rows.indexOf(child) - first;
+		const item = position < 0 ? undefined : items[position];
 		if (item !== undefined) (locals ??= {})[repeat.itemName] = item;
 	}
 	return locals;

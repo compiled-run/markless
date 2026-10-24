@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 288,
+	total: 289,
 	guided: 43,
 	groups: [
 		{
@@ -451,6 +451,11 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE',
 					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
+					kind: 'compile warning',
 					guided: false,
 				},
 				{

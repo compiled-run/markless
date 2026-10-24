@@ -51,8 +51,8 @@ test('a repeat whose row is not mintable carries no row markup', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
-	let on = state(true);
-	<ul>@for (const row of rows; key row.id) { <li>@if (on) { <b>yes</b> }</li> }</ul>
+	let tone = state('red');
+	<ul>@for (const row of rows; key row.id) { <li style={{ color: tone }}>x</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
@@ -215,7 +215,7 @@ export function App() @{
 	]);
 });
 
-test('a row holding an @if ships no markup', async () => {
+test('a row holding an @if ships the @if as a branch slot of its markup', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
@@ -224,7 +224,18 @@ export function App() @{
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowTemplate).toEqual({
+		html: '<li><!--markless-slot:0--></li>',
+		branchSlots: [
+			{
+				path: [0, 0],
+				branchId: 'branch-site:0',
+				arms: [{ html: '<b>yes</b>' }, { html: '' }],
+				graphNodeId: 'state:on',
+				graphPath: [],
+			},
+		],
+	});
 });
 
 test('a row holding a nested repeat whose rows mint ships markup with the nested marker', async () => {

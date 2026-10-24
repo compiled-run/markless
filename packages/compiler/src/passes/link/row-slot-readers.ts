@@ -10,7 +10,12 @@ export type RowSlotReaderComponentsInput = {
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 };
 
-type RowMintFlag = 'rowSlotReader' | 'rowComponentMint' | 'rowTemplateMint' | 'nestedRepeats';
+type RowMintFlag =
+	| 'rowSlotReader'
+	| 'rowComponentMint'
+	| 'rowTemplateMint'
+	| 'nestedRepeats'
+	| 'rowBranchMint';
 
 /** Components whose tree rebuilds rows through a render-data reader, transitively through imports. */
 export function rowSlotReaderComponents(input: RowSlotReaderComponentsInput): ReadonlySet<string> {
@@ -42,13 +47,15 @@ export function rowComponentMintComponents(
 export function rowTemplateMintComponents(
 	input: RowSlotReaderComponentsInput,
 	componentNames: ReadonlyArray<string>,
-	flag: 'rowTemplateMint' | 'nestedRepeats' = 'rowTemplateMint',
+	flag: 'rowTemplateMint' | 'nestedRepeats' | 'rowBranchMint' = 'rowTemplateMint',
 ): ReadonlySet<string> {
 	// A plain row record names no component, so every component of its module may own it.
 	const owns = (input.protocolView.keyedRepeats ?? []).some((repeat) =>
 		flag === 'nestedRepeats'
 			? repeat.enclosingRow !== undefined
-			: (repeat.rowTemplate ?? repeat.emptyArm) !== undefined,
+			: flag === 'rowBranchMint'
+				? repeat.rowTemplate?.branchSlots !== undefined
+				: (repeat.rowTemplate ?? repeat.emptyArm) !== undefined,
 	);
 	return withComposingComponents(new Set(owns ? componentNames : []), input, flag);
 }
@@ -91,7 +98,14 @@ export function withRowSlotReaders(
 	);
 	const templating = rowTemplateMintComponents(input, componentNames);
 	const nesting = rowTemplateMintComponents(input, componentNames, 'nestedRepeats');
-	if (reading.size === 0 && minting.size === 0 && templating.size === 0 && nesting.size === 0)
+	const flipping = rowTemplateMintComponents(input, componentNames, 'rowBranchMint');
+	if (
+		reading.size === 0 &&
+		minting.size === 0 &&
+		templating.size === 0 &&
+		nesting.size === 0 &&
+		flipping.size === 0
+	)
 		return moduleGraphInterface;
 	return {
 		...moduleGraphInterface,
@@ -107,6 +121,7 @@ export function withRowSlotReaders(
 					? { rowTemplateMint: true as const }
 					: {}),
 				...(nesting.has(component.componentName) ? { nestedRepeats: true as const } : {}),
+				...(flipping.has(component.componentName) ? { rowBranchMint: true as const } : {}),
 			})),
 		},
 	};
@@ -145,5 +160,14 @@ export function importedNestedRepeats(
 ): boolean {
 	return Object.values(importedModuleInterfaces ?? {}).some((moduleInterface) =>
 		moduleInterface.render.components.some((component) => component.nestedRepeats === true),
+	);
+}
+
+/** Whether any component a module imports holds rows that flip an @if of their own, in its tree. */
+export function importedRowBranchMints(
+	importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined,
+): boolean {
+	return Object.values(importedModuleInterfaces ?? {}).some((moduleInterface) =>
+		moduleInterface.render.components.some((component) => component.rowBranchMint === true),
 	);
 }

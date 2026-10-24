@@ -52,7 +52,9 @@ export function wireNestedRepeats(
 		if (enclosingId) nested.set(enclosingId, [...(nested.get(enclosingId) ?? []), repeat]);
 	}
 	const wired = new WeakMap<ResumeKeyedRepeatRecord, Map<unknown, () => void>>(),
-		roots = new WeakMap<ResumeKeyedRepeatRecord, Scoped>();
+		roots = new WeakMap<ResumeKeyedRepeatRecord, Scoped>(),
+		// Instances wired with the page whose @if arm events wait for row code; the first gesture waits with them.
+		settling: Array<Promise<unknown>> = [];
 	let serial = 0;
 	const onRow: ResumeRepeatRowHook = (enclosing, rowRoot, rowKey) => {
 		const records = nested.get(enclosing.id);
@@ -80,7 +82,7 @@ export function wireNestedRepeats(
 					})
 				: undefined;
 			if (root) roots.set(instance, root);
-			void wireKeyedRepeats(
+			const wiring = wireKeyedRepeats(
 				{
 					...input,
 					graph: instanceGraph(input.graph, root, () => item() === undefined, ++serial),
@@ -91,17 +93,21 @@ export function wireNestedRepeats(
 				rowComponentHost,
 				onRow,
 			);
+			if (wiring) settling.push(wiring.catch(() => undefined));
 		}
 		rows.set(rowKey, () => {
 			for (const release of releases.splice(0)) release();
 		});
 	};
 	const topLevel = repeats.filter((repeat) => !repeat.enclosingRow);
-	return wireKeyedRepeats(
+	const settled = () =>
+		settling.length ? Promise.all(settling.splice(0)).then(() => undefined) : undefined;
+	const top = wireKeyedRepeats(
 		{ ...input, view: { ...input.view, keyedRepeats: topLevel } },
 		rowComponentHost,
 		onRow,
 	);
+	return top ? top.then(settled) : settled();
 }
 
 function nestedInstance(

@@ -167,6 +167,33 @@ export function keyedRepeatRowMintUnsupportedDiagnostic(input: {
 	};
 }
 
+export const ROW_BRANCH_FLIP_UNSUPPORTED_CODE = 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED' as const;
+
+// A row that ships no markup has no way to show another arm, so its @if keeps the arm the server chose.
+export function rowBranchFlipUnsupportedDiagnostic(input: {
+	readonly itemName: string;
+	readonly branchLabel: string;
+	readonly testSource: string;
+	readonly refusal: KeyedRepeatRowMintRefusal;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	const cause = refusalCause(input.itemName, input.refusal);
+	return {
+		code: ROW_BRANCH_FLIP_UNSUPPORTED_CODE,
+		severity: KEYED_REPEAT_ROW_MINT_UNSUPPORTED_SEVERITY,
+		phase: PUBLIC_RENDER_PHASE,
+		title: `This ${input.branchLabel} in a @for row never changes in the browser`,
+		message: `${cause.message} So each row keeps the arm the server rendered for ${input.branchLabel} (${input.testSource}): when ${input.testSource} changes after the page loads, the row does not show the other arm.`,
+		why: `A row flips its own ${input.branchLabel} from the row markup the payload carries: the test read per row, and each arm's elements, text and attributes. A row needing anything more ships no markup at all, so nothing can rebuild an arm in it.`,
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: cause.suggestion }],
+		docsUrl: `https://markless.dev/errors/${ROW_BRANCH_FLIP_UNSUPPORTED_CODE}`,
+	};
+}
+
 export function keyedRepeatRowsUnplacedDiagnostic(input: {
 	readonly itemName: string;
 	readonly node: AnyNode;

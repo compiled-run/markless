@@ -137,23 +137,20 @@ export function mintRowNodes(
 	const nodes = markupNodes<ResumeDomNode>(template, rowTemplate.html, parent as MarkupParent);
 	// Every path is walked before any fill: replacing a marker rewrites the
 	// childNodes a later path would have counted through.
-	const rowRoot = nodes.find((node) => node.nodeType === 1) as ResumeDomElement | undefined,
-		slots = rowTemplate.textSlots ?? [],
+	const slots = rowTemplate.textSlots ?? [],
 		anchors = slots.map((slot) => nodeAtPath(nodes, slot.path) as ReplaceableNode | undefined),
 		attributeSlots = rowTemplate.attributeSlots ?? [],
 		hosts = attributeSlots.map(
 			(slot) => nodeAtPath(nodes, slot.path) as AttributableNode | undefined,
 		);
-	if (
-		!rowRoot ||
-		anchors.some((anchor) => !anchor?.replaceWith) ||
-		hosts.some((element) => !element?.setAttribute)
-	)
-		throw repeatRuntimeError(
+	const empty = () =>
+		repeatRuntimeError(
 			repeat,
 			'MARKLESS_REPEAT_ROW_MINT_EMPTY',
 			'built no row from its markup, and half a row is worse than none.',
 		);
+	if (anchors.some((anchor) => !anchor?.replaceWith) || hosts.some((element) => !element?.setAttribute))
+		throw empty();
 	const valueAt = (at: number, slot: ProtocolRowTemplateSlotValue) =>
 		values ? values[at] : slotValue(slot, item, graph);
 	for (const [at, slot] of attributeSlots.entries())
@@ -165,7 +162,30 @@ export function mintRowNodes(
 		);
 	for (const [at, slot] of slots.entries())
 		anchors[at]!.replaceWith!(host.createTextNode(String(valueAt(at, slot) ?? '')));
-	return { rowRoot, nodes };
+	// A filled text slot is one node for one marker, so a branch marker's path still holds.
+	const built = rowTemplate.branchSlots
+		? rowBranches!.mint(parent, repeat, nodes, item, graph, values)
+		: nodes;
+	const rowRoot = built.find((node) => node.nodeType === 1) as ResumeDomElement | undefined;
+	if (!rowRoot) throw empty();
+	return { rowRoot, nodes: built };
+}
+
+/** What an `@if` in a row adds to the mint, installed by `fns/row-branch-mint` on a page whose rows hold one. */
+export type RowBranchHooks = {
+	readonly mint: (
+		parent: ResumeDomElement,
+		repeat: ResumeKeyedRepeatRecord,
+		nodes: ReadonlyArray<ResumeDomNode>,
+		item: unknown,
+		graph: RowMintGraph | undefined,
+		values: ReadonlyArray<unknown> | undefined,
+	) => ReadonlyArray<ResumeDomNode>;
+	readonly patch: typeof patchRow;
+};
+let rowBranches: RowBranchHooks | undefined;
+export function marklessInstallRowBranches(hooks: RowBranchHooks): void {
+	rowBranches = hooks;
 }
 
 /** Writes moved slot values onto the live row, keeping its elements and focus; false (nothing written) means rebuild. */
@@ -174,7 +194,11 @@ export function patchRow(
 	repeat: ResumeKeyedRepeatRecord,
 	before: ReadonlyArray<unknown>,
 	after: ReadonlyArray<unknown>,
+	// Called once an arm flipped, so the arm's events are registered on its new nodes.
+	rewire?: () => void,
 ): boolean {
+	// Its arms stand between the row's elements, so a row with an @if is patched by the code that counts them.
+	if (repeat.rowTemplate!.branchSlots) return rowBranches!.patch(row, repeat, before, after, rewire);
 	const template = repeat.rowTemplate!,
 		texts = template.textSlots ?? [],
 		writes: Array<() => void> = [];
@@ -239,7 +263,7 @@ function slotTarget(
 }
 
 // An always-present attribute is already in the html, a scoped class with its scope class; a live control's state is its property.
-function writeAttribute(
+export function writeAttribute(
 	element: AttributableNode & Record<string, unknown>,
 	name: string,
 	value: unknown,
@@ -305,7 +329,7 @@ function focusAt(row: ResumeDomElement, path: ReadonlyArray<number>): boolean {
 }
 
 // A slot value when the repeat runtime handed none; a write to what it reads rebuilds the row.
-function slotValue(
+export function slotValue(
 	slot: ProtocolRowTemplateSlotValue,
 	item: unknown,
 	graph: RowMintGraph | undefined,
@@ -333,11 +357,14 @@ export function nodeAtPath(
 	}
 	return node;
 }
-type MintingDocument = NonNullable<ResumeDomElement['ownerDocument']> & {
+export type MintingDocument = NonNullable<ResumeDomElement['ownerDocument']> & {
 	readonly createTextNode?: (data: string) => ResumeDomNode;
 };
-type ReplaceableNode = ResumeDomNode & { readonly replaceWith?: (node: ResumeDomNode) => void };
-type AttributableNode = ResumeDomNode & {
+export type ReplaceableNode = ResumeDomNode & {
+	readonly replaceWith?: (...nodes: ResumeDomNode[]) => void;
+	readonly remove?: () => void;
+};
+export type AttributableNode = ResumeDomNode & {
 	readonly getAttribute?: (name: string) => string | null;
 	readonly setAttribute?: (name: string, value: string) => void;
 	readonly removeAttribute?: (name: string) => void;

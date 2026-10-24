@@ -63,6 +63,15 @@ async function exercise(container: HTMLElement, entry: Entry, served: boolean) {
 	if (entry.family === 'rows') {
 		await expectTargets(container, entry, '2', served);
 		await expectTargets(container, entry, '1', served);
+		if (!entry.flips) return;
+		const flip = container.querySelector<HTMLButtonElement>('[data-flip]')!;
+		const closed = () => container.querySelectorAll('em').length;
+		flip.click();
+		await expect.poll(closed, { message: `${entry.name}: every row's arm closes` }).toBeGreaterThan(0);
+		flip.click();
+		await expect.poll(closed, { message: `${entry.name}: every row's arm opens again` }).toBe(0);
+		await expectTargets(container, entry, '1', served);
+		await expectTargets(container, entry, '2', served);
 		return;
 	}
 	await expectTargets(container, entry);
