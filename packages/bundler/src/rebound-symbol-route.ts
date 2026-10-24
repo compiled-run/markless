@@ -1,3 +1,5 @@
+import { protocolBoundSymbolPrefix } from '@markless/serializer';
+
 type BoundRoute = {
 	readonly prefix: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
@@ -64,14 +66,19 @@ export function emitSymbolRouteTable(input: {
 }
 
 // An edge binds `symbol:N` to `bound:symbol%3AN:<edge>`, so it ships its edge half and a key list its sibling instances share.
+// The table rebuilds an id with `encodeURIComponent`, so only keys the protocol spells that way share one.
 function boundEntry(boundSymbols: Readonly<Record<string, string>>, keyLists: string[]): string {
 	const entries = Object.entries(boundSymbols);
 	const [firstKey, firstId] = entries[0]!;
-	const head = `bound:${encodeURIComponent(firstKey)}:`;
+	const head = `${protocolBoundSymbolPrefix(firstKey)}:`;
 	const suffix = firstId.startsWith(head) ? firstId.slice(head.length) : undefined;
 	if (
 		suffix === undefined ||
-		entries.some(([key, id]) => id !== `bound:${encodeURIComponent(key)}:${suffix}`)
+		entries.some(
+			([key, id]) =>
+				protocolBoundSymbolPrefix(key) !== `bound:${encodeURIComponent(key)}` ||
+				id !== `${protocolBoundSymbolPrefix(key)}:${suffix}`,
+		)
 	)
 		return JSON.stringify(boundSymbols);
 	const keys = JSON.stringify(entries.map(([key]) => key));

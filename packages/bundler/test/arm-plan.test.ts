@@ -99,7 +99,7 @@ test('every settled-arm hole of live-feed is covered, including the derived weig
 			kind: 'text',
 			name: undefined,
 			from: {
-				symbolId: 'bound:symbol%3A1:component-edge%3A0',
+				symbolId: 'bound:symbol%3A1:0',
 				args: [
 					{ node: 'computed:feed', path: ['updates', 'length'] },
 					{ node: 'state:weight', path: [] },
@@ -220,7 +220,7 @@ function plain(pass: Awaited<ReturnType<typeof renderForcedArm>>) {
 // ---------------------------------------------------------------------------
 // T012 / S4a: the lean bound-symbol descriptor.
 //
-// The plan's derived hole is a REFERENCE to `bound:symbol%3A1:component-edge%3A0`.
+// The plan's derived hole is a REFERENCE to `bound:symbol%3A1:0`.
 // Calling it needs the base symbol the loader resolves plus the mapping from
 // the child's legacy prop reads onto the parent routes — facts that live only
 // in the compiler's bound-resolver rows. The row below is the row the real
@@ -228,7 +228,7 @@ function plain(pass: Awaited<ReturnType<typeof renderForcedArm>>) {
 // ---------------------------------------------------------------------------
 
 const LIVE_FEED_BOUND_ROW = {
-	id: 'bound:symbol%3A1:component-edge%3A0',
+	id: 'bound:symbol%3A1:0',
 	baseSymbolId: 'imported:%2Fdemos%2Flive-feed%2Fsrc%2FUpdateSummary.tsrx:symbol:1',
 	componentEdgePath: ['component-edge:0'],
 	ancestry: [
@@ -286,7 +286,7 @@ test('the bound-symbol descriptor is derived per boundary from the arm chunk gra
 	expect(descriptors).toEqual({
 		'boundary:0': [
 			{
-				id: 'bound:symbol%3A1:component-edge%3A0',
+				id: 'bound:symbol%3A1:0',
 				base: 'imported:%2Fdemos%2Flive-feed%2Fsrc%2FUpdateSummary.tsrx:symbol:1',
 				slots: [
 					['prop:props', ['updates', 'length'], 'computed:feed', ['updates', 'length']],

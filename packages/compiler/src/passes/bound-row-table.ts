@@ -1,3 +1,5 @@
+import { protocolBoundSymbolBaseEnd } from '@markless/serializer';
+
 // A bound row is one (child symbol, component edge) pair. Its capture slots are
 // the symbol's, and only the routes a prop takes differ from one edge to the
 // next, so the resolver ships each symbol's slots once and each edge's routes
@@ -35,7 +37,15 @@ export function decodeBoundRow(
 ): unknown {
 	if (cache.has(id)) return cache.get(id);
 	const [slots, symbols, edges] = tables;
-	const at = id.indexOf(':', 6);
+	// The base ends at the first `:` after `bound:`, or after its closing parenthesis when it is itself bound.
+	let at = id.indexOf(':', 6);
+	for (let depth = 0, index = 6; id[6] === '(' && index < id.length; index++) {
+		if (id[index] === '(') depth++;
+		else if (id[index] === ')' && --depth === 0) {
+			at = id[index + 1] === ':' ? index + 1 : -1;
+			break;
+		}
+	}
 	const prefix = id.slice(0, at);
 	const entries =
 		at > 0 && Object.hasOwn(edges, id.slice(at + 1)) ? edges[id.slice(at + 1)]! : [];
@@ -82,8 +92,8 @@ export function factorBoundRows(rows: ReadonlyArray<JsonBoundRow>): BoundRowTabl
 	const edges: Record<string, EdgeEntry[]> = {};
 	const unrouted = new Set<EdgeEntry>();
 	for (const row of rows) {
-		const at = row.id.indexOf(':', 6);
-		if (!row.id.startsWith('bound:') || at < 0) return null;
+		const at = protocolBoundSymbolBaseEnd(row.id);
+		if (at < 0) return null;
 		const prefix = row.id.slice(0, at);
 		const suffix = row.id.slice(at + 1);
 		const { id: _id, baseSymbolId, loaderSymbolId, captureSlots, ...fields } = row;

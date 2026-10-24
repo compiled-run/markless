@@ -279,9 +279,9 @@ test('planBoundSymbolResolver derives bound rows from edge paths and recorded an
 			],
 		}),
 	]);
-	expect(artifact.rows[0]?.id).toContain('component-edge%3Aparent');
+	expect(artifact.rows[0]?.id).toContain(':parent[b=branch%3Apanel;k=]/');
 	expect(artifact.rows[0]?.id).not.toContain('Action');
-	expect(artifact.rows[0]?.id).not.toContain('component-edge%3Achild[]');
+	expect(artifact.rows[0]?.id).not.toContain('/child[]');
 });
 
 test('planSymbolResolver assigns derive symbols for sync computed records', async () => {

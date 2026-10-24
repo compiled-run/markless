@@ -264,7 +264,7 @@ export default function Page() @{
 		]),
 	).toEqual([
 		['component-edge:0', 'symbol:1', 'c0:'],
-		['component-edge:1', 'bound:symbol%3A0:component-edge%3A0', 'c1:c0:'],
+		['component-edge:1', 'bound:symbol%3A0:0', 'c1:c0:'],
 	]);
 	expect(page.captureAnalysis.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 });
