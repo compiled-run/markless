@@ -81,7 +81,7 @@ server would send:
   it starts. The wrapper passes your arguments to the browser's `fetch` unchanged and returns its
   promise as is.
 - A page that answers `Cache-Control: no-store` or `no-cache` is fetched again at the click, unless
-  the early request is still arriving. One that answers `max-age=N` is shown for at most `N` seconds.
+  the early request is still arriving. One that answers `max-age=N` is shown for at most `N` seconds; `max-age=0`, which hosts such as Vercel send on every response for the browser's own cache, keeps the usual window.
 
 In a built app, the code that handles these clicks is one small file the browser downloads once and
 caches for every page. It starts when the browser finishes reading the page. A link clicked before

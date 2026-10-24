@@ -411,7 +411,9 @@ export function runFragmentNavigation(
 			const maxAge = /(?:^|,)\s*max-age\s*=\s*"?(\d+)/i.exec(cacheControl);
 			if (/(?:^|,)\s*no-(?:store|cache)\b/i.test(cacheControl))
 				entry.expires = w.performance.now();
-			else if (maxAge) entry.expires = entry.at + Number(maxAge[1]) * 1000;
+			// max-age=0 is what a host sends on every response (Vercel's default): it rules the browser's HTTP cache, not a click.
+			else if (maxAge && Number(maxAge[1]) > 0)
+				entry.expires = entry.at + Number(maxAge[1]) * 1000;
 			const type = response.headers.get('content-type') ?? '';
 			if (!response.ok || !type.includes('text/html') || !response.body)
 				throw new Error(`MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: ${response.status}`);

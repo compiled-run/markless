@@ -155,6 +155,25 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a page answering max-age=0, as a host sends on every response, is shown as fetched ahead, at once', async () => {
+			const { page, arrived } = await open(browser);
+			await fetchedAhead(page, arrived, '[data-hosted]', '/hosted');
+			// Any further page fetch never answers: a click that asked again would never land.
+			const asked: string[] = [];
+			await page.route(
+				(url) => fragmentPageUrl(url)?.pathname === '/hosted',
+				(route) => void asked.push(route.request().url()),
+			);
+			const shown = await page.locator('[data-count]').count();
+			const clicked = await page.evaluate(() => performance.now());
+			await page.locator('[data-hosted]').click();
+			await landedOn(page, 'hosted');
+			const landed = await page.evaluate(() => performance.now());
+			expect([shown, asked]).toEqual([0, []]);
+			expect(landed - clicked).toBeLessThan(1_000);
+			await page.close();
+		});
+
 		test('a page fetched ahead is not shown past its Cache-Control max-age', async () => {
 			const { page, arrived } = await open(browser);
 			await fetchedAhead(page, arrived, '[data-brief]', '/brief');

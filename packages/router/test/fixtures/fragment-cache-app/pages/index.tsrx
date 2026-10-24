@@ -6,6 +6,7 @@ export default function Home() @{
 		<a href="/list" data-list>List</a>
 		<a href="/live" data-live>Live</a>
 		<a href="/brief" data-brief>Brief</a>
+		<a href="/hosted" data-hosted>Hosted</a>
 		<form
 			data-form
 			onSubmit={(event) => {
