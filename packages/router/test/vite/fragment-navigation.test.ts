@@ -658,19 +658,23 @@ for (const [name, browserType] of [
 
 		test('a plain anchor to a page navigates by fragment; one to an unknown path loads normally', async () => {
 			const { page, errors, requests } = await open(browser, '/other');
-			// Every runtime start on the container while the leaving page shows; the swap removes this recorder with its state.
+			// Every runtime start on the container from the press on, while the leaving page shows: an idle wake before
+			// the press is the page's own. The swap removes this recorder with the leaving page's state.
 			await page.evaluate(() => {
 				const container = document.querySelector('[data-async-container]')!;
 				const log: string[] = [];
 				(window as unknown as Record<string, unknown>).__starts = log;
-				let value: unknown;
+				let pressed = false;
+				addEventListener('pointerdown', () => (pressed = true), { capture: true, once: true });
+				let value = (container as unknown as Record<string, unknown>).__marklessDelegatedDispatch;
 				Object.defineProperty(container, '__marklessDelegatedDispatch', {
 					configurable: true,
 					enumerable: true,
 					get: () => value,
 					set: (next) => {
 						value = next;
-						log.push(document.querySelector('[data-page]')?.getAttribute('data-page') ?? '');
+						if (pressed)
+							log.push(document.querySelector('[data-page]')?.getAttribute('data-page') ?? '');
 					},
 				});
 			});
