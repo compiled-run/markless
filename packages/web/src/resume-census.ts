@@ -43,13 +43,12 @@ function blockEnd(census: CensusNode[], at: number): number {
 function insertionSlot(census: CensusNode[], first: CensusNode): number {
 	const parent = first.parentElement ?? first.parentNode;
 	if (!parent) return census.length;
-	let slot = -1;
-	for (const child of Array.from(parent.childNodes ?? [])) {
-		if (child === first) break;
-		const at = census.indexOf(child);
-		if (at >= 0) slot = blockEnd(census, at);
+	// Only the nearest listed sibling: an append to a long list stays linear.
+	const siblings = Array.from(parent.childNodes ?? []);
+	for (let index = siblings.indexOf(first); index-- > 0; ) {
+		const at = census.indexOf(siblings[index]!);
+		if (at >= 0) return blockEnd(census, at);
 	}
-	if (slot >= 0) return slot;
 	const at = census.indexOf(parent);
 	return at >= 0 ? at + 1 : census.length;
 }
