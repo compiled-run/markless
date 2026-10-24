@@ -1,6 +1,7 @@
 import type { JavaScriptAstNode } from '@markless/compiler';
 import { basename, dirname, join } from 'pathe';
 import { parseChunkCode } from './chunk-ast.ts';
+import { runChunkTask } from './chunk-workers.ts';
 
 export type PreloadHelperChunk = {
 	readonly fileName: string;
@@ -15,12 +16,12 @@ type HelperExport = 'init' | 'preload';
 type ChunkRewrite = { readonly code: string; readonly droppedImport: boolean };
 
 // Empty preload wrappers are stripped per chunk; this drops the then-unused helper, its inits and imports bundle-wide, or changes nothing.
-export function stripUnusedVitePreloadHelperFromBundle(
+export async function stripUnusedVitePreloadHelperFromBundle(
 	chunks: readonly PreloadHelperChunk[],
-): void {
+): Promise<void> {
 	for (const helperChunk of chunks) {
 		if (!helperChunk.code.includes('vite:preloadError')) continue;
-		const rewrites = planHelperRemoval(helperChunk, chunks);
+		const rewrites = await planHelperRemoval(helperChunk, chunks);
 		if (!rewrites) continue;
 		for (const [chunk, rewrite] of rewrites) {
 			chunk.code = rewrite.code;
@@ -33,10 +34,10 @@ export function stripUnusedVitePreloadHelperFromBundle(
 	}
 }
 
-function planHelperRemoval(
+async function planHelperRemoval(
 	helperChunk: PreloadHelperChunk,
 	chunks: readonly PreloadHelperChunk[],
-): Map<PreloadHelperChunk, ChunkRewrite> | undefined {
+): Promise<Map<PreloadHelperChunk, ChunkRewrite> | undefined> {
 	const code = helperChunk.code;
 	const program = parse(code);
 	if (!program) return undefined;
@@ -91,13 +92,40 @@ function planHelperRemoval(
 	if (exported.size === 0) return rewrites;
 
 	const helperBase = basename(helperChunk.fileName);
-	for (const chunk of chunks) {
-		if (chunk === helperChunk || !chunk.code.includes(helperBase)) continue;
-		const rewrite = rewriteImporter(chunk, helperChunk.fileName, exported);
+	const importers = chunks.filter(
+		(chunk) => chunk !== helperChunk && chunk.code.includes(helperBase),
+	);
+	const context = { helperFileName: helperChunk.fileName, exported };
+	// In bundle order, a window ahead: one importer that keeps the helper ends the plan, so the rest never run.
+	const pending: Promise<ChunkRewrite | undefined | false>[] = [];
+	const launch = (index: number) => {
+		const chunk = importers[index]!;
+		const rewrite = runChunkTask('helperImporterRewrite', chunk.fileName, chunk.code, context);
+		rewrite.catch(() => {});
+		pending[index] = rewrite;
+	};
+	let next = 0;
+	for (; next < Math.min(IMPORTER_WINDOW, importers.length); next++) launch(next);
+	for (const [index, chunk] of importers.entries()) {
+		const rewrite = await pending[index]!;
 		if (rewrite === false) return undefined;
+		if (next < importers.length) launch(next++);
 		if (rewrite) rewrites.set(chunk, rewrite);
 	}
 	return rewrites;
+}
+
+const IMPORTER_WINDOW = 16;
+
+export function helperImporterRewrite(
+	fileName: string,
+	code: string,
+	context: {
+		readonly helperFileName: string;
+		readonly exported: ReadonlyMap<string, HelperExport>;
+	},
+): ChunkRewrite | undefined | false {
+	return rewriteImporter({ fileName, code }, context.helperFileName, context.exported);
 }
 
 type HelperModule = {

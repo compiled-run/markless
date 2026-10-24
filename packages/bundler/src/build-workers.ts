@@ -9,6 +9,7 @@ import type {
 import type { PersistentCompileCache } from './compile-store.ts';
 import {
 	runChunkTaskInline,
+	type ChunkTaskContext,
 	type ChunkTaskName,
 	type ChunkTaskResult,
 } from './build/chunk-tasks.ts';
@@ -31,6 +32,7 @@ type ChunkJob = {
 	readonly task: ChunkTaskName;
 	readonly fileName: string;
 	readonly code: string;
+	readonly context: unknown;
 	readonly resolve: (result: never) => void;
 	readonly reject: (error: unknown) => void;
 };
@@ -152,7 +154,14 @@ function dispatch(): void {
 		try {
 			entry.worker.postMessage(
 				job.kind === 'chunk'
-					? { kind: 'chunk', id: job.id, task: job.task, fileName: job.fileName, code: job.code }
+					? {
+							kind: 'chunk',
+							id: job.id,
+							task: job.task,
+							fileName: job.fileName,
+							code: job.code,
+							context: job.context,
+						}
 					: { kind: 'compile', id: job.id, input: job.input, key: job.key, store: job.store },
 			);
 		} catch {
@@ -171,7 +180,9 @@ function giveBack(job: Job): void {
 		return;
 	}
 	try {
-		job.resolve(runChunkTaskInline(job.task, job.fileName, job.code) as never);
+		job.resolve(
+			runChunkTaskInline(job.task, job.fileName, job.code, job.context as never) as never,
+		);
 	} catch (error) {
 		job.reject(error);
 	}
@@ -189,11 +200,12 @@ export function runChunkJob<T extends ChunkTaskName>(
 	task: T,
 	fileName: string,
 	code: string,
+	context?: ChunkTaskContext<T>,
 ): Promise<ChunkTaskResult<T>> {
 	size = Math.max(size, buildWorkerCount());
 	if (unavailable || size === 0) {
 		try {
-			return Promise.resolve(runChunkTaskInline(task, fileName, code));
+			return Promise.resolve(runChunkTaskInline(task, fileName, code, context));
 		} catch (error) {
 			return Promise.reject(error);
 		}
@@ -201,7 +213,7 @@ export function runChunkJob<T extends ChunkTaskName>(
 	if (!workers.length || (workers.length < size && workers.every((entry) => entry.online)))
 		addWorker();
 	return new Promise((resolve, reject) => {
-		queue.push({ kind: 'chunk', id: nextId++, task, fileName, code, resolve, reject });
+		queue.push({ kind: 'chunk', id: nextId++, task, fileName, code, context, resolve, reject });
 		dispatch();
 	});
 }

@@ -22,6 +22,7 @@ type ChunkJob = {
 	readonly task: ChunkTaskName;
 	readonly fileName: string;
 	readonly code: string;
+	readonly context?: unknown;
 };
 
 // Compiles run while modules transform and chunk reads while chunks render, so a worker loads the chunk passes only once asked.
@@ -33,7 +34,7 @@ parentPort!.on('message', async (job: CompileJob | ChunkJob) => {
 	else await runCompileJob(job);
 });
 
-async function runChunkJob({ id, task, fileName, code }: ChunkJob): Promise<void> {
+async function runChunkJob({ id, task, fileName, code, context }: ChunkJob): Promise<void> {
 	chunkTasks ??= import('./build/chunk-tasks.ts');
 	chunkAst ??= import('./build/chunk-ast.ts');
 	const [{ runChunkTaskInline }, { clearParsedChunkCode }] = await Promise.all([
@@ -41,7 +42,10 @@ async function runChunkJob({ id, task, fileName, code }: ChunkJob): Promise<void
 		chunkAst,
 	]);
 	try {
-		parentPort!.postMessage({ id, result: runChunkTaskInline(task, fileName, code) });
+		parentPort!.postMessage({
+			id,
+			result: runChunkTaskInline(task, fileName, code, context as never),
+		});
 	} catch (error) {
 		parentPort!.postMessage({
 			id,

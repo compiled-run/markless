@@ -16,7 +16,7 @@ function helperChunk(extra = ''): PreloadHelperChunk {
 }
 
 describe('bundle-wide Vite preload helper removal', () => {
-	test('removes the helper module, its exports, imports and init calls once nothing calls it', () => {
+	test('removes the helper module, its exports, imports and init calls once nothing calls it', async () => {
 		const helper = helperChunk();
 		const mixed: PreloadHelperChunk = {
 			fileName: 'build/chunk-mixed.js',
@@ -29,7 +29,7 @@ describe('bundle-wide Vite preload helper removal', () => {
 			imports: ['build/chunk-helper.js', 'build/chunk-runtime.js'],
 		};
 
-		stripUnusedVitePreloadHelperFromBundle([helper, mixed, onlyHelper]);
+		await stripUnusedVitePreloadHelperFromBundle([helper, mixed, onlyHelper]);
 
 		expect(helper.code).toBe(
 			'import{t as e}from"./chunk-runtime.js";function s(e){return e+1}function c(){return(c=e((()=>{})))()}export{s as t,c as u};',
@@ -44,26 +44,26 @@ describe('bundle-wide Vite preload helper removal', () => {
 		expect(onlyHelper.imports).toEqual(['build/chunk-runtime.js']);
 	});
 
-	test('a pack loader exported as a declaration beside the helper does not block the removal', () => {
+	test('a pack loader exported as a declaration beside the helper does not block the removal', async () => {
 		const helper = helperChunk('export function $mlAb12(){return c()}');
 
-		stripUnusedVitePreloadHelperFromBundle([helper]);
+		await stripUnusedVitePreloadHelperFromBundle([helper]);
 
 		expect(helper.code).toBe(
 			'import{t as e}from"./chunk-runtime.js";function s(e){return e+1}function c(){return(c=e((()=>{})))()}export function $mlAb12(){return c()}export{s as t,c as u};',
 		);
 	});
 
-	test('a declared export that reads the preload function keeps the helper', () => {
+	test('a declared export that reads the preload function keeps the helper', async () => {
 		const helper = helperChunk('export function $mlAb12(){return a}');
 		const before = helper.code;
 
-		stripUnusedVitePreloadHelperFromBundle([helper]);
+		await stripUnusedVitePreloadHelperFromBundle([helper]);
 
 		expect(helper.code).toBe(before);
 	});
 
-	test('keeps the whole bundle when any chunk still calls the preload function', () => {
+	test('keeps the whole bundle when any chunk still calls the preload function', async () => {
 		const helper = helperChunk();
 		const caller: PreloadHelperChunk = {
 			fileName: 'build/chunk-caller.js',
@@ -71,12 +71,12 @@ describe('bundle-wide Vite preload helper removal', () => {
 		};
 		const before = [helper.code, caller.code];
 
-		stripUnusedVitePreloadHelperFromBundle([helper, caller]);
+		await stripUnusedVitePreloadHelperFromBundle([helper, caller]);
 
 		expect([helper.code, caller.code]).toEqual(before);
 	});
 
-	test('keeps the whole bundle when a dynamic import of the helper chunk reads a removed export', () => {
+	test('keeps the whole bundle when a dynamic import of the helper chunk reads a removed export', async () => {
 		const helper = helperChunk();
 		const lazy: PreloadHelperChunk = {
 			fileName: 'build/chunk-lazy.js',
@@ -84,19 +84,19 @@ describe('bundle-wide Vite preload helper removal', () => {
 		};
 		const before = [helper.code, lazy.code];
 
-		stripUnusedVitePreloadHelperFromBundle([helper, lazy]);
+		await stripUnusedVitePreloadHelperFromBundle([helper, lazy]);
 
 		expect([helper.code, lazy.code]).toEqual(before);
 	});
 
-	test('a dynamic import reading only kept exports does not block the removal', () => {
+	test('a dynamic import reading only kept exports does not block the removal', async () => {
 		const helper = helperChunk();
 		const lazy: PreloadHelperChunk = {
 			fileName: 'build/chunk-lazy.js',
 			code: 'async function load(){return import("./chunk-helper.js").then(e=>(e.u(),e.t))}export{load};',
 		};
 
-		stripUnusedVitePreloadHelperFromBundle([helper, lazy]);
+		await stripUnusedVitePreloadHelperFromBundle([helper, lazy]);
 
 		expect(helper.code).not.toContain('vite:preloadError');
 		expect(lazy.code).toBe(
@@ -104,7 +104,7 @@ describe('bundle-wide Vite preload helper removal', () => {
 		);
 	});
 
-	test('an init alias passed as a value is not a removable call, so nothing is removed', () => {
+	test('an init alias passed as a value is not a removable call, so nothing is removed', async () => {
 		const helper = helperChunk();
 		const holder: PreloadHelperChunk = {
 			fileName: 'build/chunk-holder.js',
@@ -112,18 +112,18 @@ describe('bundle-wide Vite preload helper removal', () => {
 		};
 		const before = [helper.code, holder.code];
 
-		stripUnusedVitePreloadHelperFromBundle([helper, holder]);
+		await stripUnusedVitePreloadHelperFromBundle([helper, holder]);
 
 		expect([helper.code, holder.code]).toEqual(before);
 	});
 
-	test('a helper chunk that calls its own preload function stays as it was', () => {
+	test('a helper chunk that calls its own preload function stays as it was', async () => {
 		const helper = helperChunk(
 			'async function load(){return a(()=>import("./route.js"),["route.css"])}',
 		);
 		const before = helper.code;
 
-		stripUnusedVitePreloadHelperFromBundle([helper]);
+		await stripUnusedVitePreloadHelperFromBundle([helper]);
 
 		expect(helper.code).toBe(before);
 	});
