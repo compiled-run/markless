@@ -15,19 +15,17 @@ function submit(container: ParentNode, name: string): boolean {
 
 const picked = (container: ParentNode) => container.querySelector('[data-picked]')?.textContent;
 
-// A client-rendered row does not cancel a submit at once yet, a gap outside addressing; its handler still has to run.
-async function expectRowControls(container: HTMLElement, cancelsAtOnce: boolean) {
-	const cancelled = submit(container, 'lin');
-	if (cancelsAtOnce) expect(cancelled).toBe(true);
+async function expectRowControls(container: HTMLElement) {
+	expect(submit(container, 'lin')).toBe(true);
 	await expect.poll(() => picked(container)).toBe('lin');
 	container.querySelector<HTMLButtonElement>('[data-pick="ada"]')!.click();
 	await expect.poll(() => picked(container)).toBe('ada!');
 }
 
 test('SSR: row controls after interpolated text run their own handlers', async () => {
-	await expectRowControls((await renderSSR(TextRowsPage)).container as HTMLElement, true);
+	await expectRowControls((await renderSSR(TextRowsPage)).container as HTMLElement);
 });
 
 test('CSR: row controls after interpolated text run their own handlers', async () => {
-	await expectRowControls((await render(TextRowsPage)).container as HTMLElement, false);
+	await expectRowControls((await render(TextRowsPage)).container as HTMLElement);
 });

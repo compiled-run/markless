@@ -18,13 +18,7 @@ const load = (entry: Entry) => modules[`./generated/${entry.name}.tsrx`]!();
 
 const hit = (container: ParentNode) => container.querySelector('[data-hit]')?.textContent;
 
-// Two known gaps outside addressing leave a submit to its handler alone: a client-rendered row, and an arm a flip rebuilt after resume.
-async function expectTargets(
-	container: HTMLElement,
-	entry: Entry,
-	row?: string,
-	cancelsAtOnce = true,
-) {
+async function expectTargets(container: HTMLElement, entry: Entry, row?: string) {
 	const scope = row ? container.querySelector(`[data-row="${row}"]`)! : container;
 	for (const target of entry.targets) {
 		const host = scope.querySelector<HTMLElement>(`[data-h="${target.id}"]`);
@@ -33,11 +27,9 @@ async function expectTargets(
 		if (target.kind === 'submit') {
 			const event = new SubmitEvent('submit', { bubbles: true, cancelable: true });
 			host!.dispatchEvent(event);
-			if (cancelsAtOnce)
-				expect(
-					event.defaultPrevented,
-					`${entry.name}: ${target.id} cancels its submit`,
-				).toBe(true);
+			expect(event.defaultPrevented, `${entry.name}: ${target.id} cancels its submit`).toBe(
+				true,
+			);
 		} else host!.click();
 		await expect
 			.poll(() => hit(container), { message: `${entry.name}: ${target.id}` })
@@ -59,10 +51,10 @@ async function expectUpdates(container: HTMLElement, entry: Entry) {
 		.toBe(entry.interpolations);
 }
 
-async function exercise(container: HTMLElement, entry: Entry, served: boolean) {
+async function exercise(container: HTMLElement, entry: Entry) {
 	if (entry.family === 'rows') {
-		await expectTargets(container, entry, '2', served);
-		await expectTargets(container, entry, '1', served);
+		await expectTargets(container, entry, '2');
+		await expectTargets(container, entry, '1');
 		if (!entry.flips) return;
 		const flip = container.querySelector<HTMLButtonElement>('[data-flip]')!;
 		const closed = () => container.querySelectorAll('em').length;
@@ -70,8 +62,8 @@ async function exercise(container: HTMLElement, entry: Entry, served: boolean) {
 		await expect.poll(closed, { message: `${entry.name}: every row's arm closes` }).toBeGreaterThan(0);
 		flip.click();
 		await expect.poll(closed, { message: `${entry.name}: every row's arm opens again` }).toBe(0);
-		await expectTargets(container, entry, '1', served);
-		await expectTargets(container, entry, '2', served);
+		await expectTargets(container, entry, '1');
+		await expectTargets(container, entry, '2');
 		return;
 	}
 	await expectTargets(container, entry);
@@ -82,7 +74,7 @@ async function exercise(container: HTMLElement, entry: Entry, served: boolean) {
 		await expect.poll(() => container.querySelector('section')).toBeNull();
 		flip.click();
 		await expect.poll(() => container.querySelector('section')).not.toBeNull();
-		await expectTargets(container, entry, undefined, !served);
+		await expectTargets(container, entry);
 		return;
 	}
 	const notes = () => container.querySelectorAll('s').length;
@@ -113,10 +105,10 @@ for (const entry of manifest) {
 	}
 	test(`${entry.name}: SSR resume lands every record on its own element`, async () => {
 		const { html } = await commands.renderSSR(entry.path, 'default');
-		await exercise(renderServerHTML(html).container, entry, true);
+		await exercise(renderServerHTML(html).container, entry);
 	});
 	test(`${entry.name}: CSR lands every record on its own element`, async () => {
 		const screen = await render((await load(entry)).default as never);
-		await exercise(screen.container as HTMLElement, entry, false);
+		await exercise(screen.container as HTMLElement, entry);
 	});
 }
