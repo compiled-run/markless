@@ -1532,6 +1532,14 @@
 			"reason": "a resume a navigation retired while it was starting disposes itself instead of claiming the container the next page keeps (+313 B rendered, runs at first interaction, not at load)"
 		},
 		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "web/payload-resume",
+			"from": 5155,
+			"to": 5411,
+			"reason": "a resume the leaving page started checks the page lifetime before building its runtime and drops a start() error once the page was swapped, so it never locates the old payload in the next page (website sidebar resume locator errors: 6 of 6 runs at 4x CPU slowdown on main, 0 of 8 here); runs at resume, not on every page load"
+		},
+		{
 			"date": "2026-10-23",
 			"guard": "runtime",
 			"subject": "router/vite/entries/fragment-entry",
@@ -1570,14 +1578,6 @@
 			"from": 1003,
 			"to": 1608,
 			"reason": "arm and row records address elements through one resolver that counts element children and @if/@try blocks, never text (controls after text or a nested block landed on the wrong element after resume); replaces the per-module walks in resume-branches/-keyed-repeats/-locators, resume chunk minified+gzip +95 B, runs at first interaction, not at load"
-		},
-		{
-			"date": "2026-10-24",
-			"guard": "runtime",
-			"subject": "web/payload-resume",
-			"from": 5155,
-			"to": 5411,
-			"reason": "a resume the leaving page started checks the page lifetime before building its runtime and drops a start() error once the page was swapped, so it never locates the old payload in the next page (website sidebar resume locator errors: 6 of 6 runs at 4x CPU slowdown on main, 0 of 8 here); runs at resume, not on every page load"
 		}
 	],
 	"runtimeModules": {
