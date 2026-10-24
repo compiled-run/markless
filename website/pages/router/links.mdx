@@ -80,8 +80,10 @@ server would send:
   `HEAD`. Back and Forward ask again too. To see these writes, the router wraps `window.fetch` once
   it starts. The wrapper passes your arguments to the browser's `fetch` unchanged and returns its
   promise as is.
-- A page that answers `Cache-Control: no-store` or `no-cache` is fetched again at the click, unless
-  the early request is still arriving. One that answers `max-age=N` is shown for at most `N` seconds.
+- A page that answers `Cache-Control: no-store` is fetched again at the click, unless the early
+  request is still arriving. One that answers `max-age=N` with `N` above 0 is shown for at most `N`
+  seconds. `max-age=0`, `no-cache` and `must-revalidate` change nothing here: they ask a cache to
+  check with the server, and hosts such as Vercel send them on every page by default.
 
 In a built app, the code that handles these clicks is one small file the browser downloads once and
 caches for every page. It starts when the browser finishes reading the page. A link clicked before

@@ -147,6 +147,15 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test("a host's default Cache-Control (public, max-age=0, must-revalidate) still lets a click reuse the hover fetch", async () => {
+			const { page, arrived } = await open(browser);
+			await fetchedAhead(page, arrived, '[data-edge]', '/edge');
+			const now = await bumpElsewhere();
+			expect(await follow(page, '[data-edge]', 'edge')).toBe(now - 1);
+			expect(arrived.filter((path) => path === '/edge')).toHaveLength(1);
+			await page.close();
+		});
+
 		test('a page that answers Cache-Control: no-store is fetched again at the click', async () => {
 			const { page, arrived } = await open(browser);
 			await fetchedAhead(page, arrived, '[data-live]', '/live');
