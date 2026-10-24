@@ -655,7 +655,7 @@ function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): bo
 	const arriving = slots(to as Element);
 	if (leaving.length !== arriving.length) return false;
 	leaving.forEach((slot, index) => {
-		const nodes = Array.from(arriving[index]!.childNodes, (node) => d.adoptNode(node));
+		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
 		slot.replaceChildren(...nodes);
 		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
 	});
