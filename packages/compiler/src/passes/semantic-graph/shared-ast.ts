@@ -70,20 +70,27 @@ export function ownedModuleAstOrNull(
 export function createSourceMemo<Value>(
 	limit = 4,
 ): (filename: string, source: string, compute: () => Value) => Value {
-	const entries = new Map<string, Value>();
+	// Keyed by the source string itself, whose hash the engine caches on it: a joined key was rebuilt and rehashed per call.
+	const entries = new Map<string, Map<string, Value>>();
+	let size = 0;
 	return (filename, source, compute) => {
-		const key = `${filename}\u0000${source}`;
-		if (entries.has(key)) {
-			const memoized = entries.get(key) as Value;
-			entries.delete(key);
-			entries.set(key, memoized);
-			return memoized;
+		const byFile = entries.get(source);
+		if (byFile?.has(filename)) {
+			entries.delete(source);
+			entries.set(source, byFile);
+			return byFile.get(filename) as Value;
 		}
 		const value = compute();
-		entries.set(key, value);
-		if (entries.size > limit) {
-			const oldest = entries.keys().next();
-			if (!oldest.done) entries.delete(oldest.value);
+		if (byFile) {
+			entries.delete(source);
+			entries.set(source, byFile);
+			byFile.set(filename, value);
+		} else entries.set(source, new Map([[filename, value]]));
+		size++;
+		while (size > limit) {
+			const [oldestSource, oldest] = entries.entries().next().value!;
+			size -= oldest.size;
+			entries.delete(oldestSource);
 		}
 		return value;
 	};

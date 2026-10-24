@@ -160,25 +160,25 @@ const NON_STRUCTURE_KEYS: ReadonlySet<string> = new Set([
 /** The first TSRX-only node type in the tree, or `null` when there is none. */
 export function findTsrxOnlyNodeType(root: unknown): string | null {
 	const seen = new Set<object>();
-	const stack: unknown[] = [root];
+	const stack: object[] = root && typeof root === 'object' ? [root] : [];
 
 	while (stack.length > 0) {
-		const value = stack.pop();
-		if (!value || typeof value !== 'object') continue;
+		const value = stack.pop() as object;
 		if (seen.has(value)) continue;
 		seen.add(value);
 
 		if (Array.isArray(value)) {
-			for (const item of value) stack.push(item);
+			for (const item of value) if (item && typeof item === 'object') stack.push(item);
 			continue;
 		}
 
 		const type = (value as { type?: unknown }).type;
 		if (typeof type === 'string' && TSRX_ONLY_NODE_TYPES.has(type)) return type;
 
-		for (const [key, child] of Object.entries(value)) {
+		for (const key in value) {
 			if (NON_STRUCTURE_KEYS.has(key)) continue;
-			stack.push(child);
+			const child = (value as Record<string, unknown>)[key];
+			if (child && typeof child === 'object') stack.push(child);
 		}
 	}
 

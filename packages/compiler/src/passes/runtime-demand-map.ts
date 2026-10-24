@@ -2100,34 +2100,54 @@ function transitiveSymbolDemand(
 	return result;
 }
 
+// Built once per capture analysis: every closure below walks the same two maps.
+const symbolGraphs = new WeakMap<
+	CaptureAnalysisArtifact,
+	{
+		readonly baseByBound: ReadonlyMap<string, string>;
+		readonly callbacksBySymbol: ReadonlyMap<string, ReadonlyArray<string>>;
+	}
+>();
+
+function symbolGraph(captureAnalysis: CaptureAnalysisArtifact) {
+	let graph = symbolGraphs.get(captureAnalysis);
+	if (!graph) {
+		graph = {
+			baseByBound: new Map(
+				(captureAnalysis.boundResolverRows ?? []).map((row) => [row.id, row.baseSymbolId]),
+			),
+			callbacksBySymbol: new Map(
+				captureAnalysis.extractedSymbols.map((symbol) => [
+					symbol.symbolId,
+					symbol.captureSlots.flatMap((slot) =>
+						slot.routes.flatMap((route) =>
+							route.kind === 'callback-route' ? [route.callbackSymbolId] : [],
+						),
+					),
+				]),
+			),
+		};
+		symbolGraphs.set(captureAnalysis, graph);
+	}
+	return graph;
+}
+
 function transitiveSymbolIds(
 	symbolIds: ReadonlyArray<string>,
 	captureAnalysis?: CaptureAnalysisArtifact,
 ): string[] {
 	if (!captureAnalysis) return [...symbolIds];
-	const baseByBound = new Map(
-		(captureAnalysis.boundResolverRows ?? []).map((row) => [row.id, row.baseSymbolId]),
-	);
-	const callbacksBySymbol = new Map(
-		captureAnalysis.extractedSymbols.map((symbol) => [
-			symbol.symbolId,
-			symbol.captureSlots.flatMap((slot) =>
-				slot.routes.flatMap((route) =>
-					route.kind === 'callback-route' ? [route.callbackSymbolId] : [],
-				),
-			),
-		]),
-	);
-	const result: string[] = [];
+	const { baseByBound, callbacksBySymbol } = symbolGraph(captureAnalysis);
+	const reached = new Set<string>();
 	const pending = [...symbolIds];
-	while (pending.length > 0) {
-		const requested = pending.shift()!;
-		const symbolId = baseByBound.get(requested) ?? requested;
-		if (result.includes(symbolId)) continue;
-		result.push(symbolId);
-		pending.push(...(callbacksBySymbol.get(symbolId) ?? []));
+	for (let index = 0; index < pending.length; index++) {
+		const symbolId = baseByBound.get(pending[index]!) ?? pending[index]!;
+		if (reached.has(symbolId)) continue;
+		reached.add(symbolId);
+		const callbacks = callbacksBySymbol.get(symbolId);
+		if (callbacks) pending.push(...callbacks);
 	}
-	return result;
+	return [...reached];
 }
 
 function eventKey(hostNodeId: string, eventName: string): string {

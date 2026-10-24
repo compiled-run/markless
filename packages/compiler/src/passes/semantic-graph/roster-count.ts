@@ -2,7 +2,7 @@ import type {
 	ModuleGraphInterfacePropSpend,
 	SemanticElementRosterCount,
 } from '../../artifacts.ts';
-import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, forEachChildNode, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import { pendingDeriveOwner } from './collect-async.ts';
@@ -393,7 +393,9 @@ function walkCountScope(
 	const refusals: ScopeRefusal[] = [];
 	const routes: ScopeRoute[] = [];
 	const seen = new Set<AnyNode>();
-	const visit = (node: AnyNode, ancestors: ReadonlyArray<AnyNode>): void => {
+	// One stack for the whole walk: copying the chain at every node made the walk quadratic in depth.
+	const ancestors: AnyNode[] = [];
+	const visit = (node: AnyNode): void => {
 		if (seen.has(node)) return;
 		seen.add(node);
 		const localName = node.type === 'Identifier' ? getIdentifierName(node) : undefined;
@@ -421,10 +423,13 @@ function walkCountScope(
 				return;
 			}
 		}
-		const chain = [...ancestors, node];
-		for (const child of markupChildNodes(node)) visit(child, chain);
+		ancestors.push(node);
+		forEachChildNode(node, visit);
+		const opening = node.openingElement as AnyNode | undefined;
+		if (opening) forEachChildNode(opening, visit);
+		ancestors.pop();
 	};
-	visit(scope.component, []);
+	visit(scope.component);
 	return { deferred, deferredSpends, refusals, routes };
 }
 
@@ -489,11 +494,6 @@ export const COUNT_VALUE_PARAMETER = 'marklessCountValue';
 
 // The shared walk skips `openingElement`, so an attribute expression is only
 // reachable through it - and an attribute is where a count is usually spent.
-function markupChildNodes(node: AnyNode): AnyNode[] {
-	const opening = node.openingElement as AnyNode | undefined;
-	return opening ? [...childNodes(node), ...childNodes(opening)] : childNodes(node);
-}
-
 type Spend = { readonly node: AnyNode; readonly operation: string };
 
 type PropTarget = { readonly element: AnyNode; readonly propName: string };

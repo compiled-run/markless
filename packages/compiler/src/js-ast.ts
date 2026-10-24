@@ -50,7 +50,9 @@ const PARSE_CACHE_LIMIT = 256;
  * barrel walk re-reaches every dependency. Sound only while every pass on this
  * path treats the tree as read-only; the freeze mode below is what proves that.
  */
-const parseCache = new Map<string, Program>();
+// Keyed by the source string itself, whose hash the engine keeps on it; a joined key was rebuilt and rehashed per call.
+const parseCache = new Map<string, Map<string, Program>>();
+let parseCacheSize = 0;
 let parseCacheHits = 0;
 let parseCacheMisses = 0;
 let freezeParsedTrees = false;
@@ -62,11 +64,12 @@ export type ParseCacheStats = {
 };
 
 export function parseCacheStats(): ParseCacheStats {
-	return { hits: parseCacheHits, misses: parseCacheMisses, size: parseCache.size };
+	return { hits: parseCacheHits, misses: parseCacheMisses, size: parseCacheSize };
 }
 
 export function resetParseCache(): void {
 	parseCache.clear();
+	parseCacheSize = 0;
 	parseCacheHits = 0;
 	parseCacheMisses = 0;
 }
@@ -122,12 +125,12 @@ function parseModuleWith(
 	options: MarklessParseOptions,
 	cacheable: boolean,
 ): Program {
-	const cacheKey = cacheable ? `${filename}\u0000${source}` : null;
-	if (cacheKey !== null) {
-		const cached = parseCache.get(cacheKey);
+	if (cacheable) {
+		const byFile = parseCache.get(source);
+		const cached = byFile?.get(filename);
 		if (cached !== undefined) {
-			parseCache.delete(cacheKey);
-			parseCache.set(cacheKey, cached);
+			parseCache.delete(source);
+			parseCache.set(source, byFile!);
 			parseCacheHits += 1;
 			return cached;
 		}
@@ -174,12 +177,17 @@ function parseModuleWith(
 		if (fatal) throw fatal;
 	}
 	settleTemplateShapes(program, source, result.comments);
-	if (cacheKey === null) return program;
+	if (!cacheable) return program;
 	const shared = freezeParsedTrees ? deepFreeze(program) : program;
-	parseCache.set(cacheKey, shared);
-	if (parseCache.size > PARSE_CACHE_LIMIT) {
-		const oldest = parseCache.keys().next();
-		if (!oldest.done) parseCache.delete(oldest.value);
+	const byFile = parseCache.get(source) ?? new Map<string, Program>();
+	parseCache.delete(source);
+	parseCache.set(source, byFile);
+	byFile.set(filename, shared);
+	parseCacheSize += 1;
+	while (parseCacheSize > PARSE_CACHE_LIMIT) {
+		const [oldestSource, oldest] = parseCache.entries().next().value!;
+		parseCacheSize -= oldest.size;
+		parseCache.delete(oldestSource);
 	}
 	return shared;
 }
