@@ -161,6 +161,35 @@ test('the header and sidebar the pages share are the same nodes afterwards, and 
 	await page.close();
 });
 
+// Scrolling an element in the task that swaps makes the browser lay out the whole page before it can paint.
+test('a scrolled box the navigation keeps is not scrolled again, so the swap forces no layout for it', async () => {
+	const { page, errors } = await open('/alpha');
+	await page.evaluate(() => {
+		document.querySelector('[data-sidebar]')!.scrollTop = 300;
+		const host = globalThis as { __scrolls?: string[] };
+		host.__scrolls = [];
+		const own = Element.prototype.scrollTo;
+		Element.prototype.scrollTo = function (this: Element, ...args: unknown[]) {
+			host.__scrolls!.push(
+				this.getAttribute('data-sidebar') !== null ? 'sidebar' : this.localName,
+			);
+			return (own as (...a: unknown[]) => void).apply(this, args);
+		} as typeof Element.prototype.scrollTo;
+	});
+	await page.locator('[data-side="15"]').click();
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Beta',
+	);
+	expect(
+		await page.evaluate(() => [
+			(globalThis as { __scrolls?: string[] }).__scrolls,
+			document.querySelector('[data-sidebar]')!.scrollTop,
+		]),
+	).toEqual([[], 300]);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('a stateful button inside the kept layout answers each press once after navigating, and Back', async () => {
 	const { page, errors } = await open('/alpha');
 	await page.click('[data-layout-press]');
