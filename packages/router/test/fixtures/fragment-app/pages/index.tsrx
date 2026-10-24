@@ -30,10 +30,15 @@ export default function Home() @{
 			data-late-write
 			onClick={async () => {
 				late = 'waiting';
-				await new Promise((resolve) => setTimeout(resolve, 400));
-				late = 'written';
-				theme = 'late';
-				count = 99;
+				// The test releases this once the next page has landed, so the write always comes after the navigation.
+				await new Promise((resolve) => ((window as unknown as Record<string, unknown>).__releaseLateWrite = resolve));
+				try {
+					late = 'written';
+					theme = 'late';
+					count = 99;
+				} finally {
+					(window as unknown as Record<string, unknown>).__lateWriteRan = true;
+				}
 			}}
 		>Late write</button>
 		<button

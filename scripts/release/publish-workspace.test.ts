@@ -1,6 +1,6 @@
 // publish-workspace against a fake `pnpm` and `npm` on PATH that answer like the registry did on 0.6.0 and 0.7.0.
 import { spawnSync } from 'node:child_process';
-import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,47 +58,59 @@ const uploadAnswers: Record<Upload, { readonly status: number; readonly stderr: 
 };
 
 // Each package answers `script[n]` on its n-th upload or view and the last entry after that.
+// The fakes are POSIX shell, not Node: one run makes about thirty calls, and thirty Node startups
+// pushed the E401 case past the test timeout on a loaded machine.
 async function fakeTools(scripts: Readonly<Record<string, Script>>) {
 	const directory = await mkdtemp(join(tmpdir(), 'markless-fake-publish-'));
-	const shared = `const { appendFileSync, existsSync, readFileSync, writeFileSync } = require('node:fs');
-const scripts = ${JSON.stringify(scripts)};
-const counts = ${JSON.stringify(join(directory, 'counts.json'))};
-function answer(kind, name, fallback) {
-	const seen = existsSync(counts) ? JSON.parse(readFileSync(counts, 'utf8')) : {};
-	const key = kind + ' ' + name;
-	const index = seen[key] ?? 0;
-	seen[key] = index + 1;
-	writeFileSync(counts, JSON.stringify(seen));
-	appendFileSync(${JSON.stringify(join(directory, 'calls.log'))}, key + '\\n');
-	const answers = scripts[name]?.[kind] ?? [fallback];
-	return answers[Math.min(index, answers.length - 1)];
+	for (const sub of ['answers', 'counts', 'replies']) await mkdir(join(directory, sub));
+	const file = (kind: string, name: string) => `${kind}-${name.replace(/[@/]/g, '_')}`;
+	for (const [name, script] of Object.entries(scripts))
+		for (const kind of ['upload', 'view'] as const)
+			if (script[kind])
+				await writeFile(join(directory, 'answers', file(kind, name)), `${script[kind]!.join('\n')}\n`);
+	for (const [answer, reply] of Object.entries(uploadAnswers)) {
+		await writeFile(join(directory, 'replies', `${answer}.stderr`), reply.stderr);
+		await writeFile(join(directory, 'replies', `${answer}.status`), String(reply.status));
+	}
+	const answer = `answer() {
+	key="$1-$(printf '%s' "$2" | tr '@/' '__')"
+	count="${directory}/counts/$key"
+	index=$(cat "$count" 2>/dev/null || echo 0)
+	echo $((index + 1)) > "$count"
+	echo "$1 $2" >> "${directory}/calls.log"
+	answers="${directory}/answers/$key"
+	if [ -f "$answers" ]; then
+		reply=$(sed -n "$((index + 1))p" "$answers")
+		[ -n "$reply" ] || reply=$(tail -n 1 "$answers")
+	else
+		reply="$3"
+	fi
 }
 `;
 	const pnpm = join(directory, 'pnpm');
 	await writeFile(
 		pnpm,
-		`#!/usr/bin/env node
-${shared}
-const name = process.argv[3];
-const answers = ${JSON.stringify(uploadAnswers)};
-const reply = answers[answer('upload', name, 'ok')];
-process.stderr.write(reply.stderr.replace('NAME', name));
-process.exit(reply.status);
+		`#!/bin/sh
+${answer}
+name="$2"
+answer upload "$name" ok
+sed "s|NAME|$name|" "${directory}/replies/$reply.stderr" >&2
+exit "$(cat "${directory}/replies/$reply.status")"
 `,
 	);
 	const npm = join(directory, 'npm');
 	await writeFile(
 		npm,
-		`#!/usr/bin/env node
-${shared}
-const spec = process.argv[3];
-const name = spec.slice(0, spec.lastIndexOf('@'));
-if (answer('view', name, 'missing') === 'visible') {
-	process.stdout.write('${version}\\n');
-	process.exit(0);
-}
-process.stderr.write('npm error code E404\\nnpm error 404 No match found for version ${version}\\n');
-process.exit(1);
+		`#!/bin/sh
+${answer}
+name="\${2%@*}"
+answer view "$name" missing
+if [ "$reply" = visible ]; then
+	echo '${version}'
+	exit 0
+fi
+printf 'npm error code E404\\nnpm error 404 No match found for version ${version}\\n' >&2
+exit 1
 `,
 	);
 	await chmod(pnpm, 0o755);
