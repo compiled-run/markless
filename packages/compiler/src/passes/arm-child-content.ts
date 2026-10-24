@@ -6,6 +6,7 @@ import type {
 	SemanticMarkupChunk,
 	SemanticMarkupSlot,
 } from '../artifacts.ts';
+import { elementAddress } from './semantic-graph/projection-placement.ts';
 
 type ChildComponentSlot = Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>;
 
@@ -153,7 +154,8 @@ function singleRootChunk(
  * must be addressed in the arm's coordinate space rather than the child's own.
  */
 export type ArmHostPlacement = {
-	readonly path: ReadonlyArray<number>;
+	/** Null when no element address can name the host; see elementAddress. */
+	readonly path: ReadonlyArray<number> | null;
 	/** The props of the child this host belongs to; empty for the arm's own hosts. */
 	readonly props: ReadonlyMap<string, ArmChildProp>;
 };
@@ -166,6 +168,9 @@ export function armHostPaths(
 ): ReadonlyMap<string, ArmHostPlacement> {
 	const paths = new Map<string, ArmHostPlacement>();
 	const noProps: ReadonlyMap<string, ArmChildProp> = new Map();
+	// Render data folds unaddressed elements into counts, so siblings are counted from the full markup.
+	const markup = semanticGraph?.markup.chunks ?? [];
+	const branchSites = semanticGraph?.branchSites ?? [];
 	collect(chunkId, [], noProps, new Set());
 	return paths;
 
@@ -179,15 +184,21 @@ export function armHostPaths(
 		seen.add(id);
 		const chunk = renderData.chunks.find((candidate) => candidate.id === id);
 		if (!chunk) return;
+		// A single-root child starts at the slot that placed it, so its own first step is the slot's.
+		const at = (path: ReadonlyArray<number>) => {
+			const address = elementAddress({ chunks: markup, branchSites, chunkId: id, path });
+			return address && (offset.length ? [...offset, ...address.slice(1)] : address);
+		};
 		for (const host of chunk.hosts)
-			paths.set(host.hostNodeId, { path: compose(offset, host.coordinate.path), props });
+			paths.set(host.hostNodeId, { path: at(host.coordinate.path), props });
 		for (const slot of chunk.slots) {
 			if (slot.kind !== 'child-component') continue;
 			const descent = armChildDescent(renderData, semanticGraph, slot, interfaces);
 			// An imported child brings no record of this module's to address: its
 			// module publishes arm material only for markup nothing here wired.
 			if (!descent || descent.imported) continue;
-			collect(descent.chunkId, compose(offset, slot.coordinate.path), descent.props, seen);
+			const placed = at(slot.coordinate.path);
+			if (placed) collect(descent.chunkId, placed, descent.props, seen);
 		}
 	}
 }
@@ -209,15 +220,4 @@ export function armChildRead(
 	const prop = props.get(name);
 	if (prop?.kind !== 'read') return null;
 	return { graphNodeId: prop.graphNodeId, path: [...prop.path, ...rest] };
-}
-
-// A single-root child starts at its parent slot's own position, so composing is
-// appending the coordinate's tail to the position the child was spliced at.
-function compose(
-	offset: ReadonlyArray<number>,
-	path: ReadonlyArray<number>,
-): ReadonlyArray<number> {
-	if (offset.length === 0) return path;
-	const head = offset[offset.length - 1] ?? 0;
-	return [...offset.slice(0, -1), head + (path[0] ?? 0), ...path.slice(1)];
 }

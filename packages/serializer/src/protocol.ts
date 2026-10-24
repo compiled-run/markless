@@ -53,6 +53,16 @@ export {
 
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 
+/**
+ * Where an element sits below the node an address starts from, one step per
+ * level. A step counts the parent's element children, and each @if, @switch or
+ * @try block as one (its start comment, content and end comment together). Text
+ * never counts, since adjacent text merges and an empty value renders no node,
+ * so the server's HTML and a client-built tree read the same. A negative step
+ * counts back from the end: -1 is the last.
+ */
+export type ProtocolElementAddress = ReadonlyArray<number>;
+
 export type ProtocolSyncPolicyCondition =
 	| {
 			readonly type: 'and';
@@ -478,7 +488,7 @@ export type ProtocolViewPayload = {
 		 */
 		readonly enclosingRow?: {
 			readonly repeatId: string;
-			readonly parentHostPath: ReadonlyArray<number>;
+			readonly parentHostPath: ProtocolElementAddress;
 			readonly itemPath?: ReadonlyArray<string>;
 		};
 		readonly collectionGraphNodeId?: string;
@@ -628,13 +638,13 @@ export type ProtocolViewPayload = {
 			readonly rowChunkId?: string;
 		};
 		readonly rowElementHandles?: ReadonlyArray<{
-			readonly hostPath: ReadonlyArray<number>;
+			readonly hostPath: ProtocolElementAddress;
 			readonly handleId: string;
 			readonly name: string;
 			readonly plural?: boolean;
 		}>;
 		readonly rowEvents: ReadonlyArray<{
-			readonly hostPath: ReadonlyArray<number>;
+			readonly hostPath: ProtocolElementAddress;
 			readonly eventName: string;
 			readonly symbolIds: ReadonlyArray<string>;
 			readonly syncPolicy?: ProtocolSyncPolicy;
@@ -648,7 +658,7 @@ export type ProtocolViewPayload = {
 		readonly armTests?: ReadonlyArray<unknown>;
 		readonly armRecords?: ReadonlyArray<{
 			readonly events: ReadonlyArray<{
-				readonly hostPath: ReadonlyArray<number>;
+				readonly hostPath: ProtocolElementAddress;
 				readonly eventName: string;
 				readonly symbolIds: ReadonlyArray<string>;
 				readonly syncPolicy?: ProtocolSyncPolicy;

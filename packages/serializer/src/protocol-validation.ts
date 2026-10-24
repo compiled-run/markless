@@ -453,6 +453,25 @@ function assertNonNegativeIntegerArrayField(
 	}
 }
 
+// An element address step counts back from the parent's end when negative.
+function assertElementAddressField(
+	record: Record<string, unknown>,
+	key: string,
+	context: string,
+): void {
+	const value = record[key];
+	if (!Array.isArray(value))
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected ${key} array.`,
+		);
+	if (!value.every((step) => Number.isInteger(step)))
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected ${key} integer array.`,
+		);
+}
+
 function assertOptionalStringArrayField(
 	record: Record<string, unknown>,
 	key: string,
@@ -535,7 +554,7 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	if (enclosingRow === undefined) return;
 	assertRecordShape(enclosingRow, context);
 	assertStringField(enclosingRow, 'repeatId', context);
-	assertNonNegativeIntegerArrayField(enclosingRow, 'parentHostPath', context);
+	assertElementAddressField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
 }
 
@@ -674,7 +693,7 @@ function assertOptionalRowElementHandles(
 	for (const [index, handle] of handles.entries()) {
 		const handleContext = `${context}[${index}]`;
 		assertRecordShape(handle, handleContext);
-		assertNonNegativeIntegerArrayField(handle, 'hostPath', handleContext);
+		assertElementAddressField(handle, 'hostPath', handleContext);
 		assertStringField(handle, 'handleId', handleContext);
 		assertStringField(handle, 'name', handleContext);
 		assertOptionalBooleanField(handle, 'plural', handleContext);
@@ -789,7 +808,7 @@ function assertRowEvents(value: unknown, context: string): void {
 	for (const [index, event] of value.entries()) {
 		const eventContext = `${context}[${index}]`;
 		assertRecordShape(event, eventContext);
-		assertNonNegativeIntegerArrayField(event, 'hostPath', eventContext);
+		assertElementAddressField(event, 'hostPath', eventContext);
 		assertStringField(event, 'eventName', eventContext);
 		assertStringArrayField(event, 'symbolIds', eventContext);
 		if (event.syncPolicy !== undefined) {

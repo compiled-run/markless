@@ -1,4 +1,5 @@
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { PROTOCOL_BLOCK_START_COMMENT } from '../../serializer/src/protocol-page-markers.ts';
 import { PROTOCOL_LOCATOR_PATHS_DIGITS } from '../../serializer/src/protocol-locator-paths-format.ts';
 import {
 	PROTOCOL_DECLARATIVE_SHADOW_ROOT_ATTRIBUTE,
@@ -44,10 +45,12 @@ type ServedTree = {
 	readonly childCounts: ReadonlyArray<number>;
 	/** Per page-level comment anchor in DOM order, the index the next element takes. */
 	readonly commentElementIndexes: ReadonlyArray<number>;
-	/** Per page-level comment anchor, its parent element and its place among the parent's child nodes. */
-	readonly commentPlaces: ReadonlyArray<{ readonly parent: number; readonly node: number }>;
 	/** Per element, the html offset just past its tag name, where an attribute can be written. */
 	readonly nameEnds: ReadonlyArray<number>;
+	/** Per element, the steps of an element address below it: child elements, and -1 for each block. */
+	readonly addressSteps: ReadonlyArray<ReadonlyArray<number>>;
+	/** Per page-level comment anchor that opens a block, the steps inside that block. */
+	readonly blockSteps: ReadonlyMap<number, ReadonlyArray<number>>;
 };
 
 export function servedElementTree(html: string): ServedTree {
@@ -63,8 +66,12 @@ export function servedElementTree(html: string): ServedTree {
 		inText[parent] = text;
 	};
 	const commentElementIndexes: number[] = [];
-	const commentPlaces: Array<{ parent: number; node: number }> = [];
 	const nameEnds = [0];
+	const addressSteps: number[][] = [[]];
+	const blockSteps = new Map<number, number[]>();
+	// Per element, the blocks open among its children, innermost last.
+	const openBlocks: Array<Array<{ readonly end: string; readonly steps: number[] }>> = [[]];
+	const stepsOf = (parent: number) => openBlocks[parent]!.at(-1)?.steps ?? addressSteps[parent]!;
 	const stack: Array<{ readonly tag: string; readonly index: number }> = [];
 	let templateDepth = 0;
 	let foreignDepth = 0;
@@ -79,10 +86,18 @@ export function servedElementTree(html: string): ServedTree {
 			const end = html.indexOf('-->', open + 4);
 			at = end < 0 ? html.length : end + 3;
 			const data = html.slice(open + 4, end < 0 ? html.length : end);
-			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data })) {
-				commentElementIndexes.push(elements.length);
-				commentPlaces.push({ parent: current(), node: nodeCounts[current()]! - 1 });
+			if (templateDepth > 0) continue;
+			const parent = current();
+			if (openBlocks[parent]!.at(-1)?.end === data) openBlocks[parent]!.pop();
+			else if (PROTOCOL_BLOCK_START_COMMENT.test(data)) {
+				const steps: number[] = [];
+				stepsOf(parent).push(-1);
+				openBlocks[parent]!.push({ end: `/${data}`, steps });
+				if (!isArmBranchAnchorComment({ nodeType: 8, data }))
+					blockSteps.set(commentElementIndexes.length, steps);
 			}
+			if (!isArmBranchAnchorComment({ nodeType: 8, data }))
+				commentElementIndexes.push(elements.length);
 			continue;
 		}
 		const next = html[open + 1] ?? '';
@@ -130,10 +145,13 @@ export function servedElementTree(html: string): ServedTree {
 					node: nodeCounts[parent]!,
 				}) - 1;
 			node(parent, false);
+			stepsOf(parent).push(index);
 			childCounts.push(0);
 			nodeCounts.push(0);
 			inText.push(false);
 			nameEnds.push(nameStart + name.length);
+			addressSteps.push([]);
+			openBlocks.push([]);
 		}
 		if (VOID_TAGS.has(lower) || selfClosing) continue;
 		if (PROTOCOL_RAW_TEXT_TAGS.has(lower)) {
@@ -145,7 +163,7 @@ export function servedElementTree(html: string): ServedTree {
 		if (FOREIGN_ROOTS.has(lower)) foreignDepth++;
 		stack.push({ tag, index });
 	}
-	return { elements, childCounts, commentElementIndexes, commentPlaces, nameEnds };
+	return { elements, childCounts, commentElementIndexes, nameEnds, addressSteps, blockSteps };
 }
 
 /** Writes `attribute="value"` on each element the map names by its index in servedElementTree(html). */

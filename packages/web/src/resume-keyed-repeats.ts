@@ -12,7 +12,7 @@ import type {
 } from './resume-types.ts';
 import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '../../serializer/src/protocol-prop-prefix.ts';
-import { pageNodes } from './resume-anchor-census.ts';
+import { elementsOf, marklessElementAt, pageNodes } from './resume-anchor-census.ts';
 
 // Nothing has moved yet, so deriving a computed collection reproduces the served rows.
 export async function primeKeyedRepeatCollections(input: {
@@ -128,7 +128,7 @@ export function findKeyedRepeatRowEventMatch(input: {
 			).entries()) {
 				const rowKey = repeatItemKey(items[rowIndex], repeat, rowIndex);
 				for (const rowEvent of rowEvents) {
-					if (rowEventHost(rowRoot, rowEvent.hostPath) === element) {
+					if (marklessElementAt(rowRoot, rowEvent.hostPath) === element) {
 						return { element, match: { repeat, parent, rowRoot, rowKey, rowEvent } };
 					}
 				}
@@ -181,7 +181,7 @@ export function wireKeyedRepeats(
 			};
 		const registerRowEvents = (rowRoot: ResumeDomElement, rowKey: unknown): void => {
 			for (const rowEvent of repeat.rowEvents) {
-				const host = rowEventHost(rowRoot, rowEvent.hostPath);
+				const host = marklessElementAt(rowRoot, rowEvent.hostPath);
 				if (!host) continue;
 				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
 			}
@@ -629,18 +629,4 @@ function rowsFrom(parent: ResumeDomElement, repeat: ResumeKeyedRepeatRecord, cou
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
 	return elementsOf(pageNodes(element));
-}
-function elementsOf(nodes: ReadonlyArray<ResumeDomNode>): ResumeDomElement[] {
-	return nodes.filter((child): child is ResumeDomElement => child.nodeType === 1);
-}
-function rowEventHost(
-	rowRoot: ResumeDomElement,
-	hostPath: ReadonlyArray<number>,
-): ResumeDomElement | undefined {
-	let current: import('./resume-types.ts').ResumeDomNode | undefined = rowRoot;
-	for (const index of hostPath) {
-		current = current.childNodes?.[index];
-		if (!current) return;
-	}
-	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
 }
