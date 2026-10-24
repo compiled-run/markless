@@ -589,6 +589,14 @@
 			"reason": "T189 row correctness (enclosing item, prop routes, style strings); INTERIM pending T192 trim"
 		},
 		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "serializer/protocol-constants",
+			"from": 697,
+			"to": 1171,
+			"reason": "bound symbol ids are spelled and read here now: nested ids wrap their base in parentheses instead of re-escaping it, and web/fns/bound-symbol dropped its own decoder"
+		},
+		{
 			"date": "2026-09-25",
 			"guard": "runtime",
 			"subject": "web/prerender/evaluator",
@@ -1650,14 +1658,6 @@
 			"from": 19772,
 			"to": 19974,
 			"reason": "composition routes the prop reads of a row template's @if branch slots and arm slots (+202 B rendered)"
-		},
-		{
-			"date": "2026-10-24",
-			"guard": "runtime",
-			"subject": "serializer/protocol-constants",
-			"from": 697,
-			"to": 1171,
-			"reason": "bound symbol ids are spelled and read here now: nested ids wrap their base in parentheses instead of re-escaping it, and web/fns/bound-symbol dropped its own decoder"
 		}
 	],
 	"runtimeModules": {
