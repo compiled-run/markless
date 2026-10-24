@@ -36,6 +36,11 @@ import {
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 } from '@markless/web/fns/container-region';
 import {
+	installKeepParts,
+	PROTOCOL_KEEP_ATTRIBUTE,
+	PROTOCOL_OWN_ATTRIBUTE,
+} from '@markless/web/fns/keep-parts';
+import {
 	normalizeMarklessDevError,
 	renderMarklessDevErrorDocument,
 } from '@markless/bundler/dev-error';
@@ -185,6 +190,7 @@ export function routerLinkBridgeModules(
 }
 
 export function createServerEntry(options: ServerEntryOptions) {
+	installKeepParts();
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
 	assertCurrentRouteAssets(options);
 	const fragmentBridge = fragmentBridgeFor(options, manifest);
@@ -547,13 +553,11 @@ function routedPageArtifact(
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map(
-			(href): RenderHeadInjection => ({
-				tag: 'link',
-				location: 'head',
-				attributes: { rel: 'stylesheet', href },
-			}),
-		),
+		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
+			tag: 'link',
+			location: 'head',
+			attributes: { rel: 'stylesheet', href },
+		})),
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -1087,6 +1091,7 @@ function fragmentConfig(
 		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,
 		pageStartComment: PROTOCOL_CONTAINER_START_COMMENT,
 		containerAttributes: [CONTAINER_ATTRIBUTE, PROTOCOL_LOCATOR_PATHS_ATTRIBUTE],
+		keepAttributes: [PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_OWN_ATTRIBUTE],
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,

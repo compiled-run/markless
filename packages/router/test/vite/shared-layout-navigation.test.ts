@@ -8,6 +8,10 @@ import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import {
+	PROTOCOL_KEEP_ATTRIBUTE,
+	PROTOCOL_OWN_ATTRIBUTE,
+} from '../../../serializer/src/protocol-keep.ts';
 
 // Two long pages render the same layout (a header with a hover transition, a sidebar, a stateful button):
 // a navigation between them keeps what both pages share, as a person resting the pointer on a link sees it.
@@ -330,4 +334,57 @@ test('the destination paints within two frames of a plain whole-page insert, wit
 	).toBe(0);
 	expect(errors).toEqual([]);
 	await navigating.close();
+});
+
+test('the server marks a component both pages render identically as kept, and the element holding the page children as its own', async () => {
+	const html = await (await fetch(`${server!.origin}/alpha`)).text();
+	const tag = (marker: string) => new RegExp(`<[^>]*${marker}[^>]*>`).exec(html)?.[0] ?? '';
+	expect(tag('data-banner')).toContain(`${PROTOCOL_KEEP_ATTRIBUTE}="`);
+	expect(tag('data-frame=')).toContain(`${PROTOCOL_KEEP_ATTRIBUTE}="`);
+	expect(tag('data-frame-body')).toContain(PROTOCOL_OWN_ATTRIBUTE);
+	// The layout holds a stateful button and renders the active link: it is not kept.
+	expect(tag('data-header')).not.toContain(PROTOCOL_KEEP_ATTRIBUTE);
+	// The sidebar's 60 links are components too, each too small to be worth a mark.
+	expect(html.match(new RegExp(`${PROTOCOL_KEEP_ATTRIBUTE}=`, 'g'))).toHaveLength(2);
+	const other = await (await fetch(`${server!.origin}/beta`)).text();
+	const hash = (page: string, marker: string) =>
+		new RegExp(`<[^>]*${marker}[^>]*${PROTOCOL_KEEP_ATTRIBUTE}="([^"]+)"`).exec(page)?.[1] ??
+		new RegExp(`<[^>]*${PROTOCOL_KEEP_ATTRIBUTE}="([^"]+)"[^>]*${marker}`).exec(page)?.[1];
+	expect(hash(other, 'data-banner')).toBe(hash(html, 'data-banner'));
+	expect(hash(other, 'data-frame=')).toBe(hash(html, 'data-frame='));
+});
+
+test('a kept part stays exactly as it was, with what a script changed in it, while the page children inside it arrive new', async () => {
+	const { page, errors } = await open('/alpha');
+	await page.evaluate(() => {
+		const banner = document.querySelector('[data-banner]')!;
+		banner.setAttribute('data-dismissed', 'yes');
+		banner.querySelector('span')!.textContent = ' (read)';
+		(globalThis as { __kept?: Element[] }).__kept = [
+			banner,
+			document.querySelector('[data-frame]')!,
+			document.querySelector('[data-title]')!,
+		];
+	});
+	await page.click('[data-top="beta"]');
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Beta',
+	);
+	expect(
+		await page.evaluate(() => {
+			const [banner, frame, title] = (globalThis as { __kept?: Element[] }).__kept!;
+			return [
+				banner === document.querySelector('[data-banner]'),
+				banner!.getAttribute('data-dismissed'),
+				banner!.querySelector('span')!.textContent,
+				frame === document.querySelector('[data-frame]'),
+				title === document.querySelector('[data-title]'),
+				document.querySelectorAll('[data-title]').length,
+			];
+		}),
+	).toEqual([true, 'yes', ' (read)', true, false, 1]);
+	await page.click('[data-layout-press]');
+	await expect.poll(() => page.textContent('[data-layout-press]')).toBe('pressed 1');
+	expect(errors).toEqual([]);
+	await page.close();
 });

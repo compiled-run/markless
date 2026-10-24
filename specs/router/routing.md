@@ -182,6 +182,30 @@ URL itself answers the whole document.
 - The prefix is root-relative; apps served under a non-root base path are not
   covered yet.
 
+### Kept parts
+
+A part of the page that both pages render byte for byte stays on screen across an in-place
+navigation, as it is, including what scripts did to it; the page's own content inside it is
+replaced, never morphed. Nothing is authored: the server decides from what it rendered.
+
+- When the router's page server renders a component that carries no resume records (no state,
+  events, behaviours, element handles, branches, async content, lists or DOM updates, except the
+  update that places its `{children}`), it marks the component's root element with
+  `data-markless-keep="<hash>"` (`PROTOCOL_KEEP_ATTRIBUTE` in
+  `packages/serializer/src/protocol-keep.ts`). The hash covers the component's markup without
+  the children the page passed, so equal hashes are equal bytes.
+- When those children are the whole content of one element of the component, that element gets
+  `data-markless-own` (`PROTOCOL_OWN_ATTRIBUTE`). Children placed any other way leave the page's
+  content in the hash, so the part is only kept on pages that render it identically.
+- A part under 512 characters of markup (without the page's children) is not marked, and a part
+  inside a kept part loses its own mark: a small part saves less than its mark costs.
+- In the swap, an element whose keep hash matches the next page's element at the same place stays;
+  each of its outermost own elements takes the next page's children, as new nodes. If the two
+  sides hold a different number of own elements, the element is morphed as before.
+- Marks are attributes, so they move no element or comment index the resume payload counts.
+- Not yet: parts with state (they need a container of their own), and leaving kept markup out of
+  the navigation fetch.
+
 `navigate(href, { replace, scroll })` from `@markless/router` navigates from
 code exactly as a click on `<Link href={href} replace scroll>` does: a page of
 the app swaps in place, and anything the router cannot take (a path that names

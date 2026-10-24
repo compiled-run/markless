@@ -1,5 +1,6 @@
 import { PROJECTION_MARK_PATTERN, PROJECTION_MARK_PREFIX } from '../fns/projection-html.ts';
 import { marklessAttributeValue } from '../dom-attribute.ts';
+import type { KeepParts } from '../fns/keep-parts-hook.ts';
 import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
 	MARKLESS_DEFERRED_COUNT_NAME,
@@ -433,6 +434,7 @@ export function projectionNotRenderedError(
 }
 
 export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDataOutput> {
+	const keep = (globalThis as Record<symbol, KeepParts | undefined>)[Symbol.for('markless.keep-parts')];
 	const idPrefix = input.idPrefix ?? '';
 	const chunks = new Map(input.renderData.chunks.map((chunk) => [chunk.id, chunk]));
 	const locators: Array<SsrDataCoordinates['locators'][number]> = [];
@@ -713,7 +715,13 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									}),
 								);
 								const baseTokens = childTokens ?? countTokens;
-								const html = withoutProjectionMarks(child.html);
+								const html = keep
+									? keep(
+											withoutProjectionMarks(child.html),
+											projection?.html,
+											child,
+										)
+									: withoutProjectionMarks(child.html);
 								// Spliced: the child's own `{children}` slot already placed the projection
 								// where the HTML puts it, so appending it again would double-count it.
 								if (span?.consumed) return { html, tokens: baseTokens };
