@@ -9,7 +9,10 @@ const UNNAMED_CHUNK = 'chunk.js';
 const parsedByExtension = new Map<string, Map<string, ParseResult>>();
 // A tree and its parser buffers take ~30 times its code, so a large site's chunks parse uncached past this budget.
 export const PARSED_CHUNK_CACHE_MAX_CODE_LENGTH = 16 * 1024 * 1024;
+// Each tree also costs a fixed amount however short its code, and a site renders thousands of tiny facade chunks.
+export const PARSED_CHUNK_CACHE_MAX_ENTRIES = 1024;
 let cachedCodeLength = 0;
+let cachedEntries = 0;
 // A chunk's superseded code is dropped once its new code is parsed.
 const codeByFile = new Map<string, string>();
 
@@ -32,21 +35,28 @@ export function renderedChunkCount(chunks: Readonly<Record<string, unknown>>): n
 function forgetSuperseded(fileName: string, code: string): void {
 	const previous = codeByFile.get(fileName);
 	if (previous === undefined || previous === code) return;
-	if (parsedFor(fileName).delete(previous)) cachedCodeLength -= previous.length;
+	if (parsedFor(fileName).delete(previous)) {
+		cachedCodeLength -= previous.length;
+		cachedEntries--;
+	}
 	codeByFile.delete(fileName);
 }
 
 function admits(fileName: string, code: string): boolean {
 	if (fileName !== UNNAMED_CHUNK) forgetSuperseded(fileName, code);
-	return cachedCodeLength + code.length <= PARSED_CHUNK_CACHE_MAX_CODE_LENGTH;
+	return (
+		cachedEntries < PARSED_CHUNK_CACHE_MAX_ENTRIES &&
+		cachedCodeLength + code.length <= PARSED_CHUNK_CACHE_MAX_CODE_LENGTH
+	);
 }
 
 function remember(fileName: string, code: string, result: ParseResult): void {
 	const parsed = parsedFor(fileName);
-	if (parsed.has(code)) return;
+	if (parsed.has(code) || cachedEntries >= PARSED_CHUNK_CACHE_MAX_ENTRIES) return;
 	if (fileName !== UNNAMED_CHUNK) codeByFile.set(fileName, code);
 	parsed.set(code, result);
 	cachedCodeLength += code.length;
+	cachedEntries++;
 }
 
 export function parseChunkCode(fileName: string, code: string): ParseResult {
@@ -63,14 +73,17 @@ export async function prefetchChunkParses(
 ): Promise<void> {
 	const pending: Promise<void>[] = [];
 	let reserved = 0;
+	let reservedEntries = 0;
 	for (const { fileName, code } of chunks) {
 		if (parsedFor(fileName).has(code)) continue;
 		if (
 			!admits(fileName, code) ||
+			cachedEntries + reservedEntries >= PARSED_CHUNK_CACHE_MAX_ENTRIES ||
 			cachedCodeLength + reserved + code.length > PARSED_CHUNK_CACHE_MAX_CODE_LENGTH
 		)
 			continue;
 		reserved += code.length;
+		reservedEntries++;
 		pending.push(
 			parse(fileName, code).then(
 				(result) => remember(fileName, code, result),
@@ -84,8 +97,10 @@ export async function prefetchChunkParses(
 
 export function clearParsedChunkCode(): void {
 	parsedByExtension.clear();
+	clearChunkFactCaches();
 	codeByFile.clear();
 	cachedCodeLength = 0;
+	cachedEntries = 0;
 }
 
 // Over-approximates: an `import` keyword followed, past whitespace and comments, by `(`.
@@ -203,6 +218,37 @@ export function chunkDynamicImports(
 	fileName: string,
 	code: string,
 ): readonly ChunkDynamicImport[] | undefined {
+	const known = dynamicImportsByFile.get(fileName);
+	if (known?.code === code) return known.value;
+	return readChunkDynamicImports(fileName, code);
+}
+
+export function clearChunkFactCaches(): void {
+	dynamicImportsByFile.clear();
+	localExportsByFile.clear();
+}
+
+// Answers read on a chunk worker, one per chunk file: a rewritten chunk replaces its entry, so no
+// superseded code stays alive and the cache never outgrows the bundle.
+type FactEntry<T> = { readonly code: string; readonly value: T };
+const dynamicImportsByFile = new Map<string, FactEntry<readonly ChunkDynamicImport[] | undefined>>();
+
+export function knowsChunkDynamicImports(fileName: string, code: string): boolean {
+	return dynamicImportsByFile.get(fileName)?.code === code;
+}
+
+export function rememberChunkDynamicImports(
+	fileName: string,
+	code: string,
+	found: readonly ChunkDynamicImport[] | undefined,
+): void {
+	dynamicImportsByFile.set(fileName, { code, value: found });
+}
+
+export function readChunkDynamicImports(
+	fileName: string,
+	code: string,
+): readonly ChunkDynamicImport[] | undefined {
 	const parsed = parseChunkCode(fileName, code);
 	if (parsed.errors.length) return undefined;
 	const found: ChunkDynamicImport[] = [];
@@ -233,6 +279,25 @@ export function chunkDynamicImports(
 // `export { local as exported }` bindings without a source, read from the module record.
 // Undefined when the chunk has parse errors or an export this reader cannot classify without the tree.
 export function chunkLocalExportSpecifiers(
+	fileName: string,
+	code: string,
+): Map<string, string> | undefined {
+	const known = localExportsByFile.get(fileName);
+	if (known?.code === code) return known.value;
+	return readChunkLocalExportSpecifiers(fileName, code);
+}
+
+const localExportsByFile = new Map<string, FactEntry<Map<string, string> | undefined>>();
+
+export function rememberChunkLocalExportSpecifiers(
+	fileName: string,
+	code: string,
+	bindings: Map<string, string> | undefined,
+): void {
+	localExportsByFile.set(fileName, { code, value: bindings });
+}
+
+export function readChunkLocalExportSpecifiers(
 	fileName: string,
 	code: string,
 ): Map<string, string> | undefined {

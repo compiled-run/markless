@@ -2,15 +2,22 @@ import { dirname, join, normalize, relative } from 'pathe';
 import {
 	type ChunkDynamicImport,
 	chunkDynamicImports,
+	clearChunkFactCaches,
 	chunkLocalExportSpecifiers,
 	mayContainDynamicImport,
 	parseChunkCode,
 	prefetchChunkParses,
+	readChunkDynamicImports,
+	readChunkLocalExportSpecifiers,
+	rememberChunkDynamicImports,
+	rememberChunkLocalExportSpecifiers,
 	renderedChunkCount,
 	spansAnyOffset,
 	textOffsets,
 } from './chunk-ast.ts';
 import { RolldownMagicString, type Plugin } from 'rolldown';
+import { CHUNK_WORKER_MIN_CODE_LENGTH, runChunkTask } from './chunk-workers.ts';
+import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 import { rootRelativeId } from '../module-id.ts';
 import { withoutMachinePaths } from './machine-paths.ts';
 import { startupPackOfLazy } from './route-pack-groups.ts';
@@ -127,11 +134,18 @@ export function lazyModuleFacadesPlugin(
 						pending.clear();
 					}
 				};
-				void prefetchChunkParses(
-					Object.values(chunks).filter(
-						(item) => !item.moduleIds.length || mayContainDynamicImport(item.code),
+				void Promise.all([
+					prefetchChunkParses(
+						Object.values(chunks).filter(
+							(item) => !item.moduleIds.length || mayContainDynamicImport(item.code),
+						),
 					),
-				).then(collapse);
+					prefetchFacadeChunkFacts(Object.values(chunks)),
+				]).then(() => {
+					collapse();
+					clearFacadeChunkFacts();
+					clearChunkFactCaches();
+				});
 			});
 		},
 		renderError(error) {
@@ -247,13 +261,13 @@ export function collapseLazyModuleFacades(
 		if (!chunk) return false;
 		let own = inert.get(fileName);
 		if (own === undefined) {
-			const parsed = parseChunkCode(chunk.fileName, renderedCode.get(fileName)!);
-			const body = parsed.program.body as Syntax[];
-			const scope = topLevelScope(body, (source) => {
-				const from = chunks.get(resolve(fileName, source));
-				return !!from && !from.imports.length && inertClosure(from.fileName, new Set());
-			});
-			own = !parsed.errors.length && body.every((node) => inertStatement(node, scope));
+			const facts = chunkInertness(chunk.fileName, renderedCode.get(fileName)!);
+			own =
+				facts.inert &&
+				facts.leafSources.every((source) => {
+					const from = chunks.get(resolve(fileName, source));
+					return !!from && !from.imports.length && inertClosure(from.fileName, new Set());
+				});
 			inert.set(fileName, own);
 		}
 		return own && chunk.imports.every((name) => inertClosure(name, seen));
@@ -268,11 +282,7 @@ export function collapseLazyModuleFacades(
 			let result = awaitChecked.get(fileName);
 			if (result === undefined) {
 				const code = renderedCode.get(fileName);
-				result =
-					code !== undefined &&
-					code.includes('await') &&
-					mayContainDynamicImport(code) &&
-					hasTopLevelAwait(parseChunkCode(fileName, code).program);
+				result = code !== undefined && chunkTopLevelAwait(fileName, code);
 				awaitChecked.set(fileName, result);
 			}
 			return result;
@@ -633,10 +643,7 @@ export function collapseLazyModuleFacades(
 // A pack registers its loaders when it evaluates, because import() of an evaluated module still resolves a task later.
 export const PACK_REGISTRY = '__marklessPacks';
 export const PACK_REGISTRATION = `(globalThis.${PACK_REGISTRY}??={})[import.meta.url]`;
-// Loader names are exports every registering pack spells out at evaluation, so they stay short.
-export const PACK_LOADER_PREFIX = '$ml';
 const PACKED_NAME_PATTERN = /\$ml[\w$]*|__marklessNamespace[\w$]*/g;
-export const PACK_LOAD = '__marklessPackLoad';
 const PACK_LOAD_SOURCE = `function ${PACK_LOAD}(specifier,loader,load){const pack=globalThis.${PACK_REGISTRY}?.[import.meta.resolve?.(specifier)];return pack?Promise.resolve().then(pack[loader]):load().then(module=>module[loader]())}`;
 
 // Evaluating a pack only declares its lazy module bodies. A route preloads the lazy targets of every pack it
@@ -689,20 +696,103 @@ function ownPack(
 	return names.size === 1 ? name : undefined;
 }
 
-type TopLevelScope = { readonly declared: Set<string>; readonly leafImports: Set<string> };
+type TopLevelScope = {
+	readonly declared: Set<string>;
+	readonly leafImports: { has(name: string): boolean };
+};
 
-function topLevelScope(body: Syntax[], leaf: (source: string) => boolean): TopLevelScope {
+// Whether a chunk's top level is inert holds on its own code, except that a call may only go to an
+// import from a dependency-free chunk: those import sources come back for the caller to check.
+export type ChunkInertness =
+	| { readonly inert: false }
+	| { readonly inert: true; readonly leafSources: readonly string[] };
+
+const inertnessByCode = new Map<string, ChunkInertness>();
+const topLevelAwaitByCode = new Map<string, boolean>();
+
+function chunkInertness(fileName: string, code: string): ChunkInertness {
+	return inertnessByCode.get(code) ?? readChunkInertness(fileName, code);
+}
+
+function chunkTopLevelAwait(fileName: string, code: string): boolean {
+	return topLevelAwaitByCode.get(code) ?? readChunkTopLevelAwait(fileName, code);
+}
+
+export function readChunkInertness(fileName: string, code: string): ChunkInertness {
+	const parsed = parseChunkCode(fileName, code);
+	if (parsed.errors.length) return { inert: false };
+	const body = parsed.program.body as Syntax[];
+	const leafSources = new Set<string>();
+	const scope = topLevelScope(body, leafSources);
+	return body.every((node) => inertStatement(node, scope))
+		? { inert: true, leafSources: [...leafSources] }
+		: { inert: false };
+}
+
+export function readChunkTopLevelAwait(fileName: string, code: string): boolean {
+	return (
+		code.includes('await') &&
+		mayContainDynamicImport(code) &&
+		hasTopLevelAwait(parseChunkCode(fileName, code).program)
+	);
+}
+
+/** Everything the facade collapse reads from one chunk's code, from a single parse. */
+export function facadeChunkFacts(fileName: string, code: string) {
+	return {
+		dynamicImports: mayContainDynamicImport(code)
+			? readChunkDynamicImports(fileName, code)
+			: undefined,
+		localExportSpecifiers: readChunkLocalExportSpecifiers(fileName, code),
+		inertness: readChunkInertness(fileName, code),
+		topLevelAwait: readChunkTopLevelAwait(fileName, code),
+	};
+}
+
+/** Reads every large chunk's facade facts on the chunk workers, so the collapse finds them cached. */
+export async function prefetchFacadeChunkFacts(
+	chunks: Iterable<{ readonly fileName: string; readonly code: string }>,
+): Promise<void> {
+	await Promise.all(
+		[...chunks]
+			.filter((chunk) => chunk.code.length >= CHUNK_WORKER_MIN_CODE_LENGTH)
+			.map((chunk) =>
+				runChunkTask('facadeChunkFacts', chunk.fileName, chunk.code).then(
+					(facts) => {
+						if (facts.dynamicImports !== undefined || mayContainDynamicImport(chunk.code))
+							rememberChunkDynamicImports(chunk.fileName, chunk.code, facts.dynamicImports);
+						rememberChunkLocalExportSpecifiers(
+							chunk.fileName,
+							chunk.code,
+							facts.localExportSpecifiers,
+						);
+						inertnessByCode.set(chunk.code, facts.inertness);
+						topLevelAwaitByCode.set(chunk.code, facts.topLevelAwait);
+					},
+					// A read that throws is left to the synchronous path, which reports it where it did.
+					() => {},
+				),
+			),
+	);
+}
+
+export function clearFacadeChunkFacts(): void {
+	inertnessByCode.clear();
+	topLevelAwaitByCode.clear();
+}
+
+function topLevelScope(body: Syntax[], leafSources: Set<string>): TopLevelScope {
 	const declared = new Set<string>();
-	const leafImports = new Set<string>();
+	const importSources = new Map<string, string>();
 	for (const node of body) {
 		const declaration = (node.type === 'ExportNamedDeclaration' ? node.declaration : node) as
 			| Syntax
 			| undefined;
 		if (node.type === 'ImportDeclaration') {
-			const fromLeaf = leaf((node.source as { value: string }).value);
+			const source = (node.source as { value: string }).value;
 			for (const specifier of node.specifiers as { local: { name: string } }[]) {
 				declared.add(specifier.local.name);
-				if (fromLeaf) leafImports.add(specifier.local.name);
+				importSources.set(specifier.local.name, source);
 			}
 		} else if (
 			declaration?.type === 'FunctionDeclaration' ||
@@ -714,7 +804,17 @@ function topLevelScope(body: Syntax[], leaf: (source: string) => boolean): TopLe
 				if ((declarator.id as Syntax).type === 'Identifier')
 					declared.add((declarator.id as { name: string }).name);
 	}
-	return { declared, leafImports };
+	return {
+		declared,
+		leafImports: {
+			has(name) {
+				const source = importSources.get(name);
+				if (source === undefined) return false;
+				leafSources.add(source);
+				return true;
+			},
+		},
+	};
 }
 
 function inertStatement(node: Syntax, scope: TopLevelScope): boolean {

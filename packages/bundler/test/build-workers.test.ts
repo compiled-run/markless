@@ -9,9 +9,9 @@ import {
 	usePersistentCompileStore,
 } from '@markless/compiler';
 import { compilerFingerprint, createPersistentCompileCache } from '../src/compile-store.ts';
-import { createCompileWorkerPool } from '../src/compile-workers.ts';
+import { createCompileWorkerPool } from '../src/build-workers.ts';
 
-const scratch = mkdtempSync(join(tmpdir(), 'markless-compile-workers-'));
+const scratch = mkdtempSync(join(tmpdir(), 'markless-build-workers-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 afterEach(() => {
 	useCompileRunner(undefined);

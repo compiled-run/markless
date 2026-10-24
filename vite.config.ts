@@ -151,7 +151,7 @@ const buildOrder: PackUserConfig[] = [
 		dts: { eager: true },
 		entry: {
 			// Spawned by path at run time, so it ships as its own file beside the bundles that start it.
-			'compile-worker': './src/compile-worker.ts',
+			'build-worker': './src/build-worker.ts',
 			'dev-error': './src/dev-error/index.ts',
 			preload: './src/preload.ts',
 			rolldown: './src/rolldown.ts',

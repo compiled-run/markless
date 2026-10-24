@@ -4,6 +4,7 @@ import {
 	clearParsedChunkCode,
 	mayContainDynamicImport,
 	PARSED_CHUNK_CACHE_MAX_CODE_LENGTH,
+	PARSED_CHUNK_CACHE_MAX_ENTRIES,
 	parseChunkCode,
 	spansAnyOffset,
 	textOffsets,
@@ -33,6 +34,18 @@ describe('chunk syntax trees shared across post-bundle passes', () => {
 		const second = parseChunkCode('two.js', `export const b="${half}";`);
 		expect(parseChunkCode('one.js', `export const a="${half}";`)).toBe(first);
 		expect(parseChunkCode('two.js', `export const b="${half}";`)).not.toBe(second);
+		clearParsedChunkCode();
+	});
+
+	// Thousands of tiny facade chunks fit the code budget, so the cache grew with page count.
+	test('parses past a fixed number of cached trees uncached, however short their code', () => {
+		clearParsedChunkCode();
+		const trees = Array.from({ length: PARSED_CHUNK_CACHE_MAX_ENTRIES + 1 }, (_, index) =>
+			parseChunkCode(`c${index}.js`, `export const v=${index};`),
+		);
+		expect(parseChunkCode('c0.js', 'export const v=0;')).toBe(trees[0]);
+		const last = PARSED_CHUNK_CACHE_MAX_ENTRIES;
+		expect(parseChunkCode(`c${last}.js`, `export const v=${last};`)).not.toBe(trees[last]);
 		clearParsedChunkCode();
 	});
 

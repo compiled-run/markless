@@ -29,13 +29,17 @@ import {
 } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { usePersistentStrippedCode } from '../transform.ts';
-import { createCompileWorkerPool, type CompileWorkerPool } from '../compile-workers.ts';
-import { availableParallelism } from 'node:os';
+import {
+	buildWorkerCount,
+	createCompileWorkerPool,
+	type CompileWorkerPool,
+} from '../build-workers.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
 import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
-import { prefetchChunkParses } from '../build/chunk-ast.ts';
+import { clearChunkFactCaches } from '../build/chunk-ast.ts';
+import { prefetchChunkDynamicImports } from '../build/chunk-workers.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
 import { excludeSourceShippedDeps, includeOptimizedDeps } from '../optimized-deps.ts';
@@ -284,11 +288,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				usePersistentCompileStore(compileCache);
 				usePersistentStrippedCode(compileCache.strippedCode);
 				compileWorkers = createCompileWorkerPool({
-					size: compileWorkerCount(),
+					size: buildWorkerCount(),
 					store: { cache: compileCache, directory, fingerprint },
 				});
 			} else if (!serve)
-				compileWorkers = createCompileWorkerPool({ size: compileWorkerCount() });
+				compileWorkers = createCompileWorkerPool({ size: buildWorkerCount() });
 			if (compileWorkers) useCompileRunner(compileWorkers.run);
 			if (serve) {
 				devTags.registerViteTags(resolvedConfig.base);
@@ -496,13 +500,15 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			generateBundle: {
 				order: 'post',
 				async handler(_options, bundle) {
-					await prefetchChunkParses(
+					await prefetchChunkDynamicImports(
 						Object.values(bundle).filter(
 							(output) => output.type === 'chunk' && output.code.includes('import('),
 						) as Array<{ readonly fileName: string; readonly code: string }>,
 					);
 					collapseInitFacadeImports(bundle);
 					unwrapAsyncImportWrappers(bundle);
+					// Held to finalize, one entry per chunk with an import() grew with page count; finalize reads its own.
+					clearChunkFactCaches();
 				},
 			},
 		} satisfies Plugin,
@@ -767,8 +773,3 @@ function getBuildEnvironment(context: unknown): MarklessEnvironment {
 
 export type MarklessVitePlugin = ReturnType<typeof markless>[number];
 
-function compileWorkerCount(): number {
-	const configured = Number(process.env.MARKLESS_COMPILE_WORKERS);
-	if (Number.isInteger(configured) && configured >= 0) return configured;
-	return Math.max(0, Math.min(availableParallelism() - 1, 7));
-}
