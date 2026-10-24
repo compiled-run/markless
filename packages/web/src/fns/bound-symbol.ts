@@ -1,3 +1,8 @@
+import {
+	protocolBoundSymbolBase,
+	protocolBoundSymbolBaseEnd,
+} from '../../../serializer/src/protocol-constants.ts';
+
 export function marklessBoundSymbolId(
 	child: {
 		readonly symbolPrefix?: string;
@@ -24,8 +29,8 @@ export function marklessReboundSymbolId(
 	// resolver and lose the outer instance's capture adapter.
 	// Keyed by the bound id's prefix: a bare key is the child's own id, and the
 	// nested id's base is a grandchild's, which can spell the same `symbol:N`.
-	return marklessBaseSymbolId(symbolId)
-		? boundSymbols?.[symbolId.slice(0, symbolId.indexOf(':', 'bound:'.length))]
+	return protocolBoundSymbolBase(symbolId)
+		? boundSymbols?.[symbolId.slice(0, protocolBoundSymbolBaseEnd(symbolId))]
 		: undefined;
 }
 
@@ -46,7 +51,7 @@ export function marklessDomUpdateSymbolId(
 ): string {
 	const direct = child.boundSymbols?.[symbolId];
 	if (direct) return direct;
-	return marklessBaseSymbolId(symbolId)
+	return protocolBoundSymbolBase(symbolId)
 		? `${child.symbolPrefix ?? ''}${symbolId}`
 		: marklessBoundSymbolId(child, symbolId);
 }
@@ -71,13 +76,4 @@ export function marklessLiveBoundGraphRoute(binding: {
 	};
 }
 
-export function marklessBaseSymbolId(symbolId: string): string | undefined {
-	if (!symbolId.startsWith('bound:')) return undefined;
-	const separator = symbolId.indexOf(':', 'bound:'.length);
-	if (separator < 0) return undefined;
-	try {
-		return decodeURIComponent(symbolId.slice('bound:'.length, separator));
-	} catch {
-		return undefined;
-	}
-}
+export { protocolBoundSymbolBase as marklessBaseSymbolId };

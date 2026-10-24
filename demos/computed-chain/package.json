@@ -3,6 +3,9 @@
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
+	"scripts": {
+		"build": "cd fixture && vp build"
+	},
 	"dependencies": {
 		"@markless/core": "workspace:*",
 		"@markless/web": "workspace:*"

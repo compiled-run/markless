@@ -577,8 +577,8 @@ export function App() @{
 		);
 		expect(rows).toHaveLength(2);
 		expect(rows.map((row) => row.id)).toEqual([
-			`bound:${encodeURIComponent(childHandler.symbolId)}:${encodeURIComponent('component-edge:0')}`,
-			`bound:${encodeURIComponent(childHandler.symbolId)}:${encodeURIComponent('component-edge:1')}`,
+			`bound:${encodeURIComponent(childHandler.symbolId)}:0`,
+			`bound:${encodeURIComponent(childHandler.symbolId)}:1`,
 		]);
 		expect(new Set(rows.map((row) => row.id)).size).toBe(2);
 		expect(new Set(rows.map((row) => row.loaderSymbolId))).toEqual(new Set([loaderSymbolId]));

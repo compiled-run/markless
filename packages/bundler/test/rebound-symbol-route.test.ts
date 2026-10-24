@@ -71,17 +71,17 @@ test('a child symbol its edge binds is answered by that edge bound row, under th
 		loadUnbound: () => unknown;
 	};
 	expect(second.prefix).toBe('c1:');
-	expect(second.loaded).toBe('local bound:symbol%3A0:component-edge%3A1');
+	expect(second.loaded).toBe('local bound:symbol%3A0:1');
 	const first = route('c0:symbol:0') as { loaded: unknown };
-	expect(first.loaded).toBe('local bound:symbol%3A0:component-edge%3A0');
+	expect(first.loaded).toBe('local bound:symbol%3A0:0');
 
 	// The unbound child symbol stays reachable for a caller the bound row cannot place.
 	await second.loadUnbound();
 	expect(calls.at(-1)).toBe('import /relay-row.tsrx?import&markless-symbols -> symbol:0');
 
 	// An id the edge does not bind still goes to the child module as spelled.
-	await route('c1:bound:symbol%3A0:component-edge%3A0');
+	await route('c1:bound:symbol%3A0:0');
 	expect(calls.at(-1)).toBe(
-		'import /relay-row.tsrx?import&markless-symbols -> bound:symbol%3A0:component-edge%3A0',
+		'import /relay-row.tsrx?import&markless-symbols -> bound:symbol%3A0:0',
 	);
 });

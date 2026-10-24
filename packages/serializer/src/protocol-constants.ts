@@ -86,3 +86,40 @@ export function protocolInstanceQualifies(graphNodeId: string): boolean | undefi
 		? true
 		: undefined;
 }
+
+// A bound symbol id is `bound:<base>:<path>`; a base that is itself bound nests as is inside parentheses, so nesting never re-escapes.
+const PROTOCOL_BOUND_PREFIX = 'bound:';
+
+export function protocolBoundSymbolSegment(value: string): string {
+	return encodeURIComponent(value).replace(/\(/g, '%28').replace(/\)/g, '%29');
+}
+
+export function protocolBoundSymbolPrefix(base: string): string {
+	return (
+		PROTOCOL_BOUND_PREFIX +
+		(base.startsWith(PROTOCOL_BOUND_PREFIX) ? `(${base})` : protocolBoundSymbolSegment(base))
+	);
+}
+
+/** The index of the `:` that ends a bound id's base, or -1 for any other id. */
+export function protocolBoundSymbolBaseEnd(id: string): number {
+	if (!id.startsWith(PROTOCOL_BOUND_PREFIX)) return -1;
+	for (let depth = 0, at = PROTOCOL_BOUND_PREFIX.length; at < id.length; at++) {
+		if (id[at] === '(') depth++;
+		else if (id[at] === ')') depth--;
+		else if (id[at] === ':' && !depth) return at;
+	}
+	return -1;
+}
+
+/** The symbol id a bound id binds, one level down, or undefined for any other id. */
+export function protocolBoundSymbolBase(id: string): string | undefined {
+	const end = protocolBoundSymbolBaseEnd(id);
+	if (end < 0) return undefined;
+	const base = id.slice(PROTOCOL_BOUND_PREFIX.length, end);
+	try {
+		return base[0] === '(' ? base.slice(1, -1) : decodeURIComponent(base);
+	} catch {
+		return undefined;
+	}
+}
