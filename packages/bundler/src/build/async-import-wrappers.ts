@@ -185,7 +185,8 @@ function walk(
 	const descend = (child: unknown) => {
 		if (isSyntax(child) && spansAnyOffset(offsets, child)) walk(child, parents, offsets, visit);
 	};
-	for (const [key, value] of Object.entries(node)) {
+	for (const key in node) {
+		const value = (node as Record<string, unknown>)[key];
 		if (key === 'parent') continue;
 		if (Array.isArray(value)) {
 			for (const item of value) descend(item);
