@@ -1,3 +1,4 @@
+import { sharedDefinitionFilename } from './foreign-scope.ts';
 import type {
 	BoundSymbolResolverArtifact,
 	BoundSymbolResolverInput,
@@ -246,10 +247,12 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	for (const binding of input.semanticGraph.graphBindings) {
 		if (binding.kind !== 'state' || !binding.initializerSource || binding.initialValueKnown)
 			continue;
-		const moduleImports = referencedModuleImports(
-			input.semanticGraph.moduleImports,
-			binding.initializerSource,
-		);
+		// A shared state adopted from another file reads that file's imports, which symbol-modules carries.
+		const definedIn = sharedDefinitionFilename(binding.id);
+		const moduleImports =
+			definedIn !== null && definedIn !== input.semanticGraph.moduleId
+				? []
+				: referencedModuleImports(input.semanticGraph.moduleImports, binding.initializerSource);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'state-initializer',
