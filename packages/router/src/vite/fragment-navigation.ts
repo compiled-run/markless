@@ -375,11 +375,12 @@ export function runFragmentNavigation(
 					priority: speculative ? 'auto' : 'high',
 					signal: controller.signal,
 				} as RequestInit));
+			// no-store forbids reuse; a positive max-age bounds it. max-age=0, no-cache and must-revalidate only ask
+			// an HTTP cache to revalidate, and hosts such as Vercel send them on every dynamic page.
 			const cacheControl = response.headers.get('cache-control') ?? '';
-			const maxAge = /(?:^|,)\s*max-age\s*=\s*"?(\d+)/i.exec(cacheControl);
-			if (/(?:^|,)\s*no-(?:store|cache)\b/i.test(cacheControl))
-				entry.expires = w.performance.now();
-			else if (maxAge) entry.expires = entry.at + Number(maxAge[1]) * 1000;
+			const maxAge = Number(/(?:^|,)\s*max-age\s*=\s*"?(\d+)/i.exec(cacheControl)?.[1]);
+			if (/(?:^|,)\s*no-store\b/i.test(cacheControl)) entry.expires = w.performance.now();
+			else if (maxAge > 0) entry.expires = entry.at + maxAge * 1000;
 			const type = response.headers.get('content-type') ?? '';
 			if (!response.ok || !type.includes('text/html') || !response.body)
 				throw new Error(`MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: ${response.status}`);
