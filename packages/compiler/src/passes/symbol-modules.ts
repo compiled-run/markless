@@ -1415,7 +1415,12 @@ function renderBranchArms(
 					candidate.branchSiteId === branch.branchSiteId,
 			);
 			if (symbol) {
-				const diagnostic = branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id);
+				const diagnostic = branchArmUnsupportedDiagnostic(
+					branch,
+					refusals[0],
+					symbol.id,
+					input.semanticGraph,
+				);
 				diagnostics.push(diagnostic);
 				// Every refusal escalatable, or none: a branch that also holds a shape
 				// no re-render answers stays plainly refused. A refusal that only warns
@@ -1443,16 +1448,35 @@ function renderBranchArms(
 	return { armsBySite, diagnostics, escalationCandidates };
 }
 
+// A computed counts as a prop when everything it derives from is one: `@if (from <= 0)` is decided by `from`.
+function readsOnlyProps(
+	graphNodeId: string,
+	semanticGraph: SemanticGraphArtifact | undefined,
+	seen = new Set<string>(),
+): boolean {
+	if (graphNodeId.startsWith('prop:')) return true;
+	if (seen.has(graphNodeId)) return false;
+	seen.add(graphNodeId);
+	const binding = semanticGraph?.graphBindings.find((candidate) => candidate.id === graphNodeId);
+	if (binding?.kind !== 'computed' || !binding.dependencies?.length) return false;
+	return binding.dependencies.every((dependency) =>
+		readsOnlyProps(dependency.graphNodeId, semanticGraph, seen),
+	);
+}
+
 function branchArmUnsupportedDiagnostic(
 	branch: RenderDataBranch,
 	refusal: ArmRefusal | undefined,
 	symbolId: string,
+	semanticGraph: SemanticGraphArtifact | undefined,
 ): SymbolModulesDiagnostic {
 	const label = branch.kind === 'switch' ? '@switch' : '@if';
 	const detail = refusal?.detail ?? 'it holds content that has no compiled markup';
 	// A prop is the caller's to change, and a caller that never changes it ships
 	// correctly today, so only a test this file can write blocks the build.
-	const decidedByProp = branch.testReads.every((read) => read.graphNodeId.startsWith('prop:'));
+	const decidedByProp = branch.testReads.every((read) =>
+		readsOnlyProps(read.graphNodeId, semanticGraph),
+	);
 	return {
 		code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		severity: decidedByProp ? 'warning' : 'error',
