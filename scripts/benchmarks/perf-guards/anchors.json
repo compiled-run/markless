@@ -1624,7 +1624,7 @@
 			"guard": "runtime",
 			"subject": "web/resume-events",
 			"from": 17385,
-			"to": 17968,
+			"to": 17992,
 			"reason": "owner-approved: synchronous submit cancellation for every form a handler calls preventDefault on (rebuilt @if arms, list rows on the first gesture, rows added in the browser, a plain form beside row forms); without it a migrated page reloads instead of running its handler; vite-csr emitted runtime +199 gzip; repayment from client-runtime savings owed"
 		},
 		{
@@ -1780,7 +1780,7 @@
 		"web/resume-branches": 15037,
 		"web/resume-census": 1471,
 		"web/resume-commit-arm": 9551,
-		"web/resume-events": 17968,
+		"web/resume-events": 17992,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 18371,
