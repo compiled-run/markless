@@ -378,6 +378,17 @@ function installDelegatedTriggers(
 	const rowEventNames = new Set(
 		rowEventRepeats(view).flatMap((repeat) => repeat.rowEvents.map((event) => event.eventName)),
 	);
+	type RowNode = { readonly parentElement?: unknown; readonly childNodes?: ArrayLike<RowNode> };
+	// A row's handlers are wired when the runtime first starts, after the gesture that starts it has returned.
+	const rowPolicy = (row: RowNode, type: string, path: ReadonlyArray<unknown>) => {
+		for (const repeat of rowEventRepeats(view))
+			if (row.parentElement === output.liveHostNodes?.get(repeat.parentHostNodeId))
+				for (const { eventName, hostPath, syncPolicy } of repeat.rowEvents) {
+					let host: RowNode | undefined = row;
+					for (const index of hostPath) host = host?.childNodes?.[index];
+					if (syncPolicy && eventName === type && path.includes(host)) return syncPolicy;
+				}
+	};
 	const releases: Array<() => void> = [];
 	const installedEventNames = new Set<string>();
 	type DelegatedEvent = NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>;
@@ -398,9 +409,7 @@ function installDelegatedTriggers(
 			let named = false;
 			let syncPolicyApplied = false;
 			claim?.(event.target);
-			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
-				? PROTOCOL_EVENT_ACTION_KIND.event
-				: undefined;
+			let actionKind: ProtocolEventActionKind | undefined;
 			// The press-time path: an earlier listener may already have taken the target out.
 			const path = event.composedPath?.() || [];
 			for (
@@ -413,20 +422,20 @@ function installDelegatedTriggers(
 					actionKind = protocolEventActionKind(record);
 					named = true;
 					event.__marklessPressPath ??= [element];
-					// The browser reads defaultPrevented when this dispatch returns,
-					// and the handler module is still being fetched then.
-					if (record.syncPolicy && actionKind === PROTOCOL_EVENT_ACTION_KIND.event) {
-						runSyncPolicyActions(
-							record.syncPolicy,
-							syncPolicyGraph,
-							event as unknown as SyncPolicyDomEvent,
-						);
-						syncPolicyApplied = true;
-					}
+				}
+				// The browser reads defaultPrevented when this dispatch returns, and the handler module is still being fetched then.
+				const policy = record
+					? actionKind === PROTOCOL_EVENT_ACTION_KIND.event && record.syncPolicy
+					: !syncPolicyApplied && rowPolicy(element as RowNode, event.type, path);
+				if (policy) {
+					runSyncPolicyActions(policy, syncPolicyGraph, event as unknown as SyncPolicyDomEvent);
+					syncPolicyApplied = true;
 				}
 			}
 			// This container listener exists for whichever element registered the
 			// record; a sibling with no record of its own is simply not ours.
+			if (!actionKind && rowEventNames.has(event.type))
+				actionKind = PROTOCOL_EVENT_ACTION_KIND.event;
 			if (!actionKind) {
 				const pending = (
 					output.root as { __marklessArmRegistering?: Set<Promise<unknown>> }
@@ -445,11 +454,7 @@ function installDelegatedTriggers(
 			}
 			await action(
 				event,
-				named
-					? syncPolicyApplied
-						? { syncPolicyAlreadyApplied: true }
-						: undefined
-					: { ignoreUnmatched: true },
+				{ ignoreUnmatched: !named, syncPolicyAlreadyApplied: syncPolicyApplied },
 			);
 		};
 		// addEventListener drops the returned promise, so a rejection would escape

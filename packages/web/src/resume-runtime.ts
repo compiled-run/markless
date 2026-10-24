@@ -242,9 +242,14 @@ export function createResumeRuntime(
 				skipStartupBranchIds: options.skipStartupBranchIds,
 			}),
 		);
-		for (const eventType of eventTypes)
-			if (!eventTypesBefore.has(eventType) && !input.root.__marklessDelegatedDispatch)
-				input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
+		for (const eventType of eventTypes) {
+			if (eventTypesBefore.has(eventType)) continue;
+			input.root.addEventListener?.(
+				eventType,
+				input.root.__marklessDelegatedDispatch ? events!.applySyncPolicy : dispatchCaptured,
+				{ capture: true },
+			);
+		}
 		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds)
 			await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
 		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
