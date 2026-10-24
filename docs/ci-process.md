@@ -179,6 +179,26 @@ What changed, and the rule going forward:
 - `cache-cleanup.yml` deletes a pull request's caches when it closes, and a daily sweep deletes caches of closed pull requests and deleted branches and every main tool cache but the newest per key. Dry run against 2026-10-23: 232 of 722 entries, 6.6 of 10.6 GB.
 - A new cache step needs a reason it pays for itself: what one restore costs, how many jobs restore it per run, and what it saves over downloading. A cache restored by a large matrix is the first suspect.
 
+### The VoiceOver lane (parked)
+
+`voiceover` in `screen-reader.yml` is advisory (`continue-on-error`). Since #150 it reads 12 or 13 of 29 families green on the `macos-latest` (macOS 26) image, up from 2 to 4. A redesign of the real-reader driver is parked; this records where the rest fail and the options, so the next attempt starts from evidence. The traces are in the logs of runs 39890507893, 39892233837, 39896946755 and 39904970834, which log every phrase.
+
+The rest fail in four ways:
+
+1. **Runner setup.** `guidepup/setup-action` sometimes fails with "Unable to write to the user TCC.db - SIP might not be disabled" or "Failed to enable Do not disturb mode": 1 to 3 families a run, a different set each time. This is the runner image, not the families.
+2. **Speech after a focus move is not captured** (menu, modal, drawer, select, menubar). After Enter opens a surface and the family moves focus, `lastSpokenPhrase()` returns `""`: guidepup records only speech that follows one of its own commands, and VoiceOver's focus-following announcement is not one.
+3. **Keys go to the page's focus, not VoiceOver's cursor** (buttongroup, colorpicker, crop, rating). The transcript walks the cursor with `next()` and then presses a key; on this runner keyboard focus does not follow VoiceOver's cursor, so the key reaches whatever was focused before.
+4. **Containers VoiceOver steps over** (toolbar; tabs, editable and tour time out or miss a phrase for the same kind of reason). VoiceOver treats a toolbar as one item and needs its interact command to enter it.
+
+Options, cheapest first:
+
+- **A. Leave it advisory and stop here.** NVDA and the virtual reader already gate the same transcripts. Cost: the VoiceOver job stays mostly red and stops being read.
+- **B. Give `RealDriverSpec` VoiceOver-only hooks and keep the shared transcripts.** `focusCursor` would run "move keyboard focus to VoiceOver cursor" before a key, only after a walk (fixes 3). `speakFocus` would run "move VoiceOver cursor to keyboard focus" with capture, only after a family moved focus itself (fixes 2). `enter` would run `interact()` on a container (fixes 4). A first version of `focusCursor` and `speakFocus` was tried in #150 and reverted: it broke the slider transcript (ArrowRight left the thumb at 50 where 41 was expected), and the cause was not established. Start by reproducing that on one family. Cost: a driver change plus one VoiceOver CI run per family to check it.
+- **C. Separate VoiceOver transcripts** for the families whose interaction model differs (menu-like surfaces, toolbar, composite widgets), and keep the shared one elsewhere. Cost: two expectations to maintain per such family.
+- **D. Move the lane to a self-hosted Mac** where TCC and Do Not Disturb are set once by hand. This only removes failure 1.
+
+Recommendation: B, then C only for whatever B leaves red, with A as the state until someone owns it.
+
 ## 8. Cutting a release
 
 Markless releases **minor versions only**: 0.6.0, 0.7.0, and so on. There are no patch releases. A fix ships in the next minor, so the way to ship a fix sooner is to cut the next minor sooner. No script or workflow accepts a release type; the next version is always the current one with the middle number raised by one.
