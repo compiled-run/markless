@@ -222,11 +222,15 @@ async function startDecodedResume(
 				},
 			});
 		});
+	// An in-place navigation swapped the page while this resume loaded: its payload no longer describes the DOM.
+	const stale = () => pageLifetime(input.root) !== life;
+	const swapped = stale();
 	runtime = createResumeRuntime({
 		root: input.root,
 		graph,
 		state: decoded.state,
-		view: decoded.view,
+		view: swapped ? { ...decoded.view, asyncBoundaries: [] } : decoded.view,
+		...(swapped ? { liveHostNodes: new Map() } : {}),
 		loadSymbol,
 		createVisibilityObserver: input.createVisibilityObserver,
 		createRemovalObserver: input.createRemovalObserver,
@@ -240,8 +244,13 @@ async function startDecodedResume(
 		deleteResumedPayload(input.root);
 		retiring.dispose();
 	};
-	await runtime.start();
-	if (pageLifetime(input.root) !== life) {
+	if (!swapped)
+		try {
+			await runtime.start();
+		} catch (error) {
+			if (!stale()) throw error;
+		}
+	if (stale()) {
 		runtime.dispose();
 		return { decoded, graph, runtime };
 	}
