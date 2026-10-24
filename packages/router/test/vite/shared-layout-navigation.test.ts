@@ -211,6 +211,41 @@ test('a text field the layout keeps shows what the server rendered for the next 
 	await page.close();
 });
 
+// A content element both pages render at the same place, with a class and colour of its own and a colour transition:
+// the swap must show the leaving colour or the arriving one, never a frame in between (a badge morphing, a panel flashing).
+test('a content element whose class changes across a navigation never animates between the two pages', async () => {
+	const { page, errors } = await open('/alpha');
+	await page.evaluate(() => {
+		const host = globalThis as { __colors?: string[]; __done?: boolean };
+		host.__colors = [];
+		let after = -1;
+		const tick = () => {
+			const badge = document.querySelector('[data-badge]');
+			const panel = document.querySelector('[data-panel]');
+			if (badge && panel)
+				host.__colors!.push(
+					`${getComputedStyle(badge).backgroundColor}|${getComputedStyle(panel).backgroundColor}`,
+				);
+			if (document.querySelector('[data-title]')?.textContent === 'Beta' && after < 0)
+				after = host.__colors!.length;
+			if (after < 0 || host.__colors!.length - after < 40) requestAnimationFrame(tick);
+			else host.__done = true;
+		};
+		requestAnimationFrame(tick);
+	});
+	await page.click('[data-top="beta"]');
+	await page.waitForFunction(() => (globalThis as { __done?: boolean }).__done === true);
+	const colors = await page.evaluate(() => (globalThis as { __colors?: string[] }).__colors!);
+	const leaving = 'rgb(250, 0, 0)|rgb(10, 10, 10)';
+	const arriving = 'rgb(0, 0, 250)|rgb(240, 240, 240)';
+	expect([...new Set(colors)].filter((color) => color !== leaving && color !== arriving)).toEqual(
+		[],
+	);
+	expect(colors.at(-1)).toBe(arriving);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 // From the moment the destination's nodes are in the document to the next frame: a swap that holds
 // the leaving page on screen while it fills the next one in pieces shows up here as extra frames.
 async function insertToFrame(page: Page, insert: () => Promise<unknown>): Promise<number> {

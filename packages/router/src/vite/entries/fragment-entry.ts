@@ -684,6 +684,30 @@ function resetControl(element: Element): void {
 	}
 }
 
+// A kept node takes the next page's classes in one step: a CSS transition between two pages' styles shows as morphing.
+// Transitions are off while the swap's styles are computed once, then on again; that change itself starts none.
+function withoutTransitions(d: Document): () => void {
+	const rule = '*,*::before,*::after{transition:none!important}';
+	const Sheet = d.defaultView?.CSSStyleSheet;
+	// A constructed sheet passes a strict style-src policy and adds no node a page script could observe.
+	if (Sheet && 'adoptedStyleSheets' in d) {
+		const sheet = new Sheet();
+		sheet.replaceSync(rule);
+		d.adoptedStyleSheets = [...d.adoptedStyleSheets, sheet];
+		return () => {
+			void d.documentElement.offsetHeight;
+			d.adoptedStyleSheets = d.adoptedStyleSheets.filter((own) => own !== sheet);
+		};
+	}
+	const style = d.createElement('style');
+	style.textContent = rule;
+	d.head.append(style);
+	return () => {
+		void d.documentElement.offsetHeight;
+		style.remove();
+	};
+}
+
 // Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.
 function forgetRuntimeState(root: Element): void {
 	const forget = (node: Node) => {
@@ -857,6 +881,7 @@ export async function navigate(
 	let scripts: Element[] = [];
 	const commit = (): boolean => {
 		if (id !== session.navigation) return false;
+		const settle = withoutTransitions(d);
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
 			if (!element.isConnected || !scope.contains(element)) continue;
@@ -949,6 +974,7 @@ export async function navigate(
 			sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
 		for (const element of head.stale) element.remove();
 		if (next.title && d.title !== next.title) d.title = next.title;
+		settle();
 		return true;
 	};
 	const committed = commit();
