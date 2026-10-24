@@ -88,7 +88,7 @@ import {
 	inlineHandlerRenderLocals,
 	inlineRenderLocals,
 	liftRenderLocalComposite,
-	liftArmRenderLocalValue,
+	liftArmShownValue,
 } from './render-local-inline.ts';
 import { collectGraphDependencies } from './collect-async.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
@@ -209,7 +209,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 			requireWritableRead: true,
 		}) ??
 		liftArmModuleValue(expression, state) ??
-		liftArmRenderLocalValue(expression, state) ??
+		liftArmShownValue(expression, state) ??
 		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
@@ -1215,7 +1215,7 @@ function collectAttribute(
 				requireWritableRead: true,
 			}) ??
 			liftArmModuleValue(expressionValue, state) ??
-			liftArmRenderLocalValue(expressionValue, state) ??
+			liftArmShownValue(expressionValue, state) ??
 			liftRenderLocalComposite(expressionValue, state, TEMPLATE_READ_OPTIONS);
 		if (
 			!composite &&
