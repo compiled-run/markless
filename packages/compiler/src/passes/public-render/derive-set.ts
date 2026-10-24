@@ -518,6 +518,21 @@ function factoryComputedGraphNodeIds(
 
 /** The factory expressions this module's server render copies out of another file. */
 function foreignCopiedBodies(input: PublicRenderModuleInput): ReadonlyArray<ForeignCopiedBody> {
+	return [...foreignComputedBodies(input), ...foreignStateSeedBodies(input)];
+}
+
+// A shared state's initializer the server render evaluates in place when its value could not be folded.
+function foreignStateSeedBodies(input: PublicRenderModuleInput): ReadonlyArray<ForeignCopiedBody> {
+	return input.semanticGraph.graphBindings.flatMap((binding) => {
+		if (binding.kind !== 'state' || binding.initializerSource === undefined) return [];
+		const definedIn = sharedDefinitionFilename(binding.id);
+		return definedIn === null || definedIn === moduleIdOf(input.source)
+			? []
+			: [{ graphNodeId: binding.id, name: binding.name, source: binding.initializerSource, definedIn }];
+	});
+}
+
+function foreignComputedBodies(input: PublicRenderModuleInput): ReadonlyArray<ForeignCopiedBody> {
 	const sharedSources = collectSsrSharedComputedSources(input);
 	if (sharedSources.size === 0) return [];
 	const syncComputedNames = syncComputedNamesByGraphNodeId(input);

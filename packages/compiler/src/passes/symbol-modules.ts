@@ -361,15 +361,16 @@ function foreignFactoryScopeCarry(
 
 	const carried = modules.map((module) => {
 		const symbol = symbolsById.get(module.symbolId);
-		if (symbol?.kind !== 'sync-computed-derive') return module;
+		if (symbol?.kind !== 'sync-computed-derive' && symbol?.kind !== 'state-initializer')
+			return module;
 		const definedIn = sharedDefinitionFilename(symbol.graphNodeId);
 		if (definedIn === null || definedIn === moduleIdOf(source)) return module;
 
-		const freeNames = unboundForeignBodyNames(
-			symbol,
-			captureSlotsBySymbol.get(symbol.id) ?? [],
-		);
-		if (freeNames.size === 0) return module;
+		const freeNames =
+			symbol.kind === 'sync-computed-derive'
+				? unboundForeignBodyNames(symbol, captureSlotsBySymbol.get(symbol.id) ?? [])
+				: undefined;
+		if (freeNames?.size === 0) return module;
 
 		origins ??= bindingOrigins({
 			moduleId: moduleIdOf(source),
@@ -383,7 +384,7 @@ function foreignFactoryScopeCarry(
 					name: symbol.name,
 					source: symbol.source,
 					definedIn,
-					freeNames,
+					...(freeNames ? { freeNames } : {}),
 				},
 			],
 			sharedDefinitions: definitions,
