@@ -716,6 +716,7 @@ function forgetRuntimeState(root: Element): void {
 // Scrolled boxes (a sidebar) keep their offset when the same box is there after the swap:
 // at its old place in the tree, or else by its id when the next page wraps it differently.
 type ScrolledBox = {
+	readonly element: Element;
 	readonly path: string | undefined;
 	readonly id: string;
 	readonly kind: string;
@@ -880,6 +881,7 @@ export async function navigate(
 			if (!element.isConnected || !scope.contains(element)) continue;
 			if (element.scrollTop || element.scrollLeft)
 				offsets.push({
+					element,
 					path: elementPath(scope, element),
 					id: element.id,
 					kind: boxKind(element),
@@ -962,9 +964,15 @@ export async function navigate(
 			}
 		}
 		scripts = fresh.flatMap(scriptsIn);
+		// A box the swap kept still has its offset; scrolling it again would lay out the page before it paints.
 		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
 		for (const box of offsets)
-			sameBox(scope, box)?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
+			if (!box.element.isConnected)
+				sameBox(scope, box)?.scrollTo({
+					top: box.top,
+					left: box.left,
+					behavior: 'instant',
+				});
 		for (const element of head.stale) element.remove();
 		if (next.title && d.title !== next.title) d.title = next.title;
 		settle();
