@@ -322,9 +322,14 @@ function readsGraphRoot(source: string, state: WalkState): boolean {
 }
 
 // A flipped arm rebuilds from graph reads alone, so a body const it shows rides a computed of its definition.
+/** The same lift for a value markup shows, which also takes a props-only composite: a flip rebuilds the arm from graph reads alone. */
+export const liftArmShownValue = (expression: AnyNode, state: WalkState) =>
+	liftArmRenderLocalValue(expression, state, true);
+
 export function liftArmRenderLocalValue(
 	expression: AnyNode,
 	state: WalkState,
+	propsOnly = false,
 ): { readonly graphNodeId: string } | null {
 	if (
 		!state.currentArmScope ||
@@ -333,7 +338,16 @@ export function liftArmRenderLocalValue(
 	)
 		return null;
 	const inlined = inlineRenderLocals(expression, state);
-	if (inlined.kind !== 'inlined' || inlined.definitions.length === 0) return null;
+	if (inlined.kind !== 'inlined') return null;
+	// A plain read already resolves to its graph node; a props-only composite has no other route a flip can rebuild from.
+	if (
+		inlined.definitions.length === 0 &&
+		(!propsOnly ||
+			expression.type === 'Identifier' ||
+			expression.type === 'MemberExpression' ||
+			collectGraphDependencies(expression, state).length === 0)
+	)
+		return null;
 	const guard = armGuardCondition(state);
 	if (!guard) return null;
 	const definitions = [...guard.definitions, ...inlined.definitions];
