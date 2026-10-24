@@ -689,6 +689,8 @@ export function runFragmentNavigation(
 
 // A fragment fetch asks for the page path under this prefix, so a cache keyed on the URL, or a host rewrite that drops the query, keeps it apart from the page.
 export const FRAGMENT_PATH_PREFIX = '/_markless/fragment';
+/** Set on every fragment response, so a redirect it answers can be pointed back at a fragment. */
+export const FRAGMENT_RESPONSE_HEADER = 'x-markless-fragment';
 
 export function fragmentRequestUrl(url: string | URL): URL {
 	const target = new URL(url);
