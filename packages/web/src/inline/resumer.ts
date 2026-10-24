@@ -1100,7 +1100,7 @@ function runInlineResumer(
 		(target as Element).closest?.(
 			defaultPrevented ? 'a[href][data-markless-router-link]' : 'a[href]',
 		);
-	const submits = eventNames.includes('submit') || nestedEventNames.includes('submit');
+	const submits = eventNames.includes('submit');
 	const primeEventNames = ['focusin', 'pointerover'].filter(
 		(_name, hover) =>
 			submits ||
@@ -1126,7 +1126,6 @@ function runInlineResumer(
 					element.tagName === 'SELECT';
 				// A form that handles its submit wakes on a pointer over its submit button or a focus inside it.
 				if (
-					submits &&
 					element.tagName === 'FORM' &&
 					entryOf(element, 'submit') &&
 					(!hover ||
