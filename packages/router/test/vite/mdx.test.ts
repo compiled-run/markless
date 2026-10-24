@@ -9,6 +9,7 @@ import {
 	transformMdxRoute,
 } from '../../src/vite/mdx.ts';
 import { createMdxRenderDataSurface } from '../../src/vite/runtime/mdx-route.ts';
+import { servedRenderDataSourceReference } from '../../../bundler/src/served-render-data.ts';
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'markless-mdx-config-'));
 afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }));
@@ -339,7 +340,9 @@ import Choices from '../../components/Choices.tsrx';
 		expect(code).toContain('loadScalarActionPlan');
 		expect(code).toContain('./Meter.tsrx?markless-symbols&markless-scalar-plans');
 		expect(code).toContain('renderData: marklessMdxRenderData');
-		expect(code).toContain('return Promise.all([import("./Meter.tsrx?markless-render-data")])');
+		expect(code).toContain(
+			`return Promise.all([import(${JSON.stringify(servedRenderDataSourceReference('./Meter.tsrx?markless-render-data'))})])`,
+		);
 		expect(code).toContain('modules[0].marklessPrerenderData');
 	});
 

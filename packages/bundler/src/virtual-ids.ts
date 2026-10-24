@@ -4,10 +4,14 @@ import { isAbsolute, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { MARKLESS_BUILD_PREFIX } from './build/chunking.ts';
 import { symbolVirtualModuleSourceFile } from './source-module.ts';
-import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
+import { CLIENT_RENDER_DATA_ENTRY_KIND, MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import { triggerGroupVirtualModuleSourceFile } from './trigger-groups.ts';
 import type { MarklessEnvironment, MarklessVirtualModule } from './types.ts';
 import { MARKLESS_SCALAR_PLAN_SOURCE_QUERY } from './scalar-plan-source.ts';
+import {
+	isServedRenderDataRequest,
+	MARKLESS_SERVED_RENDER_DATA_QUERY,
+} from './served-render-data.ts';
 
 export const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
@@ -123,11 +127,20 @@ export function renderDataReachedFromQuery(id: string): string | undefined {
 	);
 }
 
+/** The full render data a server-rendered app's client render loads on demand; no resume reaches it. */
+export function isClientRenderDataEntry(id: string): boolean {
+	return normalizeVirtualId(id).startsWith(
+		`${MARKLESS_VIRTUAL_PREFIX}${CLIENT_RENDER_DATA_ENTRY_KIND}:`,
+	);
+}
+
 // A route's client-navigation facade or its own render data: only navigating to the route runs it.
 export function isRouteNavigationSourceRequest(id: string): boolean {
 	return (
 		MARKLESS_ROUTE_SOURCE_QUERY_RE.test(id) ||
-		(isRenderDataSourceRequest(id) && renderDataReachedFromQuery(id) === undefined)
+		(isRenderDataSourceRequest(id) &&
+			renderDataReachedFromQuery(id) === undefined &&
+			!isServedRenderDataRequest(id))
 	);
 }
 
@@ -306,6 +319,7 @@ export function pathname(id: string) {
 const CLIENT_ONLY_SOURCE_QUERY_KEYS = new Set([
 	'markless-render-data',
 	'markless-reached-from',
+	MARKLESS_SERVED_RENDER_DATA_QUERY,
 	'markless-symbols',
 	'markless-scalar-plans',
 ]);

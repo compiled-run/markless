@@ -43,6 +43,8 @@ export type MarklessVirtualModuleType =
 	| 'payload'
 	| 'prerender-wake'
 	| 'render-data'
+	// The render data a server-rendered page's browser loads: only what it can still render.
+	| 'render-data-served'
 	// `export *` of the render data: every lazy import names this, every static import the render data.
 	| 'render-data-entry'
 	| 'resolver'
@@ -86,6 +88,8 @@ export interface TransformTsrxModuleInput {
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
 	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
+	/** Pages are rendered on the server, so a browser-side render loads full render data only when it runs. */
+	serverRenderedPages?: boolean;
 	artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
 	devResumeReexport?: boolean;

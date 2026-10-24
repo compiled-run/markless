@@ -381,12 +381,28 @@
 			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
 		},
 		{
+			"date": "2026-10-24",
+			"guard": "construct",
+			"subject": "event handler",
+			"from": 2951,
+			"to": 3184,
+			"reason": "Emitted bytes now count two views of the render data: the served one a resumed page loads and the full one only a browser-side render() loads; the full view's per-instance cost is unchanged and every measured docs page downloads less."
+		},
+		{
 			"date": "2026-09-24",
 			"guard": "construct",
 			"subject": "text binding",
 			"from": null,
 			"to": 3779,
 			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "construct",
+			"subject": "text binding",
+			"from": 3779,
+			"to": 4211,
+			"reason": "Emitted bytes now count two views of the render data: the served one a resumed page loads and the full one only a browser-side render() loads; the full view's per-instance cost is unchanged and every measured docs page downloads less."
 		},
 		{
 			"date": "2026-09-24",
@@ -403,6 +419,14 @@
 			"from": null,
 			"to": 5343,
 			"reason": "initial per-construct glue anchors: marginal emitted bytes per instance on minimal fixtures (framework-overhead model, owner ruling 2026-09-24)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "construct",
+			"subject": "keyed @for",
+			"from": 5343,
+			"to": 6879,
+			"reason": "Emitted bytes now count two views of the render data: the served one a resumed page loads and the full one only a browser-side render() loads; the full view's per-instance cost is unchanged and every measured docs page downloads less."
 		},
 		{
 			"date": "2026-09-24",
@@ -629,12 +653,28 @@
 			"reason": "+29 B is the web/resume-commit-arm entry the build-time demand map now names on branch records (virtual payload module only, no shipped chunk carries it); it lets pages with no arm leave 9.2 kB of arm-commit code unpreloaded"
 		},
 		{
+			"date": "2026-10-24",
+			"guard": "construct",
+			"subject": "@if",
+			"from": 6135,
+			"to": 7991,
+			"reason": "Emitted bytes now count two views of the render data: the served one a resumed page loads and the full one only a browser-side render() loads; the full view's per-instance cost is unchanged and every measured docs page downloads less."
+		},
+		{
 			"date": "2026-10-17",
 			"guard": "construct",
 			"subject": "async boundary",
 			"from": 7778,
 			"to": 7807,
 			"reason": "+29 B is the web/resume-commit-arm entry the build-time demand map now names on async-boundary records (virtual payload module only, no shipped chunk carries it); it lets pages with no arm leave 9.2 kB of arm-commit code unpreloaded"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "construct",
+			"subject": "async boundary",
+			"from": 7807,
+			"to": 10095,
+			"reason": "Emitted bytes now count two views of the render data: the served one a resumed page loads and the full one only a browser-side render() loads; the full view's per-instance cost is unchanged and every measured docs page downloads less."
 		},
 		{
 			"date": "2026-10-17",
@@ -1698,11 +1738,11 @@
 		"web/storage-plane": 1810
 	},
 	"constructGlue": {
-		"event handler": 2951,
-		"text binding": 3779,
-		"@if": 6135,
-		"keyed @for": 5343,
-		"async boundary": 7807
+		"event handler": 3184,
+		"text binding": 4211,
+		"@if": 7991,
+		"keyed @for": 6879,
+		"async boundary": 10095
 	},
 	"resumeRows": {
 		"keyed rows": 542,

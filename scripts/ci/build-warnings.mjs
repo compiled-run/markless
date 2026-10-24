@@ -24,7 +24,7 @@ export const ALLOWED_WARNINGS = [
 		build: 'website',
 		pattern: /^\(!\) Some chunks are larger than \d+ kB after minification/,
 		reason:
-			'Open owner decision: figure drawings ship in page packs (home 2.0 MB, 623 kB gzip) and the <Code> compile worker is 3.4 MB.',
+			'Open owner decision: the <Code> compile worker is 3.4 MB, the highlighter pack 654 kB, and the full figure render data a browser-side render() loads is up to 2.0 MB; no page load or link navigation fetches the last.',
 	},
 ];
 

@@ -45,7 +45,9 @@ const RUNTIME_PACKAGE_PATH = new RegExp(
 const NODE_MODULES = /.*[/\\]node_modules[/\\]((?:@[^/\\]+[/\\])?[^/\\]+)/;
 const MARKLESS_VIRTUAL = 'virtual:markless:';
 // Handler bodies and compiled markup are the author's code; the per-construct wrapper around them is priced by construct anchors.
-const AUTHOR_VIRTUAL_KINDS = ['symbol', 'render-data'].map((kind) => `${MARKLESS_VIRTUAL}${kind}:`);
+const AUTHOR_VIRTUAL_KINDS = ['symbol', 'render-data', 'render-data-served'].map(
+	(kind) => `${MARKLESS_VIRTUAL}${kind}:`,
+);
 const MARKLESS_QUERY = /[?&]markless-/;
 const AUTHOR_QUERY = /[?&]markless-render-data\b/;
 

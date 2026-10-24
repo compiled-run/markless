@@ -2629,7 +2629,29 @@ export type PublicRenderModuleArtifact = {
 		readonly ssrFunctionName: string;
 	}>;
 	readonly componentDefinitions: ReadonlyArray<Readonly<Record<string, unknown>>>;
+	/** The render data a server-rendered page's browser loads; absent where there is no client render data. */
+	readonly servedRenderData?: ServedRenderDataArtifact;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+/**
+ * What a server-rendered page's browser needs of this module's render data. It
+ * renders markup only where the graph can change it (`browser-rendered.ts`), so
+ * the readers keep only the expressions written there, and every other chunk
+ * keeps its slots but not its markup.
+ */
+export type ServedRenderDataArtifact = {
+	readonly renderDataModuleSource: string;
+	/** Residue reader source per component; a component with nothing to read has none. */
+	readonly readers: Readonly<Record<string, string>>;
+	readonly imports: ReadonlyArray<{ readonly source: string; readonly line: string }>;
+	readonly declarations: ReadonlyArray<string>;
+	/** Components the browser may render whole, so their initial values ship. */
+	readonly browserRenderedComponents: ReadonlyArray<string>;
+	/** Component edges inside browser-rendered chunks: their children ship their full render data. */
+	readonly browserRenderedEdgeIds: ReadonlyArray<string>;
+	/** Components with any part the browser renders; the others are only walked through, never evaluated. */
+	readonly evaluatedComponents: ReadonlyArray<string>;
 };
 
 export type CompileTsrxModuleInput = SemanticGraphInput &

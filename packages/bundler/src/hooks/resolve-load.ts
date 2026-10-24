@@ -114,7 +114,9 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 	if (sharedInlineSources !== null) return sharedInlineSources;
 	const resolverSource = resolverVirtualModuleSourceFile(normalizedId);
 	const symbolSource = symbolVirtualModuleSourceFile(normalizedId);
-	const renderDataSource = normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}render-data:`)
+	const renderDataSource =
+		normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}render-data:`) ||
+		normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}render-data-served:`)
 		? marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot())
 		: null;
 	const ownerSource = resolverSource ?? symbolSource ?? renderDataSource;

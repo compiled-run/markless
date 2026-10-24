@@ -18,6 +18,7 @@ import {
 	warnDelegateImportFailures,
 } from '../link-driver.ts';
 import { nativePackingEnabled } from '../packing-option.ts';
+import { isServedRenderDataRequest } from '../served-render-data.ts';
 import { registerRenderDataStyles, registerTransformArtifacts } from '../plugin-state.ts';
 import type { TransformTsrxModuleInput, TransformTsrxModuleResult } from '../types.ts';
 import {
@@ -185,8 +186,9 @@ export async function emitTransformResult(
 		transformedClientPrimarySources.add(source);
 	}
 	if (currentEnvironment === 'client' && renderDataRequest) {
+		const servedRequest = isServedRenderDataRequest(id);
 		const renderDataModule = transformed.virtualModules.find(
-			(module) => module.type === 'render-data',
+			(module) => module.type === (servedRequest ? 'render-data-served' : 'render-data'),
 		);
 		if (renderDataModule) {
 			const nativeModules = renderDataNativeDependencies(
@@ -351,7 +353,11 @@ function sharesCanonicalRenderData(
 	if (request.ctx.internalOptions.dev === true || request.materializedRenderDataReach)
 		return false;
 	if (renderDataReachedFromQuery(request.id) !== undefined) return false;
-	if (renderDataModule.type !== 'render-data' || renderDataModule.canonicalRenderData !== true)
+	if (
+		(renderDataModule.type !== 'render-data' &&
+			renderDataModule.type !== 'render-data-served') ||
+		renderDataModule.canonicalRenderData !== true
+	)
 		return false;
 	const registered = request.ctx.state.virtualModules.get(renderDataModule.id);
 	return (
@@ -402,7 +408,13 @@ function renderDataNativeDependencies(
 		for (const id of moduleSpecifiers(code)) {
 			if (selected.has(id)) continue;
 			const module = modules.get(id);
-			if (!module || (module.type !== 'symbol' && module.type !== 'symbol-bundle')) continue;
+			if (
+				!module ||
+				(module.type !== 'symbol' &&
+					module.type !== 'symbol-bundle' &&
+					module.type !== 'render-data-served')
+			)
+				continue;
 			selected.set(id, module);
 			visit(module.source);
 		}

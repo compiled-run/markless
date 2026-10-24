@@ -309,6 +309,11 @@ export function emitSourceModule(input: {
 	readonly hasBoundSymbols?: boolean;
 	readonly prerenderRecords?: boolean;
 	readonly directCsr?: boolean;
+	/**
+	 * Set where a page resumes from served records: its client render path loads the full render
+	 * data from here on demand, so nothing that merely imports this module downloads it.
+	 */
+	readonly lazyFullRenderDataId?: string;
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
 	readonly hasOverlayMarks?: boolean;
@@ -363,7 +368,9 @@ export function emitSourceModule(input: {
 			: canonicalRenderData
 				? emitsSsrBody
 					? `import { marklessPrerenderData, marklessRenderData } from ${singleQuoted(input.renderDataId)};`
-					: `import { marklessPrerenderData } from ${singleQuoted(input.renderDataId)};`
+					: input.lazyFullRenderDataId
+						? ''
+						: `import { marklessPrerenderData } from ${singleQuoted(input.renderDataId)};`
 				: `import { marklessRenderData } from ${singleQuoted(input.renderDataId)};`,
 		symbolsOnly
 			? ''
@@ -490,6 +497,9 @@ export function emitSourceModule(input: {
 					ssrExportName: input.publicRenderSsrExportName,
 					ssrComponents: input.publicRenderSsrComponentExports ?? [],
 					canonicalRenderData,
+					...(canonicalRenderData && !emitsSsrBody && input.lazyFullRenderDataId
+						? { lazyFullRenderDataId: input.lazyFullRenderDataId }
+						: {}),
 					prerenderRecords: input.prerenderRecords,
 					dev: input.dev,
 				}),
@@ -776,6 +786,8 @@ export function emitResumeModule(input: {
 	readonly prerenderDataId?: string;
 	// Re-exports the render data for `import()`: one module imported both ways would not split.
 	readonly lazyRenderDataId?: string;
+	// The same for the served render data, which a page resumed from its served records loads instead.
+	readonly servedRenderDataId?: string;
 	// The page's canonical render-data module, for the component-row mint alone.
 	// `prerenderDataId` is gated on prerendered records, so a plain resumed page
 	// has none - and a component row still has to reach the surface.
@@ -840,7 +852,9 @@ export function emitResumeModule(input: {
 			input.executionLog !== 'never',
 			input.prerenderDataId,
 			stagedPrerender,
-			componentRowLoader(input) ? (input.lazyRenderDataId ?? input.renderDataId) : undefined,
+			componentRowLoader(input)
+				? (input.servedRenderDataId ?? input.lazyRenderDataId ?? input.renderDataId)
+				: undefined,
 			input.symbolRoutes.length > 0 || servedPlansOnly,
 			// A composed child's own closure plan is asked for only where this page already dispatches lean.
 			(input.closurePlanRoutes ?? []).some((route) => 'importSource' in route) &&
@@ -981,7 +995,7 @@ export function emitQueuedResumeContainerEvent(
 		'export function resumeContainerEvent(input) {',
 		'\tconst root = input.root;',
 		// The boot names a host's record by its index in the served events; this module reads the record.
-		"\tif (input.eventIndex >= 0) input = { ...input, eventRecord: (root.__mE ||= JSON.parse(root.querySelector('script[type=\"markless/view\"]').textContent).events)[input.eventIndex] };",
+		'\tif (input.eventIndex >= 0) input = { ...input, eventRecord: (root.__mE ||= JSON.parse(root.querySelector(\'script[type="markless/view"]\').textContent).events)[input.eventIndex] };',
 		// Only a page a foreign script changed evaluates the repair; the packer keeps it beside this module.
 		censusRepair
 			? "\tif (root.__marklessShifted) return import('@markless/web/fns/served-census-repair').then((census) => (census.marklessRepairCensus(root), resumeContainerEvent(input)));"
@@ -1167,6 +1181,7 @@ function emitCompiledAppDefault(input: {
 		readonly ssrFunctionName: string;
 	}>;
 	readonly canonicalRenderData: boolean;
+	readonly lazyFullRenderDataId?: string;
 	readonly prerenderRecords?: boolean;
 	readonly dev?: boolean;
 }): string {
@@ -1177,9 +1192,13 @@ function emitCompiledAppDefault(input: {
 			: input.prerenderRecords === true
 				? [`\tloadSymbol: ${input.symbolLoaderName},`]
 				: [];
-	const renderDataEntry = input.canonicalRenderData
-		? ['\trenderData: marklessPrerenderData,']
-		: [];
+	const renderDataEntry = !input.canonicalRenderData
+		? []
+		: input.lazyFullRenderDataId
+			? [
+					`\trenderData: () => import(${singleQuoted(input.lazyFullRenderDataId)}).then((data) => data.marklessPrerenderData),`,
+				]
+			: ['\trenderData: marklessPrerenderData,'];
 	// The optional render context is the per-request streaming channel (T107):
 	// dropping it here would silently force every page back to blocking SSR.
 	const servesSsr =
