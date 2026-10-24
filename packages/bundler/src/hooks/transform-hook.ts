@@ -51,6 +51,7 @@ import {
 } from './transform-link.ts';
 import {
 	type TransformRequest,
+	interfaceCompileInput,
 	planTransformHookRequest,
 	tracksSourcePublication,
 } from './transform-request.ts';
@@ -281,8 +282,7 @@ async function runFirstPassTransform(
 					manifestSource,
 					provisional.moduleImports,
 					moduleLinkArtifacts,
-					internalOptions.buildId,
-					ctx.getRoot(),
+					interfaceCompileInput(ctx),
 					provisionalImports,
 				);
 			} catch {

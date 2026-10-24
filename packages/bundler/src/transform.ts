@@ -18,6 +18,7 @@ import {
 	prerenderInterfacesComplete,
 	type BoundSymbolResolverRow,
 	type CompilerDiagnostic,
+	type CompileTsrxModuleInput,
 	type CompileTsrxModuleResult,
 	type RenderDataArtifact,
 	type RuntimeDemandMapArtifact,
@@ -1122,31 +1123,31 @@ function fulfilledEscalationSymbolIds(
 	);
 }
 
-async function compileWithBlockingDiagnostics(
-	input: Pick<
-		TransformTsrxModuleInput,
-		| 'filename'
-		| 'moduleId'
-		| 'source'
-		| 'buildId'
-		| 'symbols'
-		| 'importedModuleInterfaces'
-		| 'importedModuleConstants'
-		| 'artifactChildMaterializations'
-		| 'executionLog'
-		| 'serverOnlyProps'
-		| 'routeRoot'
-	>,
-	resolverId: string,
-) {
-	const compiled = await compileTsrxModule({
+type CompiledTransformInput = Pick<
+	TransformTsrxModuleInput,
+	| 'filename'
+	| 'moduleId'
+	| 'source'
+	| 'buildId'
+	| 'symbols'
+	| 'importedModuleInterfaces'
+	| 'importedModuleConstants'
+	| 'artifactChildMaterializations'
+	| 'executionLog'
+	| 'serverOnlyProps'
+	| 'routeRoot'
+>;
+
+/** The compiler input a transform compiles; anything else that only needs a module's interface asks for the same one. */
+export function transformCompileInput(input: CompiledTransformInput): CompileTsrxModuleInput {
+	return {
 		filename: input.filename,
 		moduleId: input.moduleId,
 		source: input.source,
 		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
 		...(input.routeRoot ? { routeRoot: true } : {}),
 		buildId: input.buildId,
-		resolverId,
+		resolverId: `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`,
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
@@ -1154,7 +1155,11 @@ async function compileWithBlockingDiagnostics(
 		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
 		// default 'auto' keeps the authored-source strings for dev tooling.
 		omitAuthoredSource: normalizeExecutionLogMode(input.executionLog) === 'never',
-	});
+	};
+}
+
+async function compileWithBlockingDiagnostics(input: CompiledTransformInput, resolverId: string) {
+	const compiled = await compileTsrxModule(transformCompileInput(input));
 	const fulfilled = fulfilledEscalationSymbolIds(compiled, input, resolverId);
 	return {
 		compiled,

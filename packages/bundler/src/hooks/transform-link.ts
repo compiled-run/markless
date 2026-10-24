@@ -45,7 +45,7 @@ import {
 	materializedReachedRenderDataSource,
 } from '../virtual-ids.ts';
 import { recoverImportedChildMetadata } from './resolve-load.ts';
-import type { TransformRequest } from './transform-request.ts';
+import { interfaceCompileInput, type TransformRequest } from './transform-request.ts';
 
 export type LinkedTransformChildren = {
 	readonly transformed: TransformTsrxModuleResult;
@@ -134,8 +134,7 @@ export function sourceBarrelComponents(
 		request.plan.manifestSource,
 		transformed.moduleImports,
 		request.ctx.state.moduleLinkArtifacts(request.currentEnvironment),
-		request.ctx.internalOptions.buildId,
-		request.ctx.getRoot(),
+		interfaceCompileInput(request.ctx),
 	);
 }
 
@@ -167,8 +166,7 @@ export async function linkTransformChildren(
 			manifestSource,
 			moduleImports,
 			moduleLinkArtifacts,
-			internalOptions.buildId,
-			ctx.getRoot(),
+			interfaceCompileInput(ctx),
 			resolvedInterfaceImports,
 		);
 	// A walk run before this one skipped `.tsrx` imports; only their re-exports are added to it.
