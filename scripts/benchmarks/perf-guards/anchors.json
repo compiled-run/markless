@@ -1538,6 +1538,14 @@
 			"from": 26155,
 			"to": 24610,
 			"reason": "an in-place navigation morphs the next page into the kept container in one task: the view transition and chunked fill are gone, -1,545 B rendered"
+		},
+		{
+			"date": "2026-10-23",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 16645,
+			"to": 17385,
+			"reason": "a key pressed while an earlier dispatch runs goes where that dispatch's handler put focus (dispatch-time code only)"
 		}
 	],
 	"runtimeModules": {
@@ -1636,7 +1644,7 @@
 		"web/resume-branches": 15037,
 		"web/resume-census": 1471,
 		"web/resume-commit-arm": 9551,
-		"web/resume-events": 16645,
+		"web/resume-events": 17385,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 17266,

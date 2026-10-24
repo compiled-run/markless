@@ -128,6 +128,8 @@ const pendingFocus = new Map<
 	}
 >();
 let openCommitPending: (() => boolean) | undefined;
+// The element a handler last focused and when, so a key that waited behind that handler can go where it put focus.
+let lastHandlerFocus: [HandleElement, number] | undefined;
 
 function installFocusShim(target: HandleElement | undefined): void {
 	if (!target || typeof target.focus !== 'function' || target[NATIVE_FOCUS]) return;
@@ -140,7 +142,10 @@ function installFocusShim(target: HandleElement | undefined): void {
 			value(options?: FocusOptions) {
 				// Uncommitted writes land first, so focus never arrives on text about to change.
 				const held = openCommitPending?.() && marklessEditableControl(target);
-				if (!held) native(options);
+				if (!held) {
+					native(options);
+					lastHandlerFocus = [target, performance.now()];
+				}
 				// A call outside a dispatch has no commit to wait for. Inside one, the
 				// last call is the one the handler meant, whether the target refused it
 				// or took it: the commit can undo either.
@@ -207,6 +212,24 @@ export function marklessEndFocusCommit(dispatch: number): void {
 	if (held.took && held.target.ownerDocument?.activeElement !== held.target.ownerDocument?.body)
 		return;
 	held.target[NATIVE_FOCUS]?.call(held.target, held.options);
+	lastHandlerFocus = [held.target, performance.now()];
+}
+
+// A key pressed while an earlier dispatch ran goes where that dispatch's handler then put focus, as if it had run at once.
+function keyTargetAfterHandlerFocus(event: ResumeDomEvent, root: ResumeDomElement) {
+	const key = event as unknown as KeyboardEvent;
+	const active =
+		key.key &&
+		key.isTrusted &&
+		lastHandlerFocus &&
+		lastHandlerFocus[1] > key.timeStamp &&
+		lastHandlerFocus[0];
+	return active &&
+		active !== event.target &&
+		active.ownerDocument?.activeElement === active &&
+		containsElement(root, active as ResumeDomElement)
+		? (active as ResumeDomElement)
+		: undefined;
 }
 
 // Focus reaches an element before any key event can. These are the names a
@@ -464,10 +487,14 @@ export function createEventWiring(input: {
 		event: ResumeDomEvent,
 		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {
+		const moved = keyTargetAfterHandlerFocus(event, input.root);
+		if (moved) Object.defineProperty(event, 'target', { value: moved });
 		const target = event.target;
 		// A field's own events stay in order: its edit hold judges each write against non-overlapping dispatches.
 		const options = {
 			...dispatchOptions,
+			// A key the browser would have sent to an element with no handler does nothing there.
+			...(moved ? { ignoreUnmatched: true } : {}),
 			releaseQueue: marklessEditableControl(target)
 				? undefined
 				: input.root.__marklessReleaseDispatch,

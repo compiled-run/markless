@@ -12,6 +12,7 @@ import ServedOpen from './scenarios/served-open.tsrx';
 import SpentTrigger from './scenarios/spent-trigger.tsrx';
 import Fallback from './scenarios/fallback.tsrx';
 import Labelled from './scenarios/labelled.tsrx';
+import LiveRegionBehind from './scenarios/live-region-behind.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
@@ -556,6 +557,32 @@ test('CSR: tabbing off the last control in the dialog does not reach the page be
 	expect(el(Background).contains(document.activeElement)).toBe(false);
 
 	await closeBasic();
+});
+
+test('CSR: Tab does not carry focus into a live region behind the dialog, which stays announceable', async () => {
+	await render(LiveRegionBehind);
+	await openBasic();
+	const live = page.getByTestId('live');
+
+	el<HTMLElement>(Close).focus();
+	await userEvent.keyboard('{Tab}');
+	expect(el(Content).contains(document.activeElement)).toBe(true);
+	await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+	expect(el(live).contains(document.activeElement)).toBe(false);
+	expect(el(live).hasAttribute('inert')).toBe(false);
+	expect(el(live).getAttribute('aria-hidden')).toBe(null);
+
+	await closeBasic();
+});
+
+test('CSR: an aria-live="off" container behind the dialog is marked like the rest of the page', async () => {
+	await render(LiveRegionBehind);
+	await openBasic();
+
+	await expect.poll(() => el(page.getByTestId('quiet')).hasAttribute('inert')).toBe(true);
+
+	await closeBasic();
+	expect(el(page.getByTestId('quiet')).hasAttribute('inert')).toBe(false);
 });
 
 test('CSR: a display-contents wrapper breaks neither the opening focus nor the tab cycle', async () => {

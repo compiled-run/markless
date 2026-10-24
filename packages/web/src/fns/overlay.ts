@@ -32,8 +32,8 @@
  * without superseding one another - two tips an author served open are both
  * what the author asked for.
  *
- * What it deliberately does not do. It never closes anything and never moves
- * focus. It does READ focus - `document.activeElement` at the moment an element
+ * What it deliberately does not do. It never closes anything, and it moves
+ * focus only to keep it inside a modal (below). It does READ focus - `document.activeElement` at the moment an element
  * enlists is left on that element, because only this module is present at that
  * moment and a family restoring focus later cannot go back and look. Reading is
  * not moving: what to do with it is the family's. `dismiss` is a report, not an
@@ -42,7 +42,9 @@
  * family's to implement is modality, because it is document-wide and has to be
  * reference counted across nesting - so an enlisted element that the family
  * authored `aria-modal="true"` on takes the rest of the page out of reach and
- * locks the page's scroll, and gives both back when it leaves the stack.
+ * locks the page's scroll, and gives both back when it leaves the stack. Out of
+ * reach includes the keyboard: a live region behind it stays announceable, so
+ * focus that Tab carries out of the modal is sent back to where it came from.
  *
  * An enlisted element must still be attached when it hides. An element removed
  * from the document while it is on the stack leaves its background marks behind,
@@ -97,6 +99,7 @@ export type OverlayDismissDetail = {
 type OverlayEntry = {
 	readonly element: HTMLElement;
 	readonly hint: boolean;
+	readonly modal: boolean;
 	readonly undo: Array<() => void>;
 };
 
@@ -278,7 +281,8 @@ function enlist(element: HTMLElement, owner: Document, becameShown: boolean): vo
 	if (becameShown)
 		for (const other of stack.filter(isHint))
 			if (!other.element.contains(element)) reportDismiss(other.element, 'superseded');
-	const entry: OverlayEntry = { element, hint, undo: [] };
+	const modal = element.matches?.(MODAL_SELECTOR) === true || element.querySelector(MODAL_SELECTOR) !== null;
+	const entry: OverlayEntry = { element, hint, modal, undo: [] };
 	stack.push(entry);
 
 	// Read before anything below marks the background: marking makes the subtree
@@ -294,7 +298,7 @@ function enlist(element: HTMLElement, owner: Document, becameShown: boolean): vo
 	// role belongs to the content, so the test reads the enlisted element or its
 	// subtree. Anything else - what closes, where focus lands - stays the family's
 	// own handler.
-	if (element.matches?.(MODAL_SELECTOR) || element.querySelector(MODAL_SELECTOR)) {
+	if (modal) {
 		entry.undo.push(hideBackground(element));
 		entry.undo.push(lockScroll(owner));
 	}
@@ -366,7 +370,7 @@ function collectOutsideSubtrees(parent: Element, surface: Element, outside: Elem
 		// A live region behind a modal still has to announce, so it is neither
 		// marked nor descended into; a subtree holding one is descended into so
 		// the region survives while its siblings are marked.
-		if (child.hasAttribute('aria-live')) continue;
+		if (isLiveRegion(child)) continue;
 		if (holdsLiveRegion(child)) {
 			collectOutsideSubtrees(child, surface, outside);
 			continue;
@@ -377,9 +381,15 @@ function collectOutsideSubtrees(parent: Element, surface: Element, outside: Elem
 
 function holdsLiveRegion(element: Element): boolean {
 	for (const child of Array.from(element.children)) {
-		if (child.hasAttribute('aria-live') || holdsLiveRegion(child)) return true;
+		if (isLiveRegion(child) || holdsLiveRegion(child)) return true;
 	}
 	return false;
+}
+
+// `aria-live="off"` is the attribute saying the element is not a live region.
+function isLiveRegion(element: Element): boolean {
+	const live = element.getAttribute('aria-live');
+	return live !== null && live !== 'off';
 }
 
 function mark(element: Element, attribute: BackgroundAttribute): () => void {
@@ -440,6 +450,7 @@ function listen(owner: Document): void {
 	stopListening();
 	owner.addEventListener('keydown', onKeyDown, true);
 	owner.addEventListener('pointerdown', onPointerDown, true);
+	owner.addEventListener('focusin', onFocusIn, true);
 	listeningDocument = owner;
 }
 
@@ -447,7 +458,31 @@ function stopListening(): void {
 	if (!listeningDocument) return;
 	listeningDocument.removeEventListener('keydown', onKeyDown, true);
 	listeningDocument.removeEventListener('pointerdown', onPointerDown, true);
+	listeningDocument.removeEventListener('focusin', onFocusIn, true);
 	listeningDocument = undefined;
+}
+
+function onFocusIn(event: FocusEvent): void {
+	const target = event.target;
+	if (!(target instanceof Node)) return;
+	let index = stack.length - 1;
+	for (; index >= 0; index -= 1) {
+		const entry = stack[index]!;
+		// A surface stacked above the modal is part of it, wherever it is rendered.
+		if (entry.element.contains(target)) return;
+		if (entry.modal) break;
+	}
+	const modal = stack[index];
+	// The closing family hands focus back while the observer has yet to release the entry.
+	if (!modal || modal.element.hidden || !modal.element.isConnected) return;
+	const from = event.relatedTarget;
+	const back =
+		from instanceof HTMLElement && modal.element.contains(from)
+			? from
+			: modal.element.matches(MODAL_SELECTOR)
+				? modal.element
+				: modal.element.querySelector<HTMLElement>(MODAL_SELECTOR);
+	back?.focus();
 }
 
 function onKeyDown(event: KeyboardEvent): void {

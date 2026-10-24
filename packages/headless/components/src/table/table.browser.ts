@@ -326,6 +326,16 @@ test('CSR: Home and End go to the ends of the row, and with Control to the corne
 	await expect.poll(() => document.activeElement).toBe(el(ReadmeName));
 });
 
+test('SSR: keys pressed while the first click is still waking the table go where focus is when they run', async () => {
+	await renderSSR(Selectable);
+
+	await userEvent.click(el(LicenseName));
+	await userEvent.keyboard('{ArrowDown} ');
+
+	await expect.poll(() => picked(el(Root))).toEqual(['changelog']);
+	expect(document.activeElement).toBe(el(ChangelogItem));
+});
+
 test('CSR: the space bar picks the row the focused cell sits in', async () => {
 	await render(PickedCells);
 	el(ReadmeSize).focus();
