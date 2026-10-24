@@ -12,12 +12,14 @@ The process below answers each one.
 
 ## 1. `pnpm ci:local`: run exactly what CI runs
 
+For a write task only `--fast` runs locally; heavier jobs run on the pull request (section 3).
+
 `scripts/ci/local.mjs` reads `.github/workflows/ci.yml` at run time and runs each job's `run:` steps. Nothing is copied from the YAML by hand, so a step added to the workflow is picked up automatically. The only thing the script owns is a small table saying, for each job with checks, whether it belongs to the fast set, the full set, or runs only in CI. A new job without an entry makes the script exit with an error that names it, so the table cannot fall behind silently.
 
 ```sh
 pnpm ci:local --list      # every job and step in ci.yml, and what runs locally
 pnpm ci:local             # fast mode (same as --fast)
-pnpm ci:local --full      # every job this machine can run
+pnpm ci:local --full      # every job this machine can run (debugging only: the PR's CI run is the receipt)
 pnpm ci:local --job browser --job boxes-router   # just these jobs
 pnpm ci:local --clean     # same, in a throwaway worktree of HEAD
 pnpm ci:local --linux     # each job in its own Linux container (needs docker)
@@ -95,14 +97,15 @@ Why not `act`: it replays the whole workflow including `actions/cache`, artifact
 
 When to use it: before pushing anything that touches the HMR/dev server, native dependencies, keyboard or focus handling in browser tests, or the workflow's install steps. Otherwise, a PR run is the Linux check.
 
-## 3. Before pushing to `main` (agents and PM)
+## 3. What runs where (agents and PM)
 
-A push to `main` needs all of these, run on the exact commit being pushed:
+Heavy verification runs on GitHub Actions, not on this Mac. The org's plan runs 60 jobs at once; this Mac runs about three heavy commands before everything on it slows down, and the load itself made tests flaky.
 
-1. `pnpm ci:local --fast --clean` is green. `--clean` makes it the committed tree, so an untracked helper file or a leftover build cannot make it pass. This is 70 seconds.
-2. `pnpm ci:local --full` is green for every job whose inputs the change touches, and always when the change touches `packages/bundler`, `packages/router`, `packages/web`, `packages/runtime`, the demos, or anything a box reads. When in doubt, run `--full`.
-3. If the change is Linux-sensitive (list above) and `--linux` is not available, push to a branch and open a PR. Wait for its CI instead of pushing to `main` directly.
-4. The receipt says which `ci:local` mode ran, on which commit, and the result line it printed. "Green on N runs" in prose is not a receipt.
+1. **Locally, every write task:** `pnpm run typecheck` and `pnpm ci:local --fast` (agent files, typecheck, unit). The pre-commit hook runs the fast jobs on every commit too.
+2. **On GitHub, through the pull request:** everything heavier. That means browser, the `boxes-*` lanes, build-scale, perf-guards, the benchmark, demo and website boxes, and the migrate checks. Push the branch, open the PR, and let CI run.
+3. **The receipt is the PR's green CI run** on the exact commit: its run URL, or the commit's check summary. No task is reported done before that run is green. "Green on N local runs" in prose is not a receipt.
+4. **Local heavy runs are for debugging one specific failure:** `pnpm ci:local --job <id>`, or the single test file. They do not replace the PR run.
+5. **A/B build timings** go through the `Build timing` workflow (`gh workflow run build-timing.yml -f base=<ref> -f head=<ref> -f app=<dir> -f rounds=<n>`), which interleaves both refs on one runner. No scratch branches.
 
 Multi-commit series (for example a migration done unit by unit) go on a branch with a PR. `main` gets the series after the PR is green, not one red commit at a time. The vite-plus migration put 21 consecutive red commits on `main` this way.
 
@@ -175,6 +178,26 @@ What changed, and the rule going forward:
 - `prepare-playwright` looks the browser cache up instead of restoring it, and skips the pnpm store cache.
 - `cache-cleanup.yml` deletes a pull request's caches when it closes, and a daily sweep deletes caches of closed pull requests and deleted branches and every main tool cache but the newest per key. Dry run against 2026-10-23: 232 of 722 entries, 6.6 of 10.6 GB.
 - A new cache step needs a reason it pays for itself: what one restore costs, how many jobs restore it per run, and what it saves over downloading. A cache restored by a large matrix is the first suspect.
+
+### The VoiceOver lane (parked)
+
+`voiceover` in `screen-reader.yml` is advisory (`continue-on-error`). Since #150 it reads 12 or 13 of 29 families green on the `macos-latest` (macOS 26) image, up from 2 to 4. A redesign of the real-reader driver is parked; this records where the rest fail and the options, so the next attempt starts from evidence. The traces are in the logs of runs 39890507893, 39892233837, 39896946755 and 39904970834, which log every phrase.
+
+The rest fail in four ways:
+
+1. **Runner setup.** `guidepup/setup-action` sometimes fails with "Unable to write to the user TCC.db - SIP might not be disabled" or "Failed to enable Do not disturb mode": 1 to 3 families a run, a different set each time. This is the runner image, not the families.
+2. **Speech after a focus move is not captured** (menu, modal, drawer, select, menubar). After Enter opens a surface and the family moves focus, `lastSpokenPhrase()` returns `""`: guidepup records only speech that follows one of its own commands, and VoiceOver's focus-following announcement is not one.
+3. **Keys go to the page's focus, not VoiceOver's cursor** (buttongroup, colorpicker, crop, rating). The transcript walks the cursor with `next()` and then presses a key; on this runner keyboard focus does not follow VoiceOver's cursor, so the key reaches whatever was focused before.
+4. **Containers VoiceOver steps over** (toolbar; tabs, editable and tour time out or miss a phrase for the same kind of reason). VoiceOver treats a toolbar as one item and needs its interact command to enter it.
+
+Options, cheapest first:
+
+- **A. Leave it advisory and stop here.** NVDA and the virtual reader already gate the same transcripts. Cost: the VoiceOver job stays mostly red and stops being read.
+- **B. Give `RealDriverSpec` VoiceOver-only hooks and keep the shared transcripts.** `focusCursor` would run "move keyboard focus to VoiceOver cursor" before a key, only after a walk (fixes 3). `speakFocus` would run "move VoiceOver cursor to keyboard focus" with capture, only after a family moved focus itself (fixes 2). `enter` would run `interact()` on a container (fixes 4). A first version of `focusCursor` and `speakFocus` was tried in #150 and reverted: it broke the slider transcript (ArrowRight left the thumb at 50 where 41 was expected), and the cause was not established. Start by reproducing that on one family. Cost: a driver change plus one VoiceOver CI run per family to check it.
+- **C. Separate VoiceOver transcripts** for the families whose interaction model differs (menu-like surfaces, toolbar, composite widgets), and keep the shared one elsewhere. Cost: two expectations to maintain per such family.
+- **D. Move the lane to a self-hosted Mac** where TCC and Do Not Disturb are set once by hand. This only removes failure 1.
+
+Recommendation: B, then C only for whatever B leaves red, with A as the state until someone owns it.
 
 ## 8. Cutting a release
 

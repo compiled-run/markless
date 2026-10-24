@@ -475,12 +475,12 @@ test('CSR: a drag moves the boundary as far as the pointer went', async () => {
 	pointer(divider, 'pointermove', at.x + 80, at.y);
 	pointer(divider, 'pointerup', at.x + 80, at.y);
 
-	await expect.poll(() => Number(el(Nav).getAttribute('ui-size'))).toBeGreaterThan(30);
+	// The release is its own dispatch, queued behind the moves that already resized the panels.
+	await expect.poll(() => el(Settled).textContent).toBe('1');
 	expect(el(Nav).getBoundingClientRect().width).toBeCloseTo(before + 80, 0);
 	const nav = Number(el(Nav).getAttribute('ui-size'));
 	const main = Number(el(Main).getAttribute('ui-size'));
 	expect(nav + main).toBeCloseTo(100, 2);
-	expect(el(Settled).textContent).toBe('1');
 	expect(Number(el(Changed).textContent)).toBeGreaterThan(1);
 	expect(el(SettledAt).textContent).toBe(String(nav));
 });
