@@ -1404,11 +1404,16 @@ function emitResumeContainerEvent(
 	routedClosures = false,
 	streamsArms = false,
 ): string {
+	// An in-place navigation that swapped the page while a wake awaited code gave the container a new lifetime: the wake stops before reading the next page's DOM.
+	const lifeOpen = (indent: string) => `${indent}const marklessLife = handoff.root.__mL;`;
+	const lifeCheck = (indent: string) => `${indent}if (handoff.root.__mL !== marklessLife) return;`;
 	// A runtime woken while a streamed @pending arm is still on its way adopts that arm.
 	const armsOpen = (indent: string) =>
 		streamsArms
 			? [
-					`${indent}const marklessArms = (await import('@markless/web/fns/streamed-arms')).marklessStreamedArms(handoff.root, ${loadSymbolName});`,
+					`${indent}const marklessArmsModule = await import('@markless/web/fns/streamed-arms');`,
+					lifeCheck(indent),
+					`${indent}const marklessArms = marklessArmsModule.marklessStreamedArms(handoff.root, ${loadSymbolName});`,
 				]
 			: [];
 	const armsStarted = (indent: string) =>
@@ -1426,9 +1431,11 @@ function emitResumeContainerEvent(
 		stagedPrerender && prerenderDataId
 			? [
 					'async function marklessFullResumeHandoff(handoff) {',
+					lifeOpen('\t'),
 					'\thandoff.root.__asyncResumeRuntimeStarted = true;',
 					'\tconst group = await marklessLoadPrerenderTriggerGroup(handoff);',
 					"\tconst { mergePrerenderPayloadRecords, resumePrerenderTriggerGroup } = await import('@markless/web/fns/prerender-trigger-resume');",
+					lifeCheck('\t'),
 					// Staging is an optimization, never a correctness gate: interactions
 					// no group covers (branch-arm events today, future record kinds
 					// tomorrow) fall back to the full prerender resume.
@@ -1436,9 +1443,12 @@ function emitResumeContainerEvent(
 					"\t\tconst { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
 					// Cached per root, never registered on the dispatch chain: a registered
 					// handler sits outermost and would starve the group loader above.
+					lifeCheck('\t\t'),
 					'\t\thandoff.root.__marklessFullResumeRuntime ??= (async () => {',
 					'\t\t\tconst marklessPrerenderData = await marklessLoadPrerenderData();',
-					`\t\t\tconst fallbackRecords = mergePrerenderPayloadRecords(await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName}), handoff.root);`,
+					`\t\t\tconst derivedRecords = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
+					lifeCheck('\t\t\t'),
+					'\t\t\tconst fallbackRecords = mergePrerenderPayloadRecords(derivedRecords, handoff.root);',
 					'\t\t\treturn (await resumeFromPrerenderRecords({',
 					'\t\t\t\t...fallbackRecords,',
 					'\t\t\t\troot: handoff.root,',
@@ -1448,6 +1458,7 @@ function emitResumeContainerEvent(
 					'\t\t\t})).runtime;',
 					'\t\t})();',
 					'\t\tconst marklessFullRuntime = await handoff.root.__marklessFullResumeRuntime;',
+					'\t\tif (!marklessFullRuntime) return;',
 					'\t\tawait marklessFullRuntime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 					'\t\treturn;',
 					'\t}',
@@ -1462,6 +1473,7 @@ function emitResumeContainerEvent(
 			: prerenderDataId
 				? [
 						'async function marklessFullResumeHandoff(handoff) {',
+						lifeOpen('\t'),
 						'\thandoff.root.__marklessLinkedRenderDataBoot = true;',
 						'\thandoff.root.__asyncResumeRuntimeStarted = true;',
 						// One runtime per container: this runs on EVERY event, so an
@@ -1469,6 +1481,7 @@ function emitResumeContainerEvent(
 						'\tconst runtime = await (handoff.root.__marklessFullResumeRuntime ??= (async () => {',
 						"\t\tconst { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
 						`\t\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
+						lifeCheck('\t\t'),
 						'\t\tconst mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);',
 						...armsOpen('\t\t'),
 						streamsArms
@@ -1483,14 +1496,17 @@ function emitResumeContainerEvent(
 							? ['\t\t});', ...armsStarted('\t\t'), '\t\treturn resumed.runtime;']
 							: ['\t\t})).runtime;']),
 						'\t})());',
+						'\tif (!runtime) return;',
 						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 						'}',
 					].join('\n')
 				: [
 						'async function marklessFullResumeHandoff(handoff) {',
+						lifeOpen('\t'),
 						'	handoff.root.__asyncResumeRuntimeStarted = true;',
 						...armsOpen('\t'),
 						`	const { resumeFromPayloadDocument } = await import(${singleQuoted(resumeEntry)});`,
+						lifeCheck('\t'),
 						'	const { runtime } = await resumeFromPayloadDocument({',
 						'		document: handoff.document,',
 						'		root: handoff.root,',
@@ -1550,7 +1566,9 @@ function emitResumeContainerEvent(
 			'	});',
 		];
 		const row = [
+			'	const marklessLife = input.root.__mL;',
 			"	const { resumeScalarRowEventFromPayloadDocument } = await import('@markless/web/event-only-lean/row');",
+			'	if (input.root.__mL !== marklessLife) return;',
 			'	await resumeScalarRowEventFromPayloadDocument({',
 			...leanInput,
 		];

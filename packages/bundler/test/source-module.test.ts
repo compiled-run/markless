@@ -55,6 +55,44 @@ test('emitSourceModule keeps full resume behind a dynamic handoff', () => {
 	);
 });
 
+test('a full-resume wake whose page an in-place navigation swapped while its code loaded leaves the next page alone', async () => {
+	const source = emitResumeModule({ ...baseInput, needsFullResume: true, streamsArms: true })
+		.replace(/^import .*;$/gm, '')
+		.replace(/export /g, '')
+		.replace(/\bimport\(/g, 'loadModule(');
+	const wake = async (swapDuring?: string) => {
+		const root: Record<string, unknown> = { __mL: {}, querySelector: () => null };
+		const resumed: unknown[] = [];
+		const adopted: unknown[] = [];
+		const loadModule = async (id: string) => {
+			// The router's swap gives the container a new page lifetime.
+			if (id === swapDuring) root.__mL = {};
+			if (id === '@markless/web/fns/streamed-arms')
+				return {
+					marklessStreamedArms: (armsRoot: unknown) => (
+						adopted.push(armsRoot), { loadSymbol: () => undefined, started: () => undefined }
+					),
+				};
+			if (id === '@markless/core/web/resume')
+				return {
+					resumeFromPayloadDocument: async (input: unknown) => (
+						resumed.push(input), { runtime: { dispatch: async () => undefined } }
+					),
+				};
+			return {};
+		};
+		const resume = new Function('loadModule', `${source}\nreturn resumeContainerEvent;`)(
+			loadModule,
+		) as (input: unknown) => Promise<void>;
+		await resume({ root, event: { type: 'click' } });
+		return { resumed: resumed.length, adopted: adopted.length };
+	};
+
+	expect(await wake()).toEqual({ resumed: 1, adopted: 1 });
+	expect(await wake('@markless/core/web/resume')).toEqual({ resumed: 0, adopted: 1 });
+	expect(await wake('@markless/web/fns/streamed-arms')).toEqual({ resumed: 0, adopted: 0 });
+});
+
 test('server source module carries the prerender wake URL beside the regular resume URL', () => {
 	const code = emitSourceModule({
 		...baseInput,
