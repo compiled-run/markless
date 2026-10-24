@@ -22,6 +22,8 @@ export interface FragmentNavigationConfig {
 	readonly pageStartComment: string;
 	// The container's own attributes, never carried from the leaving page's element to the next one.
 	readonly containerAttributes: readonly [container: string, paths: string];
+	// A component output both pages render byte for byte, and the element in it holding the page's own children.
+	readonly keepAttributes: readonly [keep: string, own: string];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
 	readonly documentLoads: boolean;
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
@@ -608,6 +610,13 @@ function morphRange(
 	page: boolean,
 ): void {
 	for (const next of incoming) {
+		if (cursor && cursor !== stop && keptAlike(cursor, next)) {
+			const after = cursor.nextSibling;
+			if (!replaceOwn(d, cursor as Element, next as Element, fresh))
+				morphNode(d, cursor, next, fresh, page);
+			cursor = after;
+			continue;
+		}
 		// A node the next page dropped from a list: the one after it is the match.
 		if (cursor && cursor !== stop && !sameKind(cursor, next)) {
 			const after = cursor.nextSibling;
@@ -631,6 +640,37 @@ function morphRange(
 		cursor.remove();
 		cursor = after;
 	}
+}
+
+// Set for each navigation from the config: the server marks what both pages render byte for byte.
+let keepAttributes: readonly [keep: string, own: string] = ['', ''];
+
+function keptAlike(from: ChildNode, to: ChildNode): boolean {
+	if (from.nodeType !== 1 || to.nodeType !== 1 || !keepAttributes[0]) return false;
+	const hash = (from as Element).getAttribute(keepAttributes[0]);
+	return hash !== null && hash === (to as Element).getAttribute(keepAttributes[0]);
+}
+
+// The page's own children inside a kept element: the outermost marked elements, the root itself when it is one.
+function ownSlots(root: Element): Element[] {
+	const own = keepAttributes[1];
+	if (root.hasAttribute(own)) return [root];
+	return [...root.querySelectorAll(`[${own}]`)].filter(
+		(slot) => !root.contains(slot.parentElement?.closest(`[${own}]`) ?? null),
+	);
+}
+
+// A kept element stays as it is, with whatever scripts did to it; only the page's own children are replaced, whole.
+function replaceOwn(d: Document, from: Element, to: Element, fresh: Element[]): boolean {
+	const leaving = ownSlots(from);
+	const arriving = ownSlots(to);
+	if (leaving.length !== arriving.length) return false;
+	leaving.forEach((slot, index) => {
+		const nodes = Array.from(arriving[index]!.childNodes, (node) => d.adoptNode(node));
+		slot.replaceChildren(...nodes);
+		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
+	});
+	return true;
 }
 
 function morphNode(
@@ -876,6 +916,7 @@ export async function navigate(
 	const commit = (): boolean => {
 		if (id !== session.navigation) return false;
 		const settle = withoutTransitions(d);
+		keepAttributes = state.config.keepAttributes ?? ['', ''];
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
 			if (!element.isConnected || !scope.contains(element)) continue;
