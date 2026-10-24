@@ -29,8 +29,11 @@ import {
 } from '../build/prerender.ts';
 import { executionLogActivationInjection } from '../execution-log.ts';
 import { usePersistentStrippedCode } from '../transform.ts';
-import { createCompileWorkerPool, type CompileWorkerPool } from '../compile-workers.ts';
-import { availableParallelism } from 'node:os';
+import {
+	buildWorkerCount,
+	createCompileWorkerPool,
+	type CompileWorkerPool,
+} from '../build-workers.ts';
 import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
@@ -285,11 +288,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				usePersistentCompileStore(compileCache);
 				usePersistentStrippedCode(compileCache.strippedCode);
 				compileWorkers = createCompileWorkerPool({
-					size: compileWorkerCount(),
+					size: buildWorkerCount(),
 					store: { cache: compileCache, directory, fingerprint },
 				});
 			} else if (!serve)
-				compileWorkers = createCompileWorkerPool({ size: compileWorkerCount() });
+				compileWorkers = createCompileWorkerPool({ size: buildWorkerCount() });
 			if (compileWorkers) useCompileRunner(compileWorkers.run);
 			if (serve) {
 				devTags.registerViteTags(resolvedConfig.base);
@@ -770,8 +773,3 @@ function getBuildEnvironment(context: unknown): MarklessEnvironment {
 
 export type MarklessVitePlugin = ReturnType<typeof markless>[number];
 
-function compileWorkerCount(): number {
-	const configured = Number(process.env.MARKLESS_COMPILE_WORKERS);
-	if (Number.isInteger(configured) && configured >= 0) return configured;
-	return Math.max(0, Math.min(availableParallelism() - 1, 7));
-}
