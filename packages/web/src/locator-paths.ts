@@ -34,6 +34,8 @@ type ServedElement = {
 	readonly parent: number;
 	/** Its place among the parent's element children. */
 	readonly child: number;
+	/** Its place among the parent's child nodes, text and comments included. */
+	readonly node: number;
 };
 
 type ServedTree = {
@@ -47,8 +49,17 @@ type ServedTree = {
 };
 
 export function servedElementTree(html: string): ServedTree {
-	const elements: ServedElement[] = [{ tag: '', parent: -1, child: 0 }];
+	const elements: ServedElement[] = [{ tag: '', parent: -1, child: 0, node: 0 }];
 	const childCounts = [0];
+	const nodeCounts = [0];
+	// Adjacent text the parser joins into one node, tracked per parent.
+	const inText = [false];
+	const current = () => (stack.length ? stack[stack.length - 1]!.index : 0);
+	const node = (parent: number, text: boolean) => {
+		if (templateDepth > 0 || (text && inText[parent])) return;
+		nodeCounts[parent]!++;
+		inText[parent] = text;
+	};
 	const commentElementIndexes: number[] = [];
 	const nameEnds = [0];
 	const stack: Array<{ readonly tag: string; readonly index: number }> = [];
@@ -59,7 +70,9 @@ export function servedElementTree(html: string): ServedTree {
 	while (at < html.length) {
 		const open = html.indexOf('<', at);
 		if (open < 0) break;
+		if (open > at) node(current(), true);
 		if (html.startsWith('<!--', open)) {
+			node(current(), false);
 			const end = html.indexOf('-->', open + 4);
 			at = end < 0 ? html.length : end + 3;
 			const data = html.slice(open + 4, end < 0 ? html.length : end);
@@ -69,6 +82,7 @@ export function servedElementTree(html: string): ServedTree {
 		}
 		const next = html[open + 1] ?? '';
 		if (next === '!' || next === '?') {
+			node(current(), false);
 			const end = html.indexOf('>', open);
 			at = end < 0 ? html.length : end + 1;
 			continue;
@@ -77,6 +91,7 @@ export function servedElementTree(html: string): ServedTree {
 		const nameStart = closing ? open + 2 : open + 1;
 		const nameMatch = /^[a-zA-Z][^\s/>]*/.exec(html.slice(nameStart, nameStart + 64));
 		if (!nameMatch) {
+			node(current(), true);
 			at = open + 1;
 			continue;
 		}
@@ -102,8 +117,17 @@ export function servedElementTree(html: string): ServedTree {
 			lower === PROTOCOL_TEMPLATE_CONTENT_TAG &&
 			DECLARATIVE_SHADOW_ROOT.test(html.slice(nameStart + name.length, tagEnd));
 		if (templateDepth === 0 && !shadowRoot) {
-			index = elements.push({ tag, parent, child: childCounts[parent]!++ }) - 1;
+			index =
+				elements.push({
+					tag,
+					parent,
+					child: childCounts[parent]!++,
+					node: nodeCounts[parent]!,
+				}) - 1;
+			node(parent, false);
 			childCounts.push(0);
+			nodeCounts.push(0);
+			inText.push(false);
 			nameEnds.push(nameStart + name.length);
 		}
 		if (VOID_TAGS.has(lower) || selfClosing) continue;
