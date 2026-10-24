@@ -10,7 +10,7 @@ on:
     # Manual runs only: main's ruleset does not count required checks from a dispatched run.
     workflow_dispatch:
 
-# Every main commit gets a complete run: in a shared group a newer push cancelled the run still
+# Every main commit gets a run of its own: in a shared group a newer push cancelled the run still
 # waiting, so back-to-back merges left main with no finished run. A pull request still cancels its
 # superseded run.
 concurrency:
@@ -145,49 +145,71 @@ jobs:
     # hash.
     lanes:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            # Reads the merge queue's CI run for this commit.
+            actions: read
         timeout-minutes: 10
         outputs:
             # The browsers are a function of the Playwright version, the system packages of that and the runner image:
             # a lockfile change elsewhere keeps both caches, so no job downloads them from the CDN or the apt mirror.
+            queue_run: ${{ steps.queue.outputs.run }}
             playwright_version: ${{ steps.playwright.outputs.version }}
             image_os: ${{ steps.playwright.outputs.image }}
             key_unit: ${{ steps.unit.outputs.cache-primary-key }}
-            run_unit: ${{ steps.unit.outputs.cache-hit != 'true' }}
+            run_unit: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true') }}
             key_browser: ${{ steps.browser.outputs.cache-primary-key }}
-            run_browser: ${{ steps.browser.outputs.cache-hit != 'true' }}
+            run_browser: ${{ steps.queue.outputs.tested != 'true' && (steps.browser.outputs.cache-hit != 'true') }}
             key_completion_matrix: ${{ steps.completion_matrix.outputs.cache-primary-key }}
-            run_completion_matrix: ${{ steps.completion_matrix.outputs.cache-hit != 'true' }}
+            run_completion_matrix: ${{ steps.queue.outputs.tested != 'true' && (steps.completion_matrix.outputs.cache-hit != 'true') }}
             key_boxes_bundler: ${{ steps.boxes_bundler.outputs.cache-primary-key }}
-            run_boxes_bundler: ${{ steps.boxes_bundler.outputs.cache-hit != 'true' }}
+            run_boxes_bundler: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_bundler.outputs.cache-hit != 'true') }}
             key_boxes_router: ${{ steps.boxes_router.outputs.cache-primary-key }}
-            run_boxes_router: ${{ steps.boxes_router.outputs.cache-hit != 'true' }}
+            run_boxes_router: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_router.outputs.cache-hit != 'true') }}
             key_boxes_music_player: ${{ steps.boxes_music_player.outputs.cache-primary-key }}
-            run_boxes_music_player: ${{ steps.boxes_music_player.outputs.cache-hit != 'true' }}
+            run_boxes_music_player: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_music_player.outputs.cache-hit != 'true') }}
             key_boxes_music_player_ssr: ${{ steps.boxes_music_player_ssr.outputs.cache-primary-key }}
-            run_boxes_music_player_ssr: ${{ steps.boxes_music_player_ssr.outputs.cache-hit != 'true' }}
+            run_boxes_music_player_ssr: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_music_player_ssr.outputs.cache-hit != 'true') }}
             key_receipts: ${{ steps.receipts.outputs.cache-primary-key }}
-            run_receipts: ${{ steps.receipts.outputs.cache-hit != 'true' }}
+            run_receipts: ${{ steps.queue.outputs.tested != 'true' && (steps.receipts.outputs.cache-hit != 'true') }}
             key_website_boxes: ${{ steps.website_boxes.outputs.cache-primary-key }}
-            run_website_boxes: ${{ steps.website_boxes.outputs.cache-hit != 'true' }}
+            run_website_boxes: ${{ steps.queue.outputs.tested != 'true' && (steps.website_boxes.outputs.cache-hit != 'true') }}
             key_perf_guards: ${{ steps.perf_guards.outputs.cache-primary-key }}
-            run_perf_guards: ${{ steps.perf_guards.outputs.cache-hit != 'true' }}
+            run_perf_guards: ${{ steps.queue.outputs.tested != 'true' && (steps.perf_guards.outputs.cache-hit != 'true') }}
             key_demo_boxes: ${{ steps.demo_boxes.outputs.cache-primary-key }}
-            run_demo_boxes: ${{ steps.demo_boxes.outputs.cache-hit != 'true' }}
+            run_demo_boxes: ${{ steps.queue.outputs.tested != 'true' && (steps.demo_boxes.outputs.cache-hit != 'true') }}
             key_build_scale: ${{ steps.build_scale.outputs.cache-primary-key }}
-            run_build_scale: ${{ steps.build_scale.outputs.cache-hit != 'true' }}
+            run_build_scale: ${{ steps.queue.outputs.tested != 'true' && (steps.build_scale.outputs.cache-hit != 'true') }}
             key_build_warnings: ${{ steps.build_warnings.outputs.cache-primary-key }}
-            run_build_warnings: ${{ steps.build_warnings.outputs.cache-hit != 'true' }}
-            run_playwright:
-                ${{ steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' ||
+            run_build_warnings: ${{ steps.queue.outputs.tested != 'true' && (steps.build_warnings.outputs.cache-hit != 'true') }}
+            run_playwright: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' ||
                 steps.boxes_bundler.outputs.cache-hit != 'true' ||
                 steps.website_boxes.outputs.cache-hit != 'true' ||
                 steps.perf_guards.outputs.cache-hit != 'true' ||
-                steps.demo_boxes.outputs.cache-hit != 'true' }}
+                steps.demo_boxes.outputs.cache-hit != 'true') }}
 
         steps:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
+
+            # The merge queue lands the exact commit it tested, so a green merge_group run for this sha already
+            # ran every lane; the push run keeps only the cheap always-on jobs that report the required checks.
+            - name: Find the merge queue's run of this commit
+              id: queue
+              if: github.event_name == 'push'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=merge_group&status=success&per_page=1" \
+                    --jq '.workflow_runs[0].id // empty' || true)
+                  if [ -n "$run" ]; then
+                    echo "tested=true" >> "$GITHUB_OUTPUT"
+                    echo "run=$run" >> "$GITHUB_OUTPUT"
+                    echo "already tested by run $run"
+                  else
+                    echo "no green merge-queue run for ${GITHUB_SHA}; running every lane"
+                  fi
 
             - name: Name the Playwright caches
               id: playwright
@@ -1435,6 +1457,157 @@ jobs:
     # Saves the green markers for the sharded lanes. A shard cannot save its own
     # marker: one green shard next to a red one would let the whole lane skip on
     # the next identical tree. This job only saves once the lane as a whole won.
+    # A push the merge queue already tested runs no lane, so it records each lane's green marker (and the
+    # box lanes' receipts, from the queue run's artifacts) on main, where pull requests restore them from.
+    # Saving a key that already exists is a no-op.
+    carry-queue-markers:
+        needs: lanes
+        if: needs.lanes.outputs.queue_run != ''
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        permissions:
+            contents: read
+            actions: read
+        steps:
+            - name: Write the lane markers, and list the receipts the queue run uploaded
+              id: queue
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  for lane in unit browser completion-matrix boxes-bundler boxes-router boxes-music-player boxes-music-player-ssr website-boxes perf-guards demo-boxes build-scale build-warnings receipts; do echo ok > "$lane-completed.txt"; done
+                  names=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${{ needs.lanes.outputs.queue_run }}/artifacts?per_page=100" --jq '[.artifacts[].name] | join(" ")')
+                  echo "artifacts=$names" >> "$GITHUB_OUTPUT"
+
+            - name: Carry the unit lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_unit }}
+                  path: unit-completed.txt
+
+            - name: Carry the browser lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_browser }}
+                  path: browser-completed.txt
+
+            - name: Carry the completion-matrix lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_completion_matrix }}
+                  path: completion-matrix-completed.txt
+
+            - name: Fetch the boxes-bundler receipts the merge queue's run wrote
+              id: receipts_boxes_bundler
+              if: contains(format(' {0} ', steps.queue.outputs.artifacts), ' receipts-bundler ')
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-bundler
+                  path: packages/bundler/.witness/receipts
+                  run-id: ${{ needs.lanes.outputs.queue_run }}
+                  github-token: ${{ github.token }}
+
+            - name: Carry the boxes-bundler lane marker and receipts
+              if: steps.receipts_boxes_bundler.outcome == 'success'
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_bundler }}
+                  path: |
+                      boxes-bundler-completed.txt
+                      packages/bundler/.witness/receipts
+
+            - name: Fetch the boxes-router receipts the merge queue's run wrote
+              id: receipts_boxes_router
+              if: contains(format(' {0} ', steps.queue.outputs.artifacts), ' receipts-router ')
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-router
+                  path: packages/router/.witness/receipts
+                  run-id: ${{ needs.lanes.outputs.queue_run }}
+                  github-token: ${{ github.token }}
+
+            - name: Carry the boxes-router lane marker and receipts
+              if: steps.receipts_boxes_router.outcome == 'success'
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_router }}
+                  path: |
+                      boxes-router-completed.txt
+                      packages/router/.witness/receipts
+
+            - name: Fetch the boxes-music-player receipts the merge queue's run wrote
+              id: receipts_boxes_music_player
+              if: contains(format(' {0} ', steps.queue.outputs.artifacts), ' receipts-music-player ')
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-music-player
+                  path: demos/music-player/.witness/receipts
+                  run-id: ${{ needs.lanes.outputs.queue_run }}
+                  github-token: ${{ github.token }}
+
+            - name: Carry the boxes-music-player lane marker and receipts
+              if: steps.receipts_boxes_music_player.outcome == 'success'
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_music_player }}
+                  path: |
+                      boxes-music-player-completed.txt
+                      demos/music-player/.witness/receipts
+
+            - name: Fetch the boxes-music-player-ssr receipts the merge queue's run wrote
+              id: receipts_boxes_music_player_ssr
+              if: contains(format(' {0} ', steps.queue.outputs.artifacts), ' receipts-music-player-ssr ')
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-music-player-ssr
+                  path: demos/music-player-ssr/.witness/receipts
+                  run-id: ${{ needs.lanes.outputs.queue_run }}
+                  github-token: ${{ github.token }}
+
+            - name: Carry the boxes-music-player-ssr lane marker and receipts
+              if: steps.receipts_boxes_music_player_ssr.outcome == 'success'
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_music_player_ssr }}
+                  path: |
+                      boxes-music-player-ssr-completed.txt
+                      demos/music-player-ssr/.witness/receipts
+
+            - name: Carry the website-boxes lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_website_boxes }}
+                  path: website-boxes-completed.txt
+
+            - name: Carry the perf-guards lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_perf_guards }}
+                  path: perf-guards-completed.txt
+
+            - name: Carry the demo-boxes lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_demo_boxes }}
+                  path: demo-boxes-completed.txt
+
+            - name: Carry the build-scale lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_build_scale }}
+                  path: build-scale-completed.txt
+
+            - name: Carry the build-warnings lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_build_warnings }}
+                  path: build-warnings-completed.txt
+
+            - name: Carry the receipts lane marker
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_receipts }}
+                  path: receipts-completed.txt
+
     save-lane-markers:
         needs: [lanes, unit, browser]
         if: always()
@@ -1651,6 +1824,11 @@ jobs:
                     base="${{ github.event.pull_request.base.sha }}"
                   elif [ "$GITHUB_EVENT_NAME" = "merge_group" ]; then
                     base="${{ github.event.merge_group.base_sha }}"
+                  elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ -n "$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=merge_group&status=success&per_page=1" --jq '.workflow_runs[0].id // empty' || true)" ]; then
+                    echo "the merge queue already benchmarked ${GITHUB_SHA}"
+                    echo "bench=false" >> "$GITHUB_OUTPUT"
+                    echo "base=" >> "$GITHUB_OUTPUT"
+                    exit 0
                   elif [ "$GITHUB_EVENT_NAME" = "push" ]; then
                     base="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1" \
                       --jq '.workflow_runs[0].head_sha // empty' || true)"
