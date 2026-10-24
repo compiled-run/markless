@@ -35,6 +35,7 @@ import { outputDefaults } from '../build/chunking.ts';
 import { unwrapAsyncImportWrappers } from '../build/async-import-wrappers.ts';
 import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
 import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
+import { clearChunkFactCaches } from '../build/chunk-ast.ts';
 import { prefetchChunkDynamicImports } from '../build/chunk-workers.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
@@ -503,6 +504,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					);
 					collapseInitFacadeImports(bundle);
 					unwrapAsyncImportWrappers(bundle);
+					// Held to finalize, one entry per chunk with an import() grew with page count; finalize reads its own.
+					clearChunkFactCaches();
 				},
 			},
 		} satisfies Plugin,
