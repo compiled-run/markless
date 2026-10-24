@@ -18,6 +18,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Event payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/fns/row-component-mint.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		'A client-minted row censuses the compiler-emitted branch anchors in the fragment it just built, before the row joins the page.',
+	'packages/web/src/fns/row-branch-mint.ts :: return node.nodeType === 8 && (node as { readonly data?: string }).data === data;':
+		"A row flips its @if between the compiler-emitted anchor pair among one element's children inside that row, never the page.",
 	'packages/web/src/fns/streamed-arms.ts :: for (const patch of document.querySelectorAll(STATE_PATCH))':
 		'Streamed-arm adoption reads dependency edges from the inert state-patch scripts the server emitted.',
 	'packages/web/src/fns/streamed-arms.ts :: html: arm.innerHTML,':

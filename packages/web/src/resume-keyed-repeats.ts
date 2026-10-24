@@ -52,7 +52,8 @@ let armRows: typeof import('./resume-repeat-branch-arm.ts') | undefined;
 
 // The mint loader is written into `__marklessRowMint` by the app's resume module only when a repeat can build; naming it here would ship it to every app.
 type RowMint = typeof import('./fns/row-mint.ts') &
-	Partial<import('./fns/row-component-mint.ts').RowComponentMintApi>;
+	Partial<import('./fns/row-component-mint.ts').RowComponentMintApi> &
+	Partial<ReturnType<typeof import('./fns/row-branch-mint.ts').marklessRowBranches>>;
 type RowComponentHost = import('./fns/row-component-mint.ts').RowComponentMintHost;
 type RowMintHost = {
 	readonly __marklessRowMint?: (
@@ -60,6 +61,8 @@ type RowMintHost = {
 		graph?: RuntimeGraph,
 		host?: RowComponentHost,
 	) => Promise<RowMint>;
+	// Written beside the mint loader only on a page whose rows hold an @if.
+	readonly __marklessRowBranches?: () => Promise<Partial<RowMint>>;
 };
 type RowMintCell = { mint?: RowMint; load?: Promise<RowMint> };
 const rowMintCells = new WeakMap<object, RowMintCell>();
@@ -75,10 +78,12 @@ function loadRowMint(
 	graph?: RuntimeGraph,
 	host?: RowComponentHost,
 ): Promise<RowMint> | undefined {
-	const load = (globalThis as RowMintHost).__marklessRowMint;
+	const { __marklessRowMint: load, __marklessRowBranches: branches } = globalThis as RowMintHost;
 	if (!load) return undefined;
 	const cell = rowMintCell(graph);
-	return (cell.load ||= load(renderData, graph, host).then((module) => (cell.mint = module)));
+	return (cell.load ||= load(renderData, graph, host).then(
+		async (module) => (cell.mint = branches ? { ...module, ...(await branches()) } : module),
+	));
 }
 
 export function validateOneRepeat(
@@ -94,6 +99,16 @@ export function findRepeatItemByKey(
 ): unknown {
 	for (const [index, item] of readKeyedRepeatCollection(graph, repeat).entries())
 		if (Object.is(repeatItemKey(item, repeat, index), key)) return item;
+}
+// A row handler's locals: the item under the key, and the index when the handler reads it.
+export function rowLocals(
+	graph: RepeatReadableGraph,
+	repeat: ResumeKeyedRepeatRecord,
+	key: unknown,
+): Record<string, unknown> {
+	const items = readKeyedRepeatCollection(graph, repeat),
+		index = items.findIndex((item, at) => Object.is(repeatItemKey(item, repeat, at), key));
+	return { [repeat.itemName]: items[index], ...(repeat.indexName && { [repeat.indexName]: index }) };
 }
 export function findKeyedRepeatRowEventMatch(input: {
 	readonly graph: RepeatReadableGraph;
@@ -169,6 +184,7 @@ export function wireKeyedRepeats(
 			return wireKeyedRepeats(input, rowComponentHost, onRow);
 		});
 	for (const repeat of input.view.keyedRepeats ?? []) validateOneRepeat(input.graph, repeat);
+	const armsWired: Array<Promise<unknown>> = [];
 	for (const repeat of input.view.keyedRepeats ?? []) {
 		const parent = input.elementsByHostId.get(repeat.parentHostNodeId);
 		if (!parent) continue;
@@ -177,15 +193,18 @@ export function wireKeyedRepeats(
 			served = new Map<unknown, [unknown, number]>(),
 			slots: RowSlots = {
 				values: new Map(),
-				ready: !repeat.rowTemplate?.componentName,
+				ready: !repeat.rowTemplate?.componentName && !repeat.rowTemplate?.branchSlots,
 			};
-		const registerRowEvents = (rowRoot: ResumeDomElement, rowKey: unknown): void => {
+		const registerRowEvents = (rowRoot: ResumeDomElement, rowKey: unknown, arms?: true): void => {
 			for (const rowEvent of repeat.rowEvents) {
-				const host = marklessElementAt(rowRoot, rowEvent.hostPath);
+				if (arms && !rowEvent.arm) continue;
+				const host = rowEvent.arm
+					? cell?.mint?.armEventHost?.(rowRoot, repeat, rowEvent, slots.values.get(rowKey))
+					: marklessElementAt(rowRoot, rowEvent.hostPath);
 				if (!host) continue;
 				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
 			}
-			onRow?.(repeat, rowRoot, rowKey);
+			if (!arms) onRow?.(repeat, rowRoot, rowKey);
 		};
 		// A server-painted `@empty` arm is not this runtime's to remove.
 		const arm: MountedEmptyArm = { mounted: false, nodes: [] };
@@ -201,7 +220,7 @@ export function wireKeyedRepeats(
 				rowRootsByKey.set(rowKey, rowRoot);
 				served.set(rowKey, [repeat.rowComponent ? itemCopy(item) : item, rowIndex]);
 				if (slots.ready)
-					slots.values.set(rowKey, rowSlotValues(repeat, item, rowIndex, input.graph));
+					slots.values.set(rowKey, rowSlotValues(repeat, item, rowIndex, input.graph, slots));
 				registerRowEvents(rowRoot, rowKey);
 			}
 		};
@@ -229,18 +248,18 @@ export function wireKeyedRepeats(
 		};
 		const readyMint = (): Promise<RowMint> | undefined =>
 			loadRowMint(input.renderData, input.graph, rowComponentHost)?.then(async (mint) => {
-				if (!slots.ready) {
+				if (!slots.ready && repeat.rowTemplate?.componentName) {
 					if (!mint.slotReader)
 						throw new Error(`MARKLESS_REPEAT_ROW_SLOT_READER_MISSING: ${repeat.id}`);
 					slots.read ??= await mint.slotReader(repeat, input.graph);
 				}
-				if (slots.read && !slots.ready) {
+				slots.branches ??= repeat.rowTemplate?.branchSlots && mint.branchValues;
+				if ((slots.read || slots.branches) && !slots.ready) {
 					for (const [rowKey, [item, index]] of served)
-						slots.values.set(
-							rowKey,
-							rowSlotValues(repeat, item, index, input.graph, slots.read),
-						);
+						slots.values.set(rowKey, rowSlotValues(repeat, item, index, input.graph, slots));
 					slots.ready = true;
+					if (slots.branches)
+						for (const [rowKey, rowRoot] of rowRootsByKey) registerRowEvents(rowRoot, rowKey, true);
 				}
 				slots.settled = true;
 				return mint;
@@ -253,9 +272,11 @@ export function wireKeyedRepeats(
 		};
 		// No gesture changes a fixed prop list, so none waits for its row code: it loads when idle.
 		const propCollection = !rowsChange && isProp(repeat.collectionGraphNodeId);
-		if (deferredStart) afterReaderInput(startLoading);
+		// A served row's @if arm events wait on row code, so it cannot wait for the reader's input.
+		if (deferredStart && !repeat.rowTemplate?.branchSlots) afterReaderInput(startLoading);
 		else if (propCollection) (globalThis.requestIdleCallback ?? setTimeout)(startLoading);
 		else startLoading();
+		if (repeat.rowTemplate?.branchSlots && loading) armsWired.push(loading.catch(() => undefined));
 		let pending: ReturnType<NonNullable<RowMint['rows']>> | undefined;
 		const settledMint = (): { readonly mint: RowMint | undefined } | undefined => {
 			if (!builds) return { mint: undefined };
@@ -333,6 +354,7 @@ export function wireKeyedRepeats(
 			}),
 		);
 	}
+	if (armsWired.length) return Promise.all(armsWired).then(() => undefined);
 }
 // Window capture runs before the container's dispatch, so a gesture's handler still waits for the rows it writes.
 function afterReaderInput(run: () => void): void {
@@ -354,7 +376,7 @@ function applyKeyedRepeatRowOrder(
 	rowRootsByKey: Map<unknown, ResumeDomElement>,
 	arm: MountedEmptyArm,
 	mint: RowMint | undefined,
-	registerRowEvents?: (rowRoot: ResumeDomElement, rowKey: unknown) => void,
+	registerRowEvents?: (rowRoot: ResumeDomElement, rowKey: unknown, arms?: true) => void,
 	slots: RowSlots = { values: new Map(), ready: true },
 	rangeEnd?: ResumeDomNode,
 ): void {
@@ -364,10 +386,10 @@ function applyKeyedRepeatRowOrder(
 	const knownRows = new Set(rowRootsByKey.values());
 	for (const [index, item] of readKeyedRepeatCollection(graph, repeat).entries()) {
 		const rowKey = repeatItemKey(item, repeat, index),
-			values = slots.ready
-				? rowSlotValues(repeat, item, index, graph, slots.read)
-				: undefined,
+			values = slots.ready ? rowSlotValues(repeat, item, index, graph, slots) : undefined,
 			seen = slots.values.get(rowKey);
+		// Set before the row's arm events register: they read which arm it now shows.
+		if (values) slots.values.set(rowKey, values);
 		let rowRoot = rowRootsByKey.get(rowKey);
 		// A row whose slot values moved is patched where it stands, else rebuilt.
 		const focus =
@@ -375,7 +397,9 @@ function applyKeyedRepeatRowOrder(
 			mint &&
 			!repeat.rowComponent &&
 			seen?.some((value, at) => !Object.is(value, values![at])) &&
-			!mint.patchRow?.(rowRoot, repeat, seen, values!)
+			!mint.patchRow?.(rowRoot, repeat, seen, values!, () =>
+				registerRowEvents?.(rowRoot!, rowKey, true),
+			)
 				? (mint.focusPath?.(rowRoot) ?? [])
 				: undefined;
 		if (focus) rowRoot = undefined;
@@ -391,7 +415,6 @@ function applyKeyedRepeatRowOrder(
 			knownRows.add(rowRoot);
 			registerRowEvents?.(rowRoot, rowKey);
 		}
-		if (values) slots.values.set(rowKey, values);
 		nextRows.push(rowRoot);
 	}
 	const mutableParent = parent as MutableRepeatParent;
@@ -421,6 +444,7 @@ function applyKeyedRepeatRowOrder(
 			}
 	for (const rowRoot of currentRows)
 		if (!staying.has(rowRoot)) {
+			mint?.dropRow?.(rowRoot, repeat);
 			mutableParent.removeChild?.(rowRoot);
 			(rowRoot as DisposedRepeatRow).__marklessRowParent = parent;
 		}
@@ -541,6 +565,7 @@ type RowSlots = {
 	ready: boolean;
 	settled?: boolean;
 	read?: RowSlotReader | undefined;
+	branches?: RowMint['branchValues'];
 };
 // So a write in place still reads as a moved item.
 function itemCopy(item: unknown): unknown {
@@ -550,28 +575,36 @@ function itemCopy(item: unknown): unknown {
 		return item;
 	}
 }
+type SlotOwner = Pick<NonNullable<ResumeKeyedRepeatRecord['rowTemplate']>, 'textSlots' | 'attributeSlots'>;
 function templateSlots(repeat: ResumeKeyedRepeatRecord) {
-	const template = repeat.rowTemplate;
-	return [...(template?.textSlots ?? []), ...(template?.attributeSlots ?? [])];
+	return slotsOf(repeat.rowTemplate ?? {});
 }
-// Text slots first; compared by value, since a mutation in place keeps the item's identity.
+function slotsOf(owner: SlotOwner) {
+	return [...(owner.textSlots ?? []), ...(owner.attributeSlots ?? [])];
+}
+// Text slots first, then one entry per @if; compared by value, since a mutation in place keeps the item's identity.
 function rowSlotValues(
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
 	index: number,
 	graph: Pick<RuntimeGraph, 'read'>,
-	read?: RowSlotReader,
+	slots?: RowSlots,
 ): unknown[] {
-	return templateSlots(repeat).map((slot) =>
+	const read = slots?.read;
+	const values = templateSlots(repeat).map((slot) =>
 		'itemPath' in slot
 			? readItemPath(item, slot.itemPath)
 			: 'source' in slot
 				? read?.(slot.source, item, index)
 				: graph.read(slot.graphNodeId, slot.graphPath),
 	);
+	return slots?.branches ? [...values, ...slots.branches(repeat, item, index, graph, read)] : values;
 }
 function rowSlotReads(repeat: ResumeKeyedRepeatRecord) {
-	return templateSlots(repeat).flatMap((slot) =>
+	return [
+		...templateSlots(repeat),
+		...(repeat.rowTemplate?.branchSlots ?? []).flatMap((branch) => [branch, ...branch.arms.flatMap(slotsOf)]),
+	].flatMap((slot) =>
 		'source' in slot
 			? (slot.reads ?? [])
 			: 'graphNodeId' in slot

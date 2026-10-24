@@ -6165,13 +6165,16 @@ export const errorEntries: readonly ErrorEntry[] = [
 		stage: 'runtime',
 		severity: 'error',
 		description: 'A Markless runtime error from @markless/web.',
-		printed: [
-			'MARKLESS_REPEAT_ROW_MINT_EMPTY: built no row from its markup, and half a row is worse than none.',
-		],
+		printed: ['MARKLESS_REPEAT_ROW_MINT_EMPTY: <branchId> arm <value>'],
 		structured: false,
 		sources: [
 			{
 				id: 'f0',
+				file: 'packages/web/src/fns/row-branch-mint.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-branch-mint.ts',
+			},
+			{
+				id: 'f1',
 				file: 'packages/web/src/fns/row-mint.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-mint.ts',
 			},
@@ -6787,6 +6790,40 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/router/src/spa-navigation.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/spa-navigation.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'warning',
+		description:
+			'This <branchLabel> in a @for row never changes in the browser: a Markless build warning.',
+		printed: [
+			'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: <message> So each row keeps the arm the server rendered for <branchLabel> (<testSource>): when <testSource> changes after the page loads, the row does not show the other arm.',
+			"A row flips its own <branchLabel> from the row markup the payload carries: the test read per row, and each arm's elements, text and attributes. A row needing anything more ships no markup at all, so nothing can rebuild an arm in it.",
+			'https://markless.dev/errors/MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
+		],
+		structured: true,
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:#6a737d',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
 			},
 		],
 		moreSources: 0,

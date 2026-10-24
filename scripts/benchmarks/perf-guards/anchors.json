@@ -1618,6 +1618,38 @@
 			"from": 1003,
 			"to": 1608,
 			"reason": "arm and row records address elements through one resolver that counts element children and @if/@try blocks, never text (controls after text or a nested block landed on the wrong element after resume); replaces the per-module walks in resume-branches/-keyed-repeats/-locators, resume chunk minified+gzip +95 B, runs at first interaction, not at load"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 17266,
+			"to": 18371,
+			"reason": "an @if in a keyed row flips per row: arm events registered once row code is in, branch values beside the row's slot values, row handlers handed the row index (+1,105 B rendered, runs when rows wire at first interaction, not at load; the flip itself is fns/row-branch-mint, loaded only by rows holding an @if)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "web/fns/row-mint",
+			"from": 7614,
+			"to": 7992,
+			"reason": "the row mint hands an @if in a row to fns/row-branch-mint: two hook calls and a row root found after the branch arm is placed (+378 B rendered; the arm code is the separate module)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 17232,
+			"to": 17564,
+			"reason": "a composed child's row template qualifies its @if branch slots and arm slots, and an arm host's events find their row scope (+332 B rendered, dispatch-time only)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "web/fns/composition",
+			"from": 19772,
+			"to": 19974,
+			"reason": "composition routes the prop reads of a row template's @if branch slots and arm slots (+202 B rendered)"
 		}
 	],
 	"runtimeModules": {
@@ -1667,16 +1699,16 @@
 		"web/dom-journal-direct": 1223,
 		"web/fns/bound-symbol": 1497,
 		"web/fns/closure-action": 7539,
-		"web/fns/composition": 19772,
+		"web/fns/composition": 19974,
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 17232,
+		"web/fns/instance-scope": 17564,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
 		"web/fns/row-locals": 942,
-		"web/fns/row-mint": 7614,
+		"web/fns/row-mint": 7992,
 		"web/fns/row-slot-mint": 2633,
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
@@ -1719,7 +1751,7 @@
 		"web/resume-events": 17385,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 17266,
+		"web/resume-keyed-repeats": 18371,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,

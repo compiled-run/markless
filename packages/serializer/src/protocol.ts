@@ -364,6 +364,24 @@ export type ProtocolRowTemplateSlotValue =
 			}>;
 	  };
 
+/** One arm of a row's branch: its markup and slots, FRAGMENT-relative to the arm's first node. */
+export type ProtocolRowTemplateArm = {
+	readonly html: string;
+	readonly textSlots?: ReadonlyArray<
+		{ readonly path: ReadonlyArray<number> } & ProtocolRowTemplateSlotValue
+	>;
+	readonly attributeSlots?: ReadonlyArray<
+		{ readonly path: ReadonlyArray<number>; readonly name: string } & ProtocolRowTemplateSlotValue
+	>;
+};
+
+export type ProtocolRowTemplateBranchSlot = {
+	readonly path: ReadonlyArray<number>;
+	readonly branchId: string;
+	readonly armTests?: ReadonlyArray<unknown>;
+	readonly arms: ReadonlyArray<ProtocolRowTemplateArm>;
+} & ProtocolRowTemplateSlotValue;
+
 export type ProtocolViewPayload = {
 	readonly version: typeof ASYNC_PROTOCOL_VERSION;
 	// Async runner transport is independent from authored boundary reads. The
@@ -508,6 +526,11 @@ export type ProtocolViewPayload = {
 		 */
 		readonly branchArm?: { readonly branchId: string; readonly arm: number };
 		readonly itemName: string;
+		/**
+		 * The `index` name of the `@for`, which a row handler reading it is handed
+		 * beside the item. Pay-per-use: present only when a row handler reads it.
+		 */
+		readonly indexName?: string;
 		readonly rowElementCount: number;
 		/**
 		 * Element children of the parent that stand before the rows. Rows occupy
@@ -586,6 +609,18 @@ export type ProtocolViewPayload = {
 					readonly name: string;
 				} & ProtocolRowTemplateSlotValue
 			>;
+			/**
+			 * An `@if`/`@switch` written in the row, flipped per row. The slot value is
+			 * the test (the discriminant for a `@switch`, matched against `armTests`),
+			 * and `path` names the marker in `html` the shown arm's anchors and nodes
+			 * replace. A branch that IS the row (`@for { @if { <tr> } }`) has the marker
+			 * as the whole html: its arm is the row root, so a flip rebuilds the row.
+			 * `branchId` is the branch site as the anchor comments spell it, before
+			 * composition's prefix, like `branchArm.branchId`.
+			 *
+			 * Pay-per-use: a row with no such branch omits the field.
+			 */
+			readonly branchSlots?: ReadonlyArray<ProtocolRowTemplateBranchSlot>;
 		};
 		/**
 		 * The parent graph node each prop a `rowTemplate` source slot reads follows,
@@ -648,6 +683,12 @@ export type ProtocolViewPayload = {
 			readonly eventName: string;
 			readonly symbolIds: ReadonlyArray<string>;
 			readonly syncPolicy?: ProtocolSyncPolicy;
+			/**
+			 * The event's host sits in arm `arm` of `rowTemplate.branchSlots[slot]`, so it
+			 * exists only while that arm shows, and `hostPath` is ARM-relative: element
+			 * index among the arm's nodes, then child-node indexes from there.
+			 */
+			readonly arm?: { readonly slot: number; readonly arm: number };
 		}>;
 	}>;
 	readonly branches?: ReadonlyArray<{

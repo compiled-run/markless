@@ -66,7 +66,7 @@ export function Board() @{
 	expect(rowMintCodes).toEqual([]);
 });
 
-test('a row whose @if reads page state still cannot grow, and says why', async () => {
+test('a row whose @if reads page state grows and flips from its row template', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Page.tsrx',
 		source: `
@@ -86,14 +86,20 @@ export function App() @{
 `,
 		symbols: [],
 	});
-	expect(result.protocolView.keyedRepeats?.[0]?.rowComponent).toBeUndefined();
-	const refusal = result.publicRenderPlan.diagnostics.find(
-		(diagnostic) => diagnostic.code === ROW_MINT_UNSUPPORTED,
-	);
-	expect(refusal?.suggestions?.[0]?.message).toContain('Make the @if test read only todo');
+	const repeat = result.protocolView.keyedRepeats?.[0];
+	expect(repeat?.rowComponent).toBeUndefined();
+	expect(repeat?.rowTemplate?.branchSlots?.[0]).toMatchObject({
+		graphNodeId: 'state:open',
+		graphPath: [],
+	});
+	expect(
+		result.publicRenderPlan.diagnostics.filter(
+			(diagnostic) => diagnostic.code === ROW_MINT_UNSUPPORTED,
+		),
+	).toEqual([]);
 });
 
-test('an owner element with its own handler inside an arm keeps the row unminted', async () => {
+test('an owner element with its own handler inside an arm rides the row template as an arm event', async () => {
 	const { repeat, rowMintCodes } = await compile(`
 import { state } from '@markless/core';
 
@@ -110,5 +116,8 @@ export function App() @{
 }
 `);
 	expect(repeat?.rowComponent).toBeUndefined();
-	expect(rowMintCodes).toEqual([ROW_MINT_UNSUPPORTED]);
+	expect(repeat?.rowEvents).toEqual([
+		expect.objectContaining({ hostPath: [0], eventName: 'click', arm: { slot: 0, arm: 0 } }),
+	]);
+	expect(rowMintCodes).toEqual([]);
 });

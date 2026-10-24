@@ -1049,6 +1049,22 @@ test('a page placing component rows from another module keeps the component mint
 	expect(host.__marklessRowMint).toBe(componentMint);
 });
 
+test('only rows holding an @if of their own install the row-branch loader', () => {
+	const loader = "import('@markless/web/fns/row-branch-mint')";
+	const flipping = repeatDemandMap([
+		'web/repeat-runtime',
+		'web/resume-keyed-repeats',
+		'web/fns/row-mint',
+		'web/fns/row-branch-mint',
+	]);
+	const building = repeatDemandMap(['web/repeat-runtime', 'web/resume-keyed-repeats', 'web/fns/row-mint']);
+	expect(emitResumeModule({ ...baseInput, runtimeDemandMap: flipping })).toContain(loader);
+	expect(emitResumeModule({ ...baseInput, runtimeDemandMap: building })).not.toContain(loader);
+	expect(
+		emitResumeModule({ ...baseInput, runtimeDemandMap: building, linkedRowBranches: true }),
+	).toContain(loader);
+});
+
 test('only a repeat nested in another repeat\'s rows installs the nested-repeat loader', () => {
 	const loader = "import('@markless/web/fns/nested-repeats')";
 	const nested = repeatDemandMap([

@@ -295,6 +295,7 @@ export function emitSourceModule(input: {
 	readonly linkedRowComponents?: boolean;
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
+	readonly linkedRowBranches?: boolean;
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
@@ -680,6 +681,7 @@ function componentRowLoader(input: {
 	readonly linkedRowComponents?: boolean;
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
+	readonly linkedRowBranches?: boolean;
 }): string | undefined {
 	if (!input.renderDataId) return undefined;
 	// A child module's install runs only if that module is ever evaluated, which resume never needs.
@@ -694,6 +696,13 @@ function componentRowLoader(input: {
 		: undefined;
 }
 
+// Beside the mint loader, only on a page whose rows flip an @if of their own.
+function rowBranchesLoader(runtimeDemandMap: unknown, linked = false): string | null {
+	return linked || demandsKeyedRepeatModule(runtimeDemandMap, ROW_BRANCH_MINT_RUNTIME_MODULE_ID)
+		? "globalThis.__marklessRowBranches ??= () => import('@markless/web/fns/row-branch-mint').then((branches) => branches.marklessRowBranches());"
+		: null;
+}
+
 // Whichever mint this page's repeats demand, for client output that has no resume module.
 function clientRowMintLoader(input: {
 	readonly renderDataId?: string;
@@ -702,6 +711,7 @@ function clientRowMintLoader(input: {
 	readonly linkedRowComponents?: boolean;
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
+	readonly linkedRowBranches?: boolean;
 }): string | null {
 	const mint = demandsRowComponentMint(input.runtimeDemandMap)
 		? emitRowComponentMintLoaderInstall()
@@ -709,9 +719,13 @@ function clientRowMintLoader(input: {
 			(input.linkedRowTemplates || demandsRowMint(input.runtimeDemandMap)
 				? emitRowMintLoaderInstall()
 				: null));
-	// Nested repeats wire through the same client module, for the same reason.
-	const nested = nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats);
-	return mint && nested ? `${mint}\n${nested}` : (mint ?? nested);
+	// Nested repeats and row branches wire through the same client module, for the same reason.
+	const lines = [
+		mint,
+		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats),
+		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches),
+	].filter((line): line is string => line !== null);
+	return lines.length > 0 ? lines.join('\n') : null;
 }
 
 // Assigned over a plain mint, which cannot read a row's expressions, but never over the component mint, which can.
@@ -753,6 +767,7 @@ const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
 const NESTED_REPEATS_RUNTIME_MODULE_ID = 'web/fns/nested-repeats';
 const ROW_COMPONENT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-component-mint';
 const ROW_SLOT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-slot-mint';
+const ROW_BRANCH_MINT_RUNTIME_MODULE_ID = 'web/fns/row-branch-mint';
 
 /** True when the compiler recorded an `overlay` mark for this module. */
 export function demandsOverlay(runtimeDemandMap: unknown): boolean {
@@ -796,6 +811,7 @@ export function emitResumeModule(input: {
 	readonly linkedRowComponents?: boolean;
 	readonly linkedRowTemplates?: boolean;
 	readonly linkedNestedRepeats?: boolean;
+	readonly linkedRowBranches?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
 	// The page's tree reaches a storage() cell, possibly in a child module whose cells this payload never holds.
@@ -916,6 +932,7 @@ export function emitResumeModule(input: {
 				? emitRowMintLoaderInstall()
 				: null),
 		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats),
+		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches),
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
