@@ -1,6 +1,6 @@
-import type { ModulePreloadInput } from '@markless/web/render-to-string';
 import type {
 	FragmentEntryModule,
+	FragmentPreload,
 	FragmentFetched,
 	FragmentNavigationConfig,
 	FragmentNavigationState,
@@ -35,13 +35,19 @@ export function startFragmentNavigation(
 	let running: FragmentNavigationApi | undefined;
 	let starting: Promise<FragmentNavigationApi> | undefined;
 	let pressed: FragmentEarly | undefined;
-	const preload = (item: ModulePreloadInput) => {
+	const preload = (item: FragmentPreload) => {
 		const href = new URL(typeof item === 'string' ? item : item.href, d.baseURI).href;
 		if (arriving.has(href)) return;
 		const link = d.createElement('link');
-		link.rel = 'modulepreload';
+		// A destination stylesheet loads beside its page, not once the page has arrived.
+		if (typeof item !== 'string' && 'as' in item) {
+			link.rel = 'preload';
+			link.as = item.as;
+		} else {
+			link.rel = 'modulepreload';
+			link.crossOrigin = 'anonymous';
+		}
 		link.href = href;
-		link.crossOrigin = 'anonymous';
 		arriving.set(href, new Promise((done) => (link.onload = link.onerror = done)));
 		d.head.appendChild(link);
 	};
@@ -291,9 +297,14 @@ export function runFragmentNavigation(
 			if (present.has(href) || arriving.has(href)) continue;
 			present.add(href);
 			const link = d.createElement('link');
-			link.rel = 'modulepreload';
+			if ('as' in entry) {
+				link.rel = 'preload';
+				link.as = entry.as;
+			} else {
+				link.rel = 'modulepreload';
+				link.crossOrigin = entry.crossOrigin ?? 'anonymous';
+			}
 			link.href = href;
-			link.crossOrigin = entry.crossOrigin ?? 'anonymous';
 			if (low) link.fetchPriority = 'low';
 			arriving.set(
 				href,

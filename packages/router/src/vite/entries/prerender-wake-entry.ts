@@ -12,7 +12,9 @@ export async function resumeContainerEvent(input: {
 	const routeWakeModule = loadRouteWakeModule ? await loadRouteWakeModule() : undefined;
 	const resume = (routeWakeModule as RouteWakeModule | undefined)?.resumeContainerEvent;
 	if (typeof resume !== 'function') {
-		throw new Error(`Markless Router could not wake prerendered route module: ${file ?? '<unknown>'}`);
+		throw new Error(
+			`Markless Router could not wake prerendered route module: ${file ?? '<unknown>'}`,
+		);
 	}
 	await resume(input);
 }

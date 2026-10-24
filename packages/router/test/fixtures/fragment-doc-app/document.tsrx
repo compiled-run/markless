@@ -27,6 +27,9 @@ export default function Document({
 			<title>{title}</title>
 			<meta name="description" content={`About ${title}`} />
 			<link rel="canonical" href={`https://guide.test${pathname}`} />
+			@if (pathname !== '/') {
+				<link rel="stylesheet" href="/guide.css" />;
+			}
 		</head>
 		<body
 			class={pathname === '/' ? 'page page-home' : 'page'}
