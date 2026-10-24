@@ -60,6 +60,8 @@ const NON_TEST_JOBS = new Set([
 	// Writes the green markers for the sharded lanes. A cache write is not a
 	// check, so a merge must not hang on it.
 	'save-lane-markers',
+	// Copies a merge-queue run's markers onto main for a push that queue run already tested.
+	'carry-queue-markers',
 ]);
 
 const GATE_JOB = 'test';
