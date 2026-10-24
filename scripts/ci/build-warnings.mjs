@@ -19,14 +19,7 @@ export const GUARDED_BUILDS = [
 ];
 
 /** Warnings a build may print, each with the one-line reason it stays. */
-export const ALLOWED_WARNINGS = [
-	{
-		build: 'website',
-		pattern: /^\(!\) Some chunks are larger than \d+ kB after minification/,
-		reason:
-			'Open owner decision: figure drawings ship in page packs (home 2.0 MB, 623 kB gzip) and the <Code> compile worker is 3.4 MB.',
-	},
-];
+export const ALLOWED_WARNINGS = [];
 
 // Rolldown's timing report: how long plugin callbacks took, not a defect in the build.
 const TIMING_REPORT_START = /^\[PLUGIN_TIMINGS\]/;

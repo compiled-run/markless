@@ -11,7 +11,9 @@ highlighter, and removes `readonly`.
 
 `editor.ts` repaints the `<pre>` on each input with `highlight.ts`: shiki's core on its JavaScript
 regex engine, with the same github-light/github-dark pair, the site's `tsrx` grammar and the same
-surface pass (`tooling/shiki-surface.ts`) as the build. Dark mode stays a CSS swap. Tab, Shift+Tab,
+surface pass (`tooling/shiki-surface.ts`) as the build. It writes each line's spans from shiki's
+tokens the way shiki's HTML output does, so no HTML serializer ships, and only a block with a `.ts`
+file loads the TypeScript grammar (`typescript-grammar.ts`, its own chunk). Dark mode stays a CSS swap. Tab, Shift+Tab,
 Enter, Backspace and closing pairs are pure functions in `edit-commands.ts`, ported from shikicode
 (MIT, https://github.com/magic-akari/shikicode); the editor applies them through
 `execCommand('insertText')`, so the browser's own undo keeps every edit. Escape then Tab leaves

@@ -23,6 +23,7 @@ import {
 	type RenderDataArtifact,
 	type RuntimeDemandMapArtifact,
 	type RuntimeDemandMapRecordKind,
+	type ServedRenderDataArtifact,
 } from '@markless/compiler';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
@@ -61,6 +62,7 @@ import {
 import type { PrerenderSettleBoundMap } from '@markless/web/inline/resumer';
 import { injectExecutionLogModuleHook, normalizeExecutionLogMode } from './execution-log.ts';
 import { sharedInlineSourcesModuleId } from './shared-inline-sources.ts';
+import { servedRenderDataSourceReference } from './served-render-data.ts';
 import {
 	compileInlineResumerSources,
 	compilePrerenderInlineResumerSources,
@@ -241,6 +243,29 @@ export async function transformTsrxModule(
 
 // Reads back the owner of `virtual:markless:<kind>:<encoded source>[:<detail>]`,
 // the shape every generated id above is minted in; style ids append `.css`.
+function servedRenderDataId(encodedModuleId: string): string {
+	return `${MARKLESS_VIRTUAL_PREFIX}render-data-served:${encodedModuleId}`;
+}
+
+function servedRenderDataEntryId(encodedModuleId: string): string {
+	return `${MARKLESS_VIRTUAL_PREFIX}render-data-served-entry:${encodedModuleId}`;
+}
+
+// What a client render of a server-rendered app's module imports on demand: only `render()` runs it.
+export function clientRenderDataEntryId(encodedModuleId: string): string {
+	return `${MARKLESS_VIRTUAL_PREFIX}${CLIENT_RENDER_DATA_ENTRY_KIND}:${encodedModuleId}`;
+}
+
+export const CLIENT_RENDER_DATA_ENTRY_KIND = 'render-data-csr-entry';
+
+// The served spelling of a child's render-data import, whichever form the import takes.
+function servedRenderDataReference(reference: string): string {
+	const canonical = `${MARKLESS_VIRTUAL_PREFIX}render-data:`;
+	return reference.startsWith(canonical)
+		? servedRenderDataId(reference.slice(canonical.length))
+		: servedRenderDataSourceReference(reference);
+}
+
 // The payload, render-data and style ids encode the owner's module id, which
 // reads back to a file only through `root`; the rest encode the file itself.
 // Accepts rolldown-resolved ids (leading `\0`); null when the id carries no source.
@@ -482,6 +507,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
 			? `${MARKLESS_VIRTUAL_PREFIX}render-data-entry:${encodedModuleId}`
 			: undefined;
+	const servedRenderData =
+		linkedClientRenderData && lazyRenderDataId
+			? compiled.publicRenderModule.servedRenderData
+			: undefined;
 	const virtualModules: MarklessVirtualModule[] = [
 		...(compiled.publicRenderModule.renderDataModuleSource
 			? [
@@ -513,6 +542,35 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			? [
 					{
 						id: lazyRenderDataId,
+						type: 'render-data-entry' as const,
+						source: `export * from ${JSON.stringify(renderDataId)};`,
+					},
+				]
+			: []),
+		...(servedRenderData
+			? [
+					{
+						id: servedRenderDataId(encodedModuleId),
+						type: 'render-data-served' as const,
+						canonicalRenderData: true,
+						source: await prerenderDataModuleSource(
+							compiled,
+							input.environment,
+							input.importedModuleInterfaces,
+							input.renderDataImportSources,
+							input.artifactChildMaterializations,
+							input.filename,
+							input.moduleId ?? input.filename,
+							servedRenderData,
+						),
+					},
+					{
+						id: servedRenderDataEntryId(encodedModuleId),
+						type: 'render-data-entry' as const,
+						source: `export * from ${JSON.stringify(servedRenderDataId(encodedModuleId))};`,
+					},
+					{
+						id: clientRenderDataEntryId(encodedModuleId),
 						type: 'render-data-entry' as const,
 						source: `export * from ${JSON.stringify(renderDataId)};`,
 					},
@@ -566,6 +624,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						? renderDataId
 						: undefined,
 				lazyRenderDataId,
+				...(servedRenderData
+					? { servedRenderDataId: servedRenderDataEntryId(encodedModuleId) }
+					: {}),
 				// Only the canonical emission exports `marklessPrerenderData`, so a page
 				// without one has no surface a component row could be minted against.
 				renderDataId:
@@ -791,6 +852,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					publicRenderSsrComponentExports:
 						compiled.publicRenderModule.ssrComponentExports,
 					canonicalRenderData: prerenderInterfacesComplete(compiled, input),
+					...(servedRenderData && input.serverRenderedPages && !input.dev
+						? { lazyFullRenderDataId: clientRenderDataEntryId(encodedModuleId) }
+						: {}),
 					// The interface publishes exactly the shared definitions this
 					// module owns AND exports, each under the name it exports it as,
 					// so the emitted module keeps the binding a `.ts` barrel links.
@@ -873,6 +937,37 @@ function renderDataInitializerSymbolIds(compiled: CompileTsrxModuleResult): Set<
 	return ids;
 }
 
+// A served page evaluates a component only where the browser renders part of it; one it merely walks
+// through to reach a row needs its edges and hosts, not its records. No served path reads a definition's chunks.
+const UNEVALUATED_DEFINITION_FIELDS = [
+	'state',
+	'stateCellIndexes',
+	'stateComputedIndexes',
+	'stateSharedSeedIndexes',
+	'servedComputedIndexes',
+	'view',
+	'initialValues',
+	'initialValueKinds',
+	'initializerResidues',
+	'stateGraphNodeIds',
+];
+
+function servedDefinition(
+	record: Readonly<Record<string, unknown>>,
+	served: ServedRenderDataArtifact,
+	rootsWidget: unknown,
+): Readonly<Record<string, unknown>> {
+	const { chunks: _chunks, ...rest } = record;
+	const seeds = Object.values(
+		(record.initialValueKinds as Readonly<Record<string, string>> | undefined) ?? {},
+	).includes('shared-seed');
+	if (served.evaluatedComponents.includes(String(record.name)) || rootsWidget === true || seeds)
+		return rest;
+	return Object.fromEntries(
+		Object.entries(rest).filter(([field]) => !UNEVALUATED_DEFINITION_FIELDS.includes(field)),
+	);
+}
+
 async function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	environment: TransformTsrxModuleInput['environment'],
@@ -881,11 +976,20 @@ async function prerenderDataModuleSource(
 	artifactChildMaterializations: TransformTsrxModuleInput['artifactChildMaterializations'],
 	sourceFilename: string,
 	moduleId: string,
+	served?: ServedRenderDataArtifact,
 ): Promise<string> {
 	const importedComponents = new Map<
 		string,
 		{ readonly source: string; readonly local: string }
 	>();
+	// A child the browser may render whole ships its full render data; every other child only its served part.
+	const browserRenderedChildren = served
+		? new Set(
+				compiled.semanticGraph.componentEdges.flatMap((edge) =>
+					served.browserRenderedEdgeIds.includes(edge.id) ? [edge.childComponentName] : [],
+				),
+			)
+		: undefined;
 	for (const edge of compiled.semanticGraph.componentEdges) {
 		if (!edge.importSource || importedComponents.has(edge.childComponentName)) continue;
 		if (artifactChildMaterializations?.[edge.id]) continue;
@@ -895,10 +999,14 @@ async function prerenderDataModuleSource(
 				`MARKLESS_PRERENDER_RENDER_DATA_MISSING: Imported child ${JSON.stringify(edge.childComponentName)} from ${JSON.stringify(edge.importSource)} has no linked render-data artifact.`,
 			);
 		}
+		const full =
+			renderDataImportSources?.[edge.importSource] ??
+			`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.moduleId ?? linked.filename)}`;
 		importedComponents.set(edge.childComponentName, {
 			source:
-				renderDataImportSources?.[edge.importSource] ??
-				`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.moduleId ?? linked.filename)}`,
+				browserRenderedChildren && !browserRenderedChildren.has(edge.childComponentName)
+					? servedRenderDataReference(full)
+					: full,
 			local: `marklessPrerenderImport${importedComponents.size}`,
 		});
 	}
@@ -929,7 +1037,7 @@ async function prerenderDataModuleSource(
 			residueReaderDeclarations,
 			// A build-time gate answer, not render data: stripped here so widening the
 			// gate adds no payload byte to the modules it turns the pass on for.
-			rootsWidget: _rootsWidget,
+			rootsWidget,
 			projectsIntoRows,
 			...record
 		} = definition as Readonly<Record<string, unknown>> & {
@@ -944,8 +1052,11 @@ async function prerenderDataModuleSource(
 			readonly initialValues?: RenderDataArtifact['initialValues'];
 			readonly initializerResidues?: Readonly<Record<string, string>>;
 		};
+		const readerSource = served ? served.readers[String(definition.name)] : residueReaderSource;
 		const initializers = new Map<string, string>();
-		for (const initial of record.initialValues ?? []) {
+		const initialized =
+			!served || served.browserRenderedComponents.includes(String(definition.name));
+		for (const initial of initialized ? (record.initialValues ?? []) : []) {
 			const symbolId = renderDataInitializerSymbolId(record, initial, initializerSymbolIds);
 			if (!symbolId) continue;
 			const module = initializerModules.get(symbolId)!;
@@ -960,7 +1071,7 @@ async function prerenderDataModuleSource(
 			}
 			initializers.set(symbolId, imported.local);
 		}
-		for (const entry of residueReaderImports ?? []) {
+		for (const entry of (served ? served.imports : residueReaderImports) ?? []) {
 			if (readerImports.has(entry.line)) continue;
 			const rebound = entry.line.replace(
 				JSON.stringify(entry.source),
@@ -973,17 +1084,19 @@ async function prerenderDataModuleSource(
 				await stripEmittedTypesFromFragment(rebound, `${renderDataId}:reader-import`, true),
 			);
 		}
-		for (const line of residueReaderDeclarations ?? []) {
+		for (const line of (served ? served.declarations : residueReaderDeclarations) ?? []) {
 			if (readerDeclarations.has(line)) continue;
 			readerDeclarations.set(
 				line,
 				await stripEmittedTypesFromFragment(line, `${renderDataId}:reader-declaration`),
 			);
 		}
-		const data = jsonSourceWithNonFiniteNumbers(record) ?? 'undefined';
-		const reader = residueReaderSource
+		const data =
+			jsonSourceWithNonFiniteNumbers(served ? servedDefinition(record, served, rootsWidget) : record) ??
+			'undefined';
+		const reader = readerSource
 			? await stripEmittedTypesFromExpression(
-					residueReaderSource,
+					readerSource,
 					`${renderDataId}:reader:${String(definition.name)}`,
 				)
 			: undefined;
@@ -1054,7 +1167,7 @@ async function prerenderDataModuleSource(
 			? ["import { marklessRowHosts } from '@markless/web/fns/row-qualified-view';"]
 			: []),
 		...preludes,
-		compiled.publicRenderModule.renderDataModuleSource,
+		served ? served.renderDataModuleSource : compiled.publicRenderModule.renderDataModuleSource,
 		...factored.factories,
 		`const marklessPrerenderComponents = {${componentEntries
 			.map(

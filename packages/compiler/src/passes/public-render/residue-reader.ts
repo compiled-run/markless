@@ -92,8 +92,12 @@ export function deferredRosterCountCases(
 export function renderDecisionSources(
 	input: PublicRenderModuleInput,
 	componentName: string,
+	inChunk?: (chunkId: string) => boolean,
+	withInitializers = true,
 ): ReadonlyArray<string> {
-	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
+	const chunks = input.renderData.chunks.filter(
+		(chunk) => chunk.componentName === componentName && (!inChunk || inChunk(chunk.id)),
+	);
 	const branchIds = new Set(
 		chunks.flatMap((chunk) =>
 			chunk.slots.flatMap((slot) => (slot.kind === 'branch' ? [slot.branchSiteId] : [])),
@@ -108,8 +112,9 @@ export function renderDecisionSources(
 	for (const repeat of input.renderData.repeats)
 		if (repeatIds.has(repeat.repeatId) && repeat.collectionSource)
 			sources.add(repeat.collectionSource);
-	for (const source of Object.values(componentInitializerResidues(input, componentName)))
-		sources.add(source);
+	if (withInitializers)
+		for (const source of Object.values(componentInitializerResidues(input, componentName)))
+			sources.add(source);
 	for (const branch of input.renderData.branches)
 		if (
 			branchIds.has(branch.branchSiteId) &&
@@ -117,10 +122,51 @@ export function renderDecisionSources(
 			branch.testSource
 		)
 			sources.add(branch.testSource);
+	const placedEdgeIds = inChunk
+		? new Set(
+				chunks.flatMap((chunk) =>
+					chunk.slots.flatMap((slot) =>
+						slot.kind === 'child-component' ? [slot.componentEdgeId] : [],
+					),
+				),
+			)
+		: undefined;
 	for (const edge of componentEdgesFor(input, componentName))
-		for (const prop of edge.props)
-			if (prop.kind === 'opaque' && prop.source) sources.add(prop.source);
+		if (!placedEdgeIds || placedEdgeIds.has(edge.id))
+			for (const prop of edge.props)
+				if (prop.kind === 'opaque' && prop.source) sources.add(prop.source);
 	return [...sources];
+}
+
+/** The browser's share of one component's authored expressions, chosen by `ClientResidueScope`. */
+export type ClientResidueScope = {
+	readonly inChunk: (chunkId: string) => boolean;
+	readonly withInitializers: (componentName: string) => boolean;
+};
+
+/**
+ * The authored expressions the browser may evaluate for one component: all of
+ * them, or within a scope, only those written in chunks the browser can render.
+ */
+export function clientResidueSources(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	scope?: ClientResidueScope,
+): ReadonlyArray<string> {
+	const chunks = input.renderData.chunks.filter(
+		(chunk) => chunk.componentName === componentName && (!scope || scope.inChunk(chunk.id)),
+	);
+	return [
+		...new Set([
+			...authoredResidueSources(chunks),
+			...renderDecisionSources(
+				input,
+				componentName,
+				scope?.inChunk,
+				scope?.withInitializers(componentName) ?? true,
+			),
+		]),
+	];
 }
 
 /**
@@ -582,16 +628,12 @@ export function emitClientResidueReader(
 	componentName: string,
 	rootComponentName: string | undefined,
 	componentAst: AnyNode | undefined,
+	scope?: ClientResidueScope,
 ): string | null {
 	const componentChunks = input.renderData.chunks.filter(
 		(chunk) => chunk.componentName === componentName,
 	);
-	const sources = [
-		...new Set([
-			...authoredResidueSources(componentChunks),
-			...renderDecisionSources(input, componentName),
-		]),
-	];
+	const sources = clientResidueSources(input, componentName, scope);
 	const handles = elementHandleIdSources(componentChunks);
 	if (sources.length === 0 && handles.length === 0) return null;
 	const literals = constantPropLiterals(input, componentName);
@@ -738,6 +780,7 @@ export function emitClientResidueReader(
 export function emitClientResidueReaderPrelude(
 	input: PublicRenderModuleInput,
 	componentNames: ReadonlyArray<string>,
+	scope?: ClientResidueScope,
 ): {
 	readonly imports: ReadonlyArray<{ readonly source: string; readonly line: string }>;
 	readonly declarations: ReadonlyArray<string>;
@@ -748,14 +791,10 @@ export function emitClientResidueReaderPrelude(
 	);
 	const readDependencies = createResidueDependencyReader();
 	const componentReads = componentNames.map((componentName) => {
-		const chunks = input.renderData.chunks.filter(
-			(chunk) => chunk.componentName === componentName,
-		);
 		const literals = constantPropLiterals(input, componentName);
-		const sources = [
-			...authoredResidueSources(chunks),
-			...renderDecisionSources(input, componentName),
-		].filter((source) => !literals.has(source));
+		const sources = clientResidueSources(input, componentName, scope).filter(
+			(source) => !literals.has(source),
+		);
 		const locals = componentResidueLocals(
 			input,
 			componentAsts.get(componentName),

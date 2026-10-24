@@ -184,6 +184,7 @@ export function planTransformHookRequest(
 		devResumeReexport: plan.devResumeReexport,
 		prerenderRecordData:
 			currentEnvironment === 'client' ? ctx.prerenderRecordsBySource?.get(source) : undefined,
+		serverRenderedPages: internalOptions.routeModules !== undefined,
 	};
 	return {
 		ctx,
