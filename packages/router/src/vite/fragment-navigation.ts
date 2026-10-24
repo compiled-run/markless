@@ -389,7 +389,7 @@ export function runFragmentNavigation(
 	// budget: an idle fetch stops once the page's region passes this many bytes, leaving that page to intent.
 	const request = (
 		url: URL,
-		speculative: boolean,
+		speculative: boolean | 'idle',
 		started?: FragmentEarly,
 		budget = Infinity,
 	): FragmentPrefetch => {
@@ -404,7 +404,8 @@ export function runFragmentNavigation(
 				w.fetch(target.href, {
 					credentials: 'same-origin',
 					headers: speculative ? { purpose: 'prefetch' } : {},
-					priority: speculative ? 'auto' : 'high',
+					// The idle tier never competes with what the page itself still loads.
+					priority: speculative === 'idle' ? 'low' : speculative ? 'auto' : 'high',
 					signal: controller.signal,
 				} as RequestInit));
 			const cacheControl = response.headers.get('cache-control') ?? '';
@@ -467,7 +468,13 @@ export function runFragmentNavigation(
 	};
 	// An unused prefetch still streaming holds a connection: drop it once stale, and keep only a few open,
 	// or an HTTP/1.1 origin's per-host connection limit stalls the next click behind them.
-	const prefetch = (url: URL, code = true, started?: FragmentEarly, budget = Infinity) => {
+	const prefetch = (
+		url: URL,
+		code = true,
+		started?: FragmentEarly,
+		budget = Infinity,
+		idle = false,
+	) => {
 		const key = pageKey(url);
 		// A hover timer can fire after its link's page is already shown.
 		if (!config.prefetch || key === state.shown) return;
@@ -484,7 +491,7 @@ export function runFragmentNavigation(
 			state.prefetches.delete(stale);
 			entry.abort();
 		}
-		const entry = request(url, true, started, budget);
+		const entry = request(url, idle ? 'idle' : true, started, budget);
 		// A page over the idle budget is left for a hover or a press to fetch whole.
 		entry.result.catch(() => {
 			if (state.prefetches.get(key) === entry) state.prefetches.delete(key);
@@ -508,7 +515,7 @@ export function runFragmentNavigation(
 			if (open >= config.prefetchConnections) return;
 			const url = idleQueue.shift()!;
 			if (state.prefetches.has(pageKey(url)) || fetched.has(pageKey(url))) continue;
-			prefetch(url, false, undefined, config.idleFragmentBytes);
+			prefetch(url, false, undefined, config.idleFragmentBytes, true);
 			// Low priority and never evaluated: a modulepreload only fills the cache before a press.
 			preloadCode(url, true);
 		}

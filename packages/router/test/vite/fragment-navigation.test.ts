@@ -1077,6 +1077,35 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test.runIf(name === 'chromium')(
+			'the idle tier fetches pages at low priority, after the load event',
+			async () => {
+				const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+				const cdp = await page.context().newCDPSession(page);
+				await cdp.send('Network.enable');
+				const fetched: { path: string; priority: string; at: number }[] = [];
+				cdp.on('Network.requestWillBeSent', (event) => {
+					const url = new URL(event.request.url);
+					if (fragmentPageUrl(url))
+						fetched.push({
+							path: url.pathname,
+							priority: event.request.initialPriority,
+							at: event.timestamp,
+						});
+				});
+				let loaded = 0;
+				cdp.on('Page.loadEventFired', (event) => (loaded = event.timestamp));
+				await cdp.send('Page.enable');
+				await page.goto(origin + '/');
+				await expect.poll(() => fetched.length, { timeout: 5000 }).toBeGreaterThan(0);
+				for (const request of fetched) {
+					expect(request.priority).toBe('Low');
+					expect(request.at).toBeGreaterThanOrEqual(loaded);
+				}
+				await page.close();
+			},
+		);
+
 		test('at idle on a fast connection, the swap module and the code of each page in view download', async () => {
 			const { page, errors } = await open(browser);
 			const scripts: string[] = [];
