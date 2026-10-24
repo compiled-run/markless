@@ -62,6 +62,7 @@ export function nativePackingPlugins(
 	root: () => string,
 	demandMaps: () => Iterable<RuntimeDemandMapManifest | undefined> = () => [],
 	demandSources: () => Iterable<InteractionDemandSource> = () => [],
+	directCsrOnly: () => boolean = () => false,
 ): NativePackingPlugin[] {
 	let groups = new Map<string, string>();
 	let routeSets = new Map<string, ReadonlyArray<string>>();
@@ -82,7 +83,7 @@ export function nativePackingPlugins(
 			options(input) {
 				return { ...input, preserveEntrySignatures: 'allow-extension' };
 			},
-			buildEnd(error) {
+			async buildEnd(error) {
 				groups = new Map();
 				routeSets = new Map();
 				eagerLazyRoutes = new Map();
@@ -145,6 +146,18 @@ export function nativePackingPlugins(
 						entryIds.add(id);
 					}
 				}
+				// A direct-DOM mount never takes render()'s other paths or the runtime loaders app modules install, so
+				// that framework code stays out of the startup packs and loads only if something does reach it.
+				const renderFallbacks = new Set<string>();
+				if (!routeSources.size && directCsrOnly()) {
+					const render = await this.resolve('@markless/web/render');
+					for (const target of (render && modules.get(render.id)?.dynamicDependencies) ?? [])
+						renderFallbacks.add(target);
+					for (const module of modules.values())
+						if (module.app)
+							for (const target of module.dynamicDependencies)
+								if (!modules.get(target)?.app) renderFallbacks.add(target);
+				}
 				const roots = routeSources.size ? routeSources : entrySources;
 				for (const [id, module] of modules) {
 					if (routeSources.size && isRouteNavigationSourceRequest(id))
@@ -181,10 +194,13 @@ export function nativePackingPlugins(
 					closures: partitioned ? closures : [],
 					undemandedDynamicTargets: withUndemandedReExportDoors(
 						modules,
-						undemandedRuntimeModules({
-							demandMaps: demandMaps(),
-							moduleIds: modules.keys(),
-						}),
+						new Set([
+							...undemandedRuntimeModules({
+								demandMaps: demandMaps(),
+								moduleIds: modules.keys(),
+							}),
+							...renderFallbacks,
+						]),
 					),
 				});
 				dynamicImporters = dynamicImportersOf(modules);

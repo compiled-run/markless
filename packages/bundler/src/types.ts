@@ -173,6 +173,8 @@ export interface MarklessTransformManifest {
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];
 	runtimeDemandMap?: RuntimeDemandMapManifest;
+	/** This client module mounts through the direct-DOM renderer, which never reaches render()'s other paths. */
+	directCsr?: boolean;
 }
 
 export interface MarklessBuildModuleReference {
@@ -263,4 +265,6 @@ export type MarklessRolldownPluginApi = {
 		readonly source: string;
 		readonly map: RuntimeDemandMapManifest | undefined;
 	}>;
+	/** Whether every compiled module of this build mounts through the direct-DOM renderer. */
+	directCsrOnly: () => boolean;
 };

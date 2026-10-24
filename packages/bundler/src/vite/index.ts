@@ -184,6 +184,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules;
 			runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
 			runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
+			directCsrOnly: MarklessRolldownPluginApi['directCsrOnly'];
 		};
 	};
 	const packingPlugins = nativePackingEnabled(options)
@@ -191,6 +192,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				() => resolvedRoot,
 				() => basePlugin.api.runtimeDemandMaps(),
 				() => basePlugin.api.runtimeDemandSources(),
+				() => basePlugin.api.directCsrOnly(),
 			)
 		: undefined;
 	const packOwnership = packingPlugins?.[0]?.api;
