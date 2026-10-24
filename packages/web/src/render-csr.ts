@@ -398,9 +398,7 @@ function installDelegatedTriggers(
 			let named = false;
 			let syncPolicyApplied = false;
 			claim?.(event.target);
-			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
-				? PROTOCOL_EVENT_ACTION_KIND.event
-				: undefined;
+			let actionKind: ProtocolEventActionKind | undefined;
 			// The press-time path: an earlier listener may already have taken the target out.
 			const path = event.composedPath?.() || [];
 			for (
@@ -425,6 +423,9 @@ function installDelegatedTriggers(
 					}
 				}
 			}
+			// A row event name is heard for rows too, but an element's own record still decides first.
+			if (!actionKind && rowEventNames.has(event.type))
+				actionKind = PROTOCOL_EVENT_ACTION_KIND.event;
 			// This container listener exists for whichever element registered the
 			// record; a sibling with no record of its own is simply not ours.
 			if (!actionKind) {
