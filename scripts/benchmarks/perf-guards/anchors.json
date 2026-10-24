@@ -1650,6 +1650,22 @@
 			"from": 19772,
 			"to": 19974,
 			"reason": "composition routes the prop reads of a row template's @if branch slots and arm slots (+202 B rendered)"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 25013,
+			"to": 26033,
+			"reason": "an in-place navigation keeps a part both pages render byte for byte as it is and replaces only the page's own children inside it (page regions, slice 1); re-measured on top of the transitions-off swap"
+		},
+		{
+			"date": "2026-10-24",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 20618,
+			"to": 20878,
+			"reason": "the renderer looks up the page server's keep-parts hook and calls it for each child; the marking itself is server-only (page regions, slice 1)"
 		}
 	],
 	"runtimeModules": {
@@ -1662,7 +1678,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 25013,
+		"router/vite/entries/fragment-entry": 26033,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 9858,
@@ -1766,7 +1782,7 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20618,
+		"web/ssr-data/renderer": 20878,
 		"web/storage-plane": 1810
 	},
 	"constructGlue": {
