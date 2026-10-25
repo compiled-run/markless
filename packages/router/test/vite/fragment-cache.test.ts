@@ -6,7 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
-import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
+import { FRAGMENT_HOVER_DWELL_MS, fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
@@ -161,6 +161,27 @@ for (const [name, browserType] of [
 			await fetchedAhead(page, arrived, '[data-live]', '/live');
 			const now = await bumpElsewhere();
 			expect(await follow(page, '[data-live]', 'live')).toBe(now);
+			await page.close();
+		});
+
+		test('the move that woke the navigation code over a link still counts as resting on it', async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			const arrived: string[] = [];
+			page.on('requestfinished', (request) => {
+				const fragment = fragmentPageUrl(new URL(request.url()));
+				if (fragment) arrived.push(fragment.pathname);
+			});
+			// Page timers wait for the test, so only the pointer wakes the code and only the clock ends the dwell.
+			await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+			await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+			await page.goto(`${origin}/`);
+			await landedOn(page, 'home');
+			await page.locator('[data-live]').hover();
+			await page.waitForFunction(
+				() => !(document as { __marklessFragmentWake?: unknown }).__marklessFragmentWake,
+			);
+			await page.clock.runFor(FRAGMENT_HOVER_DWELL_MS);
+			await expect.poll(() => arrived.includes('/live')).toBe(true);
 			await page.close();
 		});
 

@@ -700,8 +700,11 @@ export function runFragmentNavigation(
 	};
 	// The event that woke this code: a press or hover on a link acts as it would have had this code been running.
 	const replay = (event: Event | undefined) => {
-		if (event?.type === 'pointerover') hover(event);
-		else if (event && event.type !== 'popstate') press(event);
+		if (event?.type === 'pointerover') {
+			hover(event);
+			// The pointer's first move over the link, dispatched right after, is not the page shifting under it.
+			previous = undefined;
+		} else if (event && event.type !== 'popstate') press(event);
 	};
 	return { traverse, replay, go };
 }
