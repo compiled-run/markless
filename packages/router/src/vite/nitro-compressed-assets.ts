@@ -7,6 +7,7 @@ import type { Plugin } from 'vite';
 
 type CompressedAssetsNitro = {
 	options: {
+		preset?: string;
 		serveStatic?: boolean | string;
 		output: { publicDir: string };
 		compressPublicAssets?: boolean | { gzip?: boolean; brotli?: boolean; zstd?: boolean };
@@ -32,8 +33,15 @@ export function compressedAssetsModule(
 	return {
 		name: 'markless-router:compressed-assets',
 		setup(nitro: CompressedAssetsNitro) {
-			const { serveStatic } = nitro.options;
-			if (configured || !serveStatic || serveStatic === 'inline') return;
+			const { preset, serveStatic } = nitro.options;
+			// The prerenderer is a second Nitro with its own preset and output; the files served are the build's own.
+			if (
+				configured ||
+				preset === 'nitro-prerender' ||
+				!serveStatic ||
+				serveStatic === 'inline'
+			)
+				return;
 			nitro.options.compressPublicAssets = { gzip: true };
 			state.brotliDir = nitro.options.output.publicDir;
 		},
