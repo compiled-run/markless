@@ -123,7 +123,9 @@ const resumeOnDemandEntries = [
 // (1,000 rows: 0.8 -> 0.17 ms on a handler, 2.4 -> 0.15 ms on a cell no handler owns): 29,986 -> 30,291 raw.
 // 2026-10-25: a resumed keyed reorder keeps the rows on the longest run already in order (moving the last of n rows to the
 // front costs one move, not n-1): 30,291 -> 31,161 raw.
-const sourceByteLimit = 31161;
+// 2026-10-25: a row's arrival and the renumbering behind it land in one update (symbol loader held beneath instance
+// scoping, keyed commit waits for the roster's symbols): 31,161 -> 31,499 raw.
+const sourceByteLimit = 31499;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
