@@ -573,16 +573,18 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	}
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
 	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
-	if (root && root.__mArmLive && root.__mArmLive(id)) return;
-	if (root && root.__mAdopted) return;
-	if (root && !root.__marklessCensus) {
-		const c = [root], cw = d.createTreeWalker(root, 129);
+	if (root && !root.__marklessComments) {
+		const c = [root], m = [], cw = d.createTreeWalker(root, 129);
 		for (let x; (x = cw.nextNode());)
 			if (x.nodeType !== 8) c.push(x);
-			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)}) c.length = 1;
+			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)}) (c.length = 1), (m.length = 0);
 			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)}) break;
-		root.__marklessCensus = c;
+			else m.push(x);
+		root.__marklessComments = m;
+		root.__marklessCensus ||= c;
 	}
+	if (root && root.__mArmLive && root.__mArmLive(id)) return;
+	if (root && root.__mAdopted) return;
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);
 	s.parentNode.insertBefore(tpl.content, e);
 	tpl.remove();${wake}

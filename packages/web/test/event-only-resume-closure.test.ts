@@ -119,7 +119,10 @@ const resumeOnDemandEntries = [
 // arm they show) and a row handler is handed its row index: resume-keyed-repeats.ts closure 27,756 -> 29,986 raw;
 // minified+gzip 4,373 -> 4,658 bytes (rolldown, workspace packages external, same method both sides), under the 4,800
 // gzip wall; the arm code itself is fns/row-branch-mint, which only a page whose rows hold an @if loads.
-const sourceByteLimit = 29986;
+// 2026-10-25: page comment indexes read the served page's comments once a streamed arm has landed: resume-keyed-repeats.ts
+// closure 29,979 -> 30,156 raw, all of it pageCommentCensus in resume-anchor-census.ts, which that bundle never keeps;
+// minified+gzip 4,653 -> 4,653 bytes (rolldown, workspace packages external, same method both sides).
+const sourceByteLimit = 30156;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

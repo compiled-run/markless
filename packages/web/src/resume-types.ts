@@ -51,6 +51,7 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 	// Container-scoped element census in DOM order, shared by every wake.
 	__marklessCensus?: ResumeDomElement[];
+	__marklessComments?: ResumeDomComment[];
 	// The arm each flipping branch shows, for rows written straight into an arm.
 	__marklessBranchArms?: Map<string, ResumeBranchArmEntry>;
 	// Resume reads the host document off the root element (streamed arm patch

@@ -80,8 +80,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		"The inline boots census the container in DOM order and flag a count the server did not serve, counting the page's elements between the start and end comments an author's element carries.",
 	'packages/web/src/inline/served-census.ts :: if (next.nodeType !== 8) live.push(next as Element);':
 		'The inline census tells the page start and end comments from the elements it counts.',
-	'packages/web/src/render-to-stream.ts :: const c = [root], cw = d.createTreeWalker(root, 129);':
-		"The streamed-arm executor pins the container's DOM-order census before an arm commit moves it, counting the page's elements between the start and end comments an author's element carries.",
+	'packages/web/src/render-to-stream.ts :: const c = [root], m = [], cw = d.createTreeWalker(root, 129);':
+		"The streamed-arm executor pins the container's DOM-order census and served comments before the first arm commit moves them, counting the page's nodes between the start and end comments an author's element carries.",
 	'packages/web/src/render-to-stream.ts :: if (x.nodeType !== 8) c.push(x);':
 		'The streamed-arm census tells the page start and end comments from the elements it counts.',
 	'packages/web/src/resume-anchor-census.ts :: const data = child.nodeType === 8 ? (child as { data?: string }).data : undefined;':

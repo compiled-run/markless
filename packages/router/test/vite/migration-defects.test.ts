@@ -749,3 +749,20 @@ test.each([
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test.each([
+	['/streamed-sections', 2],
+	['/streamed-sections-between', 3],
+	['/streamed-sections-pending', 2],
+])('a composed @if in an earlier streamed boundary leaves later boundaries resumable (%s)', async (path, rows) => {
+	const { page, errors } = await open(path);
+	await expect.poll(() => page.locator('[data-toggle]').count()).toBe(rows);
+	await page.waitForLoadState('load');
+	for (let index = rows - 1; index >= 0; index--) {
+		await page.locator('[data-toggle]').nth(index).click();
+		await expect.poll(() => page.locator('[data-toggle]').nth(index).textContent()).toBe('[+]');
+		expect(await page.locator('[data-toggled]').nth(index).getAttribute('hidden')).toBe('');
+	}
+	expect(errors).toEqual([]);
+	await page.close();
+});
