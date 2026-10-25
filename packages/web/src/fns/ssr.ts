@@ -1611,22 +1611,8 @@ export function marklessSsrAppendChildView(context: {
 	}
 	for (const behavior of childView.behaviors)
 		context.behaviors.push({
-			...behavior,
+			...marklessSsrBindBehavior(behavior, context.child, childInstancePath),
 			hostNodeId: context.child.hostPrefix + behavior.hostNodeId,
-			...(behavior.inputGraphReads
-				? {
-						inputGraphReads: behavior.inputGraphReads.map((read) =>
-							marklessSsrRemapBehaviorRead(
-								read,
-								context.child.graphProps,
-								childInstancePath,
-							),
-						),
-					}
-				: {}),
-			...(behavior.symbolId
-				? { symbolId: marklessBoundSymbolId(context.child, behavior.symbolId) }
-				: {}),
 		});
 	// A widget-scoped handle id is one module-level string every instance of that
 	// widget spells, so it takes the same qualification every other record's graph
@@ -2060,6 +2046,26 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 					]
 				: [];
 		}),
+		...(arm.behaviors && {
+			behaviors: arm.behaviors.map((behavior) =>
+				marklessSsrBindBehavior(behavior, child, instancePath),
+			),
+		}),
+	};
+}
+function marklessSsrBindBehavior<T extends SsrBehaviorRecord>(
+	behavior: T,
+	child: SsrPrefixChild,
+	instancePath: string,
+): T {
+	return {
+		...behavior,
+		...(behavior.inputGraphReads && {
+			inputGraphReads: behavior.inputGraphReads.map((read) =>
+				marklessSsrRemapBehaviorRead(read, child.graphProps, instancePath),
+			),
+		}),
+		...(behavior.symbolId && { symbolId: marklessBoundSymbolId(child, behavior.symbolId) }),
 	};
 }
 export function marklessSsrResolveAnchorRecords<T extends SsrAnchoredRecord>(
