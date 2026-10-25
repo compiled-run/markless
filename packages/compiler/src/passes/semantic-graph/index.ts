@@ -50,8 +50,8 @@ import {
 	collectComputedWriteDiagnostics,
 	collectDelete,
 	collectExpressionReads,
-	collectNestedFunctionWrites,
 	collectUpdate,
+	collectWritesIn,
 } from './collect-expressions.ts';
 import { collectModuleScopeGraphCreation } from './collect-module-scope.ts';
 import { bareArmInterpolationDiagnostic, submoduleUnsupportedDiagnostic } from './diagnostics.ts';
@@ -577,10 +577,8 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'AssignmentExpression':
 			collectAssignment(node, state);
 			collectExpressionReads(node, state);
-			// A function in the value runs later and writes then - a timer callback
-			// is the ordinary case - so the walk carries on into it rather than
-			// treating those writes as part of the assignment it sits inside.
-			collectNestedFunctionWrites(node.right as AnyNode | undefined, state);
+			// `a = (b = 1)` writes twice, and a function in the value writes when it runs.
+			collectWritesIn(node.right as AnyNode | undefined, state);
 			return;
 		case 'UpdateExpression':
 			collectUpdate(node, state);

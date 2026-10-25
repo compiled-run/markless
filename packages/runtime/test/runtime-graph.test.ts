@@ -1809,3 +1809,14 @@ test('graph subscribe returns an unsubscribe that stops the subscription firing'
 	await (graph as { flush?: () => Promise<void> }).flush?.();
 	expect(fired).toEqual(['fired']);
 });
+
+test('a write answers the value it wrote, changed or not, as the assignment it lowers from does', () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:count', value: { total: 1 } }],
+	});
+
+	expect(graph.write({ graphNodeId: 'state:count', path: ['total'], value: 5 })).toBe(5);
+	expect(graph.write({ graphNodeId: 'state:count', path: ['total'], value: 5 })).toBe(5);
+	const next = { total: 9 };
+	expect(graph.write({ graphNodeId: 'state:count', value: next })).toBe(next);
+});

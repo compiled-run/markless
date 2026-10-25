@@ -197,6 +197,7 @@ export async function marklessRunClosureAction(
 				readPath(readNode(q(graphNodeId)), path),
 			write(write: { graphNodeId: string; path?: ReadonlyArray<string>; value: unknown }) {
 				set(writable(q(write.graphNodeId), write.path), write.value);
+				return write.value;
 			},
 			update(update: {
 				graphNodeId: string;

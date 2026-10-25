@@ -1406,7 +1406,8 @@ function emitResumeContainerEvent(
 ): string {
 	// An in-place navigation that swapped the page while a wake awaited code gave the container a new lifetime: the wake stops before reading the next page's DOM.
 	const lifeOpen = (indent: string) => `${indent}const marklessLife = handoff.root.__mL;`;
-	const lifeCheck = (indent: string) => `${indent}if (handoff.root.__mL !== marklessLife) return;`;
+	const lifeCheck = (indent: string) =>
+		`${indent}if (handoff.root.__mL !== marklessLife) return;`;
 	// A runtime woken while a streamed @pending arm is still on its way adopts that arm.
 	const armsOpen = (indent: string) =>
 		streamsArms
@@ -2096,7 +2097,7 @@ function emitScalarAction(
 		'	const graph = {',
 		`		hasCell(graphNodeId) { return graphNodeId === ${JSON.stringify(action.cell)}; },`,
 		`		read(graphNodeId, path = []) { if (graphNodeId !== ${JSON.stringify(action.cell)} || path.length) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "read"); return state.value; },`,
-		`		write(write) { if (write.graphNodeId !== ${JSON.stringify(action.cell)} || (write.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "write"); if (!Object.is(state.value, write.value)) { state.value = write.value; values.set(${JSON.stringify(action.cell)}, state.value); state.dirty = true; } },`,
+		`		write(write) { if (write.graphNodeId !== ${JSON.stringify(action.cell)} || (write.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "write"); if (!Object.is(state.value, write.value)) { state.value = write.value; values.set(${JSON.stringify(action.cell)}, state.value); state.dirty = true; } return write.value; },`,
 		`		update(update) { if (update.graphNodeId !== ${JSON.stringify(action.cell)} || (update.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "update"); const previous = state.value; const next = update.update(previous); if (!Object.is(previous, next)) { state.value = next; values.set(${JSON.stringify(action.cell)}, state.value); state.dirty = true; } return update.returnValue === "previous" ? previous : update.returnValue === "next" ? next : undefined; },`,
 		'		call() { return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "call"); },',
 		'		async flush() {},',

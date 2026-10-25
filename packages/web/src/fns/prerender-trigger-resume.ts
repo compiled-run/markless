@@ -439,6 +439,7 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 		},
 		write: (write) => {
 			for (const segment of owners(write.graphNodeId)) segment.graph.write(write);
+			return write.value;
 		},
 		update: (update) => broadcastUpdate(staged, owners(update.graphNodeId), update),
 		call: (call) => {

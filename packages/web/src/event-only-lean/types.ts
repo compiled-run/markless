@@ -5,7 +5,7 @@ import type { RuntimeGraphCall, RuntimeGraphUpdate, RuntimeGraphWrite } from '@m
 
 export type EventOnlyResumeGraph = {
 	read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
-	write(write: RuntimeGraphWrite): void;
+	write(write: RuntimeGraphWrite): unknown;
 	update(update: RuntimeGraphUpdate): unknown;
 	call(call: RuntimeGraphCall): unknown;
 	flush(): Promise<void>;
@@ -77,10 +77,7 @@ export type EventOnlyResumeSymbolContext = {
 	readonly behaviorInputs?: ReadonlyArray<unknown>;
 	readonly args?: ReadonlyArray<unknown>;
 	readonly invokeCallback?: (symbolId: string, args: ReadonlyArray<unknown>) => Promise<unknown>;
-	readonly invokeSymbol?: (
-		symbolId: string,
-		context: ResumeSymbolContext,
-	) => Promise<unknown>;
+	readonly invokeSymbol?: (symbolId: string, context: ResumeSymbolContext) => Promise<unknown>;
 };
 
 export type EventOnlyResumeBehaviorCleanup = () => void;

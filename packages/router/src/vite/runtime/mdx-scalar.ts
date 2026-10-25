@@ -179,7 +179,7 @@ async function runScalar(
 		},
 		write(write) {
 			check(write.graphNodeId, write.path);
-			value = write.value;
+			return (value = write.value);
 		},
 		update(update) {
 			check(update.graphNodeId, update.path);

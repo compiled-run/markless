@@ -5,7 +5,7 @@ type ScalarWriteGraph = {
 		readonly graphNodeId: string;
 		readonly path?: ReadonlyArray<string>;
 		readonly value: unknown;
-	}) => void;
+	}) => unknown;
 	readonly update: (update: {
 		readonly graphNodeId: string;
 		readonly path?: ReadonlyArray<string>;
@@ -49,6 +49,7 @@ export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWr
 		});
 	}
 	context.graph.write({ graphNodeId: input.graphNodeId, path: [], value: input.value });
+	return input.value;
 }
 
 function marklessScalarLeafError(code: string, site: string): Error {
