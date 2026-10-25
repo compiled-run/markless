@@ -1000,8 +1000,10 @@ function runInlineResumer(
 				return condition.conditions.some((item) => shared.matches!(item, event, container));
 			if (condition.type === 'not')
 				return !shared.matches!(condition.condition, event, container);
-			if (condition.type === 'graph-truthy')
-				return !!shared.read!(container, condition.graphNodeId, condition.path);
+			if (condition.type === 'graph-truthy') {
+				const value = shared.read!(container, condition.graphNodeId, condition.path);
+				return 'equals' in condition ? value === condition.equals : !!value;
+			}
 			if (condition.type === 'constant-truthy') return !!condition.value;
 			if (condition.type === 'event-equals')
 				return (
@@ -1035,13 +1037,13 @@ function runInlineResumer(
 			if (condition.type === 'not')
 				return !matchesPolicyCondition(condition.condition, event);
 			if (condition.type === 'graph-truthy') {
-				return __MARKLESS_INLINE_GRAPH_SYNC_POLICY__
-					? !!globalScope.__marklessInlineSyncPolicy?.read?.(
-							root,
-							condition.graphNodeId,
-							condition.path,
-						)
-					: false;
+				if (!__MARKLESS_INLINE_GRAPH_SYNC_POLICY__) return false;
+				const value = globalScope.__marklessInlineSyncPolicy?.read?.(
+					root,
+					condition.graphNodeId,
+					condition.path,
+				);
+				return 'equals' in condition ? value === condition.equals : !!value;
 			}
 			if (condition.type === 'constant-truthy') return !!condition.value;
 			if (condition.type === 'event-equals')
