@@ -766,3 +766,20 @@ test.each([
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test.each([
+	['/prop-seeded-recipe', '[data-seeded]', ['v1 /prop-seeded-recipe']],
+	['/prop-row-reads', 'li', ['one v1', 'two']],
+	['/prop-param/plum', '[data-tag]', ['red plum!', 'blue']],
+])('a boundary the browser settles again reads the page props (%s)', async (path, selector, shown) => {
+	const { page, errors } = await open(path);
+	await page.waitForLoadState('load');
+	await page.click('[data-bump]');
+	await expect.poll(() => page.locator(selector).allTextContents()).toEqual(shown);
+	if (path === '/prop-row-reads')
+		expect(await page.locator('li').evaluateAll((rows) => rows.map((row) => row.className))).toEqual(['here', 'here']);
+	if (path === '/prop-param/plum')
+		expect(await page.locator('[data-tag]').evaluateAll((rows) => rows.map((row) => row.title))).toEqual(['ripe', 'ripe']);
+	expect(errors).toEqual([]);
+	await page.close();
+});

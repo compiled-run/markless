@@ -14,6 +14,7 @@ import type { ResumeArmRecordSet } from '../resume-types.ts';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
+import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '../../../serializer/src/protocol-constants.ts';
 import { prepareSsrResumeRecords } from './records.ts';
 import {
 	marklessSsrAttachSnapshots,
@@ -343,9 +344,14 @@ export async function renderPrerenderBoundary(
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		const freshCellIds = new Set<string>();
-		const output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true, {}, {
-			cellIds: freshCellIds,
-		});
+		const output = await evaluatePrerenderDataSurface(
+			page,
+			propsOrLoadSymbol,
+			graph,
+			true,
+			servedPageProps(graph),
+			{ cellIds: freshCellIds },
+		);
 		const settled = await settledBoundaryResult(output, boundaryId);
 		const cells = freshArmCells(output, freshCellIds);
 		return cells.length > 0 ? { ...settled, cells } : settled;
@@ -378,10 +384,14 @@ export async function renderPrerenderBranch(
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
-		output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true, {}, {
-			branchSiteId,
-			cellIds: freshCellIds,
-		});
+		output = await evaluatePrerenderDataSurface(
+			page,
+			propsOrLoadSymbol,
+			graph,
+			true,
+			servedPageProps(graph),
+			{ branchSiteId, cellIds: freshCellIds },
+		);
 	} else {
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	}
@@ -473,6 +483,11 @@ async function evaluatePrerenderDataSurface(
 type RosterResumeHost = {
 	readonly __marklessRosterResume?: () => Promise<typeof import('../fns/roster-resume.ts')>;
 };
+
+// The page's props were served once, as its props cell; a render in the browser reads them back from there.
+function servedPageProps(graph: RuntimeGraph): Readonly<Record<string, unknown>> {
+	return asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID));
+}
 
 function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
 	return value !== null && typeof value === 'object'
