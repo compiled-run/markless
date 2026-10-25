@@ -59,6 +59,11 @@ export async function executedAtLoad(
 	const browser = await chromium.launch();
 	try {
 		const page = await browser.newPage();
+		// Headless Chromium on Linux sends its resting cursor's pointerover after first layout; that is input.
+		await page.addInitScript((types) => {
+			for (const type of types)
+				addEventListener(type, (event) => event.stopImmediatePropagation(), true);
+		}, PHANTOM_POINTER_EVENTS);
 		const origin = new URL(url).origin;
 		// Only same-origin JS is counted; live third-party images held the load event past 30 s.
 		await page.route(
@@ -76,7 +81,9 @@ export async function executedAtLoad(
 			await page.waitForSelector(options.settledSelector, { state: 'attached' });
 		await page.waitForLoadState('networkidle');
 		// Idle callbacks run first-in first-out, so this one lands after the idle work the page queued at load.
-		await page.evaluate(() => new Promise<void>((settled) => requestIdleCallback(() => settled())));
+		await page.evaluate(
+			() => new Promise<void>((settled) => requestIdleCallback(() => settled())),
+		);
 		const { result } = await cdp.send('Profiler.takePreciseCoverage');
 		let executed = 0;
 		for (const script of result) {
@@ -88,6 +95,19 @@ export async function executedAtLoad(
 		await browser.close();
 	}
 }
+
+const PHANTOM_POINTER_EVENTS = [
+	'pointerover',
+	'pointerenter',
+	'pointermove',
+	'pointerout',
+	'pointerleave',
+	'mouseover',
+	'mouseenter',
+	'mousemove',
+	'mouseout',
+	'mouseleave',
+];
 
 type CoverageRange = { startOffset: number; endOffset: number; count: number };
 
