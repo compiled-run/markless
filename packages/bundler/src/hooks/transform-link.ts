@@ -225,6 +225,11 @@ export async function linkTransformChildren(
 		linkedChildren.set(linkedModuleChildKey(child), child);
 		importedChildSources.add(child.source);
 	}
+	const cycle = moduleMetadata.recordComponentChildren(
+		request.source,
+		resolvedChildren.flatMap((child) => (child.externalized ? [] : [child.source])),
+	);
+	if (cycle) throw componentImportCycleError(cycle);
 	const forcedUnawaited = await forceImportedModules(
 		pluginContext,
 		mergeLinkedModuleChildren(
@@ -454,4 +459,12 @@ function claimIdSpelling(root: string | undefined) {
 		moduleIdForSource: (source: string) => moduleIdFor(source, root),
 		sourceForModuleId: (moduleId: string) => sourceForModuleId(moduleId, root),
 	};
+}
+
+// Each file links against the symbols its children finished publishing, which
+// files that render each other can never both finish first.
+function componentImportCycleError(cycle: ReadonlyArray<string>): Error {
+	return new Error(
+		`MARKLESS_COMPONENT_IMPORT_CYCLE: These files render each other's components: ${cycle.join(' -> ')}. Each file is compiled against what the files it renders publish, and files that render each other cannot both publish first. Put the components that render each other in one .tsrx file, where a component may render itself or another component of that file at any depth; one that holds @try has to be the file's default export.`,
+	);
 }

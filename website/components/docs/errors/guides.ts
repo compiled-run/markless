@@ -169,7 +169,8 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		how: 'Build the local only from props, state, and imported values. Or move it to the top of the file. Or make it `state()`.',
 	},
 	MARKLESS_HANDLER_WRITES_RENDER_LOCAL: {
-		summary: 'An event handler changes a value from the component body, and the change would be lost.',
+		summary:
+			'An event handler changes a value from the component body, and the change would be lost.',
 		what: 'A handler that reads a `const` from the component body builds a fresh copy of it each time it runs. Changing that copy, with `list.push(...)`, `names.set(...)` or `box.count = 1`, would be lost before the next run. A method the compiler cannot prove only reads the value counts as a change.',
 		how: 'Keep data that changes in `state()`, and assign it a new value: a copy with the change applied.',
 		example: [
@@ -212,6 +213,24 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		summary: 'A computed() value reads itself.',
 		what: 'This `computed()` reads the value that it defines. There is no order in which Markless can work it out.',
 		how: 'Read the value you meant to start from. If two values share a name by mistake, rename one.',
+	},
+	MARKLESS_COMPONENT_IMPORT_CYCLE: {
+		summary: "Two or more files render each other's components.",
+		what: 'Markless compiles each file against what the files it renders publish once they are compiled. When files render each other, like a comment that renders its replies from another file and replies that render comments, neither can finish first, so the build stops instead of waiting forever.',
+		how: "Move the components that render each other into one `.tsrx` file. Inside one file a component can render itself, or another component of the same file, at any depth. A component that holds `@try` has to be that file's default export.",
+		example: [
+			'export default function Comment({ item }) @{',
+			'\t<div>{item.text}<Replies items={item.replies} /></div>',
+			'}',
+			'',
+			'export function Replies({ items }) @{',
+			'\t<ul>',
+			'\t\t@for (const reply of items; key reply.id) {',
+			'\t\t\t<li><Comment item={reply} /></li>',
+			'\t\t}',
+			'\t</ul>',
+			'}',
+		],
 	},
 	MARKLESS_COMPUTED_READ_CALLED: {
 		summary: 'A computed() value is called like a function.',

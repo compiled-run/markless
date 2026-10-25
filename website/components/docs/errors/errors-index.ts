@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 289,
-	guided: 43,
+	total: 290,
+	guided: 44,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -797,6 +797,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_COMPONENT_EXPORT_NAME_RESERVED',
 					kind: 'build error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_COMPONENT_IMPORT_CYCLE',
+					kind: 'build error',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_CSR_ROOT_DECLARATION_MISSING',
