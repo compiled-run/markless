@@ -1754,6 +1754,14 @@
 			"from": 15113,
 			"to": 15275,
 			"reason": "an @try nested inside another @try's settled content, inline or in a child component, registers and loads when the outer commits"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "web/resume-arm-keyed-repeats",
+			"from": null,
+			"to": 1225,
+			"reason": "lazy arm keyed-repeat wiring split out of web/resume-runtime (which shrinks); loads only when an @if arm holds keyed rows"
 		}
 	],
 	"runtimeModules": {
@@ -1845,6 +1853,7 @@
 		"web/repeat-runtime": 2594,
 		"web/resume": 3419,
 		"web/resume-anchor-census": 1608,
+		"web/resume-arm-keyed-repeats": 1225,
 		"web/resume-arm-records": 7741,
 		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 8885,

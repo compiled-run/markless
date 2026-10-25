@@ -1671,6 +1671,7 @@ export function marklessSsrAppendChildView(context: {
 			decided &&
 			!contentDriven &&
 			!namesIdrefs &&
+			!marklessSsrArmRecordSetIsLive(branch.servedArmRecords) &&
 			!marklessSsrDecidedArmIsLive(branch, armRecords)
 		)
 			continue;
