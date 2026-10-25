@@ -10,6 +10,7 @@ import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-uti
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 import {
 	PROTOCOL_KEEP_ATTRIBUTE,
+	PROTOCOL_KEEP_SHARED_PREFIX,
 	PROTOCOL_OWN_ATTRIBUTE,
 } from '../../../serializer/src/protocol-keep.ts';
 
@@ -50,8 +51,12 @@ afterAll(async () => {
 	if (root) await rm(root, { recursive: true, force: true });
 });
 
-async function open(path: string): Promise<{ page: Page; errors: string[] }> {
+async function open(
+	path: string,
+	before?: (page: Page) => void,
+): Promise<{ page: Page; errors: string[] }> {
 	const page = await browser!.newPage({ viewport: { width: 1000, height: 700 } });
+	before?.(page);
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	page.on('console', (message) => {
@@ -415,6 +420,106 @@ test('a kept part stays exactly as it was, with what a script changed in it, whi
 	).toEqual([true, 'yes', ' (read)', true, false, 1, 600]);
 	await page.click('[data-layout-press]');
 	await expect.poll(() => page.textContent('[data-layout-press]')).toBe('pressed 1');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+// Every fragment response this page receives, by the page path it names.
+function fragmentResponses(page: Page): Array<{ readonly address: string; readonly body: Promise<string> }> {
+	const seen: Array<{ readonly address: string; readonly body: Promise<string> }> = [];
+	page.on('response', (response) => {
+		const address = new URL(response.url()).pathname;
+		if (address.startsWith('/_markless/fragment/'))
+			seen.push({ address, body: response.text().catch(() => '') });
+	});
+	return seen;
+}
+
+const SHARED_ADDRESS = (path: string) =>
+	new RegExp(`^/_markless/fragment/(?:${PROTOCOL_KEEP_SHARED_PREFIX}[0-9a-z]+)+${path}$`);
+
+test('a navigation leaves out of its download the parts the page holds, and they stay with the next page values', async () => {
+	let responses!: ReturnType<typeof fragmentResponses>;
+	const { page, errors } = await open('/alpha', (page) => (responses = fragmentResponses(page)));
+	await page.evaluate(() => {
+		(globalThis as { __kept?: Element[] }).__kept = [
+			document.querySelector('[data-banner]')!,
+			document.querySelector('[data-frame]')!,
+		];
+	});
+	await page.click('[data-top="beta"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Beta');
+	const beta = responses.find((response) => response.address.endsWith('/beta'))!;
+	expect(beta.address).toMatch(SHARED_ADDRESS('/beta'));
+	const body = await beta.body;
+	expect(body).toContain('Beta part 0');
+	expect(body).not.toContain('Release notes');
+	expect(body).not.toContain('Shared parts / ');
+	expect(
+		await page.evaluate(() => {
+			const [banner, frame] = (globalThis as { __kept?: Element[] }).__kept!;
+			return [
+				banner === document.querySelector('[data-banner]'),
+				frame === document.querySelector('[data-frame]'),
+				document.querySelector('[data-banner] strong')?.textContent,
+				document.querySelector('[data-trail="alpha"]')!.getAttribute('aria-current'),
+				document.querySelector('[data-trail="beta"]')!.getAttribute('aria-current'),
+				document.querySelectorAll('[data-frame-body] > [data-part]').length,
+			];
+		}),
+	).toEqual([true, true, 'Release notes', null, 'page', 600]);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('pages with the same shell ask for the same address, so one cached copy of a page serves them all', async () => {
+	let responses!: ReturnType<typeof fragmentResponses>;
+	const { page, errors } = await open('/alpha', (page) => (responses = fragmentResponses(page)));
+	await page.click('[data-top="beta"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Beta');
+	await page.click('[data-top="alpha"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Alpha');
+	const shell = (path: string) =>
+		responses.find((response) => response.address.endsWith(path))!.address.slice(0, -path.length);
+	expect(shell('/beta')).toMatch(SHARED_ADDRESS(''));
+	expect(shell('/alpha')).toBe(shell('/beta'));
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a kept part that answers clicks answers each click once with its own handler after navigating, and Back', async () => {
+	const { page, errors } = await open('/alpha');
+	const presses = () =>
+		page.evaluate(() => (globalThis as { __bannerPresses?: number }).__bannerPresses);
+	await page.click('[data-banner-press]');
+	await expect.poll(presses).toBe(1);
+	await page.click('[data-top="beta"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Beta');
+	await page.click('[data-banner-press]');
+	await expect.poll(presses).toBe(2);
+	await page.goBack();
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Alpha');
+	await page.click('[data-banner-press]');
+	await expect.poll(presses).toBe(3);
+	await page.click('[data-layout-press]');
+	await expect.poll(() => page.textContent('[data-layout-press]')).toBe('pressed 1');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a page that lost a part a fetched fragment left out gets the whole fragment, so the part shows again', async () => {
+	let responses!: ReturnType<typeof fragmentResponses>;
+	const { page, errors } = await open('/alpha', (page) => (responses = fragmentResponses(page)));
+	await page.hover('[data-top="beta"]');
+	await expect.poll(() => responses.some((response) => response.address.endsWith('/beta'))).toBe(true);
+	await page.evaluate(() => document.querySelector('[data-banner]')!.remove());
+	await page.click('[data-top="beta"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Beta');
+	expect(await page.textContent('[data-banner] strong')).toBe('Release notes');
+	expect(responses.map((response) => response.address).filter((address) => address.endsWith('/beta'))).toEqual([
+		expect.stringMatching(SHARED_ADDRESS('/beta')),
+		'/_markless/fragment/beta',
+	]);
 	expect(errors).toEqual([]);
 	await page.close();
 });

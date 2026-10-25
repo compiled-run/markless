@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 289,
+	total: 290,
 	guided: 43,
 	groups: [
 		{
@@ -1000,6 +1000,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ROUTER_KEPT_PART_UNPLACED',
 					kind: 'build error',
 					guided: false,
 				},

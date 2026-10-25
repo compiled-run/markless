@@ -37,8 +37,11 @@ import {
 } from '@markless/web/fns/container-region';
 import {
 	installKeepParts,
+	PROTOCOL_ISLANDS_ATTRIBUTE,
 	PROTOCOL_KEEP_ATTRIBUTE,
+	PROTOCOL_KEEP_SHARED_PREFIX,
 	PROTOCOL_OWN_ATTRIBUTE,
+	PROTOCOL_STUB_ATTRIBUTE,
 } from '@markless/web/fns/keep-parts';
 import {
 	normalizeMarklessDevError,
@@ -49,6 +52,7 @@ import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
 import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
+import { keptPartsForFragment, keptSetOf } from './kept-stubs.ts';
 import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-region.ts';
 import {
 	FRAGMENT_APPEND_END,
@@ -60,6 +64,7 @@ import {
 	FRAGMENT_PREFETCH_CONNECTIONS,
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
+	fragmentKeptSegment,
 	fragmentPageUrl,
 	runFragmentNavigation,
 	startFragmentNavigation,
@@ -97,6 +102,8 @@ export interface ServerEntryOptions {
 	readonly navigation?: 'fragment' | 'render';
 	// The fragment swap module; without it route changes render client-side.
 	readonly fragmentEntryPath?: string;
+	// Component modules more than one route renders, from the build's module graph (none in dev).
+	readonly sharedPartModules?: readonly string[];
 	// The files the fragment entry statically imports, preloaded beside it.
 	readonly fragmentEntryImports?: readonly string[];
 	// The inline half of fragment navigation, minified by the build (the source form serves otherwise).
@@ -191,7 +198,7 @@ export function routerLinkBridgeModules(
 }
 
 export function createServerEntry(options: ServerEntryOptions) {
-	installKeepParts();
+	installKeepParts(new Set(options.sharedPartModules));
 	const manifest = buildRouteManifestFromFileIds(options.routeFileIds);
 	assertCurrentRouteAssets(options);
 	const fragmentBridge = fragmentBridgeFor(options, manifest);
@@ -238,6 +245,9 @@ export function createServerEntry(options: ServerEntryOptions) {
 		const fragmentUrl = fragmentNavigation ? fragmentPageUrl(requestUrl) : undefined;
 		const fragment = fragmentUrl !== undefined;
 		const url = fragmentUrl ?? requestUrl;
+		// A fragment address may first name the shared kept parts the requesting page holds: those come as stubs.
+		const segment = fragment ? fragmentKeptSegment(requestUrl) : undefined;
+		const kept = segment === undefined ? undefined : keptSetOf(segment);
 		const match = matchRouteManifest(url.pathname, manifest);
 		// Under the endpoint prefix only a page file in pages/api/ answers; a root catch-all never does.
 		if (
@@ -258,7 +268,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		}
 
 		try {
-			return await renderPage(url, match.route.file, match.params, 200, fragment, request);
+			return await renderPage(url, match.route.file, match.params, 200, fragment, request, kept);
 		} catch (error) {
 			// Surface the stack: a silent 500 hid the async-renderSsr break.
 			console.error('[markless-router] page render failed:', error);
@@ -330,6 +340,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		status: number,
 		fragment: boolean,
 		request: Request,
+		kept?: ReadonlySet<string>,
 	) {
 		const loadPageModule = options.pageModuleLoaders[file];
 		if (!loadPageModule) {
@@ -353,6 +364,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 			? ((await options.documentModuleLoader()) as DocumentModule)
 			: undefined;
 		const headers: Record<string, string> = { 'content-type': 'text/html;charset=utf-8' };
+		const served = (html: string) => (fragment ? keptPartsForFragment(html, kept) : html);
 
 		const baseArtifact = pageModule.default;
 		const renderSsr = baseArtifact?.renderSsr ?? pageModule.marklessRenderSsr;
@@ -447,7 +459,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 				headStart,
 			);
 			return new Response(
-				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				served(wholeDocument(shell, pageHtml, fragment, documentLoads)),
 				http.commit(status, headers),
 			);
 		}
@@ -467,14 +479,15 @@ export function createServerEntry(options: ServerEntryOptions) {
 		);
 		if (stream.pendingArmCount === 0) {
 			return new Response(
-				wholeDocument(shell, pageHtml, fragment, documentLoads),
+				served(wholeDocument(shell, pageHtml, fragment, documentLoads)),
 				http.commit(status, headers),
 			);
 		}
 		const placed = placePage(shell, DOCUMENT_CHILDREN_PLACEHOLDER, pageHtml);
 		// A fragment is a whole region document first; each settled arm then follows on its own, delimited.
 		const prefix = fragment
-			? fragmentDocument(shell, pageHtml, documentLoads) + FRAGMENT_REGION_END
+			? keptPartsForFragment(fragmentDocument(shell, pageHtml, documentLoads), kept) +
+				FRAGMENT_REGION_END
 			: placed.prefix;
 		const suffix = fragment ? '' : placed.suffix;
 		const appendEnd = fragment ? FRAGMENT_APPEND_END : '';
@@ -930,7 +943,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE }) : 'null'}));`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, keep: [PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_KEEP_SHARED_PREFIX] }) : 'null'}));`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1156,7 +1169,13 @@ function fragmentConfig(
 		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,
 		pageStartComment: PROTOCOL_CONTAINER_START_COMMENT,
 		containerAttributes: [CONTAINER_ATTRIBUTE, PROTOCOL_LOCATOR_PATHS_ATTRIBUTE],
-		keepAttributes: [PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_OWN_ATTRIBUTE],
+		keepAttributes: [
+			PROTOCOL_KEEP_ATTRIBUTE,
+			PROTOCOL_OWN_ATTRIBUTE,
+			PROTOCOL_ISLANDS_ATTRIBUTE,
+			PROTOCOL_STUB_ATTRIBUTE,
+			PROTOCOL_KEEP_SHARED_PREFIX,
+		],
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,

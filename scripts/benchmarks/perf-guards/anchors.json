@@ -1706,6 +1706,22 @@
 			"from": 19772,
 			"to": 19974,
 			"reason": "composition routes the prop reads of a row template's @if branch slots and arm slots (+202 B rendered)"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 26073,
+			"to": 29378,
+			"reason": "a swap places the kept parts a fragment left out and sets their islands, and loads the document when it cannot (page regions, slice 2)"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 20878,
+			"to": 21638,
+			"reason": "the renderer builds the masked copy keep-parts hashes, only while the page server installs it (page regions, slice 2)"
 		}
 	],
 	"runtimeModules": {
@@ -1718,7 +1734,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 26073,
+		"router/vite/entries/fragment-entry": 29378,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 9858,
@@ -1822,7 +1838,7 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20878,
+		"web/ssr-data/renderer": 21638,
 		"web/storage-plane": 1810
 	},
 	"constructGlue": {

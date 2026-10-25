@@ -1,3 +1,4 @@
+import { PROTOCOL_KEEP_SHARED_PREFIX } from '@markless/web/fns/keep-parts';
 import type {
 	FragmentEntryModule,
 	FragmentPreload,
@@ -75,7 +76,17 @@ export function startFragmentNavigation(
 		if (!code || here(url)) return;
 		const target = new URL(url.href);
 		target.hash = '';
-		target.pathname = intent.requestPrefix + target.pathname;
+		const [keep, shared] = intent.keep;
+		const held = [
+			...new Set(
+				Array.from(d.querySelectorAll(`[${keep}^="${shared}"]`), (part) =>
+					part.getAttribute(keep),
+				),
+			),
+		]
+			.sort()
+			.join('');
+		target.pathname = intent.requestPrefix + (held && '/' + held) + target.pathname;
 		const controller = new AbortController();
 		const response = w.fetch(target.href, {
 			credentials: 'same-origin',
@@ -170,6 +181,8 @@ export type FragmentIntent = {
 	readonly hoverDwellMs: number;
 	readonly requestPrefix: string;
 	readonly prefetchAttribute: string;
+	// The keep attribute and the prefix of a shared keep hash: the page names the parts it holds in the address.
+	readonly keep: readonly [attribute: string, shared: string];
 };
 
 // A page fetch a press started before the run half arrived; the run half adopts it as its prefetch.
@@ -398,11 +411,24 @@ export function runFragmentNavigation(
 	};
 	// One request: the destination's region document and its resume payload, parsed on arrival (no script runs), so the click only swaps.
 	// budget: an idle fetch stops once the page's region passes this many bytes, leaving that page to intent.
+	const [keep, , , , shared] = config.keepAttributes;
+	// The shared kept parts this page holds, named in the address so the server leaves them out; one address per shell.
+	const held = () =>
+		[
+			...new Set(
+				Array.from(d.querySelectorAll(`[${keep}^="${shared}"]`), (part) =>
+					part.getAttribute(keep),
+				),
+			),
+		]
+			.sort()
+			.join('');
 	const request = (
 		url: URL,
 		speculative: boolean | 'idle',
 		started?: FragmentEarly,
 		budget = Infinity,
+		whole = false,
 	): FragmentPrefetch => {
 		fetched.add(pageKey(url));
 		const controller = started?.controller ?? new AbortController();
@@ -410,15 +436,24 @@ export function runFragmentNavigation(
 			const prefix = config.requestPrefix;
 			const target = new URL(url.href);
 			target.hash = '';
-			target.pathname = prefix + target.pathname;
-			const response = await (started?.response ??
-				w.fetch(target.href, {
+			const ask = (parts: string) => {
+				target.pathname = prefix + (parts && '/' + parts) + url.pathname;
+				return w.fetch(target.href, {
 					credentials: 'same-origin',
 					headers: speculative ? { purpose: 'prefetch' } : {},
 					// The idle tier never competes with what the page itself still loads.
 					priority: speculative === 'idle' ? 'low' : speculative ? 'auto' : 'high',
 					signal: controller.signal,
-				} as RequestInit));
+				} as RequestInit);
+			};
+			let response = await (started?.response ?? ask(whole ? '' : held()));
+			const sharedSegment = new RegExp(`^${prefix}/(?:${shared}[0-9a-z]+)+(?=/)`);
+			// A static host holds only the plain address.
+			if (
+				response.status === 404 &&
+				sharedSegment.test(new URL(response.url || target.href).pathname)
+			)
+				response = await ask('');
 			// no-store forbids reuse; a positive max-age bounds it. max-age=0, no-cache and must-revalidate only ask
 			// an HTTP cache to revalidate, and hosts such as Vercel send them on every dynamic page.
 			const cacheControl = response.headers.get('cache-control') ?? '';
@@ -434,7 +469,7 @@ export function runFragmentNavigation(
 			// A redirect off the fragment path answered with a whole document.
 			if (!finalUrl.pathname.startsWith(`${prefix}/`))
 				throw new Error('MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE: redirected');
-			finalUrl.pathname = finalUrl.pathname.slice(prefix.length);
+			finalUrl.pathname = finalUrl.pathname.replace(sharedSegment, prefix).slice(prefix.length);
 			finalUrl.hash = url.hash;
 			const declared = Number(response.headers.get('content-length') ?? 0);
 			if (declared > budget) throw new Error('MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET');
@@ -720,12 +755,20 @@ export function fragmentRequestUrl(url: string | URL): URL {
 	return target;
 }
 
+// The kept parts a fragment address may name first (see PROTOCOL_KEEP_SHARED_PREFIX) are not part of the page path.
+const KEPT_SEGMENT = new RegExp(`^/((?:${PROTOCOL_KEEP_SHARED_PREFIX}[0-9a-z]+)+)(?=/)`);
+
 // The page URL a fragment request names, or undefined for any other request.
 export function fragmentPageUrl(url: URL): URL | undefined {
 	if (!url.pathname.startsWith(`${FRAGMENT_PATH_PREFIX}/`)) return undefined;
 	const page = new URL(url);
-	page.pathname = url.pathname.slice(FRAGMENT_PATH_PREFIX.length);
+	page.pathname = url.pathname.slice(FRAGMENT_PATH_PREFIX.length).replace(KEPT_SEGMENT, '');
 	return page;
+}
+
+// The kept parts a fragment address names, as one segment, or undefined.
+export function fragmentKeptSegment(url: URL): string | undefined {
+	return KEPT_SEGMENT.exec(url.pathname.slice(FRAGMENT_PATH_PREFIX.length))?.[1];
 }
 
 // The response's region document ends here; each streamed @pending arm after it ends with the append marker.
