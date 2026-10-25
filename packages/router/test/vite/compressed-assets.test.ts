@@ -1,14 +1,18 @@
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
-import { brotliDecompressSync, gunzipSync } from 'node:zlib';
+import { brotliCompressSync, brotliDecompressSync, constants, gunzipSync } from 'node:zlib';
 import { join, resolve } from 'pathe';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
-import { compressedAssetsModule } from '../../src/vite/nitro-compressed-assets.ts';
+import {
+	compressedAssetsModule,
+	compressedAssetsState,
+	PUBLIC_BROTLI_QUALITY,
+} from '../../src/vite/nitro-compressed-assets.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -60,11 +64,16 @@ function get(path: string, acceptEncoding?: string) {
 		(done, fail) => {
 			const req = request(
 				origin + path,
-				{ headers: acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding } },
+				{
+					headers:
+						acceptEncoding === undefined ? {} : { 'accept-encoding': acceptEncoding },
+				},
 				(res) => {
 					const chunks: Buffer[] = [];
 					res.on('data', (chunk: Buffer) => chunks.push(chunk));
-					res.on('end', () => done({ headers: res.headers, body: Buffer.concat(chunks) }));
+					res.on('end', () =>
+						done({ headers: res.headers, body: Buffer.concat(chunks) }),
+					);
 				},
 			);
 			req.on('error', fail);
@@ -105,16 +114,45 @@ test('the node server answers a script with its precompressed brotli or gzip cop
 	expect(plain.body.equals(original)).toBe(true);
 });
 
+test('every file with a gzip copy has a brotli copy written at the public brotli quality', async () => {
+	const publicDir = join(root, '.output/public');
+	const gzipped = (await readdir(publicDir, { recursive: true })).filter((file) =>
+		file.endsWith('.gz'),
+	);
+	expect(gzipped.length).toBeGreaterThan(0);
+	for (const gz of gzipped) {
+		const original = await readFile(join(publicDir, gz.slice(0, -3)));
+		const br = await readFile(join(publicDir, `${gz.slice(0, -3)}.br`));
+		expect(brotliDecompressSync(br).equals(original)).toBe(true);
+		const expected = brotliCompressSync(original, {
+			params: { [constants.BROTLI_PARAM_QUALITY]: PUBLIC_BROTLI_QUALITY },
+		});
+		expect(br.equals(expected), gz).toBe(true);
+	}
+});
+
 test('precompression stays off where the host compresses at its edge, inlines assets, or the app chose', () => {
-	const options = (serveStatic: boolean | string) => ({ options: { serveStatic } as { serveStatic: boolean | string; compressPublicAssets?: unknown } });
+	const options = (serveStatic: boolean | string) => ({
+		options: { serveStatic, output: { publicDir: '/out/public' } } as {
+			serveStatic: boolean | string;
+			output: { publicDir: string };
+			compressPublicAssets?: unknown;
+		},
+	});
 	const node = options(true);
-	compressedAssetsModule(false).setup(node);
-	expect(node.options.compressPublicAssets).toEqual({ gzip: true, brotli: true });
+	const nodeState = compressedAssetsState();
+	compressedAssetsModule(false, nodeState).setup(node);
+	expect(node.options.compressPublicAssets).toEqual({ gzip: true });
+	expect(nodeState.brotliDir).toBe('/out/public');
 	for (const nitro of [options(false), options('inline')]) {
-		compressedAssetsModule(false).setup(nitro);
+		const state = compressedAssetsState();
+		compressedAssetsModule(false, state).setup(nitro);
 		expect(nitro.options.compressPublicAssets).toBeUndefined();
+		expect(state.brotliDir).toBeUndefined();
 	}
 	const chosen = options(true);
-	compressedAssetsModule(true).setup(chosen);
+	const chosenState = compressedAssetsState();
+	compressedAssetsModule(true, chosenState).setup(chosen);
 	expect(chosen.options.compressPublicAssets).toBeUndefined();
+	expect(chosenState.brotliDir).toBeUndefined();
 });
