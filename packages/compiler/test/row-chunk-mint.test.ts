@@ -59,6 +59,60 @@ export function Lists() @{
 	expect(inner?.rowTemplate?.branchSlots).toHaveLength(1);
 });
 
+test('a nested @for whose row @if holds a component still gives the enclosing row markup', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Badge({ label }) @{
+	<b>{label}</b>
+}
+
+export function Lists() @{
+	let lists = state([{ key: 'a', items: [{ id: 1, on: true, label: 'A' }] }]);
+
+	<section>
+		@for (const list of lists; key list.key) {
+			<ol>@for (const item of list.items; key item.id) { <li>@if (item.on) { <Badge label={item.label} /> } @else { <i>off</i> }</li> }</ol>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const [outer, inner] = result.protocolView.keyedRepeats ?? [];
+	expect(outer?.rowTemplate?.html).toBe('<ol><!--markless-slot:0--></ol>');
+	expect(inner?.rowComponent).toEqual({ componentName: 'Lists', rowChunkId: 'repeat:repeat:1:row' });
+});
+
+test('a nested @for whose rows hold an @if inside an @if arm is refused, not dropped', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function Lists() @{
+	let open = state(true);
+	let lists = state([{ key: 'a', items: [{ id: 1, on: true }] }]);
+
+	<section>
+		<button onClick={() => open = !open}>toggle</button>
+		@if (open) {
+			<div>@for (const list of lists; key list.key) { <ol>@for (const item of list.items; key item.id) { <li>@if (item.on) { <b>on</b> }</li> }</ol> }</div>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+	expect(
+		result.symbolModules.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toEqual([expect.objectContaining({ severity: 'error' })]);
+});
+
 test('a @switch row with a child component in one arm mints the same way', async () => {
 	const { repeat, rowMintCodes } = await compile(`
 import { state } from '@markless/core';

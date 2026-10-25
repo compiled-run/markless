@@ -887,7 +887,7 @@ function nestedRepeatMints(
 	if (!hostPathsForChunk(input, enclosing.rowChunkId, true).has(nested.parentHostNodeId))
 		return false;
 	if (render.emptyChunkId && !mintableEmptyArm(input, render).emptyArm) return false;
-	if (rowComponentMint(input, render)) return false;
+	if (rowComponentMint(input, render)) return true;
 	const template = mintableRowTemplate(input, render, null).rowTemplate;
 	return template !== undefined;
 }
