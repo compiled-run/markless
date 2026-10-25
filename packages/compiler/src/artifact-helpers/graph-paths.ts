@@ -6,6 +6,12 @@ import type {
 
 const asyncSnapshotKeys = new Set(['status', 'version', 'key', 'error', 'value']);
 
+// `a?.b` in markup reads the same path as `a.b`: a graph read through a missing value is already undefined.
+export function optionalMemberReadSource(source: string): string {
+	const plain = source.replaceAll('?.', '.');
+	return plain !== source && /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/.test(plain) ? plain : source;
+}
+
 export function resolveGraphPath(
 	source: string,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,

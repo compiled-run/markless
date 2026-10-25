@@ -20,6 +20,7 @@ import {
 } from '../../ast/tsrx.ts';
 import {
 	graphBindingMap,
+	optionalMemberReadSource,
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
@@ -1075,16 +1076,17 @@ function sourceResidue(
 			return { kind: 'repeat-item', repeatId: repeat.id, path };
 		}
 	}
-	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(source)
+	const memberPath = optionalMemberReadSource(source);
+	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(memberPath)
 		? // Component scope only: a factory local and a component's shared-instance
 			// local routinely share a name, and the instance is what markup names.
 			// The declaring component narrows it further: two sibling parts may each
 			// declare the same local, and a module-wide map keeps only the last.
 			(resolveGraphPath(
-				source,
+				memberPath,
 				graphBindingMap(context.graph, null, componentName),
 				semanticAliasMap(context.graph, null, componentName),
-			) ?? resolveSharedInstanceGraphPath(source, context.graph, componentName))
+			) ?? resolveSharedInstanceGraphPath(memberPath, context.graph, componentName))
 		: null;
 	if (resolved) {
 		return { kind: 'graph-read', graphNodeId: resolved.binding.id, path: resolved.path };

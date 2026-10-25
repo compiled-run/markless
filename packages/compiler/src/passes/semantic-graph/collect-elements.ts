@@ -401,10 +401,12 @@ function readsAsyncComputed(source: string, state: WalkState): boolean {
 function refuseUnroutedExpression(expression: AnyNode, target: string, state: WalkState): boolean {
 	if (state.currentKeyedRepeatScopeIds.length > 0) return false;
 	if (expression.type === 'Identifier') return false;
+	const member =
+		expression.type === 'ChainExpression' ? (expression.expression as AnyNode) : expression;
 	if (
-		expression.type === 'MemberExpression' &&
-		!isCompositeTemplateExpression(expression) &&
-		pureCompositeReadSources(expression, state)
+		member.type === 'MemberExpression' &&
+		!isCompositeTemplateExpression(member) &&
+		pureCompositeReadSources(member, state)
 	)
 		return false;
 	let owned = false;
