@@ -801,7 +801,7 @@ test('buildSemanticGraph reports unextractable synchronous event policy', async 
 			suggestions: [
 				{
 					message:
-						"Write the guard from event fields compared with literals (`event.key === 'Enter'`), modifier flags (`event.metaKey`), state, props and module constants, joined with &&, || and !: either `if (event.key === 'Enter' && !busy) event.preventDefault()` or an early `if (event.key !== 'Enter') return;` before an unconditional `event.preventDefault()`. A condition that reads the DOM (such as `event.target.closest('a')`) cannot run before the handler loads; keep what it decides in state, or remove the cancel from the lazy handler.",
+						"Write the guard from event fields, state, props and module constants, read as they are or compared with a literal (`event.key === 'Enter'`, `tab === 'show'`), joined with &&, || and !: either `if (event.key === 'Enter' && !busy) event.preventDefault()` or an early `if (event.key !== 'Enter') return;` before an unconditional `event.preventDefault()`. A condition that reads the DOM or a browser global (such as `event.target.closest('a')` or `location.pathname`) cannot run before the handler loads; keep what it decides in state or in a computed over state and props, and guard on that (`if (onThisPage) event.preventDefault()`), or remove the cancel from the lazy handler.",
 				},
 			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',

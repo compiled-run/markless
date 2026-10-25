@@ -708,6 +708,8 @@ export type SemanticSyncPolicyCondition =
 			readonly type: 'graph-truthy';
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
+			/** When present, the read must equal this value rather than be truthy. */
+			readonly equals?: string | number | boolean | null;
 	  }
 	| {
 			readonly type: 'constant-truthy';

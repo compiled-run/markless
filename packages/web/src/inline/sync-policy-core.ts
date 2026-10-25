@@ -42,7 +42,8 @@ function evaluateSyncPolicy(
 	}
 	if (condition.type === 'not') return !evaluateSyncPolicy(condition.condition, graph, event);
 	if (condition.type === 'graph-truthy') {
-		return Boolean(graph.read(condition.graphNodeId, condition.path ?? []));
+		const value = graph.read(condition.graphNodeId, condition.path ?? []);
+		return 'equals' in condition ? value === condition.equals : Boolean(value);
 	}
 	if (condition.type === 'constant-truthy') return Boolean(condition.value);
 

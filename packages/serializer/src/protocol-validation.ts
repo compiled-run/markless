@@ -1692,6 +1692,16 @@ function assertSyncPolicyCondition(value: unknown, context: string): void {
 	if (value.type === 'graph-truthy') {
 		assertStringField(value, 'graphNodeId', context);
 		assertOptionalStringArrayField(value, 'path', context);
+		if (
+			'equals' in value &&
+			value.equals !== null &&
+			!['string', 'number', 'boolean'].includes(typeof value.equals)
+		) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}: expected equals to be a string, number, boolean or null.`,
+			);
+		}
 		return;
 	}
 
