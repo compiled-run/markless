@@ -254,11 +254,22 @@ export function App() @{
 	});
 });
 
-test('a row holding a nested repeat whose rows cannot mint ships no markup', async () => {
+test('a row holding a nested repeat whose rows hold an @if ships markup for both', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a', tags: [{ id: 't', on: true }] }]);
 	<ul>@for (const row of rows; key row.id) { <li>@for (const tag of row.tags; key tag.id) { <b>@if (tag.on) { <i>on</i> }</b> }</li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.html).toBe('<li><!--markless-slot:0--></li>');
+	expect(view.keyedRepeats?.[1]?.rowTemplate?.branchSlots).toHaveLength(1);
+});
+
+test('a row holding a nested repeat whose rows cannot mint ships no markup', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a', tags: [{ id: 't', attrs: { title: 't' } }] }]);
+	<ul>@for (const row of rows; key row.id) { <li>@for (const tag of row.tags; key tag.id) { <b {...tag.attrs}>t</b> }</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');

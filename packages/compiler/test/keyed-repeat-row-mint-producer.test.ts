@@ -115,18 +115,18 @@ test('a row holding an @if over page state with a component in an arm warns that
 	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
 });
 
-// The row decides its own arm, so the browser renders the whole row chunk for a new row.
-test('a row whose @if reads only the row item stays silent - the payload names the row chunk', async () => {
+// The row decides its own arm from its template, so a new item object patches the row instead of rebuilding it.
+test('a row whose @if reads only the row item stays silent - the payload carries the row template', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <em>on</em> } @else { <em>off</em> }</li> }</ul>`,
 	);
 
 	expect(rowMintWarnings(compiled)).toEqual([]);
-	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
-	expect(rowRecord(compiled)?.rowComponent).toEqual({
-		componentName: 'App',
-		rowChunkId: 'repeat:repeat:0:row',
-	});
+	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
+	expect(rowRecord(compiled)?.rowTemplate?.branchSlots?.[0]?.arms.map((arm) => arm.html)).toEqual([
+		'<em>on</em>',
+		'<em>off</em>',
+	]);
 });
 
 test('a row whose element wraps a component stays silent - both halves ship', async () => {
