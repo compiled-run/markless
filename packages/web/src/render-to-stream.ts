@@ -28,6 +28,7 @@ import {
 	type SsrRenderOutput,
 	withArmEventHostMarks,
 } from './render-to-string.ts';
+import { armNestedBoundaries } from './arm-nested-boundaries.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
@@ -211,6 +212,7 @@ async function* streamArmAppends(input: {
 	readonly shellState: ProtocolStatePayload | undefined;
 }): AsyncGenerator<string, void, void> {
 	const remaining = new Map(input.pendingArms.map((arm) => [arm.boundaryId, arm]));
+	const streamed = new Set<string>();
 	const signal = input.renderContext.streaming.signal;
 	if (signal.aborted) return;
 	let cancelAppends!: () => void;
@@ -275,6 +277,7 @@ async function* streamArmAppends(input: {
 				)
 					continue;
 				remaining.delete(arm.boundaryId);
+				streamed.add(arm.boundaryId);
 				if (!executorEmitted) {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
 					executorEmitted = true;
@@ -287,6 +290,17 @@ async function* streamArmAppends(input: {
 				if (missed > 1)
 					throw streamArmError(arm.boundaryId, '@try or @catch arm', 'boundary record');
 				missedWaves.set(arm, missed);
+			}
+			// A boundary first rendered inside an arm this wave settled streams in a later wave, after that arm.
+			for (const arm of pendingStreamArms(output, input.renderContext)) {
+				if (streamed.has(arm.boundaryId) || remaining.has(arm.boundaryId)) continue;
+				remaining.set(arm.boundaryId, {
+					...arm,
+					revealDependencyIds: [
+						...arm.revealDependencyIds,
+						...enclosingBoundaryIds(output, arm.boundaryId, streamed),
+					],
+				});
 			}
 			if (parts.length > 0) yield parts.join('');
 		}
@@ -333,6 +347,21 @@ async function renderSettleWave(
 		}
 		throw error;
 	}
+}
+
+function enclosingBoundaryIds(
+	output: SsrRenderOutput,
+	boundaryId: string,
+	streamed: ReadonlySet<string>,
+): string[] {
+	const boundaries = output.view?.asyncBoundaries ?? [];
+	const inner = boundaries.find((boundary) => boundary.id === boundaryId);
+	if (!inner) return [];
+	return boundaries.flatMap((boundary) =>
+		streamed.has(boundary.id) && armNestedBoundaries([inner], boundary).length > 0
+			? [boundary.id]
+			: [],
+	);
 }
 
 // A sync derive gating the arm reads upstream values the shell served as pending, so they ride its patch.
@@ -399,9 +428,13 @@ function renderArmAppend(
 		cells,
 		computed: serializeRuntimeAsyncSnapshots([...computedById.values()]),
 	});
+	const nested = armNestedBoundaries(output.view?.asyncBoundaries ?? [], boundary);
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
-		withPaintedBranchArms(armRecords, output) as never,
+		withPaintedBranchArms(
+			nested.length > 0 ? { ...armRecords, asyncBoundaries: nested } : armRecords,
+			output,
+		) as never,
 	];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 

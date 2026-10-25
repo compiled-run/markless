@@ -153,9 +153,14 @@ export async function asyncComputedFromRecord(
 
 function asyncRunnerSymbolsByGraphNode(view: ProtocolViewPayload): Record<string, string> {
 	const symbols = { ...view.asyncRunners };
-	for (const boundary of view.asyncBoundaries)
+	type Boundary = (typeof view.asyncBoundaries)[number];
+	const visit = (boundary: Boundary): void => {
 		for (const read of boundary.asyncReads)
 			if (read.runnerSymbolId) symbols[read.graphNodeId] ??= read.runnerSymbolId;
+		const records = boundary.armRecords as { readonly asyncBoundaries?: Boundary[] } | undefined;
+		for (const nested of records?.asyncBoundaries ?? []) visit(nested);
+	};
+	for (const boundary of view.asyncBoundaries) visit(boundary);
 	return symbols;
 }
 

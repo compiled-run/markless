@@ -1,7 +1,6 @@
 import { runtimeResumeError } from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import { boundaryArmRecordSet, materializeArmRecords } from './resume-arm-records.ts';
-import type { AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import {
 	containsElement,
 	elementsBetweenAnchors,
@@ -119,7 +118,7 @@ export function createArmCommitter(
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
 		) => Promise<void>;
-		readonly asyncBoundaryWiring?: () => AsyncBoundaryWiring | undefined;
+		readonly addAsyncBoundary?: (boundary: ResumeAsyncBoundaryRecord) => void;
 		readonly documentHost?: CommitDocument;
 	},
 	installEventType: (eventType: string) => void,
@@ -465,8 +464,8 @@ async function registerNestedAsyncBoundaries(
 	records: NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
 	computed: ArmCommitUpdate['computed'],
 ): Promise<void> {
-	const wiring = deps.asyncBoundaryWiring?.();
-	if (!wiring || !deps.graph || !deps.loadSymbol)
+	const add = deps.addAsyncBoundary;
+	if (!add || !deps.graph || !deps.loadSymbol)
 		throw new Error('Markless nested async boundary registration is unavailable.');
 	const census = commentsBetween(range.startAnchor, range.endAnchor);
 	const boundaries: ResumeAsyncBoundaryRecord[] = records.map((record) => {
@@ -508,7 +507,7 @@ async function registerNestedAsyncBoundaries(
 			),
 		);
 	}
-	for (const nested of boundaries) wiring.add(nested);
+	for (const nested of boundaries) add(nested);
 }
 
 // The page comment census restricted to the range, so indexes count from the arm start.

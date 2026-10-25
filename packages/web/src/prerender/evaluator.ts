@@ -16,6 +16,7 @@ import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '../../../serializer/src/protocol-constants.ts';
 import { prepareSsrResumeRecords } from './records.ts';
+import { armNestedBoundaries } from '../arm-nested-boundaries.ts';
 import {
 	marklessSsrAttachSnapshots,
 	marklessComposeState,
@@ -1229,22 +1230,7 @@ async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string
 	if (!anchor || !armRecords || Array.isArray(armRecords)) {
 		throw new Error(`MARKLESS_PRERENDER_BOUNDARY_MISSING: ${boundaryId}`);
 	}
-	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
-		...anchor,
-		index: anchor.index - boundary.startAnchor.index - 1,
-	});
-	const nested = records.view.asyncBoundaries
-		.filter(
-			(candidate) =>
-				candidate.startAnchor.index > boundary.startAnchor.index &&
-				candidate.endAnchor.index < boundary.endAnchor.index,
-		)
-		.map(({ armRecords: served, ...candidate }) => ({
-			...candidate,
-			...(served && !Array.isArray(served) && { armRecords: served as ResumeArmRecordSet }),
-			startAnchor: armIndex(candidate.startAnchor),
-			endAnchor: armIndex(candidate.endAnchor),
-		}));
+	const nested = armNestedBoundaries(records.view.asyncBoundaries, boundary);
 	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
 	const set = armRecords as ResumeArmRecordSet;
 	return {
