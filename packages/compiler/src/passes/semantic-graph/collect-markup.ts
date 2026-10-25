@@ -476,6 +476,8 @@ function emitNode(
 	// writes the scope class beside whatever the caller passed.
 	const spreadCount = elementAttributes.filter(isSpreadAttribute).length;
 	let spreadClassResidue: SemanticMarkupResidue | null = null;
+	// A textarea ignores a value attribute: its text content is the value it shows.
+	let textareaValue: AnyNode | null = null;
 	for (const attribute of elementAttributes) {
 		if (isSpreadAttribute(attribute)) {
 			const expression = unwrapExpressionContainer(
@@ -557,6 +559,10 @@ function emitNode(
 			if (!omittable) append(builder, '"');
 			continue;
 		}
+		if (name === 'value' && tagName.toLowerCase() === 'textarea') {
+			textareaValue = attribute;
+			continue;
+		}
 		if (name === 'class') classSeen = true;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
@@ -617,10 +623,36 @@ function emitNode(
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
 	append(builder, '>');
-	if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);
+	if (textareaValue) emitTextareaValue(textareaValue, path, builder, context, repeat);
+	else if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);
 	else emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	if (!VOID_TAG_NAMES.has(tagName.toLowerCase())) append(builder, `</${tagName}>`);
 	return 1;
+}
+
+function emitTextareaValue(
+	attribute: AnyNode,
+	path: ReadonlyArray<number>,
+	builder: ChunkBuilder,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+): void {
+	const value = attribute.value as AnyNode | undefined;
+	const expression = unwrapExpressionContainer(value);
+	const literal = staticAttributeValue(value, expression);
+	if (literal) {
+		const text = staticAttributeText('value', literal.value);
+		if (text !== null) append(builder, escapeHtml(text));
+		return;
+	}
+	if (!expression) return;
+	addSlot(builder, {
+		kind: 'attribute',
+		name: 'value',
+		coordinate: { kind: 'child-index', path },
+		residue: expressionResidue(expression, context, repeat, builder.componentName, 'value'),
+		alwaysPresent: true,
+	});
 }
 
 // The parser hands a script body over as raw JSXText, braces and all: literal
