@@ -263,13 +263,14 @@ function createEventResumeGraph(input: {
 		},
 		write(write: RuntimeGraphWrite) {
 			const path = write.path ?? [];
-			const currentValue = readPath(cells.get(write.graphNodeId), path);
-			if (Object.is(currentValue, write.value)) return;
-			cells.set(
-				write.graphNodeId,
-				writePath(cells.get(write.graphNodeId), path, write.value),
-			);
-			markDirty(write.graphNodeId, path);
+			if (!Object.is(readPath(cells.get(write.graphNodeId), path), write.value)) {
+				cells.set(
+					write.graphNodeId,
+					writePath(cells.get(write.graphNodeId), path, write.value),
+				);
+				markDirty(write.graphNodeId, path);
+			}
+			return write.value;
 		},
 		update(update: RuntimeGraphUpdate) {
 			const path = update.path ?? [];

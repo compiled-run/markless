@@ -271,7 +271,8 @@ export type RuntimeGraph = {
 	readonly listSharedDefinitions: () => NonNullable<ProtocolStatePayload['sharedDefinitions']>;
 	readonly takeSharedPatches: () => RuntimeGraphSharedPatch[];
 	readonly applySharedPatch: (patch: RuntimeGraphSharedPatch) => boolean;
-	readonly write: (write: RuntimeGraphWrite) => void;
+	/** Answers the value written, as the assignment it lowers from does. */
+	readonly write: (write: RuntimeGraphWrite) => unknown;
 	readonly update: (update: RuntimeGraphUpdate) => unknown;
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
@@ -353,7 +354,14 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const markDirtyPath = (graphNodeId: string, path: ReadonlyArray<string>): void => {
 		dirtyPaths.push({ graphNodeId, path });
 		plane?.recordWrite(graphNodeId, path);
-		markDirtyComputedDependencies(graphNodeId, path, dependents, dirtyPaths, plane, invalidateAsyncComputed);
+		markDirtyComputedDependencies(
+			graphNodeId,
+			path,
+			dependents,
+			dirtyPaths,
+			plane,
+			invalidateAsyncComputed,
+		);
 		// Last, so an observer that reads back finds every computed this write
 		// invalidated already marked and answering afresh.
 		notifyWriteObservers(graphNodeId, path);
@@ -487,15 +495,25 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					const ranSubscriptions = new Set<string>();
 					const commits: RuntimeGraphCommit[] = [];
 					// A subscription added mid-pass runs after every older one, as an appended entry would.
-					for (let floor = 0, ceiling; floor < (ceiling = subscriptionSequence); floor = ceiling)
+					for (
+						let floor = 0, ceiling;
+						floor < (ceiling = subscriptionSequence);
+						floor = ceiling
+					)
 						for (const subscription of dueSubscriptions(pending, floor, ceiling)) {
-							if (!subscriptionOrder.has(subscription) || ranSubscriptions.has(subscription.id))
+							if (
+								!subscriptionOrder.has(subscription) ||
+								ranSubscriptions.has(subscription.id)
+							)
 								continue;
 							ranSubscriptions.add(subscription.id);
 							const ran = subscription.run(
 								readGraph(subscription.graphNodeId, subscription.path ?? []),
 							);
-							const entries = typeof (ran as PromiseLike<unknown>)?.then === 'function' ? await ran : ran;
+							const entries =
+								typeof (ran as PromiseLike<unknown>)?.then === 'function'
+									? await ran
+									: ran;
 							if (typeof entries === 'function') commits.push(entries);
 							else appendJournalResult(journal, entries as DomJournalResult | void);
 						}
@@ -531,10 +549,16 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		for (const { graphNodeId, path } of pending)
 			for (const subscription of subscriptionsByNode.get(graphNodeId) ?? []) {
 				const order = subscriptionOrder.get(subscription)!;
-				if (order >= floor && order < ceiling && pathsIntersect(path, subscription.path ?? []))
+				if (
+					order >= floor &&
+					order < ceiling &&
+					pathsIntersect(path, subscription.path ?? [])
+				)
 					due.add(subscription);
 			}
-		return [...due].sort((left, right) => subscriptionOrder.get(left)! - subscriptionOrder.get(right)!);
+		return [...due].sort(
+			(left, right) => subscriptionOrder.get(left)! - subscriptionOrder.get(right)!,
+		);
 	};
 
 	const notifyJournalListeners = async (): Promise<void> => {
@@ -566,15 +590,19 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			// Map presence separates an unseeded node from one holding undefined; computeds
 			// carry no payload value, so their first derive to undefined must not read as a no-op.
 			const seeded = cells.has(write.graphNodeId);
-			if (seeded && plane?.commitDerived(write, path)) return;
-			if (seeded && Object.is(readPath(current, path), write.value)) return;
-			commitCell(write.graphNodeId, path, write.value);
+			if (
+				!seeded ||
+				!(plane?.commitDerived(write, path) || Object.is(readPath(current, path), write.value))
+			)
+				commitCell(write.graphNodeId, path, write.value);
+			return write.value;
 		},
 		update(update) {
 			const path = update.path ?? [];
 			const currentValue = readPath(cells.get(update.graphNodeId), path);
 			const nextValue = update.update(currentValue);
-			if (!Object.is(currentValue, nextValue)) commitCell(update.graphNodeId, path, nextValue);
+			if (!Object.is(currentValue, nextValue))
+				commitCell(update.graphNodeId, path, nextValue);
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
 		},
@@ -653,4 +681,3 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 	};
 }
-

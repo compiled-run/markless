@@ -51,7 +51,7 @@ export function emitCreatePublicGraph(
 		...trackDirtyArrayIndexesDeclaration,
 		'\treturn {',
 		'\t\tread(graphNodeId, path = []) { return readMarklessPublicPath(cells.get(graphNodeId), path); },',
-		`\t\twrite(write) { const path = write.path ?? []; const previousValue = cells.get(write.graphNodeId); dirtyGraphNodeIds.add(write.graphNodeId); ${trackDirtyArrayIndexesWrite}cells.set(write.graphNodeId, writeMarklessPublicPath(previousValue, path, write.value)); },`,
+		`\t\twrite(write) { const path = write.path ?? []; const previousValue = cells.get(write.graphNodeId); dirtyGraphNodeIds.add(write.graphNodeId); ${trackDirtyArrayIndexesWrite}cells.set(write.graphNodeId, writeMarklessPublicPath(previousValue, path, write.value)); return write.value; },`,
 		`\t\tupdate(update) { const path = update.path ?? []; const previousValue = cells.get(update.graphNodeId); const currentValue = readMarklessPublicPath(previousValue, path); const nextValue = update.update(currentValue); dirtyGraphNodeIds.add(update.graphNodeId); ${trackDirtyArrayIndexesUpdate}cells.set(update.graphNodeId, writeMarklessPublicPath(previousValue, path, nextValue)); if (update.returnValue === "previous") return currentValue; if (update.returnValue === "next") return nextValue; },`,
 		...optionalMethods,
 		'\t\tisDirty(graphNodeId) { return dirtyGraphNodeIds.has(graphNodeId); },',

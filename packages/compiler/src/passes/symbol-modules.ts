@@ -1703,10 +1703,24 @@ function renderChunkParts(
 				});
 				continue;
 			}
-			if (slot.kind === 'attribute' && slot.residue.kind === 'graph-read' && !slot.directClassMatch) {
-				const constant = scopedPropConstant(scope, slot.residue.graphNodeId, slot.residue.path);
+			if (
+				slot.kind === 'attribute' &&
+				slot.residue.kind === 'graph-read' &&
+				!slot.directClassMatch
+			) {
+				const constant = scopedPropConstant(
+					scope,
+					slot.residue.graphNodeId,
+					slot.residue.path,
+				);
 				if (constant) {
-					pushText(constantAttributeHtml(slot.name, constant.value, slot.alwaysPresent === true));
+					pushText(
+						constantAttributeHtml(
+							slot.name,
+							constant.value,
+							slot.alwaysPresent === true,
+						),
+					);
 					continue;
 				}
 				if (child?.imported)
@@ -7097,15 +7111,17 @@ function loweredEventWriteNode(
 		const operator = EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator);
 		if (!operator) return null;
 
+		const parameterName = freshUpdaterParameter(value);
 		return graphUpdateCall({
 			graphNodeId: write.graphNodeId,
 			path: write.path,
 			pathNode,
 			returnValue: 'next',
+			parameterName,
 			updateExpression:
 				operator === '&&' || operator === '||' || operator === '??'
-					? logicalNode(operator, identifierNode('value'), value)
-					: binaryNode(operator, identifierNode('value'), value),
+					? logicalNode(operator, identifierNode(parameterName), value)
+					: binaryNode(operator, identifierNode(parameterName), value),
 		});
 	}
 
@@ -7137,6 +7153,30 @@ function loweredEventWriteNode(
 	}
 
 	return null;
+}
+
+// The updater's parameter must not shadow a name the authored value reads.
+function freshUpdaterParameter(value: EmissionNode): string {
+	const names = new Set<string>();
+	collectIdentifierNames(value, names);
+	let name = 'value';
+	for (let index = 1; names.has(name); index++) name = `value${index}`;
+	return name;
+}
+
+function collectIdentifierNames(node: unknown, names: Set<string>): void {
+	if (Array.isArray(node)) {
+		for (const item of node) collectIdentifierNames(item, names);
+		return;
+	}
+	if (!node || typeof node !== 'object') return;
+	const record = node as Record<string, unknown>;
+	if (record.type === 'Identifier' && typeof record.name === 'string') names.add(record.name);
+	for (const [key, child] of Object.entries(record)) {
+		if (typeof child !== 'object' || EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (record.computed !== true && (key === 'property' || key === 'key')) continue;
+		collectIdentifierNames(child, names);
+	}
 }
 
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
@@ -7191,6 +7231,11 @@ function eventWriteArgumentNodes(
 			continue;
 		}
 
+		if (containsWriteExpression(argument)) {
+			args.push(rewriteEventHandlerNode(argument, node, rewrite));
+			continue;
+		}
+
 		const value = valueExpressionNode(argument, rewrite.source, rewrite.writeValueInput);
 		if (!value) return null;
 
@@ -7219,12 +7264,29 @@ function eventWriteArgumentNodes(
  * every value routed here was already falling through to the read rewrite.
  */
 function eventWriteValueNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode {
-	if (containsFunctionLikeNode(node)) return rewriteEventHandlerNode(node, undefined, rewrite);
+	if (containsFunctionLikeNode(node) || containsWriteExpression(node))
+		return rewriteEventHandlerNode(node, undefined, rewrite);
 
 	return (
 		valueExpressionNode(node, rewrite.source, rewrite.writeValueInput) ??
 		rewriteGraphReadsAndLocals(node, rewrite.source, rewrite.writeValueInput)
 	);
+}
+
+function containsWriteExpression(node: AnyNode): boolean {
+	if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') return true;
+
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && containsWriteExpression(item))) return true;
+			continue;
+		}
+		if (isNode(child) && containsWriteExpression(child)) return true;
+	}
+
+	return false;
 }
 
 function containsFunctionLikeNode(node: AnyNode): boolean {

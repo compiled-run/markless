@@ -1406,7 +1406,8 @@ function emitResumeContainerEvent(
 ): string {
 	// An in-place navigation that swapped the page while a wake awaited code gave the container a new lifetime: the wake stops before reading the next page's DOM.
 	const lifeOpen = (indent: string) => `${indent}const marklessLife = handoff.root.__mL;`;
-	const lifeCheck = (indent: string) => `${indent}if (handoff.root.__mL !== marklessLife) return;`;
+	const lifeCheck = (indent: string) =>
+		`${indent}if (handoff.root.__mL !== marklessLife) return;`;
 	// A runtime woken while a streamed @pending arm is still on its way adopts that arm.
 	const armsOpen = (indent: string) =>
 		streamsArms
@@ -2113,7 +2114,7 @@ function emitScalarAction(
 			: []),
 		...emitScalarWrite(action),
 		`	const symbol = await Promise.resolve(${loadSymbolName}(${JSON.stringify(action.symbolId)}));`,
-		'	await Promise.resolve(symbol({ graph: { ...graph, write() {}, update(update) { const value = graph.read(update.graphNodeId, update.path ?? []); return update.returnValue === "previous" || update.returnValue === "next" ? value : undefined; } }, event: input.event, element: host, getElementHandle: () => undefined }));',
+		'	await Promise.resolve(symbol({ graph: { ...graph, write: (write) => write.value, update(update) { const value = graph.read(update.graphNodeId, update.path ?? []); return update.returnValue === "previous" || update.returnValue === "next" ? value : undefined; } }, event: input.event, element: host, getElementHandle: () => undefined }));',
 		'	if (state.dirty) {',
 		'		state.dirty = false;',
 		...action.textUpdates.map(

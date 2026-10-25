@@ -89,9 +89,11 @@ export async function createLeanScalarGraph(
 		write(write) {
 			if ((write.path?.length ?? 0) > 0) return leanEscalation('write-path');
 			materialize(write.graphNodeId);
-			if (Object.is(cells.get(write.graphNodeId), write.value)) return;
-			cells.set(write.graphNodeId, write.value);
-			dirty.push({ graphNodeId: write.graphNodeId });
+			if (!Object.is(cells.get(write.graphNodeId), write.value)) {
+				cells.set(write.graphNodeId, write.value);
+				dirty.push({ graphNodeId: write.graphNodeId });
+			}
+			return write.value;
 		},
 		update(update) {
 			if ((update.path?.length ?? 0) > 0) return leanEscalation('update-path');
@@ -295,7 +297,7 @@ export function shadowLeanActionPlanGraph(
 ): EventOnlyResumeContainer['graph'] {
 	return {
 		...graph,
-		write() {},
+		write: (write) => write.value,
 		update(update) {
 			const value = graph.read(update.graphNodeId, update.path ?? []);
 			return update.returnValue === 'previous' || update.returnValue === 'next'

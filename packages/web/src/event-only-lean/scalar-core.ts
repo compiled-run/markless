@@ -314,6 +314,7 @@ function createScalarCoreGraph(
 		},
 		write(write) {
 			setScalar(write.graphNodeId, write.value, write.path, values, dirty, 'write-path');
+			return write.value;
 		},
 		update(update) {
 			const previous = values.get(update.graphNodeId),
@@ -396,7 +397,7 @@ function executePlanWrite(graph: EventOnlyResumeContainer['graph'], plan: LeanAc
 function shadowGraph(graph: EventOnlyResumeContainer['graph']): EventOnlyResumeContainer['graph'] {
 	return {
 		...graph,
-		write() {},
+		write: (write) => write.value,
 		update(update) {
 			const value = graph.read(update.graphNodeId, update.path ?? []);
 			return update.returnValue === 'previous' || update.returnValue === 'next'
