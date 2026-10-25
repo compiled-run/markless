@@ -624,7 +624,7 @@ function isScalarWriteOnlyEventSymbol(
 	)
 		return false;
 	const write = symbol.writes?.[0];
-	if (!write || write.row || write.path.length !== 0) return false;
+	if (!write || write.row || write.through || write.path.length !== 0) return false;
 	if (write.operation === 'update')
 		return !!write.updateOperator && eventHandlerBodyAllowsScalarLeaf(symbol, write);
 	if (write.operation !== 'assign' || write.assignmentOperator) return false;
@@ -694,7 +694,9 @@ function eventHandlerBodyAllowsScalarLeaf(
 	if (!authoredWrite || !fn || !isNode(fn.body)) return false;
 	const body = fn.body as AnyNode;
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
-	const parameters = new Set(asNodes(fn.params).flatMap((param) => getIdentifierName(param) ?? []));
+	const parameters = new Set(
+		asNodes(fn.params).flatMap((param) => getIdentifierName(param) ?? []),
+	);
 	let wrote = false;
 	return statements.every((statement) => {
 		if (statement.type === 'EmptyStatement') return true;
@@ -936,7 +938,7 @@ function payloadDemandRecords(
 			runtimeModuleIds: unique([
 				...rowDispatchCore,
 				...KEYED_REPEAT,
-				...(record.rowTemplate ?? record.emptyArm ? ROW_MINT : []),
+				...((record.rowTemplate ?? record.emptyArm) ? ROW_MINT : []),
 				...(record.rowComponent ? ROW_COMPONENT_MINT : []),
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
 				...(record.rowTemplate?.branchSlots ? ROW_BRANCH_MINT : []),
@@ -1116,9 +1118,7 @@ function armActionDemandRecords(
 	scope: FirstUseScope,
 	dispatchCore: ReadonlyArray<string>,
 ): RuntimeDemandMapAction[] {
-	type Arm =
-		| ProtocolArmRecordSet
-		| NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
+	type Arm = ProtocolArmRecordSet | NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
 	type Repeat = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
 	const { view, records, symbolDemand } = scope;
 	const actions: RuntimeDemandMapAction[] = [];
@@ -1156,7 +1156,9 @@ function armActionDemandRecords(
 			action(
 				containerId,
 				kind,
-				'hostNodeId' in event ? event.hostNodeId : `${containerId}/${event.hostPath.join('.')}`,
+				'hostNodeId' in event
+					? event.hostNodeId
+					: `${containerId}/${event.hostPath.join('.')}`,
 				event,
 				protocolEventActionKind(event),
 			);
@@ -1581,7 +1583,10 @@ function consequenceReach(
 			...(repeat.rowTemplate?.attributeSlots ?? []),
 			...branches,
 			...branches.flatMap((branch) =>
-				branch.arms.flatMap((arm) => [...(arm.textSlots ?? []), ...(arm.attributeSlots ?? [])]),
+				branch.arms.flatMap((arm) => [
+					...(arm.textSlots ?? []),
+					...(arm.attributeSlots ?? []),
+				]),
 			),
 		].flatMap((slot): ReadonlyArray<AffectedRead> =>
 			'graphNodeId' in slot
@@ -1903,7 +1908,9 @@ function firstUsePage(scope: FirstUseScope): RuntimeDemandMapFirstUsePage {
 						new Set(),
 						new Map(
 							boundaries.flatMap((boundary) =>
-								boundary.asyncReads.map((read) => [read.graphNodeId, null] as const),
+								boundary.asyncReads.map(
+									(read) => [read.graphNodeId, null] as const,
+								),
 							),
 						),
 						[],

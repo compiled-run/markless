@@ -854,7 +854,52 @@ export type SemanticStateWrite = {
 	readonly argumentSources?: ReadonlyArray<string>;
 	/** Set when the target is rooted in the item of an enclosing keyed `@for`; names that repeat. */
 	readonly rowRepeatId?: string;
+	/** Set when the target is rooted in a local declared inside a nested function. */
+	readonly through?: SemanticWriteThrough;
+	/** `Object.assign(target, ...sources)`: `target` is the first argument, `argumentSources` the rest. */
+	readonly objectAssign?: true;
 };
+
+/**
+ * What a local declared in a handler, callback or attach body holds when a write
+ * goes through it, decided from the binding its name resolves to.
+ *
+ * - `local`: a value of its own, so the write is plain JavaScript.
+ * - `path`: the object at a static state path (`const p = user.profile`); `path`
+ *   is the written member path below it.
+ * - `element`: one element of a state array (a `for...of` variable, a `find()`
+ *   result, an array-callback parameter). `local` names the variable holding the
+ *   element; `path` is the member path inside it.
+ * - `untracked`: state reached in a way no graph path can name.
+ */
+export type SemanticWriteThrough =
+	| { readonly kind: 'local'; readonly local: string }
+	| {
+			readonly kind: 'path';
+			readonly local: string;
+			readonly target: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'element';
+			readonly local: string;
+			readonly collection: string;
+			readonly path: ReadonlyArray<string>;
+	  }
+	| {
+			readonly kind: 'untracked';
+			readonly local: string;
+			readonly reason:
+				| 'conditional'
+				| 'copy'
+				| 'destructured'
+				| 'dynamic-key'
+				| 'map-entry'
+				| 'nested-element'
+				| 'reassigned'
+				| 'row-item';
+			readonly source: string;
+	  };
 
 export type SemanticStateRead = {
 	readonly source: string;
@@ -1400,6 +1445,7 @@ export type StateLoweringInput = {
 export type StateLoweringDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_STATE_UNRESOLVED_WRITE'
+		| 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED'
 		| 'MARKLESS_STATE_DYNAMIC_PATH_READ'
 		| 'MARKLESS_STATE_DYNAMIC_PATH_WRITE'
 		| 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE'
@@ -1471,6 +1517,22 @@ export type LoweredStateWrite = {
 	 * `itemPath` is the path inside that element.
 	 */
 	readonly row?: LoweredRowItem;
+	/**
+	 * A write through a handler local that holds state. `graphNodeId`/`path` name
+	 * where the local's value lives (`basePath`) followed by the written member
+	 * path; for an `element` local `path` stops at the collection and the element
+	 * is found at dispatch by identity.
+	 */
+	readonly through?: LoweredWriteThrough;
+	/** `Object.assign(target, ...sources)`: each member the sources carry is written. */
+	readonly objectAssign?: true;
+};
+
+export type LoweredWriteThrough = {
+	readonly local: string;
+	readonly element: boolean;
+	readonly basePath: ReadonlyArray<string>;
+	readonly path: ReadonlyArray<string>;
 };
 
 /** A nested row's `enclosing` finds the collection inside the enclosing row's item. */

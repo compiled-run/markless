@@ -12,8 +12,10 @@ import {
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { getFrameworkApiForCall } from './imports.ts';
+import type { SemanticStateWrite } from '../../artifacts.ts';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
+import { writeThroughLocal } from './write-through-locals.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {
 	const target = unwrapChainExpression(node.left as AnyNode | undefined);
@@ -28,6 +30,7 @@ export function collectAssignment(node: AnyNode, state: WalkState): void {
 		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
 		...rowWriteScope(target, state),
+		...throughField(target, state, 'assign'),
 		operation: 'assign',
 		assignmentOperator: operator === '=' ? undefined : operator,
 		valueSource: value ? expressionSource(value, state.source) : undefined,
@@ -46,9 +49,41 @@ export function collectUpdate(node: AnyNode, state: WalkState): void {
 		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
 		...rowWriteScope(target, state),
+		...throughField(target, state, 'update'),
 		operation: 'update',
 		prefix: node.prefix === true,
 		updateOperator: node.operator === '--' ? '--' : '++',
+	});
+}
+
+/**
+ * `Object.assign(target, ...sources)` changes `target` in place, member by
+ * member, so a state target is a write of each member the sources carry.
+ */
+export function collectObjectAssign(node: AnyNode, state: WalkState): void {
+	const callee = unwrapChainExpression(node.callee as AnyNode | undefined);
+	if (callee?.type !== 'MemberExpression' || getStaticMemberPropertyName(callee) !== 'assign')
+		return;
+	const owner = unwrapValueWrappers(callee.object as AnyNode | undefined);
+	if (owner?.type !== 'Identifier' || owner.name !== 'Object' || !isGlobalReference(owner, state))
+		return;
+	const [first, ...sources] = asNodes(node.arguments);
+	const target = unwrapValueWrappers(first);
+	if (!target || first?.type === 'SpreadElement' || isFreshValue(target, state)) return;
+	if (target.type !== 'Identifier' && target.type !== 'MemberExpression') return;
+	if (diagnoseBannedWriteSite(node, target, state)) return;
+
+	state.graph.stateWrites.push({
+		target: expressionSource(target, state.source),
+		...sharedScope(state),
+		...writeScope(state),
+		targetSpan: sourceSpan(target, state.filename),
+		...rowWriteScope(target, state),
+		...throughField(target, state, 'call'),
+		operation: 'call',
+		method: 'assign',
+		objectAssign: true,
+		argumentSources: sources.map((source) => expressionSource(source, state.source)),
 	});
 }
 
@@ -83,6 +118,7 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 		...writeScope(state),
 		targetSpan: sourceSpan(target, state.filename),
 		...rowWriteScope(target, state),
+		...throughField(target, state, 'call'),
 		operation: 'call',
 		method,
 		argumentSources: asNodes(node.arguments).map((argument) =>
@@ -139,6 +175,7 @@ export function collectDelete(node: AnyNode, state: WalkState): void {
 		...writeScope(state),
 		targetSpan: sourceSpan(originalTarget ?? target, state.filename),
 		...rowWriteScope(target, state),
+		...throughField(target, state, 'delete'),
 		operation: 'delete',
 		optional: target.optional === true || isChainExpression(originalTarget),
 	});
@@ -166,7 +203,10 @@ export function collectWritesIn(node: AnyNode | undefined, state: WalkState): vo
 
 	if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') return;
 
-	if (node.type === 'CallExpression') collectCollectionCall(node, state);
+	if (node.type === 'CallExpression') {
+		collectCollectionCall(node, state);
+		collectObjectAssign(node, state);
+	}
 
 	for (const child of childNodes(node)) collectWritesIn(child, state);
 }
@@ -392,6 +432,11 @@ function diagnoseBannedWriteSite(node: AnyNode, target: AnyNode, state: WalkStat
 	};
 
 	if (state.currentCreationSite === 'computed') {
+		const through = writeThroughLocal(target, state, 'assign');
+		if (through && through.kind !== 'local') {
+			state.graph.diagnostics.push(stateWriteInComputedDiagnostic(diagnosticInput));
+			return true;
+		}
 		// The rule bans writing *graph state* from a derive, because that is the
 		// self-waking cycle. Writing a local accumulator or a plain object that
 		// happens to live inside the derive is ordinary JavaScript. Whether the
@@ -632,6 +677,16 @@ export function resolvedSymbolAt(semantic: ModuleSemantics, offset: number): num
  * binding the root identifier resolves to, so a handler local that shadows the
  * item name is not mistaken for the row.
  */
+function throughField(
+	target: AnyNode,
+	state: WalkState,
+	operation: SemanticStateWrite['operation'],
+): { readonly through?: NonNullable<ReturnType<typeof writeThroughLocal>> } {
+	if (!state.currentFunctionSite) return {};
+	const through = writeThroughLocal(target, state, operation);
+	return through ? { through } : {};
+}
+
 function rowWriteScope(target: AnyNode, state: WalkState): { readonly rowRepeatId?: string } {
 	if (state.currentKeyedRepeatScopeIds.length === 0) return {};
 	const root = writeTargetRootIdentifier(target);

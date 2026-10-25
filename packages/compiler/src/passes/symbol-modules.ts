@@ -10,6 +10,7 @@ import type {
 	LoweredRowItem,
 	LoweredStateRead,
 	LoweredStateWrite,
+	LoweredWriteThrough,
 	PlannedSymbol,
 	PlannedSymbolCrossModuleInline,
 	RenderDataArtifact,
@@ -5993,6 +5994,15 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
+			...[WRITE_THROUGH_FN, OBJECT_ASSIGN_FN]
+				.filter((name) => referenced.has(name))
+				.map((localName) =>
+					moduleImportNode({
+						kind: 'named' as const,
+						localName,
+						source: '@markless/web/fns/write-through',
+					}),
+				),
 			...(referenced.has(CALLBACK_SLOT_FN)
 				? [
 						moduleImportNode({
@@ -7187,6 +7197,13 @@ function eventWriteNodeMatches(node: AnyNode, write: LoweredStateWrite, source: 
 		return isNode(node.argument) && valueNodeText(node.argument, source) === write.source;
 	}
 
+	if (write.operation === 'call' && write.objectAssign) {
+		if (node.type !== 'CallExpression' || !isNode(node.callee)) return false;
+		if (valueNodeText(node.callee, source) !== 'Object.assign') return false;
+		const target = asNodes(node.arguments)[0];
+		return !!target && valueNodeText(target, source) === write.source;
+	}
+
 	if (write.operation === 'call') {
 		if (node.type !== 'CallExpression' || !isNode(node.callee)) return false;
 
@@ -7206,16 +7223,22 @@ function eventWriteNodeMatches(node: AnyNode, write: LoweredStateWrite, source: 
 /** The band-local twin of `emitEventWrite`, built from the authored node. */
 function loweredEventWriteNode(
 	node: AnyNode,
-	write: LoweredStateWrite,
+	authored: LoweredStateWrite,
 	rewrite: EventHandlerRewrite,
 ): EmissionNode | null {
+	const write = authored.through ? { ...authored, path: authored.through.path } : authored;
 	const pathNode = rowItemPathNode(write);
+	const throughCallee = (method: 'write' | 'update' | 'delete' | 'call') =>
+		authored.through
+			? memberNode(writeThroughCall(authored.through, authored.graphNodeId), method)
+			: undefined;
 	if (write.operation === 'assign') {
 		const value = isNode(node.right) ? eventWriteValueNode(node.right, rewrite) : null;
 		if (!value) return null;
 
 		if (!write.assignmentOperator) {
 			return graphWriteCall({
+				calleeNode: throughCallee('write'),
 				graphNodeId: write.graphNodeId,
 				path: write.path,
 				pathNode,
@@ -7228,6 +7251,7 @@ function loweredEventWriteNode(
 
 		const parameterName = freshUpdaterParameter(value);
 		return graphUpdateCall({
+			calleeNode: throughCallee('update'),
 			graphNodeId: write.graphNodeId,
 			path: write.path,
 			pathNode,
@@ -7242,6 +7266,7 @@ function loweredEventWriteNode(
 
 	if (write.operation === 'update' && write.updateOperator) {
 		return graphUpdateCall({
+			calleeNode: throughCallee('update'),
 			graphNodeId: write.graphNodeId,
 			path: write.path,
 			pathNode,
@@ -7251,7 +7276,27 @@ function loweredEventWriteNode(
 	}
 
 	if (write.operation === 'delete') {
-		return graphDeleteCall({ graphNodeId: write.graphNodeId, path: write.path, pathNode });
+		return graphDeleteCall({
+			calleeNode: throughCallee('delete'),
+			graphNodeId: write.graphNodeId,
+			path: write.path,
+			pathNode,
+		});
+	}
+
+	if (write.operation === 'call' && write.objectAssign) {
+		const args = eventWriteArgumentNodes(node, rewrite);
+		if (!args || args.length === 0) return null;
+		const [target, ...sources] = args;
+		return callNode(identifierNode(OBJECT_ASSIGN_FN), [
+			authored.through
+				? writeThroughCall(authored.through, authored.graphNodeId)
+				: memberChainNode('context.graph'),
+			literalNode(write.graphNodeId),
+			pathNode ?? stringArrayNode(write.path),
+			target!,
+			arrayNode(sources),
+		]);
 	}
 
 	if (write.operation === 'call' && write.method) {
@@ -7259,6 +7304,7 @@ function loweredEventWriteNode(
 		if (!args) return null;
 
 		return graphMethodCall({
+			calleeNode: throughCallee('call'),
 			graphNodeId: write.graphNodeId,
 			path: write.path,
 			pathNode,
@@ -7295,6 +7341,19 @@ function collectIdentifierNames(node: unknown, names: Set<string>): void {
 }
 
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
+const WRITE_THROUGH_FN = 'marklessWriteThrough';
+const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
+
+// The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
+function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {
+	return callNode(identifierNode(WRITE_THROUGH_FN), [
+		identifierNode('context'),
+		literalNode(graphNodeId),
+		stringArrayNode(through.basePath),
+		identifierNode(through.local),
+		literalNode(through.element),
+	]);
+}
 
 // The row element's path is found at dispatch from the item the row was dispatched with.
 function rowItemPathNode(write: LoweredStateWrite): EmissionNode | undefined {
@@ -7335,14 +7394,7 @@ function eventWriteArgumentNodes(
 		if (argument.type === 'SpreadElement') {
 			if (!isNode(argument.argument)) return null;
 
-			const spread = valueExpressionNode(
-				argument.argument,
-				rewrite.source,
-				rewrite.writeValueInput,
-			);
-			if (!spread) return null;
-
-			args.push(spreadNode(spread));
+			args.push(spreadNode(eventWriteValueNode(argument.argument, rewrite)));
 			continue;
 		}
 
@@ -7351,10 +7403,7 @@ function eventWriteArgumentNodes(
 			continue;
 		}
 
-		const value = valueExpressionNode(argument, rewrite.source, rewrite.writeValueInput);
-		if (!value) return null;
-
-		args.push(value);
+		args.push(eventWriteValueNode(argument, rewrite));
 	}
 
 	return args;
@@ -7617,7 +7666,7 @@ function eventHandlerScalarLeafStatements(
 	}
 
 	const write = writes[0];
-	if (!write || write.row || write.path.length !== 0) return null;
+	if (!write || write.row || write.through || write.path.length !== 0) return null;
 	if (!projection) return null;
 
 	const fn = eventHandlerFunctionExpression(projection);
