@@ -274,6 +274,7 @@ export function createResumeRuntime(
 		records: ArmCommitUpdate['armRecords'],
 	): Promise<ArmRegistrationDeps> {
 		const eventWiring = await getEvents();
+		await eventWiring.prepareSyncPolicy(records.events, []);
 		const behaviors = records.behaviors.length > 0 ? await loadBehaviorRuntime() : undefined;
 		return {
 			root: input.root,

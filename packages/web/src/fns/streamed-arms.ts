@@ -7,6 +7,7 @@ import type {
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { derivedReconcilePlane, installDerivedReconcilePlane } from '../reconcile-plane-slot.ts';
+import { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-stream-open.ts';
 
 // A runtime that wakes while the server still streams an @pending boundary's arm
 // runs every event at once and adopts the arm when it lands: the boundary's runner
@@ -75,7 +76,8 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 		document.querySelector(`${selector}[${attribute}="${CSS.escape(value)}"]`);
 	const template = (id: string) => query('template', 'm\\:arm', id) as HTMLTemplateElement | null;
 	const view = JSON.parse(viewText) as ProtocolViewPayload;
-	const streaming = document.readyState === 'loading';
+	const open = Reflect.get(document, PROTOCOL_STREAM_OPEN_PROPERTY) as Promise<void> | undefined;
+	const streaming = !!open || document.readyState === 'loading';
 	const byRunner = new Map<string, StreamedState>();
 	const byUpdate = new Map<string, StreamedState>();
 	const byBoundary = new Map<string, StreamedState>();
@@ -149,7 +151,8 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 		for (const state of byBoundary.values())
 			if (!query(ARM_RECORDS, 'data-boundary', state.boundaryId)) state.resolve?.(undefined);
 	};
-	if (streaming) document.addEventListener('DOMContentLoaded', closed, { once: true });
+	if (open) void open.then(closed);
+	else if (streaming) document.addEventListener('DOMContentLoaded', closed, { once: true });
 	else closed();
 
 	let internals: Internals | undefined;

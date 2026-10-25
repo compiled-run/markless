@@ -11,6 +11,7 @@ import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 } from '../../../serializer/src/protocol-page-markers.ts';
+import { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-stream-open.ts';
 
 /** Test seam: a root (or its prototype) may carry a clock that replaces the browser's frame and idle scheduling. */
 export type MarklessDeferClock = {
@@ -69,6 +70,7 @@ export function createMarklessDefer(
 	pageEnd: string,
 	pathsAttribute: string,
 	hostSelector: string,
+	streamOpenProperty: string,
 ): MarklessDefer {
 	const scope = globalThis as typeof globalThis & {
 		scheduler?: { postTask?: (run: () => void, options: { priority: string }) => unknown };
@@ -110,7 +112,10 @@ export function createMarklessDefer(
 		const next = () => clock.idle(() => (root.__marklessArmRegistering?.size ? next() : run()));
 		const loaded = () =>
 			clock.frame(() => (scope.__mArm?.idle ? scope.__mArm.idle(next) : next()));
-		if (document.readyState === 'complete') loaded();
+		// A page swapped in place loads when its navigation's stream ends.
+		const open = Reflect.get(document, streamOpenProperty) as Promise<void> | undefined;
+		if (open) void open.then(loaded);
+		else if (document.readyState === 'complete') loaded();
 		else addEventListener('load', loaded, { once: true });
 	};
 	const trigger = (
@@ -179,7 +184,7 @@ export const INLINE_DEFER_LOADER_SOURCE = '(url) => import(/* @vite-ignore */ ur
 
 /** An expression that installs the helper once per document and evaluates to it; a build passes the factory minified. */
 export function inlineDeferSource(factory = createMarklessDefer.toString()): string {
-	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE},${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)},${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)},${JSON.stringify(PROTOCOL_EVENT_HOST_SELECTOR)}))`;
+	return `(globalThis.__mDefer||=(${factory})(${INLINE_DEFER_LOADER_SOURCE},${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)},${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)},${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)},${JSON.stringify(PROTOCOL_EVENT_HOST_SELECTOR)},${JSON.stringify(PROTOCOL_STREAM_OPEN_PROPERTY)}))`;
 }
 
 /** One lane's registration, appended only to a served page whose records name that lane's event. */
@@ -200,6 +205,7 @@ export function marklessDefer(): MarklessDefer {
 			PROTOCOL_CONTAINER_END_COMMENT,
 			PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 			PROTOCOL_EVENT_HOST_SELECTOR,
+			PROTOCOL_STREAM_OPEN_PROPERTY,
 		))
 	);
 }

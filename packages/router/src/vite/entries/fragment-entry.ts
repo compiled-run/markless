@@ -14,6 +14,9 @@ export interface FragmentNavigationConfig {
 	readonly retireProperty: string;
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
+	readonly streamOpenProperty: string;
+	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
+	readonly pendingDeadlineMs: number;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
@@ -111,6 +114,8 @@ type Session = {
 	streaming?: AbortController;
 	// The history entry on screen, and the last scroll offset seen for every entry this tab visited.
 	current?: string;
+	// An entry a navigation pushed whose page has not swapped in yet: the next navigation replaces it.
+	unshown?: string;
 	readonly positions: Map<string, { readonly x: number; readonly y: number }>;
 };
 
@@ -784,6 +789,52 @@ function sameBox(root: Element, box: ScrolledBox): Element | undefined {
 	return named && root.contains(named) && boxKind(named) === box.kind ? named : undefined;
 }
 
+type HeldStream = {
+	readonly reader: ReadableStreamDefaultReader<Uint8Array>;
+	readonly ended: boolean;
+};
+
+// Reads ahead until the stream ends or `ms` pass, then hands back a reader that replays what it read.
+function holdStream(
+	reader: ReadableStreamDefaultReader<Uint8Array>,
+	ms: number,
+	w: Window,
+): Promise<HeldStream> {
+	const chunks: Uint8Array[] = [];
+	let ended = false;
+	let failure: { readonly error: unknown } | undefined;
+	let wake = () => {};
+	const replay = {
+		read: async () => {
+			while (!chunks.length && !ended) await new Promise<void>((done) => (wake = done));
+			if (chunks.length) return { done: false, value: chunks.shift()! };
+			if (failure) throw failure.error;
+			return { done: true, value: undefined };
+		},
+		cancel: (reason?: unknown) => reader.cancel(reason),
+	} as ReadableStreamDefaultReader<Uint8Array>;
+	return new Promise((resolve) => {
+		const timer = w.setTimeout(
+			() => resolve({ reader: replay, ended: false }),
+			Math.max(0, ms),
+		);
+		void (async () => {
+			try {
+				for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+					chunks.push(chunk.value);
+					wake();
+				}
+			} catch (error) {
+				failure = { error };
+			}
+			ended = true;
+			wake();
+			w.clearTimeout(timer);
+			resolve({ reader: replay, ended: true });
+		})();
+	});
+}
+
 // Streamed @pending arms arrive after the region, one delimited piece each, and run exactly as on a landing.
 async function streamAppends(
 	d: Document,
@@ -791,6 +842,7 @@ async function streamAppends(
 	fetched: FragmentFetched,
 	end: Node,
 	signal: AbortSignal,
+	arrived: boolean,
 ): Promise<string | undefined> {
 	const marker = state.config.appendMarker;
 	const decoder = new TextDecoder();
@@ -824,6 +876,11 @@ async function streamAppends(
 		}
 	}
 	flush(true);
+	// Arms that all arrived before the swap commit in its task, so @pending never paints.
+	if (arrived && !signal.aborted)
+		(d.defaultView as unknown as Record<string, { flush?: () => void } | undefined>)[
+			state.config.streamExecutorGlobal
+		]?.flush?.();
 	if ((end as Comment).data !== state.config.pageEndComment) end.parentNode?.removeChild(end);
 	return signal.aborted ? undefined : all;
 }
@@ -841,19 +898,55 @@ export async function navigate(
 	const session = sessionFor(d);
 	const id = ++session.navigation;
 	session.streaming?.abort();
+	// The address follows the click at once, so Back before the page arrives returns to the page still shown.
+	const entryNow = () =>
+		(w.history.state as { __marklessFragment?: { id?: string } } | null)?.__marklessFragment
+			?.id;
+	let entered: string | undefined;
+	if (mode !== 'traverse') {
+		const unshown = session.unshown !== undefined && session.unshown === entryNow();
+		if (!unshown)
+			session.positions.set(session.current ?? entryNow() ?? LANDING_ENTRY, {
+				x: w.scrollX,
+				y: w.scrollY,
+			});
+		w.history.scrollRestoration = 'manual';
+		session.unshown = entered = entryId();
+		const entry = { __marklessFragment: { id: entered, x: 0, y: 0 } };
+		if (mode === 'push' && !unshown) w.history.pushState(entry, '', url.href);
+		else w.history.replaceState(entry, '', url.href);
+	}
+	const left = () => entered !== undefined && entryNow() !== entered;
+	const stale = () => id !== session.navigation || left();
 	const fallback = (href: string) => {
 		if (mode === 'traverse') w.location.reload();
-		else w.location.assign(href);
+		else w.location.replace(href);
 	};
-	const taken = take(state, url, mode === 'traverse', w.performance.now());
+	const started = w.performance.now();
+	const taken = take(state, url, mode === 'traverse', started);
+	const abandon = () => {
+		if (session.unshown === entered) session.unshown = undefined;
+		taken.abort();
+	};
 	let fetched: FragmentFetched;
 	try {
 		fetched = await taken.result;
 	} catch {
-		if (id === session.navigation) fallback(url.href);
+		if (!stale()) fallback(url.href);
 		return;
 	}
-	if (id !== session.navigation) return taken.abort();
+	if (stale()) return abandon();
+	let arrived = !fetched.rest;
+	if (fetched.rest) {
+		const held = await holdStream(
+			fetched.rest,
+			state.config.pendingDeadlineMs - (w.performance.now() - started),
+			w,
+		);
+		arrived = held.ended;
+		fetched = { ...fetched, rest: held.reader };
+	}
+	if (stale()) return abandon();
 	// A prefetch is shared by every link to the page, so the address takes the clicked link's #fragment.
 	const landed = new URL(fetched.url);
 	landed.hash = url.hash;
@@ -879,7 +972,7 @@ export async function navigate(
 	const ranFiles = filesRan(d);
 	const head = await mergeHead(d, next);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
-	if (id !== session.navigation) return taken.abort();
+	if (stale()) return abandon();
 	let restore = scroll;
 	if (mode === 'traverse') {
 		const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
@@ -887,17 +980,10 @@ export async function navigate(
 		if (saved) restore = saved;
 		session.current = key;
 	} else {
-		const leaving =
-			session.current ??
-			(w.history.state as { __marklessFragment?: { id?: string } } | null)?.__marklessFragment
-				?.id ??
-			LANDING_ENTRY;
-		session.positions.set(leaving, { x: w.scrollX, y: w.scrollY });
-		w.history.scrollRestoration = 'manual';
-		session.current = entryId();
-		const entry = { __marklessFragment: { id: session.current, x: 0, y: 0 } };
-		if (mode === 'push') w.history.pushState(entry, '', landed.href);
-		else w.history.replaceState(entry, '', landed.href);
+		session.current = entered;
+		session.unshown = undefined;
+		if (landed.href !== w.location.href)
+			w.history.replaceState(w.history.state, '', landed.href);
 	}
 	let region!: Element;
 	let end!: Comment;
@@ -1010,6 +1096,21 @@ export async function navigate(
 	};
 	const committed = commit();
 	if (!committed) return;
+	const controller = new AbortController();
+	session.streaming = controller;
+	const host = d as unknown as Record<string, unknown>;
+	const openKey = state.config.streamOpenProperty;
+	const open = fetched.rest
+		? new Promise<void>((done) => {
+				controller.signal.addEventListener('abort', () => done(), { once: true });
+			})
+		: undefined;
+	if (open) host[openKey] = open;
+	else delete host[openKey];
+	const ended = () => {
+		if (open && host[openKey] === open) delete host[openKey];
+		controller.abort();
+	};
 	const ran = runScripts(
 		d,
 		[...head.scripts, ...(scripts as HTMLScriptElement[])],
@@ -1027,24 +1128,31 @@ export async function navigate(
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
 	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
 	state.rescan();
-	const controller = new AbortController();
-	session.streaming = controller;
 	const key = state.shown;
-	void streamAppends(d, state, fetched, end, controller.signal).then((rest) => {
-		if (rest === undefined) return;
-		state.visited.delete(key);
-		const text = `${fetched.prefix}${state.config.regionEndMarker}${rest}`;
-		state.visited.set(key, text);
-		while (state.visited.size > 8) state.visited.delete(state.visited.keys().next().value!);
-		const parsed = parsedVisits.get(state) ?? new Map<string, FragmentFetched>();
-		parsedVisits.set(state, parsed);
-		// Parsing runs no page code; done at idle, a Back to this page only swaps.
-		const idle = () => {
-			if (state.visited.get(key) === text) parsed.set(key, state.parse(fetched.url, text));
-			for (const other of parsed.keys()) if (!state.visited.has(other)) parsed.delete(other);
-		};
-		if (w.requestIdleCallback) w.requestIdleCallback(idle, { timeout: 2000 });
-		else w.setTimeout(idle, 200);
-	}, reportAsync);
+	void streamAppends(d, state, fetched, end, controller.signal, arrived).then(
+		(rest) => {
+			ended();
+			if (rest === undefined) return;
+			state.visited.delete(key);
+			const text = `${fetched.prefix}${state.config.regionEndMarker}${rest}`;
+			state.visited.set(key, text);
+			while (state.visited.size > 8) state.visited.delete(state.visited.keys().next().value!);
+			const parsed = parsedVisits.get(state) ?? new Map<string, FragmentFetched>();
+			parsedVisits.set(state, parsed);
+			// Parsing runs no page code; done at idle, a Back to this page only swaps.
+			const idle = () => {
+				if (state.visited.get(key) === text)
+					parsed.set(key, state.parse(fetched.url, text));
+				for (const other of parsed.keys())
+					if (!state.visited.has(other)) parsed.delete(other);
+			};
+			if (w.requestIdleCallback) w.requestIdleCallback(idle, { timeout: 2000 });
+			else w.setTimeout(idle, 200);
+		},
+		(error: unknown) => {
+			ended();
+			reportAsync(error);
+		},
+	);
 	await ran;
 }

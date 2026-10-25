@@ -34,6 +34,7 @@ import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+	PROTOCOL_STREAM_OPEN_PROPERTY,
 } from '@markless/web/fns/container-region';
 import {
 	installKeepParts,
@@ -49,6 +50,7 @@ import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
 import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
+import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../navigation-timing.ts';
 import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-region.ts';
 import {
 	FRAGMENT_APPEND_END,
@@ -1150,6 +1152,8 @@ function fragmentConfig(
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
+		streamOpenProperty: PROTOCOL_STREAM_OPEN_PROPERTY,
+		pendingDeadlineMs: MARKLESS_NAV_SETTLE_DEADLINE_MS,
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,
