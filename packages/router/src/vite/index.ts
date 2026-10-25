@@ -115,6 +115,7 @@ const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
 const LINK_BRIDGE_PATHS_PLACEHOLDER = '__MARKLESS_ROUTER_LINK_BRIDGE_PATHS__';
+const SHARED_PART_MODULES_PLACEHOLDER = '__MARKLESS_ROUTER_SHARED_PART_MODULES__';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
@@ -1128,6 +1129,14 @@ function linkBridgeFilesPlugin(
 			async handler(_options, bundle) {
 				if (this.environment?.name !== 'ssr') return;
 				const chunks = outputChunks(bundle);
+				const shared = chunks.find((chunk) =>
+					chunk.code?.includes(SHARED_PART_MODULES_PLACEHOLDER),
+				);
+				if (shared)
+					shared.code = shared.code!.replace(
+						SHARED_PART_MODULES_PLACEHOLDER,
+						jsStringLiteralContent(JSON.stringify(sharedPartModules(this, root))),
+					);
 				const target = chunks.find((chunk) =>
 					chunk.code?.includes(LINK_BRIDGE_PATHS_PLACEHOLDER),
 				);
@@ -1172,6 +1181,47 @@ function linkBridgeFilesPlugin(
 	};
 }
 
+type ModuleGraph = {
+	getModuleIds(): IterableIterator<string>;
+	getModuleInfo(id: string): {
+		readonly importedIds: readonly string[];
+		readonly dynamicallyImportedIds: readonly string[];
+	} | null;
+};
+
+// The component modules more than one route renders (the document renders on every route): parts only one route renders
+// differ from route to route, so a navigation never names them in a fragment address.
+function sharedPartModules(graph: ModuleGraph, root: string): string[] {
+	const fileOf = (id: string) => {
+		const pathname = decodePath(parseURL(id).pathname);
+		return isAbsolute(pathname) ? normalizeRouteFileId(relative(root, pathname)) : undefined;
+	};
+	const routes = new Map<string, number>();
+	let route = 0;
+	for (const id of graph.getModuleIds()) {
+		const file = fileOf(id);
+		if (!file || (!isPageModuleFile(file) && file !== 'document.tsrx')) continue;
+		const every = file === 'document.tsrx';
+		const seen = new Set<string>([id]);
+		const queue = [id];
+		route++;
+		while (queue.length) {
+			const info = graph.getModuleInfo(queue.pop()!);
+			for (const next of [...(info?.importedIds ?? []), ...(info?.dynamicallyImportedIds ?? [])])
+				if (!seen.has(next)) {
+					seen.add(next);
+					queue.push(next);
+				}
+		}
+		for (const reached of seen) {
+			const name = fileOf(reached);
+			if (!name || reached === id || !/\.(?:tsrx|mdx)$/.test(name)) continue;
+			routes.set(name, every ? Infinity : (routes.get(name) ?? 0) + 1);
+		}
+	}
+	return [...routes].filter(([, count]) => count > 1).map(([name]) => name).toSorted();
+}
+
 function bundledPageFileIds(chunks: readonly OutputChunkLike[], root: string): string[] {
 	const files = new Set<string>();
 	for (const chunk of chunks)
@@ -1198,9 +1248,11 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { documentNavigation } from ${JSON.stringify(`${ROUTER_OPTIONS_ID}${query}`)};`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
 		`const linkBridgePathsJson = globalThis.__marklessRouterLinkBridgePathsJson ?? ${JSON.stringify(LINK_BRIDGE_PATHS_PLACEHOLDER)};`,
+		`const sharedPartModulesJson = globalThis.__marklessRouterSharedPartModulesJson ?? ${JSON.stringify(SHARED_PART_MODULES_PLACEHOLDER)};`,
 		`const entry = createServerEntry({`,
 		`  dev: import.meta.env.DEV,`,
 		`  linkBridgePaths: linkBridgePathsJson === ${JSON.stringify(LINK_BRIDGE_PATHS_PLACEHOLDER)} ? undefined : JSON.parse(linkBridgePathsJson),`,
+		`  sharedPartModules: sharedPartModulesJson === ${JSON.stringify(SHARED_PART_MODULES_PLACEHOLDER)} ? undefined : JSON.parse(sharedPartModulesJson),`,
 		`  base: import.meta.env.BASE_URL,`,
 		`  resumeEntryPath,`,
 		`  prerenderWakeEntryPath,`,

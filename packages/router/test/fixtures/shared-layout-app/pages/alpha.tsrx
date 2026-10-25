@@ -3,7 +3,7 @@ import Frame from '../src/frame.tsrx';
 
 export default function AlphaPage() @{
 	<Layout active="/alpha">
-		<Frame>
+		<Frame current="/alpha">
 			<h1 data-title>{'Alpha'}</h1>
 			<div class="panel panel-dark" data-panel><span class="badge badge-solid" data-badge>{'Badge'}</span></div>
 			<section data-part><h2>{'Alpha part 0'}</h2><p>{'Words for part 0 of alpha, long enough to wrap and lay out like prose.'}</p><ul><li>{'a'}</li><li>{'b'}</li></ul></section>

@@ -162,7 +162,8 @@ async function stylesheetsBeforePage(
 	}, destination);
 	let released = Infinity;
 	await page.route(
-		(url) => url.pathname === `/_markless/fragment${destination}`,
+		// Plain, or naming the kept parts this page holds.
+		(url) => url.pathname.startsWith('/_markless/fragment/') && url.pathname.endsWith(destination),
 		async (route) => {
 			await new Promise((resolve) => setTimeout(resolve, 400));
 			released = Date.now();

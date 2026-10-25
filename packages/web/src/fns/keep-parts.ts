@@ -4,13 +4,33 @@ import {
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 } from '@markless/serializer';
+import { PROTOCOL_EVENT_HOST_ATTRIBUTE } from '@markless/serializer/protocol';
 import {
+	PROTOCOL_ISLANDS_ATTRIBUTE,
 	PROTOCOL_KEEP_ATTRIBUTE,
+	PROTOCOL_KEEP_SHARED_PREFIX,
 	PROTOCOL_OWN_ATTRIBUTE,
+	PROTOCOL_STUB_ATTRIBUTE,
 } from '../../../serializer/src/protocol-keep.ts';
-import { KEEP_PARTS_HOOK, type KeepParts } from './keep-parts-hook.ts';
+import {
+	KEEP_ATTRIBUTE,
+	KEEP_CHILDREN,
+	KEEP_END,
+	KEEP_PARTS_HOOK,
+	KEEP_SPAN,
+	KEEP_TEXT,
+	KEEP_VALUE,
+	type KeepParts,
+} from './keep-parts-hook.ts';
 
-export { PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_OWN_ATTRIBUTE };
+export {
+	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_ISLANDS_ATTRIBUTE,
+	PROTOCOL_KEEP_ATTRIBUTE,
+	PROTOCOL_KEEP_SHARED_PREFIX,
+	PROTOCOL_OWN_ATTRIBUTE,
+	PROTOCOL_STUB_ATTRIBUTE,
+};
 
 type Coordinates = {
 	readonly locators: ReadonlyArray<unknown>;
@@ -18,7 +38,7 @@ type Coordinates = {
 };
 
 type SsrDataChildView = {
-	readonly locators?: ReadonlyArray<unknown>;
+	readonly locators?: ReadonlyArray<{ readonly hostNodeId?: unknown }>;
 	readonly keyedRepeats?: ReadonlyArray<unknown>;
 	readonly domUpdates?: ReadonlyArray<{
 		readonly graphNodeId?: unknown;
@@ -32,19 +52,20 @@ type SsrDataChildOutput = {
 		readonly computed?: ReadonlyArray<unknown>;
 	};
 	readonly propEvents?: ReadonlyArray<unknown>;
+	readonly structure?: { readonly keepMasked?: string; readonly keepModule?: string };
 };
 type SsrDataChildRecords = SsrDataChildView & {
-	readonly events?: ReadonlyArray<unknown>;
+	readonly events?: ReadonlyArray<{ readonly hostNodeId?: unknown }>;
 	readonly behaviors?: ReadonlyArray<unknown>;
 	readonly elementHandles?: ReadonlyArray<unknown>;
 	readonly branches?: ReadonlyArray<unknown>;
 	readonly asyncBoundaries?: ReadonlyArray<unknown>;
 };
 
-// Nothing the browser resumes: no state, events, behaviours, handles, branches or async content.
+// Nothing the browser resumes but events: no state, behaviours, handles, branches or async content. An event's
+// handler comes from the next page's payload, and its ref from the fragment (see the router's kept-stubs).
 function noResumeRecords(child: SsrDataChildOutput, view: SsrDataChildRecords): boolean {
 	return (
-		!view.events?.length &&
 		!view.behaviors?.length &&
 		!view.elementHandles?.length &&
 		!view.branches?.length &&
@@ -67,42 +88,153 @@ const childrenUpdates = (view: SsrDataChildView) =>
 const OPENING_TAG = /^\s*<([a-zA-Z][\w-]*)/;
 // Below this much markup a kept part saves less than its own mark costs.
 const KEEP_MIN_CHARS = 512;
-const NESTED_KEEP = new RegExp(` ${PROTOCOL_KEEP_ATTRIBUTE}="[0-9a-z]+"`, 'g');
+// A part kept inside a kept part needs none of its own marks.
+const NESTED_MARKS = new RegExp(
+	` (?:${PROTOCOL_KEEP_ATTRIBUTE}|${PROTOCOL_ISLANDS_ATTRIBUTE})="[^"]*"| ${PROTOCOL_OWN_ATTRIBUTE}(?=[\\s/>])`,
+	'g',
+);
+const RAW_TEXT = /^(?:script|style|textarea|title)$/i;
+const VOID = /^(?:area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/i;
+const SLOT_SPAN = new RegExp(
+	`([${KEEP_VALUE}${KEEP_ATTRIBUTE}])([^${KEEP_SPAN}]*)${KEEP_SPAN}([^${KEEP_END}]*)${KEEP_END}`,
+	'g',
+);
+
+export type KeepIsland = readonly [element: number, name: string, value: string | null];
+
+type Masked = {
+	readonly hash: string;
+	readonly islands: ReadonlyArray<KeepIsland>;
+	readonly text: boolean;
+	// Element index of each `{children}` slot's element, in document order.
+	readonly children: ReadonlyArray<number>;
+	readonly elements: number;
+};
+
+const ENTITY: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" };
+const unescape = (text: string) =>
+	text.replace(/&(amp|lt|gt|quot|#39);/g, (_, name: string) => ENTITY[name]!);
+
+// A whole-attribute slot renders nothing, ` name`, or ` name="value"`.
+function attributeValue(rendered: string): string | null | undefined {
+	if (!rendered) return null;
+	const parsed = /^ [^\s="]+(?:="([^"]*)")?$/.exec(rendered);
+	return parsed ? unescape(parsed[1] ?? '') : undefined;
+}
+
+// Elements in document order (the root is 0), with the attribute slots each holds; or undefined when the masked
+// markup does not read as one element tree.
+function readMasked(masked: string): Masked | undefined {
+	const islands: KeepIsland[] = [];
+	const children: number[] = [];
+	const open: number[] = [];
+	let element = -1;
+	let text = false;
+	let spans = 0;
+	for (let at = 0; at < masked.length; ) {
+		const char = masked[at]!;
+		if (char === KEEP_TEXT) text = true;
+		else if (char === KEEP_CHILDREN) {
+			if (masked[at - 1] !== '>' || !masked.startsWith('</', at + 1)) return undefined;
+			children.push(open.at(-1)!);
+		} else if (char === '<') {
+			if (masked.startsWith('<!--', at)) {
+				const close = masked.indexOf('-->', at + 4);
+				if (close === -1) return undefined;
+				at = close + 3;
+				continue;
+			}
+			if (masked[at + 1] === '/') {
+				open.pop();
+				at = masked.indexOf('>', at) + 1 || masked.length;
+				continue;
+			}
+			const name = /^<([a-zA-Z][\w:.-]*)/.exec(masked.slice(at, at + 64))?.[1];
+			if (name) {
+				let end = at + name.length + 1;
+				for (let quote = ''; end < masked.length; end++) {
+					const inner = masked[end]!;
+					if (quote) quote = inner === quote ? '' : quote;
+					else if (inner === '"' || inner === "'") quote = inner;
+					else if (inner === '>') break;
+				}
+				if (end >= masked.length) return undefined;
+				element++;
+				for (const span of masked.slice(at, end).matchAll(SLOT_SPAN)) {
+					const value =
+						span[1] === KEEP_VALUE ? unescape(span[3]!) : attributeValue(span[3]!);
+					if (value === undefined) return undefined;
+					islands.push([element, span[2]!, value]);
+					spans++;
+				}
+				at = end + 1;
+				if (RAW_TEXT.test(name)) {
+					const close = masked.toLowerCase().indexOf(`</${name.toLowerCase()}`, at);
+					if (close === -1) return undefined;
+					at = close;
+				} else if (!VOID.test(name) && masked[end - 1] !== '/') open.push(element);
+				continue;
+			}
+		}
+		at++;
+	}
+	let markers = 0;
+	for (const char of masked) if (char === KEEP_VALUE || char === KEEP_ATTRIBUTE) markers++;
+	if (markers !== spans) return undefined;
+	return {
+		hash: hashText(masked.replace(SLOT_SPAN, '$1$2')),
+		islands,
+		text,
+		children,
+		elements: element + 1,
+	};
+}
 
 /**
- * A presentational child's root element gets a hash of its markup with the page's children left out, and the element
- * holding exactly those children is marked as the page's own: equal hashes are equal bytes, so a navigation keeps the
- * element and replaces only the page's children.
+ * A presentational child's root element gets a hash of its markup with the page's children and its attribute slot
+ * values left out, and the element holding exactly those children is marked as the page's own: equal hashes are equal
+ * bytes but for those values, so a navigation keeps the element, sets the values and replaces only the page's children.
  */
-function keepMarked(html: string, projected: string | undefined, presentational: boolean): string {
+function keepMarked(
+	html: string,
+	projected: string | undefined,
+	masked: string | undefined,
+	presentational: boolean,
+	shared: boolean,
+): string {
 	if (!presentational || !OPENING_TAG.test(html)) return html;
-	if (!projected) return keepAt(html);
-	// The page's children appear once, verbatim, as the whole content of one element; or this output is not kept.
-	const start = html.indexOf(projected);
-	if (start === -1 || html.indexOf(projected, start + 1) !== -1) return html;
-	const end = start + projected.length;
-	const tagStart = html.lastIndexOf('<', start - 1);
-	const name = /^<([a-zA-Z][\w-]*)[^<>]*>$/.exec(html.slice(tagStart, start))?.[1];
-	if (!name || !html.startsWith(`</${name}`, end)) return html;
-	const before = html.slice(0, start - 1).replace(NESTED_KEEP, '');
-	const after = html.slice(end).replace(NESTED_KEEP, '');
+	let start = html.length;
+	let end = html.length;
+	if (projected) {
+		// The page's children appear once, verbatim, as the whole content of one element; or this output is not kept.
+		start = html.indexOf(projected);
+		if (start === -1 || html.indexOf(projected, start + 1) !== -1) return html;
+		end = start + projected.length;
+		const tagStart = html.lastIndexOf('<', start - 1);
+		const name = /^<([a-zA-Z][\w-]*)[^<>]*>$/.exec(html.slice(tagStart, start))?.[1];
+		if (!name || !html.startsWith(`</${name}`, end)) return html;
+	}
+	const before = html.slice(0, projected ? start - 1 : html.length).replace(NESTED_MARKS, '');
+	const after = html.slice(end).replace(NESTED_MARKS, '');
 	if (before.length + after.length < KEEP_MIN_CHARS) return html;
-	return mark(
-		`${before} ${PROTOCOL_OWN_ATTRIBUTE}>${projected}${after}`,
-		hashText(before + '>' + after),
-	);
-}
-
-// A part kept whole: the parts kept inside it need no mark of their own.
-function keepAt(html: string): string {
-	const shell = html.replace(NESTED_KEEP, '');
-	return shell.length < KEEP_MIN_CHARS ? html : mark(shell, hashText(shell));
-}
-
-function mark(html: string, hash: string): string {
-	const root = OPENING_TAG.exec(html)!;
+	const read = masked === undefined ? undefined : readMasked(masked);
+	// The masked markup holds exactly this part's own `{children}`, where the html has it.
+	const valid =
+		read &&
+		(projected
+			? read.children.length === 1 && read.children[0] === (readMasked(html.slice(0, start))?.elements ?? 0) - 1
+			: read.children.length === 0);
+	const hash = valid
+		? (shared && !read.text ? PROTOCOL_KEEP_SHARED_PREFIX : '') + read.hash
+		: hashText(before + '>' + after);
+	const islands =
+		valid && read.islands.length
+			? ` ${PROTOCOL_ISLANDS_ATTRIBUTE}="${JSON.stringify(read.islands).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`
+			: '';
+	const shell = projected ? `${before} ${PROTOCOL_OWN_ATTRIBUTE}>${projected}${after}` : before;
+	const root = OPENING_TAG.exec(shell)!;
 	const at = root.index + root[0].length;
-	return `${html.slice(0, at)} ${PROTOCOL_KEEP_ATTRIBUTE}="${hash}"${html.slice(at)}`;
+	return `${shell.slice(0, at)} ${PROTOCOL_KEEP_ATTRIBUTE}="${hash}"${islands}${shell.slice(at)}`;
 }
 
 function hashText(text: string): string {
@@ -124,7 +256,9 @@ function presentational(child: object): boolean {
 	return (
 		(!!view || !!coordinates) &&
 		(!view ||
-			((view.locators?.length ?? 0) <= childrenUpdates(view) &&
+			((view.locators ?? []).filter(
+				(locator) => !view.events?.some((event) => event.hostNodeId === locator.hostNodeId),
+			).length <= childrenUpdates(view) &&
 				(view.domUpdates?.length ?? 0) === childrenUpdates(view) &&
 				(view.keyedRepeats?.length ?? 0) === 0 &&
 				noResumeRecords(child as SsrDataChildOutput, view))) &&
@@ -134,10 +268,19 @@ function presentational(child: object): boolean {
 	);
 }
 
-const keepParts: KeepParts = (html, projected, child) =>
-	keepMarked(html, projected, presentational(child));
-
-/** Installs keep-parts for every render in this process. */
-export function installKeepParts(): void {
-	(globalThis as { [KEEP_PARTS_HOOK]?: KeepParts })[KEEP_PARTS_HOOK] = keepParts;
+/**
+ * Installs keep-parts for every render in this process. `sharedModules`: the component modules more than one route
+ * renders, from the build's module graph; only their parts may be named in a fragment address.
+ */
+export function installKeepParts(sharedModules: ReadonlySet<string> = new Set()): void {
+	(globalThis as { [KEEP_PARTS_HOOK]?: KeepParts })[KEEP_PARTS_HOOK] = (html, projected, child) => {
+		const structure = (child as SsrDataChildOutput).structure;
+		return keepMarked(
+			html,
+			projected,
+			structure?.keepMasked,
+			presentational(child),
+			structure?.keepModule !== undefined && sharedModules.has(structure.keepModule),
+		);
+	};
 }

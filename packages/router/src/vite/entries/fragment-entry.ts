@@ -22,7 +22,13 @@ export interface FragmentNavigationConfig {
 	readonly pageStartComment: string;
 	// The container's own attributes, never carried from the leaving page's element to the next one.
 	readonly containerAttributes: readonly [container: string, paths: string];
-	readonly keepAttributes: readonly [keep: string, own: string];
+	readonly keepAttributes: readonly [
+		keep: string,
+		own: string,
+		islands: string,
+		stub: string,
+		sharedPrefix: string,
+	];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
 	readonly documentLoads: boolean;
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
@@ -79,8 +85,14 @@ export type FragmentNavigationState = {
 	shown: string;
 	readonly eligible: (anchor: Element | null | undefined, forClick?: boolean) => URL | undefined;
 	readonly preloadCode: (url: URL, low: boolean) => void;
-	// speculative: a prefetch (low priority, `Purpose: prefetch`), not a click.
-	readonly request: (url: URL, speculative: boolean) => FragmentPrefetch;
+	// speculative: a prefetch (low priority, `Purpose: prefetch`), not a click. whole: no kept part left out.
+	readonly request: (
+		url: URL,
+		speculative: boolean,
+		started?: undefined,
+		budget?: number,
+		whole?: boolean,
+	) => FragmentPrefetch;
 	readonly prefetch: (url: URL) => void;
 	readonly parse: (url: string, text: string) => FragmentFetched;
 	readonly idleDownloads: boolean;
@@ -613,6 +625,14 @@ function morphRange(
 			cursor = cursor.nextSibling;
 			continue;
 		}
+		// A part the fragment left out stands elsewhere on this page: a copy of it comes here.
+		if (next.nodeType === 1 && (next as Element).hasAttribute(keepAttributes[3])) {
+			const copy = heldCopy(next as Element);
+			parent.insertBefore(copy, cursor && cursor !== stop ? cursor : stop);
+			keepAs(d, copy, next as Element, fresh);
+			fresh.push(copy);
+			continue;
+		}
 		// A node the next page dropped from a list: the one after it is the match.
 		if (cursor && cursor !== stop && !sameKind(cursor, next)) {
 			const after = cursor.nextSibling;
@@ -629,7 +649,7 @@ function morphRange(
 		}
 		const node = d.adoptNode(next);
 		parent.insertBefore(node, cursor && cursor !== stop ? cursor : stop);
-		if (node.nodeType === 1) fresh.push(node as Element);
+		if (node.nodeType === 1) fresh.push(placeHeldParts(d, node as Element, fresh));
 	}
 	while (cursor && cursor !== stop) {
 		const after: ChildNode | null = cursor.nextSibling;
@@ -638,27 +658,107 @@ function morphRange(
 	}
 }
 
-let keepAttributes: readonly [keep: string, own: string] = ['', ''];
+let keepAttributes: FragmentNavigationConfig['keepAttributes'] = ['', '', '', '', ''];
+// This page's shared kept parts by hash, not yet kept in place by the swap: what a stub's part is copied from.
+let held = new Map<string, Element[]>();
 
-// Both pages render this element byte for byte: it stays, with what scripts did to it; only the page's own children inside are replaced.
+// Whether this page holds a part for every stub in `next`; the parts become the ones the swap places.
+function holdParts(scope: Element, next: Element | Document): boolean {
+	const [keep, , , stub, shared] = keepAttributes;
+	held = new Map();
+	if (!stub) return true;
+	for (const part of scope.querySelectorAll(`[${keep}^="${shared}"]`)) {
+		const hash = part.getAttribute(keep)!;
+		held.set(hash, [...(held.get(hash) ?? []), part]);
+	}
+	const needed = new Map<string, number>();
+	for (const part of next.querySelectorAll(`[${stub}]`)) {
+		const hash = part.getAttribute(keep)!;
+		needed.set(hash, (needed.get(hash) ?? 0) + 1);
+	}
+	return [...needed].every(([hash, count]) => (held.get(hash)?.length ?? 0) >= count);
+}
+
+// Copied, never moved: a move mid-swap would pull a node out from under the morph's cursor. The swap checked before
+// committing that this page holds a part for every stub.
+function heldCopy(stub: Element): Element {
+	const parts = held.get(stub.getAttribute(keepAttributes[0])!)!;
+	return (parts[0] ?? stub).cloneNode(true) as Element;
+}
+
+function placeHeldParts(d: Document, node: Element, fresh: Element[]): Element {
+	const stub = keepAttributes[3];
+	if (!stub) return node;
+	for (const part of node.querySelectorAll(`[${stub}]`)) {
+		const copy = heldCopy(part);
+		part.replaceWith(copy);
+		keepAs(d, copy, part, fresh);
+	}
+	return node;
+}
+
+// Both pages render this element byte for byte but for its islands: it stays, with what scripts did to it; only the
+// page's own children inside are replaced.
 function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
-	const [keep, own] = keepAttributes;
+	const keep = keepAttributes[0];
 	const hash = keep && from.nodeType === 1 && (from as Element).getAttribute(keep);
 	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return false;
+	return keepAs(d, from as Element, to as Element, fresh);
+}
+
+function keepAs(d: Document, from: Element, to: Element, fresh: Element[]): boolean {
+	const [keep, own, islands] = keepAttributes;
 	const slots = (root: Element) =>
 		root.hasAttribute(own)
 			? [root]
 			: [...root.querySelectorAll(`[${own}]`)].filter(
 					(slot) => !root.contains(slot.parentElement!.closest(`[${own}]`)),
 				);
-	const leaving = slots(from as Element);
-	const arriving = slots(to as Element);
-	if (leaving.length !== arriving.length) return false;
+	const leaving = slots(from);
+	const arriving = slots(to);
+	if (leaving.length !== arriving.length || !setIslands(d, from, to, leaving, islands)) return false;
+	const list = held.get(from.getAttribute(keep)!);
+	if (list?.includes(from)) list.splice(list.indexOf(from), 1);
 	leaving.forEach((slot, index) => {
 		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
 		slot.replaceChildren(...nodes);
+		for (const node of nodes) if (node.nodeType === 1) placeHeldParts(d, node as Element, fresh);
 		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
 	});
+	return true;
+}
+
+type Island = readonly [element: number, name: string, value: string | null];
+
+// The attribute values both pages render differently: elements counted from the root in document order, not
+// counting what the own slots hold.
+function setIslands(
+	d: Document,
+	from: Element,
+	to: Element,
+	slots: readonly Element[],
+	attribute: string,
+): boolean {
+	const incoming = attribute ? to.getAttribute(attribute) : null;
+	if (incoming === from.getAttribute(attribute)) return true;
+	// Every slot is listed, an absent attribute as null, so the next page's list alone sets them all.
+	const next = (incoming ? JSON.parse(incoming) : []) as Island[];
+	let last = -1;
+	for (const [element] of next) last = Math.max(last, element);
+	const elements: Element[] = [from];
+	const inSlot = new Set(slots);
+	const walker = d.createTreeWalker(from, 1, (node) =>
+		inSlot.has((node as Element).parentElement!) ? 2 : 1,
+	);
+	while (elements.length <= last && walker.nextNode()) elements.push(walker.currentNode as Element);
+	if (elements.length <= last) return false;
+	for (const [element, name, value] of next) {
+		const target = elements[element]!;
+		if (value === null) target.removeAttribute(name);
+		else if (target.getAttribute(name) !== value) target.setAttribute(name, value);
+	}
+	if (incoming === null) from.removeAttribute(attribute);
+	else from.setAttribute(attribute, incoming);
 	return true;
 }
 
@@ -686,7 +786,7 @@ function morphNode(
 	) {
 		const node = d.adoptNode(incoming);
 		element.replaceWith(node);
-		fresh.push(node);
+		fresh.push(placeHeldParts(d, node, fresh));
 		return;
 	}
 	if (!page && element.isEqualNode(incoming)) return;
@@ -854,14 +954,25 @@ export async function navigate(
 		return;
 	}
 	if (id !== session.navigation) return taken.abort();
+	const documentLoads = state.config.documentLoads;
+	const outgoing = documentLoads ? d.body : regionOf(state, d);
+	const scope = documentLoads && !isContainer(d.body) ? d.body : outgoing?.parentElement;
+	keepAttributes = state.config.keepAttributes ?? ['', '', '', '', ''];
+	// A fragment fetched for another page's parts, or one a script took away, comes again with every part.
+	if (scope && !holdParts(scope, fetched.doc)) {
+		try {
+			fetched = await state.request(url, false, undefined, undefined, true).result;
+		} catch {
+			if (id === session.navigation) fallback(url.href);
+			return;
+		}
+		if (id !== session.navigation) return;
+	}
 	// A prefetch is shared by every link to the page, so the address takes the clicked link's #fragment.
 	const landed = new URL(fetched.url);
 	landed.hash = url.hash;
 	const next = fetched.doc;
-	const documentLoads = state.config.documentLoads;
 	const incoming = documentLoads ? next.body : regionOf(state, next);
-	const outgoing = documentLoads ? d.body : regionOf(state, d);
-	const scope = documentLoads && !isContainer(d.body) ? d.body : outgoing?.parentElement;
 	if (!incoming || !outgoing || !scope) {
 		fallback(landed.href);
 		return;
@@ -905,7 +1016,8 @@ export async function navigate(
 	const commit = (): boolean => {
 		if (id !== session.navigation) return false;
 		const settle = withoutTransitions(d);
-		keepAttributes = state.config.keepAttributes ?? ['', ''];
+		keepAttributes = state.config.keepAttributes ?? ['', '', '', '', ''];
+		holdParts(scope, incoming);
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
 			if (!element.isConnected || !scope.contains(element)) continue;
@@ -1008,7 +1120,15 @@ export async function navigate(
 		settle();
 		return true;
 	};
-	const committed = commit();
+	let committed: boolean;
+	try {
+		committed = commit();
+	} catch (error) {
+		// A part the stubs named belongs somewhere the swap cannot put it: the document loads instead.
+		reportAsync(error);
+		fallback(landed.href);
+		return;
+	}
 	if (!committed) return;
 	const ran = runScripts(
 		d,

@@ -1,6 +1,14 @@
 import { PROJECTION_MARK_PATTERN, PROJECTION_MARK_PREFIX } from '../fns/projection-html.ts';
 import { marklessAttributeValue } from '../dom-attribute.ts';
-import type { KeepParts } from '../fns/keep-parts-hook.ts';
+import {
+	KEEP_ATTRIBUTE,
+	KEEP_CHILDREN,
+	KEEP_END,
+	KEEP_SPAN,
+	KEEP_TEXT,
+	KEEP_VALUE,
+	type KeepParts,
+} from '../fns/keep-parts-hook.ts';
 import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
 	MARKLESS_DEFERRED_COUNT_NAME,
@@ -138,6 +146,7 @@ export type SsrDataChunk = {
 };
 
 export type SsrRenderData = {
+	readonly filename?: string;
 	readonly root: { readonly componentName: string; readonly templateId: string } | null;
 	readonly chunks: ReadonlyArray<SsrDataChunk>;
 	readonly repeats: ReadonlyArray<{
@@ -212,6 +221,9 @@ export type SsrDataStructure = {
 	readonly elementCount: number;
 	/** Repeat slots walked by this render, including their id prefix. */
 	readonly repeatIds?: ReadonlyArray<string>;
+	/** Server only, while keep-parts is installed: the masked markup keep-parts hashes, and the module it came from. */
+	readonly keepMasked?: string;
+	readonly keepModule?: string;
 };
 
 export type SsrDataCoordinates = {
@@ -301,7 +313,12 @@ export type StructureToken =
 			readonly anchorHtml?: string;
 	  };
 
-type RenderedPart = { readonly html: string; readonly tokens: ReadonlyArray<StructureToken> };
+// `masked`: only while keep-parts is installed (server), the same markup with each attribute slot and `{children}` marked (see fns/keep-parts.ts).
+type RenderedPart = {
+	readonly html: string;
+	readonly tokens: ReadonlyArray<StructureToken>;
+	readonly masked?: string;
+};
 
 /**
  * The HTML side splices a projection INSIDE the child, at the
@@ -462,6 +479,10 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					repeatIds: anchors.flatMap((anchor) =>
 						anchor.kind === 'repeat' ? [anchor.id] : [],
 					),
+					// The compiled component returns `structure` as is, so the masked markup reaches the parent's keep-parts.
+					...(rendered.masked === undefined
+						? {}
+						: { keepMasked: rendered.masked, keepModule: input.renderData.filename }),
 				},
 				structureTokens: rendered.tokens,
 			};
@@ -516,12 +537,18 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 		}
 
 		let html = '';
+		let masked = keep && '';
 		const renderedSlots = new Map<SsrDataSlot, RenderedPart>();
+		const add = (part: RenderedPart) => {
+			html += part.html;
+			if (keep) masked += part.masked ?? part.html;
+		};
 		const walk = (from: number): Awaitable<void> => {
 			for (let index = from; index < parts.length; index++) {
 				const part = parts[index]!;
 				if (typeof part === 'string') {
 					html += part;
+					if (keep) masked += part;
 					continue;
 				}
 				const rendered = renderSlot(part, context);
@@ -529,12 +556,12 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					const next = index + 1;
 					return rendered.then((settled) => {
 						renderedSlots.set(part, settled);
-						html += settled.html;
+						add(settled);
 						return walk(next);
 					});
 				}
 				renderedSlots.set(part, rendered);
-				html += rendered.html;
+				add(rendered);
 			}
 			return undefined;
 		};
@@ -565,7 +592,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					tokens.push(INERT_ELEMENT_TOKEN);
 				for (const token of ordered[index]?.tokens ?? []) tokens.push(token);
 			}
-			return { html, tokens };
+			return keep ? { html, tokens, masked: masked as string } : { html, tokens };
 		});
 	}
 
@@ -603,18 +630,38 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					// reports the projection's token span so `renderChunk` can sort it into
 					// the child's own stream by this slot's coordinate.
 					const claimed = claimProjectionSpans(String(value ?? ''), slot.raw === true);
-					if (slot.raw) return { html: claimed.text, tokens: claimed.tokens };
-					return { html: value == null ? '' : escapeHtml(claimed.text), tokens: [] };
+					const html = slot.raw
+						? claimed.text
+						: value == null
+							? ''
+							: escapeHtml(claimed.text);
+					const children =
+						slot.raw &&
+						slot.residue.kind === 'graph-read' &&
+						slot.residue.path[0] === 'children';
+					return {
+						html,
+						tokens: slot.raw ? claimed.tokens : [],
+						...(keep ? { masked: children ? KEEP_CHILDREN : KEEP_TEXT + html } : {}),
+					};
 				});
 			case 'attribute':
-				return marklessThen(input.read(slot.residue, context), (value) => ({
+				return marklessThen(input.read(slot.residue, context), (value) => {
 					// The name and quotes are already in the statics, so an absent value
 					// writes nothing rather than the word "undefined" into them.
-					html: slot.alwaysPresent
+					const html = slot.alwaysPresent
 						? escapeHtml(marklessAttributeValue(slot.name, value) ?? '')
-						: renderAttribute(slot.name, value),
-					tokens: [],
-				}));
+						: renderAttribute(slot.name, value);
+					return {
+						html,
+						tokens: [],
+						...(keep
+							? {
+									masked: `${slot.alwaysPresent ? KEEP_VALUE : KEEP_ATTRIBUTE}${slot.name}${KEEP_SPAN}${html}${KEEP_END}`,
+								}
+							: {}),
+					};
+				});
 			case 'spread-attributes':
 				return marklessThen(input.read(slot.residue, context), (value) => ({
 					html: renderSpreadAttributes(value, slot.excludeNames),
@@ -715,6 +762,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									}),
 								);
 								const baseTokens = childTokens ?? countTokens;
+								const masked = keep
+									? (child.structure?.keepMasked ?? withoutProjectionMarks(child.html))
+									: undefined;
 								const html = keep
 									? keep(
 											withoutProjectionMarks(child.html),
@@ -724,7 +774,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									: withoutProjectionMarks(child.html);
 								// Spliced: the child's own `{children}` slot already placed the projection
 								// where the HTML puts it, so appending it again would double-count it.
-								if (span?.consumed) return { html, tokens: baseTokens };
+								if (span?.consumed) return { html, tokens: baseTokens, masked };
 								if (span) {
 									const markAt = child.html.indexOf(span.mark);
 									if (markAt < 0)
@@ -734,6 +784,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 										);
 									return {
 										html,
+										masked,
 										tokens: spliceTokensAtMark(
 											baseTokens,
 											child.html.slice(0, markAt),
@@ -743,6 +794,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								}
 								return {
 									html,
+									masked,
 									tokens: [...baseTokens, ...(projection?.tokens ?? [])],
 								};
 							});
