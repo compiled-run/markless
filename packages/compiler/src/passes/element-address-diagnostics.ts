@@ -2,6 +2,7 @@ import type {
 	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
 	SemanticGraphArtifact,
+	SemanticGraphInput,
 	SymbolModulesDiagnostic,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
@@ -20,9 +21,14 @@ export function unaddressableElementDiagnostics(input: {
 	readonly renderData?: RenderDataArtifact;
 	readonly protocolView?: ProtocolViewPayloadWithArmRecords;
 	readonly symbolResolver: SymbolResolverPlan;
+	readonly source?: Pick<SemanticGraphInput, 'importedModuleInterfaces'>;
 }): ReadonlyArray<SymbolModulesDiagnostic> {
 	const { semanticGraph, renderData, protocolView } = input;
 	if (!semanticGraph || !renderData || !protocolView) return [];
+	const interfaces = input.source?.importedModuleInterfaces;
+	const imports = interfaces
+		? { componentEdges: semanticGraph.componentEdges, importedModuleInterfaces: interfaces }
+		: {};
 	const spans = recordSpans(semanticGraph, input.symbolResolver);
 	const refused = new Map<string, SourceSpan | undefined>();
 	const refuse = (hostNodeId: string) => {
@@ -48,7 +54,7 @@ export function unaddressableElementDiagnostics(input: {
 			?.armChunkIds ?? [])
 			armChunks.add(chunkId);
 	for (const chunkId of armChunks)
-		for (const [hostNodeId, placement] of armHostPaths(renderData, semanticGraph, chunkId))
+		for (const [hostNodeId, placement] of armHostPaths(renderData, semanticGraph, chunkId, interfaces))
 			if (placement.path === null) refuse(hostNodeId);
 
 	const chunks = semanticGraph.markup.chunks;
@@ -62,6 +68,7 @@ export function unaddressableElementDiagnostics(input: {
 				!elementAddress({
 					chunks,
 					branchSites: semanticGraph.branchSites,
+					...imports,
 					chunkId: row!.id,
 					path: host.coordinate.path,
 				})

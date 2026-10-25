@@ -156,3 +156,66 @@ export default function Page() @{
 	expect(armEvents(compiled)).toEqual([['click', [0, -3]]]);
 	expect(refusals(compiled)).toEqual([]);
 });
+
+test('an imported component of one root element counts as one step', async () => {
+	const card = await compileTsrxModule({
+		filename: 'src/Card.tsrx',
+		source: `export default function Card() @{
+	<figure><figcaption>caption</figcaption></figure>
+}`,
+		symbols: [],
+	});
+	const compiled = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+import Card from './Card.tsrx';
+const SHOWN = true;
+export default function Page() @{
+	let tab = state('a');
+	<main>
+		@if (SHOWN) {
+			<article>
+				<Card />
+				<div><button onClick={() => (tab = 'b')}>{tab}</button></div>
+				<Card />
+			</article>
+		}
+	</main>
+}`,
+		symbols: [],
+		importedModuleInterfaces: { './Card.tsrx': card.moduleGraphInterface },
+	});
+	expect(refusals(compiled)).toEqual([]);
+	expect(armEvents(compiled)).toEqual([['click', [0, 1, 0]]]);
+});
+
+test('an imported component whose root is a @for still refuses', async () => {
+	const list = await compileTsrxModule({
+		filename: 'src/List.tsrx',
+		source: `export default function List({ items }: { items: ReadonlyArray<{ id: number }> }) @{
+	@for (const item of items; key item.id) { <p>{item.id}</p> }
+}`,
+		symbols: [],
+	});
+	const compiled = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+import List from './List.tsrx';
+const SHOWN = true;
+export default function Page() @{
+	let hits = state(0);
+	<main>
+		@if (SHOWN) {
+			<section>
+				<List items={[{ id: 1 }]} />
+				<button onClick={() => hits++}>{hits}</button>
+				<List items={[{ id: 2 }]} />
+			</section>
+		}
+	</main>
+}`,
+		symbols: [],
+		importedModuleInterfaces: { './List.tsrx': list.moduleGraphInterface },
+	});
+	expect(refusals(compiled)).toHaveLength(1);
+});

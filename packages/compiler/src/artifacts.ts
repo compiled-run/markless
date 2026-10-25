@@ -326,6 +326,8 @@ export type ModuleGraphInterfaceArtifact = {
 				readonly path: ReadonlyArray<string>;
 			}>;
 			readonly elementCount: ModuleGraphInterfaceElementCount;
+			/** Steps the component's top level takes in its parent's element address; absent reads as 'unknown'. */
+			readonly addressSteps?: ModuleGraphInterfaceElementCount;
 			// Absent on an interface built before this field existed, which reads as 'unknown'.
 			readonly constructReach?: ModuleGraphInterfaceConstructReach;
 			readonly projection?: ModuleGraphInterfaceProjection;

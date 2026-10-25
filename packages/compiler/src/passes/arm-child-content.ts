@@ -171,6 +171,9 @@ export function armHostPaths(
 	// Render data folds unaddressed elements into counts, so siblings are counted from the full markup.
 	const markup = semanticGraph?.markup.chunks ?? [];
 	const branchSites = semanticGraph?.branchSites ?? [];
+	const imports = semanticGraph && interfaces
+		? { componentEdges: semanticGraph.componentEdges, importedModuleInterfaces: interfaces }
+		: {};
 	collect(chunkId, [], noProps, new Set());
 	return paths;
 
@@ -186,7 +189,7 @@ export function armHostPaths(
 		if (!chunk) return;
 		// A single-root child starts at the slot that placed it, so its own first step is the slot's.
 		const at = (path: ReadonlyArray<number>) => {
-			const address = elementAddress({ chunks: markup, branchSites, chunkId: id, path });
+			const address = elementAddress({ chunks: markup, branchSites, ...imports, chunkId: id, path });
 			return address && (offset.length ? [...offset, ...address.slice(1)] : address);
 		};
 		for (const host of chunk.hosts)

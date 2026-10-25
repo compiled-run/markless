@@ -752,6 +752,7 @@ test('the interface entry grows only the fields this component needs', async () 
 		source: plainImportedRow,
 	});
 	expect(Object.keys(child.moduleGraphInterface.render.components[0]!).sort()).toEqual([
+		'addressSteps',
 		'armMaterial',
 		'childChunks',
 		'componentName',
