@@ -2,6 +2,7 @@ import { parseModule } from '../../js-ast.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
+	ModuleGraphInterfaceElementCount,
 	SemanticGraphArtifact,
 	SemanticGraphInput,
 	SemanticLocalDeclaration,
@@ -27,7 +28,11 @@ import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach } from '../construct-reach.ts';
-import { chunkElementCount, projectionPlacementFields } from './projection-placement.ts';
+import {
+	chunkElementCount,
+	componentAddressSteps,
+	projectionPlacementFields,
+} from './projection-placement.ts';
 import {
 	getComponentFunction,
 	literalContainerText,
@@ -252,6 +257,17 @@ export async function buildSemanticGraph(
 								localName: binding.localName,
 								path: binding.propPath,
 							})),
+						...addressStepsField(
+							componentAddressSteps({
+								chunks: graph.markup.chunks,
+								branchSites: graph.branchSites,
+								componentEdges: graph.componentEdges,
+								...(input.importedModuleInterfaces
+									? { importedModuleInterfaces: input.importedModuleInterfaces }
+									: {}),
+								rootChunkId: root.id,
+							}),
+						),
 						constructReach: componentConstructReach(constructReachInput, root.id),
 						...spreadHostsField(chunks),
 						...projectionPlacementFields({
@@ -748,4 +764,10 @@ function withFunctionSite(
 	state.currentFunctionSite = site;
 	run();
 	state.currentFunctionSite = previous;
+}
+
+function addressStepsField(
+	steps: ModuleGraphInterfaceElementCount,
+): { readonly addressSteps?: number } {
+	return typeof steps === 'number' ? { addressSteps: steps } : {};
 }

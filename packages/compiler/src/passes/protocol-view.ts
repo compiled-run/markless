@@ -1108,7 +1108,14 @@ function branchArmHostPaths(
 	input: ProtocolViewPayloadInput,
 	chunkId: string,
 ): ReadonlyMap<string, ArmHostPlacement & { readonly path: ReadonlyArray<number> }> {
-	return addressedOnly(armHostPaths(renderDataOf(input), input.semanticGraph, chunkId));
+	return addressedOnly(
+		armHostPaths(
+			renderDataOf(input),
+			input.semanticGraph,
+			chunkId,
+			input.source?.importedModuleInterfaces,
+		),
+	);
 }
 
 // A host no address can name carries no record; the build refuses it with its own diagnostic.
@@ -1170,6 +1177,12 @@ function hostPathsForChunk(
 			const address = elementAddress({
 				chunks,
 				branchSites,
+				...(input.semanticGraph && input.source?.importedModuleInterfaces
+					? {
+							componentEdges: input.semanticGraph.componentEdges,
+							importedModuleInterfaces: input.source.importedModuleInterfaces,
+						}
+					: {}),
 				chunkId,
 				path: host.coordinate.path,
 			});

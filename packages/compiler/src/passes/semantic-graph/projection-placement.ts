@@ -1,7 +1,9 @@
 import type {
+	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceElementCount,
 	ModuleGraphInterfaceProjection,
 	SemanticBranchSite,
+	SemanticComponentEdge,
 	SemanticMarkupChunk,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
@@ -46,6 +48,7 @@ type Scope = {
 	readonly childIndexes: Map<SemanticMarkupChunk, ChildIndex>;
 	// The census one step of an element address takes: a host counts once, without its subtree, and a block once.
 	readonly siblingsOnly: boolean;
+	readonly input: ChunkScopeInput;
 };
 
 // What occupies each child index under one parent path: a host wins over an anchor slot at the same index.
@@ -55,6 +58,9 @@ type ChildIndex = Map<string, Map<number, ChildPosition>>;
 type ChunkScopeInput = {
 	readonly chunks: ReadonlyArray<SemanticMarkupChunk>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
+	// With both, an imported child's published addressSteps stand in for the chunks this module never saw.
+	readonly componentEdges?: ReadonlyArray<SemanticComponentEdge>;
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 };
 
 type ProjectionSite = {
@@ -133,6 +139,13 @@ export function projectionPlacementFields(
 	};
 }
 
+/** Steps a component's top level takes in its parent's element address. */
+export function componentAddressSteps(
+	input: ChunkScopeInput & { readonly rootChunkId: string },
+): ModuleGraphInterfaceElementCount {
+	return countChunk(createScope(input, true), input.rootChunkId, UNKNOWN, new Set());
+}
+
 /**
  * Where one chunk position stands in the DOM the browser holds, server-sent or
  * client-built alike, as a ProtocolElementAddress: per level, its place among
@@ -170,17 +183,18 @@ export function elementAddress(
 	return address;
 }
 
-const scopes = new WeakMap<ReadonlyArray<SemanticMarkupChunk>, Scope>();
+const scopes = new WeakMap<ReadonlyArray<SemanticMarkupChunk>, Map<object | undefined, Scope>>();
 
 function scopeOf(input: ChunkScopeInput, siblingsOnly = false): Scope {
-	if (siblingsOnly) {
-		const cached = scopes.get(input.chunks);
-		if (cached) return cached;
-		const scope = createScope(input, true);
-		scopes.set(input.chunks, scope);
-		return scope;
-	}
-	return createScope(input, false);
+	if (!siblingsOnly) return createScope(input, false);
+	let byImports = scopes.get(input.chunks);
+	if (!byImports) scopes.set(input.chunks, (byImports = new Map()));
+	const imports = input.componentEdges && input.importedModuleInterfaces;
+	const cached = byImports.get(imports);
+	if (cached) return cached;
+	const scope = createScope(input, true);
+	byImports.set(imports, scope);
+	return scope;
 }
 
 function createScope(input: ChunkScopeInput, siblingsOnly: boolean): Scope {
@@ -197,6 +211,7 @@ function createScope(input: ChunkScopeInput, siblingsOnly: boolean): Scope {
 		),
 		chunkById: new Map(),
 		childIndexes: new Map(),
+		input,
 	};
 }
 
@@ -343,6 +358,8 @@ function slotCount(
 				: UNKNOWN;
 		}
 		case 'child-component': {
+			if (scope.siblingsOnly && !chunkOf(scope, slot.childTemplateId))
+				return importedAddressSteps(scope.input, slot.componentEdgeId);
 			const projected = slot.projectionChunkId
 				? countChunk(scope, slot.projectionChunkId, projection, seen)
 				: 0;
@@ -357,4 +374,18 @@ function slotCount(
 		default:
 			return UNKNOWN;
 	}
+}
+
+function importedAddressSteps(
+	input: ChunkScopeInput,
+	componentEdgeId: string,
+): ModuleGraphInterfaceElementCount {
+	const edge = input.componentEdges?.find((candidate) => candidate.id === componentEdgeId);
+	if (!edge?.importSource) return UNKNOWN;
+	const component = input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
+		(candidate) =>
+			candidate.componentName === edge.childComponentName ||
+			(edge.importedName !== undefined && candidate.exportName === edge.importedName),
+	);
+	return component?.addressSteps ?? UNKNOWN;
 }

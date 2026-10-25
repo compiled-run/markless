@@ -1,5 +1,6 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
+import ImportedSiblingsPage from './imported-siblings-page.tsrx';
 import NestedIfPage from './nested-if-page.tsrx';
 import StateBranchPage from './state-branch-page.tsrx';
 import TextBeforePage from './text-before-page.tsrx';
@@ -59,4 +60,21 @@ test('SSR: a form after a nested @if in an arm submits through its own handler',
 
 test('CSR: a form after a nested @if in an arm submits through its own handler', async () => {
 	await expectNestedIfBeforeForm((await render(NestedIfPage)).container as HTMLElement);
+});
+
+async function expectImportedSiblingsForm(container: HTMLElement) {
+	expect(submit(container)).toBe(true);
+	await expect.poll(() => sent(container)).toBe('1');
+	expect(submit(container)).toBe(true);
+	await expect.poll(() => sent(container)).toBe('2');
+}
+
+test('SSR: a form between imported components in an arm submits through its own handler', async () => {
+	await expectImportedSiblingsForm(
+		(await renderSSR(ImportedSiblingsPage)).container as HTMLElement,
+	);
+});
+
+test('CSR: a form between imported components in an arm submits through its own handler', async () => {
+	await expectImportedSiblingsForm((await render(ImportedSiblingsPage)).container as HTMLElement);
 });
