@@ -81,6 +81,8 @@ export async function refreshSyncComputed(
 				deriving,
 			);
 	}
+	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
+	if (input.records && awaitsAsyncAncestor(input.computed, input.records, input.graph)) return;
 	const graph = seedSourceGraph(input.graph, input.computed);
 	const roster = await loadRosterResume();
 	const result = (await input.loadSymbol(input.computed.deriveSymbolId))({
@@ -95,6 +97,29 @@ export async function refreshSyncComputed(
 		graphNodeId: input.computed.graphNodeId,
 		value: await result,
 	});
+}
+
+type DependencyRecord = {
+	readonly graphNodeId: string;
+	readonly async?: boolean;
+	readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
+};
+
+function awaitsAsyncAncestor(
+	computed: Pick<DependencyRecord, 'dependencies'>,
+	records: ReadonlyArray<DependencyRecord>,
+	graph: RuntimeGraph,
+	visited = new Set<string>(),
+): boolean {
+	for (const { graphNodeId } of computed.dependencies ?? []) {
+		if (visited.has(graphNodeId)) continue;
+		visited.add(graphNodeId);
+		const record = records.find((candidate) => candidate.graphNodeId === graphNodeId);
+		if (record?.async === true) {
+			if (graph.read(graphNodeId, ['status']) !== 'fulfilled') return true;
+		} else if (record && awaitsAsyncAncestor(record, records, graph, visited)) return true;
+	}
+	return false;
 }
 
 // A shared seed re-runs its own authored expression, so its prop reads have to

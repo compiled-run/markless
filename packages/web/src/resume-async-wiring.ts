@@ -333,6 +333,16 @@ export async function settleAsyncBoundaryRange(
 			input.settleTracker?.markSettled(boundary.id);
 			return;
 		}
+		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
+		if (input.root.__marklessBranchArms?.has(boundary.id)) {
+			await input.commitArm(boundary, {
+				html: update.html,
+				arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
+				armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+			});
+			input.settleTracker?.markSettled(boundary.id);
+			return;
+		}
 	}
 	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
