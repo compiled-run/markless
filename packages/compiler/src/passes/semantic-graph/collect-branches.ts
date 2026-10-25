@@ -1,6 +1,10 @@
 import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
-import { type CompositeReadOptions, collectCompositeTemplateExpression } from './composite-reads.ts';
+import {
+	type CompositeReadOptions,
+	collectCompositeTemplateExpression,
+} from './composite-reads.ts';
+import { readsShadowingRowItem } from './collect-repeat.ts';
 import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
@@ -38,10 +42,19 @@ const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions = {
 function branchTest(
 	test: AnyNode | undefined,
 	state: WalkState,
-): { readonly testSource: string; readonly testComputedGraphNodeId?: string } {
+): {
+	readonly testSource: string;
+	readonly testComputedGraphNodeId?: string;
+	readonly testReadsRowItem?: true;
+} {
 	if (!test) return { testSource: '' };
 	const testSource = expressionSource(test, state.source);
-	const composite = collectCompositeTemplateExpression(test, state, BRANCH_CONDITION_READ_OPTIONS);
+	if (readsShadowingRowItem(test, state)) return { testSource, testReadsRowItem: true };
+	const composite = collectCompositeTemplateExpression(
+		test,
+		state,
+		BRANCH_CONDITION_READ_OPTIONS,
+	);
 	return composite
 		? { testSource, testComputedGraphNodeId: composite.graphNodeId }
 		: { testSource };

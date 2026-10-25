@@ -92,7 +92,7 @@ import {
 	liftArmShownValue,
 } from './render-local-inline.ts';
 import { collectGraphDependencies } from './collect-async.ts';
-import { repeatRowBindsName } from './collect-repeat.ts';
+import { readsShadowingRowItem, repeatRowBindsName } from './collect-repeat.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -198,6 +198,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 
 export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
+	if (readsShadowingRowItem(expression, state)) return;
 	// Same bound the attribute branch already takes: no write can move a prop after
 	// the render that read it, so a props-only text read owes no record - and with
 	// method calls lifted, minting one would demand a capture slot for the receiver.
@@ -1150,6 +1151,10 @@ function collectAttribute(
 		expressionValue,
 		state.currentStyleScopeClass,
 	);
+	if (conditionalClass && readsShadowingRowItem(conditionalClass.test, state)) {
+		walk(expressionValue, state);
+		return;
+	}
 	if (conditionalClass) {
 		// A test that is not a plain graph read resolves to no graph node later, so
 		// without this computed the whole record is dropped and the class never moves.
@@ -1204,6 +1209,10 @@ function collectAttribute(
 	}
 
 	if (expressionValue && expressionValue.type !== 'Literal') {
+		if (readsShadowingRowItem(expressionValue, state)) {
+			walk(expressionValue, state);
+			return;
+		}
 		const attributeDiagnostic = attributeValueDiagnostic(attributeName, expressionValue, state);
 		if (attributeDiagnostic) state.graph.diagnostics.push(attributeDiagnostic);
 		// A refused style object owes no update record: writing one would bind the
