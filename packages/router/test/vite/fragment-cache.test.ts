@@ -6,7 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
-import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
+import { FRAGMENT_HOVER_DWELL_MS, fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
@@ -57,12 +57,12 @@ async function bumpElsewhere(): Promise<number> {
 	return ((await response.json()) as { count: number }).count;
 }
 
-// Pages whose fetch finished, and a wait for one that settles on the request's own requestfinished event.
+// Pages the server answered. Not requestfinished: a fetch the page already read can still end as net::ERR_ABORTED.
 function trackFetches(page: Page) {
 	const arrived: string[] = [];
 	const waiting = new Map<string, (() => void)[]>();
-	page.on('requestfinished', (request) => {
-		const path = fragmentPageUrl(new URL(request.url()))?.pathname;
+	page.on('response', (response) => {
+		const path = fragmentPageUrl(new URL(response.url()))?.pathname;
 		if (!path) return;
 		arrived.push(path);
 		for (const done of waiting.get(path) ?? []) done();
@@ -177,6 +177,27 @@ for (const [name, browserType] of [
 			await fetchedAhead(page, fetched, '[data-live]', '/live');
 			const now = await bumpElsewhere();
 			expect(await follow(page, '[data-live]', 'live')).toBe(now);
+			await page.close();
+		});
+
+		test('a mouse still over the link that woke the navigation code, through moves that go nowhere, fetches that page ahead', async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			const { fetched } = trackFetches(page);
+			// Page timers wait for the test, so only the pointer wakes the code and only the clock ends the dwell.
+			await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+			await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+			await page.goto(`${origin}/`);
+			await landedOn(page, 'home');
+			const box = (await page.locator('[data-live]').boundingBox())!;
+			const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+			await page.mouse.move(x, y);
+			await page.waitForFunction(
+				() => !(document as { __marklessFragmentWake?: unknown }).__marklessFragmentWake,
+			);
+			// A move to the same point over the same link, as Chromium sends after a layout, is no reason to stop resting.
+			await page.mouse.move(x, y);
+			await page.clock.runFor(FRAGMENT_HOVER_DWELL_MS);
+			await fetched('/live');
 			await page.close();
 		});
 

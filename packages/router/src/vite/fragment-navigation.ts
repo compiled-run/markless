@@ -628,32 +628,45 @@ export function runFragmentNavigation(
 	// Intent: press, touch and keyboard focus fetch at once. A mouse fetches once it rests on a link:
 	// a pointer crossing a list of links on its way somewhere never rests on the ones it crosses.
 	let restTimer = 0;
+	let resting = '';
 	let previous: { x: number; y: number; t: number } | undefined;
+	const stopRest = () => {
+		w.clearTimeout(restTimer);
+		resting = '';
+	};
 	const hover = (event: Event) => {
 		const pointer = event as PointerEvent;
 		if (pointer.pointerType !== 'mouse') return;
 		const point = { x: pointer.clientX, y: pointer.clientY, t: pointer.timeStamp };
-		// A move that went nowhere is the page shifting under a still pointer, not the pointer resting on a link.
-		if (previous && point.x === previous.x && point.y === previous.y)
-			return void w.clearTimeout(restTimer);
+		// A move that went nowhere is the page shifting under a still pointer, unless the same link is still under it.
+		if (previous && point.x === previous.x && point.y === previous.y) {
+			if (eligible(anchorOf(event))?.href !== resting) stopRest();
+			return;
+		}
 		const gap = previous ? point.t - previous.t : 0;
 		const creeping =
 			!!previous &&
 			gap > 0 &&
 			Math.hypot(point.x - previous.x, point.y - previous.y) / gap < 0.1;
 		previous = point;
-		w.clearTimeout(restTimer);
+		stopRest();
 		const url = eligible(anchorOf(event));
 		if (!url) return;
 		// Moves arrive about once a frame, so resting means no move for longer than the last gap.
-		if (creeping) prefetch(url);
-		else
-			restTimer = w.setTimeout(() => prefetch(url), Math.max(config.hoverDwellMs, gap * 1.5));
+		if (creeping) return prefetch(url);
+		resting = url.href;
+		restTimer = w.setTimeout(
+			() => {
+				resting = '';
+				prefetch(url);
+			},
+			Math.max(config.hoverDwellMs, gap * 1.5),
+		);
 	};
 	d.addEventListener('pointermove', hover, { passive: true });
-	d.addEventListener('pointerout', () => w.clearTimeout(restTimer), { passive: true });
+	d.addEventListener('pointerout', stopRest, { passive: true });
 	const press = (event: Event) => {
-		w.clearTimeout(restTimer);
+		stopRest();
 		const anchor = anchorOf(event);
 		const url = eligible(anchor);
 		if (url) prefetch(url);
@@ -667,7 +680,7 @@ export function runFragmentNavigation(
 		const url = eligible(anchor, true);
 		if (!url) return false;
 		const current = new URL(location.href);
-		w.clearTimeout(restTimer);
+		stopRest();
 		const replace = anchor.hasAttribute(config.replaceAttribute) || url.href === current.href;
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
 		const swap = (entry: FragmentEntryModule) =>
@@ -700,11 +713,8 @@ export function runFragmentNavigation(
 	};
 	// The event that woke this code: a press or hover on a link acts as it would have had this code been running.
 	const replay = (event: Event | undefined) => {
-		if (event?.type === 'pointerover') {
-			hover(event);
-			// The pointer's first move over the link, dispatched right after, is not the page shifting under it.
-			previous = undefined;
-		} else if (event && event.type !== 'popstate') press(event);
+		if (event?.type === 'pointerover') hover(event);
+		else if (event && event.type !== 'popstate') press(event);
 	};
 	return { traverse, replay, go };
 }
