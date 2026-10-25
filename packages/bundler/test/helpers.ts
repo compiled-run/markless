@@ -214,10 +214,11 @@ export function marklessSourceAliases(
 		const directory = repo(`packages/${name}`);
 		const manifest = JSON.parse(
 			readFileSync(join(directory, 'package.json'), 'utf8'),
-		) as { exports: Record<string, string> };
-		for (const [subpath, target] of Object.entries(manifest.exports)) {
+		) as { exports: Record<string, string | { readonly default: string }> };
+		for (const [subpath, entry] of Object.entries(manifest.exports)) {
 			const specifier = `@markless/${name}${subpath.slice(1)}`;
-			const file = resolve(directory, target);
+			// One alias serves every environment, so a conditional export takes its default target.
+			const file = resolve(directory, typeof entry === 'string' ? entry : entry.default);
 			if (subpath === '.') {
 				roots.push({ find: specifier, replacement: file });
 			} else if (subpath.includes('*')) {

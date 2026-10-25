@@ -52,7 +52,7 @@ async function serve(outDir: string) {
 	return { server, origin: `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}` };
 }
 
-test('a directly rendered app preloads none of the render fallbacks and still renders and reacts', async () => {
+test('a directly rendered app imported through @markless/core preloads none of the render fallbacks and still renders and reacts', async () => {
 	const direct = await build('vite-csr-direct');
 	for (const marker of RENDER_FALLBACK_MARKERS) expect(direct.code).not.toContain(marker);
 	console.info(`direct startup: ${direct.startup.length} scripts, ${direct.code.length} B raw, ${direct.gzip} B gzip`);
@@ -81,7 +81,8 @@ test('a directly rendered app preloads none of the render fallbacks and still re
 	}
 }, 180_000);
 
+// The scoped style keeps this app off the direct-DOM path.
 test('an app that can reach the render fallbacks keeps them in its startup scripts', async () => {
-	const control = await build('vite-csr');
+	const control = await build('vite-csr-styles');
 	expect(RENDER_FALLBACK_MARKERS.some((marker) => control.code.includes(marker))).toBe(true);
 }, 180_000);
