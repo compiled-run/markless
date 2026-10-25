@@ -6,7 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
-import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
+import { FRAGMENT_HOVER_DWELL_MS, fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
@@ -57,16 +57,32 @@ async function bumpElsewhere(): Promise<number> {
 	return ((await response.json()) as { count: number }).count;
 }
 
+// Pages whose fetch finished, and a wait for one that settles on the request's own requestfinished event.
+function trackFetches(page: Page) {
+	const arrived: string[] = [];
+	const waiting = new Map<string, (() => void)[]>();
+	page.on('requestfinished', (request) => {
+		const path = fragmentPageUrl(new URL(request.url()))?.pathname;
+		if (!path) return;
+		arrived.push(path);
+		for (const done of waiting.get(path) ?? []) done();
+		waiting.delete(path);
+	});
+	const fetched = (path: string) =>
+		arrived.includes(path)
+			? Promise.resolve()
+			: new Promise<void>((done) => waiting.set(path, [...(waiting.get(path) ?? []), done]));
+	return { arrived, fetched };
+}
+
+type Fetched = (path: string) => Promise<void>;
+
 async function open(browser: Browser) {
 	const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-	const arrived: string[] = [];
-	page.on('requestfinished', (request) => {
-		const fragment = fragmentPageUrl(new URL(request.url()));
-		if (fragment) arrived.push(fragment.pathname);
-	});
+	const { arrived, fetched } = trackFetches(page);
 	await page.goto(`${origin}/`);
 	await landedOn(page, 'home');
-	return { page, arrived };
+	return { page, arrived, fetched };
 }
 
 async function landedOn(page: Page, name: string) {
@@ -76,9 +92,9 @@ async function landedOn(page: Page, name: string) {
 	);
 }
 
-async function fetchedAhead(page: Page, arrived: string[], link: string, path: string) {
+async function fetchedAhead(page: Page, fetched: Fetched, link: string, path: string) {
 	await page.locator(link).hover();
-	await expect.poll(() => arrived.includes(path)).toBe(true);
+	await fetched(path);
 }
 
 async function follow(page: Page, link: string, name: string) {
@@ -101,16 +117,16 @@ for (const [name, browserType] of [
 		});
 
 		test('a page fetched ahead is shown as fetched when nothing on this page wrote since', async () => {
-			const { page, arrived } = await open(browser);
-			await fetchedAhead(page, arrived, '[data-list]', '/list');
+			const { page, fetched } = await open(browser);
+			await fetchedAhead(page, fetched, '[data-list]', '/list');
 			const now = await bumpElsewhere();
 			expect(await follow(page, '[data-list]', 'list')).toBe(now - 1);
 			await page.close();
 		});
 
 		test('a fetch the page sends that is not a read makes the click ask the server again', async () => {
-			const { page, arrived } = await open(browser);
-			await fetchedAhead(page, arrived, '[data-list]', '/list');
+			const { page, fetched } = await open(browser);
+			await fetchedAhead(page, fetched, '[data-list]', '/list');
 			const now = await page.evaluate(async () => {
 				const response = await fetch('/api/bump', { method: 'POST' });
 				return ((await response.json()) as { count: number }).count;
@@ -120,8 +136,8 @@ for (const [name, browserType] of [
 		});
 
 		test('a submitted form makes the click ask the server again', async () => {
-			const { page, arrived } = await open(browser);
-			await fetchedAhead(page, arrived, '[data-list]', '/list');
+			const { page, fetched } = await open(browser);
+			await fetchedAhead(page, fetched, '[data-list]', '/list');
 			const now = await bumpElsewhere();
 			await page.locator('[data-form] button').click();
 			await expect
@@ -148,8 +164,8 @@ for (const [name, browserType] of [
 		});
 
 		test("a host's default Cache-Control (public, max-age=0, must-revalidate) still lets a click reuse the hover fetch", async () => {
-			const { page, arrived } = await open(browser);
-			await fetchedAhead(page, arrived, '[data-edge]', '/edge');
+			const { page, arrived, fetched } = await open(browser);
+			await fetchedAhead(page, fetched, '[data-edge]', '/edge');
 			const now = await bumpElsewhere();
 			expect(await follow(page, '[data-edge]', 'edge')).toBe(now - 1);
 			expect(arrived.filter((path) => path === '/edge')).toHaveLength(1);
@@ -157,16 +173,33 @@ for (const [name, browserType] of [
 		});
 
 		test('a page that answers Cache-Control: no-store is fetched again at the click', async () => {
-			const { page, arrived } = await open(browser);
-			await fetchedAhead(page, arrived, '[data-live]', '/live');
+			const { page, fetched } = await open(browser);
+			await fetchedAhead(page, fetched, '[data-live]', '/live');
 			const now = await bumpElsewhere();
 			expect(await follow(page, '[data-live]', 'live')).toBe(now);
 			await page.close();
 		});
 
+		test('the move that woke the navigation code over a link still counts as resting on it', async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			const { fetched } = trackFetches(page);
+			// Page timers wait for the test, so only the pointer wakes the code and only the clock ends the dwell.
+			await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+			await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+			await page.goto(`${origin}/`);
+			await landedOn(page, 'home');
+			await page.locator('[data-live]').hover();
+			await page.waitForFunction(
+				() => !(document as { __marklessFragmentWake?: unknown }).__marklessFragmentWake,
+			);
+			await page.clock.runFor(FRAGMENT_HOVER_DWELL_MS);
+			await fetched('/live');
+			await page.close();
+		});
+
 		test('a page fetched ahead is not shown past its Cache-Control max-age', async () => {
-			const { page, arrived } = await open(browser);
-			await fetchedAhead(page, arrived, '[data-brief]', '/brief');
+			const { page, fetched } = await open(browser);
+			await fetchedAhead(page, fetched, '[data-brief]', '/brief');
 			await page.waitForTimeout(1_200);
 			const now = await bumpElsewhere();
 			expect(await follow(page, '[data-brief]', 'brief')).toBe(now);
