@@ -1794,6 +1794,14 @@
 			"from": null,
 			"to": 2061,
 			"reason": "the reader copies record subtrees a page serves once back into each value that holds them: HN port 290-comment item HTML 2,982,703 -> 2,034,449 B raw; loaded only with the templated-list reader, nothing runs at page load"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 26073,
+			"to": 28332,
+			"reason": "the swap holds the leaving page until the next one's stream ends or the navigation deadline passes, pushes the address as it starts so a newer click or Back cancels it, and marks the document while it streams so the page resumes from the server's arms instead of fetching again; it loads on link intent, never at page load"
 		}
 	],
 	"runtimeModules": {
@@ -1806,7 +1814,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 26073,
+		"router/vite/entries/fragment-entry": 28332,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 10187,
