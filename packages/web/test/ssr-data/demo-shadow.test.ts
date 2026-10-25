@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { ProtocolViewPayload } from '@markless/serializer';
+import { decodeProtocolPayloadLists, type ProtocolViewPayload } from '@markless/serializer';
 import { compileTsrxModule } from '../../../compiler/src/index.ts';
 import type {
 	CompileTsrxModuleResult,
@@ -134,8 +134,10 @@ test('music-player records-from-chunks exactly match its renderToString twin', a
 	expect(derivedRecords).toEqual(serializedBySsr);
 	expect(prerendered).not.toContain('type="markless/state"');
 	expect(prerendered).not.toContain('type="markless/view"');
-	expect(ssrTwin).toContain(
-		`<script type="markless/state">${JSON.stringify(derivedRecords.state)}</script>`,
+	// The served state script may carry shared records; decoded, it is the derived state exactly.
+	const servedState = /<script type="markless\/state">([\s\S]*?)<\/script>/.exec(ssrTwin)?.[1];
+	expect(decodeProtocolPayloadLists('markless/state', JSON.parse(servedState ?? 'null'))).toEqual(
+		JSON.parse(JSON.stringify(derivedRecords.state)),
 	);
 	expect(ssrTwin).toContain(
 		`<script type="markless/view">${JSON.stringify(withNamedHostLocators(derivedRecords.view))}</script>`,

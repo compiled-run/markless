@@ -974,7 +974,9 @@ function runInlineResumer(
 						readonly records?: ReadonlyArray<SerializedRecord>;
 					};
 					const records = new Map(
-						(payload.records ?? []).map((record) => [record.id, record]),
+						[...(state.sharedRecords ?? []), ...(payload.records ?? [])].map(
+							(record) => [record.id, record],
+						),
 					);
 					graph.set(cell.graphNodeId, shared.decode!(payload.root, records));
 				}

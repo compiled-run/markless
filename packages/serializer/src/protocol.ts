@@ -1,4 +1,5 @@
 import { ASYNC_BOUNDARY_ARM } from './async-boundary-arm.ts';
+import type { SerializedRecord } from './value.ts';
 import {
 	ASYNC_PROTOCOL_VERSION,
 	PROTOCOL_EVENT_ACTION_KIND,
@@ -242,6 +243,8 @@ export type ProtocolStatePayload = {
 		readonly graphNodeId: string;
 		readonly key: string;
 	}>;
+	// Served form only: value records two or more envelopes hold, which decoding copies back into each.
+	readonly sharedRecords?: ReadonlyArray<SerializedRecord>;
 };
 
 // D3 arm-relative coordinates: records inside an async boundary arm index

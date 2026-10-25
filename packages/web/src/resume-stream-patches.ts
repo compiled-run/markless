@@ -1,5 +1,6 @@
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client.ts';
 import type { ProtocolStatePayload, ProtocolStreamedArmPatch } from '@markless/serializer';
+import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import type { ResumeDomOwnerDocument } from './resume-types.ts';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
@@ -60,7 +61,10 @@ export function adoptStreamedArmPatches(
 			(candidate) => candidate.runnerGraphNodeId === graphNodeId,
 		);
 		if (!boundary || uncommittedBoundaryIds.has(boundary.id)) continue;
-		const delta = JSON.parse(script.textContent as string) as StreamedStateDelta | null;
+		const delta = decodeProtocolPayloadLists(
+			'markless/state',
+			JSON.parse(script.textContent as string) as StreamedStateDelta | null,
+		);
 		if (delta) deltas.set(graphNodeId, delta);
 	}
 	const cells = mergeStateRecords(decoded.state.cells, deltas.values(), 'cells');

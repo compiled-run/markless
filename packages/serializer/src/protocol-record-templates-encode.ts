@@ -1,5 +1,6 @@
 import type { RuntimePayloadType } from './protocol-client.ts';
 import { PROTOCOL_RECORD_KEYS } from './protocol-record-keys.ts';
+import { shareStateRecords } from './protocol-shared-records.ts';
 import {
 	PROTOCOL_TEMPLATED_LISTS,
 	type ProtocolTemplatedRecords,
@@ -123,8 +124,9 @@ function valueSlots(rows: ReadonlyArray<RegExpMatchArray>) {
 /** The payload with each templated list served in its shorter form, for JSON.stringify. */
 export function encodeProtocolPayloadLists<T extends object>(
 	type: RuntimePayloadType,
-	payload: T,
+	served: T,
 ): T {
+	const payload = type === 'markless/state' ? shareStateRecords(served) : served;
 	const keys: Readonly<Record<string, string>> = PROTOCOL_RECORD_KEYS[type];
 	let encoded: Record<string, unknown> | undefined;
 	for (const key of PROTOCOL_TEMPLATED_LISTS[type]) {

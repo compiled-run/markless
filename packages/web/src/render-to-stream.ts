@@ -2,6 +2,7 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	serializeRuntimeAsyncSnapshots,
 	serializeRuntimeStateCells,
+	shareStateRecords,
 	type ProtocolStatePayload,
 	type ProtocolStreamedArmPatch,
 	type ProtocolSyncPolicy,
@@ -378,10 +379,10 @@ function renderArmAppend(
 			)
 			.map((definition) => [definition.graphNodeId, definition]),
 	);
-	const patch: Pick<ProtocolStatePayload, 'cells' | 'computed'> = {
+	const patch: Pick<ProtocolStatePayload, 'cells' | 'computed'> = shareStateRecords({
 		cells,
 		computed: serializeRuntimeAsyncSnapshots([...computedById.values()]),
-	};
+	});
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
 		withPaintedBranchArms(armRecords, output) as never,
