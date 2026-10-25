@@ -119,7 +119,9 @@ const resumeOnDemandEntries = [
 // arm they show) and a row handler is handed its row index: resume-keyed-repeats.ts closure 27,756 -> 29,986 raw;
 // minified+gzip 4,373 -> 4,658 bytes (rolldown, workspace packages external, same method both sides), under the 4,800
 // gzip wall; the arm code itself is fns/row-branch-mint, which only a page whose rows hold an @if loads.
-const sourceByteLimit = 29986;
+// 2026-10-25: the first-click row match climbs from the target once per list instead of scanning every row per ancestor
+// (1,000 rows: 0.8 -> 0.17 ms on a handler, 2.4 -> 0.15 ms on a cell no handler owns): 29,986 -> 30,291 raw.
+const sourceByteLimit = 30291;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
