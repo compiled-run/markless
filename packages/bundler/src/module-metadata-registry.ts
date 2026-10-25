@@ -46,6 +46,8 @@ export class ModuleMetadataRegistry {
 	readonly #sourceClaimPublications = new Map<string, SourceClaimPublication>();
 	// Which source is blocked on which (a load or the barrier), so a cycle is read, not deadlocked.
 	readonly #waits = new Map<string, Map<string, number>>();
+	// The files each source renders components from, whatever the environment.
+	readonly #componentChildren = new Map<string, ReadonlyArray<string>>();
 
 	#publication(environment: MarklessEnvironment, source: string): SourceClaimPublication {
 		const key = publicationKey(environment, source);
@@ -109,6 +111,30 @@ export class ModuleMetadataRegistry {
 		this.#claimOrder.clear();
 		this.#sourceClaimPublications.clear();
 		this.#waits.clear();
+		this.#componentChildren.clear();
+	}
+
+	/** Records the files `source` renders components from; returns the cycle back to `source` they close, if any. */
+	recordComponentChildren(
+		source: string,
+		children: ReadonlyArray<string>,
+	): ReadonlyArray<string> | undefined {
+		this.#componentChildren.set(source, children);
+		const path: string[] = [];
+		const visited = new Set<string>();
+		const reaches = (current: string): boolean => {
+			for (const child of this.#componentChildren.get(current) ?? []) {
+				path.push(child);
+				if (child === source) return true;
+				if (!visited.has(child)) {
+					visited.add(child);
+					if (reaches(child)) return true;
+				}
+				path.pop();
+			}
+			return false;
+		};
+		return reaches(source) ? [source, ...path] : undefined;
 	}
 
 	recordCaptureMetadata(source: string, manifest: CaptureManifest): void {

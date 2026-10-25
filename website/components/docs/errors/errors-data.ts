@@ -1814,6 +1814,404 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_COMPONENT_IMPORT_CYCLE',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: "Two or more files render each other's components.",
+		printed: [
+			"MARKLESS_COMPONENT_IMPORT_CYCLE: These files render each other's components: <cycle>. Each file is compiled against what the files it renders publish, and files that render each other cannot both publish first. Put the components that render each other in one .tsrx file, where a component may render itself or another component of that file at any depth; one that holds @try has to be the file's default export.",
+		],
+		structured: false,
+		guide: {
+			summary: "Two or more files render each other's components.",
+			what: [
+				{
+					id: 's0',
+					text: 'Markless compiles each file against what the files it renders publish once they are compiled. When files render each other, like a comment that renders its replies from another file and replies that render comments, neither can finish first, so the build stops instead of waiting forever.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Move the components that render each other into one ',
+				},
+				{
+					id: 's1',
+					text: '.tsrx',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' file. Inside one file a component can render itself, or another component of the same file, at any depth. A component that holds ',
+				},
+				{
+					id: 's3',
+					text: '@try',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: " has to be that file's default export.",
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'default',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'Comment',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r7',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'item',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r9',
+							text: ' }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'div',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>{item.text}<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'Replies',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'items',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: '{item.replies} /></',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'div',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r9',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Replies',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'items',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r7',
+							text: ' }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@for',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' (',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' reply ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'of',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r6',
+							text: ' items; ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'key',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r8',
+							text: ' reply.id) {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '><',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'Comment',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'item',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: '{reply} /></',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r9',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l8',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l9',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l10',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/hooks/transform-link.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/hooks/transform-link.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_COMPONENT_PART_AS_PAGE',
 		packageName: '@markless/web',
 		stage: 'runtime',
