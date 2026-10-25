@@ -1712,8 +1712,8 @@
 			"guard": "runtime",
 			"subject": "router/vite/entries/fragment-entry",
 			"from": 26073,
-			"to": 29194,
-			"reason": "a swap places the kept parts a fragment left out and sets their islands (page regions, slice 2)"
+			"to": 29378,
+			"reason": "a swap places the kept parts a fragment left out and sets their islands, and loads the document when it cannot (page regions, slice 2)"
 		},
 		{
 			"date": "2026-10-25",
@@ -1734,7 +1734,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 29194,
+		"router/vite/entries/fragment-entry": 29378,
 		"router/vite/entries/resume-entry": 2406,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 9858,

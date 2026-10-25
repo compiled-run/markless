@@ -6685,6 +6685,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_KEPT_PART_UNPLACED',
+		packageName: '@markless/router',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/router.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/vite/entries/fragment-entry.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/entries/fragment-entry.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_NAVIGATE_SERVER',
 		packageName: '@markless/router',
 		stage: 'runtime',
