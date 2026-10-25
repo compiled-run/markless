@@ -7,6 +7,7 @@ type RuntimeModule = typeof import('@markless/runtime');
 type RuntimeGraph = import('@markless/runtime').RuntimeGraph;
 type RuntimeGraphAsyncSnapshot = import('@markless/runtime').RuntimeGraphAsyncSnapshot;
 type RuntimeGraphRead = import('@markless/runtime').RuntimeGraphRead;
+type RuntimeGraphAsyncComputed = import('@markless/runtime').RuntimeGraphAsyncComputed;
 
 export type ResumePayloadGraphInput = {
 	readonly state: ProtocolStatePayload;
@@ -113,36 +114,41 @@ function asyncComputedFromPayload(
 	return Promise.all(
 		input.state.computed
 			.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
-			.map(async (computed) => {
-				const runnerSymbolId = runnerSymbols[computed.graphNodeId]!;
-				const dependencies = computed.dependencies ?? [];
-				return {
-					graphNodeId: computed.graphNodeId,
-					dependencies,
-					initialSnapshot:
-						computed.snapshot &&
-						(await deserializeAsyncComputedSnapshot(computed.snapshot)),
-					key: (read: RuntimeGraphRead) => {
-						const dependency = dependencies[0];
-						return dependencies.length > 1
-							? dependencies.map((dependency) =>
-									read(dependency.graphNodeId, dependency.path),
-								)
-							: dependency && read(dependency.graphNodeId, dependency.path);
-					},
-					run: async ({ key, signal, read }) => {
-						return (await input.loadSymbol(runnerSymbolId))({
-							graph: graphRef(),
-							read,
-							key,
-							signal,
-							element: input.root,
-							getElementHandle: () => undefined,
-						});
-					},
-				};
-			}),
+			.map((computed) =>
+				asyncComputedFromRecord(computed, runnerSymbols[computed.graphNodeId]!, input, graphRef),
+			),
 	);
+}
+
+export async function asyncComputedFromRecord(
+	computed: ProtocolStatePayload['computed'][number],
+	runnerSymbolId: string,
+	input: Pick<ResumePayloadGraphInput, 'root' | 'loadSymbol'>,
+	graphRef: () => RuntimeGraph,
+): Promise<RuntimeGraphAsyncComputed> {
+	const dependencies = computed.dependencies ?? [];
+	return {
+		graphNodeId: computed.graphNodeId,
+		dependencies,
+		initialSnapshot:
+			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot)),
+		key: (read: RuntimeGraphRead) => {
+			const dependency = dependencies[0];
+			return dependencies.length > 1
+				? dependencies.map((dependency) => read(dependency.graphNodeId, dependency.path))
+				: dependency && read(dependency.graphNodeId, dependency.path);
+		},
+		run: async ({ key, signal, read }) => {
+			return (await input.loadSymbol(runnerSymbolId))({
+				graph: graphRef(),
+				read,
+				key,
+				signal,
+				element: input.root,
+				getElementHandle: () => undefined,
+			});
+		},
+	};
 }
 
 function asyncRunnerSymbolsByGraphNode(view: ProtocolViewPayload): Record<string, string> {

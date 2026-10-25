@@ -3328,7 +3328,7 @@ export function App() @{
 	]);
 });
 
-test('compileTsrxModule ships only gate-supported async boundary anchors, re-indexed', async () => {
+test('compileTsrxModule ships nested and sibling async boundaries in document anchor order', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/NestedAsync.tsrx',
 		source: `
@@ -3353,23 +3353,18 @@ export function App() @{
 		symbols: [],
 	});
 
-	// Boundary 0 contains boundary 1 (both unsupported: nested); boundary 2 is
-	// inside <article> at the top level of its parent... it is conditional-free
-	// and non-nested, so it gates supported.
+	// A @try nested in another's arm ships like its siblings; resume finds each by its rendered anchors.
 	expect(
-		result.renderData.boundaries.filter((boundary) => boundary.protocolSupported),
-	).toHaveLength(1);
-
-	// The runtime payload must ship ONLY anchors that the SSR emitter actually
-	// emits, re-indexed contiguously — otherwise resume throws
-	// missingCommentAnchorError on the phantom records.
-	expect(result.protocolView.asyncBoundaries).toHaveLength(1);
-	expect(result.protocolView.asyncBoundaries[0]).toEqual(
-		expect.objectContaining({
-			startAnchor: expect.objectContaining({ strategy: 'dom-order-comment', index: 0 }),
-			endAnchor: expect.objectContaining({ strategy: 'dom-order-comment', index: 1 }),
-		}),
-	);
+		result.protocolView.asyncBoundaries.map((boundary) => [
+			boundary.id,
+			boundary.startAnchor.index,
+			boundary.endAnchor.index,
+		]),
+	).toEqual([
+		['boundary:0', 0, 1],
+		['boundary:1', 2, 3],
+		['boundary:2', 4, 5],
+	]);
 });
 
 test('compileTsrxModule renders async boundary anchors with @pending content in SSR html', async () => {
@@ -3392,7 +3387,7 @@ export function App() @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	expect(result.renderData.boundaries).toEqual([
-		expect.objectContaining({ boundaryId: 'boundary:0', protocolSupported: true }),
+		expect.objectContaining({ boundaryId: 'boundary:0' }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -3514,7 +3509,7 @@ export function App() @{
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	expect(result.renderData.boundaries).toEqual([
-		expect.objectContaining({ boundaryId: 'boundary:0', protocolSupported: true }),
+		expect.objectContaining({ boundaryId: 'boundary:0' }),
 	]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const renderSsr = ssrModule.marklessRenderSsr as (

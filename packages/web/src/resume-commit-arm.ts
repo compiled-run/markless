@@ -1,4 +1,7 @@
-import { materializeArmRecords } from './resume-arm-records.ts';
+import { runtimeResumeError } from './inline/resume-errors.ts';
+import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { boundaryArmRecordSet, materializeArmRecords } from './resume-arm-records.ts';
+import type { AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import {
 	containsElement,
 	elementsBetweenAnchors,
@@ -9,12 +12,15 @@ import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
 	ResumeArmRange,
+	ResumeAsyncBoundaryRecord,
 	ResumeBehaviorRecord,
+	ResumeDomComment,
 	ResumeDomElement,
 	ResumeElementHandleValue,
 	ResumeDomNode,
 	ResumeEventRecord,
 	ResumeKeyedRepeatRecord,
+	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
 
@@ -113,6 +119,7 @@ export function createArmCommitter(
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
 		) => Promise<void>;
+		readonly asyncBoundaryWiring?: () => AsyncBoundaryWiring | undefined;
 		readonly documentHost?: CommitDocument;
 	},
 	installEventType: (eventType: string) => void,
@@ -174,6 +181,7 @@ export async function registerArmRecordSet(
 		elementHandles: true,
 		keyedRepeats: true,
 		branches: true,
+		asyncBoundaries: true,
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
 	if (update.elementsByHostId) assertNativeArmRecordHosts(update);
@@ -229,6 +237,14 @@ export async function registerArmRecordSet(
 	}
 	if (materialized.branches.length)
 		await deps.registerArmBranches?.(boundary.id, materialized.branches);
+	if (update.armRecords.asyncBoundaries?.length)
+		await registerNestedAsyncBoundaries(
+			deps,
+			installEventType,
+			boundary,
+			update.armRecords.asyncBoundaries,
+			update.computed,
+		);
 	return materialized;
 }
 
@@ -438,4 +454,72 @@ function armCommitRendererMissingError(boundary: ResumeArmRange): Error {
 		boundary,
 		'settled with rendered @try/@catch content, but this host provides no HTML renderer to build DOM nodes from it.',
 	);
+}
+
+// @try blocks a settled arm rendered inside itself: their own arm records, the async
+// computeds of components that render created, then live boundary wiring.
+async function registerNestedAsyncBoundaries(
+	deps: ArmRegistrationDeps,
+	installEventType: (eventType: string) => void,
+	range: ResumeArmRange,
+	records: NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
+	computed: ArmCommitUpdate['computed'],
+): Promise<void> {
+	const wiring = deps.asyncBoundaryWiring?.();
+	if (!wiring || !deps.graph || !deps.loadSymbol)
+		throw new Error('Markless nested async boundary registration is unavailable.');
+	const census = commentsBetween(range.startAnchor, range.endAnchor);
+	const boundaries: ResumeAsyncBoundaryRecord[] = records.map((record) => {
+		const startAnchor = census[record.startAnchor.index];
+		const endAnchor = census[record.endAnchor.index];
+		if (!startAnchor || !endAnchor)
+			throw runtimeResumeError(
+				'MARKLESS_RESUME_LOCATOR_MISSING',
+				`Async boundary ${record.id} expected its comment anchors inside the arm that rendered it.`,
+			);
+		return { ...record, startAnchor, endAnchor };
+	});
+	for (const nested of boundaries) {
+		const armRecords = boundaryArmRecordSet(nested.armRecords);
+		if (armRecords)
+			await registerArmRecordSet(deps, installEventType, nested, {
+				armRecords,
+				...(computed && { computed }),
+			});
+	}
+	const runners = new Map(
+		boundaries.flatMap((nested) =>
+			nested.asyncReads.flatMap((read) =>
+				read.runnerSymbolId ? [[read.graphNodeId, read.runnerSymbolId] as const] : [],
+			),
+		),
+	);
+	const graph = deps.graph;
+	for (const record of computed ?? []) {
+		const runnerSymbolId = runners.get(record.graphNodeId);
+		if (record.async !== true || !runnerSymbolId) continue;
+		const { asyncComputedFromRecord } = await import('./payload-graph-construct.ts');
+		graph.defineAsyncComputed?.(
+			await asyncComputedFromRecord(
+				record,
+				runnerSymbolId,
+				{ root: deps.root, loadSymbol: deps.loadSymbol as ResumeRuntimeInput['loadSymbol'] },
+				() => graph,
+			),
+		);
+	}
+	for (const nested of boundaries) wiring.add(nested);
+}
+
+// The page comment census restricted to the range, so indexes count from the arm start.
+function commentsBetween(start: ResumeDomComment, end: ResumeDomComment): ResumeDomComment[] {
+	const comments: ResumeDomComment[] = [];
+	type Linked = ResumeDomNode & { readonly nextSibling?: Linked | null };
+	const visit = (node: Linked): void => {
+		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+			comments.push(node as ResumeDomComment);
+		for (const child of Array.from(node.childNodes ?? [])) visit(child as Linked);
+	};
+	for (let at = (start as Linked).nextSibling; at && at !== end; at = at.nextSibling) visit(at);
+	return comments;
 }

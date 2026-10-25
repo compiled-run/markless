@@ -61,6 +61,7 @@ export function createResumeRuntime(
 		containerSubscriptionReleases: Array<() => void> = [];
 	const asyncBoundariesById = prepared.asyncBoundariesById;
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
+	let asyncBoundaryWiring: import('./resume-async-wiring.ts').AsyncBoundaryWiring | undefined;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
 	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
@@ -312,6 +313,7 @@ export function createResumeRuntime(
 						await behaviors.activateBehaviors(hostNodeId, { flush: false });
 					}
 				: undefined,
+			asyncBoundaryWiring: () => asyncBoundaryWiring,
 			registerArmBranches: async (boundaryId, records) => {
 				const branches = await loadBranchRuntime();
 				for (const hostNodeId of branches.registerArmBranches(boundaryId, records as never))
@@ -435,6 +437,9 @@ export function createResumeRuntime(
 			commitArm: commitBoundaryArm,
 			connectBranchWiring: (wiring) => {
 				Object.assign(branchWiring, wiring);
+			},
+			connectAsyncBoundaryWiring: (wiring) => {
+				asyncBoundaryWiring = wiring;
 			},
 			receiveSharedPatch,
 			sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,

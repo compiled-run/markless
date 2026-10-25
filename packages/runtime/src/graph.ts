@@ -276,6 +276,8 @@ export type RuntimeGraph = {
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
+	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
+	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -302,7 +304,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const readInitializers = new Map<string, () => unknown>();
 	const computedNodes = createRuntimeComputedNodes(input.computed);
 	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
-	const dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
+	let dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
 	// Per node, in subscribe order; the sequence number restores that order across nodes.
 	const subscriptionsByNode = new Map<string, RuntimeGraphSubscription[]>();
 	const subscriptionOrder = new Map<RuntimeGraphSubscription, number>();
@@ -595,6 +597,13 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			}
 
 			return outcome.result;
+		},
+		defineAsyncComputed(asyncComputed) {
+			const id = asyncComputed.graphNodeId;
+			if (asyncComputedNodes.has(id) || cells.has(id)) return false;
+			asyncComputedNodes.set(id, createRuntimeAsyncComputedNodes([asyncComputed]).get(id)!);
+			dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
+			return true;
 		},
 		subscribe(subscription) {
 			internals.addSubscription(subscription);

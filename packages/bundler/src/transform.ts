@@ -1490,7 +1490,7 @@ export function planSettleModule(input: {
 	// No render data means no settled arms to describe, not a build failure.
 	for (const boundary of input.boundaries ?? []) {
 		const node = boundary.runnerGraphNodeId;
-		if (!node || !boundary.protocolSupported) continue;
+		if (!node) continue;
 		const runner = symbolById.get(input.asyncRunners?.[node] ?? '');
 		if (!runner) continue;
 		const descriptors = input.descriptors?.[boundary.boundaryId] ?? [];

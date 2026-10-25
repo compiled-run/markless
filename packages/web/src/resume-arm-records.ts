@@ -182,6 +182,8 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 		elementHandles: true,
 		keyedRepeats: true,
 		branches: true,
+		// Nested boundaries resolve their own anchors when they register.
+		asyncBoundaries: true,
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
 	const byHostId = new Map<string, ResumeDomElement>(input.elementsByHostId);

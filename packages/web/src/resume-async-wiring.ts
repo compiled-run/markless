@@ -25,6 +25,8 @@ import type {
 export type AsyncBoundarySettleTracker = {
 	readonly hasSettledContent: (boundaryId: string) => boolean;
 	readonly markSettled: (boundaryId: string) => void;
+	readonly track: (boundary: ResumeAsyncBoundaryRecord) => void;
+	readonly forget: (boundaryId: string) => void;
 	readonly whenAllSettled: () => Promise<void>;
 	readonly holdSettleCommitsFor: (minVisibleMs: number) => void;
 	// Waits out the active commit floor; resolves true iff it actually waited
@@ -50,23 +52,33 @@ export function createAsyncBoundarySettleTracker(input: {
 }): AsyncBoundarySettleTracker {
 	const now = input.clock?.now ?? Date.now;
 	const settledById = new Map<string, boolean>();
-	for (const boundary of input.boundaries) {
-		settledById.set(
+	const track = (boundary: ResumeAsyncBoundaryRecord) =>
+		void settledById.set(
 			boundary.id,
 			boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.try ||
 				boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.catch,
 		);
-	}
+	for (const boundary of input.boundaries) track(boundary);
 	let commitFloor = 0;
 	let allSettled: Promise<void> | undefined;
 	let resolveAllSettled = () => {};
 	const isAllSettled = () => [...settledById.values()].every(Boolean);
+	const announceIfAllSettled = () => {
+		if (!isAllSettled()) return;
+		resolveAllSettled();
+		allSettled = undefined;
+	};
 	return {
 		hasSettledContent: (boundaryId) => settledById.get(boundaryId) === true,
 		markSettled(boundaryId) {
 			if (settledById.get(boundaryId) !== false) return;
 			settledById.set(boundaryId, true);
-			if (isAllSettled()) resolveAllSettled();
+			announceIfAllSettled();
+		},
+		track,
+		forget(boundaryId) {
+			settledById.delete(boundaryId);
+			announceIfAllSettled();
 		},
 		whenAllSettled() {
 			if (isAllSettled()) return Promise.resolve();
@@ -88,8 +100,13 @@ export function createAsyncBoundarySettleTracker(input: {
 	};
 }
 
+export type AsyncBoundaryWiring = {
+	// A boundary an arm commit rendered: rewires it against its fresh anchors.
+	readonly add: (boundary: ResumeAsyncBoundaryRecord) => void;
+};
+
 export function wireAsyncBoundariesWithoutLoadingCapability(input: {
-	readonly asyncBoundariesById: ReadonlyMap<string, ResumeAsyncBoundaryRecord>;
+	readonly asyncBoundariesById: Map<string, ResumeAsyncBoundaryRecord>;
 	readonly graph: ResumeRuntimeInput['graph'];
 	readonly root: ResumeRuntimeInput['root'];
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
@@ -113,65 +130,101 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	// T120: the re-settle hold (resume-resettle-hold.ts) observes every
 	// snapshot of an update-symbol boundary to deadline-gate @pending.
 	readonly onAsyncSnapshot?: (boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) => void;
-}): void {
-	for (const boundary of input.asyncBoundariesById.values()) {
+}): AsyncBoundaryWiring {
+	const releasesById = new Map<string, Array<() => void>>();
+	const release = (boundaryId: string) => {
+		for (const done of releasesById.get(boundaryId) ?? []) done();
+		releasesById.delete(boundaryId);
+	};
+	let disposed = false;
+	input.storeContainerSubscription(() => {
+		disposed = true;
+		for (const boundaryId of releasesById.keys()) release(boundaryId);
+	});
+	const wire = (boundary: ResumeAsyncBoundaryRecord, demand: boolean, catchUp: boolean) => {
+		if (disposed) return;
+		const releases: Array<() => void> = [];
+		releasesById.set(boundary.id, releases);
 		for (const asyncRead of boundary.asyncReads) {
-			input.storeContainerSubscription(
-				input.graph.subscribe({
-					id: `async-boundary:${boundary.id}:${asyncRead.graphNodeId}:${asyncRead.path.join('.')}`,
-					graphNodeId: asyncRead.graphNodeId,
-					path: [],
-					run(snapshot) {
-						snapshot = boundaryGateSnapshot(
-							input.graph,
-							boundary,
-							asyncRead.graphNodeId,
-							snapshot,
+			const subscribed = input.graph.subscribe({
+				id: `async-boundary:${boundary.id}:${asyncRead.graphNodeId}:${asyncRead.path.join('.')}`,
+				graphNodeId: asyncRead.graphNodeId,
+				path: [],
+				run(snapshot) {
+					// A boundary whose range an outer commit replaced has nothing left to settle.
+					if (detached(input.root, boundary.startAnchor)) {
+						if (input.asyncBoundariesById.get(boundary.id) !== boundary) return;
+						input.asyncBoundariesById.delete(boundary.id);
+						input.settleTracker?.forget(boundary.id);
+						return release(boundary.id);
+					}
+					snapshot = boundaryGateSnapshot(
+						input.graph,
+						boundary,
+						asyncRead.graphNodeId,
+						snapshot,
+					);
+					if (!boundary.updateSymbolId) {
+						const settled = isSettledStatus(
+							(snapshot as { readonly status?: unknown } | null)?.status,
 						);
-						if (!boundary.updateSymbolId) {
-							const settled = isSettledStatus(
-								(snapshot as { readonly status?: unknown } | null)?.status,
-							);
-							// D8: once the range shows settled content, a re-run
-							// keeps rendering the prior snapshot — the structural
-							// pending journal never replaces visible content.
-							if (!settled && input.settleTracker?.hasSettledContent(boundary.id)) {
-								return;
-							}
-							if (settled) input.settleTracker?.markSettled(boundary.id);
-							return boundaryRangeJournal(boundary.id, {
-								type: 'async-boundary-snapshot',
-								boundaryId: boundary.id,
-								graphNodeId: asyncRead.graphNodeId,
-								path: asyncRead.path,
-								snapshot,
-							});
+						// Once the range shows settled content, a re-run keeps the prior snapshot on screen.
+						if (!settled && input.settleTracker?.hasSettledContent(boundary.id)) {
+							return;
 						}
-						// T120: report the snapshot to the re-settle hold (deadline-
-						// gated @pending), then settle through the shared path.
-						input.onAsyncSnapshot?.(boundary, snapshot);
-						return settleAsyncBoundaryRange(input, boundary, snapshot);
-					},
-				}),
-			);
-		}
-		if (
-			(boundary.updateSymbolId && !input.settleTracker?.hasSettledContent(boundary.id)) ||
-			input.demandOnStart === true
-		) {
-			for (const asyncRead of boundary.asyncReads)
-				input.graph.read(asyncRead.graphNodeId, ['status']);
-			// A runner another reader demanded first can settle before this subscribed, and no write follows to announce it.
-			const read = boundary.asyncReads[0];
-			if (input.demandOnStart && boundary.updateSymbolId && read && !input.settleTracker?.hasSettledContent(boundary.id)) {
-				const snapshot = boundaryGateSnapshot(input.graph, boundary, read.graphNodeId, input.graph.read(read.graphNodeId, []));
-				if (isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status)) {
+						if (settled) input.settleTracker?.markSettled(boundary.id);
+						return boundaryRangeJournal(boundary.id, {
+							type: 'async-boundary-snapshot',
+							boundaryId: boundary.id,
+							graphNodeId: asyncRead.graphNodeId,
+							path: asyncRead.path,
+							snapshot,
+						});
+					}
+					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
-					void settleAsyncBoundaryRange(input, boundary, snapshot);
-				}
+					return settleAsyncBoundaryRange(input, boundary, snapshot);
+				},
+			});
+			releases.push(subscribed);
+		}
+		if (!demand) return;
+		for (const asyncRead of boundary.asyncReads)
+			input.graph.read(asyncRead.graphNodeId, ['status']);
+		// A runner another reader demanded first can settle before this subscribed, and no write follows to announce it.
+		const read = boundary.asyncReads[0];
+		if (catchUp && boundary.updateSymbolId && read && !input.settleTracker?.hasSettledContent(boundary.id)) {
+			const snapshot = boundaryGateSnapshot(input.graph, boundary, read.graphNodeId, input.graph.read(read.graphNodeId, []));
+			if (isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status)) {
+				input.onAsyncSnapshot?.(boundary, snapshot);
+				void settleAsyncBoundaryRange(input, boundary, snapshot);
 			}
 		}
-	}
+	};
+	for (const boundary of input.asyncBoundariesById.values())
+		wire(
+			boundary,
+			(!!boundary.updateSymbolId && !input.settleTracker?.hasSettledContent(boundary.id)) ||
+				input.demandOnStart === true,
+			input.demandOnStart === true,
+		);
+	return {
+		add(boundary) {
+			release(boundary.id);
+			input.asyncBoundariesById.set(boundary.id, boundary);
+			input.settleTracker?.track(boundary);
+			const settled = input.settleTracker?.hasSettledContent(boundary.id) === true;
+			wire(boundary, !settled, !settled);
+		},
+	};
+}
+
+// A removed ancestor ends the parent chain short of the root; a host without parent links counts as attached.
+function detached(root: unknown, node: unknown): boolean {
+	type Linked = { readonly parentNode?: Linked | null };
+	for (let at = node as Linked | null | undefined; at; at = at.parentNode)
+		if (at === root || at.parentNode === undefined) return false;
+	return !!node;
 }
 
 function boundaryGateSnapshot(

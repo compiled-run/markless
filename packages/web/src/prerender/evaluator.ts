@@ -1185,10 +1185,27 @@ async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string
 	if (!anchor || !armRecords || Array.isArray(armRecords)) {
 		throw new Error(`MARKLESS_PRERENDER_BOUNDARY_MISSING: ${boundaryId}`);
 	}
+	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
+		...anchor,
+		index: anchor.index - boundary.startAnchor.index - 1,
+	});
+	const nested = records.view.asyncBoundaries
+		.filter(
+			(candidate) =>
+				candidate.startAnchor.index > boundary.startAnchor.index &&
+				candidate.endAnchor.index < boundary.endAnchor.index,
+		)
+		.map(({ armRecords: served, ...candidate }) => ({
+			...candidate,
+			...(served && !Array.isArray(served) && { armRecords: served as ResumeArmRecordSet }),
+			startAnchor: armIndex(candidate.startAnchor),
+			endAnchor: armIndex(candidate.endAnchor),
+		}));
 	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
+	const set = armRecords as ResumeArmRecordSet;
 	return {
 		html: anchor.html,
-		armRecords: armRecords as ResumeArmRecordSet,
+		armRecords: nested.length > 0 ? { ...set, asyncBoundaries: nested } : set,
 		computed: records.state.computed,
 	};
 }

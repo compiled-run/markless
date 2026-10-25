@@ -71,11 +71,6 @@ export function createRenderData(input: {
 				armChunkIds: slot?.armTemplateIds ?? {
 					try: `async:${boundary.id}:arm:try`,
 				},
-				protocolSupported:
-					boundary.parentBoundaryId === undefined &&
-					!semanticGraph.asyncBoundaries.some(
-						(candidate) => candidate.parentBoundaryId === boundary.id,
-					),
 			};
 		}),
 		interactions: interactionEvents.map((event) => ({

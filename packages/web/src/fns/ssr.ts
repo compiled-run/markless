@@ -1173,7 +1173,10 @@ export function marklessSsrArmizeBoundaries(
 	const snapshotById = new Map<string | null | undefined, SsrAsyncSnapshot | undefined>(
 		(asyncSnapshots ?? []).map((entry) => [entry.graphNodeId, entry.snapshot]),
 	);
-	return boundaries.map((boundary) => {
+	// Document order reversed: a nested boundary claims its own records before the arm around it does.
+	const armized = new Map([...boundaries].reverse().map((boundary) => [boundary, armizeBoundary(boundary)]));
+	return boundaries.map((boundary) => armized.get(boundary)!);
+	function armizeBoundary(boundary: SsrBoundaryRecord): SsrBoundaryRecord {
 		// Child-composed boundaries already carry a single armized record set;
 		// arm-relative coordinates survive composition untouched.
 		if (!Array.isArray(boundary.armRecords)) return boundary;
@@ -1269,7 +1272,7 @@ export function marklessSsrArmizeBoundaries(
 				branches: planned.branches ?? [],
 			},
 		};
-	});
+	}
 }
 // An escalating branch holds a component that has to run, so a flip replaces its
 // range wholesale rather than rebuilding markup. Its served records therefore
@@ -1766,6 +1769,8 @@ export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child:
 		elementHandles: true,
 		keyedRepeats: true,
 		branches: true,
+		// Only a client settle render nests boundaries in an arm set; served sets list them flat.
+		asyncBoundaries: true,
 	} satisfies Record<keyof import('../resume-types.ts').ResumeArmRecordSet, true>;
 	void exhaustive;
 	return {

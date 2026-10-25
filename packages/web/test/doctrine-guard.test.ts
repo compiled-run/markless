@@ -44,6 +44,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The streamed-arm executor finds its compiler-emitted boundary comment anchors.',
 	'packages/web/src/resume-arm-records.ts :: if (within && node.nodeType === 8 && isArmBranchAnchorComment(node as ResumeDomComment)) {':
 		'Arm-record adoption censuses compiler-emitted branch anchors within an explicit range.',
+	'packages/web/src/resume-commit-arm.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
+		"A settled arm's nested @try blocks find their anchors among the comments inside that arm's own range, never the page.",
 	"packages/web/src/resume-arm-records.ts :: const data = sibling.nodeType === 8 ? sibling.data! : '';":
 		"A CSR event's own target claims a painted arm's hosts: it reads only the target's ancestors and their preceding siblings for the arm's start anchor, never the page.",
 	'packages/web/src/resume-arm-records.ts :: next && !(next.nodeType === 8 && next.data === `/${data}`);':

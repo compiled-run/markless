@@ -258,6 +258,10 @@ export type ResumeArmRecordSet = {
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly keyedRepeats?: NonNullable<ProtocolViewPayload['keyedRepeats']>;
 	readonly branches?: ReadonlyArray<ResumeArmBranchRecord>;
+	/** @try blocks the arm renders inside itself, anchor indexes counted from the arm start. */
+	readonly asyncBoundaries?: ReadonlyArray<
+		Omit<ResumeAsyncBoundaryPayload, 'armRecords'> & { readonly armRecords?: ResumeArmRecordSet }
+	>;
 };
 export type ResumeAsyncBoundaryPayload = ProtocolViewPayload['asyncBoundaries'][number] & {
 	// A single armized set (SSR and CSR compose both armize live arms); a
