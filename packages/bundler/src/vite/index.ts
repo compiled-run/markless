@@ -42,7 +42,11 @@ import { clearChunkFactCaches } from '../build/chunk-ast.ts';
 import { prefetchChunkDynamicImports } from '../build/chunk-workers.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
-import { excludeSourceShippedDeps, includeOptimizedDeps } from '../optimized-deps.ts';
+import {
+	excludeSourceShippedDeps,
+	includeOptimizedDeps,
+	runtimeFunctionSpecifiers,
+} from '../optimized-deps.ts';
 import { RESUME_ENTRY_SPECIFIER, STORAGE_FREE_RESUME_ENTRY_SPECIFIER } from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
 import { isCompilerStatefulModuleId, sharedReachedRenderDataRequest } from '../virtual-ids.ts';
@@ -259,6 +263,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				includeOptimizedDeps(config, [
 					RESUME_ENTRY_SPECIFIER,
 					STORAGE_FREE_RESUME_ENTRY_SPECIFIER,
+					...runtimeFunctionSpecifiers(),
 				]);
 				excludeSourceShippedDeps(config);
 			}
