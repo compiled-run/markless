@@ -156,3 +156,27 @@ test('precompression stays off where the host compresses at its edge, inlines as
 	expect(chosen.options.compressPublicAssets).toBeUndefined();
 	expect(chosenState.brotliDir).toBeUndefined();
 });
+
+test('the prerenderer a build starts leaves the deployed output to the host preset', () => {
+	const state = compressedAssetsState();
+	const module = compressedAssetsModule(false, state);
+	const deployed = {
+		options: { preset: 'vercel', output: { publicDir: '/app/.vercel/output/static' } },
+	};
+	const prerender = {
+		options: {
+			preset: 'nitro-prerender',
+			serveStatic: true,
+			output: { publicDir: '/app/.output/public' },
+		} as {
+			preset: string;
+			serveStatic: boolean;
+			output: { publicDir: string };
+			compressPublicAssets?: unknown;
+		},
+	};
+	module.setup(deployed);
+	module.setup(prerender);
+	expect(state.brotliDir).toBeUndefined();
+	expect(prerender.options.compressPublicAssets).toBeUndefined();
+});
