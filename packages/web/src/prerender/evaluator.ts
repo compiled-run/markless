@@ -695,14 +695,18 @@ export function evaluatePrerenderDataComponent(input: {
 		input.graph && input.symbolPrefix
 			? new Set(ownedStateCells(definition).map((cell) => cell.graphNodeId))
 			: undefined;
-	const read = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown => {
+	const readAt = (
+		graphNodeId: string,
+		path: ReadonlyArray<string>,
+		authoredPath: boolean,
+	): unknown => {
 		// A minted row loads its symbols through the resume loader, which scopes a
 		// symbol's reads by prepending the instance path. With no live graph to
 		// resolve that against, this component's own values answer to the
 		// compile-time id the symbol was emitted with.
 		const instancePath =
 			input.graph || values.has(graphNodeId) ? '' : marklessInstancePath(graphNodeId);
-		if (instancePath) return read(graphNodeId.slice(instancePath.length), path);
+		if (instancePath) return readAt(graphNodeId.slice(instancePath.length), path, authoredPath);
 		if (graphNodeId === definition.propCellId || graphNodeId === 'prop:props') {
 			return readPath(input.props, path);
 		}
@@ -716,11 +720,13 @@ export function evaluatePrerenderDataComponent(input: {
 		if (values.has(graphNodeId) && !liveCellIds?.has(graphNodeId))
 			return readPath(values.get(graphNodeId), path);
 		// Render data carries authored paths; an async computed's graph node is its snapshot.
-		const graphPath = definition.state.computed.some(
-			(computed) => computed.graphNodeId === graphNodeId && computed.async === true,
-		)
-			? ['value', ...path]
-			: path;
+		const graphPath =
+			authoredPath &&
+			definition.state.computed.some(
+				(computed) => computed.graphNodeId === graphNodeId && computed.async === true,
+			)
+				? ['value', ...path]
+				: path;
 		if (input.graph)
 			return input.graph.read(
 				instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId,
@@ -730,6 +736,11 @@ export function evaluatePrerenderDataComponent(input: {
 			return readPath(input.boundGraphValues.get(graphNodeId), path);
 		return readPath(values.get(graphNodeId), path);
 	};
+	const read = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown =>
+		readAt(graphNodeId, path, true);
+	// A compiled symbol already reads an async computed's snapshot path (`["value", ...]`).
+	const symbolRead = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown =>
+		readAt(graphNodeId, path, false);
 	const ownModule: PrerenderBoundModule = input.module ?? {
 		rootPrefix: input.symbolPrefix,
 		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
@@ -793,7 +804,7 @@ export function evaluatePrerenderDataComponent(input: {
 						const own = read(graphNodeId, path);
 						return own === undefined && scope.symbolPrefix.endsWith(at) ? scope.read(local, path) : own;
 					}
-				: read;
+				: symbolRead;
 		return marklessThen(
 			linkedInitializer ??
 				(input.loadSymbol(
@@ -993,12 +1004,10 @@ export function evaluatePrerenderDataComponent(input: {
 						const boundary = (definition.boundaries ?? []).find(
 							(candidate) => candidate.boundaryId === slot.boundaryId,
 						);
-						const snapshot = boundary?.runnerGraphNodeId
-							? state.computed.find(
-									(candidate) => candidate.graphNodeId === boundary.runnerGraphNodeId,
-								)?.snapshot
+						const status = boundary?.runnerGraphNodeId
+							? runnerStatus(boundary.runnerGraphNodeId, state.computed)
 							: undefined;
-						return snapshot?.status === 'fulfilled' ? 0 : snapshot?.status === 'rejected' ? 2 : 1;
+						return status === 'fulfilled' ? 0 : status === 'rejected' ? 2 : 1;
 					},
 					seedChild: (slot, context) =>
 						marklessRosterSeedPass(context.sharedSeeds, () =>
@@ -1188,6 +1197,26 @@ export function evaluatePrerenderDataComponent(input: {
 			},
 		),
 	);
+}
+
+// A sync runner over async values settles with them: rejected if any rejected, pending until all fulfilled.
+function runnerStatus(
+	graphNodeId: string,
+	computed: ProtocolStatePayload['computed'],
+	visited = new Set<string>(),
+): unknown {
+	visited.add(graphNodeId);
+	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
+	if (!record || record.async) return record?.snapshot?.status;
+	let status = 'fulfilled';
+	for (const dependency of record.dependencies ?? []) {
+		if (visited.has(dependency.graphNodeId)) continue;
+		if (!computed.some((candidate) => candidate.graphNodeId === dependency.graphNodeId)) continue;
+		const settled = runnerStatus(dependency.graphNodeId, computed, visited);
+		if (settled === 'rejected') return settled;
+		if (settled !== 'fulfilled') status = 'pending';
+	}
+	return status;
 }
 
 async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {

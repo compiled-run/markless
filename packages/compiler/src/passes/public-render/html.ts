@@ -84,6 +84,12 @@ export function collectSsrAsyncRunnerDefinitions(
 	const computedByGraphNode = new Map(
 		input.protocolState.computed.map((computed) => [computed.graphNodeId, computed]),
 	);
+	// A shared() instance has no render-body local, so its fields are read from the render's state map.
+	const sharedGraphNodeIds = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.sharedDefinitionId !== undefined ? [binding.id] : [],
+		),
+	);
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'async-computed-runner' ||
@@ -96,6 +102,7 @@ export function collectSsrAsyncRunnerDefinitions(
 										symbol,
 										registeredGraphNodeIds,
 										input.source.filename,
+										sharedGraphNodeIds,
 									),
 								dependencies: (
 									computedByGraphNode.get(symbol.graphNodeId)?.dependencies ?? []
@@ -120,20 +127,24 @@ function ssrAsyncRunnerSource(
 	>,
 	registeredGraphNodeIds: ReadonlySet<string>,
 	filename: string,
+	stateGraphNodeIds: ReadonlySet<string> = new Set(),
 ): string {
 	// One local per read root. A dependency whose node sits BELOW that root (a
 	// shared instance's `allChecked` resolves to the computed itself) contributes
 	// a member of the local instead of replacing it.
 	const roots = new Map<string, { root: string | null; members: Map<string, string> }>();
 	for (const dependency of symbol.dependencies ?? []) {
-		if (!registeredGraphNodeIds.has(dependency.graphNodeId)) continue;
+		const registered = registeredGraphNodeIds.has(dependency.graphNodeId);
+		if (!registered && !stateGraphNodeIds.has(dependency.graphNodeId)) continue;
 		const sourcePath = dependency.source.split('.');
 		const name = sourcePath[0];
 		if (!name || sourcePath.some((part) => !/^[$A-Z_a-z][$\w]*$/.test(part))) continue;
 		const entry = roots.get(name) ?? { root: null, members: new Map<string, string>() };
 		roots.set(name, entry);
 		const read = (path: ReadonlyArray<string>) =>
-			`read(${JSON.stringify(dependency.graphNodeId)},${JSON.stringify(path)})`;
+			registered
+				? `read(${JSON.stringify(dependency.graphNodeId)},${JSON.stringify(path)})`
+				: `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(dependency.graphNodeId)}),${JSON.stringify(path)})`;
 		const rootPathLength = dependency.path.length - sourcePath.length + 1;
 		if (rootPathLength >= 0) {
 			entry.root ??= read(dependency.path.slice(0, rootPathLength));

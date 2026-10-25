@@ -13,6 +13,7 @@ import type {
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
+	optionalMemberReadSource,
 	resolveGraphPath,
 	runtimeGraphDependencyPath,
 	runtimeGraphReadPath,
@@ -57,10 +58,11 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	// the host it is bound to.
 	const resolveTemplateRead = (read: SemanticTemplateRead) => {
 		const scope = readScopeOf(read.componentName ?? componentByHostNodeId.get(read.hostNodeId));
+		const source = optionalMemberReadSource(read.source);
 		return (
-			resolveGraphPath(read.source, scope.bindings, scope.aliases) ??
+			resolveGraphPath(source, scope.bindings, scope.aliases) ??
 			resolveSharedInstanceGraphPath(
-				read.source,
+				source,
 				input.semanticGraph,
 				componentByHostNodeId.get(read.hostNodeId),
 			)

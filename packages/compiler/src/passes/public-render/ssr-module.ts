@@ -830,7 +830,25 @@ function emitSsrDataLines(
 						`{const marklessSsrDerived=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(value.graphNodeId)},${value.source},marklessSsrRenderContext,false${extra});if(marklessSsrDerived.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(value.graphNodeId)},marklessSsrDerived.value);}`,
 				)
 				.join('');
-			const settled = `marklessSsrRenderStateValues.set(${JSON.stringify(runner.graphNodeId)},marklessSsrSnapshot.value);`;
+			// A sync runner settles with its async inputs, which the arm may read directly too.
+			const definitions = collectSsrAsyncRunnerDefinitions(input);
+			const inputs = new Set<string>();
+			const visit = (graphNodeId: string): void => {
+				for (const dependency of definitions.get(graphNodeId)?.dependencies ?? []) {
+					if (inputs.has(dependency)) continue;
+					inputs.add(dependency);
+					visit(dependency);
+				}
+			};
+			if (extra) visit(runner.graphNodeId);
+			const settled = `marklessSsrRenderStateValues.set(${JSON.stringify(runner.graphNodeId)},marklessSsrSnapshot.value);${[
+				...inputs,
+			]
+				.map(
+					(graphNodeId) =>
+						`{const marklessSsrInput=marklessSsrAsyncRuns.get(${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
+				)
+				.join('')}`;
 			return [
 				`case ${JSON.stringify(boundary.boundaryId)}:{const marklessSsrSnapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(marklessSsrSnapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}return {arm:marklessSsrAsyncArm(marklessSsrSnapshot),error:marklessSsrSnapshot.error};}`,
 			];
