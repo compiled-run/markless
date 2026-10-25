@@ -1,6 +1,10 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { AliasOptions, UserConfig } from 'vite';
 import { dirname, isAbsolute, join, normalize, resolve } from 'pathe';
+
+// Vite's `parent > dependency` include form: an app reaches @markless/web only through @markless/core.
+const NESTED_DEPENDENCY = ' > ';
 
 export type DepResolution = Pick<UserConfig, 'root'> & {
 	readonly resolve?: Pick<NonNullable<UserConfig['resolve']>, 'alias' | 'preserveSymlinks'>;
@@ -17,7 +21,12 @@ export function optimizedDepsToInclude(
 	const preserveSymlinks = resolution.resolve?.preserveSymlinks === true;
 	const alias = resolution.resolve?.alias;
 	return specifiers.filter(
-		(specifier) => !servedFromSource(applyAlias(specifier, alias), root, preserveSymlinks),
+		(specifier) =>
+			!servedFromSource(
+				applyAlias(specifier.split(NESTED_DEPENDENCY)[0]!, alias),
+				root,
+				preserveSymlinks,
+			),
 	);
 }
 
@@ -33,6 +42,26 @@ export function includeOptimizedDeps(config: UserConfig, specifiers: ReadonlyArr
 		...include,
 		...bundled.filter((specifier) => !include.includes(specifier)),
 	];
+}
+
+// Emitted code imports these from @markless/web directly; pre-bundled beside the resume entries, every module both reach is one copy.
+export function runtimeFunctionSpecifiers(
+	webEntry: string | undefined = import.meta.resolve?.('@markless/web'),
+): string[] {
+	if (!webEntry?.startsWith('file://')) return [];
+	let files: string[];
+	try {
+		files = readdirSync(join(dirname(fileURLToPath(webEntry)), 'fns'));
+	} catch {
+		return [];
+	}
+	// A source checkout's `.ts` modules are served as they are, never pre-bundled.
+	return files
+		.filter((file) => file.endsWith('.js'))
+		.map(
+			(file) =>
+				`@markless/core${NESTED_DEPENDENCY}@markless/web/fns/${file.slice(0, -'.js'.length)}`,
+		);
 }
 
 // A package that ships Markless source (`publishConfig.marklessShipsSource`) is compiled by the

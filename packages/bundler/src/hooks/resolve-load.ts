@@ -40,7 +40,12 @@ export async function resolveIdHook(
 ) {
 	const { importedChildSources } = ctx.state;
 	const runtimeCatalogId = marklessRuntimeSpecifierId(source);
-	if (runtimeCatalogId) return { id: runtimeCatalogId };
+	if (runtimeCatalogId)
+		return (
+			(await optimizedRuntimeImport(pluginContext, source, runtimeCatalogId)) ?? {
+				id: runtimeCatalogId,
+			}
+		);
 	const normalized = normalizeVirtualId(source);
 	if (isSharedInlineSourcesModuleId(normalized)) return { id: resolveVirtualId(normalized) };
 	if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
@@ -89,6 +94,24 @@ export async function resolveIdHook(
 	}
 
 	return null;
+}
+
+type DepsOptimizerContext = {
+	readonly environment?: {
+		readonly depsOptimizer?: { isOptimizedDepFile(id: string): boolean };
+	};
+};
+
+// The dev optimizer's resume entries carry their own copy of this module; the raw file would be a second one.
+async function optimizedRuntimeImport(
+	pluginContext: PluginContext,
+	source: string,
+	file: string,
+): Promise<{ readonly id: string } | null> {
+	const optimizer = (pluginContext as unknown as DepsOptimizerContext).environment?.depsOptimizer;
+	if (!optimizer) return null;
+	const resolved = await pluginContext.resolve(source, file, { skipSelf: true });
+	return resolved && optimizer.isOptimizedDepFile(resolved.id.split('?')[0]!) ? resolved : null;
 }
 
 export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginContext, id: string) {

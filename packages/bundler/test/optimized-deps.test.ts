@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import type { UserConfig } from 'vite';
 import { dirname, join } from 'pathe';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -7,6 +8,7 @@ import {
 	excludeSourceShippedDeps,
 	includeOptimizedDeps,
 	optimizedDepsToInclude,
+	runtimeFunctionSpecifiers,
 } from '../src/optimized-deps.ts';
 import {
 	RESUME_ENTRY_SPECIFIER,
@@ -278,5 +280,32 @@ describe('excludeSourceShippedDeps', () => {
 		const config: UserConfig = { root };
 		excludeSourceShippedDeps(config);
 		expect(config.optimizeDeps).toBeUndefined();
+	});
+});
+
+describe('runtimeFunctionSpecifiers', () => {
+	const webPackage = (name: string, files: ReadonlyArray<string>) => {
+		const fns = join(directory, name, 'fns');
+		mkdirSync(fns, { recursive: true });
+		for (const file of files) writeFileSync(join(fns, file), '');
+		return pathToFileURL(join(directory, name, 'index.js')).href;
+	};
+
+	test('names each built runtime function module through @markless/core', () => {
+		const entry = webPackage('web-dist', ['instance-scope.js', 'instance-scope.d.ts', 'row-mint.js']);
+		expect(runtimeFunctionSpecifiers(entry).sort()).toEqual([
+			'@markless/core > @markless/web/fns/instance-scope',
+			'@markless/core > @markless/web/fns/row-mint',
+		]);
+	});
+
+	test('names nothing for a source checkout, which the dev server serves as it is', () => {
+		expect(runtimeFunctionSpecifiers(webPackage('web-src', ['instance-scope.ts']))).toEqual([]);
+	});
+
+	test('keeps the nested form only while @markless/core is installed', () => {
+		const nested = ['@markless/core > @markless/web/fns/instance-scope'];
+		expect(optimizedDepsToInclude(nested, { root: pnpmInstall('nested-pnpm') })).toEqual(nested);
+		expect(optimizedDepsToInclude(nested, { root: workspaceLink('nested-link').root })).toEqual([]);
 	});
 });
