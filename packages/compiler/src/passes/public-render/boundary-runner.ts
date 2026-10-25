@@ -38,6 +38,9 @@ export function resolveBoundaryRunners(
 		readonly source: string;
 		readonly asyncBoundaryId?: string | undefined;
 		readonly computedGraphNodeId?: string | undefined;
+		// The edge already names the node, so a same-named local elsewhere in the module cannot shadow it.
+		readonly graphNodeId?: string;
+		readonly path?: ReadonlyArray<string>;
 	}> = [
 		...semanticGraph.templateReads,
 		...semanticGraph.keyedRepeats.map((repeat) => ({
@@ -47,7 +50,14 @@ export function resolveBoundaryRunners(
 		...semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				prop.kind === 'graph-reference'
-					? [{ source: prop.source, asyncBoundaryId: edge.asyncBoundaryId }]
+					? [
+							{
+								source: prop.source,
+								asyncBoundaryId: edge.asyncBoundaryId,
+								graphNodeId: prop.graphNodeId,
+								path: prop.path,
+							},
+						]
 					: [],
 			),
 		),
@@ -64,9 +74,12 @@ export function resolveBoundaryRunners(
 				const composite = read.computedGraphNodeId
 					? bindingsById.get(read.computedGraphNodeId)
 					: undefined;
+				const named = read.graphNodeId ? bindingsById.get(read.graphNodeId) : undefined;
 				const resolved = composite
 					? { binding: composite, path: [] }
-					: resolveGraphPath(read.source, bindings, aliases);
+					: named
+						? { binding: named, path: read.path ?? [] }
+						: resolveGraphPath(read.source, bindings, aliases);
 				if (!resolved) {
 					unresolvedSources.push(read.source);
 					continue;
