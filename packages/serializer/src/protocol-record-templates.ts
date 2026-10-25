@@ -48,5 +48,5 @@ export function decodeProtocolPayloadLists<T>(type: RuntimePayloadType, payload:
 			if (list && !Array.isArray(list))
 				record[key] = expandRecordTemplates(list as ProtocolTemplatedRecords, keys[key]);
 		}
-	return type === 'markless/state' ? expandSharedRecords(payload) : payload;
+	return expandSharedRecords(payload);
 }

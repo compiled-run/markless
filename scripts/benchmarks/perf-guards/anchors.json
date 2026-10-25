@@ -1786,6 +1786,14 @@
 			"from": 1976,
 			"to": 2597,
 			"reason": "a sync computed over an unsettled async value stays pending instead of running (spec 03)"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "serializer/protocol-shared-records-decode",
+			"from": null,
+			"to": 2061,
+			"reason": "the reader copies record subtrees a page serves once back into each value that holds them: HN port 290-comment item HTML 2,982,703 -> 2,034,449 B raw; loaded only with the templated-list reader, nothing runs at page load"
 		}
 	],
 	"runtimeModules": {
@@ -1822,6 +1830,7 @@
 		"serializer/protocol-prop-prefix": 270,
 		"serializer/protocol-record-keys": 1134,
 		"serializer/protocol-record-templates": 1118,
+		"serializer/protocol-shared-records-decode": 2061,
 		"serializer/protocol-templated-lists": 437,
 		"serializer/storage-slot": 780,
 		"serializer/value-constants": 360,
