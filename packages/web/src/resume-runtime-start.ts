@@ -143,6 +143,16 @@ export async function startResumeRuntime(input: {
 			}),
 		);
 	}
+	// Not gated on a keyed repeat: a family whose parts are written flat has a
+	// roster to derive against too, and it is resume itself that first makes the
+	// roster live.
+	const roster = (runtimeInput.state?.computed ?? []).some((computed) =>
+		computed.dependencies?.some((dependency) =>
+			dependency.graphNodeId.includes(ELEMENT_BINDING_SEGMENT),
+		),
+	)
+		? Promise.resolve((globalThis as RosterResumeHost).__marklessRosterResume?.())
+		: undefined;
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
 		// Rows written straight into a boundary arm follow the arm each commit announces here.
 		if (runtimeInput.view.keyedRepeats!.some((repeat) => repeat.branchArm))
@@ -162,6 +172,9 @@ export async function startResumeRuntime(input: {
 			loadSymbol: runtimeInput.loadSymbol,
 			elementHandles: prepared.elementHandles,
 		});
+		const rosterSymbols = roster
+			?.then((module) => module?.loadRosterSymbols(runtimeInput))
+			.catch(() => undefined);
 		await keyedRepeats.wireKeyedRepeats(
 			{
 				graph: runtimeInput.graph,
@@ -171,6 +184,7 @@ export async function startResumeRuntime(input: {
 				storeContainerSubscription,
 				renderData: runtimeInput.renderData,
 				root: runtimeInput.root,
+				rosterSymbols,
 			},
 			{
 				runtimeInput,
@@ -180,17 +194,8 @@ export async function startResumeRuntime(input: {
 			},
 		);
 	}
-	// Not gated on a keyed repeat: a family whose parts are written flat has a
-	// roster to derive against too, and it is resume itself that first makes the
-	// roster live.
-	if (
-		(runtimeInput.state?.computed ?? []).some((computed) =>
-			computed.dependencies?.some((dependency) =>
-				dependency.graphNodeId.includes(ELEMENT_BINDING_SEGMENT),
-			),
-		)
-	) {
-		(await (globalThis as RosterResumeHost).__marklessRosterResume?.())?.wireRosterRevisions({
+	if (roster) {
+		(await roster)?.wireRosterRevisions({
 			graph: runtimeInput.graph,
 			computed: runtimeInput.state?.computed ?? [],
 			keyedRepeats: runtimeInput.view.keyedRepeats ?? [],
