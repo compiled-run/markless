@@ -5,6 +5,7 @@ import type { PluginContext } from 'rolldown';
 import { withQuery } from 'ufo';
 import { marklessRuntimeSpecifierId } from '../build/delegate-loader.ts';
 import { MARKLESS_EXECUTION_SIZES } from '../build/execution-sizes.ts';
+import { RUNTIME_FUNCTIONS_PREFIX } from '../optimized-deps.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	executionLogVirtualModuleSource,
@@ -109,7 +110,7 @@ async function optimizedRuntimeImport(
 	file: string,
 ): Promise<{ readonly id: string } | null> {
 	const optimizer = (pluginContext as unknown as DepsOptimizerContext).environment?.depsOptimizer;
-	if (!optimizer) return null;
+	if (!optimizer || !source.startsWith(RUNTIME_FUNCTIONS_PREFIX)) return null;
 	const resolved = await pluginContext.resolve(source, file, { skipSelf: true });
 	return resolved && optimizer.isOptimizedDepFile(resolved.id.split('?')[0]!) ? resolved : null;
 }

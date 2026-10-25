@@ -46,3 +46,12 @@ test('without a dev optimizer a runtime import resolves to its own file', async 
 		id: marklessRuntimeSpecifierId(SPECIFIER),
 	});
 });
+
+test('a runtime import the optimizer can never hold is not resolved through it', async () => {
+	const inline = '@markless/web/inline/sync-policy-core-lazy';
+	const { asked, context } = pluginContext(true);
+	expect(await resolveIdHook(hookContext, context, inline, '/app/pages/a.tsrx')).toEqual({
+		id: marklessRuntimeSpecifierId(inline),
+	});
+	expect(asked).toEqual([]);
+});

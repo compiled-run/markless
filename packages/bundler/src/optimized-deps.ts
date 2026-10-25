@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, normalize, resolve } from 'pathe';
 
 // Vite's `parent > dependency` include form: an app reaches @markless/web only through @markless/core.
 const NESTED_DEPENDENCY = ' > ';
+export const RUNTIME_FUNCTIONS_PREFIX = '@markless/web/fns/';
 
 export type DepResolution = Pick<UserConfig, 'root'> & {
 	readonly resolve?: Pick<NonNullable<UserConfig['resolve']>, 'alias' | 'preserveSymlinks'>;
@@ -60,7 +61,7 @@ export function runtimeFunctionSpecifiers(
 		.filter((file) => file.endsWith('.js'))
 		.map(
 			(file) =>
-				`@markless/core${NESTED_DEPENDENCY}@markless/web/fns/${file.slice(0, -'.js'.length)}`,
+				`@markless/core${NESTED_DEPENDENCY}${RUNTIME_FUNCTIONS_PREFIX}${file.slice(0, -'.js'.length)}`,
 		);
 }
 
