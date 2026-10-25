@@ -293,18 +293,14 @@ export function createResumeRuntime(
 					[],
 					records.flatMap((repeat) => repeat.rowEvents),
 				);
-				const { wireKeyedRepeats } = await import('./resume-keyed-repeats-lazy.ts');
-				for (const record of records)
-					await wireKeyedRepeats({
-						graph: input.graph,
-						view: { ...input.view, keyedRepeats: [record, ...records.filter((each) => each.enclosingRow)] },
-						elementsByHostId,
-						events: eventWiring,
-						storeContainerSubscription: (release) =>
-							storeHostSubscription(record.parentHostNodeId, release),
-						renderData: input.renderData,
-						pageRepeats: input.view.keyedRepeats,
-					});
+				await (
+					await import('./resume-arm-keyed-repeats.ts')
+				).wireArmKeyedRepeats(input, records, {
+					elementsByHostId,
+					events: eventWiring,
+					elementHandles,
+					storeHostSubscription,
+				});
 			},
 			addBehaviors: behaviors
 				? async (hostNodeId, records) => {
