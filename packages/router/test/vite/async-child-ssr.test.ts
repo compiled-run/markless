@@ -69,3 +69,7 @@ test('an async value in a component the page imports streams from the server', a
 test('each instance of an async component, at any depth, streams its own value', async () => {
 	await served('/async-in-children', ['head', 'item 1', 'item 2', 'item 3']);
 });
+
+test('a child with no props and a @try without @catch streams its value', async () => {
+	await served('/child-async-not-streamed', ['loaded child']);
+});
