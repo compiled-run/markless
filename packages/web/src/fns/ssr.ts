@@ -220,8 +220,9 @@ type SsrAsyncRunEntry = {
 	promise?: Promise<SsrAsyncSnapshot>;
 	settled?: SsrAsyncSnapshot;
 };
-type SsrAsyncRuns = Map<string, SsrAsyncRunEntry>;
+type SsrAsyncRuns = Pick<Map<string, SsrAsyncRunEntry>, 'get' | 'set'>;
 type SsrRenderContext = SsrRecord & {
+	readonly idPrefix?: string;
 	readonly prerender?: boolean;
 	readonly prerenderSettle?: {
 		readonly graph?: {
@@ -565,7 +566,9 @@ export async function marklessSsrRunAsyncComputed(
 	const streaming = renderContext?.streaming;
 	const definitions: ReadonlyMap<string, SsrAsyncRunnerDefinition> =
 		runnerDefinitions ?? new Map([[graphNodeId, { run, dependencies: [] }]]);
-	const runs: SsrAsyncRuns = streaming?.runs ?? requestRuns ?? new Map();
+	const runs: SsrAsyncRuns = streaming?.runs
+		? marklessSsrInstanceRuns(streaming.runs, renderContext?.idPrefix ?? '')
+		: (requestRuns ?? new Map());
 	const entry = marklessSsrEnsureAsyncComputedRun(
 		graphNodeId,
 		definitions,
@@ -613,6 +616,16 @@ export async function marklessSsrRunAsyncComputed(
 	const snapshot = await entry.promise;
 	marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 	return snapshot;
+}
+
+// The request registry is shared by every component instance, so a child's runs live under its instance prefix.
+function marklessSsrInstanceRuns(runs: SsrAsyncRuns, prefix: string): SsrAsyncRuns {
+	if (!prefix) return runs;
+	const scoped: SsrAsyncRuns = {
+		get: (graphNodeId) => runs.get(prefix + graphNodeId),
+		set: (graphNodeId, entry) => (runs.set(prefix + graphNodeId, entry), scoped as never),
+	};
+	return scoped;
 }
 
 function marklessSsrEnsureAsyncComputedRun(
