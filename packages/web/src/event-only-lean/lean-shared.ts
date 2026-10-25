@@ -89,9 +89,10 @@ export async function createLeanScalarGraph(
 		write(write) {
 			if ((write.path?.length ?? 0) > 0) return leanEscalation('write-path');
 			materialize(write.graphNodeId);
-			if (Object.is(cells.get(write.graphNodeId), write.value)) return write.value;
-			cells.set(write.graphNodeId, write.value);
-			dirty.push({ graphNodeId: write.graphNodeId });
+			if (!Object.is(cells.get(write.graphNodeId), write.value)) {
+				cells.set(write.graphNodeId, write.value);
+				dirty.push({ graphNodeId: write.graphNodeId });
+			}
 			return write.value;
 		},
 		update(update) {

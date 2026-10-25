@@ -590,9 +590,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			// Map presence separates an unseeded node from one holding undefined; computeds
 			// carry no payload value, so their first derive to undefined must not read as a no-op.
 			const seeded = cells.has(write.graphNodeId);
-			if (seeded && plane?.commitDerived(write, path)) return write.value;
-			if (seeded && Object.is(readPath(current, path), write.value)) return write.value;
-			commitCell(write.graphNodeId, path, write.value);
+			if (
+				!seeded ||
+				!(plane?.commitDerived(write, path) || Object.is(readPath(current, path), write.value))
+			)
+				commitCell(write.graphNodeId, path, write.value);
 			return write.value;
 		},
 		update(update) {

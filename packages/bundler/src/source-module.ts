@@ -2097,7 +2097,7 @@ function emitScalarAction(
 		'	const graph = {',
 		`		hasCell(graphNodeId) { return graphNodeId === ${JSON.stringify(action.cell)}; },`,
 		`		read(graphNodeId, path = []) { if (graphNodeId !== ${JSON.stringify(action.cell)} || path.length) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "read"); return state.value; },`,
-		`		write(write) { if (write.graphNodeId !== ${JSON.stringify(action.cell)} || (write.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "write"); if (!Object.is(state.value, write.value)) { state.value = write.value; values.set(${JSON.stringify(action.cell)}, state.value); state.dirty = true; } return write.value; },`,
+		`		write(write) { if (write.graphNodeId !== ${JSON.stringify(action.cell)} || (write.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "write"); if (!Object.is(state.value, write.value)) { state.value = write.value; values.set(${JSON.stringify(action.cell)}, state.value); state.dirty = true; } },`,
 		`		update(update) { if (update.graphNodeId !== ${JSON.stringify(action.cell)} || (update.path?.length ?? 0)) return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "update"); const previous = state.value; const next = update.update(previous); if (!Object.is(previous, next)) { state.value = next; values.set(${JSON.stringify(action.cell)}, state.value); state.dirty = true; } return update.returnValue === "previous" ? previous : update.returnValue === "next" ? next : undefined; },`,
 		'		call() { return marklessScalarSpecializedError("MARKLESS_SCALAR_SPECIALIZED_ESCALATE", "call"); },',
 		'		async flush() {},',
@@ -2114,7 +2114,7 @@ function emitScalarAction(
 			: []),
 		...emitScalarWrite(action),
 		`	const symbol = await Promise.resolve(${loadSymbolName}(${JSON.stringify(action.symbolId)}));`,
-		'	await Promise.resolve(symbol({ graph: { ...graph, write() {}, update(update) { const value = graph.read(update.graphNodeId, update.path ?? []); return update.returnValue === "previous" || update.returnValue === "next" ? value : undefined; } }, event: input.event, element: host, getElementHandle: () => undefined }));',
+		'	await Promise.resolve(symbol({ graph: { ...graph, write: (write) => write.value, update(update) { const value = graph.read(update.graphNodeId, update.path ?? []); return update.returnValue === "previous" || update.returnValue === "next" ? value : undefined; } }, event: input.event, element: host, getElementHandle: () => undefined }));',
 		'	if (state.dirty) {',
 		'		state.dirty = false;',
 		...action.textUpdates.map(
