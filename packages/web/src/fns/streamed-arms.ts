@@ -125,7 +125,12 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 		const records = query(ARM_RECORDS, 'data-boundary', state.boundaryId);
 		if (!arm || !records) return state.resolve?.(undefined);
 		const patch = query(STATE_PATCH, 'data-graph-node', state.runnerGraphNodeId);
-		const delta = patch ? (JSON.parse(patch.textContent ?? 'null') as StateDelta | null) : null;
+		const delta = patch
+			? decodeProtocolPayloadLists(
+					'markless/state',
+					JSON.parse(patch.textContent ?? 'null') as StateDelta | null,
+				)
+			: null;
 		learn(delta);
 		state.resolve?.({
 			html: arm.innerHTML,

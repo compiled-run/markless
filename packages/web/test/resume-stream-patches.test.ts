@@ -1,4 +1,11 @@
-import { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import {
+	ASYNC_BOUNDARY_ARM,
+	ASYNC_PROTOCOL_VERSION,
+	createProtocolStatePayload,
+	deserializeGraphValue,
+	shareStateRecords,
+	type SerializedGraphPayload,
+} from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { adoptStreamedArmPatches } from '../src/resume-stream-patches.ts';
 import { registrationGraphNodeCensus } from '../src/resume-runtime.ts';
@@ -120,6 +127,33 @@ test('adoptStreamedArmPatches overlays streamed snapshots and arm records before
 	);
 	expect(adopted.view.asyncBoundaries[0]?.armRecords).toEqual(settledRecords);
 	expect(adopted.view.asyncBoundaries[0]?.initiallyServedArm).toBe(ASYNC_BOUNDARY_ARM.try);
+});
+
+test('a streamed patch whose cells share records adopts every cell whole', () => {
+	const leaf = { id: 3, text: 'leaf', replies: [] };
+	const reply = { id: 2, text: 'reply', replies: [leaf] };
+	const values = [{ replies: [reply] }, { replies: [leaf] }, { replies: [] }];
+	const { cells } = createProtocolStatePayload({
+		cells: values.map((value, at) => ({
+			graphNodeId: `r:${at}:c0:prop:props`,
+			name: 'props',
+			valueKind: 'object' as const,
+			value,
+		})),
+	});
+	const patch = shareStateRecords({ cells, computed: [] });
+	expect(patch).toHaveProperty('sharedRecords');
+	const root = fakeRoot({
+		'script[type="markless/state-patch"]': [
+			fakeScript({ 'data-graph-node': 'computed:report' }, JSON.stringify(patch)),
+		],
+	});
+
+	const adopted = adoptStreamedArmPatches(decoded, root as never);
+
+	expect(
+		adopted.state.cells.map((cell) => deserializeGraphValue(cell.value as SerializedGraphPayload)),
+	).toEqual(values);
 });
 
 test('adoptStreamedArmPatches is identity without streamed scripts or a document', () => {

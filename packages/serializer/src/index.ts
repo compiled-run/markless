@@ -11,6 +11,8 @@ export {
 	PROTOCOL_TEMPLATED_LISTS,
 	type ProtocolTemplatedRecords,
 } from './protocol-record-templates.ts';
+export { expandSharedRecords } from './protocol-shared-records-decode.ts';
+export { shareStateRecords } from './protocol-shared-records.ts';
 export * from './protocol-validation-storage.ts';
 export * from './resume-record-delta.ts';
 export * from './storage-cookie.ts';

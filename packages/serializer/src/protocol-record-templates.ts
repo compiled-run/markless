@@ -1,6 +1,7 @@
 import type { RuntimePayloadType } from './protocol-client.ts';
 import { PROTOCOL_RECORD_KEYS } from './protocol-record-keys.ts';
 import { PROTOCOL_TEMPLATED_LISTS } from './protocol-templated-lists.ts';
+import { expandSharedRecords } from './protocol-shared-records-decode.ts';
 
 export { PROTOCOL_TEMPLATED_LISTS };
 
@@ -47,5 +48,5 @@ export function decodeProtocolPayloadLists<T>(type: RuntimePayloadType, payload:
 			if (list && !Array.isArray(list))
 				record[key] = expandRecordTemplates(list as ProtocolTemplatedRecords, keys[key]);
 		}
-	return payload;
+	return expandSharedRecords(payload);
 }
