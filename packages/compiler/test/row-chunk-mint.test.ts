@@ -13,7 +13,7 @@ async function compile(source: string) {
 	};
 }
 
-test('a row whose @if reads only the row item names its row chunk for the mint', async () => {
+test('a row whose @if reads only the row item patches from its row template instead of being rebuilt', async () => {
 	const { repeat, rowMintCodes } = await compile(`
 import { state } from '@markless/core';
 
@@ -27,9 +27,36 @@ export function App() @{
 	</ul>
 }
 `);
-	expect(repeat?.rowComponent).toEqual({ componentName: 'App', rowChunkId: 'repeat:repeat:0:row' });
-	expect(repeat?.rowTemplate).toBeUndefined();
+	expect(repeat?.rowComponent).toBeUndefined();
+	expect(repeat?.rowTemplate?.branchSlots?.[0]?.arms.map((arm) => arm.html)).toEqual([
+		'<s><!--markless-slot:0--></s>',
+		'<span><!--markless-slot:0--></span>',
+	]);
 	expect(rowMintCodes).toEqual([]);
+});
+
+test('a nested @for whose rows hold an @if gives the enclosing row markup to build from', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function Lists() @{
+	let lists = state([{ key: 'a', items: [{ id: 1, view: 'x' }] }]);
+
+	<section>
+		@for (const list of lists; key list.key) {
+			<ol>@for (const item of list.items; key item.id) { <li>@if (item.view === "x") { <b>x</b> }</li> }</ol>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const [outer, inner] = result.protocolView.keyedRepeats ?? [];
+	expect(outer?.rowTemplate?.html).toBe('<ol><!--markless-slot:0--></ol>');
+	expect(inner?.enclosingRow?.repeatId).toBe(outer?.id);
+	expect(inner?.rowTemplate?.branchSlots).toHaveLength(1);
 });
 
 test('a @switch row with a child component in one arm mints the same way', async () => {

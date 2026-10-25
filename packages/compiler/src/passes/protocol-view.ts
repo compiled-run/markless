@@ -986,8 +986,11 @@ function rowComponentMint(
 	const semanticRepeat = input.semanticGraph?.keyedRepeats.find(
 		(candidate) => candidate.id === render.repeatId,
 	);
+	const componentRow = resolveRowComponentMint({ ...rowMintInput, itemName: render.itemName });
+	if (componentRow) return componentRow;
+	// A rebuilt row loses its elements, so a row a template can patch in place never takes the chunk mint.
+	if (mintableRowTemplate(input, render, null).rowTemplate) return null;
 	return (
-		resolveRowComponentMint({ ...rowMintInput, itemName: render.itemName }) ??
 		resolveRowChunkMint({
 			...rowMintInput,
 			rowNames: [render.itemName, semanticRepeat?.indexName].filter(
