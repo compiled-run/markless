@@ -239,7 +239,7 @@ function materializeArmBranchRecords(
 		: [];
 	let pageComments: ReadonlyArray<ResumeDomComment> | undefined;
 	const anchorNamed = (text: string): ResumeDomComment | undefined => {
-		pageComments ??= pageCommentCensus(input.root);
+		pageComments ??= pageCommentCensus(input.root, true);
 		return pageComments.find((comment) => commentText(comment) === text);
 	};
 	return records.map((record) => {

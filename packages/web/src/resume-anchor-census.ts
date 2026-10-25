@@ -26,7 +26,8 @@ export function pageNodes<N extends { nodeType?: number }>(root: {
 	return nodes;
 }
 
-export function pageCommentCensus(root: ResumeDomNode): ResumeDomComment[] {
+// Indexes count the served page: a streamed arm's comments are skipped unless `live` asks for them.
+export function pageCommentCensus(root: ResumeDomNode, live?: boolean): ResumeDomComment[] {
 	const comments: ResumeDomComment[] = [];
 	(function visit(nodes: ArrayLike<ResumeDomNode>): void {
 		for (const node of Array.from(nodes)) {
@@ -34,7 +35,7 @@ export function pageCommentCensus(root: ResumeDomNode): ResumeDomComment[] {
 				comments.push(node as ResumeDomComment);
 			visit(node.childNodes ?? []);
 		}
-	})(pageNodes(root));
+	})((!live && (root as ResumeDomElement).__marklessComments) || pageNodes(root));
 	return comments;
 }
 
