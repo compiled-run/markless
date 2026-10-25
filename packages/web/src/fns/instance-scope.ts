@@ -1023,6 +1023,7 @@ function composedBoundaryArmRecords(
 		elementHandles: true,
 		keyedRepeats: true,
 		branches: true,
+		asyncBoundaries: true,
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
 	const prefix = boundaryId.slice(0, boundaryId.lastIndexOf('boundary:'));
@@ -1146,6 +1147,25 @@ function composedBoundaryArmRecords(
 					})),
 				}
 			: {}),
+		...(set.asyncBoundaries && {
+			asyncBoundaries: set.asyncBoundaries.map((nested) => {
+				const id = prefix + nested.id;
+				const armRecords = nested.armRecords;
+				return {
+					...nested,
+					id,
+					runnerGraphNodeId:
+						nested.runnerGraphNodeId &&
+						marklessComposedGraphNodeId(nested.runnerGraphNodeId, instancePath, registry),
+					...(nested.updateSymbolId && { updateSymbolId: prefix + nested.updateSymbolId }),
+					asyncReads: nested.asyncReads.map((read) => ({
+						...qualifyRead(read),
+						...(read.runnerSymbolId && { runnerSymbolId: prefix + read.runnerSymbolId }),
+					})),
+					...(armRecords && { armRecords: composedBoundaryArmRecords(id, armRecords, graph) }),
+				};
+			}),
+		}),
 	};
 }
 

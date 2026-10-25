@@ -1357,7 +1357,6 @@ export type RenderDataBoundary = {
 		readonly pending?: string;
 		readonly catch?: string;
 	}>;
-	readonly protocolSupported: boolean;
 };
 
 export type RenderDataInteraction = {

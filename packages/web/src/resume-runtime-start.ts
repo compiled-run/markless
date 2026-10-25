@@ -93,6 +93,9 @@ export async function startResumeRuntime(input: {
 		readonly resettleBoundary: (boundaryId: string) => Promise<DomJournalResult | void>;
 		readonly holdPendingFlip: (graphNodeId: string) => boolean;
 	}) => void;
+	readonly connectAsyncBoundaryWiring: (
+		wiring: import('./resume-async-wiring.ts').AsyncBoundaryWiring,
+	) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
 	// Handed straight to the repeat runtime, which hands it to a component row's
@@ -215,7 +218,7 @@ export async function startResumeRuntime(input: {
 			commitArm: input.commitArm,
 			hasHtmlRenderer: !!runtimeInput.renderBranchHtml,
 		});
-		asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
+		input.connectAsyncBoundaryWiring(asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
 			asyncBoundariesById: prepared.asyncBoundariesById,
 			graph: runtimeInput.graph,
 			root: runtimeInput.root,
@@ -228,7 +231,7 @@ export async function startResumeRuntime(input: {
 			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 			settleTracker,
 			onAsyncSnapshot,
-		});
+		}));
 	}
 	for (const computed of runtimeInput.state?.computed ?? []) {
 		if (

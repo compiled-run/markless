@@ -126,14 +126,11 @@ export function createProtocolViewPayload(
 			),
 			...forwarded.elementHandles,
 		],
-		// Only gate-supported boundaries have SSR-emitted anchors; shipping
-		// records for ungated boundaries would make resume throw
-		// missingCommentAnchorError. Re-index contiguously over the emitted set.
 		keyedRepeats,
 		// Branch and boundary anchor pairs share one document-order stream, so
 		// re-indexing allocates over the emitted union in anchorOrder.
 		branches: supportedBranchRecords(input).filter((branch) => !rowFlippedBranchIds.has(branch.id)),
-		asyncBoundaries: supportedAsyncBoundaries(input).map(
+		asyncBoundaries: input.payloadArena.view.asyncBoundaries.map(
 			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
 				armRecords: armRecords.map((set, arm) =>
@@ -217,7 +214,7 @@ function optionalAsyncRunnerRegistry(
 			if (computedByGraphNode.has(dependency.graphNodeId)) visit(dependency.graphNodeId);
 		}
 	};
-	for (const boundary of supportedAsyncBoundaries(input)) {
+	for (const boundary of input.payloadArena.view.asyncBoundaries) {
 		for (const read of boundary.asyncReads) visit(read.graphNodeId);
 	}
 
@@ -243,15 +240,6 @@ function domUpdateTargetKey(
 	return target.kind;
 }
 
-function supportedAsyncBoundaries(input: ProtocolViewPayloadInput) {
-	const supported = new Set(
-		renderDataOf(input).boundaries
-			.filter((boundary) => boundary.protocolSupported)
-			.map((boundary) => boundary.boundaryId),
-	);
-	return input.payloadArena.view.asyncBoundaries.filter((boundary) => supported.has(boundary.id));
-}
-
 function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	// armScoped branches render as anchor-less ternaries re-evaluated on arm
 	// settle (need 8): no flip records, no anchor pairs.
@@ -266,16 +254,12 @@ function supportedBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string
 
 function emittedAnchorPairs(input: ProtocolViewPayloadInput) {
 	const branchIds = supportedBranchIds(input);
-	const supportedBoundaryIds = new Set(
-		renderDataOf(input).boundaries
-			.filter((boundary) => boundary.protocolSupported)
-			.map((boundary) => boundary.boundaryId),
-	);
 	return [
 		...(input.payloadArena.view.branchSites ?? []).filter((site) => branchIds.has(site.id)),
-		...input.payloadArena.view.asyncBoundaries
-			.filter((boundary) => supportedBoundaryIds.has(boundary.id))
-			.map((boundary) => ({ id: boundary.id, anchorOrder: boundary.anchorOrder })),
+		...input.payloadArena.view.asyncBoundaries.map((boundary) => ({
+			id: boundary.id,
+			anchorOrder: boundary.anchorOrder,
+		})),
 	].sort((left, right) => left.anchorOrder - right.anchorOrder);
 }
 
@@ -1028,25 +1012,18 @@ function componentSlotAt(
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
 	// Parts-based (tier 3) and component-executing (tier 4) update modules
 	// share the async-boundary-update wiring: either one settles the range.
-	const armsBoundaries = new Set(
-		renderDataOf(input).boundaries
-			.filter((entry) => entry.protocolSupported)
-			.map((entry) => entry.boundaryId),
-	);
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'async-boundary-update' && armsBoundaries.has(symbol.boundaryId)
-				? [[symbol.boundaryId, symbol.id] as const]
-				: [],
+			symbol.kind === 'async-boundary-update' ? [[symbol.boundaryId, symbol.id] as const] : [],
 		),
 	);
 }
 
-// Hosts inside a supported boundary's arms: their records nest under the
+// Hosts inside a boundary's arms: their records nest under the
 // boundary in arm-relative coordinates instead of riding the flat streams.
 function boundaryArmHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	return new Set(
-		supportedAsyncBoundaries(input).flatMap((boundary) =>
+		input.payloadArena.view.asyncBoundaries.flatMap((boundary) =>
 			boundary.armRecords.flatMap((set) => set.locators.map((locator) => locator.hostNodeId)),
 		),
 	);
