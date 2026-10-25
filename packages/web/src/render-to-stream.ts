@@ -70,7 +70,12 @@ export type MarklessSsrStream = {
 type StreamRunEntry = {
 	readonly promise: Promise<unknown>;
 	readonly async?: boolean;
-	settled?: { readonly status: 'fulfilled' | 'rejected' };
+	settled?: {
+		readonly status: 'fulfilled' | 'rejected';
+		readonly version?: number;
+		readonly key?: null;
+		readonly error?: unknown;
+	};
 };
 
 type StreamRenderContext = ReturnType<typeof storageRenderContext> & {
@@ -225,11 +230,7 @@ async function* streamArmAppends(input: {
 			// per-request registry (no run() re-execution), so the pass renders the
 			// settled arm html + armized records for every boundary that just
 			// settled; still-pending boundaries render @pending again and wait.
-			const output = await renderSsrOutput(
-				input.component,
-				input.options.props,
-				input.renderContext,
-			);
+			const output = await renderSettleWave(input, remaining.values());
 			if (signal.aborted) return;
 			// The wave's own render output is the settled truth (request-versioning
 			// discipline, Ripple prior art): a runner that settles WHILE this pass
@@ -274,6 +275,46 @@ async function* streamArmAppends(input: {
 		}
 	} finally {
 		signal.removeEventListener('abort', onCancel);
+	}
+}
+
+// Settled content that cannot render fails its own boundary: it takes @catch, so the page never stays on @pending.
+async function renderSettleWave(
+	input: {
+		readonly component: SsrRenderable;
+		readonly options: RenderToStreamOptions;
+		readonly renderContext: StreamRenderContext;
+	},
+	remaining: Iterable<PendingArm>,
+): Promise<SsrRenderOutput> {
+	const render = () => renderSsrOutput(input.component, input.options.props, input.renderContext);
+	try {
+		return await render();
+	} catch (error) {
+		const settled = [...remaining].filter((arm) => arm.entry.settled?.status === 'fulfilled');
+		const fail = (arms: ReadonlyArray<PendingArm>) => {
+			const previous = arms.map((arm) => arm.entry.settled);
+			for (const arm of arms)
+				arm.entry.settled = { status: 'rejected', version: 1, key: null, error };
+			return () => arms.forEach((arm, index) => (arm.entry.settled = previous[index]));
+		};
+		for (const arms of [
+			...settled.map((arm) => [arm]),
+			...(settled.length > 1 ? [settled] : []),
+		]) {
+			const restore = fail(arms);
+			try {
+				const output = await render();
+				console.error(
+					`[markless] the settled @try content of ${arms.map((arm) => arm.boundaryId).join(', ')} failed to render on the server, so it streams its @catch content:`,
+					error,
+				);
+				return output;
+			} catch {
+				restore();
+			}
+		}
+		throw error;
 	}
 }
 
