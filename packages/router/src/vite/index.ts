@@ -66,7 +66,12 @@ import { listenForLinkIntent } from './link-intent.ts';
 import { documentHandlerError, documentNavigationFor } from './document-navigation.ts';
 import { runFragmentNavigation, startFragmentNavigation } from './fragment-navigation.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
-import { compressedAssetsModule } from './nitro-compressed-assets.ts';
+import {
+	brotliCopiesPlugin,
+	compressedAssetsModule,
+	compressedAssetsState,
+	type CompressedAssetsState,
+} from './nitro-compressed-assets.ts';
 import {
 	devNitroClosePlugin,
 	devNitroModule,
@@ -183,6 +188,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	const routePreloads = routePreloadState();
 	const serverBuild = serverBuildState();
 	const devNitro = devNitroState();
+	const compressedAssets = compressedAssetsState();
 
 	return [
 		routerConfigPlugin(
@@ -194,6 +200,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			fragmentEntry,
 			serverBuild,
 			devNitro,
+			compressedAssets,
 		),
 		devSourceModuleRequestPlugin(),
 		devPageForUrlPlugin(options),
@@ -213,6 +220,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		),
 		linkBridgeFilesPlugin(navigationEntry, fragmentEntry, options),
 		devNitroClosePlugin(devNitro),
+		brotliCopiesPlugin(compressedAssets),
 		nitroPlugins,
 	];
 }
@@ -350,6 +358,7 @@ function routerConfigPlugin(
 	fragmentEntry: ResumeEntryState = resumeEntryState(),
 	serverBuild: ServerBuildState = serverBuildState(),
 	devNitro: DevNitroState = devNitroState(),
+	compressedAssets: CompressedAssetsState = compressedAssetsState(),
 ): Plugin {
 	let clientOutDir = '';
 	let clientEnvironmentName = '';
@@ -399,6 +408,7 @@ function routerConfigPlugin(
 					env?.command === 'build',
 					serverBuild,
 					devNitro,
+					compressedAssets,
 				),
 				server: {
 					...config.server,
@@ -740,6 +750,7 @@ function createNitroConfig(
 	isBuild = false,
 	serverBuild: ServerBuildState = serverBuildState(),
 	devNitro: DevNitroState = devNitroState(),
+	compressedAssets: CompressedAssetsState = compressedAssetsState(),
 ): NonNullable<UserConfig['nitro']> {
 	const scanDirs = Array.isArray(nitroConfig?.scanDirs)
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
@@ -766,7 +777,10 @@ function createNitroConfig(
 		modules: [
 			...(nitroConfig?.modules ?? []),
 			fragmentRequestModule(),
-			compressedAssetsModule(nitroConfig?.compressPublicAssets !== undefined),
+			compressedAssetsModule(
+				nitroConfig?.compressPublicAssets !== undefined,
+				compressedAssets,
+			),
 			...(isBuild ? [prerenderRendererModule(serverBuild)] : [devNitroModule(devNitro)]),
 		],
 		...(isBuild && {
