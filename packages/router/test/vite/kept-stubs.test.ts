@@ -82,3 +82,12 @@ test('every fragment rule gets a twin for the address that names kept parts, nev
 		'/_markless/fragment/blog': { isr: 60 },
 	});
 });
+
+test("a template's content counts as none of the part's elements, as in the DOM", () => {
+	const html =
+		`<nav ${keep(shared('n2'))}><template><b ${PROTOCOL_EVENT_HOST_ATTRIBUTE}="click:1">x</b></template>` +
+		`<a ${PROTOCOL_EVENT_HOST_ATTRIBUTE}="click:2">y</a></nav>`;
+	expect(keptPartsForFragment(html, undefined)).toContain(
+		`${PROTOCOL_ISLANDS_ATTRIBUTE}="${JSON.stringify([[2, PROTOCOL_EVENT_HOST_ATTRIBUTE, 'click:2']]).replace(/"/g, '&quot;')}"`,
+	);
+});

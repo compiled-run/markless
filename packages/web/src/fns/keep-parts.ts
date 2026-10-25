@@ -123,7 +123,7 @@ function attributeValue(rendered: string): string | null | undefined {
 }
 
 // Elements in document order (the root is 0), with the attribute slots each holds; or undefined when the masked
-// markup does not read as one element tree.
+// markup does not read as one element tree under one root.
 function readMasked(masked: string): Masked | undefined {
 	const islands: KeepIsland[] = [];
 	const children: number[] = [];
@@ -151,6 +151,10 @@ function readMasked(masked: string): Masked | undefined {
 			}
 			const name = /^<([a-zA-Z][\w:.-]*)/.exec(masked.slice(at, at + 64))?.[1];
 			if (name) {
+				// A second root: the browser keeps the first element only, and the islands would count past it.
+				// A template's content is not its children in the DOM, so the browser could not count into it.
+				if ((element >= 0 && open.length === 0) || name.toLowerCase() === 'template')
+					return undefined;
 				let end = at + name.length + 1;
 				for (let quote = ''; end < masked.length; end++) {
 					const inner = masked[end]!;

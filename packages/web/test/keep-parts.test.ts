@@ -111,3 +111,18 @@ test('a part from a module only one route renders is kept but never shared', () 
 		),
 	);
 });
+
+test('a part with more than one root, or a template, is kept only while byte for byte equal', () => {
+	const two = `<link rel="preload" href="/layer.html"><div class="layer">${filler}</div>`;
+	const twoMasked = `<link rel="preload" href="${value('href', '/layer.html')}"><div class="layer">${filler}</div>`;
+	const held = `<div class="holder"><template><p title="x">${filler}</p></template></div>`;
+	const heldMasked = `<div class="holder"><template><p title="${value('title', 'x')}">${filler}</p></template></div>`;
+	for (const [html, masked] of [
+		[two, twoMasked],
+		[held, heldMasked],
+	] as const) {
+		const out = keep(html, undefined, presentational(masked));
+		expect(mark(out, PROTOCOL_KEEP_ATTRIBUTE)!.startsWith(PROTOCOL_KEEP_SHARED_PREFIX)).toBe(false);
+		expect(out).not.toContain(PROTOCOL_ISLANDS_ATTRIBUTE);
+	}
+});

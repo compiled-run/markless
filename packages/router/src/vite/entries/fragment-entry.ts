@@ -629,7 +629,7 @@ function morphRange(
 		if (next.nodeType === 1 && (next as Element).hasAttribute(keepAttributes[3])) {
 			const copy = heldCopy(next as Element);
 			parent.insertBefore(copy, cursor && cursor !== stop ? cursor : stop);
-			keepAs(d, copy, next as Element, fresh);
+			placeStub(d, copy, next as Element, fresh);
 			fresh.push(copy);
 			continue;
 		}
@@ -686,13 +686,18 @@ function heldCopy(stub: Element): Element {
 	return (parts[0] ?? stub).cloneNode(true) as Element;
 }
 
+// A stub carries nothing to morph from: a part it cannot take fails the swap, and the document loads.
+function placeStub(d: Document, copy: Element, stub: Element, fresh: Element[]): void {
+	if (!keepAs(d, copy, stub, fresh)) throw new Error('MARKLESS_ROUTER_KEPT_PART_UNPLACED');
+}
+
 function placeHeldParts(d: Document, node: Element, fresh: Element[]): Element {
 	const stub = keepAttributes[3];
 	if (!stub) return node;
 	for (const part of node.querySelectorAll(`[${stub}]`)) {
 		const copy = heldCopy(part);
 		part.replaceWith(copy);
-		keepAs(d, copy, part, fresh);
+		placeStub(d, copy, part, fresh);
 	}
 	return node;
 }

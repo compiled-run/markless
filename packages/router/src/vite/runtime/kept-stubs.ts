@@ -8,6 +8,8 @@ import {
 } from '@markless/web/fns/keep-parts';
 
 const RAW_TEXT = /^(?:script|style|textarea|title)$/i;
+// Counted as one element, never into: a template's content is not its children in the DOM.
+const OPAQUE = /^(?:script|style|textarea|title|template)$/i;
 const VOID = /^(?:area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/i;
 const SHARED_SET = new RegExp(`^(?:${PROTOCOL_KEEP_SHARED_PREFIX}[0-9a-z]+)+$`);
 const KEPT_MARK = ` ${PROTOCOL_KEEP_ATTRIBUTE}="`;
@@ -102,7 +104,7 @@ function partElements(
 		const own = OWN_MARK.test(html.slice(open, tag.end + 1));
 		each(element++, open, tag, own && open !== start);
 		if (own && open === start) return;
-		at = own || RAW_TEXT.test(tag.name) ? elementEnd(html, open, tag) : tag.end + 1;
+		at = own || OPAQUE.test(tag.name) ? elementEnd(html, open, tag) : tag.end + 1;
 		if (at <= 0) return;
 	}
 }
