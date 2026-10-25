@@ -616,6 +616,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	};
 	const arm = (id, deps) => { queue.push([id, deps || []]); schedule(); };
 	arm.idle = (f) => (scheduled ? idle.push(f) : f());
+	arm.flush = flush;
 	return arm;
 })();`;
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';

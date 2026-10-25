@@ -80,6 +80,17 @@ render of a `#/` route.
   scripts are always fresh nodes and run again, `<template>` elements are always
   replaced, a custom element is replaced unless it is unchanged, and a form
   control shows the value the server rendered for the next page.
+- The address changes when the navigation starts, as a history entry the
+  swap later fills; a newer navigation replaces that entry while its page has
+  not swapped in. The leaving page stays on screen and interactive until the
+  next page's response has ended or the navigation deadline
+  (`MARKLESS_NAV_SETTLE_DEADLINE_MS`) has passed since the click; past it the
+  page swaps in showing its `@pending` arms. A newer navigation, or Back,
+  before the swap cancels it: the cancelled page never shows, and the page and
+  focus stay as they were.
+- A page swapped in while its response still streams resumes its `@pending`
+  boundaries from the arms the server streams, as a landing does: the browser
+  never runs their async work again.
 - Nothing of the leaving page's runtime survives on the kept nodes: the swap
   retires its runtime, its startup scripts' listeners go quiet, and the state
   the framework kept on the container and on any node of it is dropped before
