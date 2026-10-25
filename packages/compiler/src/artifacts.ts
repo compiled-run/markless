@@ -678,6 +678,8 @@ export type SemanticBranchSite = {
 	// site tests THAT node; `testSource` stays the authored text so a diagnostic
 	// quotes what the file says rather than a generated name.
 	readonly testComputedGraphNodeId?: string;
+	// The test reads an enclosing row's item, whose name shadows a graph binding.
+	readonly testReadsRowItem?: true;
 	readonly anchorOrder: number;
 	// Inside an @try arm: excluded from the page comment-anchor stream; flip
 	// wiring (if any) lives in the owning boundary's arm coordinate space.

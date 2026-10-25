@@ -220,6 +220,14 @@ async function* streamArmAppends(input: {
 	const onCancel = () => cancelAppends();
 	signal.addEventListener('abort', onCancel, { once: true });
 	let executorEmitted = false;
+	const settledRuns = new Set<PendingArm>();
+	for (const arm of remaining.values())
+		arm.entry.promise.then(
+			() => settledRuns.add(arm),
+			() => settledRuns.add(arm),
+		);
+	// A wave that starts after an arm's value settled must stream it, or every later wave re-renders forever.
+	const missedWaves = new Map<PendingArm, number>();
 	try {
 		while (remaining.size > 0) {
 			await Promise.race([
@@ -227,6 +235,7 @@ async function* streamArmAppends(input: {
 				cancelled,
 			]);
 			if (signal.aborted) return;
+			const settledBeforeWave = [...remaining.values()].filter((arm) => settledRuns.has(arm));
 			// One re-render pass per settle wave: settled runners resolve from the
 			// per-request registry (no run() re-execution), so the pass renders the
 			// settled arm html + armized records for every boundary that just
@@ -271,6 +280,13 @@ async function* streamArmAppends(input: {
 					executorEmitted = true;
 				}
 				parts.push(renderArmAppend(output, arm, input.options.nonce, input.shellState));
+			}
+			for (const arm of settledBeforeWave) {
+				if (!remaining.has(arm.boundaryId)) continue;
+				const missed = (missedWaves.get(arm) ?? 0) + 1;
+				if (missed > 1)
+					throw streamArmError(arm.boundaryId, '@try or @catch arm', 'boundary record');
+				missedWaves.set(arm, missed);
 			}
 			if (parts.length > 0) yield parts.join('');
 		}

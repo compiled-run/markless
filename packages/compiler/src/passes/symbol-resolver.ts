@@ -257,7 +257,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		const moduleImports =
 			definedIn !== null && definedIn !== input.semanticGraph.moduleId
 				? []
-				: referencedModuleImports(input.semanticGraph.moduleImports, binding.initializerSource);
+				: referencedModuleImports(
+						input.semanticGraph.moduleImports,
+						binding.initializerSource,
+					);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'state-initializer',
@@ -329,13 +332,15 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		// Resolve equal local names within the component that owns the branch.
 		const resolved = site.testComputedGraphNodeId
 			? { binding: { id: site.testComputedGraphNodeId }, path: [] as ReadonlyArray<string> }
-			: resolveBranchTestRead(
-					site.testSource,
-					input,
-					graphBindingMap(input.semanticGraph, undefined, site.componentName),
-					semanticAliasMap(input.semanticGraph, undefined, site.componentName),
-					site.componentName,
-				);
+			: site.testReadsRowItem
+				? null
+				: resolveBranchTestRead(
+						site.testSource,
+						input,
+						graphBindingMap(input.semanticGraph, undefined, site.componentName),
+						semanticAliasMap(input.semanticGraph, undefined, site.componentName),
+						site.componentName,
+					);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'branch-update',

@@ -1,5 +1,11 @@
 import { PROTOCOL_CONTAINER_HOST_NODE_ID } from '@markless/serializer';
-import { asNodes, getIdentifierName, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
+import {
+	asNodes,
+	getIdentifierName,
+	unwrapTypeAssertion,
+	walkNode,
+	type AnyNode,
+} from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
@@ -97,23 +103,20 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	// re-emitted it into a scope with no `box` at all - a first-render
 	// ReferenceError with nothing said at build time. Attribute reads already
 	// resolve through the same fallback in collect-markup.
-	const resolvedCollection =
-		resolveGraphPath(
-			collectionSource,
-			graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
-			semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
-		) ??
-		// An enclosing @for's row item owns the name whatever a module-wide
-		// instance is called, so the row binding must not reach past itself.
-		(repeatRowBindsName(collectionSource, state)
-			? null
-			: resolveSharedInstanceGraphPath(
-					collectionSource,
-					state.graph,
-					// Defect 46: a null component name matches every instance in the
-					// module and the last declaration wins.
-					state.currentComponentName,
-				));
+	// An enclosing @for's row item owns its name, so no graph node of that name answers for it.
+	const rowBound = repeatRowBindsName(collectionSource, state);
+	const resolvedCollection = rowBound
+		? null
+		: (resolveGraphPath(
+				collectionSource,
+				graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
+				semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+			) ??
+			resolveSharedInstanceGraphPath(
+				collectionSource,
+				state.graph,
+				state.currentComponentName,
+			));
 
 	if (!resolvedCollection && unresolvedSharedInstanceRoot(collectionSource, state)) {
 		state.graph.diagnostics.push(
@@ -376,4 +379,25 @@ export function repeatRowBindsName(source: string, state: WalkState): boolean {
 			(name) => name !== undefined && (source === name || source.startsWith(`${name}.`)),
 		);
 	});
+}
+
+// True when an enclosing row's item shadows a graph binding's name and the expression reads no other graph name.
+export function readsShadowingRowItem(expression: AnyNode, state: WalkState): boolean {
+	if (state.currentKeyedRepeatScopeIds.length === 0) return false;
+	const semantic = state.semantic();
+	const bindings = graphBindingMap(
+		state.graph,
+		state.currentSharedDefinitionId,
+		state.currentComponentName,
+	);
+	let shadowed = false;
+	let graphBound = false;
+	walkNode(expression, (node) => {
+		const name = getIdentifierName(node);
+		if (node.type !== 'Identifier' || !name || typeof node.start !== 'number') return;
+		if (resolvedSymbolAt(semantic, node.start) === null || !bindings.has(name)) return;
+		if (repeatRowBindsName(name, state)) shadowed = true;
+		else graphBound = true;
+	});
+	return shadowed && !graphBound;
 }

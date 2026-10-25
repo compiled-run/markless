@@ -12,6 +12,7 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
+import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	readRegion,
@@ -325,6 +326,8 @@ function graphDependency(
 	if (!namesGraphBinding(node, state, bodyRegion)) return null;
 
 	const source = expressionSource(node, state.source);
+	const root = /^[A-Za-z_$][\w$]*/.exec(source)?.[0];
+	if (root && repeatRowBindsName(root, state)) return null;
 	// Own scope first: a factory local and the instance local naming it routinely collide.
 	const resolved =
 		resolveGraphPath(source, bindings, aliases) ??
@@ -399,7 +402,14 @@ function postAwaitGraphReads(
 		}
 
 		if (candidate.type === 'MemberExpression') {
-			const read = postAwaitRead(candidate, firstAwaitEnd, state, bindings, aliases, bodyRegion);
+			const read = postAwaitRead(
+				candidate,
+				firstAwaitEnd,
+				state,
+				bindings,
+				aliases,
+				bodyRegion,
+			);
 			if (read) {
 				reads.push(read);
 				return;
@@ -412,7 +422,14 @@ function postAwaitGraphReads(
 		}
 
 		if (candidate.type === 'Identifier') {
-			const read = postAwaitRead(candidate, firstAwaitEnd, state, bindings, aliases, bodyRegion);
+			const read = postAwaitRead(
+				candidate,
+				firstAwaitEnd,
+				state,
+				bindings,
+				aliases,
+				bodyRegion,
+			);
 			if (read) reads.push(read);
 			return;
 		}
