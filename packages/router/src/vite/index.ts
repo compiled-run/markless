@@ -66,6 +66,7 @@ import { listenForLinkIntent } from './link-intent.ts';
 import { documentHandlerError, documentNavigationFor } from './document-navigation.ts';
 import { runFragmentNavigation, startFragmentNavigation } from './fragment-navigation.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
+import { compressedAssetsModule } from './nitro-compressed-assets.ts';
 import {
 	devNitroClosePlugin,
 	devNitroModule,
@@ -765,6 +766,7 @@ function createNitroConfig(
 		modules: [
 			...(nitroConfig?.modules ?? []),
 			fragmentRequestModule(),
+			compressedAssetsModule(nitroConfig?.compressPublicAssets !== undefined),
 			...(isBuild ? [prerenderRendererModule(serverBuild)] : [devNitroModule(devNitro)]),
 		],
 		...(isBuild && {
