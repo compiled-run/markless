@@ -515,7 +515,7 @@ function namesABinding(node: AnyNode): boolean {
 	return false;
 }
 
-function hasOptionalLink(node: AnyNode): boolean {
+export function hasOptionalLink(node: AnyNode): boolean {
 	let current: AnyNode | undefined = node;
 	while (current) {
 		current = unwrapValueWrappers(current);
