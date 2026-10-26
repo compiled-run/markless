@@ -136,15 +136,27 @@ across all three cases:
 - Navigation: the outgoing page stays live and interactive until the
   destination settles or the client deadline passes; past the deadline the
   destination's @pending shows.
-- Re-settle (mutation refresh, recompute): the boundary holds its prior
-  settled snapshot (snapshots are versioned with status, so the prior value is
-  always addressable); past the client deadline the boundary's @pending arm
-  commits, so a genuinely slow refresh shows honest waiting UI instead of
-  stale content indefinitely.
+- Re-settle (mutation refresh, recompute; revised 2026-10-25, owner, on the
+  async-refresh proof): the boundary keeps its last settled content
+  (snapshots are versioned with status, so the prior value is always
+  addressable) and its host carries `aria-busy="true"` from the moment the
+  refresh starts until the new `@try` or `@catch` content commits. `@pending`
+  replaces the held content only when the NEWEST run has been pending longer
+  than the stall threshold (5000 ms); the stall clock restarts on every newer
+  run, so a typing burst never reaches it. The host is the boundary's parent
+  element when the boundary is that element's only content, otherwise each
+  top-level element of the shown arm; a text-only arm in a shared parent gets
+  no marking. The runtime decides the host because a component whose root is
+  the boundary cannot see its parent at build time. Server-rendered and
+  resumed boundaries get the busy marking but no stall fallback: their
+  `@pending` arm is not shipped to the browser, and 13-resume-cache step 3
+  requires seeded content to stay visible. Live regions inside a busy
+  boundary can be silenced by NVDA with Firefox, so announcements belong in a
+  status element outside the boundary.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
-pending UI shows, it stays a minimum duration (no blink). Deadline and
-min-duration constants live in one documented module; the timing state machine
+pending UI shows, it stays a minimum duration (no blink). Deadline,
+stall-threshold and min-duration constants live in one documented module; the timing state machine
 is pure and property-tested under a fake clock. Reveal choreography is
 tier-aware: value-slot commits are layout-safe and commit immediately; range
 commits join dependency-ordered reveal trains. All timing behavior is

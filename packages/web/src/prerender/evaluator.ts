@@ -1007,7 +1007,9 @@ export function evaluatePrerenderDataComponent(input: {
 						const status = boundary?.runnerGraphNodeId
 							? runnerStatus(boundary.runnerGraphNodeId, state.computed)
 							: undefined;
-						return status === 'fulfilled' ? 0 : status === 'rejected' ? 2 : 1;
+						if (status === 'rejected')
+							return { arm: 2, error: runnerError(boundary!.runnerGraphNodeId!, state.computed) };
+						return status === 'fulfilled' ? 0 : 1;
 					},
 					seedChild: (slot, context) =>
 						marklessRosterSeedPass(context.sharedSeeds, () =>
@@ -1217,6 +1219,23 @@ function runnerStatus(
 		if (settled !== 'fulfilled') status = 'pending';
 	}
 	return status;
+}
+
+// The error of the first rejected async value the runner reads, through the same walk as runnerStatus.
+function runnerError(
+	graphNodeId: string,
+	computed: ProtocolStatePayload['computed'],
+	visited = new Set<string>(),
+): unknown {
+	visited.add(graphNodeId);
+	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
+	if (!record || record.async) return (record?.snapshot as { readonly error?: unknown } | undefined)?.error;
+	for (const dependency of record.dependencies ?? []) {
+		if (visited.has(dependency.graphNodeId)) continue;
+		if (runnerStatus(dependency.graphNodeId, computed, new Set(visited)) === 'rejected')
+			return runnerError(dependency.graphNodeId, computed, visited);
+	}
+	return undefined;
 }
 
 async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {

@@ -197,11 +197,11 @@ Boot sequence for both paths:
    demand-at-start is already the rule, so a seeded CSR mount is simply
    "demand at start with a starting value".
 3. While the re-run is pending, the re-settle hold keeps the seeded content
-   visible (no `@pending` flash — the D8 hold behavior for boundaries whose
+   visible and marked busy (no `@pending` flash — the D8 hold behavior for boundaries whose
    `@pending` arm was never shipped is the CONTRACT here, not a gap; a pinning
    test must protect it). COMPATIBILITY INVARIANT: any future
-   compiler-emitted pending renderer (the fix the resume-resettle-hold module
-   comment requests) MUST exempt boundaries that already show settled
+   compiler-emitted pending renderer (the D8 server-rendered stall-fallback
+   gap) MUST exempt boundaries that already show settled
    content — seeded or server-settled — so this contract survives that fix.
 4. Re-run fulfilled with equal data: no visible change (a refresh where
    nothing changed is pixel-identical). Fulfilled with different data:

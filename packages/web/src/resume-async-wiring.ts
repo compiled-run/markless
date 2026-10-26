@@ -2,18 +2,17 @@ import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 
-// Spec D8 + T119 ruling (12-arm-rendering): pending UI is DEADLINE-GATED
-// everywhere — first appearances render @pending structurally, navigations
-// hold the outgoing page, and RE-settles hold the prior settled content until
-// the client deadline (resume-resettle-hold.ts), then commit the boundary's
-// @pending arm with a minimum visible duration. This tracker is the settle
-// path's synchronous bookkeeping core:
+// Spec D8 (12-arm-rendering): first appearances render @pending structurally,
+// navigations hold the outgoing page, and RE-settles hold the prior settled
+// content busy until it commits or stalls (resume-resettle-hold.ts). This
+// tracker is the settle path's synchronous bookkeeping core:
 // - which boundaries currently render SETTLED content, so a re-run of their
 //   async computed keeps the prior snapshot instead of flashing @pending
 // - a promise that resolves once every tracked boundary settled (the router
@@ -127,8 +126,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	// D8 settled-content tracking + navigation transitions (T110) + the
 	// commit floor the re-settle hold raises (T120).
 	readonly settleTracker?: AsyncBoundarySettleTracker;
-	// T120: the re-settle hold (resume-resettle-hold.ts) observes every
-	// snapshot of an update-symbol boundary to deadline-gate @pending.
+	// The re-settle hold (resume-resettle-hold.ts) observes every snapshot of an update-symbol boundary.
 	readonly onAsyncSnapshot?: (boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) => void;
 }): AsyncBoundaryWiring {
 	const releasesById = new Map<string, Array<() => void>>();
@@ -170,9 +168,13 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 						);
 						// Once the range shows settled content, a re-run keeps the prior snapshot on screen.
 						if (!settled && input.settleTracker?.hasSettledContent(boundary.id)) {
+							setBoundaryBusy(boundary, true);
 							return;
 						}
-						if (settled) input.settleTracker?.markSettled(boundary.id);
+						if (settled) {
+							input.settleTracker?.markSettled(boundary.id);
+							setBoundaryBusy(boundary, false);
+						}
 						return boundaryRangeJournal(boundary.id, {
 							type: 'async-boundary-snapshot',
 							boundaryId: boundary.id,
@@ -183,7 +185,10 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					}
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
-					return settleAsyncBoundaryRange(input, boundary, snapshot);
+					return settleAsyncBoundaryRange(input, boundary, snapshot).then((result) => {
+						clearBusyUnlessRerun(input.graph, boundary);
+						return result;
+					});
 				},
 			});
 			releases.push(subscribed);
@@ -217,6 +222,15 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			wire(boundary, !settled, !settled);
 		},
 	};
+}
+
+function clearBusyUnlessRerun(
+	graph: ResumeRuntimeInput['graph'],
+	boundary: ResumeAsyncBoundaryRecord,
+): void {
+	if (boundary.runnerGraphNodeId !== null && graph.read(boundary.runnerGraphNodeId, ['status']) === 'pending')
+		return;
+	setBoundaryBusy(boundary, false);
 }
 
 // A removed ancestor ends the parent chain short of the root; a host without parent links counts as attached.

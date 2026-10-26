@@ -1,87 +1,70 @@
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
-	settleOrPendingDeadline,
+	MARKLESS_PENDING_REFRESH_STALL_MS,
+	waitMs,
 	type PendingTimingClock,
 } from './pending-timing.ts';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type { ResumeAsyncBoundaryRecord } from './resume-types.ts';
 
-// T119/T120 deadline-gated @pending on RE-settles. When a settled boundary's
-// async computed re-runs, the boundary holds its prior settled content (the
-// pending snapshot retains the prior value); only a refresh still pending at
-// the client deadline commits the boundary's @pending arm, which then stays
-// visible at least the pending minimum before the settled content commits.
-// Lives with the runtime-start wiring because its dependencies do: the
-// pending-arm HTML capture (live DOM at mount) and the commitArm primitive.
-//
-// Ordering without a commit queue: the deadline task raises the tracker's
-// commit floor BEFORE re-checking status and committing the pending arm.
-// Every settle commit waits the floor out (settleAsyncBoundaryRange), so a
-// settle racing the deadline lands strictly AFTER the pending commit — and a
-// settle that already reached the graph before the deadline makes the status
-// re-check bail (the raised floor then only holds the prior content briefly;
-// documented tie-window trade, property-tested).
+// Spec D8 re-settle: a refresh over settled content keeps that content with
+// its host marked aria-busy; only a newest run still pending after the stall
+// threshold commits the @pending arm. The stall task raises the tracker's
+// commit floor BEFORE re-checking status and committing, so a settle racing
+// it lands strictly after the pending commit. The settle path clears busy.
 
 export type ResettleHold = (boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) => void;
 
+type Stall = { readonly version: unknown; readonly epoch: object; fallback: boolean };
+
 export function createResettleHold(deps: {
 	readonly tracker: AsyncBoundarySettleTracker;
-	// Whether the client knows this boundary's @pending arm HTML. Boundaries
-	// without it (server-settled) never start a deadline race: their slow
-	// re-settles keep holding the prior content (recorded gap).
+	// Server-settled boundaries never shipped their @pending arm, so they get busy marking without a fallback.
 	readonly hasPendingArm: (boundaryId: string) => boolean;
-	// Live graph status for the boundary's async read — the deadline task
-	// re-checks it so a settle that raced the deadline wins.
 	readonly readStatus: (graphNodeId: string) => unknown;
-	// Commits the boundary's @pending arm between its anchors.
 	readonly commitPendingArm: (boundary: ResumeAsyncBoundaryRecord) => Promise<void>;
+	readonly setBusy?: (boundary: ResumeAsyncBoundaryRecord, busy: boolean) => void;
 	readonly clock?: { readonly wait?: PendingTimingClock['wait'] };
 }): ResettleHold {
-	// One in-flight refresh hold per boundary: a second refresh while the first
-	// is still pending must NOT restart the deadline (content has been stale
-	// since the first refresh began — spin-delay/busyDelay semantics).
-	const refreshResolvers = new Map<string, () => void>();
+	const stalls = new Map<string, Stall>();
+	const setBusy = deps.setBusy ?? setBoundaryBusy;
+	const wait = deps.clock?.wait ?? waitMs;
 	return (boundary, snapshot) => {
-		const status = (snapshot as { readonly status?: unknown } | null)?.status;
+		const { status, version } =
+			(snapshot as { readonly status?: unknown; readonly version?: unknown } | null) ?? {};
 		if (status === 'fulfilled' || status === 'rejected') {
-			refreshResolvers.get(boundary.id)?.();
-			refreshResolvers.delete(boundary.id);
+			stalls.delete(boundary.id);
 			return;
 		}
-		// Pending over settled content starts the deadline race exactly once;
-		// first appearances (no settled content yet) render @pending structurally.
-		if (
-			!deps.hasPendingArm(boundary.id) ||
-			!deps.tracker.hasSettledContent(boundary.id) ||
-			refreshResolvers.has(boundary.id)
-		) {
-			return;
-		}
-		const settled = new Promise<void>((resolve) => refreshResolvers.set(boundary.id, resolve));
+		if (!deps.tracker.hasSettledContent(boundary.id)) return;
+		const prior = stalls.get(boundary.id);
+		if (prior && Object.is(prior.version, version)) return;
+		setBusy(boundary, true);
+		const stall: Stall = { version, epoch: {}, fallback: prior?.fallback === true };
+		stalls.set(boundary.id, stall);
+		if (stall.fallback || !deps.hasPendingArm(boundary.id)) return;
 		void (async () => {
-			if ((await settleOrPendingDeadline(settled, deps.clock?.wait)) === 'settled') return;
-			// Floor first (ordering, see module header), then the status
-			// re-check, then the commit. A commit failure rejects unhandled —
-			// a broken anchor census must fail loudly (D2), never silently.
+			await wait(MARKLESS_PENDING_REFRESH_STALL_MS);
+			if (stalls.get(boundary.id)?.epoch !== stall.epoch) return;
 			deps.tracker.holdSettleCommitsFor(MARKLESS_PENDING_MIN_VISIBLE_MS);
 			if (
 				boundary.runnerGraphNodeId === null ||
 				deps.readStatus(boundary.runnerGraphNodeId) !== 'pending'
 			)
 				return;
+			stall.fallback = true;
+			// A commit failure rejects unhandled: a broken anchor census must fail loudly (D2).
 			await deps.commitPendingArm(boundary);
+			if (stalls.get(boundary.id) === stall) setBusy(boundary, true);
 		})();
 	};
 }
 
-// Wires the hold for a page's boundaries at runtime start. Boundaries that
-// mount showing @pending (CSR mounts, streamed shells, navigation deadline
-// swaps) keep that arm's HTML for later deadline commits. Server-settled
-// boundaries never shipped their @pending arm to the client; their slow
-// re-settles keep holding the prior content (gap: needs a compiler-emitted
-// pending renderer). Pages with no capturable pending arm skip the hold.
+// Boundaries that mount showing @pending (CSR mounts, streamed shells,
+// navigation deadline swaps) keep that arm's HTML for a later stall fallback.
 export function wireResettleHold(input: {
 	readonly tracker: AsyncBoundarySettleTracker;
 	readonly boundaries: Iterable<ResumeAsyncBoundaryRecord>;
@@ -91,22 +74,18 @@ export function wireResettleHold(input: {
 		update: ArmCommitUpdate,
 	) => Promise<void>;
 	readonly hasHtmlRenderer: boolean;
-}): ResettleHold | undefined {
-	if (!input.hasHtmlRenderer) return undefined;
+}): ResettleHold {
 	const pendingArmHtmlById = new Map<string, string>();
-	for (const boundary of input.boundaries) {
+	for (const boundary of input.hasHtmlRenderer ? input.boundaries : []) {
 		if (!boundary.updateSymbolId || input.tracker.hasSettledContent(boundary.id)) continue;
 		const pendingHtml = capturePendingArmHtml(boundary);
 		if (pendingHtml !== undefined) pendingArmHtmlById.set(boundary.id, pendingHtml);
 	}
-	if (pendingArmHtmlById.size === 0) return undefined;
 	return createResettleHold({
 		tracker: input.tracker,
 		hasPendingArm: (boundaryId) => pendingArmHtmlById.has(boundaryId),
 		readStatus: input.readStatus,
 		commitPendingArm: (boundary) =>
-			// The pending arm's own records stay unregistered (plain-host
-			// content; matches first-appearance pending behavior).
 			input.commitArm(boundary, {
 				html: pendingArmHtmlById.get(boundary.id)!,
 				armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
