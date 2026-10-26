@@ -6003,7 +6003,7 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
-			...[WRITE_THROUGH_FN, OBJECT_ASSIGN_FN]
+			...[WRITE_THROUGH_FN, OBJECT_ASSIGN_FN, AFTER_CALL_FN]
 				.filter((name) => referenced.has(name))
 				.map((localName) =>
 					moduleImportNode({
@@ -6663,6 +6663,9 @@ function rewriteEventHandlerNode(
 
 	const unfilled = unfilledCallbackSlotNode(node, rewrite);
 	if (unfilled) return carryEventHandlerComments(node, unfilled);
+
+	const changed = changedByCallNode(node, text, rewrite);
+	if (changed) return carryEventHandlerComments(node, changed);
 
 	const write = eventWriteNode(node, rewrite);
 	if (write) return carryEventHandlerComments(node, write);
@@ -7352,6 +7355,43 @@ function collectIdentifierNames(node: unknown, names: Set<string>): void {
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
 const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
+const AFTER_CALL_FN = 'marklessAfterCall';
+
+/**
+ * A call handing state to a function the compiler saw change it: the call runs
+ * as written, then each path it changed is invalidated.
+ */
+function changedByCallNode(
+	node: AnyNode,
+	text: string,
+	rewrite: EventHandlerRewrite,
+): EmissionNode | null {
+	if (node.type !== 'CallExpression' && node.type !== 'NewExpression') return null;
+	const writes = (rewrite.symbol.writes ?? []).filter(
+		(write) => write.changedByCall && write.source === text,
+	);
+	if (writes.length === 0) return null;
+	for (const write of writes) rewrite.claimedWrites.add(write);
+	let wrapped = rewriteEventHandlerChildren(node, (child) =>
+		rewriteEventHandlerNode(child, node, rewrite),
+	);
+	for (const write of writes) {
+		wrapped = callNode(identifierNode(AFTER_CALL_FN), [
+			wrapped,
+			write.through
+				? writeThroughCall(write.through, write.graphNodeId)
+				: memberChainNode('context.graph'),
+			objectNode([
+				propertyNode('graphNodeId', literalNode(write.graphNodeId)),
+				propertyNode(
+					'path',
+					stringArrayNode(write.through ? write.through.path : write.path),
+				),
+			]),
+		]);
+	}
+	return wrapped;
+}
 
 // The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
 function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {

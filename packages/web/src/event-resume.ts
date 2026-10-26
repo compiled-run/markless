@@ -17,6 +17,7 @@ import type {
 	RuntimeGraph,
 	RuntimeGraphCall,
 	RuntimeGraphDelete,
+	RuntimeGraphTouch,
 	RuntimeGraphSubscription,
 	RuntimeGraphUpdate,
 	RuntimeGraphWrite,
@@ -69,6 +70,7 @@ export type EventResumeGraph = Omit<
 		| 'write'
 		| 'update'
 		| 'call'
+		| 'touch'
 		| 'delete'
 		| 'subscribe'
 		| 'subscribeJournal'
@@ -304,6 +306,9 @@ function createEventResumeGraph(input: {
 			const result = deletePath(cells.get(deletion.graphNodeId), deletion.path);
 			if (result) markDirty(deletion.graphNodeId, deletion.path);
 			return result;
+		},
+		touch(touch: RuntimeGraphTouch) {
+			markDirty(touch.graphNodeId, touch.path ?? []);
 		},
 		subscribe(subscription) {
 			subscriptions.push(subscription);

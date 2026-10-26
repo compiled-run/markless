@@ -106,6 +106,10 @@ export {
 export { createTriggerGroups } from './passes/trigger-groups.ts';
 export { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 export { evaluateModuleConstants } from './passes/semantic-graph/constant-values.ts';
+export {
+	moduleImportSpecifiers,
+	summarizeModuleFunctions,
+} from './passes/semantic-graph/function-effects.ts';
 export { lowerStateAccess } from './passes/state-lowering.ts';
 export { emitSymbolModules } from './passes/symbol-modules.ts';
 export {

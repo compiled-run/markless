@@ -85,6 +85,7 @@ export interface TransformTsrxModuleInput {
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
+	importedFunctionSummaries?: SemanticGraphInput['importedFunctionSummaries'];
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
 	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
@@ -133,6 +134,8 @@ export interface TransformTsrxModuleResult {
 		readonly source: string;
 		readonly exportName: string;
 	}>;
+	/** Import specifiers whose function summaries this compile was not given. */
+	importedFunctionRequests?: ReadonlyArray<string>;
 }
 
 export type ArtifactChildCandidate = {

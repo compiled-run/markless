@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 294,
+	total: 297,
 	guided: 45,
 	groups: [
 		{
@@ -679,6 +679,11 @@ export const errorIndex: ErrorIndex = {
 					guided: true,
 				},
 				{
+					code: 'MARKLESS_STATE_PASSED_BY_REFERENCE',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE',
 					kind: 'compile error',
 					guided: false,
@@ -770,6 +775,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_TEMPLATE_READ_UNDECLARED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_TEMPLATE_READS_CHANGING_IMPORT',
 					kind: 'compile error',
 					guided: false,
 				},
@@ -1155,6 +1165,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_GRAPH_TOUCH_UNSUPPORTED',
 					kind: 'runtime error',
 					guided: false,
 				},

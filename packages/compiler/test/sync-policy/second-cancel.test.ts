@@ -9,6 +9,10 @@ function gridModule(handlerBody: string): string {
 	return `
 import { state } from '@markless/core';
 
+function isLocked(grid: { locked: boolean }): boolean {
+	return grid.locked;
+}
+
 export function Grid() @{
 	const grid = state({ multi: true, locked: false, index: 0 });
 
@@ -294,6 +298,10 @@ export function Item({ ...rest }) @{
 	const listSource = (secondGuard: string) => `
 import { state } from '@markless/core';
 import { Item } from './item.tsrx';
+
+function isMulti(list: { multi: boolean }): boolean {
+	return list.multi;
+}
 
 export function List() @{
 	const list = state({ multi: true });

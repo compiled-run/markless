@@ -8,6 +8,7 @@ import type {
 	SemanticLocalDeclaration,
 } from '../../artifacts.ts';
 import { applyMarklessAllowDirectives, type SourceSpan } from '../../diagnostics.ts';
+import { collectStateEscapes, resolveStateEscapes } from './collect-state-escapes.ts';
 import {
 	collectAsyncBoundary,
 	collectAsyncBoundaryDiagnostics,
@@ -106,6 +107,7 @@ export async function buildSemanticGraph(
 		frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionSummaries: input.importedFunctionSummaries,
 		serverOnlyProps: input.serverOnlyProps,
 	});
 	state.walk = walk;
@@ -176,6 +178,7 @@ export async function buildSemanticGraph(
 	collectSharedCallbackBindings(state);
 	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
+	resolveStateEscapes(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
@@ -604,6 +607,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'CallExpression':
 			collectCollectionCall(node, state);
 			collectObjectAssign(node, state);
+			collectStateEscapes(node, state);
 			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
 				const [body, ...rest] = asNodes(node.arguments);
 				withFunctionSite(state, 'computed', () => {
@@ -612,6 +616,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				for (const argument of rest) walk(argument, state);
 				return;
 			}
+			break;
+		case 'NewExpression':
+			collectStateEscapes(node, state);
 			break;
 		case 'TryStatement':
 		case 'JSXTryExpression':

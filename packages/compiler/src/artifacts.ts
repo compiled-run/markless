@@ -26,6 +26,16 @@ export type SemanticGraphInput = {
 	 * `importedConstants` on this module's props.
 	 */
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	/**
+	 * What the exported functions of each imported module do with the values handed
+	 * to them, by import specifier and export name. A handler that passes a state
+	 * object to an imported function is refused unless this shows the function only
+	 * reads it. The bundler fills this for the specifiers named by
+	 * `importedFunctionRequests`; an empty entry is a module it could not read.
+	 */
+	readonly importedFunctionSummaries?: Readonly<
+		Record<string, Readonly<Record<string, FunctionEffect>>>
+	>;
 	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly additionalFrameworkApiSources?: readonly string[];
 	/**
@@ -39,6 +49,25 @@ export type SemanticGraphInput = {
 	 * renders it as a child, so its props never change in the browser.
 	 */
 	readonly routeRoot?: boolean;
+};
+
+/** What a function does with the value handed to one of its parameters. */
+export type ParameterEffect = {
+	/** Member paths below the value that the function changes in place; `[]` is the value itself, null somewhere inside it. */
+	readonly mutates: ReadonlyArray<ReadonlyArray<string> | null>;
+	/** Paths it keeps a reference to past the call (a closure, a variable, its return value); null is somewhere inside. */
+	readonly retains: ReadonlyArray<ReadonlyArray<string> | null>;
+	/** Functions it hands the value, or a part of it, to that the analysis could not see. */
+	readonly unseen: ReadonlyArray<{
+		readonly callee: string;
+		readonly path: ReadonlyArray<string> | null;
+	}>;
+};
+
+export type FunctionEffect = {
+	readonly parameters: ReadonlyArray<ParameterEffect>;
+	/** An exported value, not a function, that code in its own module reassigns or changes in place. */
+	readonly changedByItsModule?: true;
 };
 
 export type ServerOnlyProp = {
@@ -759,6 +788,8 @@ export type SemanticEvent = {
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_PARSE_ERROR'
+		| 'MARKLESS_STATE_PASSED_BY_REFERENCE'
+		| 'MARKLESS_TEMPLATE_READS_CHANGING_IMPORT'
 		| 'MARKLESS_UI_IMPORT_SHAPE'
 		| 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED'
 		| 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED'
@@ -862,6 +893,8 @@ export type SemanticStateWrite = {
 	readonly through?: SemanticWriteThrough;
 	/** `Object.assign(target, ...sources)`: `target` is the first argument, `argumentSources` the rest. */
 	readonly objectAssign?: true;
+	/** A function this call hands state to changes it at `target`; `callSource` is the call's text. */
+	readonly changedByCall?: { readonly callSource: string };
 };
 
 /**
@@ -901,6 +934,7 @@ export type SemanticWriteThrough =
 				| 'map-entry'
 				| 'nested-element'
 				| 'reassigned'
+				| 'returned'
 				| 'row-item';
 			readonly source: string;
 	  };
@@ -1305,6 +1339,8 @@ export type SemanticGraphArtifact = {
 	readonly componentPropBindings: ReadonlyArray<SemanticComponentPropDeclaration>;
 	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
 	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
+	/** Import specifiers whose function summaries this compile needs; see `importedFunctionSummaries`. */
+	readonly importedFunctionRequests?: ReadonlyArray<string>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
@@ -1530,6 +1566,8 @@ export type LoweredStateWrite = {
 	readonly through?: LoweredWriteThrough;
 	/** `Object.assign(target, ...sources)`: each member the sources carry is written. */
 	readonly objectAssign?: true;
+	/** The path changes in place inside the call `source` names; it is invalidated after that call returns. */
+	readonly changedByCall?: true;
 };
 
 export type LoweredWriteThrough = {

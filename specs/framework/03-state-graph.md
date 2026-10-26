@@ -467,6 +467,37 @@ onto one of these locals is one graph write per member the sources carry. A
 write through such a local inside `computed()` is the same
 `MARKLESS_STATE_WRITE_IN_COMPUTED` refusal as a direct write.
 
+#### State handed to functions
+
+A handler, callback or `attach` body that passes a state object (or an array or
+object literal holding one) to a function is decided by what that function does
+with the value, as far as the compiler can read it:
+
+| The function                                                | Example                                                                                                             | Result                                                             |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| only reads it                                               | `JSON.stringify(user)`, `String(user.first)`, a helper that returns `user.first + user.last`                        | plain call                                                         |
+| receives a primitive                                        | `format(user.createdAt)` where the state's initial value there is a string or number                                | plain call                                                         |
+| changes it in place before it returns, and keeps none of it | `rename(user, 'Cy')` where `rename` does `u.first = next`; `addItem(list, x)` doing `list.push(x)`; `Object.assign` | the call runs as written, then each path it changed is invalidated |
+| keeps a reference past the call                             | a closure that changes it later, an `async` body that changes it after `await`, storing it in another object        | build error `MARKLESS_STATE_PASSED_BY_REFERENCE`                   |
+| hands it on to code the compiler cannot read                | a package import, a function picked at runtime (`registry.get(op)?.(s)`), a method of an unknown object             | build error `MARKLESS_STATE_PASSED_BY_REFERENCE`                   |
+
+"Can read" means: a function declared in the same file, or an export of a
+module the bundler resolves to a source file outside `node_modules`. The bundler
+summarizes those modules (what each exported function changes, keeps or hands
+on, per parameter) and recompiles the importer with the summaries; a compile
+that is given no summaries treats an imported function as not yet known rather
+than refusing it. Whether a value can be an object is read from the state's
+initial value; anything not known is treated as one. The diagnostic offers the
+safe patterns: pass the fields the function reads, pass a copy and assign the
+result back, or keep a live object inside a library and copy its changes into
+state from the library's own callbacks in an `attach` behaviour.
+
+The same summaries say which exported plain values a module changes itself
+(`export const store = { count: 0 }` with a function doing `store.count++`). A
+template that reads one is refused with `MARKLESS_TEMPLATE_READS_CHANGING_IMPORT`:
+the page would show its first value forever, because only state changes reach
+the page. Keep such a value in `shared()` or `state()` instead.
+
 For object state:
 
 ```tsrx

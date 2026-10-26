@@ -1,0 +1,204 @@
+import { expect, test } from 'vitest';
+import { compileTsrxModule, summarizeModuleFunctions } from '../src/index.ts';
+
+// A handler that hands a state object to a function is decided by what that
+// function does with it: a function the compiler can read that changes it in
+// place has each change invalidated after the call; one that keeps it, hands it
+// on to code nobody can read, or cannot be read at all fails the build.
+
+const helpers = `
+export function retitle(card: { title: string }, next: string) { card.title = next; }
+export function append(list: string[], entry: string) { list.push(entry); }
+export function setCount(rows: Array<{ key: string; count: number }>, key: string, count: number) {
+	const hit = rows.find((row) => row.key === key);
+	if (hit) hit.count = count;
+}
+export function caption(card: { title: string; notes: string[] }) { return card.title + card.notes.length; }
+export function watch(card: { title: string }) { return { later: () => { card.title = 'late'; } }; }
+export function forward(card: { title: string }) { vendorSave(card); }
+export async function settle(card: { title: string }) { await Promise.resolve(); card.title = 'done'; }
+declare function vendorSave(value: unknown): void;
+`;
+
+const summaries = {
+	'./cards.ts': summarizeModuleFunctions({ filename: 'src/cards.ts', source: helpers })!,
+	'card-kit': {},
+};
+
+async function compile(handlerBody: string) {
+	return compileTsrxModule({
+		filename: 'src/Board.tsrx',
+		source: `import { state } from '@markless/core';
+import { append, caption, forward, retitle, setCount, settle, watch } from './cards.ts';
+import { pack } from 'card-kit';
+
+function local(card: { title: string }) { card.title = card.title.toUpperCase(); }
+
+export function Board() @{
+	let card = state({ title: 'a', notes: ['n'] });
+	let rows = state([{ key: 'k', count: 0 }]);
+	let picked = state('');
+	<div>
+		<output>{card.title}</output>
+		<output>{rows[0].count}</output>
+		<output>{picked}</output>
+		<button onClick={() => { ${handlerBody} }}>go</button>
+	</div>
+}
+`,
+		symbols: [],
+		importedFunctionSummaries: summaries,
+	});
+}
+
+type Compiled = Awaited<ReturnType<typeof compile>>;
+
+function errors(result: Compiled) {
+	return [
+		...result.semanticGraph.diagnostics,
+		...result.stateLowering.diagnostics,
+		...result.symbolModules.diagnostics,
+	].filter((diagnostic) => diagnostic.severity === 'error');
+}
+
+function handlerSource(result: Compiled): string {
+	return result.symbolModules.modules.find((module) => module.kind === 'event-handler')!.source;
+}
+
+test('a module summary says which parameters a function changes, keeps or hands on', () => {
+	expect(summaries['./cards.ts']).toMatchObject({
+		retitle: {
+			parameters: [{ mutates: [['title']], retains: [], unseen: [] }, expect.anything()],
+		},
+		append: { parameters: [{ mutates: [[]] }, { mutates: [], retains: [], unseen: [] }] },
+		setCount: { parameters: [{ mutates: [null] }, expect.anything(), expect.anything()] },
+		caption: { parameters: [{ mutates: [], retains: [], unseen: [] }] },
+		watch: { parameters: [{ mutates: [], retains: [[]] }] },
+		forward: { parameters: [{ unseen: [{ callee: 'vendorSave', path: [] }] }] },
+		settle: { parameters: [{ mutates: [], retains: [[]] }] },
+	});
+});
+
+test('a helper that changes the state it is handed has each change invalidated after it returns', async () => {
+	const result = await compile(
+		`retitle(card, 'b'); append(card.notes, 'm'); setCount(rows, 'k', 2); local(card); picked = caption(card);`,
+	);
+
+	expect(errors(result)).toEqual([]);
+	expect(
+		result.stateLowering.writes
+			.filter((write) => write.changedByCall)
+			.map((write) => [write.source, write.graphNodeId, write.path]),
+	).toEqual([
+		["retitle(card, 'b')", 'state:card', ['title']],
+		["append(card.notes, 'm')", 'state:card', ['notes']],
+		["setCount(rows, 'k', 2)", 'state:rows', []],
+		['local(card)', 'state:card', ['title']],
+	]);
+	expect(handlerSource(result)).toContain(
+		`marklessAfterCall(retitle(context.graph.read("state:card"), 'b'), context.graph, { graphNodeId: "state:card", path: ["title"] })`,
+	);
+});
+
+test('a change made through a row local found in state is invalidated where that row lives', async () => {
+	const result = await compile(
+		`const row = rows.find((r) => r.key === 'k'); if (row) setCount([row], 'k', 1); retitle(row as never, 'x');`,
+	);
+
+	expect(errors(result).map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining(
+			'Cannot pass "[row]" to setCount() here: "[row]" holds state objects',
+		),
+	]);
+	expect(handlerSource(result)).toContain(
+		'marklessAfterCall(retitle(row, \'x\'), marklessWriteThrough(context, "state:rows", [], row, true), { graphNodeId: "state:rows", path: ["title"] })',
+	);
+});
+
+test.each([
+	['watch(card)', 'watch() keeps a reference to it after it returns'],
+	['forward(card)', 'forward() hands it on to vendorSave()'],
+	['settle(card)', 'settle() keeps a reference to it after it returns'],
+	['pack(card)', 'Markless cannot see what pack() does with it'],
+	[
+		'window.structuredClone(card)',
+		'Markless cannot see what window.structuredClone() does with it',
+	],
+])('%s fails the build naming what the function does', async (body, reason) => {
+	const result = await compile(body);
+
+	expect(errors(result)).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_PASSED_BY_REFERENCE',
+			statePath: 'card',
+			message: expect.stringContaining(reason),
+		}),
+	]);
+});
+
+test('reading state through pure built-ins, or handing over a primitive, is not a refusal', async () => {
+	const result = await compile(
+		`picked = JSON.stringify(card) + String(card.title) + Object.keys(card).join() + caption(card); pack(card.title); console.log(card, rows);`,
+	);
+
+	expect(errors(result)).toEqual([]);
+});
+
+test('without summaries from the host, an imported function is a pending request and not a refusal', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Board.tsrx',
+		source: `import { state } from '@markless/core';
+import { retitle } from './cards.ts';
+
+export function Board() @{
+	let card = state({ title: 'a' });
+	<button onClick={() => retitle(card, 'b')}>{card.title}</button>
+}
+`,
+		symbols: [],
+	});
+
+	expect(errors(result)).toEqual([]);
+	expect(result.semanticGraph.importedFunctionRequests).toEqual(['./cards.ts']);
+});
+
+test('a template read of a plain value its module changes is refused; a constant import is not', async () => {
+	const module = summarizeModuleFunctions({
+		filename: 'src/tally.ts',
+		source: `export const tally = { hits: 0 };
+export const LABEL = { text: 'Hits' };
+export function hit() { tally.hits++; }
+`,
+	})!;
+	expect(module.tally).toEqual({ parameters: [], changedByItsModule: true });
+	expect(module.LABEL).toBeUndefined();
+
+	const result = await compileTsrxModule({
+		filename: 'src/Tally.tsrx',
+		source: `import { LABEL, hit, tally } from './tally.ts';
+
+export function Tally() @{
+	<button onClick={() => hit()}>{LABEL.text} {tally.hits}</button>
+}
+`,
+		symbols: [],
+		importedFunctionSummaries: { './tally.ts': module },
+	});
+
+	expect(errors(result)).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_TEMPLATE_READS_CHANGING_IMPORT',
+			statePath: 'tally.hits',
+		}),
+	]);
+});
+
+test('a write through what a function returned after it was handed state is refused', async () => {
+	const result = await compile(
+		`const found = local(card) ?? card; const echo = caption(card); found.title = 'x';`,
+	);
+
+	expect(errors(result).map((diagnostic) => diagnostic.code)).toContain(
+		'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+	);
+});

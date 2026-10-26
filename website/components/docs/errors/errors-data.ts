@@ -4408,6 +4408,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_GRAPH_TOUCH_UNSUPPORTED',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/write-through.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/write-through.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -9663,6 +9680,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_STATE_PASSED_BY_REFERENCE',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'State object handed to code Markless cannot follow: a Markless build error.',
+		printed: [
+			'MARKLESS_STATE_PASSED_BY_REFERENCE: Cannot pass "<argument>" to <callee>() here: "<argument>" <value>, and <value>. A change made to it there would not reach the page.',
+			'Markless has no runtime proxies. A state change reaches the page only when the compiler sees the write, so a state object handed to a function must not be changed inside it, now or later.',
+			'If <callee>() only reads it, pass the fields it reads, or a copy: `<callee>({ ...<argument> })`.',
+			'https://markless.dev/errors/MARKLESS_STATE_PASSED_BY_REFERENCE',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/collect-state-escapes.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/collect-state-escapes.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -10662,6 +10701,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_TEMPLATE_READS_CHANGING_IMPORT',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'The page shows a changing plain value once: a Markless build error.',
+		printed: [
+			'MARKLESS_TEMPLATE_READS_CHANGING_IMPORT: The page shows `<source>` once: "<root>" is a plain value that its module (<specifier>) changes, and only changes to state reach the page.',
+			'Markless has no runtime proxies. A value outside state() and shared() is rendered as it is when the page renders, and nothing tells the page when code elsewhere changes it.',
+			'Keep "<root>" in state: create it with shared() in a .tsrx module and change it through the instance, or keep a state() in this component that the code changing "<root>" also writes.',
+			'https://markless.dev/errors/MARKLESS_TEMPLATE_READS_CHANGING_IMPORT',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/collect-state-escapes.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/collect-state-escapes.ts',
 			},
 		],
 		moreSources: 0,
