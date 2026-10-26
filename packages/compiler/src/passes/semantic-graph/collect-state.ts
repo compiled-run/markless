@@ -25,7 +25,11 @@ import {
 	isFrameworkApiName,
 	type FrameworkApiName,
 } from './imports.ts';
-import { collectDestructuredAliases, collectWholeBindingAlias } from './collect-aliases.ts';
+import {
+	collectDestructuredAliases,
+	collectWholeBindingAlias,
+	patternIdentifiers,
+} from './collect-aliases.ts';
 import { collectAsyncComputedPostAwaitReads, collectGraphDependencies } from './collect-async.ts';
 import {
 	collectExpressionReads,
@@ -43,6 +47,7 @@ import {
 	helperStateReturnUnsupportedDiagnostic,
 	nestedStateCreationDiagnostic,
 	stateElementHandleUnsupportedDiagnostic,
+	stateFunctionValueUnsupportedDiagnostic,
 	unsupportedHelperStateReturnDiagnostic,
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
@@ -72,6 +77,17 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		if (id && init && !name && collectUnsupportedHelperReturnShape(id, init, state)) {
 			continue;
 		}
+		if (id && !name && (id.type === 'ObjectPattern' || id.type === 'ArrayPattern'))
+			for (const local of patternIdentifiers(id)) {
+				const localName = getIdentifierName(local);
+				if (!localName || state.graph.aliases.some((alias) => alias.sourceSpan?.start === local.start))
+					continue;
+				state.graph.localDeclarations.push({
+					name: localName,
+					scope: localDeclarationScope(state),
+					componentName: state.currentComponentName ?? undefined,
+				});
+			}
 		if (!id || !name || !init) continue;
 
 		state.graph.localDeclarations.push({
@@ -224,6 +240,15 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			const partialInitial = evaluatedInitial.ok
 				? null
 				: partialInitialStateValue(initial, state);
+			const storedFunction = findFunctionStateValue(initial);
+			if (storedFunction)
+				state.graph.diagnostics.push(
+					stateFunctionValueUnsupportedDiagnostic({
+						stateName: name,
+						source: expressionSource(storedFunction, state.source),
+						sourceSpan: sourceSpan(storedFunction, state.filename),
+					}),
+				);
 			const elementHandle = findElementHandleStateValue(initial, state);
 			if (elementHandle) {
 				state.graph.diagnostics.push(
@@ -1438,6 +1463,33 @@ function containsNonSerializableConstantValue(
 	if (isFunctionValue(node) || isClassInstanceValue(node) || isDomNodeValue(node)) return true;
 
 	return isNonSerializableConstantValue(node, state);
+}
+
+// A literal's own values only: a function that returns data is a value that never reaches state.
+function findFunctionStateValue(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'ClassExpression'
+	)
+		return node;
+	if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'ParenthesizedExpression')
+		return findFunctionStateValue(node.expression as AnyNode | undefined);
+	if (node.type === 'ObjectExpression')
+		for (const property of asNodes(node.properties)) {
+			if (property.type === 'Property' && property.method === true) return property;
+			const found = findFunctionStateValue(
+				(property.type === 'SpreadElement' ? property.argument : property.value) as AnyNode | undefined,
+			);
+			if (found) return found;
+		}
+	if (node.type === 'ArrayExpression')
+		for (const element of asNodes(node.elements)) {
+			const found = findFunctionStateValue(element);
+			if (found) return found;
+		}
+	return null;
 }
 
 function findElementHandleStateValue(

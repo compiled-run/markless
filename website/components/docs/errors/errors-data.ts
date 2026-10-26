@@ -9204,6 +9204,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A function cannot be stored in state: a Markless build error.',
+		printed: [
+			'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE: state "<stateName>" holds a function, `<source>`, in its initial value. A function cannot be written into the page, so the browser would read a value that is not callable.',
+			'state() values are serialized into the page and the browser resumes from them without running the component body, so only data (strings, numbers, booleans, null, arrays and plain objects) survives the trip.',
+			'Keep the function outside state(): declare it in the component body or at module scope, and store only the data it needs, for example a name to pick it by.',
+			'https://markless.dev/errors/MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
