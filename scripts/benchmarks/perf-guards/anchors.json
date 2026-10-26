@@ -1818,6 +1818,14 @@
 			"from": 1118,
 			"to": 1787,
 			"reason": "the reader now expands a keyed row's instance path from the payload's path table and fills rows served beside cells and events: recursive-payload repro resume data 428,731 -> 42,540 B, HN 484-comment item HTML 2,496,301 -> 1,190,056 B raw; loaded only with the templated-list reader, nothing runs at page load"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
+			"subject": "web/resume-stream-patches",
+			"from": 2260,
+			"to": 2414,
+			"reason": "a streamed arm's record set may now be served as templates, so adoption expands it before registering (+44 B of the +154; the rest is earlier growth since the last anchor)"
 		}
 	],
 	"runtimeModules": {
@@ -1930,7 +1938,7 @@
 		"web/resume-runtime-shared": 2089,
 		"web/resume-runtime-start": 9385,
 		"web/resume-shared-patch": 1200,
-		"web/resume-stream-patches": 2260,
+		"web/resume-stream-patches": 2414,
 		"web/resume-sync-computed": 2597,
 		"web/resume-sync-demand": 1099,
 		"web/runtime-error-reporting": 1876,
