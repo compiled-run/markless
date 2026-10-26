@@ -470,8 +470,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 
 	function renderChunk(
 		chunkId: string,
-		// The async-arm path forwards the caller's read context; only item/index
-		// are read here.
+		// The async-arm path forwards the caller's read context.
 		repeat: {
 			readonly item?: unknown;
 			readonly index?: number;
@@ -505,6 +504,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
 			hostSegment: repeat.hostSegment,
 			sharedSeeds: repeat.sharedSeeds,
+			...(repeat.asyncError !== undefined ? { asyncError: repeat.asyncError } : {}),
 		};
 		// Statics and slots as one ordered stream, so a slot that answers with a
 		// promise resumes the walk exactly where it stopped.

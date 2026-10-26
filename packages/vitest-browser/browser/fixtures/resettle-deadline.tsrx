@@ -1,10 +1,7 @@
 import { computed, state } from '@markless/core';
 import { ReportBadge } from './report-badge.tsrx';
 
-// T120 deadline-gated @pending on re-settles: this refresh is SLOW (well past
-// the 250ms client deadline), so after holding the prior settled content the
-// boundary must commit its @pending arm, keep it visible at least the pending
-// minimum, then commit the fresh settled content.
+// A 350 ms refresh: past the navigation deadline, far under the re-settle stall threshold.
 export function App() @{
 	let query = state('alpha');
 	const report = computed(async ({ signal }) => {

@@ -8,22 +8,15 @@ import {
 import { createResettleHold } from '../src/resume-resettle-hold.ts';
 import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
 
-// T119/T120 deadline-gated @pending on RE-settles, property-tested under the
-// deterministic fake clock (same discipline as navigation-hold.test.ts and
-// settle-tracker-timing.test.ts). When a settled boundary's async computed
-// re-runs, the boundary holds the prior settled content; only a refresh still
-// pending at the client deadline commits the @pending arm, which then stays
-// visible at least the pending minimum before the settled content commits.
-// Fast re-settles (the overwhelming case) never touch the DOM before settle.
-//
-// These tests drive the REAL production units exactly as the runtime wires
-// them: the re-settle hold (resume-resettle-hold.ts) raising the settle
-// tracker's commit floor BEFORE its pending-arm commit, and the production
-// settle path (settleAsyncBoundaryRange) waiting that floor out with its
-// supersede re-check.
+import {
+	MARKLESS_PENDING_MIN_VISIBLE_MS as PENDING_MIN,
+	MARKLESS_PENDING_REFRESH_STALL_MS as STALL,
+} from '../src/pending-timing.ts';
 
-const DEADLINE = 250; // MARKLESS_PENDING_SETTLE_DEADLINE_MS (shared timing module)
-const PENDING_MIN = 200; // MARKLESS_PENDING_MIN_VISIBLE_MS
+// Spec D8 re-settle under the fake clock: a refresh over settled content keeps
+// it busy; only a newest run still pending STALL ms after it started commits
+// @pending, which then stays at least PENDING_MIN before the settle commits.
+// Drives the real hold and the real settle path (settleAsyncBoundaryRange).
 
 function boundaryRecord(id: string): ResumeAsyncBoundaryRecord {
 	return {
@@ -36,25 +29,29 @@ function boundaryRecord(id: string): ResumeAsyncBoundaryRecord {
 }
 
 type ResettleCase = {
-	/** Virtual time the refresh's settled snapshot arrives. */
+	/** Virtual time the newest run's settled snapshot arrives. */
 	readonly settleAt: number;
-	/** A second refresh's pending snapshot while the first is still pending. */
-	readonly secondPendingAt?: number;
+	/** A newer run starting while the first is still pending. */
+	readonly newerRunAt?: number;
 	/** Whether the boundary has a client-known @pending arm to commit. */
 	readonly available: boolean;
 };
 
 type ResettleRun = {
 	readonly pendingShownAt: readonly number[];
+	readonly busy: readonly { readonly at: number; readonly busy: boolean }[];
 	readonly committedAt: number;
 };
 
-function createHarness(available: boolean, commitWaitMs = 0) {
+function createHarness(available: boolean, commitWaitMs = 0, settledAtStart = true) {
 	const clock = createFakeClock();
 	const boundary = boundaryRecord('report');
-	let status: string = 'fulfilled';
+	if (!settledAtStart)
+		Object.assign(boundary, { initiallyServedArm: ASYNC_BOUNDARY_ARM.pending });
+	let status: string = settledAtStart ? 'fulfilled' : 'pending';
 	const pendingShownAt: number[] = [];
 	const pendingCommittedAt: number[] = [];
+	const busy: { at: number; busy: boolean }[] = [];
 	const tracker = createAsyncBoundarySettleTracker({
 		boundaries: [boundary],
 		clock,
@@ -68,6 +65,7 @@ function createHarness(available: boolean, commitWaitMs = 0) {
 			if (commitWaitMs > 0) await clock.wait(commitWaitMs);
 			pendingCommittedAt.push(clock.now());
 		},
+		setBusy: (_, next) => void busy.push({ at: clock.now(), busy: next }),
 		clock,
 	});
 	const settle = (snapshot: unknown) =>
@@ -84,173 +82,159 @@ function createHarness(available: boolean, commitWaitMs = 0) {
 			boundary,
 			snapshot,
 		);
+	let version = 1;
+	const startRun = () => {
+		status = 'pending';
+		version += 1;
+		hold(boundary, { status: 'pending', version });
+	};
+	const finishRun = () => {
+		status = 'fulfilled';
+		hold(boundary, { status: 'fulfilled', version });
+		return settle({ status: 'fulfilled', version });
+	};
 	return {
 		clock,
 		boundary,
-		tracker,
 		hold,
-		settle,
+		startRun,
+		finishRun,
 		setStatus: (next: string) => {
 			status = next;
 		},
+		currentVersion: () => version,
 		pendingShownAt,
 		pendingCommittedAt,
+		busy,
 	};
 }
 
 async function runResettle(resettleCase: ResettleCase): Promise<ResettleRun> {
 	const harness = createHarness(resettleCase.available);
-	const { clock, boundary, hold } = harness;
-
-	// The mutation re-runs the async computed: a pending snapshot arrives for
-	// a boundary that already shows settled content (prior-value retention).
-	harness.setStatus('pending');
-	hold(boundary, { status: 'pending' });
-
-	if (
-		resettleCase.secondPendingAt !== undefined &&
-		resettleCase.secondPendingAt < resettleCase.settleAt
-	) {
-		await clock.advanceTo(resettleCase.secondPendingAt);
-		hold(boundary, { status: 'pending' });
+	const { clock } = harness;
+	harness.startRun();
+	if (resettleCase.newerRunAt !== undefined && resettleCase.newerRunAt < resettleCase.settleAt) {
+		await clock.advanceTo(resettleCase.newerRunAt);
+		harness.startRun();
 	}
-
 	await clock.advanceTo(resettleCase.settleAt);
-	harness.setStatus('fulfilled');
-	hold(boundary, { status: 'fulfilled' });
 	let committedAt = -1;
-	const settled = harness.settle({ status: 'fulfilled' }).then((entries) => {
+	const settled = harness.finishRun().then((entries) => {
 		expect(entries).toHaveLength(2);
 		committedAt = clock.now();
 	});
-
-	await clock.advanceTo(10_000);
+	await clock.advanceTo(40_000);
 	await settled;
 	expect(clock.pendingWaits(), 'leaked timing waits').toBe(0);
-	return { pendingShownAt: harness.pendingShownAt, committedAt };
+	return { pendingShownAt: harness.pendingShownAt, busy: harness.busy, committedAt };
 }
 
-test('re-settle ordering grid: deadline gate, min-duration, second-refresh, unavailable pending arm', async () => {
+test('re-settle grid: busy from the first run, stall clock restarts on a newer run, fallback keeps its minimum', async () => {
+	const settleTimes = [0, 100, 300, 2_000, 4_900, 5_000, 5_100, 6_000, 7_900, 8_000, 8_100, 9_000];
 	for (const available of [true, false]) {
-		for (const secondPendingAt of [undefined, 40, 300]) {
-			for (let settleAt = 0; settleAt <= 600; settleAt += 50) {
-				if (secondPendingAt !== undefined && secondPendingAt >= settleAt) continue;
-				const label = `settleAt=${settleAt} second=${String(secondPendingAt)} available=${String(available)}`;
-				const run = await runResettle({ settleAt, secondPendingAt, available });
-
-				if (!available) {
-					// No client-known @pending arm (server-settled boundary): no
-					// deadline race at all — prior behavior, commit at settle.
-					expect(run.pendingShownAt, label).toEqual([]);
-					expect(run.committedAt, label).toBe(settleAt);
-				} else if (settleAt < DEADLINE) {
-					// Fast re-settle: no pending frame, commit exactly at settle.
+		for (const newerRunAt of [undefined, 40, 3_000]) {
+			for (const settleAt of settleTimes) {
+				if (newerRunAt !== undefined && newerRunAt >= settleAt) continue;
+				const label = `settleAt=${settleAt} newer=${String(newerRunAt)} available=${String(available)}`;
+				const run = await runResettle({ settleAt, newerRunAt, available });
+				const stallAt = (newerRunAt ?? 0) + STALL;
+				const fallback = available && settleAt >= stallAt;
+				expect(run.busy[0], label).toEqual({ at: 0, busy: true });
+				expect(run.busy.every((entry) => entry.busy), label).toBe(true);
+				if (!fallback) {
 					expect(run.pendingShownAt, label).toEqual([]);
 					expect(run.committedAt, label).toBe(settleAt);
 				} else {
-					// Slow re-settle: @pending commits exactly at the deadline —
-					// a second refresh never restarts the deadline timer — and
-					// the settled content waits out the pending minimum.
-					expect(run.pendingShownAt, label).toEqual([DEADLINE]);
-					expect(run.committedAt, label).toBe(Math.max(settleAt, DEADLINE + PENDING_MIN));
+					expect(run.pendingShownAt, label).toEqual([stallAt]);
+					expect(run.committedAt, label).toBe(Math.max(settleAt, stallAt + PENDING_MIN));
 				}
 			}
 		}
 	}
 });
 
-test('a settle racing the deadline exactly: the pending arm is skipped once the graph settled', async () => {
+test('a settle racing the stall exactly: the pending arm is skipped once the graph settled', async () => {
 	const harness = createHarness(true);
-	const { clock, boundary, hold } = harness;
-	harness.setStatus('pending');
-	hold(boundary, { status: 'pending' });
-	// The deadline waiter fires during this advance while the graph already
-	// reads fulfilled (the settle write landed, its notification has not run
-	// yet): the pending commit must bail. Documented tie rule: the floor was
-	// raised before the bail, so the settle commit waits it out — prior
-	// content simply stays a little longer; nothing flashes.
+	const { clock } = harness;
+	harness.startRun();
+	// The graph already reads fulfilled when the stall fires; the raised floor only holds the prior content a little longer.
 	harness.setStatus('fulfilled');
-	await clock.advanceTo(DEADLINE);
-	hold(boundary, { status: 'fulfilled' });
+	await clock.advanceTo(STALL);
 	let committedAt = -1;
-	const settled = harness.settle({ status: 'fulfilled' }).then(() => {
+	const settled = harness.finishRun().then(() => {
 		committedAt = clock.now();
 	});
-	await clock.advanceTo(10_000);
+	await clock.advanceTo(40_000);
 	await settled;
 	expect(harness.pendingShownAt).toEqual([]);
-	expect(committedAt).toBe(DEADLINE + PENDING_MIN);
+	expect(committedAt).toBe(STALL + PENDING_MIN);
 });
 
-test('two sequential refreshes each get their own deadline epoch', async () => {
+test('two sequential refreshes each get their own stall clock', async () => {
 	const harness = createHarness(true);
-	const { clock, boundary, hold } = harness;
-
-	// Refresh 1 settles fast at t=100: no pending frame.
-	harness.setStatus('pending');
-	hold(boundary, { status: 'pending' });
+	const { clock } = harness;
+	harness.startRun();
 	await clock.advanceTo(100);
-	harness.setStatus('fulfilled');
-	hold(boundary, { status: 'fulfilled' });
-	await harness.settle({ status: 'fulfilled' });
+	await harness.finishRun();
 	expect(harness.pendingShownAt).toEqual([]);
 
-	// Refresh 2 starts at t=150 and settles slow at t=700: deadline at 150+250.
 	await clock.advanceTo(150);
-	harness.setStatus('pending');
-	hold(boundary, { status: 'pending' });
-	await clock.advanceTo(700);
-	harness.setStatus('fulfilled');
-	hold(boundary, { status: 'fulfilled' });
+	harness.startRun();
+	await clock.advanceTo(6_000);
 	let committedAt = -1;
-	const settled = harness.settle({ status: 'fulfilled' }).then(() => {
+	const settled = harness.finishRun().then(() => {
 		committedAt = clock.now();
 	});
-	await clock.advanceTo(10_000);
+	await clock.advanceTo(40_000);
 	await settled;
-	expect(harness.pendingShownAt).toEqual([400]);
-	expect(committedAt).toBe(700); // settle landed after the min-duration window
+	expect(harness.pendingShownAt).toEqual([150 + STALL]);
+	expect(committedAt).toBe(6_000);
+	expect(harness.busy.map((entry) => entry.at)).toEqual([0, 150, 150 + STALL]);
 	expect(clock.pendingWaits()).toBe(0);
 });
 
-test('pending snapshots while the pending arm is showing never re-commit it', async () => {
+test('re-notifies of the same run never restart the clock, and newer runs never re-commit a shown fallback', async () => {
 	const harness = createHarness(true);
 	const { clock, boundary, hold } = harness;
-	harness.setStatus('pending');
-	hold(boundary, { status: 'pending' });
-	await clock.advanceTo(300); // deadline passed at 250, pending arm shown
-	hold(boundary, { status: 'pending' }); // still-pending re-notify
-	await clock.advanceTo(320);
-	hold(boundary, { status: 'pending' });
-	await clock.advanceTo(500);
-	harness.setStatus('fulfilled');
-	hold(boundary, { status: 'fulfilled' });
-	const settled = harness.settle({ status: 'fulfilled' });
-	await clock.advanceTo(10_000);
+	harness.startRun();
+	await clock.advanceTo(1_000);
+	hold(boundary, { status: 'pending', version: harness.currentVersion() });
+	await clock.advanceTo(STALL + 100);
+	expect(harness.pendingShownAt).toEqual([STALL]);
+	harness.startRun();
+	await clock.advanceTo(STALL + 300);
+	harness.startRun();
+	await clock.advanceTo(3 * STALL);
+	const settled = harness.finishRun();
+	await clock.advanceTo(40_000);
 	await settled;
-	expect(harness.pendingShownAt).toEqual([250]); // exactly one pending commit
+	expect(harness.pendingShownAt).toEqual([STALL]);
 });
 
 test('floor-first ordering: a settle racing an in-flight pending commit lands strictly after it', async () => {
-	// The pending-arm commit itself takes 30 virtual ms; the settle snapshot
-	// arrives while it is still committing. The floor (raised BEFORE the
-	// commit) makes the settle wait out the pending minimum, so the settled
-	// content can never be stomped by the pending arm.
 	const harness = createHarness(true, 30);
-	const { clock, boundary, hold } = harness;
-	harness.setStatus('pending');
-	hold(boundary, { status: 'pending' });
-	await clock.advanceTo(DEADLINE); // deadline fires; pending commit in flight (until 280)
-	harness.setStatus('fulfilled');
-	hold(boundary, { status: 'fulfilled' });
+	const { clock } = harness;
+	harness.startRun();
+	await clock.advanceTo(STALL);
 	let committedAt = -1;
-	const settled = harness.settle({ status: 'fulfilled' }).then(() => {
+	const settled = harness.finishRun().then(() => {
 		committedAt = clock.now();
 	});
-	await clock.advanceTo(10_000);
+	await clock.advanceTo(40_000);
 	await settled;
-	expect(harness.pendingShownAt).toEqual([DEADLINE]);
-	expect(harness.pendingCommittedAt).toEqual([DEADLINE + 30]);
-	expect(committedAt).toBe(DEADLINE + PENDING_MIN); // strictly after the pending commit
+	expect(harness.pendingShownAt).toEqual([STALL]);
+	expect(harness.pendingCommittedAt).toEqual([STALL + 30]);
+	expect(committedAt).toBe(STALL + PENDING_MIN);
 	expect(clock.pendingWaits()).toBe(0);
+});
+
+test('a run during the first load is neither held nor marked busy', async () => {
+	const harness = createHarness(true, 0, false);
+	const { clock } = harness;
+	harness.startRun();
+	await clock.advanceTo(2 * STALL);
+	harness.startRun();
+	await clock.advanceTo(4 * STALL);
+	expect(harness.busy).toEqual([]);
+	expect(harness.pendingShownAt).toEqual([]);
 });

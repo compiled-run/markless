@@ -208,8 +208,7 @@ export async function startResumeRuntime(input: {
 		settleTracker = asyncWiring.createAsyncBoundarySettleTracker({
 			boundaries: prepared.asyncBoundariesById.values(),
 		});
-		// T119/T120: deadline-gated @pending on re-settles (captures the mounted
-		// @pending arms before the runners are demanded below).
+		// Captures the mounted @pending arms before the runners are demanded below.
 		const { wireResettleHold } = await import('./resume-resettle-hold.ts');
 		const onAsyncSnapshot = wireResettleHold({
 			tracker: settleTracker,

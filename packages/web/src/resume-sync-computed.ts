@@ -116,10 +116,16 @@ function awaitsAsyncAncestor(
 		visited.add(graphNodeId);
 		const record = records.find((candidate) => candidate.graphNodeId === graphNodeId);
 		if (record?.async === true) {
-			if (graph.read(graphNodeId, ['status']) !== 'fulfilled') return true;
+			if (!hasReadableValue(graph.read(graphNodeId, []))) return true;
 		} else if (record && awaitsAsyncAncestor(record, records, graph, visited)) return true;
 	}
 	return false;
+}
+
+// A re-run keeps its prior settled value readable (spec D8), so only a first run or a rejection has nothing to read.
+function hasReadableValue(snapshot: unknown): boolean {
+	const { status, value } = (snapshot as { readonly status?: unknown; readonly value?: unknown } | null) ?? {};
+	return status === 'fulfilled' || (status === 'pending' && value !== undefined);
 }
 
 // A shared seed re-runs its own authored expression, so its prop reads have to

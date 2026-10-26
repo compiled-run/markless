@@ -1007,7 +1007,9 @@ export function evaluatePrerenderDataComponent(input: {
 						const status = boundary?.runnerGraphNodeId
 							? runnerStatus(boundary.runnerGraphNodeId, state.computed)
 							: undefined;
-						return status === 'fulfilled' ? 0 : status === 'rejected' ? 2 : 1;
+						if (status === 'rejected')
+							return { arm: 2, error: runnerError(boundary!.runnerGraphNodeId!, state.computed) };
+						return status === 'fulfilled' ? 0 : 1;
 					},
 					seedChild: (slot, context) =>
 						marklessRosterSeedPass(context.sharedSeeds, () =>
@@ -1217,6 +1219,19 @@ function runnerStatus(
 		if (settled !== 'fulfilled') status = 'pending';
 	}
 	return status;
+}
+
+function runnerError(
+	graphNodeId: string,
+	computed: ProtocolStatePayload['computed'],
+	visited = new Set<string>(),
+): unknown {
+	visited.add(graphNodeId);
+	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
+	if (record?.async) return (record.snapshot as { readonly error?: unknown } | undefined)?.error;
+	for (const { graphNodeId: next } of record?.dependencies ?? [])
+		if (!visited.has(next) && runnerStatus(next, computed, new Set(visited)) === 'rejected')
+			return runnerError(next, computed, visited);
 }
 
 async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {

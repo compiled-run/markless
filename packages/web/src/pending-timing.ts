@@ -1,7 +1,7 @@
 // Client pending-UI timing — the single source for BOTH consumers of the
 // deadline-gated @pending ruling (spec D8 + T119): router navigation swaps
 // (packages/router/src/navigation-hold.ts re-exports these under their
-// navigation names) and async-boundary RE-settles (resume-async-wiring.ts).
+// navigation names) and async-boundary RE-settles (resume-resettle-hold.ts).
 // All values are structural or latency-decided; there is no per-block or
 // per-link configuration. Do not mint new numbers — one vocabulary.
 export const MARKLESS_PENDING_SETTLE_DEADLINE_MS = 250;
@@ -10,6 +10,9 @@ export const MARKLESS_PENDING_SETTLE_DEADLINE_MS = 250;
 // settled content commits (spin-delay minimum-duration semantics; prior art:
 // smeijer/spin-delay 500/200, React suspenseConfig busyDelay/busyMinDuration).
 export const MARKLESS_PENDING_MIN_VISIBLE_MS = 200;
+
+// A refresh over settled content keeps it (marked aria-busy) and shows @pending only once the newest run has waited this long; measured floor is about 1.5x the slowest normal request.
+export const MARKLESS_PENDING_REFRESH_STALL_MS = 5_000;
 
 // Streamed range commits reveal in trains: after a reveal, the next train
 // leaves no earlier than one cadence later, so multi-boundary settles under
