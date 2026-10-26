@@ -1678,6 +1678,7 @@ function renderChunkParts(
 						(candidate) => candidate.staticIndex === rowIndex,
 					)) {
 						if (
+							context.inline &&
 							rowSlot.kind === 'attribute' &&
 							!rowSlot.directClassMatch &&
 							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')

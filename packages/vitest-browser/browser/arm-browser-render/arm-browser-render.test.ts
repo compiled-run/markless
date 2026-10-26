@@ -41,13 +41,20 @@ for (const mode of ['SSR', 'CSR'] as const)
 	});
 
 for (const mode of ['SSR', 'CSR'] as const)
-	test(`${mode}: a keyed @for in an @if arm whose rows bind an attribute builds, flips and keeps the attribute`, async () => {
+	test(`${mode}: a keyed @for in an @if arm whose rows bind an attribute builds, flips and keeps the attribute and handlers`, async () => {
 		const { container } = await (mode === 'SSR' ? renderSSR(ArmRowAttributePage) : render(ArmRowAttributePage));
 		const ids = () => [...container.querySelectorAll('main p')].map((row) => `${row.id}:${row.textContent}`).join(',');
+		const press = (selector: string) => container.querySelector<HTMLElement>(selector)!.click();
 		expect(ids()).toBe('a:a,b:b');
-		container.querySelector<HTMLButtonElement>('button')!.click();
+		press('#b');
+		await expect.poll(() => container.querySelector('output')?.textContent).toBe('b');
+		press('[data-open]');
 		await expect.poll(ids).toBe('');
-		container.querySelector<HTMLButtonElement>('button')!.click();
-		await expect.poll(ids).toBe('a:a,b:b');
+		press('[data-add]');
+		press('[data-open]');
+		await expect.poll(ids).toBe('a:a,b:b,c:c');
+		press('#c');
+		await expect.poll(() => container.querySelector('output')?.textContent).toBe('c');
+		press('#a');
+		await expect.poll(() => container.querySelector('output')?.textContent).toBe('a');
 	});
-
