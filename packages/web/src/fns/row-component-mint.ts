@@ -252,7 +252,7 @@ export function marklessRowComponentMint(
 													(before) => {
 														rendered.set(rowKey, itemCopy(item));
 														if (before && !rowIsStale(parent, repeat, before, after, liveRow))
-															return followRowItem(rowGraph, repeat, after, item);
+															return followRowItem(rowGraph, after);
 														const row = placeMintedRow(rowInput, after);
 														preparedRows.set(rowKey, row);
 														awaitingPlacement.push(() =>
@@ -491,26 +491,30 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 	);
 }
 
-// A kept row's child reads its item through its own prop cell, so its nested @for follows the item there.
+// A kept row's child reads its props through its own prop cell, so what it renders below follows them there.
 function followRowItem(
 	graph: RuntimeGraph,
-	repeat: ResumeKeyedRepeatRecord,
 	render: RenderedComponentRow,
-	item: unknown,
-): void {
-	const propName = repeat.rowComponent?.itemPropName;
-	if (!propName) return;
-	let cellId: string | undefined;
-	for (const cell of render.rendered.state.cells)
+): Awaitable<void> {
+	let cell: ProtocolStatePayload['cells'][number] | undefined;
+	for (const candidate of render.rendered.state.cells)
 		if (
-			cell.graphNodeId.startsWith(render.rowSegment) &&
-			cell.graphNodeId.endsWith(PROPS) &&
-			(cellId === undefined || cell.graphNodeId.length < cellId.length)
+			candidate.graphNodeId.startsWith(render.rowSegment) &&
+			candidate.graphNodeId.endsWith(PROPS) &&
+			(cell === undefined || candidate.graphNodeId.length < cell.graphNodeId.length)
 		)
-			cellId = cell.graphNodeId;
-	if (cellId === undefined || graph.read(cellId, []) === undefined) return;
-	if (sameItem(graph.read(cellId, [propName]), item, 0)) return;
-	graph.write({ graphNodeId: cellId, path: [propName], value: item });
+			cell = candidate;
+	if (cell === undefined || graph.read(cell.graphNodeId, []) === undefined) return;
+	const cellId = cell.graphNodeId;
+	const direct = (cell as { readonly directValue?: unknown }).directValue;
+	const write = (props: unknown): void => {
+		if (!props || typeof props !== 'object') return;
+		for (const [name, value] of Object.entries(props))
+			if (!sameItem(graph.read(cellId, [name]), value, 0))
+				graph.write({ graphNodeId: cellId, path: [name], value });
+	};
+	if (direct !== undefined || cell.value === undefined) return write(direct);
+	return marklessThen(deserializeGraphValue(cell.value as SerializedGraphPayload), write);
 }
 
 // A render of the item a live row was built from, or nothing when that item no longer renders.
