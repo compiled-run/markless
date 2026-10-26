@@ -272,8 +272,8 @@ export function wireKeyedRepeats(
 		};
 		// No gesture changes a fixed prop list, so none waits for its row code: it loads when idle.
 		const propCollection = !rowsChange && isProp(repeat.collectionGraphNodeId);
-		// A served row's @if arm events wait on row code, so it cannot wait for the reader's input.
-		if (deferredStart && !repeat.rowTemplate?.branchSlots) afterReaderInput(startLoading);
+		// An event inside a row's @if arm is wired by row code, so it cannot wait for the reader.
+		if (deferredStart && !repeat.rowEvents.some((each) => each.arm)) afterReaderInput(startLoading);
 		else if (propCollection) (globalThis.requestIdleCallback ?? setTimeout)(startLoading);
 		else startLoading();
 		if (repeat.rowTemplate?.branchSlots && loading) armsWired.push(loading.catch(() => undefined));

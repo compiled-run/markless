@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, renderSSR } from '../../src/index.ts';
+import { App as BranchRows } from './idle-branch-rows.tsrx';
 import { App } from './idle-wakes-list.tsrx';
 
 type MintLoad = (...args: unknown[]) => Promise<unknown>;
@@ -57,10 +58,12 @@ afterEach(() => {
 const items = (container: HTMLElement) =>
 	Array.from(container.querySelectorAll('[data-list] li'), (row) => row.textContent);
 
-async function wokenByIdle(): Promise<HTMLElement> {
+async function wokenByIdle(
+	render: () => ReturnType<typeof renderSSR> = () => renderSSR(App),
+): Promise<HTMLElement> {
 	idle = holdIdle();
 	rowCode = countRowCodeLoads();
-	const container = (await renderSSR(App)).container as HTMLElement;
+	const container = (await render()).container as HTMLElement;
 	await expect
 		.poll(() => {
 			idle!.release();
@@ -96,4 +99,20 @@ test('a click with no hover before it still builds the row after an idle start',
 	await expect.poll(() => items(container)).toEqual(['a', 'b', 'n2']);
 	container.querySelector<HTMLButtonElement>('[data-append]')!.click();
 	await expect.poll(() => items(container)).toEqual(['a', 'b', 'n2', 'n3']);
+});
+
+const shown = (container: HTMLElement, list: string) =>
+	Array.from(container.querySelectorAll(`[${list}] > *`), (row) => row.textContent?.trim());
+
+// Rows holding an @if with no handler inside an arm have nothing to wire before the reader acts.
+test('rows holding an @if leave their row code until the reader acts after an idle start', async () => {
+	const container = await wokenByIdle(() => renderSSR(BranchRows));
+	expect(rowCode!.loads).toBe(0);
+	const first = container.querySelector('[data-task="x"] [data-badge]');
+
+	container.querySelector<HTMLButtonElement>('[data-push]')!.click();
+	await expect.poll(() => shown(container, 'data-tasks')).toEqual(['hotT', 'newX', 'Y']);
+	expect(container.querySelector('[data-task="x"] [data-badge]')).toBe(first);
+	expect(shown(container, 'data-group')).toEqual(['βGuide', 'Other']);
+	expect(rowCode!.loads).toBeGreaterThan(0);
 });
