@@ -448,3 +448,38 @@ test('__mArm commits until the runtime reads the streamed patches, then leaves t
 		}
 	}
 });
+
+test('a queued commit whose arm the runtime already adopted and removed is a no-op, not an error', async () => {
+	const stream = await renderToStream(beaconArtifact(30) as never, {});
+	const host = document.createElement('div');
+	document.body.appendChild(host);
+	const tail = document.createElement('div');
+	document.body.appendChild(tail);
+	const errors: string[] = [];
+	const onError = (event: ErrorEvent) => {
+		errors.push(event.message);
+		event.preventDefault();
+	};
+	window.addEventListener('error', onError);
+	try {
+		host.innerHTML = stream.shell;
+		const root = host.querySelector('[data-async-container]') as Element & {
+			__mArmLive?: (id: string) => boolean;
+		};
+		root.__mArmLive = () => true;
+		for await (const chunk of stream.appends()) {
+			tail.insertAdjacentHTML('beforeend', chunk);
+			runInlineScripts(tail);
+			// The runtime woke before the reveal train left and took the arm's template itself.
+			document.querySelector('template[m\\:arm="beacon:0"]')?.remove();
+		}
+		await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 400)));
+		expect(errors).toEqual([]);
+		expect(host.querySelector('[data-waiting]')).not.toBeNull();
+	} finally {
+		window.removeEventListener('error', onError);
+		tail.remove();
+		host.remove();
+		delete (globalThis as { __mArm?: unknown }).__mArm;
+	}
+});

@@ -580,8 +580,6 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	let scheduled = false;
 	const idle = [];
 	const commit = (id) => {
-	const tpl = d.querySelector('template[m\\\\:arm="' + id + '"]');
-	if (!tpl) throw new Error('MARKLESS_STREAM_ARM_TEMPLATE_MISSING: ' + id);
 	const w = d.createTreeWalker(d.body, 128);
 	let s, e, n;
 	while ((n = w.nextNode())) {
@@ -602,6 +600,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	}
 	if (root && root.__mArmLive && root.__mArmLive(id)) return;
 	if (root && root.__mAdopted) return;
+	const tpl = d.querySelector('template[m\\\\:arm="' + id + '"]');
+	if (!tpl) throw new Error('MARKLESS_STREAM_ARM_TEMPLATE_MISSING: ' + id);
 	while (s.nextSibling && s.nextSibling !== e) s.parentNode.removeChild(s.nextSibling);
 	s.parentNode.insertBefore(tpl.content, e);
 	tpl.remove();${wake}
