@@ -81,6 +81,20 @@ test('a list whose wrapper binds the async value keeps its rows after the next s
 	await page.close();
 });
 
+test("a field's async handler runs on each keystroke as it happens", async () => {
+	const { page, errors } = await open('/async-handler-queue');
+	await page.locator('input').click();
+	await page.keyboard.type('xyz', { delay: 50 });
+	await expect.poll(() => page.locator('p').innerText(), { timeout: 5000 }).toMatch(/xyz@/);
+	const runs = (await page.locator('p').innerText()).trim().split(' ');
+	expect(runs.map((run) => run.split('@')[0])).toEqual(['x', 'xy', 'xyz']);
+	const starts = runs.map((run) => Number(run.split('@')[1]));
+	// Typed 50 ms apart; a held queue starts each run only after the previous 400 ms wait.
+	expect(starts[2]! - starts[0]!).toBeLessThan(600);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 // The palette page's own shape: one async list read by several @try blocks, rows with three handlers each.
 test('every @try over one re-settled list keeps its rows, and each row runs its own handlers', async () => {
 	const { page, errors } = await open('/palette-variants');

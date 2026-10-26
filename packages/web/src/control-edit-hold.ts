@@ -16,7 +16,8 @@ type ControlLike = Record<string, unknown>;
 
 const EDITABLE_TAG = /^(?:input|textarea|select)$/i;
 
-const noted = new WeakMap<ControlLike, Map<string, unknown>>();
+// One note per dispatch still running on the control, oldest first.
+const noted = new WeakMap<ControlLike, Array<Map<string, unknown>>>();
 
 export function marklessEditableControl(target: unknown): ControlLike | undefined {
 	if (!target || typeof target !== 'object') return undefined;
@@ -32,8 +33,7 @@ export function marklessEditableControl(target: unknown): ControlLike | undefine
 
 /**
  * Remember what this dispatch's own control read like before its handlers run,
- * and hand back the release its commit closes with. Overlapping dispatches each
- * release only what they noted, so one ending does not drop another's note.
+ * and hand back the release its commit closes with.
  */
 export function marklessNoteControlEdits(target: unknown): () => void {
 	const element = marklessEditableControl(target);
@@ -45,12 +45,12 @@ export function marklessNoteControlEdits(target: unknown): () => void {
 		(properties ??= new Map()).set(name, live);
 	}
 	if (!properties) return noRelease;
-	const held = noted.get(element);
-	noted.set(element, properties);
+	const notes = noted.get(element) ?? [];
+	notes.push(properties);
+	noted.set(element, notes);
 	return () => {
-		if (noted.get(element) !== properties) return;
-		if (held) noted.set(element, held);
-		else noted.delete(element);
+		notes.splice(notes.indexOf(properties) >>> 0, 1);
+		if (!notes.length) noted.delete(element);
 	};
 }
 
@@ -59,14 +59,21 @@ function noRelease(): void {}
 /**
  * Whether writing `name` would discard edits made since the handlers ran.
  *
- * A write that matches what was noted is the ordinary case and refreshes the
- * note, so a second write in the same commit is judged against it.
+ * A write that matches the newest dispatch's note is the ordinary case and
+ * refreshes the note, so a second write in the same commit is judged against it.
+ * One that changes the control while an earlier dispatch runs may answer older text.
  */
 export function marklessControlWriteHeld(target: unknown, name: string, value: unknown): boolean {
-	const properties = noted.get(target as ControlLike);
-	if (!properties?.has(name)) return false;
+	const notes = noted.get(target as ControlLike);
+	const newest = notes?.[notes.length - 1];
+	if (!newest?.has(name)) return false;
 	const live = (target as ControlLike)[name];
-	if (live !== properties.get(name)) return true;
-	properties.set(name, value);
+	if (live !== newest.get(name)) return true;
+	if (
+		value !== live &&
+		notes!.some((note) => note !== newest && note.has(name) && note.get(name) !== live)
+	)
+		return true;
+	newest.set(name, value);
 	return false;
 }
