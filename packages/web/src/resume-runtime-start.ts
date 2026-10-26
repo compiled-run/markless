@@ -174,6 +174,8 @@ export async function startResumeRuntime(input: {
 				storeContainerSubscription,
 				renderData: runtimeInput.renderData,
 				root: runtimeInput.root,
+				loadSymbol: runtimeInput.loadSymbol,
+				getElementHandle: prepared.elementHandles.get,
 			},
 			{
 				runtimeInput,

@@ -6345,7 +6345,9 @@ export function App() @{
 	);
 	expect(result.publicRenderModule.moduleSource).toContain('createMarklessDirectChunkRenderer');
 	expect(result.protocolView.behaviors).toEqual([]);
-	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('rowBehaviors');
+	expect(result.protocolView.keyedRepeats?.[0]?.rowBehaviors).toEqual([
+		{ hostPath: [], symbolId: 'symbol:5', inputPaths: [['id']] },
+	]);
 
 	const hostsByKey = new Map<string, PublicRenderTestElement>();
 	const cleanupCounts = new Map<string, number>();

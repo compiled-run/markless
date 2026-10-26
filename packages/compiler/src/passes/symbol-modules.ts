@@ -288,6 +288,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
+			...rowAttachUnsupportedDiagnostics(input),
 			...unaddressableElementDiagnostics(input),
 			...foreignScope.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
@@ -2034,6 +2035,50 @@ function componentEdgeSpan(
 
 const emptyLocalNames = new Set<string>();
 
+const ROW_ATTACH_UNSUPPORTED_CODE = 'MARKLESS_ROW_ATTACH_UNSUPPORTED' as const;
+
+// A row attach the list record does not carry would never run on a row the browser builds.
+function rowAttachUnsupportedDiagnostics(input: SymbolModulesInput): SymbolModulesDiagnostic[] {
+	const view = input.protocolView;
+	if (!view || !input.semanticGraph) return [];
+	const carried = new Set<string>();
+	(function visit(value: unknown): void {
+		if (Array.isArray(value)) value.forEach(visit);
+		else if (value && typeof value === 'object')
+			for (const [key, child] of Object.entries(value)) {
+				if (key === 'rowBehaviors' && Array.isArray(child))
+					for (const behavior of child) carried.add((behavior as { symbolId: string }).symbolId);
+				else visit(child);
+			}
+	})(view);
+	return input.semanticGraph.behaviors.flatMap((behavior) => {
+		if (!behavior.keyedRepeatScopeIds?.length) return [];
+		const symbolIds = input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'behavior' && symbol.hostNodeId === behavior.hostNodeId ? [symbol.id] : [],
+		);
+		if (symbolIds.length > 0 && symbolIds.every((symbolId) => carried.has(symbolId))) return [];
+		return [
+			{
+				code: ROW_ATTACH_UNSUPPORTED_CODE,
+				severity: 'error' as const,
+				phase: 'public-render' as const,
+				passId: 'symbol-modules',
+				artifactKeys: ['symbolModules', 'protocolView'],
+				title: 'This attach in a @for row cannot run on rows the browser builds',
+				message: `attach={${behavior.source}} sits in a @for row, but the list's record carries no way to run it on a row added after the page loads, so those rows would never get it.`,
+				why: 'A row the browser builds runs its attach from the list record: the element inside the row and the row item paths its inputs read. An attach whose inputs read anything other than the row item, or whose element sits where the record cannot point (inside an @if arm in the row, or a list with no record), has neither.',
+				suggestions: [
+					{
+						message:
+							'Pass the attach only the row item or its fields (`attach={tooltip(row.label)}`), or read page state inside the attach function, and put it on an element the row always renders.',
+					},
+				],
+				docsUrl: `https://markless.dev/errors/${ROW_ATTACH_UNSUPPORTED_CODE}`,
+			},
+		];
+	});
+}
+
 function rowLocalNamesBySymbol(
 	renderData: RenderDataArtifact | undefined,
 	semanticGraph?: SemanticGraphArtifact,
@@ -2060,6 +2105,11 @@ function rowLocalNamesBySymbol(
 					addLocal(symbolId, repeat.itemName);
 					if (indexName) addLocal(symbolId, indexName);
 				}
+			}
+			for (const symbol of symbolResolver?.symbols ?? []) {
+				if (symbol.kind !== 'behavior' || !rowHostIds.has(symbol.hostNodeId)) continue;
+				addLocal(symbol.id, repeat.itemName);
+				if (indexName) addLocal(symbol.id, indexName);
 			}
 		}
 	}
@@ -2545,6 +2595,8 @@ export type BehaviorEmissionInput = {
 	 * emits exactly the imports it did before.
 	 */
 	readonly moduleImports?: readonly SemanticModuleImport[];
+	/** Row locals the factory closes over, bound from `context.locals` before it runs. */
+	readonly localNames?: ReadonlySet<string>;
 };
 
 /**
@@ -2610,6 +2662,11 @@ export function buildBehaviorEmission(input: BehaviorEmissionInput): EmissionPri
 				exportName,
 				['context'],
 				[
+					...[...(input.localNames ?? [])]
+						.filter((name) => factoryReferences.has(name))
+						.map((name) =>
+							constDeclarationNode(name, optionalPathNode(memberChainNode('context.locals'), [name])),
+						),
 					constDeclarationNode('inputs', behaviorInputsExpression(inputCount)),
 					constDeclarationNode(
 						'behavior',
@@ -7882,6 +7939,7 @@ export function buildSymbolModuleEmission(
 
 		return buildBehaviorEmission({
 			symbol,
+			...(input.localNames ? { localNames: input.localNames } : {}),
 			omitAuthoredSource: input.omitAuthoredSource,
 			sourceFileName: input.sourceFileName,
 			moduleDeclarations: input.moduleDeclarations,

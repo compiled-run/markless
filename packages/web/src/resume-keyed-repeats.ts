@@ -161,6 +161,8 @@ export function wireKeyedRepeats(
 		readonly renderData?: ResumeRenderDataThunk;
 		readonly root?: ResumeDomElement;
 		readonly pageRepeats?: ReadonlyArray<ResumeKeyedRepeatRecord>;
+		readonly loadSymbol?: ResumeRuntimeInput['loadSymbol'];
+		readonly getElementHandle?: (handleIdOrName: string) => unknown;
 	},
 	rowComponentHost?: RowComponentHost,
 	onRow?: ResumeRepeatRowHook,
@@ -195,14 +197,28 @@ export function wireKeyedRepeats(
 				values: new Map(),
 				ready: !repeat.rowTemplate?.componentName && !repeat.rowTemplate?.branchSlots,
 			};
+		const behaviors =
+			repeat.rowBehaviors &&
+			import('./fns/row-behaviors.ts').then((m) => m.marklessRowBehaviors(repeat, input));
+		const servedRows = new WeakSet<ResumeDomElement>();
 		const registerRowEvents = (rowRoot: ResumeDomElement, rowKey: unknown, arms?: true): void => {
+			const served = servedRows.has(rowRoot),
+				attach = (trigger?: ResumeDomElement) => behaviors?.then((b) => b.row(rowRoot, rowKey, trigger));
+			if (!arms && !served) void attach();
 			for (const rowEvent of repeat.rowEvents) {
 				if (arms && !rowEvent.arm) continue;
 				const host = rowEvent.arm
 					? cell?.mint?.armEventHost?.(rowRoot, repeat, rowEvent, slots.values.get(rowKey))
 					: marklessElementAt(rowRoot, rowEvent.hostPath);
 				if (!host) continue;
-				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
+				input.events.addRowEvent(host, {
+					repeat,
+					parent,
+					rowRoot,
+					rowKey,
+					rowEvent,
+					...(served && behaviors && { beforeRun: () => attach(host) }),
+				});
 			}
 			if (!arms) onRow?.(repeat, rowRoot, rowKey);
 		};
@@ -218,6 +234,7 @@ export function wireKeyedRepeats(
 				const item = from[rowIndex],
 					rowKey = repeatItemKey(item, repeat, rowIndex);
 				rowRootsByKey.set(rowKey, rowRoot);
+				servedRows.add(rowRoot);
 				served.set(rowKey, [repeat.rowComponent ? itemCopy(item) : item, rowIndex]);
 				if (slots.ready)
 					slots.values.set(rowKey, rowSlotValues(repeat, item, rowIndex, input.graph, slots));
@@ -245,6 +262,7 @@ export function wireKeyedRepeats(
 				slots,
 				follow?.end(),
 			);
+			void behaviors?.then((b) => b.sweep(rowRootsByKey));
 		};
 		const readyMint = (): Promise<RowMint> | undefined =>
 			loadRowMint(input.renderData, input.graph, rowComponentHost)?.then(async (mint) => {
@@ -548,7 +566,7 @@ export function readKeyedRepeatCollection(
 	const value = graph.read(repeat.collectionGraphNodeId, repeat.collectionPath);
 	return Array.isArray(value) ? value : Array.from((value ?? []) as Iterable<unknown>);
 }
-function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord, index: number): unknown {
+export function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord, index: number): unknown {
 	return repeat.indexKey ? index : readItemPath(item, repeat.keyPath);
 }
 function readItemPath(item: unknown, path: ReadonlyArray<string>): unknown {

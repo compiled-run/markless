@@ -462,6 +462,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				});
 			},
 		);
+		const rowBehaviors = rowBehaviorRecords(input, repeat, render.itemName, rowHostPaths);
 		const rowEvents = [
 			...events
 				.filter((event) => rowHostPaths.has(event.hostNodeId))
@@ -493,11 +494,43 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				...(rowEvents.some((event) => handlersRead(input, event.symbolIds, indexName))
 					? { indexName }
 					: {}),
+				...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
 				rowEvents,
 				...rowSuffixField(input, repeat.id, render, enclosingRow, rowEvents),
 			},
 		];
 	});
+}
+
+/** A row's attach as row-root coordinates and the item paths its inputs read; null when an input is not a path of the item. */
+export function rowBehaviorRecords(
+	input: ProtocolViewPayloadInput,
+	repeat: PayloadKeyedRepeat,
+	itemName: string,
+	rowHostPaths: ReadonlyMap<string, ReadonlyArray<number>>,
+): Array<{ hostPath: ReadonlyArray<number>; symbolId: string; inputPaths: ReadonlyArray<ReadonlyArray<string>> }> {
+	return withBehaviorSymbols(input, repeat.rowBehaviors ?? []).flatMap((behavior) => {
+		const hostPath = rowHostPaths.get(behavior.hostNodeId);
+		const inputPaths = behaviorItemPaths(behavior.inputSources, itemName);
+		return hostPath && behavior.symbolId && inputPaths
+			? [{ hostPath, symbolId: behavior.symbolId, inputPaths }]
+			: [];
+	});
+}
+
+/** The item path each input reads, or null when one reads anything but the row's item. */
+export function behaviorItemPaths(
+	inputSources: ReadonlyArray<string>,
+	itemName: string,
+): Array<ReadonlyArray<string>> | null {
+	const paths = inputSources.map((source) =>
+		source === itemName
+			? []
+			: source.startsWith(`${itemName}.`) && /^[\w$.]+$/.test(source)
+				? source.slice(itemName.length + 1).split('.')
+				: null,
+	);
+	return paths.every((path) => path !== null) ? (paths as Array<ReadonlyArray<string>>) : null;
 }
 
 // A served page marks every row host whose event carries a policy, which needs the rows' end as well as their start.

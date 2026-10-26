@@ -543,6 +543,7 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
 		assertOptionalStringField(repeat, 'indexName', context);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
+		assertOptionalRowBehaviors(repeat, `${context}.rowBehaviors`);
 		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);
 		assertOptionalRowTemplate(repeat, `${context}.rowTemplate`);
 		assertOptionalPropRoutes(repeat, `${context}.propRoutes`);
@@ -742,6 +743,25 @@ function assertOptionalRowElementHandles(
 		assertStringField(handle, 'handleId', handleContext);
 		assertStringField(handle, 'name', handleContext);
 		assertOptionalBooleanField(handle, 'plural', handleContext);
+	}
+}
+
+function assertOptionalRowBehaviors(record: Record<string, unknown>, context: string): void {
+	const behaviors = record.rowBehaviors;
+	if (behaviors === undefined) return;
+	if (!Array.isArray(behaviors))
+		throw invalidPayloadShapeError(contextPayloadType(context), `Invalid ${context}: expected array.`);
+	for (const [index, behavior] of behaviors.entries()) {
+		const behaviorContext = `${context}[${index}]`;
+		assertRecordShape(behavior, behaviorContext);
+		assertElementAddressField(behavior, 'hostPath', behaviorContext);
+		assertStringField(behavior, 'symbolId', behaviorContext);
+		const inputPaths = behavior.inputPaths;
+		if (!Array.isArray(inputPaths) || inputPaths.some((path) => !Array.isArray(path) || path.some((key) => typeof key !== 'string')))
+			throw invalidPayloadShapeError(
+				contextPayloadType(behaviorContext),
+				`Invalid ${behaviorContext}: expected inputPaths to be an array of string arrays.`,
+			);
 	}
 }
 

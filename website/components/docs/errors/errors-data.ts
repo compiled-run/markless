@@ -7311,6 +7311,48 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROW_ATTACH_HOST_MISSING',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_ROW_ATTACH_HOST_MISSING: keyed repeat <id> has row attach records but was wired without a symbol loader.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/resume-keyed-repeats.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/resume-keyed-repeats.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_ROW_ATTACH_UNSUPPORTED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'This attach in a @for row cannot run on rows the browser builds: a Markless build error.',
+		printed: [
+			"MARKLESS_ROW_ATTACH_UNSUPPORTED: attach={<source>} sits in a @for row, but the list's record carries no way to run it on a row added after the page loads, so those rows would never get it.",
+			'A row the browser builds runs its attach from the list record: the element inside the row and the row item paths its inputs read. An attach whose inputs read anything other than the row item, or whose element sits where the record cannot point (inside an @if arm in the row, or a list with no record), has neither.',
+			'Pass the attach only the row item or its fields (`attach={tooltip(row.label)}`), or read page state inside the attach function, and put it on an element the row always renders.',
+			'https://markless.dev/errors/MARKLESS_ROW_ATTACH_UNSUPPORTED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/symbol-modules.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/symbol-modules.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',

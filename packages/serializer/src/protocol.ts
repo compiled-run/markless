@@ -694,6 +694,12 @@ export type ProtocolViewPayload = {
 			readonly name: string;
 			readonly plural?: boolean;
 		}>;
+		/** Each row's `attach`, run on every row with its item paths as the behavior's inputs. */
+		readonly rowBehaviors?: ReadonlyArray<{
+			readonly hostPath: ProtocolElementAddress;
+			readonly symbolId: string;
+			readonly inputPaths: ReadonlyArray<ReadonlyArray<string>>;
+		}>;
 		readonly rowEvents: ReadonlyArray<{
 			readonly hostPath: ProtocolElementAddress;
 			readonly eventName: string;

@@ -40,5 +40,7 @@ export async function wireArmKeyedRepeats(
 				host.storeHostSubscription(record.parentHostNodeId, release),
 			renderData: runtime.renderData,
 			pageRepeats: runtime.view.keyedRepeats,
+			loadSymbol: runtime.loadSymbol,
+			getElementHandle: host.elementHandles.get,
 		});
 }
