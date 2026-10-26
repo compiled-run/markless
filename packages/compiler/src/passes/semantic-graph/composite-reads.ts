@@ -72,7 +72,7 @@ export function isCompositeTemplateExpression(
 			isCompositeTemplateExpression(node.expression as AnyNode, options)) ||
 		readsThroughDynamicKey(node) ||
 		(options.methodCalls === true &&
-			(isMethodCallExpression(node) || isGlobalConversionCall(node))) ||
+			(isMethodCallExpression(node) || isNamedFunctionCall(node))) ||
 		// `delete` mutates rather than reads; the read collector already refuses it,
 		// so an operator that is not a pure value still reaches the loud refusal.
 		(options.unaryOperators === true && node.type === 'UnaryExpression')
@@ -88,10 +88,10 @@ function isMethodCallExpression(node: AnyNode): boolean {
 	return callee?.type === 'MemberExpression' && callee.computed !== true;
 }
 
-function isGlobalConversionCall(node: AnyNode): boolean {
+// `fullName(user)` names a function by itself; methodCallReadSources decides whose it is.
+function isNamedFunctionCall(node: AnyNode): boolean {
 	if (node.type !== 'CallExpression' || node.optional === true) return false;
-	const callee = node.callee as AnyNode | undefined;
-	return callee?.type === 'Identifier' && GLOBAL_CONVERSION_FUNCTIONS.has(String(callee.name));
+	return (node.callee as AnyNode | undefined)?.type === 'Identifier';
 }
 
 export function pureCompositeReadSources(
@@ -149,9 +149,11 @@ function methodCallReadSources(
 	options: CompositeReadOptions,
 ): ReadonlyArray<string> | null {
 	const callee = node.callee as AnyNode;
-	// A conversion named by a binding of this module is that binding, not the global.
-	const offset = isGlobalConversionCall(node) ? rootIdentifierOffset(callee, state.source) : null;
-	if (offset !== null && resolvedSymbolAt(state.semantic(), offset) !== null) return null;
+	// A function this file imports or declares at module scope sees only its arguments,
+	// exactly as `ns.fn(arg)` does; a body-local one can close over state, and a
+	// global is trusted only when it is a plain conversion.
+	const offset = isNamedFunctionCall(node) ? rootIdentifierOffset(callee, state.source) : null;
+	if (offset !== null && !callsModuleFunction(callee, offset, state)) return null;
 	if (offset === null && !isMethodCallExpression(node)) return null;
 	const receiver =
 		offset === null
@@ -164,6 +166,13 @@ function methodCallReadSources(
 			pureCompositeReadSources(argument, state, options),
 		),
 	]);
+}
+
+function callsModuleFunction(callee: AnyNode, offset: number, state: WalkState): boolean {
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, offset);
+	if (symbolId === null) return GLOBAL_CONVERSION_FUNCTIONS.has(String(callee.name));
+	return semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind === 'module';
 }
 
 // A member chain with a `[key]` whose key is not a literal: `LABELS[tone]`, `rows[index].label`.

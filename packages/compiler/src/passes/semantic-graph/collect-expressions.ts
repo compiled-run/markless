@@ -298,7 +298,7 @@ function collectReadsIn(
 		// template literal, a call result - names no binding, so recording the
 		// whole spelling as one read hides the graph reads inside the receiver.
 		// An optional link can short-circuit, so the read stops at the value before it.
-		if (!namesABinding(node) || hasOptionalLink(node)) {
+		if (!namesABinding(node) || hasOptionalLink(node) || chainKeysIntoOneStateCell(node, state)) {
 			collectReadsIn(node.object as AnyNode | undefined, state, region);
 			if (node.computed === true) {
 				collectReadsIn(node.property as AnyNode | undefined, state, region);
@@ -524,6 +524,44 @@ function hasOptionalLink(node: AnyNode): boolean {
 		current = current.object as AnyNode | undefined;
 	}
 	return false;
+}
+
+// `users[sel]` over one component state() cell reads the cell whole and the key,
+// the rule a template position already follows; a shared instance's members are
+// separate cells, so a key into one stays a dynamic-path refusal.
+function chainKeysIntoOneStateCell(node: AnyNode, state: WalkState): boolean {
+	for (
+		let current: AnyNode | undefined = node;
+		current?.type === 'MemberExpression';
+		current = unwrapValueWrappers(current.object as AnyNode | undefined)
+	)
+		if (keysIntoOneStateCell(current, state)) return true;
+	return false;
+}
+
+function keysIntoOneStateCell(node: AnyNode, state: WalkState): boolean {
+	if (node.computed !== true) return false;
+	const property = node.property as AnyNode | undefined;
+	if (
+		property?.type === 'Literal' ||
+		property?.type === 'StringLiteral' ||
+		property?.type === 'NumericLiteral'
+	)
+		return false;
+	const object = unwrapValueWrappers(node.object as AnyNode | undefined);
+	if (!object || !namesABinding(object)) return false;
+	const source = expressionSource(object, state.source);
+	if (!source) return false;
+	const resolved = resolveGraphPath(
+		source,
+		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+	);
+	return (
+		!!resolved &&
+		(resolved.binding.kind === 'state' || resolved.binding.kind === 'computed') &&
+		resolved.binding.sharedDefinitionId === undefined
+	);
 }
 
 function isChainExpression(node: unknown): boolean {

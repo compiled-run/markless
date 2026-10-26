@@ -48,7 +48,12 @@ export type RenderLocalInline =
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
 	| { readonly kind: 'render-local'; readonly name: string }
-	| { readonly kind: 'writes-render-local'; readonly name: string; readonly write: string };
+	| {
+			readonly kind: 'writes-render-local';
+			readonly name: string;
+			readonly write: string;
+			readonly call: boolean;
+	  };
 
 type Replacement = { readonly start: number; readonly end: number; readonly text: string };
 
@@ -144,11 +149,8 @@ function inlineWithin(
 						!isFunctionNode(local.init) &&
 						rebuiltLocalWrite(candidate, ancestors, local.init, state.source)
 					) {
-						refusal = {
-							kind: 'writes-render-local',
-							name,
-							write: rebuiltLocalWrite(candidate, ancestors, local.init, state.source)!,
-						};
+						const write = rebuiltLocalWrite(candidate, ancestors, local.init, state.source)!;
+						refusal = { kind: 'writes-render-local', name, write: write.source, call: write.call };
 					} else {
 						const definition = local.init;
 						definitions.push(definition);
@@ -263,6 +265,7 @@ export function inlineHandlerRenderLocals(
 				handlerLabel,
 				localName: inlined.name,
 				write: inlined.write,
+				call: inlined.call,
 				handler: node,
 				filename: state.filename,
 			}),
