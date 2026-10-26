@@ -781,7 +781,9 @@ function createNitroConfig(
 				nitroConfig?.compressPublicAssets !== undefined,
 				compressedAssets,
 			),
-			...(isBuild ? [prerenderRendererModule(serverBuild)] : [devNitroModule(devNitro)]),
+			...(isBuild
+				? [prerenderRendererModule(serverBuild, [MARKLESS_BUILD_PREFIX, LINK_BRIDGE_DIR])]
+				: [devNitroModule(devNitro)]),
 		],
 		...(isBuild && {
 			routeRules: {
