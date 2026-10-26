@@ -563,12 +563,21 @@ export function runFragmentNavigation(
 			if (state.prefetches.get(key) === entry) state.prefetches.delete(key);
 		});
 		state.prefetches.set(key, entry);
-		w.setTimeout(() => {
-			if (state.prefetches.get(key) !== entry) return;
-			state.prefetches.delete(key);
-			entry.abort();
-		}, config.prefetchTtlMs);
+		expire(key, entry);
 		if (code) preloadCode(url, false);
+	};
+	// The timer holds a stamp, not the entry, so a page taken or dropped early frees its parsed document at once.
+	const stamps = new WeakMap<FragmentPrefetch, number>();
+	let stamped = 0;
+	const expire = (key: string, entry: FragmentPrefetch) => {
+		const stamp = ++stamped;
+		stamps.set(entry, stamp);
+		w.setTimeout(() => {
+			const current = state.prefetches.get(key);
+			if (!current || stamps.get(current) !== stamp) return;
+			state.prefetches.delete(key);
+			current.abort();
+		}, config.prefetchTtlMs);
 	};
 	// Idle tier, fast unmetered connections only: fetch the HTML of a few links in view and preload their code, one round.
 	let scanning = false;

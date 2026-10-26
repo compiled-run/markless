@@ -277,13 +277,15 @@ function captureLoadListeners(d: Document, w: Window, into: LoadListener[]): () 
 		const own = Object.getOwnPropertyDescriptor(target, 'addEventListener');
 		const add = target.addEventListener;
 		target.addEventListener = function (
-			this: EventTarget,
+			this: EventTarget | undefined,
 			kind: string,
 			listener: EventListenerOrEventListenerObject | null,
 			options?: boolean | AddEventListenerOptions,
 		) {
-			if (kind === type && listener && this === target) into.push({ target, type, listener });
-			return add.call(this, kind, listener, options);
+			// A bare call has no receiver; one for the event that already fired is kept off the target, which would hold it and its page for good.
+			const self = this ?? w;
+			if (kind === type && listener && self === target) return void into.push({ target, type, listener });
+			return add.call(self, kind, listener, options);
 		};
 		return () => {
 			if (own) Object.defineProperty(target, 'addEventListener', own);
