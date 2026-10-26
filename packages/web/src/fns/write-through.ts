@@ -22,13 +22,7 @@ type WriteThroughContext = {
 
 type WriteThroughGraph = Pick<WriteThroughContext['graph'], 'write' | 'update' | 'call' | 'delete'>;
 
-/**
- * The graph a write through a handler local lands on (`const p = user.profile;
- * p.name = x`, `for (const row of rows) row.n++`). Each operation's path is
- * relative to the local's value, which is found at dispatch: at `basePath`
- * itself, or as an element of the array there, by identity. A value no longer
- * there is a plain object, and the write changes only it, as JavaScript would.
- */
+// A value no longer where the local found it is a plain object: the write changes only it, as JavaScript would.
 export function marklessWriteThrough(
 	context: WriteThroughContext,
 	graphNodeId: string,

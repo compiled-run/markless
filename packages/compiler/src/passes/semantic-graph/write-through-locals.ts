@@ -56,13 +56,7 @@ const COPYING_METHODS = new Set([
 	'with',
 ]);
 
-/**
- * How a write whose target starts at a local declared inside a nested function
- * (a handler, an array callback, an attach body) reaches state, decided from the
- * binding the root resolves to rather than from its name. `undefined` leaves the
- * write to the name-based rules: the root is component-scoped, a module name, or
- * a recorded alias.
- */
+// Decided by the binding the root resolves to; undefined leaves component-scoped and module names to the name-based rules.
 export function writeThroughLocal(
 	target: AnyNode,
 	state: WalkState,
@@ -167,11 +161,7 @@ function bindingAt(semantic: ModuleSemantics, offset: number): Binding | null {
 	return symbolId === null ? null : (semantic.bindings[symbolId] ?? null);
 }
 
-/**
- * Declared inside a function that is not the component itself but sits in one:
- * a handler, an attach body, an array callback. Component-body names, props and
- * module names keep the rules their graph records give them.
- */
+// A handler, attach body or callback local: declared in a function nested inside a component.
 function isNestedFunctionLocal(binding: Binding, state: WalkState): boolean {
 	let innermost = true;
 	for (const scope of binding.scope.ancestors()) {

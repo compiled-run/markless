@@ -346,11 +346,7 @@ type WriteThroughLowering =
 	| { readonly kind: 'diagnostic'; readonly diagnostic: StateLoweringDiagnostic }
 	| { readonly kind: 'plain' };
 
-/**
- * A write through a local declared in a handler, callback or attach body. The
- * local's binding decided what it holds; a local holding state writes the graph
- * path its value lives at, and a local holding state no path can name refuses.
- */
+// A local holding state writes the path its value lives at; one holding state no path names refuses.
 function lowerWriteThrough(
 	write: SemanticStateWrite,
 	through: SemanticWriteThrough,

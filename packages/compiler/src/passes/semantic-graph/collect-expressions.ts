@@ -56,10 +56,7 @@ export function collectUpdate(node: AnyNode, state: WalkState): void {
 	});
 }
 
-/**
- * `Object.assign(target, ...sources)` changes `target` in place, member by
- * member, so a state target is a write of each member the sources carry.
- */
+// `Object.assign(target, ...sources)` onto state is a write of each member the sources carry.
 export function collectObjectAssign(node: AnyNode, state: WalkState): void {
 	const callee = unwrapChainExpression(node.callee as AnyNode | undefined);
 	if (callee?.type !== 'MemberExpression' || getStaticMemberPropertyName(callee) !== 'assign')
