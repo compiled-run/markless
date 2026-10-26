@@ -26,10 +26,59 @@ export function startFragmentNavigation(
 	const host = d as Document & {
 		__marklessFragmentNav?: FragmentNavigationState;
 		__marklessFragmentWake?: FragmentRouteCode;
+		__marklessFragmentIdle?: Promise<boolean>;
 	};
 	const known = host.__marklessFragmentNav?.routes ?? host.__marklessFragmentWake;
 	if (known) return void Object.assign(known, routes);
 	host.__marklessFragmentWake = routes;
+	// Nothing idle may compete with the page's own first-click code: wait for the load event and every modulepreload it landed with.
+	const landed = new Promise<void>((done) => {
+		const start = () => {
+			const pending = [
+				...d.head.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]'),
+			].filter((link) => !w.performance.getEntriesByName(link.href, 'resource').length);
+			let left = pending.length;
+			if (!left) return done();
+			const arrived = () => void (--left || done());
+			for (const link of pending) {
+				link.addEventListener('load', arrived, { once: true });
+				link.addEventListener('error', arrived, { once: true });
+			}
+		};
+		if (d.readyState === 'complete') start();
+		else w.addEventListener('load', start, { once: true });
+	});
+	// Idle downloads need evidence of a fast link: the rate the page's own downloads crossed it at, a lower bound on its speed.
+	host.__marklessFragmentIdle = landed.then(() => {
+		const intent = intentOf();
+		if (!intent) return false;
+		const connection = (
+			w.navigator as Navigator & {
+				connection?: { effectiveType?: string; saveData?: boolean };
+			}
+		).connection;
+		let bytes = 0;
+		const spans: [number, number][] = [];
+		for (const entry of [
+			...w.performance.getEntriesByType('navigation'),
+			...w.performance.getEntriesByType('resource'),
+		] as PerformanceResourceTiming[]) {
+			if (!(entry.transferSize > 0)) continue;
+			bytes += entry.transferSize;
+			spans.push([entry.responseStart, entry.responseEnd]);
+		}
+		let busy = 0;
+		let reach = -Infinity;
+		for (const [from, to] of spans.sort((a, b) => a[0] - b[0])) {
+			busy += Math.max(0, to - Math.max(from, reach));
+			reach = Math.max(reach, to);
+		}
+		if (bytes && (busy === 0 || (bytes / busy) * 1000 >= intent.idleBytesPerSecond))
+			return true;
+		if (bytes >= intent.idleMeasuredBytes) return false;
+		// Too few bytes crossed the link to tell round trips from bandwidth: only a browser reporting a fast connection says so.
+		return connection?.effectiveType === '4g' && connection.saveData !== true;
+	});
 	const scrolled = new Set<Element>();
 	const arriving = new Map<string, Promise<unknown>>();
 	let running: FragmentNavigationApi | undefined;
@@ -154,14 +203,12 @@ export function startFragmentNavigation(
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
-	if (Object.keys(routes).length) {
-		const idle = () =>
+	if (Object.keys(routes).length)
+		void landed.then(() =>
 			w.requestIdleCallback
 				? w.requestIdleCallback(() => wake(), { timeout: 3000 })
-				: w.setTimeout(() => wake(), 500);
-		if (d.readyState === 'complete') idle();
-		else w.addEventListener('load', idle, { once: true });
-	}
+				: w.setTimeout(() => wake(), 500),
+		);
 }
 
 export type FragmentIntent = {
@@ -170,6 +217,10 @@ export type FragmentIntent = {
 	readonly hoverDwellMs: number;
 	readonly requestPrefix: string;
 	readonly prefetchAttribute: string;
+	// The slowest link, measured from the page's own downloads, the idle tier fetches on.
+	readonly idleBytesPerSecond: number;
+	// The page's own downloads must carry this many bytes for a rate under that to count as a slow link.
+	readonly idleMeasuredBytes: number;
 };
 
 // A page fetch a press started before the run half arrived; the run half adopts it as its prefetch.
@@ -207,7 +258,10 @@ export function runFragmentNavigation(
 	early: FragmentEarly | undefined,
 ): FragmentNavigationApi {
 	const w = d.defaultView as Window & typeof globalThis;
-	const host = d as Document & { __marklessFragmentNav?: FragmentNavigationState };
+	const host = d as Document & {
+		__marklessFragmentNav?: FragmentNavigationState;
+		__marklessFragmentIdle?: Promise<boolean>;
+	};
 	const location = w.location;
 	const connection = (
 		w.navigator as Navigator & {
@@ -559,12 +613,11 @@ export function runFragmentNavigation(
 					idleQueue.push(url);
 			pumpIdle();
 		};
-		const idle = () =>
-			w.requestIdleCallback
-				? w.requestIdleCallback(run, { timeout: 3000 })
-				: w.setTimeout(run, 500);
-		if (d.readyState === 'complete') idle();
-		else w.addEventListener('load', idle, { once: true });
+		void (host.__marklessFragmentIdle ?? Promise.resolve(false)).then((fast) => {
+			if (!fast) return void (scanning = false);
+			if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 3000 });
+			else w.setTimeout(run, 500);
+		});
 	};
 	const fresh = (entry: FragmentPrefetch, now: number) =>
 		entry.writes === state.writes &&
@@ -748,5 +801,8 @@ export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
 // An idle fetch of a page whose region runs past this many bytes stops there; the page is fetched on intent instead.
 export const FRAGMENT_IDLE_FRAGMENT_BYTES = 256 * 1024;
+// Just above Lighthouse's Slow 4G (1.6 Mbit/s).
+export const FRAGMENT_IDLE_BYTES_PER_SECOND = 250_000;
+export const FRAGMENT_IDLE_MEASURED_BYTES = 64 * 1024;
 // Browsers without the Network Information API (WebKit, Firefox) say nothing about the connection; the idle tier's own gate bounds what they fetch.
 export const FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO = true;
