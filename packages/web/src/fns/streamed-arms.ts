@@ -6,7 +6,6 @@ import type {
 } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
-import { decodeStreamedArmPatch } from '../../../serializer/src/protocol-streamed-arm-decode.ts';
 import { derivedReconcilePlane, installDerivedReconcilePlane } from '../reconcile-plane-slot.ts';
 import { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-stream-open.ts';
 
@@ -140,11 +139,11 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 				)
 			: null;
 		learn(delta);
+		const armPatch = JSON.parse(records.textContent ?? 'null') as ProtocolStreamedArmPatch;
+		decodeProtocolPayloadLists('markless/view', armPatch[1]);
 		state.resolve?.({
 			html: arm.innerHTML,
-			patch: decodeStreamedArmPatch(
-				JSON.parse(records.textContent ?? 'null') as ProtocolStreamedArmPatch,
-			),
+			patch: armPatch,
 			state: delta,
 		});
 	};

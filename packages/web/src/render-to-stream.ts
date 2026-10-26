@@ -531,7 +531,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		}`
 		: '';
 	const debugRegistration = debugEnabled
-		? `if (md) for (const event of events) {
+		? `if (md) for (const event of records.events || []) {
 			if (event.eventName !== t) continue;
 			const locator = (records.locators || []).find((item) => item.hostNodeId === event.hostNodeId);
 			const element = locator && nodes[offset + locator.index];
@@ -545,8 +545,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
-			const events = Array.isArray(records.events) ? records.events : [];
-			const names = new Set(records.eventNames || events.map((x) => x.eventName));
+			const names = new Set(records.eventNames || (records.events || []).map((x) => x.eventName));
 			const armEnd = e;
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
@@ -560,7 +559,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 					if (!(s.compareDocumentPosition(el) & 4) || !(armEnd.compareDocumentPosition(el) & 2)) continue;
 					for (const entry of (el.getAttribute(${JSON.stringify(PROTOCOL_EVENT_HOST_ATTRIBUTE)}) || '').split(';')) {
 						const [name, ref] = entry.split('!')[0].split(':');
-						const x = name === t && ref && events[ref];
+						const x = name === t && ref && (records.events || [])[ref];
 						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r)) applied = true;
 					}
 				}

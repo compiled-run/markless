@@ -1810,6 +1810,14 @@
 			"from": 30522,
 			"to": 30833,
 			"reason": "an attach in an @if arm a child component opens is bound through the child instance, as its events already were"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
+			"subject": "serializer/protocol-record-templates",
+			"from": 1118,
+			"to": 1787,
+			"reason": "the reader now expands a keyed row's instance path from the payload's path table and fills rows served beside cells and events: recursive-payload repro resume data 428,731 -> 42,540 B, HN 484-comment item HTML 2,496,301 -> 1,190,056 B raw; loaded only with the templated-list reader, nothing runs at page load"
 		}
 	],
 	"runtimeModules": {
@@ -1845,7 +1853,7 @@
 		"serializer/protocol-page-markers": 564,
 		"serializer/protocol-prop-prefix": 270,
 		"serializer/protocol-record-keys": 1134,
-		"serializer/protocol-record-templates": 1118,
+		"serializer/protocol-record-templates": 1787,
 		"serializer/protocol-shared-records-decode": 2061,
 		"serializer/protocol-templated-lists": 437,
 		"serializer/storage-slot": 780,

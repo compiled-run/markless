@@ -11,8 +11,8 @@ import {
 	encodeStreamedArmRecords,
 } from '../src/protocol-record-templates-encode.ts';
 import { decodePayloadScripts } from '../src/protocol-client.ts';
-import { decodeStreamedArmPatch } from '../src/protocol-streamed-arm-decode.ts';
 import { renderPayloadScripts } from '../src/payload-scripts.ts';
+import { createProtocolStatePayload } from '../src/protocol-state.ts';
 import { PROTOCOL_RECORD_KEYS } from '../src/protocol-record-keys.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../src/protocol.ts';
 
@@ -273,10 +273,11 @@ test('a streamed arm serves its row records as templates and the names its boot 
 		keyedRepeats: view.keyedRepeats,
 	};
 	const served = JSON.parse(JSON.stringify(encodeStreamedArmRecords(records)));
-	expect(Array.isArray(served.events)).toBe(false);
+	expect(served.events.every((event: unknown) => event === null)).toBe(true);
+	expect(served.inRows.events).toBeDefined();
 	expect(served.eventNames).toEqual(['click']);
 	expect(JSON.stringify(served).length).toBeLessThan(JSON.stringify(records).length / 4);
-	const [, decoded] = decodeStreamedArmPatch([0, served]);
+	const decoded = decodeProtocolPayloadLists('markless/view', served);
 	expect({ ...decoded, eventNames: undefined }).toEqual({ ...records, eventNames: undefined });
 });
 
@@ -297,5 +298,39 @@ test('a streamed arm whose event carries a sync policy keeps its events plain fo
 	const served = JSON.parse(JSON.stringify(encodeStreamedArmRecords(records)));
 	expect(served.events).toEqual(events);
 	expect(Array.isArray(served.locators)).toBe(false);
-	expect(decodeStreamedArmPatch([0, served])[1]).toEqual(records);
+	expect(decodeProtocolPayloadLists('markless/view', served)).toEqual(records);
+});
+
+test('a reader with no decoder finds a cell or event outside any keyed row where it was', () => {
+	const rows = Array.from({ length: 12 }, (_, row) => chainPath([row]));
+	const view = rowView(rows);
+	const page = { hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:page'] };
+	const events = [page, ...view.events];
+	const scripts = renderPayloadScripts(
+		{
+			state: createProtocolStatePayload({
+				cells: [
+					{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 1 },
+					...rows.map((path) => ({
+						graphNodeId: `${path}state:open`,
+						name: 'open',
+						valueKind: 'scalar' as const,
+						value: true,
+					})),
+				],
+			}),
+			view: { ...view, events },
+		},
+		encodeProtocolPayloadLists,
+	);
+	const served = (script: string, type: string) =>
+		JSON.parse(script.slice(`<script type="${type}">`.length, -9));
+	const state = served(scripts.stateScript, 'markless/state');
+	const viewServed = served(scripts.viewScript, 'markless/view');
+	expect(state.cells.find((cell: { graphNodeId?: string } | null) => cell?.graphNodeId === 'state:count'))
+		.toMatchObject({ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar' });
+	expect(state.cells.slice(1).every((cell: unknown) => cell === null)).toBe(true);
+	expect(viewServed.events[0]).toEqual(page);
+	expect(viewServed.events[5]).toBeNull();
+	expect(decodePayloadScripts(scripts).view.events).toEqual(events);
 });

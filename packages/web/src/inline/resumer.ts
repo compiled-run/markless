@@ -20,13 +20,18 @@ import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } fro
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
 import { expandRecordTemplates } from '../../../serializer/src/protocol-record-templates.ts';
-import type { ProtocolInstancePaths } from '../../../serializer/src/protocol-record-templates.ts';
+import type {
+	ProtocolInstancePaths,
+	ProtocolServedRecords,
+} from '../../../serializer/src/protocol-record-templates.ts';
 import { PROTOCOL_RECORD_KEYS } from '../../../serializer/src/protocol-record-keys.ts';
 
+const listKeys = (type: keyof typeof PROTOCOL_RECORD_KEYS, list: string) =>
+	(PROTOCOL_RECORD_KEYS[type] as Readonly<Record<string, string | undefined>>)[list] ?? '';
 const inlineListKeys = {
-	cells: PROTOCOL_RECORD_KEYS['markless/state'].cells,
-	sharedRecords: PROTOCOL_RECORD_KEYS['markless/state'].sharedRecords,
-	events: PROTOCOL_RECORD_KEYS['markless/view'].events,
+	cells: listKeys('markless/state', 'cells'),
+	sharedRecords: listKeys('markless/state', 'sharedRecords'),
+	events: listKeys('markless/view', 'events'),
 };
 
 declare const __MARKLESS_PAGE_START__: string;
@@ -68,10 +73,11 @@ declare const __MARKLESS_INLINE_CENSUS__: typeof marklessServedCensus;
 declare const __MARKLESS_INLINE_PATHS_ATTRIBUTE__: typeof PROTOCOL_LOCATOR_PATHS_ATTRIBUTE;
 declare const __MARKLESS_INLINE_HOST_ATTRIBUTE__: typeof PROTOCOL_EVENT_HOST_ATTRIBUTE;
 declare const __MARKLESS_INLINE_EXPAND__: typeof expandRecordTemplates;
-declare const __MARKLESS_INLINE_KEYS__: Readonly<
-	Record<'cells' | 'sharedRecords' | 'events', string>
->;
-type InlineServed = { readonly instancePaths?: ProtocolInstancePaths };
+declare const __MARKLESS_INLINE_KEYS__: typeof inlineListKeys;
+type InlineServed = {
+	readonly instancePaths?: ProtocolInstancePaths;
+	readonly inRows?: Readonly<Record<string, ProtocolServedRecords>>;
+};
 declare const __MARKLESS_INLINE_POLICY_TYPE__: typeof PROTOCOL_SYNC_POLICY_TABLE_TYPE;
 declare const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__:
 	| ((root: Element, phase: 'ssr-inline', active: false) => InlineDebugControls)
@@ -839,11 +845,13 @@ function registerInlineResumerDebug(input: {
 		const view = JSON.parse(
 			input.root.querySelector('script[type="markless/view"]')?.textContent || 'null',
 		) as (InlineView & InlineServed) | null;
-		events = __MARKLESS_INLINE_EXPAND__(
-			view?.events ?? [],
+		const rows = __MARKLESS_INLINE_EXPAND__(
+			view?.inRows?.events ?? [],
 			__MARKLESS_INLINE_KEYS__.events,
 			view?.instancePaths,
-		) as InlineView['events'];
+		);
+		let at = 0;
+		events = (view?.events ?? []).map((record) => record ?? rows[at++]) as InlineView['events'];
 	} catch {}
 	for (const element of input.root.querySelectorAll(
 		`[${CSS.escape(__MARKLESS_INLINE_HOST_ATTRIBUTE__)}]`,
@@ -989,13 +997,17 @@ function runInlineResumer(
 				const state = JSON.parse(
 					stateScript.textContent || 'null',
 				) as ProtocolStatePayload & InlineServed;
-				const [cells, sharedRecords] = (['cells', 'sharedRecords'] as const).map((list) =>
-					__MARKLESS_INLINE_EXPAND__(
-						state[list] ?? [],
-						__MARKLESS_INLINE_KEYS__[list],
-						state.instancePaths,
-					),
-				) as unknown as [ProtocolStatePayload['cells'], ReadonlyArray<SerializedRecord>];
+				const [cells, sharedRecords] = (['cells', 'sharedRecords'] as const).map((list) => {
+					const read = (served?: ProtocolServedRecords) =>
+						__MARKLESS_INLINE_EXPAND__(
+							served ?? [],
+							__MARKLESS_INLINE_KEYS__[list],
+							state.instancePaths,
+						);
+					const rows = read(state.inRows?.[list]);
+					let at = 0;
+					return read(state[list]).map((record) => record ?? rows[at++]);
+				}) as unknown as [ProtocolStatePayload['cells'], ReadonlyArray<SerializedRecord>];
 				for (const cell of cells) {
 					if (!cell.value || graph.has(cell.graphNodeId)) continue;
 					const payload = cell.value as {

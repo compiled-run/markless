@@ -14,10 +14,7 @@ export type { RuntimePayloadType };
 
 export type { ProtocolInstancePaths, ProtocolServedRecords, ProtocolTemplatedRecords };
 
-/**
- * Expands one served record list. Self-contained, because the inline resumer embeds its source to
- * read the state cells a sync policy tests.
- */
+// Self-contained: the inline resumer embeds its source.
 export function expandRecordTemplates(
 	list: ProtocolServedRecords,
 	keys = '',
@@ -34,24 +31,17 @@ export function expandRecordTemplates(
 	const parts = t.map((text) =>
 		text.replace(/~(\d+):/g, (_, at: string) => `"${names[+at]}":`).split(/([\^`])(\d+)/),
 	);
-	// One parse for the whole list: a parse per record costs more than the text it reads.
-	const texts: string[] = [];
-	const filled: number[] = [];
-	const records = r.map((ref, index) => {
-		if (typeof ref !== 'number' && !Array.isArray(ref)) return ref;
-		const part = parts[typeof ref === 'number' ? ref : (ref[0] as number)]!;
+	return r.map((ref) => {
+		if (typeof ref === 'number') return JSON.parse(parts[ref]![0]!);
+		if (!Array.isArray(ref)) return ref;
+		const part = parts[ref[0] as number]!;
 		let text = part[0]!;
 		for (let at = 1; at < part.length; at += 3) {
-			const value = (ref as ReadonlyArray<number | string>)[+part[at + 1]! + 1]!;
+			const value = ref[+part[at + 1]! + 1]!;
 			text += (part[at] === '`' ? path(value as number) : value) + part[at + 2]!;
 		}
-		texts.push(text);
-		filled.push(index);
-		return undefined;
+		return JSON.parse(text);
 	});
-	const parsed = JSON.parse(`[${texts.join(',')}]`) as unknown[];
-	filled.forEach((index, at) => (records[index] = parsed[at]!));
-	return records;
 }
 
 /** Expands, in place, every templated list of a freshly parsed payload script. */
@@ -60,16 +50,17 @@ export function decodeProtocolPayloadLists<T>(type: RuntimePayloadType, payload:
 	const keys: Readonly<Record<string, string>> = PROTOCOL_RECORD_KEYS[type];
 	if (record) {
 		const paths = record.instancePaths as ProtocolInstancePaths | undefined;
+		const inRows = record.inRows as Record<string, ProtocolTemplatedRecords> | undefined;
 		for (const key of PROTOCOL_TEMPLATED_LISTS[type]) {
 			const list = record[key];
 			if (list && !Array.isArray(list))
-				record[key] = expandRecordTemplates(
-					list as ProtocolTemplatedRecords,
-					keys[key],
-					paths,
-				);
+				record[key] = expandRecordTemplates(list as ProtocolTemplatedRecords, keys[key], paths);
+			const rows = inRows?.[key] && expandRecordTemplates(inRows[key], keys[key], paths);
+			let at = 0;
+			if (rows) record[key] = (list as unknown[]).map((item) => item ?? rows[at++]);
 		}
 		delete record.instancePaths;
+		delete record.inRows;
 	}
 	return expandSharedRecords(payload);
 }

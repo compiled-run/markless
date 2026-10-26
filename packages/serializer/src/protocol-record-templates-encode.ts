@@ -14,8 +14,9 @@ const SEGMENT = /[cpm]\d+:|r:[^:]*:/g;
 const WHOLE_NUMBER = /^(?:0|[1-9]\d{0,14})$/;
 // Gzip already folds a few repeats, so a list is templated only once that saves a quarter of it.
 const TEMPLATED_SHARE = 0.75;
-// Readers that load no decoder find these lists' records outside any keyed row by id or index, so those stay plain.
+// Readers that load no decoder find these lists' records by id or index: a keyed row's record is served in `inRows`.
 const PLAIN_OUTSIDE_ROWS: ReadonlySet<string> = new Set(['cells', 'events']);
+const IN_A_ROW = /"(?:[cpm]\d+:)*r:[^:"\\]*:/;
 
 type Group = {
 	readonly key: string;
@@ -58,7 +59,6 @@ export function encodeRecordTemplates<T extends object>(
 	records: ReadonlyArray<T>,
 	keys = '',
 	paths?: InstancePathTable,
-	plainOutsideRows = false,
 ): ReadonlyArray<T> | ProtocolTemplatedRecords {
 	if (records.length < (paths ? 1 : 2)) return records;
 	const refer = keys ? keyRefs(keys) : (text: string) => text;
@@ -71,7 +71,6 @@ export function encodeRecordTemplates<T extends object>(
 		if (text.includes('`')) text = text.replaceAll('`', '\\u0060');
 		texts.push(text);
 		const values = [...text.matchAll(paths ? PATH_HOLE : HOLE)];
-		if (plainOutsideRows && !values.some((hole) => isPath(hole[0]))) continue;
 		let key = '';
 		let at = 0;
 		for (const hole of values) {
@@ -91,7 +90,7 @@ export function encodeRecordTemplates<T extends object>(
 		return index;
 	};
 	const templates: string[] = [];
-	const refs: Array<ProtocolTemplatedRecords['r'][number]> = [...records];
+	const refs: Array<ProtocolTemplatedRecords['r'][number]> = [];
 	for (const group of groups.values()) {
 		const first = group.rows[0]!;
 		const alone = group.rows.length === 1;
@@ -184,13 +183,25 @@ export function encodeProtocolPayloadLists<T extends object>(
 	const keys: Readonly<Record<string, string>> = PROTOCOL_RECORD_KEYS[type];
 	const paths: InstancePathTable = new Map();
 	let encoded: Record<string, unknown> | undefined;
+	const inRows: Record<string, ProtocolTemplatedRecords> = {};
 	for (const key of PROTOCOL_TEMPLATED_LISTS[type]) {
 		const list = (payload as Record<string, unknown>)[key];
 		if (!Array.isArray(list)) continue;
-		const served = encodeRecordTemplates(list, keys[key], paths, PLAIN_OUTSIDE_ROWS.has(key));
+		if (PLAIN_OUTSIDE_ROWS.has(key)) {
+			const rows = new Set(list.filter((record) => IN_A_ROW.test(JSON.stringify(record))));
+			const served = encodeRecordTemplates([...rows], keys[key], paths);
+			if (Array.isArray(served)) continue;
+			inRows[key] = served as ProtocolTemplatedRecords;
+			(encoded ??= { ...(payload as Record<string, unknown>) })[key] = list.map((record) =>
+				rows.has(record) ? null : record,
+			);
+			continue;
+		}
+		const served = encodeRecordTemplates(list, keys[key], paths);
 		if (served !== list)
 			(encoded ??= { ...(payload as Record<string, unknown>) })[key] = served;
 	}
+	if (encoded && Object.keys(inRows).length) encoded.inRows = inRows;
 	if (encoded && paths.size) encoded.instancePaths = encodeInstancePaths(paths);
 	return (encoded as T | undefined) ?? payload;
 }
@@ -211,8 +222,10 @@ export function encodeStreamedArmRecords<T extends ArmRecords>(records: T): T {
 			...encodeProtocolPayloadLists('markless/view', { ...records, events: [] }),
 			events,
 		};
-	const served = encodeProtocolPayloadLists('markless/view', records);
-	return Array.isArray(served.events)
-		? served
-		: { ...served, eventNames: [...new Set(events.map((event) => event.eventName))] };
+	const served = encodeProtocolPayloadLists('markless/view', records) as T & {
+		readonly inRows?: { readonly events?: unknown };
+	};
+	return served.inRows?.events
+		? { ...served, eventNames: [...new Set(events.map((event) => event.eventName))] }
+		: served;
 }

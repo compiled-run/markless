@@ -31,11 +31,11 @@ export const marklessReadScalarCell = (r: ParentNode, graphNodeId: string) => {
 	const script = r.querySelector('script[type="markless/state"]');
 	if (!script) return;
 	try {
-		// Templated cells keep a cell outside any keyed row as itself, and a scalar plan reads only those.
-		return ((cells: { readonly r?: ReadonlyArray<MarklessScalarCell | null> }) =>
-			(cells.r ?? (cells as ReadonlyArray<MarklessScalarCell | null>)).find(
-				(cell) => cell?.graphNodeId === graphNodeId,
-			))(JSON.parse(script.textContent || 'null')?.cells);
+		return (
+			JSON.parse(script.textContent || 'null') as {
+				readonly cells?: ReadonlyArray<MarklessScalarCell | null>;
+			} | null
+		)?.cells?.find((cell) => cell?.graphNodeId === graphNodeId);
 	} catch {}
 };
 export const marklessDecodeScalarCell = (

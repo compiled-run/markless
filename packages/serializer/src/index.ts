@@ -13,7 +13,6 @@ export {
 	type ProtocolInstancePaths,
 	type ProtocolTemplatedRecords,
 } from './protocol-record-templates.ts';
-export { decodeStreamedArmPatch } from './protocol-streamed-arm-decode.ts';
 export { expandSharedRecords } from './protocol-shared-records-decode.ts';
 export { shareStateRecords } from './protocol-shared-records.ts';
 export * from './protocol-validation-storage.ts';
