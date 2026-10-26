@@ -325,8 +325,7 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Input).textContent).toBe('hello');
 	});
 
-	// the trigger cell's cross-module read never fires though settle derives it - undiagnosed, framework-suspect
-	test.fails(`${mode}: a trigger context opens behind the caret and carries what was typed`, async () => {
+	test(`${mode}: a trigger context opens behind the caret and carries what was typed`, async () => {
 		if (mode === 'CSR') await render(Mention);
 		else await renderSSR(Mention);
 
@@ -340,8 +339,7 @@ for (const mode of MODES) {
 		await expect.poll(() => el(TriggerChar).textContent).toBe('');
 	});
 
-	// depends on the trigger-context row above
-	test.fails(`${mode}: inserting a token replaces the trigger text it was searching`, async () => {
+	test(`${mode}: inserting a token replaces the trigger text it was searching`, async () => {
 		if (mode === 'CSR') await render(Mention);
 		else await renderSSR(Mention);
 

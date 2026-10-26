@@ -110,3 +110,32 @@ export function Records() @{
 	expect(field!(graphContext({ ...cells, 'state:order': { field: 'score' } }).context)).toBe('score');
 	expect(first!(graphContext(cells).context)).toBe('second');
 });
+
+test('text and attributes reading through ?. depend on the value they read', async () => {
+	const result = await compile(`
+import { state } from '@markless/core';
+export function Records() @{
+ let u = state({ name: 'n', p: undefined as undefined | { name: string } });
+ <div>
+  <p title={u.p?.name ?? 'untitled'} onClick={() => { u.p = { name: 'z' }; }}>{u.p?.['name']}</p>
+  <output>{u?.name}</output>
+ </div>
+}
+`);
+	expect(
+		result.stateLowering.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		),
+	).toEqual([]);
+	const dependenciesOf = (graphNodeId: string) =>
+		result.protocolState.computed?.find((record) => record.graphNodeId === graphNodeId)
+			?.dependencies;
+	const updates = result.protocolView.domUpdates;
+	const titleUpdate = updates.find(
+		(update) => update.target?.kind === 'attribute' && update.target.name === 'title',
+	);
+	expect(dependenciesOf(titleUpdate!.graphNodeId)).toEqual([{ graphNodeId: 'state:u', path: ['p'] }]);
+	const [bracketText, plainText] = updates.filter((update) => update.target?.kind === 'text');
+	expect(dependenciesOf(bracketText!.graphNodeId)).toEqual([{ graphNodeId: 'state:u', path: ['p'] }]);
+	expect(plainText).toEqual(expect.objectContaining({ graphNodeId: 'state:u', path: ['name'] }));
+});

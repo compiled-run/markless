@@ -12,6 +12,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	hasOptionalLink,
 	rootBindsInsideRegion,
 	rootIdentifierOffset,
 	resolvedSymbolAt,
@@ -69,13 +70,25 @@ export function isCompositeTemplateExpression(
 		node.type === 'LogicalExpression' ||
 		node.type === 'TemplateLiteral' ||
 		(node.type === 'ChainExpression' &&
-			isCompositeTemplateExpression(node.expression as AnyNode, options)) ||
+			((hasOptionalLink(node.expression as AnyNode) &&
+				!isDottedPath(node.expression as AnyNode)) ||
+				isCompositeTemplateExpression(node.expression as AnyNode, options))) ||
 		readsThroughDynamicKey(node) ||
 		(options.methodCalls === true &&
 			(isMethodCallExpression(node) || isGlobalConversionCall(node))) ||
 		// `delete` mutates rather than reads; the read collector already refuses it,
 		// so an operator that is not a pure value still reaches the loud refusal.
 		(options.unaryOperators === true && node.type === 'UnaryExpression')
+	);
+}
+
+// `a?.b.c` is the plain graph read `a.b.c` (optionalMemberReadSource); only other chains need a computed.
+function isDottedPath(node: AnyNode | undefined): boolean {
+	if (node?.type === 'Identifier') return true;
+	return (
+		node?.type === 'MemberExpression' &&
+		node.computed !== true &&
+		isDottedPath(node.object as AnyNode | undefined)
 	);
 }
 
@@ -187,6 +200,15 @@ function memberReadSources(
 	options: CompositeReadOptions,
 ): ReadonlyArray<string> | null {
 	const object = node.object as AnyNode | undefined;
+	// An optional link can short-circuit, so the read stops at the value before it, as a computed() body's does.
+	if (hasOptionalLink(node)) {
+		return node.computed === true
+			? joinReadSources([
+					pureCompositeReadSources(object, state, options),
+					pureCompositeReadSources(node.property as AnyNode, state, options),
+				])
+			: pureCompositeReadSources(object, state, options);
+	}
 	if (node.computed === true && !isLiteralExpression(node.property as AnyNode | undefined)) {
 		if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
 		// The receiver and the key are each read whole; `LABELS[tone]` over a module value reads only its key.

@@ -15,6 +15,7 @@ import type {
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
+	optionalMemberReadSource,
 	resolveGraphPath,
 	semanticAliasMap,
 	splitStaticGraphPath,
@@ -53,7 +54,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		const lookup = scopedGraphLookup(input, null, read.componentName);
 		const resolved = resolveStateGraphPath(
 			input,
-			read.source,
+			optionalMemberReadSource(read.source),
 			lookup,
 			null,
 			read.componentName,
