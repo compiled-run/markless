@@ -7323,8 +7323,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 		sources: [
 			{
 				id: 'f0',
-				file: 'packages/web/src/resume-keyed-repeats.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/resume-keyed-repeats.ts',
+				file: 'packages/web/src/fns/row-behaviors.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-behaviors.ts',
 			},
 		],
 		moreSources: 0,
