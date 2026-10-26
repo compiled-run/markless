@@ -169,8 +169,8 @@ const liveHandoffOptions = (handoff: {
 	readonly syncPolicyAlreadyApplied?: boolean;
 	readonly propagationStopped?: boolean;
 }) => ({
-	syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
-	propagationStopped: handoff.propagationStopped === true,
+	syncPolicyAlreadyApplied: !!handoff.syncPolicyAlreadyApplied,
+	propagationStopped: !!handoff.propagationStopped,
 	ignoreUnmatched: true,
 });
 
