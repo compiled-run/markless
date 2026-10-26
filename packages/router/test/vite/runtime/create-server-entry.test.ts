@@ -674,7 +674,7 @@ describe('server entry rendering', () => {
 	});
 
 	it.each(['blocking', 'streaming'] as const)(
-		'%s render preloads the landing plan and link bridge at low fetch priority',
+		'%s render preloads the landing plan at high fetch priority and the link bridge at low',
 		async (render) => {
 			const entry = createServerEntry({
 				render,
@@ -685,7 +685,7 @@ describe('server entry rendering', () => {
 					'pages/shop/[item].tsrx': [
 						'/assets/wake.js',
 						'/assets/item-cart.js',
-						{ href: '/assets/hero-zoom.js', fetchPriority: 'high' },
+						{ href: '/assets/hero-zoom.js', fetchPriority: 'low' },
 					],
 					'pages/checkout.tsrx': ['/assets/checkout-form.js'],
 				},
@@ -709,9 +709,9 @@ describe('server entry rendering', () => {
 			expect(
 				[...head.matchAll(/<link rel="modulepreload"[^>]*>/g)].map(([tag]) => tag),
 			).toEqual([
-				'<link rel="modulepreload" href="/assets/wake.js" crossorigin="anonymous" fetchpriority="low">',
-				'<link rel="modulepreload" href="/assets/item-cart.js" crossorigin="anonymous" fetchpriority="low">',
-				'<link rel="modulepreload" href="/assets/hero-zoom.js" crossorigin="anonymous" fetchpriority="high">',
+				'<link rel="modulepreload" href="/assets/wake.js" crossorigin="anonymous" fetchpriority="high">',
+				'<link rel="modulepreload" href="/assets/item-cart.js" crossorigin="anonymous" fetchpriority="high">',
+				'<link rel="modulepreload" href="/assets/hero-zoom.js" crossorigin="anonymous" fetchpriority="low">',
 				expect.stringMatching(
 					/^<link rel="modulepreload" href="\/_markless\/links\/[0-9a-z]+\.js" crossorigin="anonymous" fetchpriority="low">$/,
 				),
@@ -978,7 +978,11 @@ describe('server entry rendering', () => {
 				default: {
 					renderSsr: () => ({
 						html: '<head></head><body><button>Menu</button>__markless_router_document_children__</body>',
-						view: { events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }] },
+						view: {
+							events: [
+								{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] },
+							],
+						},
 					}),
 				},
 			}),
