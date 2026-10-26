@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { createServer, type HotPayload, type ViteDevServer } from 'vite';
+import { createServer, type HotPayload, type InlineConfig, type ViteDevServer } from 'vite';
 import { markless } from '../src/vite/index.ts';
 import {
 	MARKLESS_DEV_ERROR_CLEAR_EVENT,
@@ -12,13 +12,32 @@ import {
 import { fixtureSsrHost } from '../fixtures/vite-ssr/src/dev-server.ts';
 import { marklessSourceAliases } from './helpers.ts';
 
+// A dev server start, an SSR render and an HMR pass took up to 6.8 s at load average 90; 5 s is a wall-clock race.
+vi.setConfig({ testTimeout: 30_000 });
+
 const root = resolve(import.meta.dirname, '../../..');
 const cleanupRoots: string[] = [];
+const startedServers: Promise<ViteDevServer>[] = [];
+// A test that timed out is still running: its server must stop watching before its root is removed.
 afterEach(async () => {
+	await Promise.all(
+		startedServers.splice(0).map((started) =>
+			started.then(
+				(server) => server.close(),
+				() => undefined,
+			),
+		),
+	);
 	await Promise.all(
 		cleanupRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })),
 	);
 });
+
+function startServer(config: InlineConfig) {
+	const started = createServer(config);
+	startedServers.push(started);
+	return started;
+}
 
 describe('SSR browser HMR', () => {
 	test('serves the framework error document when dev prerender evaluation throws', async () => {
@@ -31,7 +50,7 @@ describe('SSR browser HMR', () => {
 		let server: ViteDevServer | undefined;
 		vi.stubEnv('MARKLESS_PRERENDER', '1');
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				root: fixture.root,
 				environments: {
@@ -64,7 +83,7 @@ describe('SSR browser HMR', () => {
 		let server: ViteDevServer | undefined;
 		vi.stubEnv('MARKLESS_PRERENDER', '1');
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				root: fixture.root,
 				environments: {
@@ -75,7 +94,7 @@ describe('SSR browser HMR', () => {
 				},
 				plugins: [markless({ executionLog: 'never' })],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
 
 			const indexHtml =
@@ -107,7 +126,7 @@ describe('SSR browser HMR', () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				mode: 'ssr',
 				root: fixture.root,
@@ -164,7 +183,7 @@ describe('SSR browser HMR', () => {
 		const hookedFiles: string[] = [];
 		let server: ViteDevServer | undefined;
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				mode: 'ssr',
 				root: fixture.root,
@@ -224,14 +243,14 @@ describe('SSR browser HMR', () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				mode: 'ssr',
 				root: fixture.root,
 				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
 				plugins: [markless(), fixtureSsrHost()],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
@@ -278,7 +297,7 @@ describe('SSR browser HMR', () => {
 		const fixture = await createComponentSsrFixture();
 		let server: ViteDevServer | undefined;
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				mode: 'ssr',
 				root: fixture.root,
@@ -324,7 +343,7 @@ describe('SSR browser HMR', () => {
 		let server: ViteDevServer | undefined;
 		let capturing = true;
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				mode: 'ssr',
 				root: fixture.root,
@@ -381,7 +400,7 @@ describe('SSR browser HMR', () => {
 		let capturing = true;
 		vi.stubEnv('MARKLESS_NO_BARRIER', '1');
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				mode: 'ssr',
 				root: fixture.root,
@@ -437,7 +456,7 @@ describe('SSR browser HMR', () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;
 		try {
-			server = await createServer({
+			server = await startServer({
 				configFile: false,
 				mode: 'ssr',
 				root: fixture.root,
@@ -448,7 +467,7 @@ describe('SSR browser HMR', () => {
 				},
 				plugins: [markless(), fixtureSsrHost()],
 				resolve: { alias: marklessSourceAliases(root) },
-				server: { hmr: true, middlewareMode: true, ws: false },
+				server: { hmr: true, middlewareMode: true, ws: false, watch: null },
 			});
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');

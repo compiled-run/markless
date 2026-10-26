@@ -102,6 +102,9 @@ export default function Home() @{
 }
 `;
 
+// A whole Vite + Rolldown build: up to 3 s at load average 80, and past the 5 s default in the pre-commit unit lane under load.
+const BUILD_TIMEOUT_MS = 30_000;
+
 describe('TSRX Rolldown plugin structure', () => {
 	test('client build options allow generated entries to extend the app entry surface', () => {
 		expect(callOptions(marklessClient(), {})).toMatchObject({
@@ -411,7 +414,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(JSON.parse(String(graphAsset?.source))).toEqual(
 			expect.arrayContaining(['symbol:0', 'symbol:5']),
 		);
-	});
+	}, BUILD_TIMEOUT_MS);
 
 	test('route queries keep composed TSRX children behind the linked facade chain', async () => {
 		const routeSource = `import InteractiveCounter from '../components/InteractiveCounter.tsrx';
@@ -515,7 +518,7 @@ export default function Docs() @{ <main><InteractiveCounter /></main> }`;
 			'non-emitted canonical primaries register no orphan claims',
 		).toEqual({ verified: 0, errors: [] });
 		await assertOrdinaryRouteBuildControl();
-	});
+	}, BUILD_TIMEOUT_MS);
 
 	test('transformTsrxModule scopes browser symbol export names by source file', async () => {
 		const first = await transformTsrxModule({
@@ -2017,7 +2020,7 @@ export function App() @{
 		} finally {
 			await rm(ssrOutputDirectory, { recursive: true, force: true });
 		}
-	});
+	}, BUILD_TIMEOUT_MS);
 
 	// Unpacked, the child keeps its own emitted resolver; packed, the parent's resolver imports the child's symbols literally.
 	test.each([false, true])(
@@ -2108,6 +2111,7 @@ export function App() @{
 			expect(emittedCode).toMatch(/"0":\s*\[\[/);
 			expect(emittedCode).toMatch(/"1":\s*\[\[/);
 		},
+		BUILD_TIMEOUT_MS,
 	);
 
 	test('execution-log symbol identities are spelled root-relative in hooks, sizes and attribution', async () => {

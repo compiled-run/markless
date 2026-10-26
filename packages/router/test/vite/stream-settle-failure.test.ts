@@ -50,7 +50,7 @@ test('settled content that fails to render on the server streams its @catch cont
 	// The status went out with the shell, before the value settled.
 	expect(response.status).toBe(200);
 	expect(await response.text()).toContain('<p>failed</p>');
-	expect(server!.output()).toContain('MARKLESS_COMPOSED_READ_UNMAPPED');
+	await server!.waitForOutput('MARKLESS_COMPOSED_READ_UNMAPPED');
 	const page = await browser!.newPage();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
