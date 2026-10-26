@@ -16,6 +16,7 @@ import {
 	sharedInlineSourcesModuleSource,
 } from '../shared-inline-sources.ts';
 import { MARKLESS_VIRTUAL_PREFIX, symbolVirtualModuleSourceFile } from '../source-module.ts';
+import { rewriteTemplateDynamicImports } from '../template-dynamic-imports.ts';
 import { marklessVirtualModuleSourceFile } from '../transform.ts';
 import type { MarklessEnvironment } from '../types.ts';
 import {
@@ -141,8 +142,8 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 	const renderDataSource =
 		normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}render-data:`) ||
 		normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}render-data-served:`)
-		? marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot())
-		: null;
+			? marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot())
+			: null;
 	const ownerSource = resolverSource ?? symbolSource ?? renderDataSource;
 	// The id resolves from its owner's first pass; only a final publication ships.
 	if (ownerSource) {
@@ -190,10 +191,19 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 		);
 	}
 	if (module) {
-		return virtualModuleSourceForLoad(module, {
+		const code = virtualModuleSourceForLoad(module, {
 			dev: internalOptions.dev === true && ctx.getEnvironment(pluginContext) === 'client',
 			publicPath: internalOptions.publicPath,
 		});
+		const authoringSource =
+			ownerSource ??
+			sourceForResumeVirtualImporter(normalizedId) ??
+			sourceForPrerenderWakeVirtualImporter(normalizedId) ??
+			sourceForTriggerGroupVirtualImporter(normalizedId);
+		const root = ctx.getRoot();
+		return authoringSource && root
+			? rewriteTemplateDynamicImports(code, authoringSource, root)
+			: code;
 	}
 	return null;
 }
