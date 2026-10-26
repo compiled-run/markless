@@ -115,7 +115,12 @@ function asyncComputedFromPayload(
 		input.state.computed
 			.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
 			.map((computed) =>
-				asyncComputedFromRecord(computed, runnerSymbols[computed.graphNodeId]!, input, graphRef),
+				asyncComputedFromRecord(
+					computed,
+					runnerSymbols[computed.graphNodeId]!,
+					input,
+					graphRef,
+				),
 			),
 	);
 }
@@ -133,10 +138,12 @@ export async function asyncComputedFromRecord(
 		initialSnapshot:
 			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot)),
 		key: (read: RuntimeGraphRead) => {
-			const dependency = dependencies[0];
-			return dependencies.length > 1
-				? dependencies.map((dependency) => read(dependency.graphNodeId, dependency.path))
-				: dependency && read(dependency.graphNodeId, dependency.path);
+			const values = dependencies.map((dependency) =>
+				read(dependency.graphNodeId, dependency.path),
+			);
+			// An object changed in place keeps its identity, so it is never the same key twice.
+			if (values.length === 0) return undefined;
+			return values.length === 1 && !isObject(values[0]) ? values[0] : values;
 		},
 		run: async ({ key, signal, read }) => {
 			return (await input.loadSymbol(runnerSymbolId))({
@@ -183,4 +190,8 @@ async function deserializeGraphValue(payload: SerializedGraphPayload): Promise<u
 	valueDecoderPromise ??= import('../../serializer/src/value-decode-client-lazy.ts');
 	const { deserializeGraphValueForClient } = await valueDecoderPromise;
 	return deserializeGraphValueForClient(payload);
+}
+
+function isObject(value: unknown): boolean {
+	return typeof value === 'object' && value !== null;
 }

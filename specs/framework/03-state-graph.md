@@ -217,7 +217,11 @@ Semantics:
   not run at creation; it runs only when demanded by a DOM update or TSRX async
   boundary.
 - Reactive reads before the first `await` form the dependency key for the async
-  node. When that key changes, the runtime creates a new request version.
+  node. When that key changes, the runtime creates a new request version. A key
+  part that holds an object or array (a whole `filters` object handed to a
+  helper) changes whenever a write lands inside it: the object keeps its
+  identity when a field is written, so identity never decides that it stayed
+  the same.
 - Reactive reads after the first `await` are a compile-time diagnostic. Snapshot
   the value before awaiting, or split the logic into an async computed plus a
   sync computed:
