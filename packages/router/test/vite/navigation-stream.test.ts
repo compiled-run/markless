@@ -192,6 +192,21 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		for (const leave of ['link', 'back'] as const)
+			test(`leaving by ${leave} while the page's @try still streams never runs its recipe in the browser`, async () => {
+				const { page, errors, logs } = await open(browser, '/');
+				await page.locator('[data-to-recipe]').click();
+				await landedOn(page, 'recipe');
+				await page.locator('[data-pending]').waitFor();
+				if (leave === 'link') await page.locator('[data-leave]').click();
+				else await page.goBack();
+				await landedOn(page, leave === 'link' ? 'quick' : 'start');
+				await page.waitForTimeout(900);
+				expect(logs.filter((line) => line.startsWith('slow() browser'))).toEqual([]);
+				expect(errors).toEqual([]);
+				await page.close();
+			});
+
 		for (const arrival of ['landing', 'in-place arrival'] as const)
 			test(`after a click woke the page before its data streamed in (${arrival}), the streamed link still runs its handler`, async () => {
 				const { page, errors } = await open(

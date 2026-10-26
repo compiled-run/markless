@@ -899,7 +899,6 @@ export async function navigate(
 	containerAttribute = state.config.containerAttributes[0];
 	const session = sessionFor(d);
 	const id = ++session.navigation;
-	session.streaming?.abort();
 	// The address follows the click at once, so Back before the page arrives returns to the page still shown.
 	const entryNow = () =>
 		(w.history.state as { __marklessFragment?: { id?: string } } | null)?.__marklessFragment
@@ -992,6 +991,8 @@ export async function navigate(
 	let scripts: Element[] = [];
 	const commit = (): boolean => {
 		if (id !== session.navigation) return false;
+		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
+		session.streaming?.abort();
 		const settle = withoutTransitions(d);
 		keepAttributes = state.config.keepAttributes ?? ['', ''];
 		const offsets: ScrolledBox[] = [];
