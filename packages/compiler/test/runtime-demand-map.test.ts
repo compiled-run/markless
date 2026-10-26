@@ -783,3 +783,38 @@ test('an event inside an async boundary arm is a planner action owned by its bou
 		}
 	}
 });
+
+test.each([
+	{
+		name: 'an @if on a module constant',
+		source: `
+			import { state } from '@markless/core';
+			const SHOWN = true;
+			export default function Shell() @{
+				let count = state(0);
+				<>@if (SHOWN) { <div><button onClick={() => count++}>{count}</button>@if (count > 2) { <p>many</p> } @else { <p>few</p> }</div> }</>
+			}
+		`,
+	},
+	{
+		name: 'a @switch on a module constant',
+		source: `
+			import { state } from '@markless/core';
+			const MODE = 'wide';
+			export default function Frame() @{
+				let label = state('x');
+				<main>@switch (MODE) { @case 'wide': { <section><a onClick={() => (label = 'y')}>{label}</a>@if (label === 'y') { <b>set</b> }</section> } @default: { <i>narrow</i> } }</main>
+			}
+		`,
+	},
+])('a branch record names only a flip symbol the module ships: $name', async ({ source }) => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({ filename: '/workspace/src/Shell.tsrx', symbols: [], source });
+	const shipped = new Set(result.symbolModules.modules.map((module) => module.symbolId));
+	const branches = result.runtimeDemandMaps.prerender.payloadRecords.filter(
+		(record) => record.kind === 'branch',
+	);
+	expect(branches.length).toBeGreaterThan(0);
+	for (const record of branches)
+		for (const symbolId of record.symbolIds ?? []) expect(shipped).toContain(symbolId);
+});
