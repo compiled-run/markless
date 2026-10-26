@@ -263,6 +263,11 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'An element does not exist yet while the page renders. So the markup cannot read an `element()` handle.',
 		how: 'Read the element inside an event handler or an `attach` behavior. Show state values in the markup instead.',
 	},
+	MARKLESS_DIRECT_EVAL_UNSUPPORTED: {
+		summary: "eval() inside a component runs code that reads the component's names.",
+		what: 'Markless moves handlers and derived values into their own modules, and rewrites each state read and write it sees in your code. It cannot see inside an `eval` string, and the names that string reads are not defined where the code runs.',
+		how: "Write the code directly: `count++`, not `eval('count++')`. For code that only needs globals, use `new Function(code)()` or `(0, eval)(code)`.",
+	},
 	MARKLESS_STORAGE_KEY_STATIC: {
 		summary: 'storage() gets a key or fallback that is not a string literal.',
 		what: 'Markless reads the `storage()` key and fallback when it builds your code. So both must be string literals.',

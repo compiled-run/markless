@@ -2909,6 +2909,89 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_DIRECT_EVAL_UNSUPPORTED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: "eval() inside a component runs code that reads the component's names.",
+		printed: [
+			'MARKLESS_DIRECT_EVAL_UNSUPPORTED: `eval` in `<componentName>` runs code that reads `<named>`, but handlers and render code run in their own modules, where `<named>` is not defined.',
+			'The compiler moves handlers and derived values into separate modules and rewrites every read and write of state it can see in the source. Code inside an eval string is invisible to it, so it would throw a ReferenceError or change state without updating the page.',
+			"Write the code directly (before: `eval('count++')`, after: `count++`). To run code that only needs globals, call `new Function(code)()` or `(0, eval)(code)` instead.",
+			'https://markless.dev/errors/MARKLESS_DIRECT_EVAL_UNSUPPORTED',
+		],
+		structured: true,
+		guide: {
+			summary: "eval() inside a component runs code that reads the component's names.",
+			what: [
+				{
+					id: 's0',
+					text: 'Markless moves handlers and derived values into their own modules, and rewrites each state read and write it sees in your code. It cannot see inside an ',
+				},
+				{
+					id: 's1',
+					text: 'eval',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' string, and the names that string reads are not defined where the code runs.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Write the code directly: ',
+				},
+				{
+					id: 's1',
+					text: 'count++',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', not ',
+				},
+				{
+					id: 's3',
+					text: "eval('count++')",
+					code: true,
+				},
+				{
+					id: 's4',
+					text: '. For code that only needs globals, use ',
+				},
+				{
+					id: 's5',
+					text: 'new Function(code)()',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' or ',
+				},
+				{
+					id: 's7',
+					text: '(0, eval)(code)',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: '.',
+				},
+			],
+			example: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/direct-eval.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/direct-eval.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_DYNAMIC_TAG_INVALID',
 		packageName: '@markless/web',
 		stage: 'runtime',
