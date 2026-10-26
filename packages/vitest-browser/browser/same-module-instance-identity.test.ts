@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import CollisionPage from './fixtures/instance-collision-page.tsrx';
 import SameNamePage from './fixtures/same-module-same-name-page.tsrx';
 import SiblingsPage from './fixtures/same-module-siblings-page.tsrx';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 afterEach(() => cleanup());
 
@@ -14,7 +15,10 @@ type StatePayload = {
 function statePayloadIds(container: ParentNode): string[] {
 	const script = container.querySelector<HTMLScriptElement>('script[type="markless/state"]');
 	if (!script) throw new Error('Expected markless/state payload script.');
-	const payload = JSON.parse(script.textContent ?? 'null') as StatePayload;
+	const payload = decodeProtocolPayloadLists(
+		'markless/state',
+		JSON.parse(script.textContent ?? 'null'),
+	) as StatePayload;
 	return [...payload.cells, ...payload.computed].map((node) => node.graphNodeId);
 }
 

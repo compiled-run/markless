@@ -14,6 +14,8 @@ const protocolFile = resolve(packageDirectory, 'src/protocol.ts');
 const valueFile = resolve(packageDirectory, 'src/value.ts');
 export const RECORD_KEYS_FILE = resolve(packageDirectory, 'src/protocol-record-keys.ts');
 
+// Lists whose records repeat a few shapes spell each field name once per shape, so a key table buys nothing.
+const UNKEYED_LISTS = new Set(['locators', 'events', 'keyedRepeats']);
 // Fields typed `unknown` that carry a serialized graph value envelope; only state records hold one.
 const ENVELOPE_FIELDS = new Set(['value', 'key', 'error']);
 const PAYLOAD_TYPES = {
@@ -77,13 +79,17 @@ export function generateRecordKeysSource(): string {
 			const property = payload.getProperty(list);
 			if (!property) throw new Error(`MARKLESS_RECORD_KEYS_LIST_MISSING: ${aliasName}.${list}`);
 			const keys: string[] = [];
-			collect(
-				checker.getNonNullableType(checker.getTypeOfSymbol(property)),
-				keys,
-				new Set(),
-				payloadType === 'markless/state',
-			);
-			lines.push(`\t\t${list}: '${keys.join(' ')}',`);
+			if (!UNKEYED_LISTS.has(list))
+				collect(
+					checker.getNonNullableType(checker.getTypeOfSymbol(property)),
+					keys,
+					new Set(),
+					payloadType === 'markless/state',
+				);
+			const entry = `${list}: '${keys.join(' ')}',`;
+			// The formatter breaks an entry past 100 columns (a tab counts four) unless its key is under 7 wide.
+			const breaks = 8 + entry.length > 100 && list.length >= 7;
+			lines.push(breaks ? `\t\t${list}:\n\t\t\t'${keys.join(' ')}',` : `\t\t${entry}`);
 		}
 		tables.push(`\t'${payloadType}': {\n${lines.join('\n')}\n\t},`);
 	}

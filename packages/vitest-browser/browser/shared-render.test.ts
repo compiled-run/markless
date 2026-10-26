@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import SharedSessionPage from './fixtures/shared-session-page.tsrx';
 import SharedTwoDefinitionsPage from './fixtures/shared-two-definitions-page.tsrx';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 afterEach(() => cleanup());
 
@@ -13,7 +14,10 @@ type StatePayload = {
 function statePayloadIds(container: ParentNode): string[] {
 	const script = container.querySelector<HTMLScriptElement>('script[type="markless/state"]');
 	if (!script) throw new Error('Expected markless/state payload script.');
-	const payload = JSON.parse(script.textContent ?? 'null') as StatePayload;
+	const payload = decodeProtocolPayloadLists(
+		'markless/state',
+		JSON.parse(script.textContent ?? 'null'),
+	) as StatePayload;
 	return [...payload.cells, ...payload.computed].map((node) => node.graphNodeId);
 }
 

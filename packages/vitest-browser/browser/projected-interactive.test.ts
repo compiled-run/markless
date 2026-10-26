@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import NestedPage from './fixtures/projected-state-nested-page.tsrx';
 import PairPage from './fixtures/projected-state-pair-page.tsrx';
 import Page from './fixtures/projected-state-page.tsrx';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 // A component written inside another component's tag is PROJECTED. The
 // projected child owns its own state() and its own event handler, so composing
@@ -18,7 +19,10 @@ type StatePayload = {
 function statePayloadIds(container: ParentNode): string[] {
 	const script = container.querySelector<HTMLScriptElement>('script[type="markless/state"]');
 	if (!script) throw new Error('Expected markless/state payload script.');
-	const payload = JSON.parse(script.textContent ?? 'null') as StatePayload;
+	const payload = decodeProtocolPayloadLists(
+		'markless/state',
+		JSON.parse(script.textContent ?? 'null'),
+	) as StatePayload;
 	return [...payload.cells, ...payload.computed].map((node) => node.graphNodeId);
 }
 

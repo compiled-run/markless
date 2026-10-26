@@ -6,6 +6,7 @@ import type {
 } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
+import { decodeStreamedArmPatch } from '../../../serializer/src/protocol-streamed-arm-decode.ts';
 import { derivedReconcilePlane, installDerivedReconcilePlane } from '../reconcile-plane-slot.ts';
 import { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-stream-open.ts';
 
@@ -120,7 +121,12 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 	if (stateText)
 		learn(decodeProtocolPayloadLists('markless/state', JSON.parse(stateText) as StateDelta));
 	for (const patch of document.querySelectorAll(STATE_PATCH))
-		learn(JSON.parse(patch.textContent ?? 'null') as StateDelta | null);
+		learn(
+			decodeProtocolPayloadLists(
+				'markless/state',
+				JSON.parse(patch.textContent ?? 'null') as StateDelta | null,
+			),
+		);
 
 	const take = (state: StreamedState): void => {
 		const arm = template(state.boundaryId);
@@ -136,7 +142,9 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 		learn(delta);
 		state.resolve?.({
 			html: arm.innerHTML,
-			patch: JSON.parse(records.textContent ?? 'null') as ProtocolStreamedArmPatch,
+			patch: decodeStreamedArmPatch(
+				JSON.parse(records.textContent ?? 'null') as ProtocolStreamedArmPatch,
+			),
 			state: delta,
 		});
 	};

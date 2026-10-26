@@ -11,6 +11,7 @@ import {
 } from '../src/dev-error/index.ts';
 import { fixtureSsrHost } from '../fixtures/vite-ssr/src/dev-server.ts';
 import { marklessSourceAliases } from './helpers.ts';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 const root = resolve(import.meta.dirname, '../../..');
 const cleanupRoots: string[] = [];
@@ -503,7 +504,7 @@ async function createSsrFixture() {
 function marklessViewPayload(html: string) {
 	const match = html.match(/<script type="markless\/view">([\s\S]*?)<\/script>/);
 	expect(match).not.toBeNull();
-	return JSON.parse(match![1]) as {
+	return decodeProtocolPayloadLists('markless/view', JSON.parse(match![1])) as {
 		locators: { tagName?: string }[];
 		events: unknown[];
 	};

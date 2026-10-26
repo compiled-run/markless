@@ -5,6 +5,7 @@ import { ASYNC_BOUNDARY_ARM } from '../../../../serializer/src/index.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 import { INLINE_RESUMER_PAGE_TOKEN } from '@markless/web/inline/resumer';
+import { decodeProtocolPayloadLists } from '../../../../serializer/src/protocol-record-templates.ts';
 
 describe('server entry rendering', () => {
 	it('renders matched Markless page artifacts inside an HTML document', async () => {
@@ -308,7 +309,10 @@ describe('server entry rendering', () => {
 			html.indexOf('<script type="markless/state">') +
 				'<script type="markless/state">'.length,
 		);
-		const state = JSON.parse(stateJson.slice(0, stateJson.indexOf('</script>'))) as {
+		const state = decodeProtocolPayloadLists(
+			'markless/state',
+			JSON.parse(stateJson.slice(0, stateJson.indexOf('</script>'))),
+		) as {
 			readonly cells: ReadonlyArray<Record<string, unknown>>;
 		};
 		const propCell = state.cells.find((cell) => cell.graphNodeId === 'prop:props');

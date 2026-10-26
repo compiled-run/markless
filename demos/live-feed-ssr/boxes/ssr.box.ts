@@ -3,6 +3,7 @@ import {
 	assertArmRecordCell,
 	reachableArmRecordCells,
 } from '../../live-feed/boxes/arm-record-cells';
+import { decodeProtocolPayloadLists } from '../../../packages/serializer/src/protocol-record-templates.ts';
 
 const WAIT = { timeoutMs: 10_000 };
 const FULL_PAYLOAD_SCRIPT_BYTES = 4_761;
@@ -150,7 +151,13 @@ function readResumePayload(html: string): {
 		...html.matchAll(/<script type="markless\/(state|view)">([\s\S]*?)<\/script>/g),
 	];
 	const payload = Object.fromEntries(
-		scripts.map((match) => [match[1], JSON.parse(match[2]!) as unknown]),
+		scripts.map((match) => [
+			match[1],
+			decodeProtocolPayloadLists(
+				`markless/${match[1]}` as 'markless/state',
+				JSON.parse(match[2]!),
+			) as unknown,
+		]),
 	) as { readonly state?: unknown; readonly view?: unknown };
 	if (!payload.state || !payload.view)
 		throw new Error('Expected both resume delta payload scripts.');

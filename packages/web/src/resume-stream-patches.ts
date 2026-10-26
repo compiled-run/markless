@@ -1,6 +1,7 @@
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client.ts';
 import type { ProtocolStatePayload, ProtocolStreamedArmPatch } from '@markless/serializer';
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
+import { decodeStreamedArmPatch } from '../../serializer/src/protocol-streamed-arm-decode.ts';
 import type { ResumeDomOwnerDocument } from './resume-types.ts';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
@@ -52,7 +53,9 @@ export function adoptStreamedArmPatches(
 			if (!uncommittedBoundaryIds.has(boundaryId))
 				armPatchesByBoundary.set(
 					boundaryId,
-					JSON.parse(script.textContent as string) as ProtocolStreamedArmPatch,
+					decodeStreamedArmPatch(
+						JSON.parse(script.textContent as string) as ProtocolStreamedArmPatch,
+					),
 				);
 			continue;
 		}

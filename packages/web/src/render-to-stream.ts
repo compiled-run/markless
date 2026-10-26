@@ -2,7 +2,8 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	serializeRuntimeAsyncSnapshots,
 	serializeRuntimeStateCells,
-	shareStateRecords,
+	encodeProtocolPayloadLists,
+	encodeStreamedArmRecords,
 	type ProtocolStatePayload,
 	type ProtocolStreamedArmPatch,
 	type ProtocolSyncPolicy,
@@ -395,13 +396,17 @@ function renderArmAppend(
 			)
 			.map((definition) => [definition.graphNodeId, definition]),
 	);
-	const patch: Pick<ProtocolStatePayload, 'cells' | 'computed'> = shareStateRecords({
-		cells,
-		computed: serializeRuntimeAsyncSnapshots([...computedById.values()]),
-	});
+	const patch: Pick<ProtocolStatePayload, 'cells' | 'computed'> = encodeProtocolPayloadLists(
+		'markless/state',
+		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
+	);
+	const servedArmRecords = withPaintedBranchArms(armRecords, output) as ProtocolArmRecordSet;
+	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
-		withPaintedBranchArms(armRecords, output) as never,
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? servedArmRecords
+			: encodeStreamedArmRecords(servedArmRecords),
 	];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
@@ -526,7 +531,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		}`
 		: '';
 	const debugRegistration = debugEnabled
-		? `if (md) for (const event of records.events || []) {
+		? `if (md) for (const event of events) {
 			if (event.eventName !== t) continue;
 			const locator = (records.locators || []).find((item) => item.hostNodeId === event.hostNodeId);
 			const element = locator && nodes[offset + locator.index];
@@ -540,7 +545,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
-			const names = new Set((records.events || []).map((x) => x.eventName));
+			const events = Array.isArray(records.events) ? records.events : [];
+			const names = new Set(records.eventNames || events.map((x) => x.eventName));
 			const armEnd = e;
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
@@ -554,7 +560,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 					if (!(s.compareDocumentPosition(el) & 4) || !(armEnd.compareDocumentPosition(el) & 2)) continue;
 					for (const entry of (el.getAttribute(${JSON.stringify(PROTOCOL_EVENT_HOST_ATTRIBUTE)}) || '').split(';')) {
 						const [name, ref] = entry.split('!')[0].split(':');
-						const x = name === t && ref && (records.events || [])[ref];
+						const x = name === t && ref && events[ref];
 						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r)) applied = true;
 					}
 				}

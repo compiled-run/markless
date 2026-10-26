@@ -18,6 +18,7 @@ import { render, renderToString } from '../src/index.ts';
 import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
 import { renderCsrRuntime } from '../src/render-csr.ts';
 import { INLINE_RESUMER_PAGE_TOKEN } from '../src/inline/resumer.ts';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -2709,7 +2710,10 @@ test('renderToString keeps fragment sibling roots as direct container children a
 		'<div data-async-container data-markless-paths="6header,button|01001111|5|4o2t21"><header>Site</header><button m:on="click:0" type="button">0</button>',
 	);
 
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 
 	// The container div is walk-element 0, so both flat dom-order sibling
 	// locators are offset by +1 (0 -> 1 and 1 -> 2).
@@ -2784,7 +2788,10 @@ test('renderToString serves a locator only for a host some served record names',
 		}),
 	});
 
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 
 	expect(view.locators.map((locator) => [locator.hostNodeId, locator.index])).toEqual([
 		['h3', 4],
@@ -2968,7 +2975,11 @@ test('renderToString serializes runtime-attached async snapshots into valid payl
 	// first interaction otherwise — caught by the browser matrix).
 	const { assertProtocolStatePayload } =
 		await import('../../serializer/src/protocol-validation.ts');
-	expect(() => assertProtocolStatePayload(JSON.parse(stateJson!))).not.toThrow();
+	expect(() =>
+		assertProtocolStatePayload(
+			decodeProtocolPayloadLists('markless/state', JSON.parse(stateJson!)),
+		),
+	).not.toThrow();
 });
 
 test('renderToString self-wakes when a fulfilled boundary read has an unsettled upstream runner', async () => {
@@ -3484,7 +3495,10 @@ test('renderToString inline event resumer imports the resume module only after i
 		}),
 		{ executionLog: 'never', resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	expect(resumerSource).not.toContain('queueMicrotask');
 	expect(resumerSource).not.toContain('__mDefer');
@@ -3570,7 +3584,10 @@ test('renderToString inline event resumer serializes a cold interaction storm th
 		}),
 		{ executionLog: 'never', resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	serveHost(button, html);
@@ -3705,7 +3722,10 @@ test('renderToString inline event resumer remains the sole authority after runti
 		}),
 		{ executionLog: 'never', resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	serveHost(button, html);
@@ -3795,7 +3815,10 @@ test('renderToString inline event resumer runs sync policy before importing resu
 		}),
 		{ executionLog: 'never', resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	serveHost(button, html);
@@ -3909,7 +3932,10 @@ test('renderToString inline event resumer evaluates sync policy before importing
 		}),
 		{ executionLog: 'never', resumeModuleUrl },
 	);
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	serveHost(button, html);
@@ -4022,7 +4048,10 @@ test('renderToString inline event resumer reads graph-backed sync policy before 
 		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const state = extractScriptText(html, 'markless/state');
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	expect(resumerSource).toContain('__marklessEventOnlyGraph');
 	const button = element('BUTTON');
@@ -4189,7 +4218,10 @@ test('renderToString inline event resumer reads built-in graph values for sync p
 		{ executionLog: 'never', resumeModuleUrl },
 	);
 	const state = extractScriptText(html, 'markless/state');
-	const view = JSON.parse(extractScriptText(html, 'markless/view')) as ProtocolViewPayload;
+	const view = decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(extractScriptText(html, 'markless/view')),
+	) as ProtocolViewPayload;
 	const resumerSource = extractResumerSource(html);
 	const button = element('BUTTON');
 	serveHost(button, html);

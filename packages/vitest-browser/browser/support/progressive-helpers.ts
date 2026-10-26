@@ -4,6 +4,7 @@ import type {
 	RuntimeDispatchAction,
 } from '../../../bundler/test-support/execution-expectations.ts';
 import type { SsrPhasedRenderResult, SsrRenderResult } from '../../src/index.ts';
+import { decodeProtocolPayloadLists } from '../../../serializer/src/protocol-record-templates.ts';
 
 declare global {
 	var __marklessExecutedModules: Set<string> | undefined;
@@ -26,7 +27,10 @@ export async function renderProgressiveSSR(
 export function readViewPayload(container: HTMLElement): PayloadRecordInventory {
 	const script = container.querySelector<HTMLScriptElement>('script[type="markless/view"]');
 	if (!script) throw new Error('Expected markless/view payload script.');
-	return JSON.parse(script.textContent ?? 'null') as PayloadRecordInventory;
+	return decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(script.textContent ?? 'null'),
+	) as PayloadRecordInventory;
 }
 
 export function actionForElement(
