@@ -153,6 +153,16 @@ across all three cases:
   requires seeded content to stay visible. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
+- Failed re-settle (PROTOTYPE, not ratified): when a refresh rejects while the
+  boundary shows held `@try` content, the `@catch` arm renders AFTER the held
+  content, inside the same boundary, instead of replacing it. The held content
+  keeps reading the last settled value (a rejected snapshot carries it). Busy
+  clears before the `@catch` commits. A later rejection replaces only that
+  `@catch`; a fulfilled run replaces both with `@try`. When the boundary shows
+  `@catch` alone (first load, or a failure with nothing held), `@catch`
+  replaces as before. No attribute marks the failure: the rendered `@catch` is
+  the marker, so styling the held content uses `:has()` on its own content.
+  Retry is a state write the async computed reads.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). Deadline,

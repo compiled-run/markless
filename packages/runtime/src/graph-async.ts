@@ -177,6 +177,7 @@ function commitDependencyBlock(
 					version,
 					key,
 					error,
+					value: (input.node.snapshot as { readonly value?: unknown }).value,
 				},
 	);
 }
@@ -197,7 +198,7 @@ function startAsyncComputed(input: AsyncReconcile & {
 	// A re-run keeps the prior settled value addressable while pending (spec
 	// D8 / Solid 2 `latest`): reads through the computed answer with it until
 	// the new snapshot commits. Consecutive re-runs carry it forward; a first
-	// run or a rejected prior carries undefined (reads answer undefined). The
+	// run carries undefined (reads answer undefined); a rejection keeps the last settled value. The
 	// literal reads the prior snapshot before the assignment replaces it.
 	publish(input, {
 		status: 'pending',
@@ -211,8 +212,9 @@ function startAsyncComputed(input: AsyncReconcile & {
 
 		publish(input, snapshot);
 	};
+	const prior = (input.node.snapshot as { readonly value?: unknown }).value;
 	const commitRejected = (error: unknown): void =>
-		commit({ status: 'rejected', version, key: input.key, error });
+		commit({ status: 'rejected', version, key: input.key, error, value: prior });
 
 	try {
 		Promise.resolve(

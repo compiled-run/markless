@@ -96,6 +96,8 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly version: number;
 			readonly key: unknown;
 			readonly error: unknown;
+			// The last settled value, so @try content held beside a failed refresh's @catch keeps reading it.
+			readonly value?: unknown;
 	  };
 
 export type RuntimeGraphAsyncComputed = {

@@ -85,12 +85,14 @@ export function wireResettleHold(input: {
 		tracker: input.tracker,
 		hasPendingArm: (boundaryId) => pendingArmHtmlById.has(boundaryId),
 		readStatus: input.readStatus,
-		commitPendingArm: (boundary) =>
-			input.commitArm(boundary, {
+		commitPendingArm: (boundary) => {
+			input.tracker.markShown(boundary.id, ASYNC_BOUNDARY_ARM.pending);
+			return input.commitArm(boundary, {
 				html: pendingArmHtmlById.get(boundary.id)!,
 				armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
 				arm: ASYNC_BOUNDARY_ARM.pending,
-			}),
+			});
+		},
 	});
 }
 

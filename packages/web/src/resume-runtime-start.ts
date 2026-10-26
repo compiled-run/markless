@@ -6,7 +6,7 @@ import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
 import type {
-	ResumeAsyncBoundaryRecord,
+	ResumeArmRange,
 	ResumeDomElement,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
@@ -84,7 +84,7 @@ export async function startResumeRuntime(input: {
 	readonly storeContainerSubscription: (release: () => void) => void;
 	readonly disposeHost: (hostNodeId: string) => void;
 	readonly commitArm: (
-		boundary: ResumeAsyncBoundaryRecord,
+		boundary: ResumeArmRange,
 		update: ArmCommitUpdate,
 	) => Promise<void>;
 	// Receives the branch-runtime hooks built here (escalated-flip re-settle +
