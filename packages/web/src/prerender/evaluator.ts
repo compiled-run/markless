@@ -1221,7 +1221,6 @@ function runnerStatus(
 	return status;
 }
 
-// The error of the first rejected async value the runner reads, through the same walk as runnerStatus.
 function runnerError(
 	graphNodeId: string,
 	computed: ProtocolStatePayload['computed'],
@@ -1229,13 +1228,10 @@ function runnerError(
 ): unknown {
 	visited.add(graphNodeId);
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
-	if (!record || record.async) return (record?.snapshot as { readonly error?: unknown } | undefined)?.error;
-	for (const dependency of record.dependencies ?? []) {
-		if (visited.has(dependency.graphNodeId)) continue;
-		if (runnerStatus(dependency.graphNodeId, computed, new Set(visited)) === 'rejected')
-			return runnerError(dependency.graphNodeId, computed, visited);
-	}
-	return undefined;
+	if (record?.async) return (record.snapshot as { readonly error?: unknown } | undefined)?.error;
+	for (const { graphNodeId: next } of record?.dependencies ?? [])
+		if (!visited.has(next) && runnerStatus(next, computed, new Set(visited)) === 'rejected')
+			return runnerError(next, computed, visited);
 }
 
 async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {
