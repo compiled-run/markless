@@ -200,43 +200,28 @@ async function text(page: Page, selector: string): Promise<string | null> {
 }
 
 // The file the resume entry imports for the home route: the chunk a deploy removes before this tab fetched it.
-async function homeRouteModule(): Promise<{ readonly path: string; readonly entry: string }> {
+async function homeRouteModule(): Promise<string> {
 	const html = await (await fetch(productionOrigin)).text();
-	const entry = /data-markless-resume-module="([^"]+)"/.exec(html)?.[1];
-	const imports = JSON.parse(/<script type="importmap">([^<]*)<\/script>/.exec(html)?.[1] ?? '{}')
-		.imports as Record<string, string> | undefined;
-	const source = entry ? await (await fetch(productionOrigin + entry)).text() : '';
-	const reference = /"\/pages\/index\.tsrx":\(\)=>(?:\w+\(\(\)=>)?import\(`([^`]+)`\)/.exec(
-		source,
-	)?.[1];
-	const path = reference && (imports?.[reference] ?? reference);
-	if (!entry || !path) throw new Error('home route module not found in the resume entry');
-	return { path: new URL(path, productionOrigin + entry).pathname, entry };
+	const route = /<script type="@markless\/core\/route">([^<]*)<\/script>/.exec(html)?.[1];
+	const path = route && (JSON.parse(route) as { resume?: readonly string[] }).resume?.[0];
+	if (!path) throw new Error('home route module not found in the route script');
+	return new URL(path, productionOrigin).pathname;
 }
 
 // The tab never got the home route chunk and the origin now 404s it. With `redeploy`, the next
-// document names the route under a new URL, as the next deploy's content hash does: through the
-// entry chunk that names the route by path, and the document's map if it lists the route.
+// document names the route under a new URL, as the next deploy's content hash does: in its route script and preloads.
 async function openAfterDeploy(browser: Browser, redeploy: boolean) {
 	const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
 	const documents: string[] = [];
 	page.on('request', (request) => {
 		if (request.resourceType() === 'document') documents.push(new URL(request.url()).pathname);
 	});
-	const { path: routeModule, entry } = await homeRouteModule();
-	const routeFile = routeModule.slice(routeModule.lastIndexOf('/') + 1);
+	const routeModule = await homeRouteModule();
 	await page.route(`**${routeModule}`, (route) => route.fulfill({ status: 404, body: '' }));
-	await page.route(`${productionOrigin}${entry}?deploy=b`, async (route) => {
-		const response = await route.fetch({ url: productionOrigin + entry });
-		const body = (await response.text()).replaceAll(routeFile, `${routeFile}?deploy=b`);
-		return route.fulfill({ response, body });
-	});
 	await page.route(`${productionOrigin}/`, async (route) => {
 		if (!redeploy || documents.length < 2) return route.continue();
 		const response = await route.fetch();
-		const body = (await response.text())
-			.replaceAll(routeModule, `${routeModule}?deploy=b`)
-			.replaceAll(`"${entry}"`, `"${entry}?deploy=b"`);
+		const body = (await response.text()).replaceAll(routeModule, `${routeModule}?deploy=b`);
 		return route.fulfill({ response, body });
 	});
 	await page.goto(productionOrigin);

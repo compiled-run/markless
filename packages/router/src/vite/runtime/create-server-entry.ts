@@ -82,6 +82,8 @@ export interface ServerEntryOptions {
 	readonly prerenderWakeEntryPath?: string;
 	readonly routeModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
 	readonly routeSsrModulePreloads?: Record<string, readonly ModulePreloadInput[]>;
+	// Per route: the built chunk holding its resume module and the export that evaluates it; the route script carries it.
+	readonly routeResumeModules?: Readonly<Record<string, readonly string[]>>;
 	readonly routeStylesheets?: Record<string, readonly string[]>;
 	// The document shell's scoped CSS, linked on every route ahead of the route's own.
 	readonly documentStylesheets?: readonly string[];
@@ -376,7 +378,12 @@ export function createServerEntry(options: ServerEntryOptions) {
 			renderSsr,
 			baseArtifact,
 			pageProps,
-			file,
+			{
+				file,
+				...(options.routeResumeModules?.[file]
+					? { resume: options.routeResumeModules[file] }
+					: {}),
+			},
 			options.navigationEntryPath,
 			pageStylesheets(options, file),
 			documentModule?.default?.headInjections ?? [],
@@ -582,7 +589,7 @@ function routedPageArtifact(
 	renderSsr: SsrRender,
 	baseArtifact: SsrArtifact | undefined,
 	pageProps: PageComponentProps,
-	file: string,
+	route: RouteScript,
 	navigationEntryPath: string | undefined,
 	stylesheetHrefs: readonly string[] | undefined,
 	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
@@ -611,7 +618,7 @@ function routedPageArtifact(
 			// async work); interpolating the un-awaited Promise served 500s.
 			const output = await renderSsr(renderProps ?? pageProps, renderContext);
 			if (!output) return { html: '' };
-			const routeScript = output.state || output.view ? renderRouteScript(file) : '';
+			const routeScript = output.state || output.view ? renderRouteScript(route) : '';
 			// ONE lazy bridge, structure-triggered: it imports the navigation
 			// runtime only on Link/'#/' anchor interaction, or at load when a
 			// '#/' deep-link hash is actually present. No eager imports, no modes.
@@ -910,8 +917,13 @@ function insertHeadHtml(documentHtml: string, headHtml: string): string {
 	return `${documentHtml.slice(0, headEnd)}${headHtml}${documentHtml.slice(headEnd)}`;
 }
 
-function renderRouteScript(file: string): string {
-	return `<script type="${ROUTE_SCRIPT_TYPE}">${escapeScriptJson({ file })}</script>`;
+interface RouteScript {
+	readonly file: string;
+	readonly resume?: readonly string[];
+}
+
+function renderRouteScript(route: RouteScript): string {
+	return `<script type="${ROUTE_SCRIPT_TYPE}">${escapeScriptJson(route)}</script>`;
 }
 
 // Per page: the destinations this page links, and whether it links a '#/' route.

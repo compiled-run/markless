@@ -1,23 +1,17 @@
-const mdxPageModuleLoaders = import.meta.glob('/pages/**/*.mdx', {
-	query: '?markless-resume',
-});
-const tsrxResumeModuleLoaders = import.meta.glob('/pages/**/*.tsrx', {
-	query: '?markless-resume',
-});
-const routeResumeModules = new WeakMap<() => Promise<unknown>, Promise<unknown>>();
+import { mdxResumeModules, tsrxResumeModules } from 'virtual:markless-router/dev-resume-modules';
+
+const routeResumeModules = new Map<unknown, Promise<unknown>>();
 
 export async function resumeContainerEvent(input: {
 	readonly root: ParentNode;
 	readonly [key: string]: unknown;
 }) {
-	const file = routeFileFromRoot(input.root);
+	const route = routeFromRoot(input.root);
+	const file = route?.file;
 	// The page this event belongs to: a navigation that keeps the container starts a new one while the route module loads.
 	const life = (input.root as { readonly __mL?: object }).__mL;
 	try {
-		const loadRouteResumeModule = file && routeResumeModuleLoader(file);
-		const routeResumeModule = loadRouteResumeModule
-			? await loadRouteModuleOnce(loadRouteResumeModule)
-			: undefined;
+		const routeResumeModule = route ? await loadRouteResumeModule(route) : undefined;
 		if ((input.root as { readonly __mL?: object }).__mL !== life) return;
 		const resume = (routeResumeModule as RouteResumeModule | undefined)?.resumeContainerEvent;
 		if (typeof resume !== 'function') {
@@ -46,24 +40,39 @@ interface RouteResumeModule {
 	readonly resumeContainerEvent?: (input: unknown) => unknown;
 }
 
-function loadRouteModuleOnce(load: () => Promise<unknown>): Promise<unknown> {
-	let pending = routeResumeModules.get(load);
+interface RouteScript {
+	readonly file?: string;
+	// The built chunk holding the route's resume module, and the export that evaluates it inside a shared pack.
+	readonly resume?: readonly [url: string, loader?: string];
+}
+
+function loadRouteResumeModule(route: RouteScript): Promise<unknown> | undefined {
+	const [url, loader] = route.resume ?? [];
+	const key = url ?? (route.file && devResumeModuleLoader(route.file));
+	if (!key) return undefined;
+	let pending = routeResumeModules.get(key);
 	if (!pending) {
-		pending = load().catch((error: unknown) => {
-			routeResumeModules.delete(load);
+		pending = (
+			typeof key === 'string'
+				? import(/* @vite-ignore */ key).then((module: Record<string, () => unknown>) =>
+						loader ? module[loader]!() : module,
+					)
+				: key()
+		).catch((error: unknown) => {
+			routeResumeModules.delete(key);
 			throw error;
 		});
-		routeResumeModules.set(load, pending);
+		routeResumeModules.set(key, pending);
 	}
 	return pending;
 }
 
-function routeResumeModuleLoader(file: string): (() => Promise<unknown>) | undefined {
-	const loaders = file.endsWith('.mdx') ? mdxPageModuleLoaders : tsrxResumeModuleLoaders;
-	return loaders[file] ?? loaders[`/${file}`];
+function devResumeModuleLoader(file: string): (() => Promise<unknown>) | undefined {
+	const loaders = file.endsWith('.mdx') ? mdxResumeModules : tsrxResumeModules;
+	return loaders?.[file] ?? loaders?.[`/${file}`];
 }
 
-function routeFileFromRoot(root: ParentNode): string | undefined {
+function routeFromRoot(root: ParentNode): RouteScript | undefined {
 	const script = root.querySelector?.('script[type="@markless/core/route"]');
 	const text = script?.textContent;
 	if (!text) {
@@ -71,8 +80,8 @@ function routeFileFromRoot(root: ParentNode): string | undefined {
 	}
 
 	try {
-		const route = JSON.parse(text) as { readonly file?: unknown };
-		return typeof route.file === 'string' ? route.file : undefined;
+		const route = JSON.parse(text) as RouteScript;
+		return typeof route.file === 'string' ? route : undefined;
 	} catch {
 		return undefined;
 	}

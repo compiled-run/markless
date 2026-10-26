@@ -6,22 +6,33 @@ type Input = { root: ParentNode; value?: unknown; event?: unknown };
 type RouteModule = { resumeContainerEvent(input: Input): unknown };
 type Loader = () => Promise<RouteModule>;
 
-function entry(mdx: Record<string, Loader>, tsrx: Record<string, Loader> = {}) {
+function entry(
+	mdx: Record<string, Loader> | undefined,
+	tsrx: Record<string, Loader> = {},
+	load: (url: string) => Promise<unknown> = () => Promise.reject(new Error('no chunk')),
+) {
 	const source = readFileSync(
 		new URL('../../src/vite/entries/resume-entry.ts', import.meta.url),
 		'utf8',
 	);
 	const code = transformSync('resume-entry.ts', source)
-		.code.replaceAll('import.meta.glob', 'glob')
+		.code.replace(/^import .*$/m, '')
+		.replaceAll('import(', 'load(')
 		.replaceAll('import.meta.env.DEV', 'false')
 		.replace('export async function', 'async function');
-	return new Function('glob', `${code}; return resumeContainerEvent;`)((pattern: string) =>
-		pattern.endsWith('.mdx') ? mdx : tsrx,
-	) as (input: Input) => Promise<void>;
+	return new Function(
+		'mdxResumeModules',
+		'tsrxResumeModules',
+		'load',
+		`${code}; return resumeContainerEvent;`,
+	)(mdx, tsrx, load) as (input: Input) => Promise<void>;
 }
 
-function root(file: string) {
-	const route = { file };
+function root(file: string, resume?: readonly string[]) {
+	const route: { file: string; resume?: readonly string[] } = {
+		file,
+		...(resume ? { resume } : {}),
+	};
 	return {
 		route,
 		element: {
@@ -145,5 +156,34 @@ test('a handler error or a handler chunk failure is judged the same way as the r
 	await expect(resume({ root: page, event: { type: 'click' } })).rejects.toBe(handlerError);
 	expect(reload).not.toHaveBeenCalled();
 	await resume({ root: page, event: { type: 'click' } });
+	expect(reload).toHaveBeenCalledTimes(1);
+});
+
+test('a built page imports the resume module its route script names, once, and evaluates it through its loader', async () => {
+	const handler = vi.fn();
+	const evaluate = vi.fn(() => ({ resumeContainerEvent: handler }));
+	const load = vi.fn(async (_url: string) => ({ $mlPage: evaluate }));
+	const resume = entry(undefined, undefined, load);
+	const page = root('pages/shelf/a.tsrx', ['/build/chunk-a.js', '$mlPage']).element;
+	await Promise.all([resume({ root: page, value: 1 }), resume({ root: page, value: 2 })]);
+	await resume({ root: page, value: 3 });
+	expect(load.mock.calls).toEqual([['/build/chunk-a.js']]);
+	expect(evaluate).toHaveBeenCalledTimes(1);
+	expect(handler.mock.calls.map(([input]) => input.value)).toEqual([1, 2, 3]);
+
+	const own = vi.fn();
+	load.mockResolvedValueOnce({ resumeContainerEvent: own } as never);
+	await resume({ root: root('pages/notes.mdx', ['/build/chunk-b.js']).element, value: 4 });
+	expect(own).toHaveBeenCalledTimes(1);
+});
+
+test('a click whose named resume chunk a deploy removed loads the page again once', async () => {
+	const reload = stubPage();
+	const gone = new TypeError('Failed to fetch dynamically imported module: /build/chunk-c.js');
+	const resume = entry(undefined, undefined, () => Promise.reject(gone));
+	const page = root('pages/gone.tsrx', ['/build/chunk-c.js', '$mlGone']).element;
+	await resume({ root: page, event: { type: 'click' } });
+	expect(reload).toHaveBeenCalledTimes(1);
+	await expect(resume({ root: page, event: { type: 'click' } })).rejects.toBe(gone);
 	expect(reload).toHaveBeenCalledTimes(1);
 });

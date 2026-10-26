@@ -27,6 +27,10 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly fragmentImports?: readonly string[];
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
+	// Per route: the chunk holding its resume module, and the export that evaluates the module inside a shared pack.
+	readonly resumeModules?: Readonly<
+		Record<string, readonly [string] | readonly [string, string]>
+	>;
 	// Maps the chunk specifiers chunks import each other by to their hashed URLs; every document carries it.
 	readonly importMap?: { readonly imports: Readonly<Record<string, string>> };
 }
@@ -258,6 +262,8 @@ async function validateClientAssetsManifest(
 	};
 	assertMatchingRouteKeys(routes);
 	const importMap = input.importMap === undefined ? undefined : importMapImports(input.importMap);
+	const resumeModules =
+		input.resumeModules === undefined ? undefined : routeResumeModules(input.resumeModules);
 
 	const hrefs = new Set([
 		entries.resume,
@@ -269,6 +275,7 @@ async function validateClientAssetsManifest(
 		...Object.values(routes.ssr).flat(),
 		...Object.values(routes.styles).flat(),
 		...Object.values(importMap?.imports ?? {}),
+		...Object.values(resumeModules ?? {}).map(([href]) => href),
 	]);
 	for (const href of hrefs) {
 		const fileName = clientAssetFileName(href, base);
@@ -298,8 +305,25 @@ async function validateClientAssetsManifest(
 		base,
 		entries,
 		routes,
+		...(resumeModules ? { resumeModules } : {}),
 		...(importMap ? { importMap } : {}),
 	};
+}
+
+function routeResumeModules(
+	input: unknown,
+): Record<string, readonly [string] | readonly [string, string]> {
+	const modules = routeMap(input, 'resumeModules');
+	for (const [routeFile, reference] of Object.entries(modules))
+		if (
+			!reference[0] ||
+			reference.length > 2 ||
+			(reference.length === 2 && !/^[\w$]+$/.test(reference[1]!))
+		)
+			throw clientAssetsManifestError(
+				`has an invalid resume module for route ${JSON.stringify(routeFile)}`,
+			);
+	return modules as Record<string, readonly [string] | readonly [string, string]>;
 }
 
 function requiredStrings(input: unknown, label: string): readonly string[] {
