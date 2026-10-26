@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { gzipSync } from 'node:zlib';
+import { decodeProtocolPayloadLists } from '../../../packages/serializer/src/protocol-record-templates.ts';
 import { cases as contractCases } from '../../../demos/interaction-benchmark/runner/cases.mjs';
 import {
 	firstUseSweep,
@@ -230,7 +231,7 @@ function compileHints(publicDir, preloadedAnywhere) {
 
 function viewPayload(html) {
 	const body = /<script type="markless\/view">([\s\S]*?)<\/script>/.exec(html)?.[1];
-	return body ? JSON.parse(body) : null;
+	return body ? decodeProtocolPayloadLists('markless/view', JSON.parse(body)) : null;
 }
 
 export function actionPath(action) {

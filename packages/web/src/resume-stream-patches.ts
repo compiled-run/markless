@@ -84,7 +84,10 @@ export function adoptStreamedArmPatches(
 				return {
 					...boundary,
 					initiallyServedArm: armPatch[0],
-					armRecords: armPatch[1] as (typeof boundary)['armRecords'],
+					armRecords: decodeProtocolPayloadLists(
+						'markless/view',
+						armPatch[1],
+					) as (typeof boundary)['armRecords'],
 				};
 			}),
 		},

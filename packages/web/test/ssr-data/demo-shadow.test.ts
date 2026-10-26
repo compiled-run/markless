@@ -134,13 +134,14 @@ test('music-player records-from-chunks exactly match its renderToString twin', a
 	expect(derivedRecords).toEqual(serializedBySsr);
 	expect(prerendered).not.toContain('type="markless/state"');
 	expect(prerendered).not.toContain('type="markless/view"');
-	// The served state script may carry shared records; decoded, it is the derived state exactly.
+	// The served scripts may carry shared records and templates; decoded, they are the derived records exactly.
 	const servedState = /<script type="markless\/state">([\s\S]*?)<\/script>/.exec(ssrTwin)?.[1];
 	expect(decodeProtocolPayloadLists('markless/state', JSON.parse(servedState ?? 'null'))).toEqual(
 		JSON.parse(JSON.stringify(derivedRecords.state)),
 	);
-	expect(ssrTwin).toContain(
-		`<script type="markless/view">${JSON.stringify(withNamedHostLocators(derivedRecords.view))}</script>`,
+	const servedView = /<script type="markless\/view">([\s\S]*?)<\/script>/.exec(ssrTwin)?.[1];
+	expect(decodeProtocolPayloadLists('markless/view', JSON.parse(servedView ?? 'null'))).toEqual(
+		JSON.parse(JSON.stringify(withNamedHostLocators(derivedRecords.view))),
 	);
 });
 

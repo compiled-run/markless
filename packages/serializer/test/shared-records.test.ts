@@ -14,11 +14,15 @@ import {
 
 type Tree = { readonly id: number; readonly label: string; readonly kids: readonly Tree[] };
 
+// Letters, not digits: a served digit run is a template value, so a numbered label never appears whole.
+const letters = (id: number): string =>
+	(id >= 26 ? letters(Math.floor(id / 26) - 1) : '') + String.fromCharCode(97 + (id % 26));
+
 function tree(depth: number, next = { id: 0 }): Tree {
 	const id = next.id++;
 	return {
 		id,
-		label: `node ${id}`,
+		label: `node ${letters(id)}`,
 		kids: depth ? [tree(depth - 1, next), tree(depth - 1, next)] : [],
 	};
 }
@@ -59,9 +63,11 @@ const decoded = (state: ProtocolStatePayload) =>
 test('a subtree every level holds again is served once and decodes into every cell', () => {
 	const root = tree(6);
 	const state = createProtocolStatePayload({ cells: rowCells(root) });
-	const script = renderPayloadScripts({ state, view: viewPayload }, encodeProtocolPayloadLists)
-		.stateScript;
-	for (const id of [3, 40, 126]) expect(script.split(`"node ${id}"`)).toHaveLength(2);
+	const script = renderPayloadScripts(
+		{ state, view: viewPayload },
+		encodeProtocolPayloadLists,
+	).stateScript;
+	for (const id of [3, 40, 126]) expect(script.split(`"node ${letters(id)}"`)).toHaveLength(2);
 	expect(script.length).toBeLessThan(JSON.stringify(state).length / 2.5);
 	expect(decoded(served(state))).toEqual(decoded(state));
 });

@@ -341,6 +341,8 @@ export type ProtocolArmRecordSet = {
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
+	/** Served beside `events` sent as templates: the names the stream boot listens for. */
+	readonly eventNames?: ReadonlyArray<string>;
 };
 
 // A streamed arm carries its served-arm discriminator beside the record set,
@@ -382,7 +384,10 @@ export type ProtocolRowTemplateArm = {
 		{ readonly path: ReadonlyArray<number> } & ProtocolRowTemplateSlotValue
 	>;
 	readonly attributeSlots?: ReadonlyArray<
-		{ readonly path: ReadonlyArray<number>; readonly name: string } & ProtocolRowTemplateSlotValue
+		{
+			readonly path: ReadonlyArray<number>;
+			readonly name: string;
+		} & ProtocolRowTemplateSlotValue
 	>;
 };
 
@@ -806,3 +811,24 @@ export type ProtocolPayloadScripts = {
 	readonly stateScript: string;
 	readonly viewScript: string;
 };
+
+/**
+ * A record list served as templates. `t` holds each distinct record shape as JSON text whose
+ * per-record values are `^<slot>` holes, whose instance paths are `` `<slot> `` holes naming an
+ * entry of the payload's `instancePaths`, and whose field names the list's generated key table
+ * spells are `~<index>:` references; each `r` entry is a template index (no values), a
+ * `[template, ...values]` row filling the holes in order, or a record no other record shares.
+ */
+export type ProtocolTemplatedRecords = {
+	readonly t: ReadonlyArray<string>;
+	readonly r: ReadonlyArray<number | ReadonlyArray<number | string> | object>;
+};
+
+/**
+ * The instance paths a payload's templated lists name, as `instancePaths`: each entry is a path,
+ * or `[parent, segments]`, the path of entry `parent` followed by `segments`.
+ */
+export type ProtocolInstancePaths = ReadonlyArray<string | readonly [number, string]>;
+
+/** A record list as a payload script serves it: a plain array, or templates. */
+export type ProtocolServedRecords = ReadonlyArray<unknown> | ProtocolTemplatedRecords;

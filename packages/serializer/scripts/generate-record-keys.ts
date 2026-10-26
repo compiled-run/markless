@@ -14,6 +14,8 @@ const protocolFile = resolve(packageDirectory, 'src/protocol.ts');
 const valueFile = resolve(packageDirectory, 'src/value.ts');
 export const RECORD_KEYS_FILE = resolve(packageDirectory, 'src/protocol-record-keys.ts');
 
+// Templated lists that spell their field names out: a key table pays only where records rarely repeat a shape.
+const UNKEYED_LISTS = new Set(['cells', 'sharedRecords', 'locators', 'events', 'keyedRepeats']);
 // Fields typed `unknown` that carry a serialized graph value envelope; only state records hold one.
 const ENVELOPE_FIELDS = new Set(['value', 'key', 'error']);
 const PAYLOAD_TYPES = {
@@ -76,6 +78,7 @@ export function generateRecordKeysSource(): string {
 		for (const list of PROTOCOL_TEMPLATED_LISTS[payloadType as keyof typeof PAYLOAD_TYPES]) {
 			const property = payload.getProperty(list);
 			if (!property) throw new Error(`MARKLESS_RECORD_KEYS_LIST_MISSING: ${aliasName}.${list}`);
+			if (UNKEYED_LISTS.has(list)) continue;
 			const keys: string[] = [];
 			collect(
 				checker.getNonNullableType(checker.getTypeOfSymbol(property)),

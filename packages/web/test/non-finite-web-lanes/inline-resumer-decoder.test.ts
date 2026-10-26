@@ -1,5 +1,9 @@
 import { afterEach, expect, test } from 'vitest';
-import { createProtocolStatePayload, renderPayloadScripts } from '../../../serializer/src/index.ts';
+import {
+	createProtocolStatePayload,
+	encodeProtocolPayloadLists,
+	renderPayloadScripts,
+} from '../../../serializer/src/index.ts';
 import {
 	createInlineResumerSource,
 	INLINE_MODULE_LOADER_SOURCE,
@@ -76,21 +80,28 @@ function bootSharedGraphPolicy(): SharedGraphPolicy {
 	return shared;
 }
 
-function container(value: unknown) {
-	const scripts = renderPayloadScripts({
-		state: createProtocolStatePayload({
-			cells: [{ graphNodeId: 'limit', name: 'limit', valueKind: 'scalar', value }],
-		}),
-		view: {
-			version: 1,
-			locators: [],
-			events: [],
-			domUpdates: [],
-			behaviors: [],
-			elementHandles: [],
-			asyncBoundaries: [],
-		},
-	} as never);
+function container(
+	value: unknown,
+	cells: ReadonlyArray<Parameters<typeof createProtocolStatePayload>[0]['cells'][number]> = [
+		{ graphNodeId: 'limit', name: 'limit', valueKind: 'scalar', value },
+	],
+	encode?: typeof encodeProtocolPayloadLists,
+) {
+	const scripts = renderPayloadScripts(
+		{
+			state: createProtocolStatePayload({ cells }),
+			view: {
+				version: 1,
+				locators: [],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+			},
+		} as never,
+		encode,
+	);
 	return {
 		querySelector: () => ({
 			textContent: scripts.stateScript.replace(/^<script[^>]*>/, '').replace('</script>', ''),
@@ -117,4 +128,28 @@ test('the inline resumer decodes a non-finite object field', () => {
 	expect(
 		shared.read!(container({ maxWidth: Number.POSITIVE_INFINITY }), 'limit', ['maxWidth']),
 	).toBe(Number.POSITIVE_INFINITY);
+});
+
+test('the inline resumer reads a row cell out of a templated cell list', () => {
+	const shared = bootSharedGraphPolicy();
+	const kids = [{ id: 7, label: 'kid' }];
+	const rows = Array.from({ length: 12 }, (_, row) => `c0:${'r:1:c0:'.repeat(row)}`);
+	const cells = rows.flatMap((path) => [
+		{
+			graphNodeId: `${path}state:open`,
+			name: 'open',
+			valueKind: 'scalar' as const,
+			value: true,
+		},
+		{
+			graphNodeId: `${path}prop:props`,
+			name: 'props',
+			valueKind: 'object' as const,
+			value: { kids },
+		},
+	]);
+	const served = container(undefined, cells, encodeProtocolPayloadLists);
+	expect(served.querySelector().textContent).toContain('"instancePaths"');
+	expect(shared.read!(served, `${rows[11]}state:open`, [])).toBe(true);
+	expect(shared.read!(served, `${rows[9]}prop:props`, ['kids', '0', 'label'])).toBe('kid');
 });

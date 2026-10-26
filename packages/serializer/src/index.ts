@@ -4,11 +4,13 @@ export * from './protocol-state.ts';
 export {
 	encodeProtocolPayloadLists,
 	encodeRecordTemplates,
+	encodeStreamedArmRecords,
 } from './protocol-record-templates-encode.ts';
 export {
 	decodeProtocolPayloadLists,
 	expandRecordTemplates,
 	PROTOCOL_TEMPLATED_LISTS,
+	type ProtocolInstancePaths,
 	type ProtocolTemplatedRecords,
 } from './protocol-record-templates.ts';
 export { expandSharedRecords } from './protocol-shared-records-decode.ts';

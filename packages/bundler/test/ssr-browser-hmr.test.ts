@@ -11,6 +11,7 @@ import {
 } from '../src/dev-error/index.ts';
 import { fixtureSsrHost } from '../fixtures/vite-ssr/src/dev-server.ts';
 import { marklessSourceAliases } from './helpers.ts';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 // A dev server start, an SSR render and an HMR pass took up to 6.8 s at load average 90; 5 s is a wall-clock race.
 vi.setConfig({ testTimeout: 30_000 });
@@ -522,7 +523,7 @@ async function createSsrFixture() {
 function marklessViewPayload(html: string) {
 	const match = html.match(/<script type="markless\/view">([\s\S]*?)<\/script>/);
 	expect(match).not.toBeNull();
-	return JSON.parse(match![1]) as {
+	return decodeProtocolPayloadLists('markless/view', JSON.parse(match![1])) as {
 		locators: { tagName?: string }[];
 		events: unknown[];
 	};

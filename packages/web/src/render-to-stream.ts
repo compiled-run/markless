@@ -2,7 +2,8 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	serializeRuntimeAsyncSnapshots,
 	serializeRuntimeStateCells,
-	shareStateRecords,
+	encodeProtocolPayloadLists,
+	encodeStreamedArmRecords,
 	type ProtocolStatePayload,
 	type ProtocolStreamedArmPatch,
 	type ProtocolSyncPolicy,
@@ -395,13 +396,17 @@ function renderArmAppend(
 			)
 			.map((definition) => [definition.graphNodeId, definition]),
 	);
-	const patch: Pick<ProtocolStatePayload, 'cells' | 'computed'> = shareStateRecords({
-		cells,
-		computed: serializeRuntimeAsyncSnapshots([...computedById.values()]),
-	});
+	const patch: Pick<ProtocolStatePayload, 'cells' | 'computed'> = encodeProtocolPayloadLists(
+		'markless/state',
+		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
+	);
+	const servedArmRecords = withPaintedBranchArms(armRecords, output) as ProtocolArmRecordSet;
+	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
-		withPaintedBranchArms(armRecords, output) as never,
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? servedArmRecords
+			: encodeStreamedArmRecords(servedArmRecords),
 	];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
@@ -540,7 +545,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
-			const names = new Set((records.events || []).map((x) => x.eventName));
+			const names = new Set(records.eventNames || (records.events || []).map((x) => x.eventName));
 			const armEnd = e;
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}

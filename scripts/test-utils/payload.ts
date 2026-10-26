@@ -1,4 +1,5 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import { decodeProtocolPayloadLists } from '../../packages/serializer/src/protocol-record-templates.ts';
 
 export type PayloadScriptPair = {
 	readonly stateScript: string;
@@ -145,7 +146,10 @@ function parsePayloadScript(script: string, type: 'markless/state' | 'markless/v
 	assertPayloadScriptWrapper(script, type);
 
 	try {
-		return JSON.parse(script.slice(scriptPrefix(type).length, -scriptSuffix.length));
+		return decodeProtocolPayloadLists(
+			type,
+			JSON.parse(script.slice(scriptPrefix(type).length, -scriptSuffix.length)),
+		);
 	} catch {
 		throw new Error(`Invalid ${type} payload JSON.`);
 	}

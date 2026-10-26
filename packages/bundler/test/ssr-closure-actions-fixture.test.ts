@@ -9,6 +9,7 @@ import { expect, test } from 'vitest';
 import { resumeModuleClosure, servedResumeModuleUrl } from './helpers/served-resume-module.ts';
 import { listenOnFreePort } from './helpers/listen.ts';
 import { dispatchesSettled, trackDispatches } from './helpers/dispatch-settled.ts';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -68,29 +69,42 @@ async function open(browser: Browser, mode: Mode) {
 
 // Rendered DOM (scripts aside) plus every served cell's live value, read the
 // way full resume adopts it: the live map when present, the served value when not.
-function observe(page: Page) {
-	return page.evaluate(() => {
+async function observe(page: Page) {
+	const servedState = await page.evaluate(
+		() => document.querySelector('script[type="markless/state"]')!.textContent!,
+	);
+	const state = decodeProtocolPayloadLists('markless/state', JSON.parse(servedState)) as {
+		cells: Array<{ graphNodeId: string; value: { root: unknown } }>;
+	};
+	const ids = state.cells.map((cell) => cell.graphNodeId);
+	const seen = await page.evaluate((ids) => {
 		const container = document.querySelector('[data-async-container]') as HTMLElement & {
 			__marklessEventOnlyGraph?: Map<string, unknown>;
 			__asyncResumeRuntimeStarted?: boolean;
 		};
 		const clone = container.cloneNode(true) as HTMLElement;
 		for (const script of clone.querySelectorAll('script')) script.remove();
-		const state = JSON.parse(
-			container.querySelector('script[type="markless/state"]')!.textContent!,
-		) as { cells: Array<{ graphNodeId: string; value: { root: unknown } }> };
 		const live = container.__marklessEventOnlyGraph;
 		return {
 			html: clone.innerHTML.replace(/<!--[^>]*-->/g, ''),
 			focused: document.activeElement?.textContent ?? null,
-			cells: state.cells.map((cell) => [
-				cell.graphNodeId,
-				live && (container.__asyncResumeRuntimeStarted || live.has(cell.graphNodeId))
-					? live.get(cell.graphNodeId)
-					: cell.value.root,
-			]),
+			live: live
+				? ids.map((id) =>
+						container.__asyncResumeRuntimeStarted || live.has(id)
+							? { value: live.get(id) }
+							: undefined,
+					)
+				: undefined,
 		};
-	});
+	}, ids);
+	return {
+		html: seen.html,
+		focused: seen.focused,
+		cells: state.cells.map((cell, at) => [
+			cell.graphNodeId,
+			seen.live?.[at] ? seen.live[at]!.value : cell.value.root,
+		]),
+	};
 }
 
 async function runtimeStarted(page: Page) {

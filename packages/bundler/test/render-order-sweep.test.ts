@@ -3,6 +3,7 @@ import { resolve } from 'pathe';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { renderToString, type SsrRenderable } from '@markless/web';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const componentsRoot = resolve(repoRoot, 'packages/headless/components');
@@ -80,7 +81,7 @@ function preorderElementScan(page: string): ReadonlyArray<{ tag: string; attrs: 
 function viewPayload(html: string): { locators: ReadonlyArray<{ hostNodeId: string; index: number; tagName: string }> } | null {
 	const match = /<script type="markless\/view"[^>]*>([\s\S]*?)<\/script>/.exec(html);
 	if (!match?.[1]) return null;
-	return JSON.parse(match[1]) as never;
+	return decodeProtocolPayloadLists('markless/view', JSON.parse(match[1])) as never;
 }
 
 async function renderScenario(path: string): Promise<string> {

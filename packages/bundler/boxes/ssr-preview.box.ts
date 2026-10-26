@@ -12,6 +12,7 @@ import { executedModulesPlugin } from '../test-support/executed-modules-plugin.t
 import { runtimeSizeReport, type RuntimeSizeReport } from '../test-support/runtime-size.ts';
 import { EVENT_ONLY_RESUMER_TARGET_BYTES } from '../../../poc/fixtures/proofs/resumer-script/src/resumer-source.mjs';
 import { unpackedFixture } from './unpacked-fixture.ts';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 // Product truth: SSR resumability needs server-produced HTML. This box uses the
 // fixture's real Vite app build, then serves it through Vite preview. Preview
@@ -552,7 +553,10 @@ function executedFromHtml(html: string): string[] {
 function viewPayloadFromHtml(html: string): PayloadRecordInventory {
 	const match = html.match(/<script type="markless\/view"[^>]*>([\s\S]*?)<\/script>/);
 	if (!match) throw new Error('Expected markless/view payload in resumed page HTML.');
-	return JSON.parse(match[1]) as PayloadRecordInventory;
+	return decodeProtocolPayloadLists(
+		'markless/view',
+		JSON.parse(match[1]),
+	) as PayloadRecordInventory;
 }
 
 function counterClickAction(view: PayloadRecordInventory): {

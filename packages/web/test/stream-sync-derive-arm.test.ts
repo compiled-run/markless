@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../../compiler/src/index.ts';
 import { renderToStream } from '../src/render-to-stream.ts';
+import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
 
 const HELPERS = /from '@markless\/web\/fns\/([^']+)'/g;
 
@@ -60,7 +61,7 @@ export function Dock() @{
 	expect(settled).toContain('<b data-cargo="">tea &amp; north</b>');
 	const patch = /<script type="markless\/state-patch"[^>]*>([^<]*)<\/script>/.exec(settled)?.[1];
 	const computed = (
-		JSON.parse(patch ?? '{}') as {
+		decodeProtocolPayloadLists('markless/state', JSON.parse(patch ?? '{}')) as {
 			readonly computed?: ReadonlyArray<{
 				readonly graphNodeId: string;
 				readonly snapshot?: { readonly status: string };

@@ -120,7 +120,12 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 	if (stateText)
 		learn(decodeProtocolPayloadLists('markless/state', JSON.parse(stateText) as StateDelta));
 	for (const patch of document.querySelectorAll(STATE_PATCH))
-		learn(JSON.parse(patch.textContent ?? 'null') as StateDelta | null);
+		learn(
+			decodeProtocolPayloadLists(
+				'markless/state',
+				JSON.parse(patch.textContent ?? 'null') as StateDelta | null,
+			),
+		);
 
 	const take = (state: StreamedState): void => {
 		const arm = template(state.boundaryId);
@@ -134,9 +139,11 @@ export function marklessStreamedArms<Load extends SymbolLoader>(
 				)
 			: null;
 		learn(delta);
+		const armPatch = JSON.parse(records.textContent ?? 'null') as ProtocolStreamedArmPatch;
+		decodeProtocolPayloadLists('markless/view', armPatch[1]);
 		state.resolve?.({
 			html: arm.innerHTML,
-			patch: JSON.parse(records.textContent ?? 'null') as ProtocolStreamedArmPatch,
+			patch: armPatch,
 			state: delta,
 		});
 	};

@@ -19,6 +19,20 @@ import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overla
 import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } from './defer.ts';
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
+import { expandRecordTemplates } from '../../../serializer/src/protocol-record-templates.ts';
+import type {
+	ProtocolInstancePaths,
+	ProtocolServedRecords,
+} from '../../../serializer/src/protocol-record-templates.ts';
+import { PROTOCOL_RECORD_KEYS } from '../../../serializer/src/protocol-record-keys.ts';
+
+const listKeys = (type: keyof typeof PROTOCOL_RECORD_KEYS, list: string) =>
+	(PROTOCOL_RECORD_KEYS[type] as Readonly<Record<string, string | undefined>>)[list] ?? '';
+const inlineListKeys = {
+	cells: listKeys('markless/state', 'cells'),
+	sharedRecords: listKeys('markless/state', 'sharedRecords'),
+	events: listKeys('markless/view', 'events'),
+};
 
 declare const __MARKLESS_PAGE_START__: string;
 declare const __MARKLESS_PAGE_END__: string;
@@ -58,6 +72,12 @@ declare const __MARKLESS_INLINE_VISIBLE_EVENT__: typeof PROTOCOL_VISIBLE_EVENT_N
 declare const __MARKLESS_INLINE_CENSUS__: typeof marklessServedCensus;
 declare const __MARKLESS_INLINE_PATHS_ATTRIBUTE__: typeof PROTOCOL_LOCATOR_PATHS_ATTRIBUTE;
 declare const __MARKLESS_INLINE_HOST_ATTRIBUTE__: typeof PROTOCOL_EVENT_HOST_ATTRIBUTE;
+declare const __MARKLESS_INLINE_EXPAND__: typeof expandRecordTemplates;
+declare const __MARKLESS_INLINE_KEYS__: typeof inlineListKeys;
+type InlineServed = {
+	readonly instancePaths?: ProtocolInstancePaths;
+	readonly inRows?: Readonly<Record<string, ProtocolServedRecords>>;
+};
 declare const __MARKLESS_INLINE_POLICY_TYPE__: typeof PROTOCOL_SYNC_POLICY_TABLE_TYPE;
 declare const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__:
 	| ((root: Element, phase: 'ssr-inline', active: false) => InlineDebugControls)
@@ -210,6 +230,8 @@ export function createInlineResumerSource(options: InlineResumerBuildOptions): s
 	// Composed in, not runtime-gated: a `never` document must not carry the
 	// logging text at all, which is what the prerender variant already does.
 	const logging = options.executionLog !== 'never';
+	// Only these read served lists before the resume module decodes them.
+	const expands = options.graphSyncPolicy || options.debug;
 	return `{
 const __MARKLESS_INLINE_SYNC_POLICY__=${JSON.stringify(options.syncPolicy)};
 const __MARKLESS_INLINE_GRAPH_SYNC_POLICY__=${JSON.stringify(options.graphSyncPolicy)};
@@ -221,6 +243,8 @@ const __MARKLESS_INLINE_VISIBLE_EVENT__=${JSON.stringify(PROTOCOL_VISIBLE_EVENT_
 const __MARKLESS_INLINE_CENSUS__=${servedCensusSource()};
 const __MARKLESS_INLINE_PATHS_ATTRIBUTE__=${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)};
 const __MARKLESS_INLINE_HOST_ATTRIBUTE__=${JSON.stringify(PROTOCOL_EVENT_HOST_ATTRIBUTE)};
+const __MARKLESS_INLINE_EXPAND__=${expands ? expandRecordTemplates.toString() : 'undefined'};
+const __MARKLESS_INLINE_KEYS__=${expands ? JSON.stringify(inlineListKeys) : 'undefined'};
 const __MARKLESS_INLINE_POLICY_TYPE__=${JSON.stringify(PROTOCOL_SYNC_POLICY_TABLE_TYPE)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
 const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
@@ -818,12 +842,16 @@ function registerInlineResumerDebug(input: {
 	if (!input.controls || input.eventName === __MARKLESS_INLINE_VISIBLE_EVENT__) return;
 	let events: InlineView['events'] = [];
 	try {
-		events =
-			(
-				JSON.parse(
-					input.root.querySelector('script[type="markless/view"]')?.textContent || 'null',
-				) as InlineView | null
-			)?.events ?? [];
+		const view = JSON.parse(
+			input.root.querySelector('script[type="markless/view"]')?.textContent || 'null',
+		) as (InlineView & InlineServed) | null;
+		const rows = __MARKLESS_INLINE_EXPAND__(
+			view?.inRows?.events ?? [],
+			__MARKLESS_INLINE_KEYS__.events,
+			view?.instancePaths,
+		);
+		let at = 0;
+		events = (view?.events ?? []).map((record) => record ?? rows[at++]) as InlineView['events'];
 	} catch {}
 	for (const element of input.root.querySelectorAll(
 		`[${CSS.escape(__MARKLESS_INLINE_HOST_ATTRIBUTE__)}]`,
@@ -966,17 +994,31 @@ function runInlineResumer(
 				'script[type="markless/state"]',
 			);
 			if (stateScript && !container.__marklessEventOnlyGraphInitialized) {
-				const state = JSON.parse(stateScript.textContent || 'null') as ProtocolStatePayload;
-				for (const cell of state.cells ?? []) {
+				const state = JSON.parse(
+					stateScript.textContent || 'null',
+				) as ProtocolStatePayload & InlineServed;
+				const [cells, sharedRecords] = (['cells', 'sharedRecords'] as const).map((list) => {
+					const read = (served?: ProtocolServedRecords) =>
+						__MARKLESS_INLINE_EXPAND__(
+							served ?? [],
+							__MARKLESS_INLINE_KEYS__[list],
+							state.instancePaths,
+						);
+					const rows = read(state.inRows?.[list]);
+					let at = 0;
+					return read(state[list]).map((record) => record ?? rows[at++]);
+				}) as unknown as [ProtocolStatePayload['cells'], ReadonlyArray<SerializedRecord>];
+				for (const cell of cells) {
 					if (!cell.value || graph.has(cell.graphNodeId)) continue;
 					const payload = cell.value as {
 						readonly root: unknown;
 						readonly records?: ReadonlyArray<SerializedRecord>;
 					};
 					const records = new Map(
-						[...(state.sharedRecords ?? []), ...(payload.records ?? [])].map(
-							(record) => [record.id, record],
-						),
+						[...sharedRecords, ...(payload.records ?? [])].map((record) => [
+							record.id,
+							record,
+						]),
 					);
 					graph.set(cell.graphNodeId, shared.decode!(payload.root, records));
 				}

@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import Page from './nest-page.tsrx';
 import SinglePage from './nest-single-page.tsrx';
+import { decodeProtocolPayloadLists } from '../../../serializer/src/protocol-record-templates.ts';
 
 // A widget-scoped family composed inside ITSELF - a submenu inside a menu. Each
 // part has to be answered by its own nearest root: the inner parts by the inner
@@ -39,7 +40,10 @@ type StatePayload = {
 function statePayloadIds(container: HTMLElement): string[] {
 	const script = container.querySelector<HTMLScriptElement>('script[type="markless/state"]');
 	if (!script) throw new Error('Expected markless/state payload script.');
-	const payload = JSON.parse(script.textContent ?? 'null') as StatePayload;
+	const payload = decodeProtocolPayloadLists(
+		'markless/state',
+		JSON.parse(script.textContent ?? 'null'),
+	) as StatePayload;
 	return [...payload.cells, ...payload.computed].map((node) => node.graphNodeId);
 }
 
