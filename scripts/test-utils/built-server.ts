@@ -5,6 +5,8 @@ export type BuiltServer = {
 	readonly origin: string;
 	/** Everything the server wrote to stdout and stderr so far. */
 	output(): string;
+	/** Resolves with the output once it contains `text`; a pipe can deliver a log line after the response it belongs to. */
+	waitForOutput(text: string): Promise<string>;
 	/** Stops the server and resolves once its process has exited. */
 	close(signal?: NodeJS.Signals): Promise<void>;
 };
@@ -25,6 +27,19 @@ export function startBuiltServer(
 		stdio: ['ignore', 'pipe', 'pipe'],
 	});
 	let output = '';
+	const waiters = new Set<{ text: string; done: (output: string) => void }>();
+	const append = (chunk: Buffer) => {
+		output += chunk.toString();
+		for (const waiter of waiters)
+			if (output.includes(waiter.text)) {
+				waiters.delete(waiter);
+				waiter.done(output);
+			}
+	};
+	const waitForOutput = (text: string) =>
+		output.includes(text)
+			? Promise.resolve(output)
+			: new Promise<string>((done) => waiters.add({ text, done }));
 	const exited = new Promise<void>((done) => child.once('exit', () => done()));
 	const close = (signal?: NodeJS.Signals) => {
 		if (child.exitCode === null && child.signalCode === null) child.kill(signal);
@@ -36,18 +51,17 @@ export function startBuiltServer(
 			reject(error);
 		};
 		child.stdout.on('data', (chunk: Buffer) => {
-			output += chunk.toString();
+			append(chunk);
 			const listening = /Listening on:\s*(\S+)/.exec(output);
 			if (listening)
 				resolveServer({
 					origin: new URL(listening[1]!).origin,
 					output: () => output,
+					waitForOutput,
 					close,
 				});
 		});
-		child.stderr.on('data', (chunk: Buffer) => {
-			output += chunk.toString();
-		});
+		child.stderr.on('data', append);
 		child.once('error', fail);
 		child.once('exit', (code, signal) =>
 			fail(new Error(`built server exited (${code ?? signal}) before listening:\n${output}`)),

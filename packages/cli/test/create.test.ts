@@ -482,6 +482,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	]);
 });
 
+// `npm pack` in a child process took 2 to 7 s at load average 90 to 110 on 18 cores, about 0.6 s of it CPU.
 test('packs no repository agent configuration templates', async () => {
 	const cache = await makeWorkspace();
 	const cliRoot = new URL('..', import.meta.url);
@@ -504,7 +505,7 @@ test('packs no repository agent configuration templates', async () => {
 	expect(packedPaths).toContain('templates/common/scripts/markless-doctor.mjs');
 	expect(packedPaths).toContain('templates/common/gitignore');
 	expect(packedPaths).not.toContain('templates/common/.gitignore');
-});
+}, 30_000);
 
 test('generates app and full-stack status pages under pages', async () => {
 	await Promise.all(

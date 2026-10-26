@@ -75,22 +75,32 @@ test('a lookup table of import() loaders keeps each target in its own chunk, fet
 					value: { writeText: async (text: string) => ((globalThis as { copied?: string }).copied = text) },
 				});
 			});
-			const fetched: Array<{ phase: string; texts: number }> = [];
+			const fetched: Array<Promise<{ phase: string; texts: number }>> = [];
 			let phase = 'load';
-			page.on('response', async (response) => {
+			page.on('response', (response) => {
 				if (!response.url().endsWith('.js')) return;
 				const at = phase;
-				fetched.push({ phase: at, texts: textsIn(await response.text().catch(() => '')) });
+				fetched.push(
+					response
+						.text()
+						.catch(() => '')
+						.then((code) => ({ phase: at, texts: textsIn(code) })),
+				);
 			});
 			await page.goto(`${server.origin}/p1`);
 			await page.waitForLoadState('networkidle');
 			phase = 'click';
 			await page.locator('button').click();
-			await expect
-				.poll(() => page.evaluate(() => (globalThis as { copied?: string }).copied?.slice(0, 12)))
-				.toBe('text 1 lorem');
-			const loadTexts = fetched.filter((one) => one.phase === 'load').reduce((sum, one) => sum + one.texts, 0);
-			const clickTexts = fetched.filter((one) => one.phase === 'click').reduce((sum, one) => sum + one.texts, 0);
+			const copied = await page.waitForFunction(
+				() => (globalThis as { copied?: string }).copied,
+				undefined,
+				{ timeout: 0 },
+			);
+			expect((await copied.jsonValue())?.slice(0, 12)).toBe('text 1 lorem');
+			// The module can run before the response's body read settles.
+			const read = await Promise.all(fetched);
+			const loadTexts = read.filter((one) => one.phase === 'load').reduce((sum, one) => sum + one.texts, 0);
+			const clickTexts = read.filter((one) => one.phase === 'click').reduce((sum, one) => sum + one.texts, 0);
 			expect({ loadTexts, clickTexts }).toEqual({ loadTexts: 0, clickTexts: 1 });
 		} finally {
 			await browser.close();
