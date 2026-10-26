@@ -899,10 +899,7 @@ export function Panel() @{
 	});
 
 	expect(graph.diagnostics).toEqual([]);
-	expect(graph.behaviors.map((behavior) => behavior.source)).toEqual([
-		'chart()',
-		'resizeCanvas',
-	]);
+	expect(graph.behaviors.map((behavior) => behavior.source)).toEqual(['chart()', 'resizeCanvas']);
 });
 
 test('B921 reports attribute and spread value discipline diagnostics without flagging scalar attributes', async () => {
@@ -1637,4 +1634,31 @@ export function App() @{
 	expect(graph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 		'MARKLESS_ASYNC_POST_AWAIT_READ',
 	]);
+});
+
+test('a direct eval inside a component that reads its names, or cannot be read, fails the build', async () => {
+	const source = `import { state } from '@markless/core'; import { clamp } from './clamp.ts'; export function Tally({ step }) @{ let total = state(0); const code = 'total++'; <div><button onClick={() => { eval('total++'); }}>a</button><button onClick={() => { eval(\`clamp(step)\`); }}>b</button><button onClick={() => { eval(code); }}>c</button><button onClick={() => { eval('Math.max(1, 2).total'); (0, eval)('total'); }}>d</button>{total}</div> }`;
+	const graph = await buildSemanticGraph({
+		filename: 'src/EvalCounter.tsrx',
+		source,
+	});
+	const evals = graph.diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_DIRECT_EVAL_UNSUPPORTED',
+	);
+
+	expect(evals.map((diagnostic) => [diagnostic.severity, diagnostic.message])).toEqual([
+		[
+			'error',
+			'`eval` in `Tally` runs code that reads `total`, but handlers and render code run in their own modules, where `total` is not defined.',
+		],
+		[
+			'error',
+			'`eval` in `Tally` runs code that reads `clamp`, but handlers and render code run in their own modules, where `clamp` is not defined.',
+		],
+		[
+			'error',
+			"`eval` in `Tally` runs code the compiler cannot read, so it cannot tell whether that code needs this component's names; handlers and render code run in their own modules, where those names are not defined.",
+		],
+	]);
+	expect(evals[0]?.primarySpan?.start).toBe(source.indexOf("eval('total++')"));
 });

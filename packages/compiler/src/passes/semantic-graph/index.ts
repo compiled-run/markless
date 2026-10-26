@@ -78,6 +78,7 @@ import {
 import { collectSemanticMarkup, componentStyleScopeClass } from './collect-markup.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
+import { collectDirectEvalDiagnostics } from './direct-eval.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -157,6 +158,14 @@ export async function buildSemanticGraph(
 		prepareComponentLocalBindings(componentFunction.node.body as AnyNode, state);
 		collectComponentProps(componentFunction.node, state);
 		walk(componentFunction.node.body as AnyNode, state);
+		graph.diagnostics.push(
+			...collectDirectEvalDiagnostics({
+				ast,
+				component: componentFunction.node,
+				componentName: componentFunction.name,
+				filename: input.filename,
+			}),
+		);
 		mergeComponentLocalDeclarations(state);
 		state.currentComponentName = previousComponentName;
 		state.currentComponentId = previousComponentId;
@@ -764,8 +773,8 @@ function withFunctionSite(
 	state.currentFunctionSite = previous;
 }
 
-function addressStepsField(
-	steps: ModuleGraphInterfaceElementCount,
-): { readonly addressSteps?: number } {
+function addressStepsField(steps: ModuleGraphInterfaceElementCount): {
+	readonly addressSteps?: number;
+} {
 	return typeof steps === 'number' ? { addressSteps: steps } : {};
 }

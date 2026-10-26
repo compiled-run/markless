@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 290,
-	guided: 44,
+	total: 291,
+	guided: 45,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -202,6 +202,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_DETACHED_CONTENT_DYNAMIC',
 					kind: 'compile error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_DIRECT_EVAL_UNSUPPORTED',
+					kind: 'compile error',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_ELEMENT_GUARD_RETURN_UNSUPPORTED',
