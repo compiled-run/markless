@@ -1460,7 +1460,7 @@ function emitResumeContainerEvent(
 					'\t\t})();',
 					'\t\tconst marklessFullRuntime = await handoff.root.__marklessFullResumeRuntime;',
 					'\t\tif (!marklessFullRuntime) return;',
-					'\t\tawait marklessFullRuntime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+					'\t\tawait marklessFullRuntime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 					'\t\treturn;',
 					'\t}',
 					'\tconst records = mergePrerenderPayloadRecords({ state: group.state, view: group.view }, handoff.root);',
@@ -1468,7 +1468,7 @@ function emitResumeContainerEvent(
 					'\t\t...records, groupId: group.groupId, graphNodeIds: group.graphNodeIds,',
 					'\t\troot: handoff.root, loadSymbol: group.loadSymbol, prepareBoundaryArm: group.prepareBoundaryArm, renderBoundaryArm: group.renderBoundaryArm,',
 					'\t});',
-					'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+					'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 					'}',
 				].join('\n')
 			: prerenderDataId
@@ -1498,7 +1498,7 @@ function emitResumeContainerEvent(
 							: ['\t\t})).runtime;']),
 						'\t})());',
 						'\tif (!runtime) return;',
-						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 						'}',
 					].join('\n')
 				: [
@@ -1518,7 +1518,7 @@ function emitResumeContainerEvent(
 						),
 						'	});',
 						...armsStarted('\t'),
-						'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+						'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 						'}',
 					].join('\n');
 	const scalarOnlySpecialized =
@@ -1563,6 +1563,7 @@ function emitResumeContainerEvent(
 			'		element: input.element,',
 			'		runtimeDemandMap: payloadRuntimeDemandMap,',
 			'		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,',
+			'		propagationStopped: input.propagationStopped === true,',
 			`		loadSymbol: ${loadSymbolName},`,
 			'	});',
 		];
