@@ -373,6 +373,38 @@ describe('with route modules, only chunks several pages load go through the impo
 		expect(['b-data', 'b-route', 'header', 'runtime'].filter(renamed)).toEqual([]);
 	});
 
+	test("a page's pack cut into size-capped parts stays that page's: no part goes through the map", async () => {
+		const bundle = siteBundle();
+		// The second part of page a's navigation pack, which the first part imports.
+		const part = {
+			...chunk('build/chunk-017APART.js', '!~{017}~', 'a-data-part2', 'export const more=3;'),
+			moduleIds: ['/app/pages/a-table.ts'],
+		};
+		bundle[part.fileName] = part;
+		const aData = byName(bundle, 'a-data');
+		aData.code = `import{more}from"./chunk-017APART.js";${aData.code.replace('export const data=1;', 'export const data=more;')}`;
+		const packOf = (id: string) =>
+			id.includes('a-table')
+				? 'navigation:pages/a.tsrx-part2'
+				: /pages(?:%2F|\/)a\.tsrx\?markless-route/.test(id)
+					? 'route:pages/a.tsrx'
+					: /pages(?:%2F|\/)a\.tsrx/.test(id)
+						? 'navigation:pages/a.tsrx'
+						: id.includes('header')
+							? 'shared'
+							: undefined;
+		const specifiers = await specifyChunkReferences(bundle, {
+			publicPath,
+			root: '/app',
+			isRoute,
+			packs: { packOf, packRoutes: () => undefined },
+		});
+		await renameChunksToContentHashes(bundle);
+
+		expect(mappedNames(bundle, specifiers.importMap())).toEqual(['header', 'runtime']);
+		expect(byName(bundle, 'a-data').code).toContain(`from"./${file(bundle, 'a-data-part2')}"`);
+	});
+
 	test('editing a shared chunk renames only that chunk; the pages that load it keep their bytes', async () => {
 		const before = siteBundle();
 		const after = siteBundle({ header: '"changed"' });
