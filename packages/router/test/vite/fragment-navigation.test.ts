@@ -1246,12 +1246,15 @@ for (const [name, browserType] of [
 					downloadThroughput: (1638 * 1024) / 8,
 					uploadThroughput: (750 * 1024) / 8,
 				});
+				// The long page sent uncompressed: its own download is plenty to measure the link by.
+				await cdp.send('Network.setExtraHTTPHeaders', {
+					headers: { 'accept-encoding': 'identity' },
+				});
 				const fragments: string[] = [];
 				page.on('request', (request) => {
 					const url = fragmentPageUrl(new URL(request.url()));
 					if (url) fragments.push(url.pathname);
 				});
-				// A long page: its own download is plenty to measure the link by.
 				await page.goto(origin + '/large');
 				await page.waitForTimeout(4000);
 				expect(fragments).toEqual([]);

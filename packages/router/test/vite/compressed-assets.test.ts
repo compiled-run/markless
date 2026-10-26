@@ -1,7 +1,14 @@
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
-import { brotliCompressSync, brotliDecompressSync, constants, gunzipSync } from 'node:zlib';
+import {
+	brotliCompressSync,
+	brotliDecompressSync,
+	constants,
+	createBrotliDecompress,
+	createGunzip,
+	gunzipSync,
+} from 'node:zlib';
 import { join, resolve } from 'pathe';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
@@ -113,6 +120,68 @@ test('the node server answers a script with its precompressed brotli or gzip cop
 	expect(plain.headers['content-encoding']).toBeUndefined();
 	expect(plain.body.equals(original)).toBe(true);
 });
+
+test('the node server compresses a rendered page for a client that accepts it, and sends it plain otherwise', async () => {
+	const plain = await get('/large');
+	expect(plain.headers['content-encoding']).toBeUndefined();
+	const html = plain.body.toString();
+	expect(html).toContain('data-page="large"');
+
+	const br = await get('/large', 'gzip, deflate, br, zstd');
+	expect(br.headers['content-encoding']).toBe('br');
+	expect(String(br.headers.vary)).toMatch(/accept-encoding/i);
+	expect(br.headers['content-type']).toMatch(/text\/html/);
+	expect(br.body.length).toBeLessThan(html.length / 5);
+	expect(brotliDecompressSync(br.body).toString()).toBe(html);
+
+	const gzip = await get('/large', 'gzip');
+	expect(gzip.headers['content-encoding']).toBe('gzip');
+	expect(gunzipSync(gzip.body).toString()).toBe(html);
+
+	const fragment = await get('/_markless/fragment/large', 'gzip, br');
+	expect(fragment.headers['content-encoding']).toBe('br');
+	expect(brotliDecompressSync(fragment.body).toString()).toContain('data-page="large"');
+});
+
+for (const encoding of ['br', 'gzip'] as const)
+	test(`a compressed (${encoding}) streaming page still shows its @pending arm before its data is ready`, async () => {
+		const seen = await new Promise<{
+			firstAt: number;
+			firstText: string;
+			endAt: number;
+			all: string;
+		}>((done, fail) => {
+			const started = performance.now();
+			const req = request(
+				origin + '/slow',
+				{ headers: { 'accept-encoding': encoding } },
+				(res) => {
+					expect(res.headers['content-encoding']).toBe(encoding);
+					const decoder = encoding === 'br' ? createBrotliDecompress() : createGunzip();
+					let all = '';
+					let firstAt = 0;
+					let firstText = '';
+					decoder.on('data', (chunk: Buffer) => {
+						all += chunk.toString();
+						if (!firstAt && all.includes('loading report')) {
+							firstAt = performance.now() - started;
+							firstText = all;
+						}
+					});
+					decoder.on('end', () =>
+						done({ firstAt, firstText, endAt: performance.now() - started, all }),
+					);
+					decoder.on('error', fail);
+					res.pipe(decoder);
+				},
+			);
+			req.on('error', fail);
+			req.end();
+		});
+		expect(seen.firstText).not.toContain('report ready');
+		expect(seen.all).toContain('report ready');
+		expect(seen.endAt - seen.firstAt).toBeGreaterThan(200);
+	});
 
 test('every file with a gzip copy has a brotli copy written at the public brotli quality', async () => {
 	const publicDir = join(root, '.output/public');
