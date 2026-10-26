@@ -99,6 +99,7 @@ export function renderBodyLines(
 		}
 		const helperLine = helperStateDeclarationLine(
 			statement,
+			rootInfo.componentName,
 			input.semanticGraph.aliases ?? [],
 			stateBindings,
 			stateValueFunctionName,
@@ -409,6 +410,7 @@ function stateDeclarationLine(
 // component: the render declares that cell, and never calls the helper.
 function helperStateDeclarationLine(
 	statement: AnyNode,
+	componentName: string,
 	aliases: ReadonlyArray<{ readonly name: string; readonly target: string }>,
 	stateBindings: ReadonlyMap<string, GraphBinding>,
 	stateValueFunctionName: string,
@@ -422,8 +424,13 @@ function helperStateDeclarationLine(
 	const declaration = declarations[0]!;
 	const name = getIdentifierName(declaration.id as AnyNode | undefined);
 	const init = declaration.init as AnyNode | undefined;
-	if (!name || init?.type !== 'CallExpression') return null;
-	const target = aliases.find((alias) => alias.name === name)?.target;
+	const helperName = init?.type === 'CallExpression' ? frameworkCallName(init) : null;
+	if (!name || !helperName) return null;
+	// The cell a helper call creates is named for the component, the local and the helper.
+	const prefix = `${componentName}_${name}_${helperName}_`;
+	const target = aliases.find(
+		(alias) => alias.name === name && alias.target.startsWith(prefix),
+	)?.target;
 	const binding = target ? stateBindings.get(target) : undefined;
 	if (!binding) return null;
 	const initializer = (binding as GraphBinding & { readonly initializerSource?: string })
