@@ -310,7 +310,11 @@ export function createResumeRuntime(
 						await behaviors.activateBehaviors(hostNodeId, { flush: false });
 					}
 				: undefined,
-			asyncBoundaryWiring: () => asyncBoundaryWiring,
+			// Served arms register before the wiring starts; its start loop wires the map.
+			addAsyncBoundary: (boundary) =>
+				asyncBoundaryWiring
+					? asyncBoundaryWiring.add(boundary)
+					: void asyncBoundariesById.set(boundary.id, boundary),
 			registerArmBranches: async (boundaryId, records) => {
 				const branches = await loadBranchRuntime();
 				for (const hostNodeId of branches.registerArmBranches(boundaryId, records as never))

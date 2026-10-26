@@ -25,6 +25,12 @@ type StreamPatchDocumentRoot = {
 };
 
 type StreamedStateDelta = Pick<ProtocolStatePayload, 'cells' | 'computed'>;
+type NestedBoundary = {
+	readonly id: string;
+	readonly runnerGraphNodeId: string | null;
+	readonly initiallyServedArm: number;
+	readonly armRecords?: unknown;
+};
 
 export function adoptStreamedArmPatches(
 	decoded: DecodedPayloadScripts,
@@ -45,19 +51,39 @@ export function adoptStreamedArmPatches(
 		[...query('template[m\\:arm]')].map((template) => template.getAttribute('m:arm')),
 	);
 	const armPatchesByBoundary = new Map<string, ProtocolStreamedArmPatch>();
-	const deltas = new Map<string, StreamedStateDelta>();
+	const deltaScripts: Array<(typeof scripts)[number]> = [];
 	for (const script of scripts) {
 		const boundaryId = script.getAttribute('data-boundary');
-		if (boundaryId) {
-			if (!uncommittedBoundaryIds.has(boundaryId))
-				armPatchesByBoundary.set(
-					boundaryId,
-					JSON.parse(script.textContent as string) as ProtocolStreamedArmPatch,
-				);
-			continue;
-		}
+		if (!boundaryId) deltaScripts.push(script);
+		else if (!uncommittedBoundaryIds.has(boundaryId))
+			armPatchesByBoundary.set(
+				boundaryId,
+				JSON.parse(script.textContent as string) as ProtocolStreamedArmPatch,
+			);
+	}
+	// A streamed arm can carry @try blocks it rendered inside itself; their own streamed arms adopt into them.
+	const nestedIn = (records: unknown): ReadonlyArray<NestedBoundary> =>
+		(records as { readonly asyncBoundaries?: ReadonlyArray<NestedBoundary> } | null)
+			?.asyncBoundaries ?? [];
+	const adopt = <B extends NestedBoundary>(boundary: B): B => {
+		const armPatch = armPatchesByBoundary.get(boundary.id);
+		if (!armPatch) return boundary;
+		const records = armPatch[1] as object;
+		const nested = nestedIn(records);
+		return {
+			...boundary,
+			initiallyServedArm: armPatch[0],
+			armRecords: nested.length ? { ...records, asyncBoundaries: nested.map(adopt) } : records,
+		};
+	};
+	const runnerOwners = [
+		...decoded.view.asyncBoundaries,
+		...[...armPatchesByBoundary.values()].flatMap((armPatch) => nestedIn(armPatch[1])),
+	];
+	const deltas = new Map<string, StreamedStateDelta>();
+	for (const script of deltaScripts) {
 		const graphNodeId = script.getAttribute('data-graph-node') ?? '';
-		const boundary = decoded.view.asyncBoundaries.find(
+		const boundary = runnerOwners.find(
 			(candidate) => candidate.runnerGraphNodeId === graphNodeId,
 		);
 		if (!boundary || uncommittedBoundaryIds.has(boundary.id)) continue;
@@ -78,15 +104,7 @@ export function adoptStreamedArmPatches(
 		},
 		view: {
 			...decoded.view,
-			asyncBoundaries: decoded.view.asyncBoundaries.map((boundary) => {
-				const armPatch = armPatchesByBoundary.get(boundary.id);
-				if (!armPatch) return boundary;
-				return {
-					...boundary,
-					initiallyServedArm: armPatch[0],
-					armRecords: armPatch[1] as (typeof boundary)['armRecords'],
-				};
-			}),
+			asyncBoundaries: decoded.view.asyncBoundaries.map(adopt),
 		},
 	};
 }

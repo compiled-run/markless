@@ -783,3 +783,31 @@ test.each([
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('an @try nested in another streams both settled blocks and the inner one refreshes after resume', async () => {
+	const html = await (await fetch(`${server!.origin}/nested-try-streamed`)).text();
+	expect(html).toContain('data-harbor-wait');
+	expect(html).toContain('Harbor 0');
+	expect(html).toContain('Tide 0');
+	const { page, errors } = await open('/nested-try-streamed');
+	await expect.poll(() => text(page, '[data-harbor]')).toBe('Harbor 0');
+	await expect.poll(() => text(page, '[data-tide]')).toBe('Tide 0');
+	await page.click('[data-round]');
+	await expect.poll(() => text(page, '[data-harbor]')).toBe('Harbor 1');
+	await expect.poll(() => text(page, '[data-tide]')).toBe('Tide 1');
+	await expect.poll(() => text(page, '[data-after]')).toBe('after round 1');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('child components with their own @try inside a streamed @for all stream settled', async () => {
+	const html = await (await fetch(`${server!.origin}/nested-async-streamed`)).text();
+	expect(html).toContain('data-berths-wait');
+	for (const at of [1, 2, 3]) expect(html).toContain(`vessel ${at}`);
+	const { page, errors } = await open('/nested-async-streamed');
+	await expect
+		.poll(() => page.locator('.dock').allTextContents())
+		.toEqual(['vessel 1', 'vessel 2', 'vessel 3']);
+	expect(errors).toEqual([]);
+	await page.close();
+});

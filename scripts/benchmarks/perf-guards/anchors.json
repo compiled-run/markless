@@ -1802,6 +1802,22 @@
 			"from": 26073,
 			"to": 28332,
 			"reason": "the swap holds the leaving page until the next one's stream ends or the navigation deadline passes, pushes the address as it starts so a newer click or Back cancels it, and marks the document while it streams so the page resumes from the server's arms instead of fetching again; it loads on link intent, never at page load"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "web/payload-graph-construct",
+			"from": 4384,
+			"to": 4628,
+			"reason": "a streamed arm's nested @try adopts its own streamed arm and snapshot at wake and its async computed gets a runner"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "web/resume-stream-patches",
+			"from": 2260,
+			"to": 2702,
+			"reason": "a streamed arm's nested @try adopts its own streamed arm and snapshot at wake and its async computed gets a runner"
 		}
 	],
 	"runtimeModules": {
@@ -1877,7 +1893,7 @@
 		"web/markup-nodes": 472,
 		"web/payload-document-common": 2608,
 		"web/payload-full-storage-free": 773,
-		"web/payload-graph-construct": 4384,
+		"web/payload-graph-construct": 4628,
 		"web/payload-resume": 5411,
 		"web/payload-resume-lazy": 203,
 		"web/payload-resume-registry": 1916,
@@ -1914,7 +1930,7 @@
 		"web/resume-runtime-shared": 2089,
 		"web/resume-runtime-start": 9385,
 		"web/resume-shared-patch": 1200,
-		"web/resume-stream-patches": 2260,
+		"web/resume-stream-patches": 2702,
 		"web/resume-sync-computed": 2597,
 		"web/resume-sync-demand": 1099,
 		"web/runtime-error-reporting": 1876,
