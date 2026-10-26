@@ -1802,6 +1802,14 @@
 			"from": 26073,
 			"to": 28332,
 			"reason": "the swap holds the leaving page until the next one's stream ends or the navigation deadline passes, pushes the address as it starts so a newer click or Back cancels it, and marks the document while it streams so the page resumes from the server's arms instead of fetching again; it loads on link intent, never at page load"
+		},
+		{
+			"date": "2026-10-25",
+			"guard": "runtime",
+			"subject": "web/fns/ssr",
+			"from": 30522,
+			"to": 30833,
+			"reason": "an attach in an @if arm a child component opens is bound through the child instance, as its events already were"
 		}
 	],
 	"runtimeModules": {
@@ -1866,7 +1874,7 @@
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 3988,
-		"web/fns/ssr": 30522,
+		"web/fns/ssr": 30833,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
 		"web/fns/visible-trigger": 791,
