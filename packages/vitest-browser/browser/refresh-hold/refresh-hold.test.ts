@@ -104,11 +104,11 @@ test('@pending replaces held content only after the newest run stalls, and a new
 	expect(container.querySelector('[data-boundary]')!.getAttribute('aria-busy')).toBeNull();
 }, 30_000);
 
-test('a @catch during a held refresh replaces the busy content and clears busy', async () => {
+test('a @catch during a held refresh renders beside the held content and clears busy', async () => {
 	const screen = await render(FailingRefresh);
 	const container = screen.container as HTMLElement;
 	await expect.poll(() => container.querySelector('[data-amount]')?.textContent, { timeout: 5_000 }).toBe('10');
-	const sampler = sampleFrames(container, (root) => root.querySelector('[data-amount]')?.textContent ?? root.querySelector('[data-failed]')?.textContent ?? null);
+	const sampler = sampleFrames(container, (root) => (root.querySelector('[data-failed]') ? null : (root.querySelector('[data-amount]')?.textContent ?? null)));
 	click(container, '[data-close]');
 	await expect.poll(() => container.querySelector('[data-failed]')?.textContent, { timeout: 5_000 }).toBe('Account closed');
 	await sleep(50);
@@ -118,6 +118,9 @@ test('a @catch during a held refresh replaces the busy content and clears busy',
 	const held = fromRefresh(frames).filter((frame) => frame.content === '10');
 	expect(held.length).toBeGreaterThan(0);
 	expect(held.every((frame) => frame.busy === 1)).toBe(true);
+	expect(container.querySelector('[data-amount]')?.textContent).toBe('10');
+	const failedFollows = container.querySelector('[data-amount]')!.compareDocumentPosition(container.querySelector('[data-failed]')!);
+	expect(failedFollows & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 	expect(container.querySelectorAll('[aria-busy]')).toHaveLength(0);
 });
 
