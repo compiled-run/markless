@@ -54,7 +54,9 @@ export function createResumeRuntime(
 		addEventType = eventTypes.add.bind(eventTypes),
 		disposedHosts = new Set<string>();
 	// The startup script stays the only listener, so a type registered after serve is handed to it.
-	eventTypes.add = (type) => (input.root.__marklessListen?.(type), addEventType(type));
+	Object.defineProperty(eventTypes, 'add', {
+		value: (type: string) => (input.root.__marklessListen?.(type), addEventType(type)),
+	});
 	let captureListenersStarted = false;
 	const ignoredDisposedEventTargets = new WeakSet<ResumeDomElement>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(),

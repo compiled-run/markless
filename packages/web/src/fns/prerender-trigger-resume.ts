@@ -342,13 +342,25 @@ async function startTriggerGroup(
 			adopted.root as typeof adopted.root & { __asyncResumeRuntimeStarted?: boolean }
 		).__asyncResumeRuntimeStarted = true;
 		const cells = container.scalarValues;
-		cells.get = (id) => {
-			const owner = container.segments.find((candidate) => candidate.graphNodeIds.has(id));
-			return owner ? owner.graph.read(id) : Map.prototype.get.call(cells, id);
-		};
-		cells.has = (id) =>
-			container.segments.some((candidate) => candidate.graphNodeIds.has(id)) ||
-			Map.prototype.has.call(cells, id);
+		Object.defineProperties(cells, {
+			get: {
+				configurable: true,
+				writable: true,
+				value: (id: string) => {
+					const owner = container.segments.find((candidate) =>
+						candidate.graphNodeIds.has(id),
+					);
+					return owner ? owner.graph.read(id) : Map.prototype.get.call(cells, id);
+				},
+			},
+			has: {
+				configurable: true,
+				writable: true,
+				value: (id: string) =>
+					container.segments.some((candidate) => candidate.graphNodeIds.has(id)) ||
+					Map.prototype.has.call(cells, id),
+			},
+		});
 		adopted.root.__marklessEventOnlyGraph = cells;
 		started = true;
 		return { decoded: adopted, graph, runtime: stagedRuntime };
