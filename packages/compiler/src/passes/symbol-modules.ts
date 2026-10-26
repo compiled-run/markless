@@ -1438,11 +1438,13 @@ function renderBranchArms(
 					diagnostic.severity === 'error' &&
 					refusals.length > 0 &&
 					refusals.every((refusal) => refusal.escalatable)
-				)
+				) {
 					escalationCandidates.push({
 						branchSiteId: branch.branchSiteId,
 						symbolId: symbol.id,
 					});
+					diagnostics.push(branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id));
+				}
 			}
 			continue;
 		}
@@ -1471,6 +1473,40 @@ function readsOnlyProps(
 	return binding.dependencies.every((dependency) =>
 		readsOnlyProps(dependency.graphNodeId, semanticGraph, seen),
 	);
+}
+
+const BRANCH_ARM_RENDERS_IN_BROWSER_CODE = 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER' as const;
+
+// Spec 12 D2: an arm the browser renders by running its components says so, with the restructure that avoids it.
+function branchArmRendersInBrowserDiagnostic(
+	branch: RenderDataBranch,
+	refusals: ReadonlyArray<ArmRefusal>,
+	symbolId: string,
+): SymbolModulesDiagnostic {
+	const label = branch.kind === 'switch' ? '@switch' : '@if';
+	const names = [
+		...new Set(refusals.flatMap((refusal) => /^<([^>]+)>/.exec(refusal.detail)?.[1] ?? [])),
+	].map((name) => `<${name}>`);
+	const shown = names.length > 0 ? names.join(', ') : 'its components';
+	return {
+		code: BRANCH_ARM_RENDERS_IN_BROWSER_CODE,
+		severity: 'warning',
+		phase: 'public-render',
+		title: `This ${label} renders ${shown} in the browser when it changes`,
+		message: `when ${branch.testSource} changes, the browser renders this ${label}'s content by running ${shown}, instead of rebuilding it from compiled markup. Each time the content appears, ${shown} starts fresh: anything it kept from the last time it was shown is gone.`,
+		why: 'A flip rebuilds plain markup and value reads without running anything. Content that only running a component can produce is rendered in the browser the way the server rendered it, which loads that component and its records on the first flip.',
+		...(refusals[0]?.span ? { primarySpan: refusals[0].span } : {}),
+		passId: 'symbol-modules',
+		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
+		symbolId,
+		source: branch.testSource,
+		suggestions: [
+			{
+				message: `To keep ${shown} and what it holds across changes, render it outside the ${label} and hide it with an attribute instead.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${BRANCH_ARM_RENDERS_IN_BROWSER_CODE}`,
+	};
 }
 
 function branchArmUnsupportedDiagnostic(
@@ -1630,6 +1666,7 @@ function renderChunkParts(
 					| { text: string }
 					| { read: { graphNodeId: string; path: ReadonlyArray<string> } }
 					| { itemPath: ReadonlyArray<string> }
+					| RowAttributePart
 				> = [];
 				for (let rowIndex = 0; rowIndex < row.statics.length; rowIndex++) {
 					const text = (row.statics[rowIndex] ?? '').replace(
@@ -1640,6 +1677,32 @@ function renderChunkParts(
 					for (const rowSlot of row.slots.filter(
 						(candidate) => candidate.staticIndex === rowIndex,
 					)) {
+						if (
+							context.inline &&
+							rowSlot.kind === 'attribute' &&
+							!rowSlot.directClassMatch &&
+							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')
+						) {
+							rowParts.push({
+								attribute: {
+									name: rowSlot.name,
+									...(rowSlot.residue.kind === 'repeat-item'
+										? { itemPath: rowSlot.residue.path }
+										: {
+												read: {
+													graphNodeId: rowSlot.residue.graphNodeId,
+													path: armPartReadPath(
+														rowSlot.residue.graphNodeId,
+														rowSlot.residue.path,
+														asyncComputedNodeIds,
+													),
+												},
+											}),
+									...(rowSlot.alwaysPresent ? { alwaysPresent: true as const } : {}),
+								},
+							});
+							continue;
+						}
 						if (rowSlot.kind !== 'text')
 							return refuse(
 								`a repeated row inside it holds a ${rowSlot.kind} binding`,
@@ -1950,9 +2013,14 @@ function childRefusalReason(
 		semanticGraph && edge && !edge.importSource
 			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
 			: undefined;
+	// A child given only constants renders the same in the browser as on the server, whichever module it lives in.
+	const constantProps =
+		edge !== undefined &&
+		edge.children.childCount === 0 &&
+		edge.props.every((prop) => prop.kind === 'serializable');
 	return own
 		? { detail: own, escalatable: true }
-		: { detail: 'has to run to produce its content', escalatable: false };
+		: { detail: 'has to run to produce its content', escalatable: constantProps };
 }
 
 function componentEdgeSpan(
@@ -4406,11 +4474,12 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		arm.some((part) => 'repeat' in part && part.repeat.empty !== undefined),
 	);
 	const hasAttributeParts = arms.arms.some((arm) => arm.some((part) => 'attribute' in part));
+	const hasRowAttributeParts = armsHaveRowAttributeParts(arms.arms);
 	const hasRawParts = armsHaveRawParts(arms.arms);
 
 	const body: EmissionNode[] = [
 		...(hasRawParts ? [projectionHtmlImportNode()] : []),
-		...(hasAttributeParts
+		...(hasAttributeParts || hasRowAttributeParts
 			? [
 					moduleImportNode({
 						kind: 'named',
@@ -4467,7 +4536,7 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		),
 		armTextEscaperFunctionNode('marklessBranchText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBranchText', hasEmptyRepeatParts)]
+			? [branchRowsFunctionNode('marklessBranchText', hasEmptyRepeatParts, hasRowAttributeParts)]
 			: []),
 	];
 
@@ -4533,8 +4602,18 @@ export function buildAsyncBoundaryUpdateEmission(
 			])
 		: armRecordsAt();
 	const hasRawParts = armsHaveRawParts(input.arms.arms);
+	const hasRowAttributeParts = armsHaveRowAttributeParts(input.arms.arms);
 	const body: EmissionNode[] = [
 		...(hasRawParts ? [projectionHtmlImportNode()] : []),
+		...(hasRowAttributeParts
+			? [
+					moduleImportNode({
+						kind: 'named',
+						localName: 'marklessAttributeHtml',
+						source: '@markless/web/fns/attribute-html',
+					}),
+				]
+			: []),
 		constDeclarationNode('marklessBoundaryArms', jsonValueNode(input.arms.arms)),
 		...(records
 			? [constDeclarationNode('marklessBoundaryRecords', jsonValueNode(records.arms))]
@@ -4597,7 +4676,7 @@ export function buildAsyncBoundaryUpdateEmission(
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBoundaryText', hasEmptyRepeatParts)]
+			? [branchRowsFunctionNode('marklessBoundaryText', hasEmptyRepeatParts, hasRowAttributeParts)]
 			: []),
 		...(records && rowsShiftLocators ? [boundaryArmRecordsFunctionNode()] : []),
 	];
@@ -4725,6 +4804,23 @@ function boundaryArmRecordsFunctionNode(): EmissionNode {
  * paths are already character-identical apart from the escaper name; a shared
  * builder means a future change cannot drift them apart silently.
  */
+type RowAttributePart = {
+	attribute: {
+		name: string;
+		itemPath?: ReadonlyArray<string>;
+		read?: { graphNodeId: string; path: ReadonlyArray<string> };
+		alwaysPresent?: true;
+	};
+};
+
+function armsHaveRowAttributeParts(
+	arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArms['arms'][number][number]>>,
+): boolean {
+	return arms.some((arm) =>
+		arm.some((part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row)),
+	);
+}
+
 function armPartsHtmlExpression(
 	escaperName: string,
 	hasRepeatParts: boolean,
@@ -4898,25 +4994,26 @@ function switchArmSelectorFunctionNode(): EmissionNode {
 function branchRowsFunctionNode(
 	escaperName = 'marklessBranchText',
 	withEmpty = false,
+	withAttributes = false,
 ): EmissionNode {
-	const rowExpression = conditionalNode(
+	const walkItem = (path: string): EmissionNode =>
+		callNode(memberChainNode(`${path}.reduce`), [
+			arrowFunctionNode(
+				['value', 'key'],
+				conditionalNode(
+					binaryNode('==', identifierNode('value'), literalNode(null)),
+					identifierNode('value'),
+					computedMemberNode(identifierNode('value'), identifierNode('key')),
+				),
+			),
+			identifierNode('item'),
+		]);
+	const valueRow = conditionalNode(
 		binaryNode('!==', memberChainNode('row.text'), identifierNode('undefined')),
 		memberChainNode('row.text'),
 		conditionalNode(
 			binaryNode('!==', memberChainNode('row.itemPath'), identifierNode('undefined')),
-			callNode(identifierNode(escaperName), [
-				callNode(memberChainNode('row.itemPath.reduce'), [
-					arrowFunctionNode(
-						['value', 'key'],
-						conditionalNode(
-							binaryNode('==', identifierNode('value'), literalNode(null)),
-							identifierNode('value'),
-							computedMemberNode(identifierNode('value'), identifierNode('key')),
-						),
-					),
-					identifierNode('item'),
-				]),
-			]),
+			callNode(identifierNode(escaperName), [walkItem('row.itemPath')]),
 			callNode(identifierNode(escaperName), [
 				callNode(memberChainNode('graph.read'), [
 					memberChainNode('row.read.graphNodeId'),
@@ -4926,6 +5023,24 @@ function branchRowsFunctionNode(
 		),
 	);
 
+	const rowExpression = withAttributes
+		? conditionalNode(
+				binaryNode('!==', memberChainNode('row.attribute'), identifierNode('undefined')),
+				callNode(identifierNode('marklessAttributeHtml'), [
+					memberChainNode('row.attribute.name'),
+					conditionalNode(
+						binaryNode('!==', memberChainNode('row.attribute.itemPath'), identifierNode('undefined')),
+						walkItem('row.attribute.itemPath'),
+						callNode(memberChainNode('graph.read'), [
+							memberChainNode('row.attribute.read.graphNodeId'),
+							memberChainNode('row.attribute.read.path'),
+						]),
+					),
+					memberChainNode('row.attribute.alwaysPresent'),
+				]),
+				valueRow,
+			)
+		: valueRow;
 	const rowHtml = callNode(
 		memberNode(
 			callNode(memberChainNode('repeat.rowParts.map'), [

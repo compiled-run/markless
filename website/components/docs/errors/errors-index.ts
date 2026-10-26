@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 291,
+	total: 292,
 	guided: 45,
 	groups: [
 		{
@@ -76,6 +76,11 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
 					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+					kind: 'compile warning',
 					guided: false,
 				},
 				{

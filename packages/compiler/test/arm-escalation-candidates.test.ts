@@ -111,22 +111,18 @@ export function App() @{
 	expect(branch?.armRecords).toBeDefined();
 });
 
-// The narrowed set: an imported child brings markup and records this module
-// cannot address, so it stays plainly refused rather than becoming a candidate.
-test('an imported child that has to run is refused, not escalated', async () => {
-	const child = await compileTsrxModule({
-		filename: 'src/Counter.tsrx',
-		source: `
+const IMPORTED_COUNTER = `
 import { state } from '@markless/core';
 
 export function Counter({ label }) @{
 	let hits = state(0);
 	<em class="counter" onClick={() => hits = hits + 1}>{label}{hits}</em>
 }
-`,
-		symbols: [],
-	});
-	const result = await compileTsrxModule({
+`;
+
+async function compileHost(props: string) {
+	const child = await compileTsrxModule({ filename: 'src/Counter.tsrx', source: IMPORTED_COUNTER, symbols: [] });
+	return compileTsrxModule({
 		filename: 'src/Host.tsrx',
 		source: `
 import { state } from '@markless/core';
@@ -134,20 +130,42 @@ import { Counter } from './Counter.tsrx';
 
 export function App() @{
 	let armed = state(false);
+	let name = state('ready');
 
 	<main>
 		<button type="button" onClick={() => armed = !armed}>Arm</button>
-		@if (armed) { <Counter label="ready" /> }
+		@if (armed) { <Counter ${props} /> }
 	</main>
 }
 `,
 		symbols: [],
 		importedModuleInterfaces: { './Counter.tsrx': child.moduleGraphInterface },
 	});
+}
+
+// Given only constants, an imported child renders in the browser exactly as the server rendered it.
+test('an imported child given only constants escalates and says it renders in the browser', async () => {
+	const result = await compileHost('label="ready"');
+	expect(result.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
+	expect(
+		result.symbolModules.diagnostics.find(
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+		),
+	).toMatchObject({
+		severity: 'warning',
+		message: expect.stringContaining('by running <Counter>'),
+	});
+});
+
+test('an imported child given a value that changes is refused, not escalated', async () => {
+	const result = await compileHost('label={name}');
 	expect(result.symbolModules.armEscalationCandidates ?? []).toHaveLength(0);
 	expect(
+		result.symbolModules.diagnostics.map((candidate) => candidate.code),
+	).toEqual(expect.arrayContaining(['MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED']));
+	expect(
 		result.symbolModules.diagnostics.some(
-			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
 		),
-	).toBe(true);
+	).toBe(false);
 });
