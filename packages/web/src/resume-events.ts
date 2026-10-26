@@ -42,6 +42,7 @@ export type ResumeRowEventMatch = {
 	readonly rowRoot: ResumeDomElement;
 	readonly rowKey: unknown;
 	readonly rowEvent: ResumeKeyedRepeatRowEvent;
+	readonly beforeRun?: () => unknown;
 };
 export type ResumeRowEventRecords = WeakMap<ResumeDomElement, Map<string, ResumeRowEventMatch>>;
 /** A row a keyed repeat took out, carrying the parent it hung from. */
@@ -660,6 +661,7 @@ export function createEventWiring(input: {
 			beforeExecution,
 			stopsImmediately,
 			async () => {
+				await match.beforeRun?.();
 				await settleWriteObservers();
 				repeats.validateOneRepeat(input.graph, repeat);
 				// A nested row's instance also names the items of the rows enclosing it.

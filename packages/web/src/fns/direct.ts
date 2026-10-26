@@ -586,6 +586,7 @@ async function attachDirectRepeatBehaviors(
 		const cleanup = await symbol({
 			graph,
 			element: record.behaviorTargets[index],
+			locals: { [repeat.itemName]: record.item },
 			getElementHandle: (id) => {
 				const handleIndex = (repeat.rowElementHandles ?? []).findIndex(
 					(handle) => handle.handleId === id || handle.name === id,

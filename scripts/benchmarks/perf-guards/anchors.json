@@ -1822,10 +1822,26 @@
 		{
 			"date": "2026-10-26",
 			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 18371,
+			"to": 18890,
+			"reason": "a row the browser builds runs its attach: the hook that loads fns/row-behaviors and starts a served row's attach from its first event; measured on CI (perf-guards, PR #266)"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
 			"subject": "web/resume-stream-patches",
 			"from": 2260,
 			"to": 2414,
 			"reason": "a streamed arm's record set may now be served as templates, so adoption expands it before registering: one call, 2,265 -> 2,280 B by rolldown's rendered length against main af75a5f38; the bench measures 2,414 against the 2,260 anchor"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
+			"subject": "web/fns/row-behaviors",
+			"from": 0,
+			"to": 2221,
+			"reason": "new lazy module that runs row attach and its cleanup; only lists whose rows carry attach load it; measured on CI (perf-guards, PR #266)"
 		}
 	],
 	"runtimeModules": {
@@ -1929,7 +1945,7 @@
 		"web/resume-events": 17992,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 18371,
+		"web/resume-keyed-repeats": 18890,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-repeat-branch-arm": 1785,
@@ -1945,7 +1961,8 @@
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
 		"web/ssr-data/renderer": 20878,
-		"web/storage-plane": 1810
+		"web/storage-plane": 1810,
+		"web/fns/row-behaviors": 2221
 	},
 	"constructGlue": {
 		"event handler": 3184,

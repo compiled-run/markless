@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 292,
+	total: 294,
 	guided: 45,
 	groups: [
 		{
@@ -460,6 +460,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ROW_ATTACH_UNSUPPORTED',
 					kind: 'compile error',
 					guided: false,
 				},
@@ -1330,6 +1335,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ROSTER_COUNT_UNRESOLVED',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ROW_ATTACH_HOST_MISSING',
 					kind: 'runtime error',
 					guided: false,
 				},
