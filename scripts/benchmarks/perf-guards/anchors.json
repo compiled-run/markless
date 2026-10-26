@@ -1825,7 +1825,7 @@
 			"subject": "web/resume-stream-patches",
 			"from": 2260,
 			"to": 2414,
-			"reason": "a streamed arm's record set may now be served as templates, so adoption expands it before registering (+44 B of the +154; the rest is earlier growth since the last anchor)"
+			"reason": "a streamed arm's record set may now be served as templates, so adoption expands it before registering: one call, 2,265 -> 2,280 B by rolldown's rendered length against main af75a5f38; the bench measures 2,414 against the 2,260 anchor"
 		}
 	],
 	"runtimeModules": {
