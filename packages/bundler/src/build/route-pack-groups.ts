@@ -350,7 +350,8 @@ function splitOversizedLazyPacks(
 				filled = 0;
 			}
 			filled += size;
-			for (const id of members) groups.set(id, part === 1 ? group : `${group}-part${part}`);
+			for (const id of members)
+				groups.set(id, part === 1 ? group : `${group}${PACK_PART_MARK}${part}`);
 		}
 	}
 	return groups;
@@ -509,6 +510,13 @@ export function startupPackOfLazy(name: string): string {
 }
 
 const LAZY_PACK_MARK = '-lazy';
+const PACK_PART_MARK = '-part';
+
+// The pack a size-capped file was cut from: its parts serve the same routes.
+export function packOfPart(name: string): string {
+	return name.replace(new RegExp(`${PACK_PART_MARK}\\d+$`), '');
+}
+
 // A piece of a pack serves the same routes as the pack; lazy-module facades read `~<n>` as such.
 const FRAMEWORK_PIECE = '~1';
 
