@@ -55,8 +55,6 @@ export function createResumeRuntime(
 		disposedHosts = new Set<string>();
 	// The startup script stays the only listener, so a type registered after serve is handed to it.
 	Object.defineProperty(eventTypes, 'add', {
-		configurable: true,
-		writable: true,
 		value: (type: string) => (input.root.__marklessListen?.(type), addEventType(type)),
 	});
 	let captureListenersStarted = false;

@@ -109,8 +109,6 @@ export async function resumeFromPrerenderRecordsImpl(
 function liveSyncPolicyCells(graph: RuntimeGraph): Map<string, unknown> {
 	const cells = new Map<string, unknown>();
 	Object.defineProperty(cells, 'get', {
-		configurable: true,
-		writable: true,
 		value: (graphNodeId: string) => graph.read(graphNodeId, []),
 	});
 	return cells;
