@@ -2052,6 +2052,7 @@ export type GeneratedSymbolModule = {
 // A branch flip whose module this pass refuses to emit, rather than let the payload name it.
 export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 	readonly code:
+		| 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER'
 		| 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_UNADDRESSABLE'
 		| 'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS'
@@ -2518,6 +2519,17 @@ export type PublicRenderPlanBranchArmPart =
 							};
 					  }
 					| { readonly itemPath: ReadonlyArray<string> }
+					| {
+							readonly attribute: {
+								readonly name: string;
+								readonly itemPath?: ReadonlyArray<string>;
+								readonly read?: {
+									readonly graphNodeId: string;
+									readonly path: ReadonlyArray<string>;
+								};
+								readonly alwaysPresent?: true;
+							};
+					  }
 				>;
 				// The `@empty` block's markup, shown when the collection is empty.
 				readonly empty?: string;

@@ -1173,6 +1173,41 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'warning',
+		description:
+			'This <label> renders <shown> in the browser when it changes: a Markless build warning.',
+		printed: [
+			"MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER: when <testSource> changes, the browser renders this <label>'s content by running <shown>, instead of rebuilding it from compiled markup. Each time the content appears, <shown> starts fresh: anything it kept from the last time it was shown is gone.",
+			'A flip rebuilds plain markup and value reads without running anything. Content that only running a component can produce is rendered in the browser the way the server rendered it, which loads that component and its records on the first flip.',
+			'To keep <shown> and what it holds across changes, render it outside the <label> and hide it with an attribute instead.',
+			'https://markless.dev/errors/MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+		],
+		structured: true,
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:#6a737d',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/symbol-modules.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/symbol-modules.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',

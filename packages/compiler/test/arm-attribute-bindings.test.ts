@@ -110,7 +110,7 @@ export function Links() @{
 	expect(module).toMatch(/"attribute": \{ "name": "aria-busy", "read": [^}]+\} \}/);
 });
 
-test('an attribute in a repeated row inside an @if still refuses, in author words', async () => {
+test('an attribute in a repeated row inside an @if rebuilds with the row', async () => {
 	const result = await compile(
 		'src/Rows.tsrx',
 		`
@@ -131,11 +131,40 @@ export function Rows() @{
 	</div>
 }`,
 	);
+	expect(
+		result.symbolModules.diagnostics.filter(
+			(entry) => entry.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toEqual([]);
+	expect(branchModule(result) ?? '').toMatch(/"attribute": \{ "name": "title", "itemPath": \["label"\] \}/);
+});
+
+test('a repeated row holding an @if inside an @if still refuses, in author words', async () => {
+	const result = await compile(
+		'src/Rows.tsrx',
+		`
+import { state } from '@markless/core';
+
+export function Rows() @{
+	let open = state(false);
+	let items = state([{ id: 1, on: true }]);
+	<div>
+		<button onClick={() => (open = !open)}>Open</button>
+		@if (open) {
+			<ul>
+				@for (const item of items; key item.id) {
+					<li>@if (item.on) { <b>on</b> }</li>
+				}
+			</ul>
+		}
+	</div>
+}`,
+	);
 	const diagnostic = result.symbolModules.diagnostics.find(
 		(entry) => entry.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 	);
 	expect(diagnostic?.message).toBe(
-		'this @if (open) cannot be rebuilt when open changes because a repeated row inside it holds a attribute binding.',
+		'this @if (open) cannot be rebuilt when open changes because a repeated row inside it holds a branch binding.',
 	);
 });
 
