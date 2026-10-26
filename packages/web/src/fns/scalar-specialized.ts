@@ -32,16 +32,10 @@ export const marklessReadScalarCell = (r: ParentNode, graphNodeId: string) => {
 	if (!script) return;
 	try {
 		// Templated cells keep a cell outside any keyed row as itself, and a scalar plan reads only those.
-		const cells = (
-			JSON.parse(script.textContent || 'null') as {
-				readonly cells?: { readonly r?: ReadonlyArray<unknown> };
-			} | null
-		)?.cells;
-		return (
-			(Array.isArray(cells) ? cells : cells?.r) as
-				| ReadonlyArray<MarklessScalarCell | null>
-				| undefined
-		)?.find((cell) => cell?.graphNodeId === graphNodeId);
+		return ((cells: { readonly r?: ReadonlyArray<MarklessScalarCell | null> }) =>
+			(cells.r ?? (cells as ReadonlyArray<MarklessScalarCell | null>)).find(
+				(cell) => cell?.graphNodeId === graphNodeId,
+			))(JSON.parse(script.textContent || 'null')?.cells);
 	} catch {}
 };
 export const marklessDecodeScalarCell = (
