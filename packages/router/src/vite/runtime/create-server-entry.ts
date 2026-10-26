@@ -668,14 +668,15 @@ function landingModulePreloads(
 ): readonly ModulePreloadInput[] | undefined {
 	const preloads: ModulePreloadInput[] = [];
 	addModulePreloads(preloads, new Set(), routePreloads);
-	if (linkBridgePath) preloads.push(linkBridgePath);
-	return preloads.length > 0 ? preloads.map(lowFetchPriority) : undefined;
+	// The first click waits on the landing plan: below high, a font the stylesheet asks for late is sent ahead of it.
+	const landing = preloads.map(highFetchPriority);
+	if (linkBridgePath) landing.push({ href: linkBridgePath, fetchPriority: 'low' });
+	return landing.length > 0 ? landing : undefined;
 }
 
-// Nothing hydrates, so no landing module runs before first paint: keep them off the critical path.
-function lowFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
-	if (typeof preload === 'string') return { href: preload, fetchPriority: 'low' };
-	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'low' };
+function highFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
+	if (typeof preload === 'string') return { href: preload, fetchPriority: 'high' };
+	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'high' };
 }
 
 function routerLinkHrefs(html: string): string[] {
