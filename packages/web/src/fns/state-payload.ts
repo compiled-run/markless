@@ -3,7 +3,11 @@ import { marklessSerializeGraphValue } from './state-serialize.ts';
 // The served state payload while it is still being built: cells carry the
 // encoded value the render writes back into.
 export type MarklessStatePayloadDraft = {
-	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; value?: unknown }>;
+	readonly cells?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly name?: string;
+		value?: unknown;
+	}>;
 };
 
 export function marklessSetStatePayloadValue(
@@ -12,11 +16,15 @@ export function marklessSetStatePayloadValue(
 	value: unknown,
 ) {
 	const cell = state.cells?.find((candidate) => candidate.graphNodeId === graphNodeId);
-	if (cell) cell.value = marklessSerializeGraphValue(value);
+	if (cell) cell.value = marklessSerializeGraphValue(value, cell);
 }
 
 export type MarklessComputedPayloadDraft = {
-	computed?: Array<{ readonly graphNodeId: string; readonly value?: unknown }>;
+	computed?: Array<{
+		readonly graphNodeId: string;
+		readonly name?: string;
+		readonly value?: unknown;
+	}>;
 };
 
 // `marklessCloneState` copies the computed ARRAY but not the records in it, so a
@@ -33,6 +41,9 @@ export function marklessSsrServeComputed(
 		const index = computed.findIndex((record) => record.graphNodeId === graphNodeId);
 		const record = index < 0 ? undefined : computed[index];
 		if (!record) continue;
-		computed[index] = { ...record, value: marklessSerializeGraphValue(values.get(graphNodeId)) };
+		computed[index] = {
+			...record,
+			value: marklessSerializeGraphValue(values.get(graphNodeId), record),
+		};
 	}
 }
