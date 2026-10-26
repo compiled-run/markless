@@ -165,17 +165,20 @@ type DispatchQueueRoot = {
 	) => void;
 };
 
+const liveHandoffOptions = (handoff: {
+	readonly syncPolicyAlreadyApplied?: boolean;
+	readonly propagationStopped?: boolean;
+}) => ({
+	syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+	propagationStopped: handoff.propagationStopped === true,
+	ignoreUnmatched: true,
+});
+
 // Later events queued behind this boot reach the live runtime directly: the route
 // handoff re-imports the resume entry per event, and that import is a task hop.
 function registerLiveDispatch(input: ResumePayloadScriptsInput, runtime: ResumeRuntime): void {
 	const root = input.root;
-	const options =
-		input.handoffDispatchOptions ??
-		((handoff: ResumeHandoff) => ({
-			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
-			propagationStopped: handoff.propagationStopped === true,
-			ignoreUnmatched: true,
-		}));
+	const options = input.handoffDispatchOptions ?? liveHandoffOptions;
 	(root as DispatchQueueRoot).__marklessRegisterDispatch?.((handoff, fallback) =>
 		getAlreadyResumedPayload(root)?.runtime === runtime
 			? runtime.dispatch(handoff.event, options(handoff))
@@ -257,11 +260,7 @@ async function startDecodedResume(
 	}
 	// Reuse the existing streamed or staged dispatch authority.
 	input.root.__marklessDispatch ??= (handoff) =>
-		runtime!.dispatch(handoff.event, {
-			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
-			propagationStopped: handoff.propagationStopped === true,
-			ignoreUnmatched: true,
-		});
+		runtime!.dispatch(handoff.event, liveHandoffOptions(handoff));
 	(
 		input.root as typeof input.root & { __asyncResumeRuntimeStarted?: boolean }
 	).__asyncResumeRuntimeStarted = true;
