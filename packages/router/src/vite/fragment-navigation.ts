@@ -48,10 +48,15 @@ export function startFragmentNavigation(
 		if (d.readyState === 'complete') start();
 		else w.addEventListener('load', start, { once: true });
 	});
-	// Idle downloads need evidence of a fast link: the rate the page's own downloads crossed it at, never a guess.
+	// Idle downloads need evidence of a fast link: the rate the page's own downloads crossed it at, a lower bound on its speed.
 	host.__marklessFragmentIdle = landed.then(() => {
 		const intent = intentOf();
 		if (!intent) return false;
+		const connection = (
+			w.navigator as Navigator & {
+				connection?: { effectiveType?: string; saveData?: boolean };
+			}
+		).connection;
 		let bytes = 0;
 		const spans: [number, number][] = [];
 		for (const entry of [
@@ -62,14 +67,17 @@ export function startFragmentNavigation(
 			bytes += entry.transferSize;
 			spans.push([entry.responseStart, entry.responseEnd]);
 		}
-		if (!bytes) return false;
 		let busy = 0;
 		let reach = -Infinity;
 		for (const [from, to] of spans.sort((a, b) => a[0] - b[0])) {
 			busy += Math.max(0, to - Math.max(from, reach));
 			reach = Math.max(reach, to);
 		}
-		return busy === 0 || (bytes / busy) * 1000 >= intent.idleBytesPerSecond;
+		if (bytes && (busy === 0 || (bytes / busy) * 1000 >= intent.idleBytesPerSecond))
+			return true;
+		if (bytes >= intent.idleMeasuredBytes) return false;
+		// Too few bytes crossed the link to tell round trips from bandwidth: only a browser reporting a fast connection says so.
+		return connection?.effectiveType === '4g' && connection.saveData !== true;
 	});
 	const scrolled = new Set<Element>();
 	const arriving = new Map<string, Promise<unknown>>();
@@ -211,6 +219,8 @@ export type FragmentIntent = {
 	readonly prefetchAttribute: string;
 	// The slowest link, measured from the page's own downloads, the idle tier fetches on.
 	readonly idleBytesPerSecond: number;
+	// The page's own downloads must carry this many bytes for a rate under that to count as a slow link.
+	readonly idleMeasuredBytes: number;
 };
 
 // A page fetch a press started before the run half arrived; the run half adopts it as its prefetch.
@@ -791,7 +801,8 @@ export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
 export const FRAGMENT_IDLE_FRAGMENTS = 6;
 // An idle fetch of a page whose region runs past this many bytes stops there; the page is fetched on intent instead.
 export const FRAGMENT_IDLE_FRAGMENT_BYTES = 256 * 1024;
-// On a link this fast an idle round (FRAGMENT_IDLE_FRAGMENTS pages of at most FRAGMENT_IDLE_FRAGMENT_BYTES) takes under 2 s.
-export const FRAGMENT_IDLE_BYTES_PER_SECOND = 1_000_000;
+// Just above Lighthouse's Slow 4G (1.6 Mbit/s).
+export const FRAGMENT_IDLE_BYTES_PER_SECOND = 250_000;
+export const FRAGMENT_IDLE_MEASURED_BYTES = 64 * 1024;
 // Browsers without the Network Information API (WebKit, Firefox) say nothing about the connection; the idle tier's own gate bounds what they fetch.
 export const FRAGMENT_IDLE_WITHOUT_CONNECTION_INFO = true;

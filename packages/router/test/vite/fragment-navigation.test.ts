@@ -1251,7 +1251,8 @@ for (const [name, browserType] of [
 					const url = fragmentPageUrl(new URL(request.url()));
 					if (url) fragments.push(url.pathname);
 				});
-				await page.goto(origin + '/');
+				// A long page: its own download is plenty to measure the link by.
+				await page.goto(origin + '/large');
 				await page.waitForTimeout(4000);
 				expect(fragments).toEqual([]);
 				await context.close();
