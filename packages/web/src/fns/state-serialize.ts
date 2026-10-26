@@ -1,7 +1,8 @@
-import { marklessSerializeSlot, type MarklessSerializedRecord } from './state-slot.ts';
+import { serializeStateCellValue } from '@markless/serializer';
 
-export function marklessSerializeGraphValue(value: unknown) {
-	const records: MarklessSerializedRecord[] = [];
-	const seen = new Map<unknown, number>();
-	return { version: 1, root: marklessSerializeSlot(value, records, seen), records };
+export function marklessSerializeGraphValue(
+	value: unknown,
+	cell: { readonly graphNodeId: string; readonly name?: string },
+) {
+	return serializeStateCellValue({ ...cell, value });
 }

@@ -110,6 +110,25 @@ export function createProtocolStatePayload(input: ProtocolStatePayloadInput): Pr
 	};
 }
 
+/** Encodes one state value, throwing an error that names the state path and the value's type. */
+export function serializeStateCellValue(cell: {
+	readonly graphNodeId: string;
+	readonly name?: string;
+	readonly value: unknown;
+}): SerializedGraphPayload {
+	const result = serializeGraphValue(cell.value);
+	if (result.ok) return result.payload;
+	throw protocolStateSerializationError(
+		{
+			graphNodeId: cell.graphNodeId,
+			name: cell.name ?? '',
+			valueKind: 'unknown',
+			value: cell.value,
+		},
+		result.diagnostics[0],
+	);
+}
+
 // Live-value cells (directValue, need 14) hold values that never crossed
 // HTML. Before a payload is SERVED, those values must become envelope-encoded
 // `value` fields — payload decoding rejects a leaked directValue. Cells that

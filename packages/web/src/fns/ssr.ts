@@ -882,7 +882,7 @@ export function marklessSsrSeedPropCells(
 			graphNodeId: cell.graphNodeId,
 			name,
 			valueKind: marklessSsrValueKind(value),
-			value: marklessSerializeGraphValue(value),
+			value: marklessSerializeGraphValue(value, { graphNodeId: cell.graphNodeId, name }),
 		};
 		if (cell.keys && (cell.scalarKeys || cell.rowKeys) && cell.graphNodeId === 'prop:props')
 			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
@@ -900,7 +900,7 @@ export function marklessSsrSeedPropCells(
 								{
 									...seededCell,
 									valueKind: marklessSsrValueKind(kept),
-									value: marklessSerializeGraphValue(kept),
+									value: marklessSerializeGraphValue(kept, seededCell),
 								},
 							]
 						: []
@@ -1187,7 +1187,9 @@ export function marklessSsrArmizeBoundaries(
 		(asyncSnapshots ?? []).map((entry) => [entry.graphNodeId, entry.snapshot]),
 	);
 	// Document order reversed: a nested boundary claims its own records before the arm around it does.
-	const armized = new Map([...boundaries].reverse().map((boundary) => [boundary, armizeBoundary(boundary)]));
+	const armized = new Map(
+		[...boundaries].reverse().map((boundary) => [boundary, armizeBoundary(boundary)]),
+	);
 	return boundaries.map((boundary) => armized.get(boundary)!);
 	function armizeBoundary(boundary: SsrBoundaryRecord): SsrBoundaryRecord {
 		// Child-composed boundaries already carry a single armized record set;

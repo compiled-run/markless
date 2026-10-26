@@ -7535,11 +7535,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 				file: 'packages/serializer/src/value.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/serializer/src/value.ts',
 			},
-			{
-				id: 'f2',
-				file: 'packages/web/src/fns/state-slot.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/state-slot.ts',
-			},
 		],
 		moreSources: 0,
 	},
