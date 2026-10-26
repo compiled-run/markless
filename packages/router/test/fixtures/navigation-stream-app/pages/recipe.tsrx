@@ -8,6 +8,7 @@ export default function Recipe({ url }: PageProps) @{
 
 	<main data-page="recipe">
 		<h1 data-which>{u}</h1>
+		<a data-leave href="/quick">to the quick page</a>
 		@try {
 			<p data-answer>{data.text + ' (' + data.side + ')'}</p>
 		} @pending {
