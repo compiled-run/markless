@@ -108,7 +108,11 @@ export async function resumeFromPrerenderRecordsImpl(
 // off this map, so once the runtime owns the cells it answers from the live graph.
 function liveSyncPolicyCells(graph: RuntimeGraph): Map<string, unknown> {
 	const cells = new Map<string, unknown>();
-	cells.get = (graphNodeId) => graph.read(graphNodeId, []);
+	Object.defineProperty(cells, 'get', {
+		configurable: true,
+		writable: true,
+		value: (graphNodeId: string) => graph.read(graphNodeId, []),
+	});
 	return cells;
 }
 
