@@ -262,13 +262,24 @@ describe('the pack registry behind the import map', () => {
 	}, 60_000);
 });
 
-// Two pages, each with a route chunk and a render-data chunk of its own, both loading a shared header and the runtime.
-// The route table and its preload list name every page's chunks.
-function siteBundle(variant: { readonly aData?: string; readonly header?: string } = {}) {
+// Three pages, each with a route chunk and a render-data chunk of its own, all loading a shared header and
+// the runtime; `pair` names pages that also load one more chunk together. The route table and its preload list name
+// every page's chunks.
+function siteBundle(
+	variant: {
+		readonly aData?: string;
+		readonly header?: string;
+		readonly pair?: readonly string[];
+		readonly pairValue?: string;
+	} = {},
+) {
 	const part = (name: string, id: string, moduleIds: string[], code: string): TestChunk => ({
 		...chunk(`build/chunk-${id}.js`, `!~{${id.slice(0, 3)}}~`, name, code),
 		moduleIds,
 	});
+	const pages = ['a', 'b', 'c'];
+	const id = (page: string, kind: string) =>
+		`0${20 + pages.indexOf(page) * 2 + (kind === 'ROUT' ? 1 : 0)}${page.toUpperCase()}${kind}`;
 	const items = [
 		part(
 			'runtime',
@@ -282,38 +293,31 @@ function siteBundle(variant: { readonly aData?: string; readonly header?: string
 			['/app/components/header.tsrx'],
 			`import{run}from"./chunk-010RUNTI.js";export const header=()=>${variant.header ?? '"h"'};`,
 		),
-		part(
-			'a-data',
-			'012ADATA',
-			[
-				'\0virtual:markless:render-data:pages%2Fa.tsrx',
-				'/app/pages/a.tsrx?markless-render-data',
-			],
-			`export const data=${variant.aData ?? '1'};`,
-		),
-		part(
-			'b-data',
-			'013BDATA',
-			['\0virtual:markless:render-data:pages%2Fb.tsrx'],
-			'export const data=2;',
-		),
-		part(
-			'a-route',
-			'014AROUT',
-			['/app/pages/a.tsrx?markless-route'],
-			'import{data}from"./chunk-012ADATA.js";import{header}from"./chunk-011HEADE.js";import{run}from"./chunk-010RUNTI.js";export{data,header,run};',
-		),
-		part(
-			'b-route',
-			'015BROUT',
-			['/app/pages/b.tsrx?markless-route'],
-			'import{data}from"./chunk-013BDATA.js";import{header}from"./chunk-011HEADE.js";import{run}from"./chunk-010RUNTI.js";export{data,header,run};',
-		),
+		...(variant.pair
+			? [part('pair', '019PAIRS', ['/app/components/pair.tsrx'], `export const pair=${variant.pairValue ?? '1'};`)]
+			: []),
+		...pages.flatMap((page) => [
+			part(
+				`${page}-data`,
+				id(page, 'DATA'),
+				[
+					`\0virtual:markless:render-data:pages%2F${page}.tsrx`,
+					...(page === 'a' ? ['/app/pages/a.tsrx?markless-render-data'] : []),
+				],
+				`export const data=${page === 'a' ? (variant.aData ?? '1') : `"${page}"`};`,
+			),
+			part(
+				`${page}-route`,
+				id(page, 'ROUT'),
+				[`/app/pages/${page}.tsrx?markless-route`],
+				`import{data}from"./chunk-${id(page, 'DATA')}.js";import{header}from"./chunk-011HEADE.js";import{run}from"./chunk-010RUNTI.js";${variant.pair?.includes(page) ? 'import{pair}from"./chunk-019PAIRS.js";export{pair};' : ''}export{data,header,run};`,
+			),
+		]),
 		part(
 			'table',
 			'016TABLE',
 			['/app/node_modules/@markless/router/src/vite/entries/resume-entry.ts'],
-			'import{run}from"./chunk-010RUNTI.js";const pages={"/pages/a.tsrx":()=>import("./chunk-014AROUT.js"),"/pages/b.tsrx":()=>import("./chunk-015BROUT.js")};const preloads=["/docs/build/chunk-012ADATA.js","/docs/build/chunk-013BDATA.js"];export{pages,preloads,run};',
+			`import{run}from"./chunk-010RUNTI.js";const pages={${pages.map((page) => `"/pages/${page}.tsrx":()=>import("./chunk-${id(page, 'ROUT')}.js")`).join(',')}};const preloads=[${pages.map((page) => `"/docs/build/chunk-${id(page, 'DATA')}.js"`).join(',')}];export{pages,preloads,run};`,
 		),
 	];
 	return Object.fromEntries(items.map((item) => [item.fileName, item]));
@@ -403,6 +407,29 @@ describe('with route modules, only chunks several pages load go through the impo
 
 		expect(mappedNames(bundle, specifiers.importMap())).toEqual(['header', 'runtime']);
 		expect(byName(bundle, 'a-data').code).toContain(`from"./${file(bundle, 'a-data-part2')}"`);
+	});
+
+	test('a chunk two pages load is named by path; one three pages load goes through the map', async () => {
+		const bundle = siteBundle({ pair: ['a', 'b'] });
+		const map = await buildSite(bundle);
+
+		expect(mappedNames(bundle, map)).toEqual(['header', 'runtime']);
+		for (const page of ['a', 'b'])
+			expect(byName(bundle, `${page}-route`).code).toContain(`from"./${file(bundle, 'pair')}"`);
+	});
+
+	test('editing a chunk two pages load renames those pages\' chunks, never the third page or a shared chunk', async () => {
+		const before = siteBundle({ pair: ['a', 'b'] });
+		const after = siteBundle({ pair: ['a', 'b'], pairValue: '7' });
+		await buildSite(before);
+		await buildSite(after);
+		const renamed = (name: string) => file(after, name) !== file(before, name);
+
+		expect(['pair', 'a-route', 'b-route', 'c-route', 'header', 'runtime'].filter(renamed)).toEqual([
+			'pair',
+			'a-route',
+			'b-route',
+		]);
 	});
 
 	test('editing a shared chunk renames only that chunk; the pages that load it keep their bytes', async () => {

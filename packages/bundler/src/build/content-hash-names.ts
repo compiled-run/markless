@@ -409,9 +409,9 @@ export type ChunkSpecifiers = {
 };
 
 /**
- * Rewrites every quoted reference to a hashed chunk several pages load (`./chunk-x.js`, `/base/build/chunk-x.js`)
- * into a stable bare specifier, so a shared chunk's new bytes rename only itself. A chunk one page loads keeps
- * its path and renames that page's chunks, which keeps the document's import map to the shared chunks.
+ * Rewrites every quoted reference to a hashed chunk three or more pages load (`./chunk-x.js`, `/base/build/chunk-x.js`)
+ * into a stable bare specifier, so a shared chunk's new bytes rename only itself. A chunk one or two pages load keeps
+ * its path and renames those pages' chunks, which keeps the document's import map to the widely shared chunks.
  * References in any other shape keep the file name and stay covered by the content-hash rename.
  */
 export async function specifyChunkReferences(
@@ -498,8 +498,11 @@ function chunkModuleIds(chunk: Chunk): readonly string[] {
 			: [];
 }
 
-// The page a chunk was planned for: one route pack, or a shared pack serving one route; else the one page file all its modules come from.
-function chunkPage(chunk: Chunk, options: SpecifierOwnership): string | undefined {
+// A chunk this many pages load goes through the import map; one fewer pages load is named by path, so changing it renames those pages' chunks.
+const MAPPED_PAGE_COUNT = 3;
+
+// The pages a chunk was planned for: one route pack, or a shared pack serving a few routes; else the one page file all its modules come from.
+function chunkPages(chunk: Chunk, options: SpecifierOwnership): readonly string[] | undefined {
 	const ids = chunkModuleIds(chunk);
 	const { packs, isRoute, root } = options;
 	if (packs) {
@@ -511,14 +514,14 @@ function chunkPage(chunk: Chunk, options: SpecifierOwnership): string | undefine
 		const [pack] = names;
 		if (names.size === 1 && pack) {
 			const page = /^(?:route|navigation):(?!shared(?::|$))(.+)$/.exec(pack)?.[1];
-			if (page) return page;
+			if (page) return [page];
 			const routes = pack.startsWith('shared:') ? packs.packRoutes(pack) : undefined;
-			return routes?.length === 1 ? routes[0] : SHARED;
+			return routes?.length && routes.length < MAPPED_PAGE_COUNT ? routes : [SHARED];
 		}
 	}
 	const sources = new Set(ids.map((id) => moduleSourceFile(id, root)));
 	const [only] = sources;
-	return sources.size === 1 && isRoute?.(only!) ? only : undefined;
+	return sources.size === 1 && isRoute?.(only!) ? [only!] : undefined;
 }
 
 type SpecifierOwnership = {
@@ -527,7 +530,7 @@ type SpecifierOwnership = {
 	readonly root?: string | undefined;
 };
 
-// A chunk only one page loads is named by its path; one several pages load, or the runtime, goes through the map.
+// A chunk fewer than MAPPED_PAGE_COUNT pages load is named by its path; one more pages load, or the runtime, goes through the map.
 function namedBySpecifier(
 	chunks: readonly Chunk[],
 	references: ReadonlyMap<Chunk, readonly { readonly target: Chunk }[]>,
@@ -535,27 +538,27 @@ function namedBySpecifier(
 	options: SpecifierOwnership,
 ): (target: Chunk) => boolean {
 	if (!options.isRoute && !options.packs) return () => true;
-	const page = new Map<Chunk, string>();
+	const pages = new Map<Chunk, readonly string[]>();
 	for (const chunk of chunks) {
-		const owner = chunkPage(chunk, options);
-		if (owner) page.set(chunk, owner);
+		const owners = chunkPages(chunk, options);
+		if (owners) pages.set(chunk, owners);
 	}
 	// A page index (route table, route preload lists) names several pages' chunks; naming them does not share them.
 	const hubs = new Set<Chunk>();
 	for (const chunk of chunks) {
-		const pages = new Set<string>();
+		const named = new Set<string>();
 		for (const { target } of references.get(chunk) ?? []) {
-			const owner = page.get(target);
-			if (owner && owner !== SHARED) pages.add(owner);
+			const owners = pages.get(target);
+			if (owners?.length === 1 && owners[0] !== SHARED) named.add(owners[0]!);
 		}
-		if (pages.size > 1) hubs.add(chunk);
+		if (named.size > 1) hubs.add(chunk);
 	}
 	const loadedBy = (chunk: Chunk) =>
 		[...(importers.get(chunk) ?? [])].filter((importer) => !hubs.has(importer));
 	const owners = new Map<Chunk, Set<string>>();
 	for (const chunk of chunks) {
-		const own = page.get(chunk);
-		owners.set(chunk, new Set(own ? [own] : loadedBy(chunk).length === 0 ? [SHARED] : []));
+		const own = pages.get(chunk);
+		owners.set(chunk, new Set(own ?? (loadedBy(chunk).length === 0 ? [SHARED] : [])));
 	}
 	for (let changed = true; changed;) {
 		changed = false;
@@ -565,14 +568,15 @@ function namedBySpecifier(
 			const before = set.size;
 			for (const importer of loadedBy(chunk))
 				for (const owner of owners.get(importer)!) set.add(owner);
-			if (set.size > 1) {
+			if (set.size === before) continue;
+			changed = true;
+			if (set.size >= MAPPED_PAGE_COUNT || set.has(SHARED)) {
 				set.clear();
 				set.add(SHARED);
 			}
-			if (set.size !== before) changed = true;
 		}
 	}
-	return (target) => owners.get(target)!.size !== 1 || owners.get(target)!.has(SHARED);
+	return (target) => owners.get(target)!.size === 0 || owners.get(target)!.has(SHARED);
 }
 
 // The quoted path must resolve to the target from the importing chunk, so strings that merely contain a name stay put.
