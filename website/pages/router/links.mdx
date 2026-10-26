@@ -67,10 +67,44 @@ If `document.tsrx` reads a prop other than `children`, such as the URL, a click 
 page instead.
 
 The router also starts that request a little early. A pointer over a link, a focus, or a press
-starts it. When the browser is idle, a few visible links start too. Links to `/api/` endpoints never
-start early. If the request fails, the browser loads the address the normal way.
+starts it. When the browser is idle, a few visible links start too, on a fast connection with data
+saver off. If the request fails, the browser loads the address the normal way.
 
 Plain `<a>` links to your pages navigate the same way.
+
+<Callout
+	sprite="cross"
+	title="Does visiting the page change something?"
+	text="An early request is a real GET to your server, so it counts as a visit. A log-out link, a one-time token, a view counter: any of them runs when the visitor only looked at the link. Put prefetch={false} on a Link to such a page, and only a real click asks for it."
+/>
+
+The router never requests these early:
+
+| Link | Why |
+| --- | --- |
+| another site's address | the router only fetches your own pages |
+| a path under `/api/` | an endpoint can do anything on a GET |
+| `download`, `target="_blank"` (any `target` but `_self`), or `rel="external"` | the click leaves this tab or this app |
+| `<Link prefetch={false}>` | you said so |
+
+Everything else that names one of your pages is fair game, plain `<a>` included. `rel="nofollow"`
+does not stop it: that tells search engines what to trust, not browsers what to fetch. Next.js,
+Nuxt, SvelteKit and Turbo prefetch the same way, and opt out the same way, per link.
+
+Each early request carries the header `Purpose: prefetch`, so your server can tell it from a click.
+A page with a side effect can answer an early request without doing the work. Safer still, make the
+action a form that posts: the router never requests a `POST` early.
+
+```tsrx
+import { Link } from '@markless/router';
+
+export default function Header() @{
+	<nav>
+		<Link href="/settings">Settings</Link>
+		<Link href="/logout" prefetch={false}>Log out</Link>
+	</nav>
+}
+```
 
 A page fetched early is shown for up to 30 seconds, and only while it can still match what the
 server would send:
@@ -100,12 +134,6 @@ only that one click skips the swap.
 
 To turn early requests off for every link, write `router({ prefetch: false })` in `vite.config.ts`.
 Links still work.
-
-<Callout
-	sprite="cross"
-	title="Does the page change something each time it is visited?"
-	text="Some pages do work on every request, like a one-time token or a view counter. An early request counts as a visit. Set prefetch={false} on links to those pages, so only a real click asks for them."
-/>
 
 ## Navigate from code
 
