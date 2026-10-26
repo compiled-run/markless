@@ -730,7 +730,9 @@ function withArmScope(state: WalkState, branchSiteId: string | null, run: () => 
 	state.currentArmScope = branchSiteId
 		? { branchSiteId, hostNodeId: state.currentHostNodeId }
 		: null;
+	if (branchSiteId) state.currentBranchSiteIds.push(branchSiteId);
 	run();
+	if (branchSiteId) state.currentBranchSiteIds.pop();
 	state.currentArmScope = previous;
 }
 

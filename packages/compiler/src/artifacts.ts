@@ -186,6 +186,8 @@ export type SemanticComponentEdge = {
 		};
 	};
 	readonly branchScopeIds: ReadonlyArray<string>;
+	/** The `branch-site:` ids of the @if/@switch blocks the edge sits in, outermost first. */
+	readonly branchSiteIds?: ReadonlyArray<string>;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
 };
 

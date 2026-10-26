@@ -1593,7 +1593,8 @@ function consequenceReach(
 		);
 	};
 	const edgeMounts = (edge: SemanticComponentEdge) =>
-		edge.branchScopeIds.some((id) => {
+		(edge.branchSiteIds === undefined && edge.branchScopeIds.length > 0) ||
+		(edge.branchSiteIds ?? []).some((id) => {
 			const branch = view.branches?.find((candidate) => candidate.id === id);
 			return !branch || branchFlips(branch);
 		}) ||

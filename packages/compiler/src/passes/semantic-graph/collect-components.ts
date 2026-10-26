@@ -172,6 +172,7 @@ export function collectComponentEdge(
 			childCount: componentChildCount(node),
 		},
 		branchScopeIds: [...state.currentBranchScopeIds],
+		branchSiteIds: [...state.currentBranchSiteIds],
 		keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 	});
 
