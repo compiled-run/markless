@@ -159,3 +159,62 @@ function payloadStateCellValue(state: any, graphNodeId: string): unknown {
 	const cell = state.cells.find((candidate: any) => candidate.graphNodeId === graphNodeId);
 	return cell?.value.root;
 }
+
+test('an imported helper seeds its cell from the argument the call passes', async () => {
+	const [, app] = await compileTsrxModulesWithInterfaces([
+		{
+			filename: 'src/helpers.tsrx',
+			importSource: './helpers.tsrx',
+			source: `import { state } from '@markless/core'; export function counterFrom(initial: number) { const start = state(initial); return start; }`,
+		},
+		{
+			filename: 'src/App.tsrx',
+			source: `import { counterFrom } from './helpers.tsrx'; export function App() @{ const five = counterFrom(5); <button onClick={() => five++}>{five}</button> }`,
+		},
+	]);
+
+	expect(app.semanticGraph.diagnostics).toEqual([]);
+	expect(app.semanticGraph.graphBindings).toEqual([
+		expect.objectContaining({
+			id: 'state:App.five.counterFrom.start',
+			componentName: 'App',
+			initializerSource: '((initial) => (initial))(5)',
+		}),
+	]);
+});
+
+test('an imported helper whose initial value reads its own module is refused in author terms', async () => {
+	const [, app] = await compileTsrxModulesWithInterfaces([
+		{
+			filename: 'src/helpers.tsrx',
+			importSource: './helpers.tsrx',
+			source: `import { state } from '@markless/core'; const base = Number('4'); export function counter() { const n = state(base); return n; }`,
+		},
+		{
+			filename: 'src/App.tsrx',
+			source: `import { counter } from './helpers.tsrx'; export function App() @{ const n = counter(); <button onClick={() => n++}>{n}</button> }`,
+		},
+	]);
+
+	expect(app.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+			message: expect.stringContaining("reads `base`, which only the helper's own file can see"),
+		}),
+	]);
+});
+
+test('a same-module helper whose initial value reads a helper local is refused instead of rendering blank', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/HelperCounter.tsrx',
+		source: `import { state } from '@markless/core'; function counter() { const base = Number('4'); const n = state(base); return n; } export function App() @{ const count = counter(); <button onClick={() => count++}>{count}</button> }`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+			message: expect.stringContaining('reads `base`, which exists only inside the helper'),
+		}),
+	]);
+});

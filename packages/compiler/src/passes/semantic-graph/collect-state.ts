@@ -556,6 +556,7 @@ function directHelperGraphReturn(
 			if (frameworkApi === 'state') {
 				const initial = firstArgument(init!);
 				const evaluatedInitial = evaluateInitialStateValue(initial, state);
+				const parameters = plainParameterNames(declaration);
 				return {
 					kind: 'state',
 					localName: returnedName,
@@ -565,7 +566,11 @@ function directHelperGraphReturn(
 					...(evaluatedInitial.ok
 						? { initialValue: evaluatedInitial.value }
 						: initial
-							? { initializerSource: expressionSource(initial, state.source) }
+							? {
+									initializerSource: expressionSource(initial, state.source),
+									initializerNames: freeNames(initial, state),
+									...(parameters ? { parameters } : {}),
+								}
 							: {}),
 				};
 			}
@@ -586,6 +591,44 @@ function directHelperGraphReturn(
 	}
 
 	return null;
+}
+
+function plainParameterNames(declaration: AnyNode): ReadonlyArray<string> | null {
+	const names = asNodes(declaration.params).map((param) => getIdentifierName(param));
+	return names.every((name): name is string => !!name) ? names : null;
+}
+
+// Every name an expression reads that this file declares; globals are in scope anywhere.
+function freeNames(node: AnyNode, state: WalkState): ReadonlyArray<string> {
+	const names = new Set<string>();
+	const visit = (current: AnyNode, parent: AnyNode | null) => {
+		const isKey =
+			parent &&
+			((parent.type === 'MemberExpression' && parent.property === current && parent.computed !== true) ||
+				(parent.type === 'Property' && parent.key === current && parent.computed !== true));
+		if (
+			current.type === 'Identifier' &&
+			!isKey &&
+			typeof current.start === 'number' &&
+			resolvedSymbolAt(state.semantic(), current.start) !== null
+		)
+			names.add(String(current.name));
+		for (const child of childNodes(current)) visit(child, current);
+	};
+	visit(node, null);
+	return [...names];
+}
+
+// `counterFrom(5)` seeds the helper's cell from the argument the call passes.
+function initializerForCall(
+	initializerSource: string,
+	parameters: ReadonlyArray<string>,
+	call: AnyNode,
+	state: WalkState,
+): string {
+	if (parameters.length === 0) return initializerSource;
+	const args = asNodes(call.arguments).map((argument) => expressionSource(argument, state.source));
+	return `((${parameters.join(', ')}) => (${initializerSource}))(${args.join(', ')})`;
 }
 
 function findDirectReturnArgument(body: AnyNode | undefined): AnyNode | undefined {
@@ -665,8 +708,9 @@ function collectHelperReturnAlias(
 	if (crossModuleSource) {
 		const imported = moduleImportForHelper(helperName, state);
 		const target = imported
-			? collectImportedHelperBindingForCall(imported, localName, state)
+			? collectImportedHelperBindingForCall(imported, localName, init, state)
 			: null;
+		if (target === UNREACHABLE_INITIALIZER) return true;
 		if (target) {
 			state.graph.aliases.push({
 				name: localName,
@@ -690,7 +734,8 @@ function collectHelperReturnAlias(
 
 	if (!state.helperFunctions.has(helperName)) return false;
 	const diagnosticsBefore = state.graph.diagnostics.length;
-	const target = collectHelperBindingForCall(helperName, localName, state);
+	const target = collectHelperBindingForCall(helperName, localName, init, state);
+	if (target === UNREACHABLE_INITIALIZER) return true;
 	if (!target) {
 		if (state.graph.diagnostics.length > diagnosticsBefore) return true;
 		state.graph.diagnostics.push(
@@ -714,11 +759,14 @@ function collectHelperReturnAlias(
 	return true;
 }
 
+const UNREACHABLE_INITIALIZER = Symbol('unreachable initializer');
+
 function collectImportedHelperBindingForCall(
 	moduleImport: SemanticModuleImport,
 	localName: string,
+	call: AnyNode,
 	state: WalkState,
-): string | null {
+): string | typeof UNREACHABLE_INITIALIZER | null {
 	if (!state.currentComponentName) return null;
 
 	const moduleInterface = state.importedModuleInterfaces[moduleImport.source];
@@ -731,14 +779,36 @@ function collectImportedHelperBindingForCall(
 	);
 	if (!helperExport) return null;
 
+	const returns = helperExport.returns;
+	const parameters = returns.parameters ?? [];
+	const unreachable = (returns.initializerNames ?? []).filter((name) => !parameters.includes(name));
+	if (returns.initializerSource !== undefined && (unreachable.length > 0 || !returns.parameters)) {
+		state.graph.diagnostics.push(
+			unsupportedHelperStateReturnDiagnostic({
+				helperName: moduleImport.localName,
+				source: expressionSource(call, state.source),
+				init: call,
+				filename: state.filename,
+				reason: `its initial value \`${returns.initializerSource}\` reads ${unreachable.length > 0 ? unreachable.map((name) => `\`${name}\``).join(', ') : 'a parameter pattern'}, which only the helper's own file can see`,
+			}),
+		);
+		return UNREACHABLE_INITIALIZER;
+	}
+
 	const previousCall = state.currentHelperCall;
 	state.currentHelperCall = {
 		componentName: state.currentComponentName,
 		localName,
 		helperName: moduleImport.localName,
 	};
-	const target = graphBindingName(helperExport.returns.localName, state);
-	state.graph.graphBindings.push(graphBindingFromInterfaceReturn(helperExport.returns, state));
+	const target = graphBindingName(returns.localName, state);
+	state.graph.graphBindings.push({
+		...graphBindingFromInterfaceReturn(returns, state),
+		...declaringComponent(state),
+		...(returns.initializerSource !== undefined
+			? { initializerSource: initializerForCall(returns.initializerSource, parameters, call, state) }
+			: {}),
+	});
 	state.currentHelperCall = previousCall;
 	return target;
 }
@@ -775,11 +845,32 @@ function graphBindingFromInterfaceReturn(
 function collectHelperBindingForCall(
 	helperName: string,
 	localName: string,
+	call: AnyNode,
 	state: WalkState,
-): string | null {
+): string | typeof UNREACHABLE_INITIALIZER | null {
 	if (!state.currentComponentName) return null;
 	const helper = state.helperFunctions.get(helperName);
 	if (!helper) return null;
+	const returns = directHelperGraphReturn(helper, state);
+	if (returns?.kind === 'state' && returns.initializerSource !== undefined) {
+		const helperLocals = new Set([
+			...(returns.parameters ? [] : ['a parameter pattern']),
+			...declaredNamesIn(helper.body as AnyNode | undefined),
+		]);
+		const unreachable = (returns.initializerNames ?? []).filter((name) => helperLocals.has(name));
+		if (!returns.parameters || unreachable.length > 0) {
+			state.graph.diagnostics.push(
+				unsupportedHelperStateReturnDiagnostic({
+					helperName,
+					source: expressionSource(call, state.source),
+					init: call,
+					filename: state.filename,
+					reason: `its initial value \`${returns.initializerSource}\` reads ${unreachable.length > 0 ? unreachable.map((name) => `\`${name}\``).join(', ') : 'a parameter pattern'}, which exists only inside the helper`,
+				}),
+			);
+			return UNREACHABLE_INITIALIZER;
+		}
+	}
 
 	const previousCall = state.currentHelperCall;
 	const previousFunctionSite = state.currentFunctionSite;
@@ -793,7 +884,29 @@ function collectHelperBindingForCall(
 	const target = helperReturnTarget(helper.body as AnyNode | undefined, state);
 	state.currentFunctionSite = previousFunctionSite;
 	state.currentHelperCall = previousCall;
+	const index = state.graph.graphBindings.findIndex((binding) => binding.name === target);
+	const binding = state.graph.graphBindings[index] as
+		| (SemanticGraphBinding & { readonly initializerSource?: string })
+		| undefined;
+	if (binding?.initializerSource !== undefined && returns?.kind === 'state' && returns.parameters)
+		state.graph.graphBindings[index] = {
+			...binding,
+			initializerSource: initializerForCall(binding.initializerSource, returns.parameters, call, state),
+		} as SemanticGraphBinding;
 	return target;
+}
+
+function declaredNamesIn(body: AnyNode | undefined): ReadonlyArray<string> {
+	const names: string[] = [];
+	const visit = (node: AnyNode) => {
+		if (node.type === 'VariableDeclarator' || node.type === 'FunctionDeclaration') {
+			const name = getIdentifierName(node.id as AnyNode | undefined);
+			if (name) names.push(name);
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	if (body) visit(body);
+	return names;
 }
 
 function helperReturnTarget(body: AnyNode | undefined, state: WalkState): string | null {

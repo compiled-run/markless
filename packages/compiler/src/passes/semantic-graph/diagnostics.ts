@@ -565,7 +565,17 @@ export function unsupportedHelperStateReturnDiagnostic(input: {
 	readonly source: string;
 	readonly init: AnyNode;
 	readonly filename: string;
+	readonly reason?: string;
 }): SemanticGraphDiagnostic {
+	if (input.reason)
+		return helperReturnUnsupportedDiagnostic({
+			title: 'This helper state cannot start from its initial value here',
+			message: `Cannot create the state helper "${input.helperName}" returns at "${input.source}": ${input.reason}.`,
+			why: 'The cell is created in this component, so its initial value is computed here, where only the arguments of the call are in scope.',
+			suggestion:
+				'Pass what the initial value needs as a parameter of the helper, or declare the state in the component body.',
+			span: sourceSpan(input.init, input.filename),
+		});
 	return helperReturnUnsupportedDiagnostic({
 		title: 'Helper-created state return shape is not supported yet',
 		message: `Cannot connect helper "${input.helperName}" return value "${input.source}" to graph state. This slice supports returning one state() or computed() binding directly.`,

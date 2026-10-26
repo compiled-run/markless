@@ -233,6 +233,10 @@ export type ModuleGraphInterfaceHelperReturn = {
 	readonly valueKind?: SemanticGraphBinding['valueKind'];
 	readonly initialValue?: unknown;
 	readonly initializerSource?: string;
+	/** The names `initializerSource` reads; a caller can supply only the helper's parameters. */
+	readonly initializerNames?: ReadonlyArray<string>;
+	/** The helper's parameter names in order, when every parameter is a plain name. */
+	readonly parameters?: ReadonlyArray<string>;
 	readonly async?: boolean;
 	readonly asyncCapable?: boolean;
 	readonly functionSource?: string;
