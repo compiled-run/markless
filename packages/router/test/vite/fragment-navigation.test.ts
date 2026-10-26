@@ -508,7 +508,7 @@ for (const [name, browserType] of [
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
 			await page.evaluate(() =>
-				((window as unknown as Record<string, () => void>).__releaseLateWrite)(),
+				(window as unknown as Record<string, () => void>).__releaseLateWrite(),
 			);
 			await page.waitForFunction(
 				() => (window as unknown as Record<string, unknown>).__lateWriteRan === true,
@@ -738,8 +738,12 @@ for (const [name, browserType] of [
 				const log: string[] = [];
 				(window as unknown as Record<string, unknown>).__starts = log;
 				let pressed = false;
-				addEventListener('pointerdown', () => (pressed = true), { capture: true, once: true });
-				let value = (container as unknown as Record<string, unknown>).__marklessDelegatedDispatch;
+				addEventListener('pointerdown', () => (pressed = true), {
+					capture: true,
+					once: true,
+				});
+				let value = (container as unknown as Record<string, unknown>)
+					.__marklessDelegatedDispatch;
 				Object.defineProperty(container, '__marklessDelegatedDispatch', {
 					configurable: true,
 					enumerable: true,
@@ -747,7 +751,10 @@ for (const [name, browserType] of [
 					set: (next) => {
 						value = next;
 						if (pressed)
-							log.push(document.querySelector('[data-page]')?.getAttribute('data-page') ?? '');
+							log.push(
+								document.querySelector('[data-page]')?.getAttribute('data-page') ??
+									'',
+							);
 					},
 				});
 			});
@@ -1193,6 +1200,61 @@ for (const [name, browserType] of [
 					expect(request.at).toBeGreaterThanOrEqual(loaded);
 				}
 				await page.close();
+			},
+		);
+
+		test('the idle tier starts only once the code the page landed with has arrived', async () => {
+			const held = new URL(landing['pages/index.tsrx']!.at(-1)!, origin).pathname;
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			let arrived = Infinity;
+			const fragments: number[] = [];
+			await page.route(
+				(url) => url.pathname === held,
+				async (route) => {
+					await new Promise((resolve) => setTimeout(resolve, 1500));
+					await route.continue();
+				},
+			);
+			page.on('requestfinished', (request) => {
+				if (new URL(request.url()).pathname === held) arrived = Date.now();
+			});
+			page.on('request', (request) => {
+				if (fragmentPageUrl(new URL(request.url()))) fragments.push(Date.now());
+			});
+			await page.goto(origin + '/');
+			await expect.poll(() => fragments.length, { timeout: 10_000 }).toBeGreaterThan(0);
+			expect(Math.min(...fragments)).toBeGreaterThanOrEqual(arrived);
+			await page.close();
+		});
+
+		test.runIf(name === 'chromium')(
+			'the idle tier fetches nothing on a link the page measured slow, whatever the browser reports',
+			async () => {
+				const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+				await context.addInitScript(() =>
+					Object.defineProperty(navigator, 'connection', {
+						value: { effectiveType: '4g', saveData: false },
+					}),
+				);
+				const page = await context.newPage();
+				const cdp = await context.newCDPSession(page);
+				await cdp.send('Network.enable');
+				// Lighthouse's Slow 4G: 1.6 Mbit/s down, 150 ms round trips.
+				await cdp.send('Network.emulateNetworkConditions', {
+					offline: false,
+					latency: 150,
+					downloadThroughput: (1638 * 1024) / 8,
+					uploadThroughput: (750 * 1024) / 8,
+				});
+				const fragments: string[] = [];
+				page.on('request', (request) => {
+					const url = fragmentPageUrl(new URL(request.url()));
+					if (url) fragments.push(url.pathname);
+				});
+				await page.goto(origin + '/');
+				await page.waitForTimeout(4000);
+				expect(fragments).toEqual([]);
+				await context.close();
 			},
 		);
 
