@@ -1079,27 +1079,14 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
-		description:
-			'Lowercase on* attributes are plain HTML attributes: a Markless build warning.',
+		severity: 'error',
+		description: 'Lowercase on* attributes are plain HTML attributes: a Markless build error.',
 		printed: [
 			'MARKLESS_ATTRIBUTE_OBJECT_VALUE: `<attributeName>={<valueSource>}` is a plain attribute, not a Markless event. It would serialize the function source into HTML.<eventText>',
 			'Attribute bindings serialize to plain text in HTML and DOM updates; only graph cells keep structured values across resume.',
 			'Use the event prop casing, for example `<eventSuggestion>={...}`, or serialize a string deliberately.',
 		],
 		structured: true,
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_ATTRIBUTE_OBJECT_VALUE: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
 		sources: [
 			{
 				id: 'f0',
@@ -5699,27 +5686,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error',
 		description:
-			'<label> is not rendered by the public render path yet: a Markless build warning.',
+			'<label> is not rendered by the public render path yet: a Markless build error.',
 		printed: [
 			'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT: <message> markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
 			'The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.',
 			'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 		],
 		structured: true,
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
 		sources: [
 			{
 				id: 'f0',

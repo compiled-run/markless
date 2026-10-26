@@ -65,7 +65,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
-					kind: 'compile warning',
+					kind: 'compile error',
 					guided: false,
 				},
 				{
@@ -390,7 +390,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-					kind: 'compile warning',
+					kind: 'compile error',
 					guided: false,
 				},
 				{

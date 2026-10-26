@@ -46,7 +46,7 @@ export function unsupportedRenderConstructDiagnostic(input: {
 }): CompilerDiagnostic {
 	return {
 		code: PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
-		severity: input.severity ?? 'warning',
+		severity: input.severity ?? 'error',
 		phase: PUBLIC_RENDER_PHASE,
 		title: `${input.label} is not rendered by the public render path yet`,
 		message: `${input.message} ${DEBUGGING_PLAYBOOK_HINT}`,
