@@ -944,15 +944,19 @@ function payloadDemandRecords(
 				...(replacement.scalarRows || record.fixed ? [] : renderRuntimeModuleIds),
 			]),
 		})),
-		...(view.branches ?? []).map((record): RuntimeDemandMapRecord => ({
-			recordId: `branch:${record.id}`,
-			kind: 'branch',
-			symbolIds: record.symbolId ? [record.symbolId] : [],
-			runtimeModuleIds: unique([
-				...BRANCH,
-				...symbolIdsDemand(record.symbolId ? [record.symbolId] : [], symbolDemand),
-			]),
-		})),
+		...(view.branches ?? []).map((record): RuntimeDemandMapRecord => {
+			// A branch whose test reads nothing never flips, so nothing ever loads its flip symbol.
+			const flipSymbolIds =
+				record.symbolId && (record.testReads?.length || record.contentReads?.length)
+					? [record.symbolId]
+					: [];
+			return {
+				recordId: `branch:${record.id}`,
+				kind: 'branch',
+				symbolIds: flipSymbolIds,
+				runtimeModuleIds: unique([...BRANCH, ...symbolIdsDemand(flipSymbolIds, symbolDemand)]),
+			};
+		}),
 		...(view.asyncBoundaries ?? []).map((record): RuntimeDemandMapRecord => ({
 			recordId: `async-boundary:${record.id}`,
 			kind: 'async-boundary',
