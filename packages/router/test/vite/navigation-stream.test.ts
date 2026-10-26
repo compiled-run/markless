@@ -157,6 +157,8 @@ for (const [name, browserType] of [
 			await page.locator('[data-answer]').waitFor();
 			expect(await page.locator('[data-answer]').textContent()).toBe('loaded u=3 (server)');
 			expect(new URL(page.url()).search).toBe('?u=3');
+			// The watcher records on the next frame, which can come after the answer is in the DOM.
+			await expect.poll(async () => (await views(page)).at(-1)).toBe('recipe:3');
 			expect((await views(page)).filter((view) => !view.endsWith(' pending'))).toEqual([
 				'start:',
 				'recipe:3',
