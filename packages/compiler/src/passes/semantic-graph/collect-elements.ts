@@ -196,6 +196,11 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	state.currentHostNodeId = previousHost;
 }
 
+// A flipped arm rebuilds from graph reads alone, so even a props-only expression in it needs a node to read.
+function armRebuildsFromGraph(state: WalkState): boolean {
+	return !!state.currentArmScope && state.currentKeyedRepeatScopeIds.length === 0;
+}
+
 export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
 	if (readsShadowingRowItem(expression, state)) return;
@@ -208,7 +213,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		joined ??
 		collectCompositeTemplateExpression(expression, state, {
 			...TEMPLATE_READ_OPTIONS,
-			requireWritableRead: true,
+			requireWritableRead: !armRebuildsFromGraph(state),
 		}) ??
 		liftArmModuleValue(expression, state) ??
 		liftArmShownValue(expression, state) ??
@@ -1148,11 +1153,9 @@ function collectAttribute(
 	// an ordinary value binding.
 	if (collectIdrefAttribute(attributeName, expressionValue, state, walk, hostNodeId)) return;
 
-	const conditionalClass = conditionalClassTarget(
-		attributeName,
-		expressionValue,
-		state.currentStyleScopeClass,
-	);
+	const conditionalClass = armRebuildsFromGraph(state)
+		? null
+		: conditionalClassTarget(attributeName, expressionValue, state.currentStyleScopeClass);
 	if (conditionalClass && readsShadowingRowItem(conditionalClass.test, state)) {
 		walk(expressionValue, state);
 		return;
@@ -1228,7 +1231,7 @@ function collectAttribute(
 		const composite =
 			collectCompositeTemplateExpression(expressionValue, state, {
 				...TEMPLATE_READ_OPTIONS,
-				requireWritableRead: true,
+				requireWritableRead: !armRebuildsFromGraph(state),
 			}) ??
 			liftArmModuleValue(expressionValue, state) ??
 			liftArmShownValue(expressionValue, state) ??

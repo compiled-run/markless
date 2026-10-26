@@ -1,6 +1,7 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import ArmBrowserRenderPage from './arm-browser-render-page.tsrx';
+import ArmExpressionPage from './arm-expression-page.tsrx';
 import ArmRowAttributePage from './arm-row-attribute-page.tsrx';
 
 afterEach(() => cleanup());
@@ -57,4 +58,28 @@ for (const mode of ['SSR', 'CSR'] as const)
 		await expect.poll(() => container.querySelector('output')?.textContent).toBe('c');
 		press('#a');
 		await expect.poll(() => container.querySelector('output')?.textContent).toBe('a');
+	});
+
+for (const mode of ['SSR', 'CSR'] as const)
+	test(`${mode}: attributes an @if arm computes from props and state come back right after a flip`, async () => {
+		const { container } = await (mode === 'SSR' ? renderSSR(ArmExpressionPage) : render(ArmExpressionPage));
+		const link = (path: string) => {
+			const a = container.querySelector(`[data-item="${path}"] a`);
+			return a ? `${a.className}|${a.getAttribute('title')}|${a.getAttribute('data-tone')}` : '';
+		};
+		const press = (path: string, op: string) =>
+			container.querySelector<HTMLButtonElement>(`[data-item="${path}"] [data-${op}]`)!.click();
+		expect(link('/a')).toBe('x|/a!|cold');
+		expect(link('/b')).toBe('y|/b!|cold');
+		press('/a', 'hot');
+		await expect.poll(() => link('/a')).toBe('x|/a!|hot');
+		press('/b', 'open');
+		await expect.poll(() => link('/b')).toBe('');
+		press('/b', 'hot');
+		press('/b', 'open');
+		await expect.poll(() => link('/b')).toBe('y|/b!|hot');
+		press('/a', 'open');
+		await expect.poll(() => link('/a')).toBe('');
+		press('/a', 'open');
+		await expect.poll(() => link('/a')).toBe('x|/a!|hot');
 	});
