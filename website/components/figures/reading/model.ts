@@ -40,22 +40,36 @@ export const BODY = { from: 1, to: 13 } as const;
 export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
 export const MARK_TOUR = ['mark', 'rest', 'rest'] as const;
 
-export type Figure = 'overview' | 'values' | 'steps' | 'blocks';
+const GUESTS = ['Ada', 'Grace', 'Linus', 'Margaret', 'Alan', 'Barbara', 'Edsger', 'Frances'];
 
-/** What each mark-up shows, in plain words: the figure's caption for screen readers, and what the live region says after a replay. */
-export const SAID: Record<Figure, string> = {
-	overview:
-		"Every pair of braces in the markup has a yellow highlighter swipe and a note saying value: {name === 'Ada' ? 'host' : ''} in the class attribute, {name} inside the paragraph, and {clear} on the Clear button. A pen bracket runs down the left margin beside the whole component body, labelled instructions. A legend on the desk reads: yellow swipe equals value, written in { }; bracket equals instructions, written in @{ }.",
+/** The next guest the demo's Add button invites: the first on the list not already going, numbered once everyone is. */
+export const nextGuest = (going: readonly string[]) => GUESTS.find((name) => !going.includes(name)) ?? 'Guest ' + (going.length + 1);
+
+/** What the blocks demo's live region says after a press. */
+export const describeBlocks = (count: number) =>
+	count === 0 ? 'No guests. The @for draws no rows, and the @if line, No one yet, is shown.' : `${count} ${count === 1 ? 'guest' : 'guests'}. The @for draws ${count === 1 ? 'one row' : count + ' rows'}, and the @if line is hidden.`;
+
+export type Sketch = 'values' | 'steps';
+
+/** What each sketch shows, in plain words, for its caption and the live region. */
+export const SKETCH_SAID: Record<Sketch, string> = {
 	values:
-		"Each value is highlighted with a note saying what it produces: the class attribute gives 'host' for Ada and an empty string for Grace, {name} gives Ada, then Grace, and {clear} gives a function that runs on click.",
+		"On the left, four lines of guest-list.tsrx on a paper slip, each pair of braces drawn as an empty socket. On the right, a sketched phone showing the list. Arrows carry each value to its spot: the class value lands as a bold, highlighted style on Ada's row labelled host, {name} lands as the names Ada and Grace, and {clear} lands on the Clear button as a pointing hand ready to click.",
 	steps:
-		'The body is numbered in the order it runs, with a note on the desk saying runs in this order: 1, let guests; 2, const clear; 3, the section element. A bracket down the right side of the section, from its opening tag to its closing tag, is labelled this is what shows up.',
-	blocks:
-		"The @for block is boxed and labelled once per guest. The @if block is boxed and labelled only when no one's going. A slip on the desk, labelled on the page, shows what the file draws: Ada, Grace and a Clear button.",
+		'Three index cards, read top to bottom with numbers 1, 2 and 3: let guests, const clear, and the section element. Cards 1 and 2 leave nothing on the page. Card 3, the element, is lifted off the stack and placed on a sketched phone as what shows up: Ada, Grace and a Clear button.',
 };
 
-export const figureOf = (name: string): Figure => (name === 'values' || name === 'steps' || name === 'blocks' ? name : 'overview');
+export const sketchOf = (name: string): Sketch => (name === 'steps' ? name : 'values');
 
-export function describeMarks(figure: Figure, again: boolean): string {
-	return (again ? 'Marked up again. ' : '') + SAID[figure];
+export function describeSketch(sketch: Sketch, touched: boolean): string {
+	if (!touched) return '';
+	return sketch === 'values' ? 'The values travel again from their sockets to the screen.' : 'The cards are read again, and the last one lands on the page.';
+}
+
+/** What the printout shows, in plain words: its screen-reader caption, and what the live region says after a replay. */
+export const SAID =
+	"Every pair of braces in the markup has a yellow highlighter swipe and a note saying value: {name === 'Ada' ? 'host' : ''} in the class attribute, {name} inside the paragraph, and {clear} on the Clear button. A pen bracket runs down the left margin beside the whole component body, labelled instructions. A legend on the desk reads: yellow swipe equals value, written in { }; bracket equals instructions, written in @{ }.";
+
+export function describeMarks(again: boolean): string {
+	return (again ? 'Marked up again. ' : '') + SAID;
 }

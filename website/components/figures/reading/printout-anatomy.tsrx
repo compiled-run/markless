@@ -1,14 +1,13 @@
-// The guest-list file printed on a sheet on the desk and marked up by hand; `figure` picks which mark-up: overview, values, steps or blocks.
+// The guest-list file printed on a sheet on the desk and marked up by hand: yellow on every value, a bracket down the instructions.
 import { computed, state } from '@markless/core';
-import { describeMarks, figureOf, flip, MARK_TOUR, SAID } from './model.ts';
+import { describeMarks, flip, MARK_TOUR, SAID } from './model.ts';
 import { art } from './printout.art.ts';
 
-export default function PrintoutAnatomy({ figure }: { readonly figure: string }) @{
-	const which = figureOf(figure);
-	const marks = which === 'values' ? art.marks.values : which === 'steps' ? art.marks.steps : which === 'blocks' ? art.marks.blocks : art.marks.overview;
+export default function PrintoutAnatomy() @{
+	const marks = art.marks;
 	let beat = state('rest');
 	let touched = state(false);
-	const said = computed(() => describeMarks(which, beat !== 'rest'));
+	const said = computed(() => describeMarks(beat !== 'rest'));
 
 	<figure
 		class="anatomy"
@@ -48,7 +47,7 @@ export default function PrintoutAnatomy({ figure }: { readonly figure: string })
 				}
 			}}
 		>
-			<svg class="scene" data-beat={beat} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+			<svg class="scene" data-beat={beat} viewBox={art.view.x + ' ' + art.view.y + ' ' + art.view.width + ' ' + art.view.height} aria-hidden="true">
 				<path class="pencil" d={art.sheet.pencil} />
 				<path class="shadow-wash" d={art.sheet.curl.shadow} />
 				<path class="hatch deep" d={art.sheet.curl.hatch} />
@@ -82,7 +81,7 @@ export default function PrintoutAnatomy({ figure }: { readonly figure: string })
 			</svg>
 		</button>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a printout of guest-list.tsrx lying on a desk, marked up by hand. {SAID[which]} Press the drawing, or Enter or
+			A pen-and-ink drawing of a printout of guest-list.tsrx lying on a desk, marked up by hand. {SAID} Press the drawing, or Enter or
 			Space, to watch the marks drawn again. Escape stops it.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
@@ -115,7 +114,7 @@ export default function PrintoutAnatomy({ figure }: { readonly figure: string })
 				display: block;
 				width: 100%;
 				height: auto;
-				overflow: visible;
+				overflow: hidden;
 				--sheet: color-mix(in oklch, var(--paper) 50%, white);
 				--sheet-ink: var(--ink);
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
@@ -174,11 +173,11 @@ export default function PrintoutAnatomy({ figure }: { readonly figure: string })
 				font-size: 6.4px;
 				font-weight: 500;
 				white-space: pre;
-				fill: color-mix(in oklch, var(--sheet-ink) 88%, var(--sheet));
+				fill: var(--sheet-ink);
 			}
 
 			.tint {
-				fill: color-mix(in oklch, var(--c) 78%, var(--sheet));
+				fill: var(--c);
 			}
 
 			.swipe {

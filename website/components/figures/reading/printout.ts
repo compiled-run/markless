@@ -4,10 +4,11 @@ import { jitter, matrixOf } from '../ink/desk.ts';
 import { lengthOf, pathOf, r1, resample } from '../ink/ink.ts';
 import { LINES, VALUES } from './model.ts';
 
-/** One coloured run of a printed line, as the site's code highlighter colours it; `color` is empty for plain text. */
+/** One run of a printed line in the site's code colours, light and dark; a colour is empty where the site uses the page's ink. */
 export interface Token {
 	readonly content: string;
 	readonly color: string;
+	readonly dark: string;
 }
 
 /** Page layout in sheet centimetres: left margin, first baseline, line step, type size, character advance, indent step. */
@@ -80,35 +81,6 @@ export function createPrintout(width: number, height: number, extra: Point3[], t
 		return { d: shaft.d + pen(barb(0.6), seed + 1, 2).d + pen(barb(-0.6), seed + 2, 2).d, length: r1(shaft.length + 40) };
 	}
 
-	/** A hand-drawn oval round a centre, closed with a little overshoot. */
-	function ring(cu: number, cv: number, ru: number, rv: number, seed: number) {
-		const pts: [number, number][] = Array.from({ length: 26 }, (_, i) => {
-			const a = -1.9 + (i / 24) * Math.PI * 2;
-			return [cu + Math.cos(a) * ru, cv + Math.sin(a) * rv];
-		});
-		return pen(pts, seed, 2);
-	}
-
-	/** A loose rounded box from (u0, v0) to (u1, v1), drawn in one stroke that overshoots where it closes. */
-	function box(u0: number, v0: number, u1: number, v1: number, seed: number) {
-		const r = 0.35;
-		return pen(
-			[
-				[u0 + r, v0 - 0.05],
-				[u1 - r, v0],
-				[u1, v0 + r],
-				[u1 + 0.03, v1 - r],
-				[u1 - r, v1],
-				[u0 + r, v1 + 0.03],
-				[u0, v1 - r],
-				[u0 - 0.03, v0 + r],
-				[u0 + r + 0.5, v0 - 0.08],
-			],
-			seed,
-			3,
-		);
-	}
-
 	/** Text written along the sheet turned a quarter turn: `up` reads bottom to top, otherwise top to bottom. */
 	const turnedAt = (u: number, v: number, up: boolean) => (up ? matrixOf(proj(sheetAt(u, v)), proj(sheetAt(u, v - 0.1)), proj(sheetAt(u + 0.1, v))) : matrixOf(proj(sheetAt(u, v)), proj(sheetAt(u, v + 0.1)), proj(sheetAt(u - 0.1, v))));
 
@@ -120,5 +92,5 @@ export function createPrintout(width: number, height: number, extra: Point3[], t
 		return { d: pathOf(pts), length: r1(lengthOf(pts) + 2), width: r1(Math.hypot(b[0] - t[0], b[1] - t[1])) };
 	}
 
-	return { scene, lines, values, matrixAt: sheetMatrix, proj, pen, arrow, ring, box, turnedAt, freeSwipe };
+	return { scene, lines, values, matrixAt: sheetMatrix, proj, pen, arrow, turnedAt, freeSwipe };
 }
