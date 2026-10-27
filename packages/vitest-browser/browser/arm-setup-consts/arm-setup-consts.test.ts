@@ -49,14 +49,16 @@ for (const [mode, mount] of modes) {
 			.poll(() => container.querySelectorAll('li').length, { timeout: 5_000 })
 			.toBe(7);
 		const list = () => container.querySelector('ul');
-		expect(list()?.hasAttribute('aria-busy')).toBe(false);
-		expect(list()?.getAttribute('style')).toBe('opacity: 1');
-		await type(container.querySelector('input')!, 'ap');
-		expect(list()?.getAttribute('aria-busy')).toBe('true');
-		expect(list()?.getAttribute('style')).toBe('opacity: 0.5');
+		const looks = () => [list()?.getAttribute('aria-busy') ?? null, list()?.getAttribute('style')];
+		expect(looks()).toEqual([null, 'opacity: 1']);
+		// The first keystroke wakes a served page; the second starts a refresh over a settled answer.
+		await type(container.querySelector('input')!, 'a');
+		await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotbananagrapemango');
+		await expect.poll(looks).toEqual([null, 'opacity: 1']);
+		await type(container.querySelector('input')!, 'p');
+		await expect.poll(looks, { timeout: 700, interval: 10 }).toEqual(['true', 'opacity: 0.5']);
 		await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
-		expect(list()?.hasAttribute('aria-busy')).toBe(false);
-		expect(list()?.getAttribute('style')).toBe('opacity: 1');
+		await expect.poll(looks).toEqual([null, 'opacity: 1']);
 	});
 
 	test(`${mode}: after a failed search, Try again shows the answer from the @try arm`, async () => {
@@ -75,8 +77,12 @@ for (const [mode, mount] of modes) {
 		await expect
 			.poll(() => container.querySelector('ul')?.textContent, { timeout: 5_000 })
 			.toBe('blueberry');
-		expect(container.querySelector('ul')?.getAttribute('style')).toBe('opacity: 1');
-		expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
+		await expect
+			.poll(() => [
+				container.querySelector('ul')?.getAttribute('style'),
+				container.querySelectorAll('[aria-busy="true"]').length,
+			])
+			.toEqual(['opacity: 1', 0]);
 	});
 
 	test(`${mode}: @if and @else arm consts follow the state they read, across flips`, async () => {
@@ -86,7 +92,7 @@ for (const [mode, mount] of modes) {
 		expect(label()?.textContent).toBe('one');
 		(container.querySelector('[data-add]') as HTMLButtonElement).click();
 		await expect.poll(() => label()?.textContent).toBe('many');
-		expect(label()?.getAttribute('title')).toBe('many');
+		await expect.poll(() => label()?.getAttribute('title')).toBe('many');
 		(container.querySelector('[data-open]') as HTMLButtonElement).click();
 		await expect
 			.poll(() => container.querySelector('[data-hidden]')?.textContent)
