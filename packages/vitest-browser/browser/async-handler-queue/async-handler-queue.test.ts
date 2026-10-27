@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import InputPage from './ahq-input.tsrx';
+import CurrentTargetPage from './ahq-current-target.tsrx';
 import Page from './ahq-page.tsrx';
 
 afterEach(cleanup);
@@ -60,4 +61,31 @@ for (const mode of ['CSR', 'SSR'] as const)
 		await (mode === 'CSR' ? render(InputPage) : renderSSR(InputPage));
 		click('[data-inner]');
 		await expect.poll(() => text('[data-owner]')).toBe('outer');
+	});
+
+const hit = (selector: string) => document.querySelector<HTMLElement>(selector)?.dataset.hit;
+const key = (selector: string) =>
+	document
+		.querySelector<HTMLElement>(selector)!
+		.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+
+// currentTarget is the element whose handler runs, wherever the event started and however the handler is written.
+for (const mode of ['CSR', 'SSR'] as const)
+	test(`${mode}: every handler reads its own element as currentTarget`, async () => {
+		await (mode === 'CSR' ? render(CurrentTargetPage) : renderSSR(CurrentTargetPage));
+		click('[data-name="own"]');
+		await expect.poll(() => hit('[data-name="own"]')).toBe('own');
+		key('[data-inner]');
+		await expect.poll(() => hit('[data-name="outer"]')).toBe('outer');
+		click('[data-inline-target]');
+		await expect.poll(() => text('[data-inline]')).toBe('inline');
+		document.querySelectorAll<HTMLElement>('[data-row-target]')[1]!.click();
+		await expect.poll(() => hit('[data-name="b"]')).toBe('b');
+		click('[data-add]');
+		await expect.poll(() => document.querySelectorAll('[data-row-target]').length).toBe(3);
+		document.querySelectorAll<HTMLElement>('[data-row-target]')[2]!.click();
+		await expect.poll(() => hit('[data-name="n2"]')).toBe('n2');
+		click('[data-arm-target]');
+		await expect.poll(() => hit('[data-name="arm"]')).toBe('arm');
+		expect(hit('[data-name="a"]')).toBeUndefined();
 	});

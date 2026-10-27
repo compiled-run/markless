@@ -95,6 +95,29 @@ test("a field's async handler runs on each keystroke as it happens", async () =>
 	await page.close();
 });
 
+test('every handler reads its own element as currentTarget, wherever the event started', async () => {
+	const { page, errors } = await open('/current-target');
+	const hit = (name: string) => page.locator(`[data-name="${name}"]`).getAttribute('data-hit');
+	await page.locator('[data-name="own"]').click();
+	await expect.poll(() => hit('own')).toBe('own');
+	await page.locator('[data-inner]').focus();
+	await page.keyboard.press('ArrowRight');
+	await expect.poll(() => hit('outer')).toBe('outer');
+	await page.locator('[data-inline-target]').click();
+	await expect.poll(() => page.locator('[data-inline]').innerText()).toBe('inline');
+	await page.locator('[data-row-target]').nth(1).click();
+	await expect.poll(() => hit('b')).toBe('b');
+	await page.locator('[data-add]').click();
+	await expect.poll(() => page.locator('[data-row-target]').count()).toBe(3);
+	await page.locator('[data-row-target]').nth(2).click();
+	await expect.poll(() => hit('n2')).toBe('n2');
+	await page.locator('[data-arm-target]').click();
+	await expect.poll(() => hit('arm')).toBe('arm');
+	expect(await hit('a')).toBeNull();
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 // The palette page's own shape: one async list read by several @try blocks, rows with three handlers each.
 test('every @try over one re-settled list keeps its rows, and each row runs its own handlers', async () => {
 	const { page, errors } = await open('/palette-variants');
