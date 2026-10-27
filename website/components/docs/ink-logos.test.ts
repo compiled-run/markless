@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { flatNav, flatUiNav } from '../../nav.ts';
-import { ICONS } from './ink-icons.ts';
+import { BUTTON_MARKS, ICONS } from './ink-icons.ts';
 import { drawing, inkSprite, logoArt, rings } from './ink-logos.ts';
 import { INK_MARKS } from './ink-marks.ts';
 
@@ -38,9 +38,9 @@ describe('page marks', () => {
 		expect(new Set(icons).size).toBe(icons.length);
 	});
 
-	it('draws a mark only when a page shows it', () => {
-		const shown = new Set(pages.map((page) => page.icon));
-		expect(Object.keys(ICONS).filter((mark) => !shown.has(mark as keyof typeof ICONS))).toEqual([]);
+	it('draws a mark only when a page or a button shows it', () => {
+		const shown = new Set<string>([...pages.map((page) => page.icon!), ...BUTTON_MARKS]);
+		expect(Object.keys(ICONS).filter((mark) => !shown.has(mark))).toEqual([]);
 	});
 });
 
@@ -55,7 +55,7 @@ export const art: LogoArt = ${JSON.stringify(logoArt(art), null, '\t')};
 	});
 
 	it('freezes the page marks into one sprite the sidebar and page titles link into (run with -u after editing)', async () => {
-		const marks = [...new Set([...flatNav, ...flatUiNav].map((page) => page.icon!))];
+		const marks = [...new Set([...flatNav, ...flatUiNav].map((page) => page.icon!)), ...BUTTON_MARKS];
 		await expect(inkSprite(marks, art)).toMatchFileSnapshot(`../../public/${INK_MARKS}`);
 	});
 });

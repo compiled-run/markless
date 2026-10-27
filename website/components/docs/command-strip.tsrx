@@ -1,10 +1,13 @@
 import { state } from '@markless/core';
 import { shellLine } from './walkthrough/commands.ts';
+import { asset } from '../../site-base.ts';
+import { INK_MARKS } from './ink-marks.ts';
 
 /** One shell command on a torn strip, highlighted like a ```bash fence, with a button that copies it. */
 export default function CommandStrip({ command }: { readonly command: string }) @{
 	const line = shellLine(command, undefined, 0, 'command');
 	let copied = state('no');
+	const marks = asset(INK_MARKS) + '#';
 
 	<div class="torn-strip command-strip">
 		<span class="torn-art" aria-hidden="true">
@@ -45,10 +48,14 @@ export default function CommandStrip({ command }: { readonly command: string }) 
 				});
 			}}
 		>
-			<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-				<path class="idle" d="M8.5 4.5H7a2 2 0 0 0-2 2v12.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6.5a2 2 0 0 0-2-2h-1.5M9.5 3h5v3h-5z" />
-				<path class="done" d="M5 12.5l4.5 4.5L19 7" />
-			</svg>
+			<span class="icon" aria-hidden="true">
+				<svg class="idle" viewBox="0 0 108 108">
+					<use href={marks + 'copy'} />
+				</svg>
+				<svg class="done" viewBox="0 0 108 108">
+					<use href={marks + 'copied'} />
+				</svg>
+			</span>
 			<span class="words" aria-hidden="true">
 				<span class="idle">Copy</span>
 				<span class="done">Copied</span>
@@ -66,13 +73,13 @@ export default function CommandStrip({ command }: { readonly command: string }) 
 
 			.copy {
 				position: absolute;
-				top: 1.05rem;
-				right: 1.1rem;
+				top: 0.95rem;
+				right: 1rem;
 				display: inline-flex;
 				align-items: center;
-				gap: 0.35rem;
-				padding: 0.3rem 0.6rem;
-				border: 1.5px solid color-mix(in oklch, currentColor 45%, transparent);
+				gap: 0.4rem;
+				padding: 0.25rem 0.55rem 0.25rem 0.4rem;
+				border: 0;
 				border-radius: 0.5rem;
 				background: transparent;
 				color: inherit;
@@ -81,14 +88,17 @@ export default function CommandStrip({ command }: { readonly command: string }) 
 				line-height: 1.2;
 				cursor: pointer;
 				opacity: 0.8;
-				transition: opacity 120ms ease, border-color 120ms ease;
+				transition: opacity 120ms ease, background-color 120ms ease;
 			}
 
 			.copy:hover,
 			.copy:focus-visible,
 			.copy[data-copied='yes'] {
 				opacity: 1;
-				border-color: currentColor;
+			}
+
+			.copy:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
 			}
 
 			.copy:focus-visible {
@@ -97,13 +107,16 @@ export default function CommandStrip({ command }: { readonly command: string }) 
 			}
 
 			.icon {
-				width: 1.1em;
-				height: 1.1em;
-				fill: none;
-				stroke: currentColor;
-				stroke-width: 1.8;
-				stroke-linecap: round;
-				stroke-linejoin: round;
+				display: grid;
+				width: 2em;
+				height: 2em;
+			}
+
+			.icon > svg {
+				grid-area: 1 / 1;
+				width: 100%;
+				height: 100%;
+				overflow: visible;
 			}
 
 			.words {
