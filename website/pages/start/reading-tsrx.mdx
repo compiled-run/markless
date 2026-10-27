@@ -5,7 +5,6 @@ import Collapsible from '../../components/docs/collapsible.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import WireAnatomy from '../../components/figures/reading/wire-anatomy.tsrx';
 
 <Sidebar />
 
@@ -37,14 +36,18 @@ Seen HTML before? The tags will look familiar, and attributes use their HTML nam
 
 ## Two kinds of slots
 
-- **`{ }` means "a value goes here."** `{bags}` puts the number on the button. `onClick={() => bags++}` hands the button what to do when it's clicked: add one to `bags`. (For developers: a JavaScript *expression*.)
-- **`@{ }` means "instructions run here, top to bottom."** First `let bags = …` runs, then the `<button>` at the end is what shows up. (For developers: JavaScript *statements*.)
+Both slots hold JavaScript, but two different kinds of it.
 
-Everything else in a `.tsrx` file is built from these two.
+An **expression** is anything that produces a value: `bags`, `bags * 14`, `isOpen ? 'Close' : 'Open'`, even a function like `() => bags++`. If it could go after `let x =`, it's an expression.
 
-## `{ }`: a value goes here
+A **statement** is an instruction that runs: `let bags = state(2);`, `const price = computed(() => bags * 14);`, or a block like `@if (…) { … }` or `@for (const bag of bags; key bag.id) { … }`. It doesn't produce a value; it does something.
 
-Braces hold one value, or code that works one out. They go in the words between tags and in attributes. Quotes are fixed text, as in `class="card"`. Braces are code, as in `title={'Add ' + name}`.
+- **`{ }` means "an expression goes here."** `{bags}` puts the number on the button, and `onClick={() => bags++}` hands the button what to do when it's clicked.
+- **`@{ }` means "statements run here, top to bottom."** First `let bags = state(2)` runs, then the `<button>` at the end is what shows up.
+
+## `{ }`: an expression goes here
+
+Braces hold one expression: a value, or code that works one out. They go in the words between tags and in attributes. Quotes are fixed text, as in `class="card"`. Braces are code, as in `title={'Add ' + name}`.
 
 <Code steps={[{ label: 'Click Add a bag. Three spots change, nothing else does.', rewrites: 3 }, { label: 'Make a bag cost `16` instead of `14`.', source: 'bags * 16' }, { label: "Show `'Sold out'` when there are more than 5 bags: change the second line to `{bags > 5 ? 'Sold out' : bags * 14}`.", source: "bags > 5 ?" }]}>
 ```tsrx title="bean-card.tsrx"
@@ -74,9 +77,9 @@ export default function BeanCard() @{
 	text="Braces can show plain reads, maths and method calls, like {bags * 14} or {name.toUpperCase()}. A function you wrote, as in {format(total)}, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Work the value out with computed(), below, and show that instead."
 />
 
-## `@{ }`: instructions run here, top to bottom
+## `@{ }`: statements run here, top to bottom
 
-A component's body is a statement slot. The instructions run in order, and the body ends with the one thing it shows: an element, a fragment or a block. There's no `return`.
+A component's body is a statement slot. Its statements run in order, and the body ends with the one thing it shows: an element, a fragment or a block. There's no `return`.
 
 To show several elements side by side, wrap them in `<>` and `</>`. That pair is a **fragment**: it holds elements together and adds nothing to the page. You can also open a fresh `@{ }` among the elements, and write `//` comments between them.
 
@@ -100,27 +103,21 @@ export default function Receipt() @{
 ```
 </Code>
 
-Two things at the end of a body, or an instruction after its element, stop the build with `MARKLESS_PARSE_ERROR`, and the message says how to fix it. One limit today: a fresh `@{ }` works inside an element, but not straight inside a `<>` at the top of a component.
+Two things at the end of a body, or a statement after its element, stop the build with `MARKLESS_PARSE_ERROR`, and the message says how to fix it. One limit today: a fresh `@{ }` works inside an element, but not straight inside a `<>` at the top of a component.
 
 Already use TypeScript? It works here too: add types wherever you want them.
 
 ## Calls that tell Markless how a value behaves
 
-Some instructions call a function from `@markless/core`. They're ordinary function calls, and each one tells Markless how that value behaves:
+Some statements call a function from `@markless/core`. They're ordinary function calls, and each one tells Markless how that value behaves:
 
 - `let bags = state(2)` is a value the page keeps up with. You read it and change it like any variable. [State](/concepts/state)
 - `const total = computed(() => bags * 14)` is a value worked out from others, and kept up to date for you. [Computed](/concepts/computed)
 - `const field = element()` is a handle to a real element, for code that needs the element itself. [Reach a real element](/build/elements)
 
-### Follow the wire
-
-The jar is `bags` and the box is `total`, both set up by the instructions in `@{ }`. Each wire ends at a `{ }` slot, so **Add to cart** redraws the badge, the cart line and the total, and nothing else.
-
-<WireAnatomy />
-
 ## Blocks that start with `@`
 
-Among the elements, a line that starts with `@` is a block. Its parentheses hold a value, like a `{ }` slot. Its braces are a small statement slot: instructions first, then one thing to show.
+Among the elements, a line that starts with `@` is a block. Its parentheses hold a value, like a `{ }` slot. Its braces are a small statement slot: statements first, then one thing to show.
 
 - `@if (test) { … } @else { … }` shows one side or the other.
 - `@for (const bag of bags; key bag.id) { … } @empty { … }` repeats once per item. `key` names each item, so rows stay put when the list changes.
@@ -184,7 +181,7 @@ A few limits today. Write `@else` with its `@`; a plain `else` stops the build w
 
 | What you wrote | When it runs |
 | --- | --- |
-| Instructions in `@{ }` | Once, when that piece of the page is built: on the server for the first visit, or in the browser when a block adds it later. |
+| Statements in `@{ }` | Once, when that piece of the page is built: on the server for the first visit, or in the browser when a block adds it later. |
 | `{ }` in the elements | Once to fill the spot, then again only when a value it reads changes. |
 | A `computed()` recipe | When the page first needs it, then after a value it reads changes. |
 | `onClick` and other `on…` handlers | In the browser, every time the event happens. |

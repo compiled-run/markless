@@ -876,9 +876,6 @@ try {
 		await settleText(listDemo.locator('p').first(), (text) => text === 'Free shipping!', 'the @if branch flips when the list grows');
 		await listDemo.getByRole('button', { name: 'Empty the cart' }).click();
 		await settleText(listDemo.locator('li').first(), (text) => text === 'Your cart is empty.', 'the @empty row takes over');
-		const wire = page.locator('figure.anatomy').first();
-		await wire.locator('button.stage').click();
-		await settleText(wire.locator('[aria-live]'), (text) => text.startsWith('Added a bag.'), 'the wire figure speaks after a press');
 		await page.screenshot({
 			path: `${shotsDir}/T005-reading-tsrx-after.png`,
 			fullPage: true,
