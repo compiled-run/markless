@@ -141,9 +141,9 @@ export async function asyncComputedFromRecord(
 			const values = dependencies.map((dependency) =>
 				read(dependency.graphNodeId, dependency.path),
 			);
+			const [only] = values;
 			// An object changed in place keeps its identity, so it is never the same key twice.
-			if (values.length === 0) return undefined;
-			return values.length === 1 && !isObject(values[0]) ? values[0] : values;
+			return values.length > 1 || (typeof only === 'object' && only) ? values : only;
 		},
 		run: async ({ key, signal, read }) => {
 			return (await input.loadSymbol(runnerSymbolId))({
@@ -190,8 +190,4 @@ async function deserializeGraphValue(payload: SerializedGraphPayload): Promise<u
 	valueDecoderPromise ??= import('../../serializer/src/value-decode-client-lazy.ts');
 	const { deserializeGraphValueForClient } = await valueDecoderPromise;
 	return deserializeGraphValueForClient(payload);
-}
-
-function isObject(value: unknown): boolean {
-	return typeof value === 'object' && value !== null;
 }
