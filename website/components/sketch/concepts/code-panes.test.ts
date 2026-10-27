@@ -10,8 +10,6 @@ function shown(source: string): string {
 }
 
 const SOURCES = {
-	pour: [{ name: 'pour.tsrx', code: shown(here('./pour.tsrx')) }],
-	pourTwice: [{ name: 'pour.tsrx', code: shown(here('./pour-twice.tsrx')).replace('PourTwice', 'Pour') }],
 	basket: [{ name: 'basket.tsrx', code: shown(here('./basket.tsrx')) }],
 	basketMugsOnly: [{ name: 'basket.tsrx', code: shown(here('./basket-mugs-only.tsrx')).replace('BasketMugsOnly', 'Basket') }],
 	mugName: [{ name: 'mug-name.tsrx', code: shown(here('./mug-name.tsrx')) }],
