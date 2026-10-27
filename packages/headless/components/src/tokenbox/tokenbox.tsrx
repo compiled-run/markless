@@ -349,8 +349,7 @@ export function TokenBoxInput({
 	>
 		{/* A token's label IS its text: that is what a reader speaks crossing it,
 		    and what a copy of a range spanning it yields. */}
-		{/* A token's label IS its text: that is what a reader speaks crossing it,
-		    and what a copy of a range spanning it yields. */}
+		// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: a segment has no identity of its own; its node follows its position in the text
 		@for (const segment of tokenbox.segments; index at; key at) {
 			@if (segment.kind === 'token') {
 				<span

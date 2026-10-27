@@ -194,6 +194,7 @@ export function SliderRoot({
 	const isRange = computed(() => Array.isArray(slider.seed));
 
 	@if (isRange) {
+		// markless-allow MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER: a slider is a range or a single thumb for its whole life; the seed's shape never changes
 		<SliderGroup {...rest}>{children}</SliderGroup>
 	} @else {
 		<SliderBox {...rest}>{children}</SliderBox>

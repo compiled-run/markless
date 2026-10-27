@@ -465,6 +465,7 @@ export function Choice({
 						type="radio"
 						name={name}
 						value={first}
+						// markless-allow MARKLESS_TEMPLATE_EXPRESSION_STATIC: value is the initial choice and every caller passes a literal; the radios keep their own checked state after that
 						checked={first === value}
 						onChange={(event) => onChange?.((event.target as HTMLInputElement).value)}
 					/>
@@ -476,6 +477,7 @@ export function Choice({
 						type="radio"
 						name={name}
 						value={second}
+						// markless-allow MARKLESS_TEMPLATE_EXPRESSION_STATIC: value is the initial choice and every caller passes a literal; the radios keep their own checked state after that
 						checked={second === value}
 						onChange={(event) => onChange?.((event.target as HTMLInputElement).value)}
 					/>

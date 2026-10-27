@@ -49,6 +49,8 @@ type AllowInput<T extends CompilerDiagnostic = CompilerDiagnostic> = {
 
 export function applyMarklessAllowDirectives<T extends CompilerDiagnostic>(
 	input: AllowInput<T>,
+	// A pass that sees only its own diagnostics cannot tell a directive for a later pass from a stale one.
+	options: { readonly reportUnused?: boolean } = {},
 ): ReadonlyArray<T | CompilerDiagnostic> {
 	const directives: Array<{
 		index: number;
@@ -108,7 +110,7 @@ export function applyMarklessAllowDirectives<T extends CompilerDiagnostic>(
 			output.push(allowDirectiveDiagnostic('error', directive, input, diagnostic.code));
 	}
 	for (const directive of directives) {
-		if (used.has(directive.index)) continue;
+		if (used.has(directive.index) || options.reportUnused === false) continue;
 		output.push(
 			allowDirectiveDiagnostic(directive.reason ? 'stale' : 'reason', directive, input),
 		);
