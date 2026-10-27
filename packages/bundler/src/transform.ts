@@ -315,8 +315,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
 	const settleId = settleVirtualModuleId(input.filename);
-	const { compiled: compiledForAllClasses, blockingDiagnostics } =
-		await compileWithBlockingDiagnostics(input);
+	const {
+		compiled: compiledForAllClasses,
+		blockingDiagnostics,
+		warnings: compilerWarnings,
+	} = await compileWithBlockingDiagnostics(input);
 	const linkPendingDiagnostics = linkPendingRefusals(
 		input,
 		compiledForAllClasses,
@@ -949,6 +952,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		map: null,
 		virtualModules,
 		manifest,
+		compilerWarnings,
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
@@ -1385,6 +1389,7 @@ type CompiledTransformInput = Pick<
 	| 'serverOnlyProps'
 	| 'elementOnlyAttributes'
 	| 'routeRoot'
+	| 'dev'
 >;
 
 /** The compiler input a transform compiles; anything else that only needs a module's interface asks for the same one. */
@@ -1415,6 +1420,14 @@ async function compileWithBlockingDiagnostics(input: CompiledTransformInput) {
 	const compiled = await compileTsrxModule(transformCompileInput(input));
 	return {
 		compiled,
+		warnings: moduleDiagnostics(compiled).filter(
+			(diagnostic) =>
+				diagnostic.severity === 'warning' &&
+				diagnostic.suppressed !== true &&
+				// A build fails at bundle time on a caller that can change these props, so what it ships is proven fixed.
+				!(diagnostic.decidedByProps &&
+					(input.dev !== true || diagnostic.decidedByProps.props.length === 0)),
+		),
 		blockingDiagnostics: moduleDiagnostics(compiled).filter(
 			(diagnostic) => diagnostic.severity === 'error',
 		),
