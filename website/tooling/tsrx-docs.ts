@@ -1,66 +1,65 @@
-// Editor-style hover docs for the TSRX tokens that appear in the site's code
-// samples. Every sentence is written for a TypeScript developer who has not
-// used a UI framework before, and describes what Markless actually does.
-//
-// Sources for the wording: goals/compiled-website/notes/T001-authoring-surface.md
-// section 1, and specs/framework/12-arm-rendering.md (the @pending deadline rule).
+import { MARKLESS_PENDING_REFRESH_STALL_MS } from '@markless/web/fns/pending-timing';
+
+// Hover docs for the TSRX tokens in the site's code samples; tsrx-docs.test.ts pins each fact it can check.
 
 export type TokenDoc = {
 	/** Short label for what kind of thing the token is. */
 	readonly kind: string;
-	/** One plain sentence saying what it does. */
+	/** One or two plain sentences saying what it does. */
 	readonly doc: string;
 };
+
+const STALL_SECONDS = MARKLESS_PENDING_REFRESH_STALL_MS / 1000;
 
 /** Tokens written with a leading `@`: the constructs built into TSRX. */
 export const CONSTRUCT_DOCS: Readonly<Record<string, TokenDoc>> = {
 	'@{': {
-		kind: 'Component body',
-		doc: 'Opens the body of a component, where ordinary statements and the markup they produce sit together.',
+		kind: 'Instructions',
+		doc: 'Holds instructions: statements that run top to bottom, ending with the one element that shows up. It opens a component body, and opens again among the elements when you need a few more steps there.',
 	},
 	'@if': {
 		kind: 'Conditional',
-		doc: 'Renders the block that follows only while its condition is true.',
+		doc: 'Puts its block on the page while the test in the parentheses is true, and takes it off again when the test turns false.',
 	},
 	'@else': {
 		kind: 'Fallback branch',
-		doc: 'Renders when the condition on the matching @if is false.',
+		doc: 'Shows its block while the test on the matching @if is false.',
 	},
 	'@else if': {
 		kind: 'Chained conditional',
-		doc: 'Tests another condition when the branch before it did not match.',
+		doc: 'Tests another condition, checked only when every test before it in the chain was false.',
 	},
 	'@for': {
 		kind: 'List',
-		doc: 'Renders its block once per item, with an optional key clause naming the stable identity of each row.',
+		doc: 'Shows its block once per item. Every @for needs a key in its header, naming what keeps a row the same row when the list changes.',
 	},
 	'@empty': {
 		kind: 'Empty list branch',
-		doc: 'Renders when the list it belongs to has no items at all.',
+		doc: 'Shows when the list of the @for before it has no items.',
 	},
 	'@switch': {
 		kind: 'Value match',
-		doc: 'Renders the one @case block whose value matches the expression it is given.',
+		doc: 'Shows the one @case whose value is === to the value in the parentheses, or @default when none is.',
 	},
 	'@case': {
 		kind: 'Match branch',
-		doc: 'Renders when the value handed to @switch equals this case.',
+		doc: 'Shows when the @switch value is === to this one.',
 	},
 	'@default': {
 		kind: 'Match fallback',
-		doc: 'Renders when no @case matched the value.',
+		doc: 'Shows when no @case matched the value.',
 	},
 	'@try': {
-		kind: 'Settled content',
-		doc: 'Holds the content shown once the data it awaits has arrived.',
+		kind: 'Async block',
+		doc: 'Holds what shows once the async values read inside it are ready; every read of an async value needs one around it. While a newer answer loads, the shown content stays, marked aria-busy.',
 	},
 	'@pending': {
 		kind: 'Waiting content',
-		doc: 'Holds the content shown while @try is still waiting, and it appears only once the wait is long enough to be worth showing.',
+		doc: `Holds what shows while there is no answer yet, and a fast answer skips it. On a refresh the old content stays, and @pending takes over only if the newest request waits more than ${STALL_SECONDS} seconds. A block the server rendered keeps its content however long the refresh takes.`,
 	},
 	'@catch': {
 		kind: 'Failure content',
-		doc: 'Holds the content shown when the awaited work fails instead of settling.',
+		doc: 'Holds what shows when the async recipe throws or its promise rejects. Write @catch (error) to read the error.',
 	},
 };
 
@@ -68,57 +67,65 @@ export const CONSTRUCT_DOCS: Readonly<Record<string, TokenDoc>> = {
 export const IDENTIFIER_DOCS: Readonly<Record<string, TokenDoc>> = {
 	state: {
 		kind: 'Watched value',
-		doc: 'Declares a variable the page follows, which you read and assign exactly like any other variable.',
+		doc: 'Declares a variable the page watches. You read and assign it like any other variable, and the page keeps up.',
 	},
 	computed: {
 		kind: 'Derived value',
-		doc: 'Declares a value worked out from other values, which is recalculated for you whenever one of those inputs changes.',
+		doc: 'Declares a value worked out from other values by a recipe, worked out again whenever one of them changes. Give it an async recipe and read it inside @try.',
 	},
 	shared: {
 		kind: 'Shared definition',
-		doc: 'Declares data that several components resolve by calling it, instead of passing the data down through props.',
+		doc: 'Defines state once for several components. Each component that calls the definition gets the same copy, and scope decides how far that copy reaches.',
 	},
 	storage: {
 		kind: 'Saved value',
-		doc: 'Works like state, and also saves the value in the browser so it is still there after a reload.',
+		doc: 'String state saved in the browser\'s localStorage, so it survives a reload. Each change also sets a data- attribute on <html> that your CSS can read.',
 	},
 	element: {
 		kind: 'Element handle',
-		doc: 'Creates a handle you bind with el, so that later code can reach the real DOM node and call methods on it.',
+		doc: 'Creates a handle that el={…} points at an element. In handlers and attach the handle is that element, or undefined while it is not on the page.',
 	},
 	el: {
 		kind: 'Element binding',
-		doc: 'Binds one element() handle to this element, which is how later code gets hold of the node.',
+		doc: 'Points an element() handle at this element, so handlers and attach can reach it.',
 	},
 	style: {
 		kind: 'Scoped styles',
-		doc: 'A style block written inside a component, whose rules the compiler scopes to that component with a build-hashed class.',
+		doc: 'A <style> block inside a component. The build gives the file its own class and adds it to every selector, so the rules reach only the elements this file renders.',
 	},
 	children: {
-		kind: 'Projected content',
-		doc: 'The content written inside this component where it was used, which you may render, wrap or pass on, but not inspect or count.',
+		kind: 'Content passed in',
+		doc: 'The elements written between this component\'s tags. You can place them, wrap them or pass them on, but mapping, counting or indexing them stops the build.',
 	},
 	Html: {
 		kind: 'Document root',
-		doc: 'The root element of document.tsrx, which lets the router put the built asset tags and its pre-paint script in the head for you.',
+		doc: 'Stands in for the <html> tag in document.tsrx. The router writes the real <html> tag with the attributes you give Html, and adds the tags the page needs to your <head>.',
 	},
 	Link: {
 		kind: 'Route link',
-		doc: 'Renders a real anchor and navigates on the client, taking the route pattern as its href and the pieces of the path as params.',
+		doc: 'Renders a plain <a href>. Give it a route pattern and params, and the build writes the real address and checks it against your routes. A click swaps in the next page without a full reload.',
 	},
 	PageProps: {
 		kind: 'Page props',
-		doc: 'The props the router hands a page: params for the bracketed parts of the path, url for the address that was asked for, and status.',
+		doc: 'The props the router hands a page: params from the bracketed parts of the path, url, status, and http, the request and response, on the server only.',
 	},
 	attach: {
-		kind: 'Element behaviour',
-		doc: 'Installs longer lived code on this element, and may return a cleanup function that runs when the element goes away.',
+		kind: 'Element setup',
+		doc: 'Runs your function with this element, for setup like an observer. A function it returns runs when the element leaves the page. On a server-rendered page it waits until a handler on the element runs, or onVisible or onIdle fires.',
+	},
+	onVisible: {
+		kind: 'Visibility handler',
+		doc: 'Runs once, the first time this element scrolls into view.',
+	},
+	onIdle: {
+		kind: 'Idle handler',
+		doc: 'Runs once, after the page has loaded and the browser is idle.',
 	},
 };
 
-const HANDLER_DOC: TokenDoc = {
+export const HANDLER_DOC: TokenDoc = {
 	kind: 'Event handler',
-	doc: 'Runs when this element fires the matching DOM event, and receives the native event object.',
+	doc: 'Runs when this element gets the DOM event named after on, with the browser\'s own event object.',
 };
 
 /** The doc for one already-recognised token, or undefined if there is none. */
