@@ -37,7 +37,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'What is Markless',
 				href: '/',
-				icon: 'nib',
+				icon: 'markless-mug',
 				number: '1',
 				description:
 					'What Markless is: elements and events in TypeScript, with an API designed to compile to any device. The browser, server rendering and tests work today, and iOS and macOS are early proofs.',
