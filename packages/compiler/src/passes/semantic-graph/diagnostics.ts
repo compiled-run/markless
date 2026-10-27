@@ -1666,7 +1666,7 @@ export function attachNoStartTriggerDiagnostic(
 	const source = expressionSource(value, state.source);
 	return {
 		code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
-		severity: 'warning',
+		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'Nothing starts this attach on a server-rendered page',
 		message: `attach={${source}} on <${tagName}> has no event handler on or inside the element, and no onVisible or onIdle on it. On a server-rendered page attach starts only when one of those runs, so ${source} never runs there.`,
@@ -1677,10 +1677,6 @@ export function attachNoStartTriggerDiagnostic(
 		suggestions: [
 			{
 				message: `Add onVisible={() => {}} to <${tagName}> to start it when the element scrolls into view, or onIdle={() => {}} to start it once the page is idle.`,
-			},
-			{
-				message:
-					'If this element is only ever rendered in the browser, silence this with `// markless-allow MARKLESS_ATTACH_NO_START_TRIGGER: rendered in the browser only` on the line above.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ATTACH_NO_START_TRIGGER',
@@ -1785,7 +1781,7 @@ export function attributeObjectValueDiagnostic(
 		: '';
 	return attributeDisciplineDiagnostic(input.node, input.filename, {
 		code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
-		severity: 'warning',
+		severity: 'error',
 		title: input.eventSuggestion
 			? 'Lowercase on* attributes are plain HTML attributes'
 			: 'This attribute renders "[object Object]"',

@@ -6,6 +6,7 @@ import { join, resolve } from 'pathe';
 import ts from 'typescript';
 import { expect, test } from 'vitest';
 
+// Packs and type-checks the router: 22.8 s alone at load average 54, past 30 s in the pre-commit unit lane.
 test('the packaged MDX runtime exposes usable scalar dispatch declarations', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'markless-router-package-'));
 	try {
@@ -45,4 +46,4 @@ void pending;
 	} finally {
 		await rm(directory, { recursive: true, force: true });
 	}
-}, 30_000);
+}, 120_000);

@@ -1862,6 +1862,14 @@
 		{
 			"date": "2026-10-26",
 			"guard": "runtime",
+			"subject": "web/prerender/evaluator",
+			"from": 22696,
+			"to": 22981,
+			"reason": "a child declared beside its parent re-renders its @try or @catch with its derives reading its props: before, the derive ran without the capture its parent's binding gives it and the arm threw; runs only when such a child's async value settles"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
 			"subject": "web/resume-stream-patches",
 			"from": 2260,
 			"to": 2414,
@@ -1882,6 +1890,22 @@
 			"from": 2406,
 			"to": 2309,
 			"reason": "shrank: a page's route script names its own resume module, so the entry holds no route table"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
+			"subject": "web/control-edit-hold",
+			"from": 1479,
+			"to": 1651,
+			"reason": "a field's edit hold keeps one note per running dispatch, so a field's async handler releases the dispatch queue at its first await"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
+			"subject": "web/event-current-target",
+			"from": null,
+			"to": 477,
+			"reason": "every handler call site sets currentTarget to the handler's own element for its synchronous part"
 		}
 	],
 	"runtimeModules": {
@@ -1927,10 +1951,11 @@
 		"serializer/value-decode-client-lazy": 230,
 		"serializer/value-decode-extensions": 1720,
 		"web/coded-error": 368,
-		"web/control-edit-hold": 1479,
+		"web/control-edit-hold": 1651,
 		"web/dom-attribute": 874,
 		"web/dom-journal": 7373,
 		"web/dom-journal-direct": 1223,
+		"web/event-current-target": 477,
 		"web/fns/bound-symbol": 1497,
 		"web/fns/closure-action": 7539,
 		"web/fns/composition": 19974,
@@ -1963,7 +1988,7 @@
 		"web/payload-resume-lazy": 203,
 		"web/payload-resume-registry": 1916,
 		"web/pending-timing": 521,
-		"web/prerender/evaluator": 22696,
+		"web/prerender/evaluator": 22981,
 		"web/prerender/owning-surface": 1212,
 		"web/prerender/shared-seed-slot": 2836,
 		"web/prerender/staged-graph": 411,

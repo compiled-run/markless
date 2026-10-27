@@ -209,8 +209,8 @@ function inlineWithin(
 	return { source: text, freeNames };
 }
 
-// A row renders from its item alone, and a nested `@{ ... }` has no body of its own in the render
-// either, so a slot reading a `const` declared in one carries that const's definition instead.
+// A row, an arm and a nested `@{ ... }` have no body of their own in the render, so a slot
+// reading a `const` declared in one carries that const's definition instead.
 export function inlineNestedTemplateLocals(node: AnyNode, state: WalkState): string | null {
 	const scopes = nestedTemplateScopes(state);
 	if (scopes.length === 0) return null;
@@ -225,7 +225,7 @@ export function inlineNestedTemplateLocals(node: AnyNode, state: WalkState): str
 type Span = { readonly start: number; readonly end: number };
 const nestedTemplateScopeCache = new WeakMap<WalkState, ReadonlyArray<Span>>();
 
-// Every @for body, and every `@{ ... }` written among template children rather than as a function body.
+// Every control-flow body, and every `@{ ... }` written among template children rather than as a function body.
 function nestedTemplateScopes(state: WalkState): ReadonlyArray<Span> {
 	const cached = nestedTemplateScopeCache.get(state);
 	if (cached) return cached;
@@ -235,7 +235,21 @@ function nestedTemplateScopes(state: WalkState): ReadonlyArray<Span> {
 			spans.push({ start: node.start, end: node.end });
 	};
 	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
-		if (candidate.type === 'JSXForExpression') add(candidate.body as AnyNode | undefined);
+		if (candidate.type === 'JSXForExpression') {
+			add(candidate.body as AnyNode | undefined);
+			add(candidate.empty as AnyNode | undefined);
+		}
+		if (candidate.type === 'JSXIfExpression') {
+			add(candidate.consequent as AnyNode | undefined);
+			add(candidate.alternate as AnyNode | undefined);
+		}
+		if (candidate.type === 'JSXSwitchExpression')
+			for (const switchCase of (candidate.cases as AnyNode[] | undefined) ?? []) add(switchCase);
+		if (candidate.type === 'JSXTryExpression') {
+			add(candidate.block as AnyNode | undefined);
+			add(candidate.pending as AnyNode | undefined);
+			add((candidate.handler as AnyNode | undefined)?.body as AnyNode | undefined);
+		}
 		if (!Array.isArray(candidate.children)) return;
 		for (const child of candidate.children as AnyNode[])
 			if (child?.type === 'JSXCodeBlock') add(child);
@@ -299,7 +313,11 @@ export function liftRenderLocalComposite(
 	options: CompositeReadOptions,
 ): { readonly graphNodeId: string } | null {
 	if (state.currentKeyedRepeatScopeIds.length > 0 || state.currentSharedDefinitionId) return null;
-	if (!isCompositeTemplateExpression(expression, options)) return null;
+	if (
+		!isCompositeTemplateExpression(expression, options) &&
+		!namesNestedTemplateLocal(expression, state)
+	)
+		return null;
 	const readSources = pureCompositeReadSources(expression, state, options);
 	if (!readSources) return null;
 	const inlined = inlineRenderLocals(expression, state);
@@ -318,6 +336,20 @@ export function liftRenderLocalComposite(
 		for (const definition of new Set(inlined.definitions))
 			collectDefinitionReads(definition, state);
 	return lifted;
+}
+
+// A const written inside an arm, row or `@{ }` re-runs with every render of that block, so a plain read of it is live.
+function namesNestedTemplateLocal(expression: AnyNode, state: WalkState): boolean {
+	let root = expression;
+	while (root.type === 'MemberExpression' && root.computed !== true) root = root.object as AnyNode;
+	if (root.type !== 'Identifier' || typeof root.start !== 'number') return false;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, root.start);
+	const declared = symbolId === null ? undefined : semantic.bindings[symbolId]!.declarations[0]?.start;
+	return (
+		declared !== undefined &&
+		nestedTemplateScopes(state).some((scope) => declared >= scope.start && declared < scope.end)
+	);
 }
 
 function readsGraphRoot(source: string, state: WalkState): boolean {

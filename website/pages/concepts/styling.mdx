@@ -110,7 +110,7 @@ The second card uses `lit ? 'card lit' : 'card'`, and the page updates the class
 <Callout
 	sprite="cross"
 	title="Why does my class say [object Object]?"
-	text="An object or an array is not a class string. Write class={{ lit: on }} and the page renders class='[object Object]'. An array such as ['card', on && 'lit'] renders as 'card,false'. Markless warns with MARKLESS_ATTRIBUTE_OBJECT_VALUE either way. If the value reads state, the build stops with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Build the string with a ? : instead."
+	text="An object or an array is not a class string. Write class={{ lit: on }} and the page renders class='[object Object]'. An array such as ['card', on && 'lit'] renders as 'card,false'. Either way the build stops with MARKLESS_ATTRIBUTE_OBJECT_VALUE, or with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED when the value reads state. Build the string with a ? : instead."
 />
 
 ## One file, one class
@@ -118,7 +118,7 @@ The second card uses `lit ? 'card lit' : 'card'`, and the page updates the class
 The class belongs to the file, not to the component. Two components in one `.tsrx` file share one
 class and one stylesheet. To give a component its own scope, move it to its own file.
 
-A `<style>` block outside a function's elements never reaches the page. Markless warns with
+A `<style>` block outside a function's elements never reaches the page, so the build stops with
 `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`. For rules that cover the whole site, import an
 ordinary stylesheet.
 

@@ -928,11 +928,16 @@ test('B921 reports attribute and spread value discipline diagnostics without fla
 			message: expect.stringContaining('style={{ color:'),
 		}),
 	);
+	// Both render something the author never meant to ship, so both stop the build.
 	expect(byCode('MARKLESS_ATTRIBUTE_OBJECT_VALUE')).toEqual([
 		expect.objectContaining({
+			severity: 'error',
 			message: expect.stringContaining('data-menu="[object Object]"'),
 		}),
-		expect.objectContaining({ message: expect.stringContaining('did you mean `onClick`') }),
+		expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('did you mean `onClick`'),
+		}),
 	]);
 	expect(graph.diagnostics).not.toEqual(
 		expect.arrayContaining([
@@ -1432,7 +1437,7 @@ export function App({ children }: { children?: unknown }) @{
 }
 `;
 
-test('attach with nothing on or inside its element to start it is a warning naming the element', async () => {
+test('attach with nothing on or inside its element to start it fails the build naming the element', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/AttachStart.tsrx',
 		source: attachStartSource,
@@ -1448,7 +1453,7 @@ test('attach with nothing on or inside its element to start it is a warning nami
 	]);
 	expect(warnings[0]).toEqual(
 		expect.objectContaining({
-			severity: 'warning',
+			severity: 'error',
 			phase: 'semantic-graph',
 			primarySpan: {
 				filename: 'src/AttachStart.tsrx',
@@ -1458,7 +1463,11 @@ test('attach with nothing on or inside its element to start it is a warning nami
 			docsUrl: 'https://markless.dev/errors/MARKLESS_ATTACH_NO_START_TRIGGER',
 		}),
 	);
-	expect(graph.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(
+		graph.diagnostics
+			.filter((diagnostic) => diagnostic.severity === 'error')
+			.map((diagnostic) => diagnostic.code),
+	).toEqual(['MARKLESS_ATTACH_NO_START_TRIGGER', 'MARKLESS_ATTACH_NO_START_TRIGGER']);
 });
 
 test('buildSemanticGraph reports graph destructuring defaults as unsupported aliases', async () => {

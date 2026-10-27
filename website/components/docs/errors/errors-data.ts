@@ -838,7 +838,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error',
 		description: 'Nothing on a server-rendered page starts this attach function.',
 		printed: [
 			'MARKLESS_ATTACH_NO_START_TRIGGER: attach={<source>} on <<tagName>> has no event handler on or inside the element, and no onVisible or onIdle on it. On a server-rendered page attach starts only when one of those runs, so <source> never runs there.',
@@ -903,16 +903,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's4',
-					text: ' to start it once the page is idle. If the element only ever renders in the browser, where ',
-				},
-				{
-					id: 's5',
-					text: 'attach',
-					code: true,
-				},
-				{
-					id: 's6',
-					text: ' runs as soon as the element exists, silence the warning with a reason.',
+					text: ' to start it once the page is idle. An element that only ever renders in the browser needs one too: the build cannot tell it apart from one the server renders.',
 				},
 			],
 			example: [
@@ -1033,18 +1024,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 		},
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_ATTACH_NO_START_TRIGGER: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
 		sources: [
 			{
 				id: 'f0',
@@ -1079,27 +1058,14 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
-		description:
-			'Lowercase on* attributes are plain HTML attributes: a Markless build warning.',
+		severity: 'error',
+		description: 'Lowercase on* attributes are plain HTML attributes: a Markless build error.',
 		printed: [
 			'MARKLESS_ATTRIBUTE_OBJECT_VALUE: `<attributeName>={<valueSource>}` is a plain attribute, not a Markless event. It would serialize the function source into HTML.<eventText>',
 			'Attribute bindings serialize to plain text in HTML and DOM updates; only graph cells keep structured values across resume.',
 			'Use the event prop casing, for example `<eventSuggestion>={...}`, or serialize a string deliberately.',
 		],
 		structured: true,
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_ATTRIBUTE_OBJECT_VALUE: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
 		sources: [
 			{
 				id: 'f0',
@@ -5401,6 +5367,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_PRERENDER_CAPTURE_UNBOUND',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: ['MARKLESS_PRERENDER_CAPTURE_UNBOUND: <slotId>'],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/prerender/evaluator.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/prerender/evaluator.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_PRERENDER_CHILD_MISSING',
 		packageName: '@markless/web',
 		stage: 'runtime',
@@ -5817,27 +5800,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error',
 		description:
-			'<label> is not rendered by the public render path yet: a Markless build warning.',
+			'<label> is not rendered by the public render path yet: a Markless build error.',
 		printed: [
 			'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT: <message> markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
 			'The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.',
 			'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 		],
 		structured: true,
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
 		sources: [
 			{
 				id: 'f0',
@@ -9246,6 +9217,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'Write through a local changes state Markless cannot track: a Markless build error.',
+		printed: [
+			'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED: Cannot write to "<target>" because <value>.',
+			'Markless has no runtime proxies: a change reaches the page only when the compiler can name the state path it writes. This write would change the state object in place and the page would keep showing the old value.',
+			'https://markless.dev/errors/MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/state-lowering.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
 			},
 		],
 		moreSources: 0,

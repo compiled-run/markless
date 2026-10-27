@@ -67,7 +67,7 @@ export function closureActionPlan(
 	const computedById = new Map(state.computed.map((node) => [node.graphNodeId, node]));
 	const writes = handler.writes ?? [];
 	for (const write of writes) {
-		if (write.row || write.path.length !== 0) return;
+		if (write.row || write.through || write.path.length !== 0) return;
 		if (write.operation !== 'assign' && write.operation !== 'update') return;
 		if (!cellKinds.has(write.graphNodeId)) return;
 	}

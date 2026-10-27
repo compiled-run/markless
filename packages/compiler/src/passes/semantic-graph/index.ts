@@ -47,6 +47,7 @@ import {
 import {
 	collectAssignment,
 	collectCollectionCall,
+	collectObjectAssign,
 	collectComputedWriteDiagnostics,
 	collectDelete,
 	collectExpressionReads,
@@ -602,6 +603,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			break;
 		case 'CallExpression':
 			collectCollectionCall(node, state);
+			collectObjectAssign(node, state);
 			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
 				const [body, ...rest] = asNodes(node.arguments);
 				withFunctionSite(state, 'computed', () => {

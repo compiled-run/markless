@@ -148,6 +148,17 @@ describe('release.yml mode=cut', () => {
 		);
 	});
 
+	test('refuses before pushing anything unless the nightly screen readers passed on a commit the release contains', () => {
+		const gate = step(cut, 'Require the nightly screen readers green on a commit the release contains');
+		expect(gate.if).toBe("steps.cut.outputs.resumed != 'true'");
+		expect(gate.env).toEqual({ BASE: '${{ steps.cut.outputs.base }}' });
+		expect(gate.run).toBe('node scripts/release/reader-gate.mjs --base "$BASE"');
+		expect(names(cut).indexOf(gate.name)).toBeGreaterThan(names(cut).indexOf('Cut the next minor version'));
+		expect(names(cut).indexOf(gate.name)).toBeLessThan(
+			names(cut).indexOf('Push the release commit to its release branch'),
+		);
+	});
+
 	test('posts commit statuses only through inherit-ci.mjs, which proves the release changed versions alone', () => {
 		const commands = cut.steps.map((candidate) => candidate.run ?? '').join('\n');
 		expect(commands).not.toMatch(/\/statuses\/|check-runs -X|--method POST/u);

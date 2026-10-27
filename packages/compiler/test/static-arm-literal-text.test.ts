@@ -1,5 +1,8 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+
+// Compiling thousands of elements: 2.9 s alone at load average 54, past 5 s in the pre-commit unit lane.
+vi.setConfig({ testTimeout: 30_000 });
 
 function compile(source: string) {
 	return compileTsrxModule({ filename: '/workspace/app/src/Tabs.tsrx', source, symbols: [] });

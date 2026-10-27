@@ -11,6 +11,7 @@ import type { LeanActionPlan, LeanPlan, RuntimeDemandMap } from './lean-shared.t
 // so its plan type carries that record.
 type ScalarCorePlan = LeanPlan & { readonly eventRecord: EventOnlyResumeRecord };
 import { resumeFullEventOnly } from './lean-shared.ts';
+import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import { pageNodes } from '../resume-anchor-census.ts';
 import type { ProtocolSyncPolicyCondition } from '../../../serializer/src/protocol.ts';
 
@@ -49,7 +50,7 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 	for (const symbolId of plan.eventRecord.symbolIds) {
 		const symbol = await resolve(input.loadSymbol(symbolId));
 		void (await resolve(
-			symbol({
+			marklessRunAtCurrentTarget(input.event, element, symbol, {
 				graph: shadowGraph(graph),
 				event: input.event,
 				element,

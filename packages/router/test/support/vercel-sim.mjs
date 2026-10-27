@@ -34,7 +34,12 @@ async function staticFile(pathname) {
 	return undefined;
 }
 
-async function resolve(url) {
+// A `has` condition matches the whole header value, as Vercel's does.
+const holds = (condition, req) =>
+	condition.type === 'header' &&
+	new RegExp(`^(?:${condition.value ?? '.*'})$`).test(req.headers[condition.key.toLowerCase()] ?? '');
+
+async function resolve(url, req) {
 	const headers = {};
 	for (const route of config.routes) {
 		if (route.handle === 'filesystem') {
@@ -43,7 +48,7 @@ async function resolve(url) {
 			continue;
 		}
 		const match = new RegExp(`^${route.src}$`).exec(url.pathname);
-		if (!match) continue;
+		if (!match || !(route.has ?? []).every((condition) => holds(condition, req))) continue;
 		if (route.headers) Object.assign(headers, route.headers);
 		if (route.continue) continue;
 		if (route.status) return { status: route.status, headers };
@@ -53,6 +58,8 @@ async function resolve(url) {
 		}
 		const groups = match.groups ?? {};
 		const dest = route.dest.replace(/\$(\w+)/g, (_, key) => groups[key] ?? match[key] ?? '');
+		const rewritten = await staticFile(dest);
+		if (rewritten) return { file: rewritten, headers };
 		return { dest, groups, headers };
 	}
 	return { status: 404, headers };
@@ -60,10 +67,11 @@ async function resolve(url) {
 
 const server = createServer(async (req, res) => {
 	const url = new URL(req.url ?? '/', 'http://vercel.test');
-	const resolved = await resolve(url);
+	const resolved = await resolve(url, req);
+	if (resolved.file)
+		res.setHeader('content-type', types[extname(resolved.file)] ?? 'application/octet-stream');
 	for (const [name, value] of Object.entries(resolved.headers)) res.setHeader(name, value);
 	if (resolved.file) {
-		res.setHeader('content-type', types[extname(resolved.file)] ?? 'application/octet-stream');
 		res.end(await readFile(resolved.file));
 		return;
 	}

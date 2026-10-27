@@ -22,7 +22,6 @@ test('SSR: plain attach waits for an event on or inside its element', async () =
 	await press('[data-outside]');
 	await expect.poll(() => text('[data-plain]')).toBe('clicked');
 	await settle();
-	expect(runs('[data-plain]')).toBe(null);
 	expect(runs('[data-host]')).toBe(null);
 
 	await press('[data-inside]');
@@ -32,25 +31,23 @@ test('SSR: plain attach waits for an event on or inside its element', async () =
 	await press('[data-inside]');
 	await settle();
 	expect(runs('[data-host]')).toBe('1');
-	expect(runs('[data-plain]')).toBe(null);
 });
 
 test('SSR: onVisible on the same element starts attach once it is on screen', async () => {
 	await renderSSR(Page);
 	await expect.poll(() => runs('[data-visible]')).toBe('1');
-	expect(runs('[data-plain]')).toBe(null);
+	expect(runs('[data-host]')).toBe(null);
 });
 
 test('SSR: onIdle on the same element starts attach at idle', async () => {
 	await renderSSR(Page);
 	await expect.poll(() => runs('[data-idle]')).toBe('1');
-	expect(runs('[data-plain]')).toBe(null);
+	expect(runs('[data-host]')).toBe(null);
 });
 
 test('CSR: every attach starts when the browser creates its element', async () => {
 	await render(Page);
 	for (const selector of [
-		'[data-plain]',
 		'[data-host]',
 		'[data-self]',
 		'[data-visible]',
@@ -60,7 +57,7 @@ test('CSR: every attach starts when the browser creates its element', async () =
 	await press('[data-outside]');
 	await expect.poll(() => text('[data-plain]')).toBe('clicked');
 	await settle();
-	expect(runs('[data-plain]')).toBe('1');
+	expect(runs('[data-host]')).toBe('1');
 });
 
 for (const mode of ['SSR', 'CSR'] as const) {
@@ -78,6 +75,6 @@ for (const mode of ['SSR', 'CSR'] as const) {
 		await expect.poll(() => text('[data-plain]')).toBe('clicked');
 		await settle();
 		expect(runs('[data-shown-plain]')).toBe('1');
-		expect(runs('[data-plain]')).toBe(mode === 'SSR' ? null : '1');
+		expect(runs('[data-host]')).toBe(mode === 'SSR' ? null : '1');
 	});
 }

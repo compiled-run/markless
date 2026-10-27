@@ -1,5 +1,6 @@
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { marklessAttributeValue, marklessWriteAttribute } from '../dom-attribute.ts';
+import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import { marklessDecodeScalarCell, marklessScalarSpecializedError } from './scalar-specialized.ts';
 import { marklessScalarLocate, marklessServedDomUpdate } from './scalar-served.ts';
 
@@ -226,7 +227,7 @@ export async function marklessRunClosureAction(
 		}
 		let failure: { readonly error: unknown } | undefined;
 		try {
-			const result = symbols[0]!({
+			const result = marklessRunAtCurrentTarget(input.event, host, symbols[0]!, {
 				graph,
 				event: input.event,
 				element: host,

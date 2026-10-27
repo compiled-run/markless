@@ -702,7 +702,9 @@ function jsonNode(value: JsonValue): EmissionNode {
 	if (Array.isArray(value)) return arrayNode(value.map((item) => jsonNode(item)));
 	if (typeof value === 'object') {
 		return objectNode(
-			Object.entries(value).map(([key, child]) => stringKeyPropertyNode(key, jsonNode(child))),
+			Object.entries(value).map(([key, child]) =>
+				stringKeyPropertyNode(key, jsonNode(child)),
+			),
 		);
 	}
 	return literalNode(value);
@@ -726,7 +728,6 @@ export function shorthandPropertyNode(name: string): EmissionNode {
 		value: identifierNode(name),
 	};
 }
-
 
 /** A method-shorthand property: `update(value) { ... }`. */
 export function methodPropertyNode(
@@ -765,9 +766,7 @@ export function constDeclarationNode(name: string, init: EmissionNode): Emission
 	return {
 		type: 'VariableDeclaration',
 		kind: 'const',
-		declarations: [
-			{ type: 'VariableDeclarator', id: identifierNode(name), init },
-		],
+		declarations: [{ type: 'VariableDeclarator', id: identifierNode(name), init }],
 	};
 }
 
@@ -779,9 +778,7 @@ export function letDeclarationNode(name: string, init: EmissionNode): EmissionNo
 	return {
 		type: 'VariableDeclaration',
 		kind: 'let',
-		declarations: [
-			{ type: 'VariableDeclarator', id: identifierNode(name), init },
-		],
+		declarations: [{ type: 'VariableDeclarator', id: identifierNode(name), init }],
 	};
 }
 
@@ -863,7 +860,9 @@ export function moduleImportNode(moduleImport: ModuleImportShape): EmissionNode 
 				? { type: 'ImportNamespaceSpecifier', local }
 				: {
 						type: 'ImportSpecifier',
-						imported: identifierNode(moduleImport.importedName ?? moduleImport.localName),
+						imported: identifierNode(
+							moduleImport.importedName ?? moduleImport.localName,
+						),
 						local,
 					};
 
@@ -903,6 +902,8 @@ export function graphReadCall(input: GraphReadCallInput): EmissionNode {
 
 export type GraphWriteCallInput = {
 	readonly callee?: string;
+	/** Replaces `callee` with a computed receiver, such as a write-through facade. */
+	readonly calleeNode?: EmissionNode;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 	/** Replaces `path` when the path is computed at dispatch. */
@@ -912,7 +913,7 @@ export type GraphWriteCallInput = {
 
 /** `context.graph.write({ graphNodeId, path, value })`. */
 export function graphWriteCall(input: GraphWriteCallInput): EmissionNode {
-	return callNode(memberChainNode(input.callee ?? 'context.graph.write'), [
+	return callNode(input.calleeNode ?? memberChainNode(input.callee ?? 'context.graph.write'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
 			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),
@@ -923,6 +924,8 @@ export function graphWriteCall(input: GraphWriteCallInput): EmissionNode {
 
 export type GraphUpdateCallInput = {
 	readonly callee?: string;
+	/** Replaces `callee` with a computed receiver, such as a write-through facade. */
+	readonly calleeNode?: EmissionNode;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 	/** Replaces `path` when the path is computed at dispatch. */
@@ -939,7 +942,7 @@ export type GraphUpdateCallInput = {
  */
 export function graphUpdateCall(input: GraphUpdateCallInput): EmissionNode {
 	const parameterName = input.parameterName ?? 'value';
-	return callNode(memberChainNode(input.callee ?? 'context.graph.update'), [
+	return callNode(input.calleeNode ?? memberChainNode(input.callee ?? 'context.graph.update'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
 			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),
@@ -955,6 +958,8 @@ export function graphUpdateCall(input: GraphUpdateCallInput): EmissionNode {
 
 export type GraphDeleteCallInput = {
 	readonly callee?: string;
+	/** Replaces `callee` with a computed receiver, such as a write-through facade. */
+	readonly calleeNode?: EmissionNode;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 	/** Replaces `path` when the path is computed at dispatch. */
@@ -963,7 +968,7 @@ export type GraphDeleteCallInput = {
 
 /** `context.graph.delete({ graphNodeId, path })`. */
 export function graphDeleteCall(input: GraphDeleteCallInput): EmissionNode {
-	return callNode(memberChainNode(input.callee ?? 'context.graph.delete'), [
+	return callNode(input.calleeNode ?? memberChainNode(input.callee ?? 'context.graph.delete'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
 			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),
@@ -973,6 +978,8 @@ export function graphDeleteCall(input: GraphDeleteCallInput): EmissionNode {
 
 export type GraphMethodCallInput = {
 	readonly callee?: string;
+	/** Replaces `callee` with a computed receiver, such as a write-through facade. */
+	readonly calleeNode?: EmissionNode;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 	/** Replaces `path` when the path is computed at dispatch. */
@@ -983,7 +990,7 @@ export type GraphMethodCallInput = {
 
 /** `context.graph.call({ graphNodeId, path, method, args: [...] })`. */
 export function graphMethodCall(input: GraphMethodCallInput): EmissionNode {
-	return callNode(memberChainNode(input.callee ?? 'context.graph.call'), [
+	return callNode(input.calleeNode ?? memberChainNode(input.callee ?? 'context.graph.call'), [
 		objectNode([
 			propertyNode('graphNodeId', literalNode(input.graphNodeId)),
 			propertyNode('path', input.pathNode ?? stringArrayNode(input.path)),

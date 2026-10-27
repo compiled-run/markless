@@ -6,9 +6,10 @@ name: Screen reader
 #
 # Three lanes, cheapest first:
 #   virtual  - a screen reader written in JavaScript, no assistive technology
-#              needed. Runs on every touched PR, required green.
-#   nvda     - the real NVDA screen reader on Windows. Required green.
-#   voiceover- the real VoiceOver screen reader on macOS. Advisory, see below.
+#              needed. Runs on every touched PR and nightly.
+#   nvda     - the real NVDA screen reader on Windows. Nightly on main; the
+#              release cut refuses unless it passed (scripts/release/reader-gate.mjs).
+#   voiceover- the real VoiceOver screen reader on macOS. Nightly, advisory, see below.
 #
 # The matrix key is the component family. A new family adds its name to each
 # matrix and nothing else changes.
@@ -22,8 +23,9 @@ name: Screen reader
 # If that step fails the lane falls back to the drivability smoke, which is the
 # proof no developer machine can reproduce and the one worth keeping either way.
 
-# Pull requests run the readers only when they can change what is heard; main is read nightly (one run is
-# 102 jobs, 29 on the org's five macOS runners). No check here is required, so a skipped PR has none pending.
+# Pull requests run the virtual reader only when they can change what is heard. The real readers took 37,000
+# Windows and macOS runner-minutes on pull requests in one day (2026-10-26), most of the org's queue, so they read
+# main nightly and on dispatch: `gh workflow run screen-reader.yml --ref <branch>` reads a branch before merging.
 on:
     pull_request:
         paths:
@@ -153,6 +155,7 @@ jobs:
     # Real NVDA on a real Windows desktop session. guidepup/setup-action
     # installs NVDA and the keyboard automation it needs.
     nvda:
+        if: github.event_name != 'pull_request'
         runs-on: windows-latest
         timeout-minutes: 25
         strategy:
@@ -288,13 +291,14 @@ jobs:
     # reason: guidepup/setup-action grants VoiceOver automation by writing the
     # runner's TCC permission database directly, and every macOS runner image
     # update can break that write. A broken image would otherwise block every
-    # unrelated pull request that touches packages/headless.
+    # release.
     #
     # continue-on-error is not permission to ignore this job, and removing the
     # job is not a fix. A red VoiceOver lane is triaged like any other red: if
     # the failure is a real announcement regression it blocks the change, and if
     # it is the setup step it goes in the ledger with the runner image version.
     voiceover:
+        if: github.event_name != 'pull_request'
         runs-on: macos-latest
         timeout-minutes: 25
         continue-on-error: true

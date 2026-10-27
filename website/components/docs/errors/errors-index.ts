@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 292,
+	total: 294,
 	guided: 45,
 	groups: [
 		{
@@ -55,7 +55,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
-					kind: 'compile warning',
+					kind: 'compile error',
 					guided: true,
 				},
 				{
@@ -65,7 +65,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
-					kind: 'compile warning',
+					kind: 'compile error',
 					guided: false,
 				},
 				{
@@ -400,7 +400,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-					kind: 'compile warning',
+					kind: 'compile error',
 					guided: false,
 				},
 				{
@@ -650,6 +650,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
 					kind: 'compile error',
 					guided: false,
 				},
@@ -1180,6 +1185,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_PRERENDER_BRANCH_MISSING',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_PRERENDER_CAPTURE_UNBOUND',
 					kind: 'runtime error',
 					guided: false,
 				},
