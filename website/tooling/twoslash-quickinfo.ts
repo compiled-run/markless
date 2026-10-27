@@ -121,6 +121,16 @@ function signatureLine(parts: readonly ts.SymbolDisplayPart[] | undefined): stri
 		.trim();
 }
 
+/** A doc comment as the plain sentences a tooltip reads: a closing link-only paragraph goes, other links keep their text, emphasis marks go, backticks stay. */
+export function plainDoc(text: string): string {
+	return flatten(
+		text
+			.replace(/\n\s*\n\s*\[[^\]]+\]\([^)]*\)\s*$/, '')
+			.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+			.replace(/(\*\*|__)(.+?)\1/g, '$2'),
+	);
+}
+
 function flatten(text: string): string {
 	return text.replace(/\s+/g, ' ').trim();
 }
@@ -413,7 +423,7 @@ export function createQuickInfoService(): QuickInfoService {
 				if (!signature) continue;
 				seen.add(start);
 				found.push({
-					doc: flatten(displayPartsToString(info.documentation)),
+					doc: plainDoc(displayPartsToString(info.documentation)),
 					length,
 					signature,
 					start,
