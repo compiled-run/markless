@@ -125,11 +125,11 @@ connected"; it is not component replay. A host the browser creates, either in a
 client-rendered mount or in a branch arm or keyed row the runtime inserts after
 a state change, runs its behaviors once the element is in the DOM.
 
-A served host with `attach` and none of those triggers on it or inside it gets
-the `MARKLESS_ATTACH_NO_START_TRIGGER` warning, since its behavior would never
-run. Hosts inside `@for` rows, and hosts holding a component, a spread, or
-projected children (which may carry a handler the host cannot see), are not
-warned.
+A host with `attach` and none of those triggers on it or inside it fails the
+build with `MARKLESS_ATTACH_NO_START_TRIGGER`, since its behavior would never
+run if the server renders it. Hosts inside `@for` rows, and hosts holding a
+component, a spread, or projected children (which may carry a handler the host
+cannot see), are not refused.
 
 `attach` is compiler-special on host elements. In `attach={chart(config)}`, the
 factory call is not normal eager initial-render execution. The compiler treats

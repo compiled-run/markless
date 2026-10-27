@@ -6,7 +6,7 @@ export default function SettingsPanel() @{
 	<div data-settings>
 		<button type="button" data-toggle onClick={() => (open = !open)}>{open ? 'close' : 'open'}</button>
 		@if (open) {
-			<div data-panel tabindex="-1" attach={(panel) => {
+			<div data-panel tabindex="-1" onIdle={() => {}} attach={(panel) => {
 				panel.setAttribute('data-attached', 'yes');
 				(panel as HTMLElement).focus();
 			}}>
