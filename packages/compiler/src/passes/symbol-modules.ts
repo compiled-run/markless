@@ -1670,6 +1670,13 @@ function renderChunkParts(
 					| { itemPath: ReadonlyArray<string> }
 					| RowAttributePart
 				> = [];
+				// A boundary's update module rebuilds row markup but wires no row handler.
+				const rowAttributes =
+					context.inline !== undefined ||
+					(context.rowAttributes === true &&
+						!renderData.interactions.some((interaction) =>
+							row.hosts.some((host) => host.hostNodeId === interaction.hostNodeId),
+						));
 				for (let rowIndex = 0; rowIndex < row.statics.length; rowIndex++) {
 					const text = (row.statics[rowIndex] ?? '').replace(
 						/<!--markless-slot:\d+-->/g,
@@ -1680,7 +1687,7 @@ function renderChunkParts(
 						(candidate) => candidate.staticIndex === rowIndex,
 					)) {
 						if (
-							(context.inline || context.rowAttributes) &&
+							rowAttributes &&
 							rowSlot.kind === 'attribute' &&
 							!rowSlot.directClassMatch &&
 							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')
