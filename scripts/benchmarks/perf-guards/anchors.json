@@ -1906,6 +1906,14 @@
 			"from": null,
 			"to": 477,
 			"reason": "every handler call site sets currentTarget to the handler's own element for its synchronous part"
+		},
+		{
+			"date": "2026-10-27",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 9728,
+			"to": 9858,
+			"reason": "a settle whose answer rendered after a newer run started leaves the held content in place instead of painting @pending; runs on a settle"
 		}
 	],
 	"runtimeModules": {
@@ -2003,7 +2011,7 @@
 		"web/resume-arm-keyed-repeats": 1225,
 		"web/resume-arm-records": 7741,
 		"web/resume-arm-records-lazy": 219,
-		"web/resume-async-wiring": 9728,
+		"web/resume-async-wiring": 9858,
 		"web/resume-behaviors": 8804,
 		"web/resume-branches": 15037,
 		"web/resume-census": 1471,

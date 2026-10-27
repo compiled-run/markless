@@ -290,21 +290,19 @@ export async function settleAsyncBoundaryRange(
 	// pending UI was visible for the minimum duration (no blink). The re-settle
 	// hold raises the floor BEFORE its pending commit, so this wait also
 	// orders settle commits behind an in-flight pending-arm commit.
-	if ((await input.settleTracker?.waitOutCommitHold()) === true) {
-		// A newer run superseded this settle while it waited; its own settle
-		// subscription commits the fresher snapshot.
-		if (
-			boundary.runnerGraphNodeId !== null &&
-			input.graph.read(boundary.runnerGraphNodeId, ['status']) !== status
-		)
-			return;
-	}
+	const runnerStatus = () =>
+		boundary.runnerGraphNodeId === null
+			? status
+			: input.graph.read(boundary.runnerGraphNodeId, ['status']);
+	// A newer run that started while this settle waited or rendered owns the boundary: its own settle commits, and the hold keeps what is shown.
+	if ((await input.settleTracker?.waitOutCommitHold()) === true && runnerStatus() !== status) return;
 	const source = resolveBoundarySettleSource(input, boundary);
 	// A composed child's arm records are minted in the child's own id space; the
 	// qualifier that re-spells them in page space is installed only by pages the
 	// bundler gave component edges (fns/composed-arm-records).
 	if (source === 'renderAsyncBoundary') {
 		const rendered = await input.renderAsyncBoundary!(boundary.id, status, input.graph);
+		if (runnerStatus() === 'pending') return;
 		const armRecords = boundaryArmRecordSet(rendered.armRecords);
 		if (!armRecords) throw emptySettleRenderError(boundary.id);
 		await input.commitArm!(boundary, {
@@ -325,6 +323,7 @@ export async function settleAsyncBoundaryRange(
 		asyncBoundary: boundary,
 	});
 	if (!isResumeBranchUpdate(update)) throw emptySettleRenderError(boundary.id);
+	if (runnerStatus() === 'pending') return;
 	if (input.commitArm) {
 		const rawArmRecords = (update as { readonly armRecords?: unknown }).armRecords;
 		const plannedArmRecords = Array.isArray(boundary.armRecords)
