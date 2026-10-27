@@ -899,6 +899,15 @@ function islandScopedFamilyRecord(
 		if (isFamilyRecord(anchor) && anchor.strategy === MDX_PAGE_ANCHOR_STRATEGY)
 			mapped[key] = { ...anchor, index: context.commentOffset + Number(anchor.index) };
 	}
+	if (isFamilyRecord(record.rowTemplate))
+		mapped.rowTemplate = islandScopedRowTemplate(record.rowTemplate, island);
+	// A minted row reads through the owning component's reader, which spells ids without the island's segment.
+	if ((record.rowTemplate || record.rowComponent) && record.instancePath === undefined && island.segment)
+		mapped.instancePath = island.segment;
+	if (Array.isArray(record.propRoutes))
+		mapped.propRoutes = record.propRoutes.map((route) =>
+			isFamilyRecord(route) ? islandScopedGraphRecord(route, island) : route,
+		);
 	for (const key of MDX_NESTED_RECORD_KEYS) {
 		const nested = record[key];
 		if (Array.isArray(nested))
@@ -908,6 +917,28 @@ function islandScopedFamilyRecord(
 		else if (isFamilyRecord(nested)) mapped[key] = islandScopedFamilyRecord(nested, context);
 	}
 	return mapped;
+}
+
+// A row slot reads page state by graph id, and an island's state lives under its segment.
+function islandScopedRowTemplate(template: MdxFamilyRecord, island: MdxIslandScope): MdxFamilyRecord {
+	const slot = (value: unknown): unknown => {
+		if (!isFamilyRecord(value)) return value;
+		const scoped: Record<string, unknown> = { ...islandScopedGraphRecord(value, island) };
+		if (Array.isArray(value.reads))
+			scoped.reads = value.reads.map((read) =>
+				isFamilyRecord(read) ? islandScopedGraphRecord(read, island) : read,
+			);
+		if (Array.isArray(value.arms)) scoped.arms = value.arms.map(slots);
+		return scoped;
+	};
+	const slots = (owner: unknown): unknown => {
+		if (!isFamilyRecord(owner)) return owner;
+		const scoped: Record<string, unknown> = { ...owner };
+		for (const key of ['textSlots', 'attributeSlots', 'branchSlots'])
+			if (Array.isArray(owner[key])) scoped[key] = (owner[key] as unknown[]).map(slot);
+		return scoped;
+	};
+	return slots(template) as MdxFamilyRecord;
 }
 
 function isFamilyRecord(value: unknown): value is MdxFamilyRecord {
