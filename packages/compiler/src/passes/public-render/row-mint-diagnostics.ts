@@ -17,6 +17,7 @@ import {
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
 import { staticTemplateReadDiagnostic } from '../state-lowering.ts';
+import { joinDeciders, propsDeciding, rowsDecidedBy } from '../../artifact-helpers/prop-deciders.ts';
 import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	keyedRepeatRowsUnplacedDiagnostic,
@@ -80,28 +81,38 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			),
 		});
 		if (!refusal) return;
-		diagnostics.push(
-			keyedRepeatRowMintUnsupportedDiagnostic({
-				itemName: repeat.itemName,
-				refusal,
-				node,
-				filename: input.filename,
-			}),
+		const rowChunk = input.semanticGraph.markup.chunks.find(
+			(chunk) => chunk.id === `repeat:${repeat.id}:row`,
 		);
+		// A row only refuses what it would have to build after load; a list nothing can change needs none of it.
+		const deciding = rowsDecidedBy(repeat, input.semanticGraph);
+		const decidedByProps =
+			deciding && rowChunk?.componentName
+				? { decidedByProps: { componentName: rowChunk.componentName, props: deciding } }
+				: {};
+		if (deciding?.length !== 0)
+			diagnostics.push({
+				...keyedRepeatRowMintUnsupportedDiagnostic({
+					itemName: repeat.itemName,
+					refusal,
+					node,
+					filename: input.filename,
+				}),
+				...decidedByProps,
+			});
 		for (const read of input.semanticGraph.templateReads) {
 			if (read.keyedRepeatId !== repeat.id) continue;
 			const stale = staticTemplateReadDiagnostic(input.semanticGraph, read);
 			if (stale) diagnostics.push(stale);
 		}
-		const rowChunk = input.semanticGraph.markup.chunks.find(
-			(chunk) => chunk.id === `repeat:${repeat.id}:row`,
-		);
 		for (const slot of rowChunk?.slots ?? []) {
 			if (slot.kind !== 'branch') continue;
 			const site = input.semanticGraph.branchSites.find((candidate) => candidate.id === slot.branchSiteId);
 			if (!site) continue;
-			diagnostics.push(
-				rowBranchFlipUnsupportedDiagnostic({
+			const flippedBy = joinDeciders(deciding, testDecidedBy(site.testSource, repeat, input.semanticGraph));
+			if (flippedBy?.length === 0) continue;
+			diagnostics.push({
+				...rowBranchFlipUnsupportedDiagnostic({
 					itemName: repeat.itemName,
 					branchLabel: site.kind === 'switch' ? '@switch' : '@if',
 					testSource: site.testSource,
@@ -109,10 +120,43 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 					node,
 					filename: input.filename,
 				}),
-			);
+				...(flippedBy && rowChunk?.componentName
+					? { decidedByProps: { componentName: rowChunk.componentName, props: flippedBy } }
+					: {}),
+			});
 		}
 	});
 	return diagnostics;
+}
+
+type Repeat = SemanticGraphArtifact['keyedRepeats'][number];
+
+// A row's @if test that reads only its row items, module values and props.
+function testDecidedBy(
+	testSource: string,
+	repeat: Repeat,
+	graph: SemanticGraphArtifact,
+): ReadonlyArray<string> | null {
+	const rowNames = new Set<string>();
+	for (let at: Repeat | undefined = repeat; at; at = graph.keyedRepeats.find((candidate) => candidate.id === at!.enclosingRepeatId)) {
+		rowNames.add(at.itemName);
+		if (at.indexName) rowNames.add(at.indexName);
+	}
+	const props = new Set<string>();
+	for (const [, name] of testSource.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)/g)) {
+		if (rowNames.has(name!)) continue;
+		const prop = graph.componentPropBindings.find((candidate) => candidate.localName === name);
+		if (prop?.propPath[0] !== undefined) {
+			props.add(prop.propPath[0]);
+			continue;
+		}
+		const binding = graph.graphBindings.find((candidate) => candidate.name === name);
+		if (!binding) continue;
+		const deciding = propsDeciding(binding.id, [], graph);
+		if (!deciding) return null;
+		for (const prop of deciding) props.add(prop);
+	}
+	return [...props];
 }
 
 // The same identity the markup collector paired chunks by, so the node this
