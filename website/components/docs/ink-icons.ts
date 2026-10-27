@@ -120,6 +120,19 @@ function drumBand(cx: number, top: number, bottom: number, rx: number, ry: numbe
 	return [...rim(top, 180, 0), ...rim(bottom, 0, 180)];
 }
 
+/** A leaf from `a` to `b`, `w` across at its widest; `bulge` moves the widest point toward `b`. A `slit` parts the two halves along the midline, like a feather's vane either side of its shaft. */
+function leaf(a: P, b: P, w: number, bulge = 0.5, slit = 0, n = 18): Ring[] {
+	const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+	const len = Math.hypot(dx, dy) || 1;
+	const [nx, ny] = [-dy / len, dx / len];
+	const half = (t: number) => (w / 2) * Math.sin(Math.PI * t ** (Math.log(0.5) / Math.log(bulge)));
+	const at = (t: number, off: number): P => [a[0] + dx * t + nx * off, a[1] + dy * t + ny * off];
+	const ts = Array.from({ length: n + 1 }, (_, k) => k / n);
+	if (!slit) return [[...ts.map((t) => at(t, half(t))), ...ts.slice(1, -1).reverse().map((t) => at(t, -half(t)))]];
+	const inner = ts.filter((t) => half(t) > slit * 2);
+	return [1, -1].map((sign) => [...inner.map((t) => at(t, sign * (half(t) - slit))), ...inner.slice().reverse().map((t) => at(t, sign * slit))]);
+}
+
 function path(...shapes: Shape[]): string {
 	const rings = shapes.flatMap((s) => (isRing(s) ? [s] : s));
 	return rings.map((r) => 'M' + r.map(([x, y]) => `${Math.round(x * 100) / 100} ${Math.round(y * 100) / 100}`).join('L') + 'Z').join('');
@@ -133,9 +146,10 @@ const gear = blob(12, 12, (x, y) => {
 
 /** One mark per docs page, keyed by what the page is about. */
 export const ICONS = {
-	devices: path(frame(1, 4, 14, 10, 1.6, 1), rect(0.5, 15.2, 16, 2, 1), band(rect(17, 7.5, 6.5, 14, 1.2), 1.3), circle(20.25, 19.6, 0.7)),
-	'new-app': path(frame(2, 3, 20, 18, 1.6, 1.5), rect(3.8, 6.6, 16.4, 1.3), plus(12, 14.2, 8.4, 2.4)),
-	'tsrx-file': path(band([[4, 1.5], [14.5, 1.5], [20, 7], [20, 22.5], [4, 22.5]], 1.6), bar([[10.5, 10.5], [7.8, 14], [10.5, 17.5]], 1.7), bar([[13.5, 10.5], [16.2, 14], [13.5, 17.5]], 1.7)),
+	inkwell: path(band(rect(1, 14.5, 12.5, 8.5, 2.6), 1.5), rect(3.2, 18.4, 8.1, 2.8, 0.8), rect(3.8, 11.6, 6.9, 2.2, 0.7), bar([[7.6, 11], [22.8, 0.6]], 1.1), leaf([9.4, 9.8], [23.4, 0.2], 9, 0.58, 0.75)),
+	sprout: path(bar([[12, 19.2], [12.2, 15], [11.6, 11.4]], 1.8), leaf([10.6, 12.2], [2.2, 7.4], 5.6), leaf([12.8, 10.6], [21.6, 3.4], 7), arc(12, 23, 9, 180, 360).map(([x, y]): P => [x, 23 + (y - 23) * 0.4])),
+	'moving-box': path(band(rect(1.5, 10.5, 14.5, 12, 0.6), 1.6), [[1.5, 9.7], [8.2, 9.7], [5.6, 5.4], [0, 7]], [[9.4, 9.7], [16, 9.7], [18.6, 6.2], [12, 5]], rect(5.4, 13.6, 6.8, 2.2, 1.1), bar([[16.6, 11], [19.2, 13.6]], 1), turn([[[18.4, 14.4], [21.4, 14.4], [23.4, 16.6], [23.4, 23], [16.4, 23], [16.4, 16.6]], circle(19.9, 17.2, 1.1)], -10, 19.9, 18.5)),
+	'page-lens': path(band(blob(7.5, 8, (x, y) => inRect(x, y, 2, 1.5, 14, 18.5) && !inCircle(x, y, 15.5, 15, 7)), 1.5), rect(4.6, 5, 8.8, 1.4, 0.7), rect(4.6, 8.4, 6.6, 1.4, 0.7), rect(4.6, 11.8, 3.6, 1.4, 0.7), ring(15.5, 15, 5.6, 1.7), rect(12.6, 13.2, 5.8, 1.6, 0.8), rect(12.6, 16.2, 4, 1.6, 0.8), bar([[19.6, 19.1], [22.6, 22.4]], 3)),
 	jar: path(band(rect(4, 7, 16, 15.5, 3), 1.6), rect(5.5, 2.2, 13, 3.6, 1), turn(ellipse(9.2, 17.5, 1.9, 1.2), -20, 9.2, 17.5), turn(ellipse(14.2, 16.8, 1.9, 1.2), 25, 14.2, 16.8), turn(ellipse(11.6, 12.8, 1.9, 1.2), -5, 11.6, 12.8)),
 	funnel: path(band([[2, 8], [22, 8], [14, 15.5], [14, 21], [10, 23], [10, 15.5]], 1.5), circle(7, 3.6, 2), circle(17, 3.6, 2), circle(12, 2.6, 1.4)),
 	click: path([[9, 8], [9, 22.5], [12.4, 19], [14.8, 23.6], [17.4, 22.4], [15, 17.8], [19.8, 17.6]], bar([[9, 1.5], [9, 4.8]], 1.6), bar([[3.2, 3.8], [5.4, 6]], 1.6), bar([[2.2, 10.5], [5.4, 10.5]], 1.6), bar([[14.8, 3.8], [12.6, 6]], 1.6)),
