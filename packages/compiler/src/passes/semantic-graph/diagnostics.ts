@@ -274,7 +274,7 @@ export function templateExpressionUnsupportedDiagnostic(input: {
 		why: 'An expression with no graph node behind it renders once, from whatever the value was at render, and a later write never reaches it - so the page would show a stale value and nothing would say so.',
 		span: sourceSpan(input.node, input.filename),
 		suggestion:
-			'Write a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads. If the value needs a function of your own, put that function inside a `computed()` and read the computed here.',
+			'Write a plain read (`group.value`), an expression built from reads, operators and method calls, or a call to a function declared with `function` or `const` that does not change state. A function held in a `let`, or one that writes state, cannot be followed: move the write into an event handler.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 	});
 }
