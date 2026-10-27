@@ -122,7 +122,9 @@ const resumeOnDemandEntries = [
 // 2026-10-25: page comment indexes read the served page's comments once a streamed arm has landed: resume-keyed-repeats.ts
 // closure 29,979 -> 30,156 raw, all of it pageCommentCensus in resume-anchor-census.ts, which that bundle never keeps;
 // minified+gzip 4,653 -> 4,653 bytes (rolldown, workspace packages external, same method both sides).
-const sourceByteLimit = 30156;
+// 2026-10-26: an idle-started runtime defers row code for @if rows with no arm events: 30,156 -> 30,164 raw;
+// minified 12,365 -> 12,365, gzip 4,821 -> 4,827 bytes (rolldown, workspace packages external, same method both sides).
+const sourceByteLimit = 30164;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
