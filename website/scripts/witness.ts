@@ -398,39 +398,23 @@ try {
 		await hover.blur();
 
 		// --- the island still resumes -----------------------------------------
-		const button = page.locator('.code-block [data-code-stage]').getByRole('button', { name: 'Pour a cup' }).first();
-		const cupsLine = page.locator('.code-block [data-code-stage] p').first();
+		const stage = page.locator('.code-block [data-code-stage]').first();
+		const button = stage.getByRole('button', { name: 'Dark' });
+		const themeLine = stage.locator('h2').first();
 		await button.waitFor();
 		await page.screenshot({ path: `${shotsDir}/T004-state-before.png`, fullPage: true });
 
-		const readCount = async () => ((await cupsLine.textContent()) ?? '').trim();
-		const before = await readCount();
-		check(
-			before === 'Cups of coffee today: 0',
-			'the cups demo renders its zero state from the server',
-			before,
-		);
+		const readTheme = async () => ((await themeLine.textContent()) ?? '').trim();
+		const before = await readTheme();
+		check(before === 'Theme: light', 'the settings demo renders its light theme from the server', before);
 
-		// First click both wakes the island and increments; wait for the text to
-		// settle before the second click (a click sent mid-resume is dropped).
+		// The first click both wakes the island and assigns; wait for the text to settle before the next click.
 		await button.click();
-		await settleText(
-			cupsLine,
-			(text) => text === 'Cups of coffee today: 1',
-			'the cups demo counts the first click',
-		);
-		await button.click();
-		await settleText(
-			cupsLine,
-			(text) => text === 'Cups of coffee today: 2',
-			'the cups demo counts the second click',
-		);
-		const after = await readCount();
-		check(
-			after === 'Cups of coffee today: 2',
-			'the cups demo reaches 2 after two clicks (island resumed)',
-			after,
-		);
+		await settleText(themeLine, (text) => text === 'Theme: dark', 'the settings demo turns dark on the first click');
+		await stage.getByRole('button', { name: 'Light' }).click();
+		await settleText(themeLine, (text) => text === 'Theme: light', 'the settings demo turns light again');
+		const after = await readTheme();
+		check(after === 'Theme: light', 'the settings demo answers both buttons (island resumed)', after);
 		await page.screenshot({ path: `${shotsDir}/T004-state-after.png`, fullPage: true });
 
 		const heads: { href: string; title: string; description: string }[] = [];
@@ -585,42 +569,18 @@ try {
 			fullPage: true,
 		});
 
-		// --- widget: the drawn number on the state page --------------------------
+		// --- widget: every spot that shows theme on the state page ----------------
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const cupsStage = page.locator('.code-block [data-code-stage]').first();
-		const cupsNumbers = async () =>
-			(await cupsStage.locator('p').allTextContents()).map((text) =>
-				Number(text.replace(/[^0-9]+/g, '')),
-			);
-		const pour = cupsStage.getByRole('button', { name: 'Pour a cup' });
-		await pour.waitFor();
-		const [watchedBefore, drawnBefore] = await cupsNumbers();
-		check(watchedBefore === 0, 'cups watched number starts at 0', String(watchedBefore));
+		const themeStage = page.locator('.code-block [data-code-stage]').first();
+		await themeStage.getByRole('button', { name: 'Dark' }).waitFor();
+		await themeStage.getByRole('button', { name: 'Dark' }).click();
+		await settleText(themeStage.locator('h2').first(), (text) => text === 'Theme: dark', 'theme heading turns dark');
 		check(
-			Number.isFinite(drawnBefore) && drawnBefore >= 10 && drawnBefore <= 99,
-			'cups drew a number while the page was set up',
-			String(drawnBefore),
+			(await themeStage.locator('main').first().getAttribute('class'))?.split(/\s+/).includes('dark') === true &&
+				((await themeStage.locator('main p').first().textContent()) ?? '').includes('🌙'),
+			'one click changes the class and the picture along with the heading',
 		);
-		await pour.click();
-		await settleText(
-			cupsStage.locator('p').first(),
-			(text) => text.endsWith(': 1'),
-			'cups watched number reaches 1',
-		);
-		const [watchedAfter, drawnAfter] = await cupsNumbers();
-		check(watchedAfter === 1, 'cups watched number moved on click', String(watchedAfter));
-		check(
-			drawnAfter === drawnBefore,
-			'cups drawn number did not move, so the component did not run again',
-			`${drawnBefore} then ${drawnAfter}`,
-		);
-		await cupsStage.getByRole('button', { name: 'Start over' }).click();
-		await settleText(
-			cupsStage.locator('p').first(),
-			(text) => text === 'Cups of coffee today: 0',
-			'Start over assigns the count back to 0',
-		);
-		await page.screenshot({ path: `${shotsDir}/T005-cups-after.png`, fullPage: true });
+		await page.screenshot({ path: `${shotsDir}/T005-theme-after.png`, fullPage: true });
 
 		// --- the Code block on the state page --------------------------------------
 		{
@@ -660,20 +620,20 @@ try {
 			const input = block.locator('[data-code-input]').first();
 			check(
 				(await input.getAttribute('readonly')) !== null &&
-					(await input.inputValue()).includes('let cups = state(0)'),
+					(await input.inputValue()).includes("let theme = state('light')"),
 				'Code: the server sends each file as a read-only textarea over its highlighted lines',
 			);
 			await block
 				.locator('[data-code-stage]')
-				.getByRole('button', { name: 'Pour a cup' })
+				.getByRole('button', { name: 'Dark' })
 				.click();
 			await settleText(
-				block.locator('[data-code-stage] p').first(),
-				(text) => text.endsWith(': 1'),
+				block.locator('[data-code-stage] h2').first(),
+				(text) => text === 'Theme: dark',
 				'Code: the prerendered starter result is live before the editor loads',
 			);
 			const prerenderedSize = await block
-				.locator('[data-code-stage] p')
+				.locator('[data-code-stage] h2')
 				.first()
 				.evaluate((node) => getComputedStyle(node).fontSize);
 			await block.hover();
@@ -682,15 +642,15 @@ try {
 				(await input.getAttribute('readonly')) === null,
 				'Code: pointing at the block makes the code editable',
 			);
-			await retype(codePage, block, 'Cups of coffee today', '<p>Mugs poured: {cups}</p>');
+			await retype(codePage, block, '<h2>Theme: {theme}</h2>', '<h2>Mode: {theme}</h2>');
 			const frame = codePage.frameLocator('.code-frame');
-			await frame.locator('text=Mugs poured: 0').waitFor({ timeout: 30000 });
+			await frame.locator('text=Mode: light').waitFor({ timeout: 30000 });
 			check(
 				await block.locator('[data-code-stage]').isHidden(),
 				'Code: an edit compiles in the browser and the frame takes over the Result pane',
 			);
 			const frameSize = await frame
-				.locator('p')
+				.locator('h2')
 				.first()
 				.evaluate((node) => getComputedStyle(node).fontSize);
 			check(
@@ -704,7 +664,7 @@ try {
 				"Code: the highlighted lines repaint under the edit and stay the textarea's size",
 				JSON.stringify(layers),
 			);
-			await retype(codePage, block, 'let cups = state(0)', 'let cups = 0;');
+			await retype(codePage, block, "let theme = state('light')", "let theme = 'light';");
 			await block.locator('.line.problem').first().waitFor({ timeout: 30000 });
 			check(
 				/MARKLESS_STATE_STALE_LOCAL_WRITE/.test(
@@ -717,18 +677,18 @@ try {
 				'Code: a build error marks the line it names and is listed under the result',
 			);
 			await block.getByRole('button', { name: 'Reset code' }).click();
-			await frame.locator('text=Cups of coffee today: 0').waitFor({ timeout: 30000 });
+			await frame.locator('text=Theme: light').waitFor({ timeout: 30000 });
 			check(
 				(await block.locator('.line.problem').count()) === 0 &&
-					(await input.inputValue()).includes('let cups = state(0)'),
+					(await input.inputValue()).includes("let theme = state('light')"),
 				'Code: Reset restores the starter and clears the error',
 			);
-			await retype(codePage, block, 'let cups = state(0)', 'let cups = state(7)');
+			await retype(codePage, block, "let theme = state('light')", "let theme = state('dark')");
 			const typed = await input.inputValue();
 			await block.getByRole('button', { name: 'Run again' }).click();
 			await codePage.waitForTimeout(800);
 			check(
-				(await input.inputValue()) === typed && typed.includes('state(7)'),
+				(await input.inputValue()) === typed && typed.includes("state('dark')"),
 				'Code: Run again re-runs the preview and keeps the typed code',
 			);
 			await block.getByRole('button', { name: 'Reset code' }).click();
@@ -1901,31 +1861,16 @@ try {
 		};
 
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const pourCard = page.locator('section[data-preview="state-pour"]');
-		const pourButton = pourCard.locator('.slot:not([hidden])').getByRole('button', { name: 'Pour a cup' });
-		await pourButton.waitFor();
-		await pourButton.focus();
+		const settings = page.locator('.settings-demo').first();
+		await settings.getByRole('button', { name: 'Dark' }).focus();
 		await page.keyboard.press('Enter');
-		await pourButton.click();
-		await settleWatch(pourCard, (text) => text.includes('“Cups today: 2”'), 'state preview reports the text a click changed');
+		await settleText(settings.locator('.heading span'), (text) => text === 'Theme: dark', 'state preview turns dark by key');
+		await settings.getByRole('button', { name: 'Light' }).click();
+		await settleText(settings.locator('.heading span'), (text) => text === 'Theme: light', 'state preview turns light by click');
 		check(
-			(await watchText(pourCard)).includes('“Cups today: 2”'),
-			'state preview: two pours, by key and by click, change only the cups text',
-			await watchText(pourCard),
-		);
-		check(
-			(await ledgerText(pourCard)).includes('{drawn} never changed') &&
-				(await ledgerText(pourCard)).includes('cups++ ran 2 times'),
-			'state preview: the ledger counts cups++ runs and shows {drawn} untouched',
-			await ledgerText(pourCard),
-		);
-		await pourCard.getByRole('switch', { name: 'Button shows cups too' }).click();
-		await pourCard.locator('.slot:not([hidden])').getByRole('button', { name: /Pour cup/ }).click();
-		await settleWatch(pourCard, (text) => text.includes('2 pieces of text'), 'state preview counts both readers');
-		check(
-			(await watchText(pourCard)).includes('“Pour cup 2”'),
-			'state preview: with the button reading cups, one click changes both texts',
-			await watchText(pourCard),
+			((await settings.locator('.tally').textContent()) ?? '').replace(/\s+/g, ' ').includes('The click handler ran 2 times'),
+			'state preview: the handler ran twice while Settings() ran once',
+			(await settings.locator('.tally').textContent()) ?? '',
 		);
 
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
