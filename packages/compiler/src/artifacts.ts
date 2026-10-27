@@ -61,6 +61,8 @@ export type ParameterEffect = {
 	readonly unseen: ReadonlyArray<{
 		readonly callee: string;
 		readonly path: ReadonlyArray<string> | null;
+		/** Handed to the function its caller passes as parameter `parameter`, as that function's argument `argument`. */
+		readonly through?: { readonly parameter: number; readonly argument: number };
 	}>;
 };
 

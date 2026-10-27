@@ -9,7 +9,10 @@ type Binding = ModuleSemantics['bindings'][number];
 export type CalleeEffect =
 	| { readonly kind: 'pure' }
 	| { readonly kind: 'effect'; readonly name: string; readonly effect: ParameterEffect }
-	| { readonly kind: 'unseen'; readonly name: string };
+	| { readonly kind: 'unseen'; readonly name: string; readonly through?: Through };
+
+type Through = { readonly parameter: number; readonly argument: number };
+type Pass = ParameterEffect['unseen'][number];
 
 // Globals that read their arguments and keep none of them.
 const PURE_GLOBALS = new Set([
@@ -225,7 +228,9 @@ export function summarizeModuleFunctions(input: {
 	for (const exported of module.exports) {
 		if (!exported.name || !exported.local) continue;
 		const fn = functionOfBinding(module, exported.local);
+		const table = fn ? null : functionTableOf(module, exported.local);
 		if (fn) summaries[exported.name] = effects.ofFunction(fn);
+		else if (table) summaries[exported.name] = mergeEffects(table.map(effects.ofFunction));
 		else if (changedInModule(module, exported.local)) {
 			summaries[exported.name] = { parameters: [], changedByItsModule: true };
 		}
@@ -236,6 +241,11 @@ export function summarizeModuleFunctions(input: {
 export type FunctionEffects = {
 	readonly ofFunction: (fn: AnyNode) => FunctionEffect;
 	readonly ofCallee: (call: AnyNode, argumentIndex: number, within?: AnyNode) => CalleeEffect;
+	readonly resolveThrough: (
+		call: AnyNode,
+		effect: ParameterEffect,
+		caller?: AnyNode,
+	) => ParameterEffect;
 };
 
 // `imported` answers for an imported callee by specifier and name; undefined is a function this compile cannot see.
@@ -285,7 +295,7 @@ export function createFunctionEffects(
 
 	const createTracker = (fn: AnyNode) => {
 		const mutates: Array<string[] | null> = [];
-		const unseen: Array<{ callee: string; path: string[] | null }> = [];
+		const unseen: Array<{ callee: string; path: string[] | null; through?: Through }> = [];
 		const retains: Array<string[] | null> = [];
 		const seen = new Set<number>();
 
@@ -419,15 +429,24 @@ export function createFunctionEffects(
 					const callee = ofCallee(parent, index, fn);
 					if (callee.kind === 'pure') return;
 					if (callee.kind === 'unseen') {
-						unseen.push({ callee: callee.name, path });
+						unseen.push({
+							callee: callee.name,
+							path,
+							...(callee.through ? { through: callee.through } : {}),
+						});
 						return;
 					}
 					const within = (inner: ReadonlyArray<string> | null) =>
 						path === null || inner === null ? null : [...path, ...inner];
-					for (const mutated of callee.effect.mutates) mutates.push(within(mutated));
-					for (const kept of callee.effect.retains) retains.push(within(kept));
-					for (const pass of callee.effect.unseen) {
-						unseen.push({ callee: pass.callee, path: within(pass.path) });
+					const effect = resolveThrough(parent, callee.effect, fn);
+					for (const mutated of effect.mutates) mutates.push(within(mutated));
+					for (const kept of effect.retains) retains.push(within(kept));
+					for (const pass of effect.unseen) {
+						unseen.push({
+							callee: pass.callee,
+							path: within(pass.path),
+							...(pass.through ? { through: pass.through } : {}),
+						});
 					}
 					return;
 				}
@@ -509,7 +528,25 @@ export function createFunctionEffects(
 			}
 			const fn = functionOfBinding(module, binding);
 			if (fn) return parameterOf(ofFunction(fn), argumentIndex, name);
+			const parameter = within ? parameterIndex(within, binding) : -1;
+			if (parameter >= 0)
+				return { kind: 'unseen', name, through: { parameter, argument: argumentIndex } };
 			return { kind: 'unseen', name };
+		}
+
+		// `ops[op](x)` picks one function of a table: what any of them does decides.
+		if (callee.type === 'MemberExpression' && callee.computed === true) {
+			const owner = unwrapTypeAssertion(callee.object as AnyNode | undefined);
+			const binding = owner?.type === 'Identifier' ? module.bindingOf(owner as never) : null;
+			if (!binding) return { kind: 'unseen', name };
+			const importRecord = module.imports.find((record) => record.local?.id === binding.id);
+			if (importRecord && !importRecord.isNamespace) {
+				const summary = imported(importRecord.specifier, importRecord.name ?? 'default');
+				return parameterOf(summary, argumentIndex, name);
+			}
+			const table = importRecord ? null : functionTableOf(module, binding);
+			if (!table) return { kind: 'unseen', name };
+			return parameterOf(mergeEffects(table.map(ofFunction)), argumentIndex, name);
 		}
 
 		if (callee.type === 'MemberExpression' && callee.computed !== true) {
@@ -559,7 +596,63 @@ export function createFunctionEffects(
 		return { kind: 'unseen', name };
 	};
 
-	return { ofFunction, ofCallee };
+	// A pass into a function the caller hands over is decided by that function, when the caller wrote it.
+	const resolveThrough = (
+		call: AnyNode,
+		effect: ParameterEffect,
+		caller?: AnyNode,
+	): ParameterEffect => {
+		if (!effect.unseen.some((pass) => pass.through)) return effect;
+		const mutates = [...effect.mutates];
+		const retains = [...effect.retains];
+		const unseen: Pass[] = [];
+		for (const pass of effect.unseen) {
+			const handed = pass.through
+				? unwrapTypeAssertion(asNodes(call.arguments)[pass.through.parameter])
+				: undefined;
+			const binding =
+				handed?.type === 'Identifier' ? module.bindingOf(handed as never) : null;
+			const target =
+				handed && isFunctionNode(handed)
+					? handed
+					: binding
+						? functionOfBinding(module, binding)
+						: null;
+			if (pass.through && target) {
+				const inner = ofFunction(target).parameters[pass.through.argument] ?? NO_EFFECT;
+				const at = (path: ReadonlyArray<string> | null) =>
+					pass.path === null || path === null ? null : [...pass.path, ...path];
+				mutates.push(...inner.mutates.map(at));
+				retains.push(...inner.retains.map(at));
+				unseen.push(
+					...inner.unseen.map((nested) => ({ ...nested, path: at(nested.path) })),
+				);
+				continue;
+			}
+			const forwarded = binding && caller ? parameterIndex(caller, binding) : -1;
+			unseen.push(
+				pass.through && forwarded >= 0
+					? {
+							...pass,
+							through: { parameter: forwarded, argument: pass.through.argument },
+						}
+					: { callee: pass.callee, path: pass.path },
+			);
+		}
+		return { mutates, retains, unseen };
+	};
+
+	return { ofFunction, ofCallee, resolveThrough };
+}
+
+function parameterIndex(fn: AnyNode, binding: Binding): number {
+	return asNodes(fn.params).findIndex((param) => {
+		const target = unwrapPattern(param);
+		return (
+			target.type === 'Identifier' &&
+			(binding.declarations[0] as unknown as AnyNode | undefined) === target
+		);
+	});
 }
 
 function parameterOf(
@@ -688,6 +781,47 @@ function isLocalContainer(module: ModuleSemantics, identifier: AnyNode, within?:
 		CONTAINER_CONSTRUCTORS.has(callee.name as string) &&
 		!module.bindingOf(callee as never)
 	);
+}
+
+/** The functions of `const ops = { a: () => ..., b() {} }`, never reassigned or changed; null for anything else. */
+function functionTableOf(module: ModuleSemantics, binding: Binding): AnyNode[] | null {
+	if (changedInModule(module, binding)) return null;
+	const declaration = binding.declarations[0] as unknown as AnyNode | undefined;
+	const declarator = declaration && parentOf(module, declaration);
+	if (declarator?.type !== 'VariableDeclarator' || declarator.id !== declaration) return null;
+	const init = unwrapTypeAssertion(declarator.init as AnyNode | undefined);
+	if (init?.type !== 'ObjectExpression') return null;
+	const functions: AnyNode[] = [];
+	for (const property of asNodes(init.properties)) {
+		if (property.type !== 'Property') return null;
+		const value = unwrapTypeAssertion(property.value as AnyNode | undefined);
+		if (!value || !isFunctionNode(value)) return null;
+		functions.push(value);
+	}
+	return functions.length > 0 ? functions : null;
+}
+
+function mergeEffects(effects: ReadonlyArray<FunctionEffect>): FunctionEffect {
+	const width = Math.max(...effects.map((effect) => effect.parameters.length));
+	return {
+		parameters: Array.from({ length: width }, (_, index) => {
+			const at = effects.map((effect) => effect.parameters[index] ?? NO_EFFECT);
+			return {
+				mutates: uniqueBy(
+					at.flatMap((effect) => effect.mutates),
+					(path) => JSON.stringify(path),
+				),
+				retains: uniqueBy(
+					at.flatMap((effect) => effect.retains),
+					(path) => JSON.stringify(path),
+				),
+				unseen: uniqueBy(
+					at.flatMap((effect) => effect.unseen),
+					(pass) => JSON.stringify(pass),
+				),
+			};
+		}),
+	};
 }
 
 /** The function a name is declared as: `function f() {}`, or `const f = () => {}` never reassigned. */

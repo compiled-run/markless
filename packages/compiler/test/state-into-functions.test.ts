@@ -26,6 +26,12 @@ export function stamp(card: { title: string }) { card.title = 'x'; stamped = car
 export function stampAndSend(card: { title: string }) { card.title = 'y'; vendorSave(card); }
 export function swapEnds(list: string[]) { const next = [...list]; const first = next[0]!; next[0] = next[next.length - 1]!; next[next.length - 1] = first; return next; }
 export function idsOf(list: Array<{ id: number }>) { const ids = new Set(list.map((entry) => entry.id)); const byId = new Map([[0, list.length]]); return ids.size + byId.size; }
+const onFirst = (lists: string[][], change: (items: string[]) => string[]) => lists.map((list, at) => (at === 0 ? change(list) : list));
+export function eachFirst(lists: string[][], change: (items: string[]) => string[]) { return onFirst(lists, change); }
+export const nested: Record<string, (lists: string[][]) => string[][]> = { rev: (lists) => onFirst(lists, (items) => [...items].reverse()) };
+export const nestedKeep: Record<string, (lists: string[][]) => string[][]> = { hold: (lists) => onFirst(lists, (items) => { remembered.set({}, items); return items; }) };
+export const pure: Record<string, (list: string[]) => string[]> = { rev: (list) => [...list].reverse(), drop: (list) => list.slice(1) };
+export const keep: Record<string, (list: string[]) => string[]> = { rev: (list) => [...list].reverse(), hold: (list) => { remembered.set({}, list); return list; } };
 export function tally(card: { title: string }) { const seen = new Map(); seen.set('c', card); return seen.size; }
 `;
 
@@ -190,6 +196,63 @@ export function Board() @{
 	expect(errors(result).map((diagnostic) => diagnostic.message)).toEqual([
 		expect.stringContaining('Cannot pass "{ title, card }" to pack() here'),
 	]);
+});
+
+test('a function picked from an exported table of functions is decided by every function in the table', async () => {
+	const source = (table: string) => `import { state } from '@markless/core';
+import { ${table} } from './cards.ts';
+
+export function Board() @{
+	let list = state(['a', 'b']);
+	@for (const op of Object.keys(${table}); key op) { <button onClick={() => { list = ${table}[op]!(list); }}>{op}</button> }
+}
+`;
+	const compileWith = (table: string) =>
+		compileTsrxModule({
+			filename: 'src/Board.tsrx',
+			source: source(table),
+			symbols: [],
+			importedFunctionSummaries: summaries,
+		});
+
+	expect(errors(await compileWith('pure'))).toEqual([]);
+	expect(errors(await compileWith('keep')).map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining('keeps a reference to it after it returns'),
+	]);
+});
+
+test('a value handed to a callback the caller wrote is decided by that callback', async () => {
+	const source = (body: string, names: string) => `import { state } from '@markless/core';
+import { ${names} } from './cards.ts';
+
+export function Board() @{
+	let lists = state([['a', 'b']]);
+	<button onClick={() => { ${body} }}>{lists.length}</button>
+}
+`;
+	const run = async (body: string, names: string) =>
+		errors(
+			await compileTsrxModule({
+				filename: 'src/Board.tsrx',
+				source: source(body, names),
+				symbols: [],
+				importedFunctionSummaries: summaries,
+			}),
+		).map((diagnostic) => diagnostic.message);
+
+	expect(await run("lists = nested['rev']!(lists);", 'nested')).toEqual([]);
+	expect(await run('lists = eachFirst(lists, (items) => items.slice(1));', 'eachFirst')).toEqual(
+		[],
+	);
+	expect(await run("lists = nestedKeep['hold']!(lists);", 'nestedKeep')).toEqual([
+		expect.stringContaining('keeps a reference to it after it returns'),
+	]);
+	expect(
+		await run(
+			'lists = eachFirst(lists, (items) => { stash(items); return items; });',
+			'eachFirst',
+		),
+	).toEqual([expect.stringContaining('hands it on to stash()')]);
 });
 
 test('without summaries from the host, an imported function is a pending request and not a refusal', async () => {

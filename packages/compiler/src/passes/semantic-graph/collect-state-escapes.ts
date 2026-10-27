@@ -81,7 +81,11 @@ function resolveCall(node: AnyNode, state: WalkState): void {
 		if (!call) return;
 		if (index === 0 && isObjectAssign(call)) return;
 		if (isMarklessCallee(call, state)) return;
-		const callee = effects.effects.ofCallee(call, index);
+		const found = effects.effects.ofCallee(call, index);
+		const callee =
+			found.kind === 'effect'
+				? { ...found, effect: effects.effects.resolveThrough(call, found.effect) }
+				: found;
 		const refusal = refusalFor(
 			callee,
 			value,
@@ -276,12 +280,8 @@ function refusalFor(
 	calleeSource: string,
 ): Refusal | null {
 	if (callee.kind === 'pure') return null;
-	if (callee.kind === 'unseen') {
-		return {
-			callee: callee.name === 'the function it computes' ? calleeSource : callee.name,
-			reason: 'unseen',
-		};
-	}
+	const name = callee.name === 'the function it computes' ? calleeSource : callee.name;
+	if (callee.kind === 'unseen') return { callee: name, reason: 'unseen' };
 	const { effect } = callee;
 	const fresh = argument.type === 'ObjectExpression' || argument.type === 'ArrayExpression';
 	const mutated = effect.mutates.find((path) =>
@@ -294,12 +294,12 @@ function refusalFor(
 	);
 	// A change made now can be tracked after the call; one made later or out of sight cannot.
 	if (effect.retains.some((path) => riskAt(argument, path, state))) {
-		return { callee: callee.name, reason: 'retains' };
+		return { callee: name, reason: 'retains' };
 	}
 	const handedOn = effect.unseen.find((pass) => riskAt(argument, pass.path, state));
-	if (handedOn) return { callee: callee.name, reason: 'hands-on', detail: handedOn.callee };
+	if (handedOn) return { callee: name, reason: 'hands-on', detail: handedOn.callee };
 	if (mutated !== undefined) {
-		return { callee: callee.name, reason: 'mutates', detail: mutated?.join('.') ?? '' };
+		return { callee: name, reason: 'mutates', detail: mutated?.join('.') ?? '' };
 	}
 	return null;
 }
