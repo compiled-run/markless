@@ -111,6 +111,28 @@ Multi-commit series (for example a migration done unit by unit) go on a branch w
 
 A release commit runs `pnpm release:check` and `--fast`; a new package additionally needs its npm trusted-publisher entry before the first publish (two release runs failed with `E404` on a package's first publish).
 
+### Lanes: what each proves and when it runs
+
+Every job in `ci.yml` runs on pull requests, in the merge queue and on pushes to `main`. A content-hashed lane is skipped when its inputs already went green (the `lanes` job decides; section 1), and a push the merge queue already tested runs only the always-on jobs. The required checks are `test`, `typecheck` and `agent-files`.
+
+| Lane | What it proves | Pull request | Merge queue | `main` |
+| --- | --- | --- | --- | --- |
+| `agent-files` | agent files match `.ruler/` | always | always | always |
+| `typecheck` | `ci.yml` structure, `pnpm typecheck`, lint | always | always | always |
+| `typecheck-ts7` | the same type gate on TypeScript 7.1 | always | always | always |
+| `unit` (3 shards) | the node test project, including Chromium and WebKit fixture tests | when its inputs changed | same | skipped if the queue tested the commit |
+| `browser` (3 shards) | the real-Chromium `browser` and `ui` projects, the `@markless/ui` API manifest | when its inputs changed | same | same |
+| `completion-matrix` | the packaged editor plugin's completions | when its inputs changed | same | same |
+| `boxes-*`, `receipts` | witness boxes for the bundler, router and music players, and the analyzer receipt set they write | when their inputs changed | same | same |
+| `website-boxes`, `demo-boxes` | the docs site and the demos build and behave | when their inputs changed | same | same |
+| `perf-guards` | page-weight and interaction budgets | when their inputs changed | same | same |
+| `build-scale`, `build-warnings` | build memory and output at 100 and 300 pages; no new build warnings | when their inputs changed | same | same |
+| `package-manager-matrix` | CLI workspace detection under npm, pnpm, yarn and bun (not required) | always | always | always |
+| `benchmark`, `benchmark-guard` | js-framework-benchmark against the base (not required) | when the change can reach the benchmark app | same | same |
+| `screen-reader.yml` `virtual` | each `@markless/ui` family's transcript with a JavaScript screen reader | when headless, runtime, web or the markup passes changed | no | nightly |
+| `screen-reader.yml` `nvda`, `voiceover` | the same transcripts with real NVDA (Windows) and VoiceOver (macOS, advisory) | dispatch only | no | nightly; the release cut refuses unless the newest nightly it contains passed |
+| `ecosystem-ci.yml` | the migrated sites build and check against Markless (never blocks) | `/ecosystem-ci run` comment | no | every 3 hours when `main` moved; the release commit; every route nightly in the ecosystem repository |
+
 ## 4. Flake policy
 
 A flake is a test that fails and passes on the same code. Rules:
@@ -133,6 +155,20 @@ A flake is a test that fails and passes on the same code. Rules:
 | Test | Expires | Owner | Why |
 | --- | --- | --- | --- |
 | `packages/vitest-browser/browser/child-async-prop/child-async-prop.test.ts`, both tests | 2026-11-10 | author of #322 (`test/hold-search-in-stale-checks`) | Failed 8 CI runs on 2026-10-27 (merge groups for #265, #294, #303, #304 and #310; pull request runs of `fix/rl-state-escapes`, `fix/rl-state-snapshots` and `fix/maieul-row-prop`), each `expected [ null, '1' ] to deeply equal [ 'true', '0.5' ]`: after the second keystroke the dimmed list never showed. On this Mac at load average 44 the SSR test failed the same way 7 of 10 runs. With the fixture search held until the test releases it (#322's test change), the list is missing instead (`[ null, undefined ]`, 2 of 5 runs): the settle drew the `@pending` arm for an answer a newer search had superseded. That is a runtime race in `settleAsyncBoundaryRange` (`packages/web/src/resume-async-wiring.ts`), which #322 fixes. On the expiry date both tests run again and a guard test in the same file fails. |
+
+### Quarantine list
+
+A test listed here failed and then passed on a rerun of the same commit at least twice in the last two weeks. It keeps running: a red run of a listed test may be rerun once, with a note on the PR naming the entry, and a second red is a real failure. On the expiry date each entry is fixed or renewed with what was learned.
+
+| Test | What fails | Evidence (first attempts that passed on rerun) | Owner | Expires |
+| --- | --- | --- | --- | --- |
+| `packages/router/test/vite/page-region.test.ts` (webkit) | "the landing serves the page as body children and resumes", "a fragment swap to a streamed @pending page keeps the document content": 30 s test timeout | CI runs 40374168601, 39223212007 | thejackshelton | 2026-11-09 |
+| `packages/router/test/vite/fragment-cache.test.ts` (chromium) | "the move that woke the navigation code over a link still counts as resting on it" (30 s timeout), "a page that answers Cache-Control: no-store is fetched again at the click" | CI runs 40193557743, 40075780850 | thejackshelton | 2026-11-09 |
+| `packages/bundler/test/ssr-browser-hmr.test.ts` | "reports an invalid real edit without reload and clears it before the corrected reload", "a new .tsrx file nothing loaded imports sends no reload and no error" (watcher events, see the mechanisms above) | CI runs 39978464580, 39404383274 | thejackshelton | 2026-11-09 |
+| `benchmark-guard` | "The benchmark shards disagree on whether the app changed": two shards built different apps from one commit | CI runs 40195481656, 40017342977 | thejackshelton | 2026-11-09 |
+| `packages/cli/test/workspace-matrix.test.ts` (`package-manager-matrix`) | npm installs time out at 90 s ("a non-member app installs on its own", "an app that already matches a member declaration") | CI run 39741280055; the 0.9.0 release pull request run | thejackshelton | 2026-11-09 |
+
+Seen once in the same window and watched, not listed: `navigation-release.test.ts` (40401426019), `fragment-navigation.test.ts` (40070980873), `music-player-ssr-budget.test.ts` (40100142200), `node-in-browser-fixture.test.ts` (39908441660), `item-collections.test.ts` (39903780595), `resizable.browser.ts` (39936516624), `toaster.browser.ts` (39117438419), `component-row-refresh.test.ts` (39110964263), `completion-matrix.test.ts` M10 (39404383274). Locally under heavy load (load average 50 to 70) the pre-commit run of `--fast` also timed out in `fixed-route-rows.test.ts` (its `afterAll` past the 10 s hook timeout), `markless-tsc.test.ts`, `language.test.ts` and several bundler tests; each passed alone in seconds.
 
 ## 5. Keeping `main` green
 
