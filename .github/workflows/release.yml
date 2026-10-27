@@ -166,6 +166,13 @@ jobs:
                     node scripts/release/cut.mjs
                   fi
 
+            # NVDA and VoiceOver read main nightly instead of on every pull request, so their verdict gates here.
+            - name: Require the nightly screen readers green on a commit the release contains
+              if: steps.cut.outputs.resumed != 'true'
+              env:
+                  BASE: ${{ steps.cut.outputs.base }}
+              run: node scripts/release/reader-gate.mjs --base "$BASE"
+
             - name: Show the drafted changelog section
               env:
                   NOTES_FILE: ${{ steps.cut.outputs.notes_file }}
