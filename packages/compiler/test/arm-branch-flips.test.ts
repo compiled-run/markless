@@ -589,3 +589,34 @@ export function App() @{
 	).toBe(false);
 });
 
+
+test('an @if decided by props alone that cannot rebuild names its component and props for the build to check callers', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Panel.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+function Counter() @{
+	let count = state(0);
+	<button type="button" onClick={() => count++}>{count}</button>
+}
+
+export function Panel({ open, mode }) @{
+	const shown = computed(() => open && mode !== 'off');
+	<section>
+		@if (shown) {
+			<Counter />
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+	const decided = result.symbolModules.propDecidedBranches ?? [];
+	expect(decided.map(({ componentName, props }) => ({ componentName, props }))).toEqual([
+		{ componentName: 'Panel', props: ['open', 'mode'] },
+	]);
+	expect(decided[0]?.diagnostic).toEqual(
+		expect.objectContaining({ code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED', severity: 'warning' }),
+	);
+});

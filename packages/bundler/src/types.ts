@@ -128,6 +128,7 @@ export interface TransformTsrxModuleResult {
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
 	artifactChildren: ReadonlyArray<ArtifactChildCandidate>;
+	propFlow?: import('./prop-flow.ts').ModulePropFlow;
 	/** Imported constants a prop reads that this compile was not given. */
 	importedConstantRequests?: ReadonlyArray<{
 		readonly source: string;

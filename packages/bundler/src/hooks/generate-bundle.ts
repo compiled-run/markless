@@ -18,6 +18,8 @@ export async function generateBundleHook(
 	const { moduleMetadata, executionLogEmittedIds } = ctx.state;
 	throwLinkedModuleChildDiagnostics(moduleMetadata, [...linkedChildren.values()]);
 	if (ctx.getEnvironment(pluginContext) !== 'client') return;
+	const refusals = moduleMetadata.propFlow.refusals();
+	if (refusals.length > 0) throw new Error(refusals.join('\n\n'));
 	await finalizeBundle(pluginContext, bundle, {
 		options: internalOptions,
 		moduleMetadata,

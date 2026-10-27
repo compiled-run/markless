@@ -69,6 +69,7 @@ import {
 	compilePrerenderInlineResumerSources,
 } from './inline-resumer.ts';
 import { createCompileErrorPayload, MarklessCompileError } from './dev-error/index.ts';
+import { modulePropFlow } from './prop-flow.ts';
 import {
 	emitPrerenderBoundaryRendererModule,
 	emitPrerenderTriggerGroupModule,
@@ -879,6 +880,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
 		artifactChildren: artifactChildCandidates(compiled),
+		propFlow: modulePropFlow(compiled),
 		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],

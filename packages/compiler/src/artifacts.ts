@@ -2144,11 +2144,24 @@ export type ArmEscalationCandidate = {
 	readonly symbolId: string;
 };
 
+/**
+ * A branch whose arms cannot be rebuilt but whose test reads only the owning
+ * component's props. It ships correctly only while no caller passes those props
+ * a value that changes, which the build checks across every caller.
+ */
+export type PropDecidedBranch = {
+	readonly componentName: string;
+	readonly props: ReadonlyArray<string>;
+	readonly symbolId: string;
+	readonly diagnostic: SymbolModulesDiagnostic;
+};
+
 export type SymbolModulesArtifact = {
 	readonly passId: 'symbol-modules';
 	readonly modules: ReadonlyArray<GeneratedSymbolModule>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic | SymbolModulesDiagnostic>;
 	readonly armEscalationCandidates?: ReadonlyArray<ArmEscalationCandidate>;
+	readonly propDecidedBranches?: ReadonlyArray<PropDecidedBranch>;
 };
 
 export type RuntimeDemandMapRecordKind =

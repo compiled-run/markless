@@ -1,3 +1,4 @@
+import { PropFlowRegistry } from './prop-flow.ts';
 import type { MarklessEnvironment, MarklessTransformManifest } from './types.ts';
 
 type CaptureMetadata = NonNullable<MarklessTransformManifest['captureMetadata']>;
@@ -48,6 +49,7 @@ export class ModuleMetadataRegistry {
 	readonly #waits = new Map<string, Map<string, number>>();
 	// The files each source renders components from, whatever the environment.
 	readonly #componentChildren = new Map<string, ReadonlyArray<string>>();
+	readonly propFlow = new PropFlowRegistry();
 
 	#publication(environment: MarklessEnvironment, source: string): SourceClaimPublication {
 		const key = publicationKey(environment, source);
@@ -112,6 +114,7 @@ export class ModuleMetadataRegistry {
 		this.#sourceClaimPublications.clear();
 		this.#waits.clear();
 		this.#componentChildren.clear();
+		this.propFlow.clear();
 	}
 
 	/** Records the files `source` renders components from; returns the cycle back to `source` they close, if any. */
