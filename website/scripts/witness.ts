@@ -3096,29 +3096,25 @@ try {
 		// --- the computed page keeps its framework comparison behind a collapsible --
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const comparison = page
-			.locator('.collapsible')
-			.filter({ has: page.getByRole('button', { name: 'Coming from another framework?' }) });
-		const comparisonTrigger = comparison.getByRole('button', {
-			name: 'Coming from another framework?',
-		});
+			.locator('.collapsible details')
+			.filter({ has: page.locator('summary', { hasText: 'Coming from another framework?' }) });
+		const comparisonTrigger = comparison.locator('summary');
 		const comparisonText = comparison.locator('p');
+		const comparisonOpen = () => comparison.evaluate((details) => (details as HTMLDetailsElement).open);
 		check(
-			(await comparisonTrigger.getAttribute('aria-expanded')) === 'false' &&
-				!(await comparisonText.isVisible()),
+			!(await comparisonOpen()) && !(await comparisonText.isVisible()),
 			'the framework comparison starts closed with its text hidden',
 		);
 		await comparisonTrigger.click();
 		await comparisonText.waitFor({ state: 'visible' });
 		check(
-			(await comparisonTrigger.getAttribute('aria-expanded')) === 'true' &&
-				/dependency array/.test(await comparisonText.innerText()),
+			(await comparisonOpen()) && /dependency array/.test(await comparisonText.innerText()),
 			'opening the comparison exposes its actual text',
 		);
 		await comparisonTrigger.click();
 		await comparisonText.waitFor({ state: 'hidden' });
 		check(
-			(await comparisonTrigger.getAttribute('aria-expanded')) === 'false' &&
-				!(await comparisonText.isVisible()),
+			!(await comparisonOpen()) && !(await comparisonText.isVisible()),
 			'closing the comparison hides its text again',
 		);
 
