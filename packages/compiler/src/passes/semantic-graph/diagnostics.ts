@@ -205,13 +205,17 @@ export function handlerWritesRenderLocalDiagnostic(input: {
 	readonly handlerLabel: string;
 	readonly localName: string;
 	readonly write: string;
+	readonly call?: boolean;
 	readonly handler: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
+	const how = input.call
+		? `calls \`${input.write}\`, which the compiler cannot prove leaves \`${input.localName}\` unchanged`
+		: `changes \`${input.localName}\` with \`${input.write}\``;
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 		title: 'A handler changes a component-body value the browser rebuilds for every run',
-		message: `The \`${input.handlerLabel}\` handler changes \`${input.localName}\` with \`${input.write}\`. \`${input.localName}\` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so the change would be lost before the next run.`,
+		message: `The \`${input.handlerLabel}\` handler ${how}. \`${input.localName}\` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so any change would be lost before the next run.`,
 		why: 'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A method the compiler cannot prove only reads the value counts as a change.',
 		span: sourceSpan(input.handler, input.filename),
 		suggestion: `Keep data that changes in state(): \`const ${input.localName} = state(...)\`, and assign a new value to it, for example a copy with the change applied.`,

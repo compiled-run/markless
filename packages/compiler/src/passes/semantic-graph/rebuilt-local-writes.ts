@@ -120,13 +120,15 @@ const MUTATING_STATICS = new Set([
 	'Reflect.preventExtensions',
 ]);
 
-/** How `reference` (a read of a rebuilt body const defined by `init`) changes it, as written source, or null for a read. */
+export type RebuiltLocalWrite = { readonly source: string; readonly call: boolean };
+
+/** How `reference` (a read of a rebuilt body const defined by `init`) changes it, or null for a read. */
 export function rebuiltLocalWrite(
 	reference: AnyNode,
 	ancestors: ReadonlyArray<AnyNode>,
 	init: AnyNode,
 	source: string,
-): string | null {
+): RebuiltLocalWrite | null {
 	let node = reference;
 	let depth = ancestors.length - 1;
 	const path: Array<string | null> = [];
@@ -141,7 +143,10 @@ export function rebuiltLocalWrite(
 		node = parent;
 	}
 	const parent = depth >= 0 ? ancestors[depth] : undefined;
-	const written = () => source.slice(parent?.start ?? node.start, parent?.end ?? node.end);
+	const written = (call = false) => ({
+		source: source.slice(parent?.start ?? node.start, parent?.end ?? node.end),
+		call,
+	});
 	if (!parent) return null;
 	if (path.length > 0) {
 		if (
@@ -152,8 +157,13 @@ export function rebuiltLocalWrite(
 			return written();
 		if (parent.type === 'CallExpression' && parent.callee === node) {
 			const method = path[path.length - 1];
-			const receiver = kindAtPath(valueKind(init), init, path.slice(0, -1));
-			return method && isRead(receiver, method) ? null : written();
+			const receiverPath = path.slice(0, -1);
+			if (callsArrowMember(init, receiverPath, method ?? null, getIdentifierName(reference)))
+				return null;
+			const receiver = kindAtPath(valueKind(init), init, receiverPath);
+			if (method && isRead(receiver, method)) return null;
+			// A known kind's method off its read list changes it; an unknown one only might.
+			return written(receiver === 'unknown' || receiver === 'object' || !method);
 		}
 		return null;
 	}
@@ -166,6 +176,52 @@ export function rebuiltLocalWrite(
 	)
 		return written();
 	return null;
+}
+
+// `actions[op]()` over `{ inc: () => ..., dec: () => ... }`: an arrow has no `this`,
+// so calling one changes the object only if its body names the object.
+function callsArrowMember(
+	init: AnyNode,
+	receiverPath: ReadonlyArray<string | null>,
+	method: string | null,
+	localName: string | null,
+): boolean {
+	if (receiverPath.some((key) => key === null)) return false;
+	let receiver = unwrap(init);
+	for (const key of receiverPath) receiver = receiver && propertyValue(receiver, key!);
+	if (receiver?.type !== 'ObjectExpression') return false;
+	const properties = asNodes(receiver.properties);
+	const called =
+		method === null ? properties.map((property) => property.value as AnyNode | undefined) : [propertyValue(receiver, method)];
+	return (
+		called.length > 0 &&
+		properties.every((property) => property.type === 'Property') &&
+		called.every(
+			(value) => value?.type === 'ArrowFunctionExpression' && !namesIdentifier(value, localName),
+		)
+	);
+}
+
+function propertyValue(object: AnyNode, key: string): AnyNode | undefined {
+	if (object.type !== 'ObjectExpression') return undefined;
+	return unwrap(
+		asNodes(object.properties).find(
+			(property) =>
+				property.type === 'Property' &&
+				property.computed !== true &&
+				(getIdentifierName(property.key as AnyNode) ?? (property.key as AnyNode).value) === key,
+		)?.value as AnyNode | undefined,
+	);
+}
+
+function namesIdentifier(node: AnyNode, name: string | null): boolean {
+	if (name === null) return true;
+	if (node.type === 'Identifier' && node.name === name) return true;
+	for (const value of Object.values(node))
+		for (const child of Array.isArray(value) ? value : [value])
+			if (child && typeof child === 'object' && typeof (child as AnyNode).type === 'string')
+				if (namesIdentifier(child as AnyNode, name)) return true;
+	return false;
 }
 
 function isTransparent(node: AnyNode): boolean {

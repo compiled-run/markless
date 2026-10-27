@@ -4498,7 +4498,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'An event handler changes a value from the component body, and the change would be lost.',
 		printed: [
-			'MARKLESS_HANDLER_WRITES_RENDER_LOCAL: The `<handlerLabel>` handler changes `<localName>` with `<write>`. `<localName>` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so the change would be lost before the next run.',
+			'MARKLESS_HANDLER_WRITES_RENDER_LOCAL: The `<handlerLabel>` handler <how>. `<localName>` is a const of the component body, and the browser builds it again from its definition each time the handler runs, so any change would be lost before the next run.',
 			'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A method the compiler cannot prove only reads the value counts as a change.',
 			'Keep data that changes in state(): `const <localName> = state(...)`, and assign a new value to it, for example a copy with the change applied.',
 			'https://markless.dev/errors/MARKLESS_HANDLER_WRITES_RENDER_LOCAL',

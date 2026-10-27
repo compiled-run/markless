@@ -25,12 +25,11 @@ export const nest = shared(
 	{ scope: 'widget' },
 );
 
-// A bare call is the value only rendering produces: nothing sees inside it, so no
-// computed stands behind it. A method call on the same read is lifted instead.
-function shout(value: string) { return String(value).toUpperCase(); }
-
 export function NestItems({ testid }) @{
 	const n = nest();
+	// A call to a body-local function is a value only rendering produces: the body
+	// does not run in the browser, so no computed stands behind it.
+	const shout = (value: string) => String(value).toUpperCase();
 
 	<div data-testid={testid} data-nest-count={n.items.length}>
 		@for (const item of n.items; key item.id) {
@@ -89,6 +88,22 @@ test('a row whose widget read only rendering produces is refused, loudly', async
 	expect(repeats(compiled)[0]?.rowComponent).toBeUndefined();
 });
 
+test('a row calling a module function on the widget read mints from the lifted node', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'src/nest.tsrx',
+		source: widgetSource(`<span>{loud(n.label)}{item.id}</span>`).replace(
+			'export function NestItems',
+			'function loud(value: string) { return String(value).toUpperCase(); }\n\nexport function NestItems',
+		),
+		symbols: [],
+	});
+
+	expect(rowMintDiagnostics(compiled)).toEqual([]);
+	expect(repeats(compiled)[0]?.rowTemplate?.textSlots?.[0]?.graphNodeId).toEqual(
+		expect.stringContaining('templateExpression'),
+	);
+});
+
 // The lift reaches shared widget state too: a method call on the same read
 // becomes a computed the record can name, so this row mints where the bare call
 // above does not.
@@ -135,8 +150,6 @@ export const nest = shared(
 	{ scope: 'widget' },
 );
 
-function shout(value: string) { return String(value).toUpperCase(); }
-
 export function NestItems({ testid }) @{
 	const n = nest();
 
@@ -149,6 +162,7 @@ export function NestItems({ testid }) @{
 
 export function NestOwnedItems({ testid }) @{
 	const n = nest();
+	const shout = (value: string) => String(value).toUpperCase();
 
 	<div data-testid={testid}>
 		@for (const item of n.items; key item.id) {

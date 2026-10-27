@@ -114,8 +114,9 @@ async function refusals(source: string) {
 	);
 }
 
-test('a helper call over state in an attribute or text is refused, not rendered once', async () => {
-	const found = await refusals(`import { state } from '@markless/core';
+// An imported function sees only its arguments, exactly as `names.label(draft)` does.
+test('an imported function called over state in an attribute or text follows the state', async () => {
+	const result = await compile(`import { state } from '@markless/core';
 import { normalize, label } from './names.ts';
 export function Editor() @{
 	let draft = state('x');
@@ -125,8 +126,27 @@ export function Editor() @{
 	</form>
 }
 `);
+	const disabled = updatesFor(result, 'disabled')[0]?.graphNodeId;
+	expect(disabled).toMatch(/^computed:templateExpression:/);
+	expect(
+		result.protocolState.computed?.find((record) => record.graphNodeId === disabled)?.dependencies,
+	).toEqual([{ graphNodeId: 'state:draft', path: [] }]);
+	expect(
+		result.protocolView.domUpdates.find((update) => update.target?.kind === 'text')?.graphNodeId,
+	).toMatch(/^computed:templateExpression:/);
+});
+
+test('a body-local function called over state is refused, not rendered once', async () => {
+	const found = await refusals(`import { state } from '@markless/core';
+export function Editor() @{
+	let draft = state('x');
+	let label = (value: string) => value + draft;
+	<form onInput={(event) => (draft = event.target.value)}>
+		<output>{label(draft)}</output>
+	</form>
+}
+`);
 	expect(found.map((diagnostic) => [diagnostic.severity, diagnostic.message])).toEqual([
-		['error', expect.stringContaining("`normalize(draft) === ''`")],
 		['error', expect.stringContaining('`label(draft)`')],
 	]);
 });
@@ -194,7 +214,7 @@ export function Menu() @{
 	expect(texts[0]?.graphNodeId).toMatch(/^computed:templateExpression:/);
 });
 
-test('a local function named like a global conversion is still refused', async () => {
+test('a module function named like a global conversion is that function, and is routed', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Page.tsrx',
 		source: `import { state } from '@markless/core';
@@ -206,9 +226,12 @@ export function Menu() @{
 `,
 		symbols: [],
 	});
-	expect(result.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
-		'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
-	);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(
+		result.protocolView.domUpdates.find(
+			(update) => update.target?.kind === 'attribute' && update.target.name === 'aria-expanded',
+		)?.graphNodeId,
+	).toMatch(/^computed:templateExpression:/);
 });
 
 test('top-level markup indexing a body const by state is routed, as it is inside an @if', async () => {

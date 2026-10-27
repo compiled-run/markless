@@ -1203,10 +1203,10 @@ export function App() @{
 	const refused = semanticGraph.diagnostics.filter(
 		(diagnostic) => diagnostic.code === 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 	);
-	expect(refused.map((diagnostic) => diagnostic.severity)).toEqual(['error', 'error', 'error']);
+	// `label(flag)` calls a module function, which sees only its argument, so it is routed.
+	expect(refused.map((diagnostic) => diagnostic.severity)).toEqual(['error', 'error']);
 	expect(refused.map((diagnostic) => diagnostic.message)).toEqual([
 		expect.stringContaining("`(() => flag ? 'on' : 'off')()`"),
-		expect.stringContaining('`label(flag)`'),
 		expect.stringContaining('`flag && local`'),
 	]);
 	expect(lowered.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
