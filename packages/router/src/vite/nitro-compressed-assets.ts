@@ -4,6 +4,14 @@ import { promisify } from 'node:util';
 import { brotliCompress, constants } from 'node:zlib';
 import { join } from 'pathe';
 import type { Plugin } from 'vite';
+import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
+
+type EdgeRoute = {
+	readonly src: string;
+	readonly dest: string;
+	readonly has: ReadonlyArray<{ readonly type: 'header'; readonly key: string; readonly value: string }>;
+	readonly headers: Readonly<Record<string, string>>;
+};
 
 type CompressedAssetsNitro = {
 	options: {
@@ -11,9 +19,11 @@ type CompressedAssetsNitro = {
 		dev?: boolean;
 		buildDir?: string;
 		handlers?: Array<{ route: string; middleware: boolean; handler: string }>;
+		baseURL?: string;
 		serveStatic?: boolean | string;
 		output: { publicDir: string };
 		compressPublicAssets?: boolean | { gzip?: boolean; brotli?: boolean; zstd?: boolean };
+		vercel?: { config?: { routes?: EdgeRoute[] } };
 	};
 };
 
@@ -77,8 +87,15 @@ export default async function compressRendered(event, next) {
 // Nitro's brotli runs at quality 11: about 30 to 37 ms a file against 0.4 to 0.5 ms at 9, for 4 to 15% fewer bytes.
 export const PUBLIC_BROTLI_QUALITY = 9;
 
+// Vercel's edge compresses near quality 4, 15 to 20% larger than 11; a client chunk is built once and fetched on every landing.
+export const EDGE_BROTLI_QUALITY = 11;
+
+const EDGE_CONTENT_TYPES = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8' };
+
 export interface CompressedAssetsState {
 	brotliDir: string | undefined;
+	// Client chunks a CDN host serves from their brotli copies.
+	edgeBrotliDir?: string | undefined;
 }
 
 export function compressedAssetsState(): CompressedAssetsState {
@@ -95,7 +112,30 @@ export function compressedAssetsModule(
 		async setup(nitro: CompressedAssetsNitro) {
 			const { preset, serveStatic } = nitro.options;
 			// The prerenderer is a second Nitro with its own preset and output; the files served are the build's own.
-			if (preset === 'nitro-prerender' || !serveStatic || serveStatic === 'inline') return;
+			if (preset === 'nitro-prerender') return;
+			if (preset?.startsWith('vercel')) {
+				if (configured) return;
+				const base = nitro.options.baseURL ?? '/';
+				nitro.options.vercel ??= {};
+				nitro.options.vercel.config ??= {};
+				nitro.options.vercel.config.routes = [
+					...Object.entries(EDGE_CONTENT_TYPES).map(([extension, type]) => ({
+						src: `^${escapeRegExp(`${base}${MARKLESS_BUILD_PREFIX}`)}(.+\\.${extension})$`,
+						has: [{ type: 'header' as const, key: 'accept-encoding', value: '.*\\bbr\\b.*' }],
+						dest: `${base}${MARKLESS_BUILD_PREFIX}$1.br`,
+						headers: {
+							'content-encoding': 'br',
+							'content-type': type,
+							vary: 'Accept-Encoding',
+							'cache-control': 'public, max-age=31536000, immutable',
+						},
+					})),
+					...(nitro.options.vercel.config.routes ?? []),
+				];
+				state.edgeBrotliDir = join(nitro.options.output.publicDir, MARKLESS_BUILD_PREFIX);
+				return;
+			}
+			if (!serveStatic || serveStatic === 'inline') return;
 			if (!nitro.options.dev && nitro.options.buildDir && nitro.options.handlers) {
 				const dir = join(nitro.options.buildDir, 'markless-router');
 				const handler = join(dir, 'compress-rendered.mjs');
@@ -124,27 +164,46 @@ export function brotliCopiesPlugin(state: CompressedAssetsState): Plugin {
 		apply: 'build',
 		applyToEnvironment: (environment) => environment.name === 'nitro',
 		async buildStart() {
-			const dir = state.brotliDir;
-			if (!dir) return;
-			const pending = (await readdir(dir, { recursive: true }))
-				.filter((file) => file.endsWith('.gz'))
-				.map((file) => join(dir, file.slice(0, -3)));
-			const next = async (): Promise<void> => {
-				const file = pending.pop();
-				if (file === undefined) return;
-				if (!(await exists(`${file}.br`))) {
-					const source = await readFile(file).catch(() => undefined);
-					if (source)
-						await writeFile(
-							`${file}.br`,
-							await brotli(source, {
-								params: { [constants.BROTLI_PARAM_QUALITY]: PUBLIC_BROTLI_QUALITY },
-							}),
-						);
-				}
-				return next();
-			};
-			await Promise.all(Array.from({ length: availableParallelism() }, next));
+			if (state.brotliDir) {
+				const dir = state.brotliDir;
+				await writeBrotliCopies(
+					(await readdir(dir, { recursive: true }))
+						.filter((file) => file.endsWith('.gz'))
+						.map((file) => join(dir, file.slice(0, -3))),
+					PUBLIC_BROTLI_QUALITY,
+				);
+			}
+			if (state.edgeBrotliDir) {
+				const dir = state.edgeBrotliDir;
+				const extensions = Object.keys(EDGE_CONTENT_TYPES);
+				await writeBrotliCopies(
+					(await readdir(dir, { recursive: true }).catch(() => []))
+						.filter((file) => extensions.includes(file.slice(file.lastIndexOf('.') + 1)))
+						.map((file) => join(dir, file)),
+					EDGE_BROTLI_QUALITY,
+				);
+			}
 		},
 	};
+}
+
+async function writeBrotliCopies(files: string[], quality: number): Promise<void> {
+	const next = async (): Promise<void> => {
+		const file = files.pop();
+		if (file === undefined) return;
+		if (!(await exists(`${file}.br`))) {
+			const source = await readFile(file).catch(() => undefined);
+			if (source)
+				await writeFile(
+					`${file}.br`,
+					await brotli(source, { params: { [constants.BROTLI_PARAM_QUALITY]: quality } }),
+				);
+		}
+		return next();
+	};
+	await Promise.all(Array.from({ length: availableParallelism() }, next));
+}
+
+function escapeRegExp(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
