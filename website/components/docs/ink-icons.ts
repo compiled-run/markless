@@ -138,6 +138,20 @@ function path(...shapes: Shape[]): string {
 	return rings.map((r) => 'M' + r.map(([x, y]) => `${Math.round(x * 100) / 100} ${Math.round(y * 100) / 100}`).join('L') + 'Z').join('');
 }
 
+/** The Markless mug logo: a tall cup with coffee at its rim, two coffee-bean eyes, a D-loop handle and steam. */
+function marklessMug(): string {
+	const [cx, top, w, ry] = [10.6, 7.2, 6.8, 2.3];
+	const rimBack = Array.from({ length: 17 }, (_, k): P => {
+		const a = Math.PI * (1 + k / 16);
+		return [cx + w * Math.cos(a), top + ry * Math.sin(a)];
+	});
+	const outline: Ring = [...rimBack, ...arc(cx + w - 2.6, 20.4, 2.4, 0, 90, 5).map(([x, y]): P => [x - 0.3, y]), ...arc(cx - w + 2.6, 20.4, 2.4, 90, 180, 5).map(([x, y]): P => [x + 0.3, y])];
+	const wisps = [cx - 2.6, cx, cx + 2.6].map((x) => bar([[x, 0.6], [x + 0.8, 1.7], [x, 2.8], [x + 0.4, 3.6]], 0.9));
+	const bean = (x: number) => turn(ellipse(x, 16, 1.2, 1.7, 16), 12, x, 16);
+	return path(band(outline, 1.6), ellipse(cx, top + 0.5, w - 2.1, ry - 0.5), bean(cx - 2.5), bean(cx + 2.5), band(arc(cx + w + 0.3, 13.8, 4, -90, 90, 14), 1.7), ...wisps);
+}
+
+
 const gear = blob(12, 12, (x, y) => {
 	const a = Math.atan2(y - 12, x - 12);
 	const tooth = ((((a / TAU) * 8) % 1) + 1) % 1;
@@ -146,7 +160,7 @@ const gear = blob(12, 12, (x, y) => {
 
 /** One mark per docs page, keyed by what the page is about. */
 export const ICONS = {
-	'markless-mug': path(band(ellipse(10.2, 7.6, 6.6, 2.1), 1.3), ellipse(10.2, 7.6, 4.2, 0.8), [[3.4, 9.4], [4.3, 20], [6.2, 22.8], [14.2, 22.8], [16.1, 20], [17, 9.4], [16.4, 9.4], [10.2, 10.8], [4, 9.4]], bar(arc(17.4, 14.8, 4, -75, 80), 2.1), bar([[8, 0.8], [8.9, 2.3], [8, 3.8], [8.5, 4.6]], 1.1), bar([[12.2, 0.8], [13.1, 2.3], [12.2, 3.8], [12.7, 4.6]], 1.1)),
+	'markless-mug': marklessMug(),
 	sprout: path(bar([[12, 18.2], [12.2, 14], [11.6, 10.4]], 1.8), leaf([10.6, 11.2], [2.2, 6.4], 5.6), leaf([12.8, 9.6], [21.6, 2.4], 7), arc(12, 22, 9, 180, 360).map(([x, y]): P => [x, 22 + (y - 22) * 0.4])),
 	'box-arrow': path(rect(3, 5.2, 18, 3, 0.8), band(rect(4, 9.4, 16, 13, 0.8), 1.6), [[7.4, 14.9], [12.2, 14.9], [12.2, 12.8], [16.6, 15.95], [12.2, 19.1], [12.2, 17], [7.4, 17]]),
 	lens: path(ring(10, 10, 8, 1.9), bar(arc(10, 10, 4.6, 200, 250, 6), 1.3), bar([[16.2, 16.2], [21.6, 21.6]], 3.4)),
