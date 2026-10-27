@@ -42,6 +42,8 @@ An **expression** is anything that produces a value: `bags`, `bags * 14`, `isOpe
 
 A **statement** is an instruction that runs: `let bags = state(2);`, `const price = computed(() => bags * 14);`, or a block like `@if (…) { … }` or `@for (const bag of bags; key bag.id) { … }`. It doesn't produce a value; it does something.
 
+Statements usually contain expressions: in `let total = state(0)`, the `state(0)` part is an expression, and in `@if (bags > 3)`, `bags > 3` is.
+
 - **`{ }` means "an expression goes here."** `{bags}` puts the number on the button, and `onClick={() => bags++}` hands the button what to do when it's clicked.
 - **`@{ }` means "statements run here, top to bottom."** First `let bags = state(2)` runs, then the `<button>` at the end is what shows up.
 
