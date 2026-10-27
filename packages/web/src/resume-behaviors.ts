@@ -151,12 +151,10 @@ export function createBehaviorRuntime(input: {
 		removalObserver = createObserver((records) => {
 			const removed = new Set<ResumeDomElement>();
 			for (const record of records)
-				for (const node of record.removedNodes)
-					// A node a script moved within the page is reported removed, yet it is still here.
-					if (!containsElement(input.root, node as ResumeDomElement))
-						collectRemovedElements(node, removed);
+				for (const node of record.removedNodes) collectRemovedElements(node, removed);
 			for (const id of hostIdsInsideRemovedElements(input.elementsByHostId, removed))
-				input.disposeHost(id);
+				// A script that moves markup within the page reports it removed, yet it is still here.
+				if (!input.root.contains?.(input.elementsByHostId.get(id)!)) input.disposeHost(id);
 		});
 		removalObserver.observe(input.root, { childList: true, subtree: true });
 	}
@@ -301,7 +299,6 @@ function connectedElement(
 }
 function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
 	if (root === target) return true;
-	if (root.contains) return root.contains(target);
 	for (const child of root.childNodes ?? [])
 		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
 	return false;
