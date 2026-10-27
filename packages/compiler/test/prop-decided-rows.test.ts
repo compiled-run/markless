@@ -60,9 +60,10 @@ async function staticWarnings(source: string) {
 // An expression into an object prop renders its first value; it is right exactly while no caller changes that prop.
 test('a static expression over props names them for the caller check', async () => {
 	expect(
-		await staticWarnings(`export function Tag({ item }) @{
+		await staticWarnings(`import { shout } from './shout.ts';
+export function Tag({ item }) @{
 	const [first] = item.parts;
-	<p title={item.label.toUpperCase()}>{first === 'a' ? 'A' : 'B'}</p>
+	<p title={shout(item.label)}>{first === 'a' ? 'A' : 'B'}</p>
 }
 `),
 	).toEqual([
