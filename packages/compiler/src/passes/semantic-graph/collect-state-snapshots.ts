@@ -1,6 +1,7 @@
 import { asNodes, isNode, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticGraphBinding, SemanticGraphDiagnostic, SourceSpan } from '../../artifacts.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
+import { declaredInNestedTemplate } from './render-local-inline.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
 
@@ -73,11 +74,17 @@ function computeSnapshotSource(
 	const init = unwrapTypeAssertion(declarator.init as AnyNode | undefined);
 	if (!init || isFunction(init) || isFrameworkCall(init, state)) return null;
 	if (!declaration || isGraphName(binding, declaration, state)) return null;
+	// A const in a row or arm body re-runs with that block: only a body copy it reads is stale.
+	const rerun =
+		typeof declaration.start === 'number' && declaredInNestedTemplate(declaration.start, state);
 	for (const identifier of referencedIdentifiers(init)) {
 		const used = bindingAt(semantic, identifier);
 		if (!used) continue;
 		const usedDeclaration = used.declarations[0] as unknown as AnyNode | undefined;
-		if (usedDeclaration && isStateName(used, usedDeclaration, state)) return used.name;
+		if (usedDeclaration && isStateName(used, usedDeclaration, state)) {
+			if (rerun) continue;
+			return used.name;
+		}
 		const inner = snapshotSource(used, state, verdicts, visiting);
 		if (inner) return inner;
 	}

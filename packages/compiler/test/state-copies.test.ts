@@ -63,6 +63,35 @@ test('a computed(), an alias of a state path and a constant are not copies', asy
 	expect(errors(result)).toEqual([]);
 });
 
+test.each([
+	[
+		'a row body',
+		'<ul>@for (const line of basket; key line.sku) { const many = line.qty > owner.name.length; <li aria-current={many}>{line.sku}</li> }</ul>',
+	],
+	[
+		'an @if arm',
+		"@if (basket.length > 0) { const word = basket.length > 1 ? 'lines' : 'line'; <output>{word}</output> }",
+	],
+])('a const in %s re-runs with that block, so reading it is not a copy', async (_, markup) => {
+	const result = await compile('', markup);
+
+	expect(errors(result)).toEqual([]);
+});
+
+test('a row const built from a body copy of state is still refused', async () => {
+	const result = await compile(
+		'const filled = basket.filter((line) => line.qty > 0);',
+		'<ul>@for (const line of basket; key line.sku) { const shown = filled.length; <li>{shown}</li> }</ul>',
+	);
+
+	expect(errors(result)).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_TEMPLATE_READS_STATE_COPY',
+			message: expect.stringContaining('from the state "basket"'),
+		}),
+	]);
+});
+
 test('one object placed in state twice is refused at its second place', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Twice.tsrx',
