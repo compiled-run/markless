@@ -175,6 +175,16 @@ test('a built page imports the resume module its route script names, once, and e
 	load.mockResolvedValueOnce({ resumeContainerEvent: own } as never);
 	await resume({ root: root('pages/notes.mdx', ['/build/chunk-b.js']).element, value: 4 });
 	expect(own).toHaveBeenCalledTimes(1);
+
+	const read = vi.fn();
+	const init = vi.fn();
+	load.mockResolvedValueOnce({ $init: init, $held: { resumeContainerEvent: read } } as never);
+	await resume({
+		root: root('pages/guide.mdx', ['/build/chunk-d.js', '$init', '$held']).element,
+		value: 5,
+	});
+	expect(init).toHaveBeenCalledTimes(1);
+	expect(read).toHaveBeenCalledTimes(1);
 });
 
 test('a click whose named resume chunk a deploy removed loads the page again once', async () => {

@@ -27,10 +27,8 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly fragmentImports?: readonly string[];
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
-	// Per route: the chunk holding its resume module, and the export that evaluates the module inside a shared pack.
-	readonly resumeModules?: Readonly<
-		Record<string, readonly [string] | readonly [string, string]>
-	>;
+	// Per route: the chunk holding its resume module, then the export evaluating it inside a pack and the export holding it.
+	readonly resumeModules?: Readonly<Record<string, readonly string[]>>;
 	// Maps the chunk specifiers chunks import each other by to their hashed URLs; every document carries it.
 	readonly importMap?: { readonly imports: Readonly<Record<string, string>> };
 }
@@ -310,20 +308,14 @@ async function validateClientAssetsManifest(
 	};
 }
 
-function routeResumeModules(
-	input: unknown,
-): Record<string, readonly [string] | readonly [string, string]> {
+function routeResumeModules(input: unknown): Record<string, readonly string[]> {
 	const modules = routeMap(input, 'resumeModules');
-	for (const [routeFile, reference] of Object.entries(modules))
-		if (
-			!reference[0] ||
-			reference.length > 2 ||
-			(reference.length === 2 && !/^[\w$]+$/.test(reference[1]!))
-		)
+	for (const [routeFile, [href, ...exports]] of Object.entries(modules))
+		if (!href || exports.length > 2 || !exports.every((name) => /^[\w$]+$/.test(name)))
 			throw clientAssetsManifestError(
 				`has an invalid resume module for route ${JSON.stringify(routeFile)}`,
 			);
-	return modules as Record<string, readonly [string] | readonly [string, string]>;
+	return modules;
 }
 
 function requiredStrings(input: unknown, label: string): readonly string[] {

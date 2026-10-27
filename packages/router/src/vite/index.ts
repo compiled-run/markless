@@ -1800,9 +1800,13 @@ function routeResumeModulesFromBundle(
 		isVirtualEntryChunk(chunk, RESUME_MODULES_ORIGIN),
 	);
 	if (!table?.code) return {};
-	const modules: Record<string, readonly [string] | readonly [string, string]> = {};
+	const modules: Record<string, readonly string[]> = {};
 	const loaders = routeResumeLoaders(table.code);
-	for (const { routeFile, specifier, loader } of loaders.found) {
+	for (const { routeFile, specifier, evaluate } of loaders.found) {
+		if (!evaluate)
+			throw new Error(
+				`Markless Router could not read how ${table.fileName} evaluates the resume module of ${routeFile}.`,
+			);
 		const url = /^\.\.?\//.test(specifier)
 			? joinURL(base, normalize(join(dirname(table.fileName), specifier)))
 			: importMap[specifier];
@@ -1814,7 +1818,7 @@ function routeResumeModulesFromBundle(
 			throw new Error(
 				`Markless Router's landing plan for ${routeFile} does not preload its resume module ${url}: the first event would fetch it.`,
 			);
-		modules[routeFile] = loader ? [url, loader] : [url];
+		modules[routeFile] = [url, ...evaluate];
 	}
 	if (loaders.found.length !== loaders.imports)
 		throw new Error(
@@ -1825,10 +1829,10 @@ function routeResumeModulesFromBundle(
 
 type AstNode = { readonly type: string; readonly [key: string]: unknown };
 
-// `"/pages/x.tsrx":()=>import("./c.js").then(e=>e.$ml1())`, maybe inside Vite's CSS preload helper: a served page links its stylesheets.
+// `"/pages/x.tsrx":()=>import("./c.js")`, maybe inside Vite's CSS preload helper: a served page links its stylesheets.
 function routeResumeLoaders(code: string) {
-	const found: { routeFile: string; specifier: string; loader?: string }[] = [];
-	const loaders = new Map<AstNode, string>();
+	const found: { routeFile: string; specifier: string; evaluate?: readonly string[] }[] = [];
+	const evaluations = new Map<AstNode, readonly string[] | undefined>();
 	let imports = 0;
 	const visit = (node: unknown, route?: string): void => {
 		if (Array.isArray(node)) return node.forEach((child) => visit(child, route));
@@ -1839,16 +1843,22 @@ function routeResumeLoaders(code: string) {
 			typeof key?.value === 'string' && /^\/pages\/.+\.(?:tsrx|mdx)$/.test(key.value)
 				? key.value.slice(1)
 				: route;
-		if (current.type === 'CallExpression') {
-			const loaded = packLoader(current);
-			if (loaded) loaders.set(loaded.source, loaded.loader);
-		}
+		const then = current.type === 'CallExpression' ? (current.callee as AstNode) : undefined;
+		if (
+			then?.type === 'MemberExpression' &&
+			(then.object as AstNode).type === 'ImportExpression' &&
+			(then.property as AstNode).name === 'then'
+		)
+			evaluations.set(then.object as AstNode, packEvaluation(current));
 		if (current.type === 'ImportExpression') {
 			imports++;
 			const specifier = staticString(current.source as AstNode);
-			const loader = loaders.get(current);
 			if (routeFile && specifier)
-				found.push({ routeFile, specifier, ...(loader ? { loader } : {}) });
+				found.push({
+					routeFile,
+					specifier,
+					evaluate: evaluations.has(current) ? evaluations.get(current) : [],
+				});
 		}
 		for (const [field, child] of Object.entries(current))
 			if (field !== 'type') visit(child, routeFile);
@@ -1865,26 +1875,27 @@ function staticString(node: AstNode | undefined): string | undefined {
 		: undefined;
 }
 
-// `import(...).then(e=>e.$ml1())`: the export that evaluates a module packed with others.
-function packLoader(call: AstNode): { source: AstNode; loader: string } | undefined {
-	const then = call.callee as AstNode;
-	const [callback] = call.arguments as AstNode[];
-	const source = then.object as AstNode | undefined;
+// A module packed with others evaluates on a call: `.then(e=>e.$ml1())` returns it, `.then(e=>(e.a(),e.b))` reads it after.
+function packEvaluation(then: AstNode): readonly string[] | undefined {
+	const [callback] = then.arguments as AstNode[];
 	const [param] = (callback?.params as AstNode[] | undefined) ?? [];
-	const body = callback?.body as AstNode | undefined;
-	const member = body?.type === 'CallExpression' ? (body.callee as AstNode) : undefined;
-	return then.type === 'MemberExpression' &&
-		source?.type === 'ImportExpression' &&
-		(then.property as AstNode).name === 'then' &&
-		callback?.type === 'ArrowFunctionExpression' &&
-		param?.type === 'Identifier' &&
-		member?.type === 'MemberExpression' &&
-		(body!.arguments as AstNode[]).length === 0 &&
-		!member.computed &&
-		(member.object as AstNode).name === param.name &&
-		typeof (member.property as AstNode).name === 'string'
-		? { source, loader: (member.property as AstNode).name as string }
-		: undefined;
+	if (callback?.type !== 'ArrowFunctionExpression' || param?.type !== 'Identifier') return;
+	const member = (node: AstNode | undefined) =>
+		node?.type === 'MemberExpression' &&
+		!node.computed &&
+		(node.object as AstNode).name === param.name
+			? ((node.property as AstNode).name as string)
+			: undefined;
+	const call = (node: AstNode | undefined) =>
+		node?.type === 'CallExpression' && (node.arguments as AstNode[]).length === 0
+			? member(node.callee as AstNode)
+			: undefined;
+	const body = callback.body as AstNode;
+	const [first, second, ...rest] = (body.expressions as AstNode[] | undefined) ?? [];
+	const init = body.type === 'SequenceExpression' ? call(first) : call(body);
+	const read = body.type === 'SequenceExpression' && !rest.length ? member(second) : undefined;
+	if (body.type === 'SequenceExpression') return init && read ? [init, read] : undefined;
+	return init ? [init] : undefined;
 }
 
 function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): string[] {

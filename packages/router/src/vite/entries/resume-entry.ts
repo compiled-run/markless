@@ -42,21 +42,22 @@ interface RouteResumeModule {
 
 interface RouteScript {
 	readonly file?: string;
-	// The built chunk holding the route's resume module, and the export that evaluates it inside a shared pack.
-	readonly resume?: readonly [url: string, loader?: string];
+	// The built chunk holding the route's resume module, then the export evaluating it inside a pack and the one holding it.
+	readonly resume?: readonly [url: string, evaluate?: string, read?: string];
 }
 
 function loadRouteResumeModule(route: RouteScript): Promise<unknown> | undefined {
-	const [url, loader] = route.resume ?? [];
+	const [url, evaluate, read] = route.resume ?? [];
 	const key = url ?? (route.file && devResumeModuleLoader(route.file));
 	if (!key) return undefined;
 	let pending = routeResumeModules.get(key);
 	if (!pending) {
 		pending = (
 			typeof key === 'string'
-				? import(/* @vite-ignore */ key).then((module: Record<string, () => unknown>) =>
-						loader ? module[loader]!() : module,
-					)
+				? import(/* @vite-ignore */ key).then((module: Record<string, () => unknown>) => {
+						const evaluated = evaluate ? module[evaluate]!() : module;
+						return read ? module[read] : evaluated;
+					})
 				: key()
 		).catch((error: unknown) => {
 			routeResumeModules.delete(key);

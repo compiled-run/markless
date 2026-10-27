@@ -1826,6 +1826,22 @@
 			"from": 2260,
 			"to": 2414,
 			"reason": "a streamed arm's record set may now be served as templates, so adoption expands it before registering: one call, 2,265 -> 2,280 B by rolldown's rendered length against main af75a5f38; the bench measures 2,414 against the 2,260 anchor"
+		},
+		{
+			"date": "2026-10-27",
+			"guard": "runtime",
+			"subject": "router/vite/entries/resume-modules",
+			"from": null,
+			"to": 920,
+			"reason": "the table of every route's resume loader moved out of the resume entry into a build entry no page loads; the resume entry each landing runs no longer grows with route count"
+		},
+		{
+			"date": "2026-10-27",
+			"guard": "runtime",
+			"subject": "router/vite/entries/resume-entry",
+			"from": 2406,
+			"to": 2309,
+			"reason": "shrank: a page's route script names its own resume module, so the entry holds no route table"
 		}
 	],
 	"runtimeModules": {
@@ -1839,7 +1855,8 @@
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2666,
 		"router/vite/entries/fragment-entry": 28332,
-		"router/vite/entries/resume-entry": 2406,
+		"router/vite/entries/resume-entry": 2309,
+		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
 		"runtime/graph": 10187,
 		"runtime/graph-async": 4122,
