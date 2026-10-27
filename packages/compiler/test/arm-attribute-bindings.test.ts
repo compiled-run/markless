@@ -347,3 +347,33 @@ export function Profile({ who }: { who?: string }) @{
 		`() => (!(!${person}) && !((mode) === ('card'))) ? ${person}.name : undefined`,
 	]);
 });
+
+test('an @try whose keyed rows bind attributes re-settles through its own update module, not the component render', async () => {
+	const result = await compile(
+		'src/Finder.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+export function Finder() @{
+	let term = state('');
+	const hits = computed(async () => [{ key: term, name: term }]);
+	<div>
+		<input value={term} onInput={(event) => (term = event.currentTarget.value)} />
+		@try {
+			<ul>
+				@for (const hit of hits; key hit.key) {
+					<li data-key={hit.key} aria-label={hit.name}>{hit.name}</li>
+				}
+			</ul>
+		} @catch {
+			<p>failed</p>
+		}
+	</div>
+}`,
+	);
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	)?.source;
+	expect(update ?? '').toMatch(/"attribute": \{ "name": "data-key", "itemPath": \["key"\] \}/);
+	expect(update ?? '').toMatch(/"attribute": \{ "name": "aria-label", "itemPath": \["name"\] \}/);
+});
