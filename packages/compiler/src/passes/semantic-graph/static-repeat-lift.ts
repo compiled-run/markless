@@ -112,7 +112,6 @@ export function liftStaticCollection(
 		`() => ${inlined.source}`,
 		readSources,
 		state,
-		false,
 		undefined,
 		true,
 	);

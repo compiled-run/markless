@@ -46,7 +46,7 @@ const TONES = { calm: 'Calm', loud: 'Loud' };
 export default function UntypedTonePage({ tone }) @{
 	const view = state({ count: 0 });
 
-	<main data-label={TONES[tone]}>{view.count}</main>
+	<main data-label={TONES[tone.key]}>{view.count}</main>
 }
 `;
 

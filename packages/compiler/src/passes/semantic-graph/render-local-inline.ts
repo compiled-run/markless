@@ -330,7 +330,6 @@ export function liftRenderLocalComposite(
 		`() => ${inlined.source}`,
 		[...sources],
 		state,
-		true,
 	);
 	if (lifted)
 		for (const definition of new Set(inlined.definitions))
@@ -403,7 +402,6 @@ export function liftArmRenderLocalValue(
 			: `() => (${guard.source}) ? ${inlined.source} : undefined`,
 		[...new Set(dependencies.map((dependency) => dependency.source))],
 		state,
-		false,
 		undefined,
 		true,
 	);
