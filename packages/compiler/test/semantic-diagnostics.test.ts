@@ -928,11 +928,16 @@ test('B921 reports attribute and spread value discipline diagnostics without fla
 			message: expect.stringContaining('style={{ color:'),
 		}),
 	);
+	// Both render something the author never meant to ship, so both stop the build.
 	expect(byCode('MARKLESS_ATTRIBUTE_OBJECT_VALUE')).toEqual([
 		expect.objectContaining({
+			severity: 'error',
 			message: expect.stringContaining('data-menu="[object Object]"'),
 		}),
-		expect.objectContaining({ message: expect.stringContaining('did you mean `onClick`') }),
+		expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('did you mean `onClick`'),
+		}),
 	]);
 	expect(graph.diagnostics).not.toEqual(
 		expect.arrayContaining([

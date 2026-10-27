@@ -2651,6 +2651,8 @@ export function App() @{
 	expect(result.publicRenderPlan.diagnostics).toEqual([
 		expect.objectContaining({
 			code: PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
+			// The rules would be dropped from the page, so the build stops.
+			severity: 'error',
 			phase: PUBLIC_RENDER_PHASE,
 			passId: PUBLIC_RENDER_PLAN_PASS_ID,
 			title: expect.stringContaining('<style>'),

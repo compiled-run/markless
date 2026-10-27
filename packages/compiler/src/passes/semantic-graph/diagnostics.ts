@@ -1785,7 +1785,7 @@ export function attributeObjectValueDiagnostic(
 		: '';
 	return attributeDisciplineDiagnostic(input.node, input.filename, {
 		code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
-		severity: 'warning',
+		severity: 'error',
 		title: input.eventSuggestion
 			? 'Lowercase on* attributes are plain HTML attributes'
 			: 'This attribute renders "[object Object]"',
