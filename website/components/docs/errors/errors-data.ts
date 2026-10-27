@@ -1177,9 +1177,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
-		description:
-			'Changing this <label> cannot rebuild what it shows: a Markless build warning.',
+		severity: 'error-or-warning',
+		description: 'Changing this <label> cannot rebuild what it shows: a Markless build error.',
 		printed: [
 			'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: this <label> (<testSource>) cannot be rebuilt when <testSource> changes because <detail>.',
 			'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
@@ -1204,6 +1203,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/symbol-modules.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/symbol-modules.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
 			},
 		],
 		moreSources: 0,

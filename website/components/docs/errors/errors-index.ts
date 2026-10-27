@@ -85,7 +85,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
-					kind: 'compile warning',
+					kind: 'compile error or warning',
 					guided: false,
 				},
 				{

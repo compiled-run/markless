@@ -225,6 +225,16 @@ export async function linkTransformChildren(
 		linkedChildren.set(linkedModuleChildKey(child), child);
 		importedChildSources.add(child.source);
 	}
+	if (transformed.propFlow)
+		moduleMetadata.propFlow.record(
+			request.source,
+			transformed.propFlow,
+			new Map(
+				resolvedChildren.flatMap((child) =>
+					child.componentEdgeId ? [[child.componentEdgeId, child.source]] : [],
+				),
+			),
+		);
 	const cycle = moduleMetadata.recordComponentChildren(
 		request.source,
 		resolvedChildren.flatMap((child) => (child.externalized ? [] : [child.source])),

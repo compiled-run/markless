@@ -1,5 +1,6 @@
 import type {
 	ArmEscalationCandidate,
+	PropDecidedBranch,
 	CaptureSlot,
 	CaptureSlotRoute,
 	GeneratedSymbolModule,
@@ -286,6 +287,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		...(branchArms.escalationCandidates.length > 0
 			? { armEscalationCandidates: branchArms.escalationCandidates }
 			: {}),
+		...(branchArms.propDecided.length > 0 ? { propDecidedBranches: branchArms.propDecided } : {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
@@ -1387,12 +1389,15 @@ function renderBranchArms(
 	readonly armsBySite: ReadonlyMap<string, PublicRenderPlanBranchArms>;
 	readonly diagnostics: ReadonlyArray<SymbolModulesDiagnostic>;
 	readonly escalationCandidates: ReadonlyArray<ArmEscalationCandidate>;
+	readonly propDecided: ReadonlyArray<PropDecidedBranch>;
 } {
 	const renderData = input.renderData;
-	if (!renderData) return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [] };
+	if (!renderData)
+		return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [], propDecided: [] };
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
 	const escalationCandidates: ArmEscalationCandidate[] = [];
+	const propDecided: PropDecidedBranch[] = [];
 	// A branch each row flips from its own row template needs no page-level flip module.
 	const rowFlipped = new Set(
 		(input.protocolView?.keyedRepeats ?? []).flatMap((repeat) =>
@@ -1434,6 +1439,22 @@ function renderBranchArms(
 					input.semanticGraph,
 				);
 				diagnostics.push(diagnostic);
+				const componentName = renderData.chunks.find(
+					(chunk) => chunk.id === branch.armChunkIds[0],
+				)?.componentName;
+				if (diagnostic.severity === 'warning' && componentName)
+					propDecided.push({
+						componentName,
+						props: [
+							...new Set(
+								branch.testReads.flatMap((read) =>
+									readPropNames(read.graphNodeId, read.path, input.semanticGraph),
+								),
+							),
+						],
+						symbolId: symbol.id,
+						diagnostic,
+					});
 				// Every refusal escalatable, or none: a branch that also holds a shape
 				// no re-render answers stays plainly refused. A refusal that only warns
 				// blocks no build, so its branch keeps shipping the plan it ships today.
@@ -1459,7 +1480,7 @@ function renderBranchArms(
 			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),
 		});
 	}
-	return { armsBySite, diagnostics, escalationCandidates };
+	return { armsBySite, diagnostics, escalationCandidates, propDecided };
 }
 
 // A computed counts as a prop when everything it derives from is one: `@if (from <= 0)` is decided by `from`.
@@ -1475,6 +1496,22 @@ function readsOnlyProps(
 	if (binding?.kind !== 'computed' || !binding.dependencies?.length) return false;
 	return binding.dependencies.every((dependency) =>
 		readsOnlyProps(dependency.graphNodeId, semanticGraph, seen),
+	);
+}
+
+function readPropNames(
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+	semanticGraph: SemanticGraphArtifact | undefined,
+	seen = new Set<string>(),
+): ReadonlyArray<string> {
+	if (graphNodeId === 'prop:props') return path[0] === undefined ? [] : [path[0]];
+	if (graphNodeId.startsWith('prop:')) return [graphNodeId.slice('prop:'.length)];
+	if (seen.has(graphNodeId)) return [];
+	seen.add(graphNodeId);
+	const binding = semanticGraph?.graphBindings.find((candidate) => candidate.id === graphNodeId);
+	return (binding?.dependencies ?? []).flatMap((dependency) =>
+		readPropNames(dependency.graphNodeId, dependency.path, semanticGraph, seen),
 	);
 }
 
