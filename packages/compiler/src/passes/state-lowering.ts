@@ -709,10 +709,11 @@ function isCompositeTemplateExpression(source: string): boolean {
 	return /[?:+\-*/%<>=!&|()[\]{}]/.test(source);
 }
 
+// `art.report` names a property, not the binding `report`; a spread `...report` still reads it.
 function sourceContainsIdentifier(source: string, identifier: string): boolean {
-	return new RegExp(`(^|[^$0-9A-Z_a-z])${escapeRegExp(identifier)}(?=$|[^$0-9A-Z_a-z])`).test(
-		source,
-	);
+	return new RegExp(
+		`(?<![$0-9A-Z_a-z])(?:(?<=\\.\\.\\.)|(?<!\\.\\s*))${escapeRegExp(identifier)}(?=$|[^$0-9A-Z_a-z])`,
+	).test(source);
 }
 
 function escapeRegExp(value: string): string {
