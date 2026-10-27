@@ -8,6 +8,7 @@ import type {
 	EventOnlyResumeDomElement,
 	ResumeEventOnlyFromPayloadDocumentInput,
 } from './types.ts';
+import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import type { ResumeDomElement } from '../resume-types.ts';
 import {
 	cellValueNeedsFullDecode,
@@ -86,7 +87,7 @@ export async function resumeScalarRowEventFromPayloadDocument(
 	for (const symbolId of activeRecord.symbolIds) {
 		const symbol = await resolveSymbol(input.loadSymbol(symbolId));
 		void (await resolveResult(
-			symbol({
+			marklessRunAtCurrentTarget(input.event, rowDispatch.element, symbol, {
 				graph: shadowLeanActionPlanGraph(graph),
 				event: input.event,
 				element: rowDispatch.element,

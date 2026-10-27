@@ -9,9 +9,7 @@ export default function AttachStartPage() @{
 	let shown = state(false);
 
 	<main>
-		<p data-plain attach={mark}>
-			{ran}
-		</p>
+		<p data-plain>{ran}</p>
 		<button type="button" data-outside onClick={() => (ran = 'clicked')}>
 			wake
 		</button>
@@ -34,7 +32,7 @@ export default function AttachStartPage() @{
 		</button>
 		@if (shown) {
 			<>
-				<div data-shown-plain attach={mark}>
+				<div data-shown-plain attach={mark} onIdle={() => {}}>
 					plain arm
 				</div>
 				<div data-shown-visible attach={mark} onVisible={() => {}}>

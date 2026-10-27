@@ -90,6 +90,8 @@ export type PrerenderDataDefinition = {
 	readonly initialValues?: PrerenderRenderData['initialValues'];
 	readonly initialValueKinds?: Readonly<Record<string, string>>;
 	readonly initializerResidues?: Readonly<Record<string, string>>;
+	// Capture slot id to the prop name and path it reads, for derives a composing module bound.
+	readonly propCaptures?: Readonly<Record<string, ReadonlyArray<string>>>;
 	readonly initializers?: Readonly<Record<string, unknown>>;
 	readonly branches?: PrerenderRenderData['branches'];
 	readonly boundaries?: PrerenderRenderData['boundaries'];
@@ -818,7 +820,21 @@ export function evaluatePrerenderDataComponent(input: {
 				}
 				return marklessThen(
 					(loaded.length > 0
-						? loaded({ graph: { read: deriveRead }, read: deriveRead, ...rosterPositionContext })
+						? loaded({
+								graph: { read: deriveRead },
+								read: deriveRead,
+								...(definition.propCaptures && {
+									capture: {
+										read: (slotId: string) => {
+											const [name, ...path] = definition.propCaptures![slotId] ?? [];
+											if (name === undefined)
+												throw new Error(`MARKLESS_PRERENDER_CAPTURE_UNBOUND: ${slotId}`);
+											return readPath(input.props[name], path);
+										},
+									},
+								}),
+								...rosterPositionContext,
+							})
 						: loaded()) as Awaitable<unknown>,
 					(value) => {
 						values.set(initial.graphNodeId, value);

@@ -11,7 +11,7 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	MARKLESS_ATTACH_NO_START_TRIGGER: {
 		summary: 'Nothing on a server-rendered page starts this attach function.',
 		what: 'On a page the server renders, `attach` waits until something on its element asks for code: an event handler on the element or inside it, or `onVisible` or `onIdle` on the element itself. This element has none of those, so the function never runs there.',
-		how: 'Add `onVisible` to start it when the element scrolls into view, or `onIdle` to start it once the page is idle. If the element only ever renders in the browser, where `attach` runs as soon as the element exists, silence the warning with a reason.',
+		how: 'Add `onVisible` to start it when the element scrolls into view, or `onIdle` to start it once the page is idle. An element that only ever renders in the browser needs one too: the build cannot tell it apart from one the server renders.',
 		example: [
 			'<canvas',
 			'\tattach={(canvas) => drawChart(canvas)}',

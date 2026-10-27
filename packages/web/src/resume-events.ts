@@ -14,6 +14,7 @@ import {
 import { marklessCodedError } from './coded-error.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
 import { marklessEditableControl, marklessNoteControlEdits } from './control-edit-hold.ts';
+import { marklessRunAtCurrentTarget } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -490,14 +491,11 @@ export function createEventWiring(input: {
 		const moved = keyTargetAfterHandlerFocus(event, input.root);
 		if (moved) Object.defineProperty(event, 'target', { value: moved });
 		const target = event.target;
-		// A field's own events stay in order: its edit hold judges each write against non-overlapping dispatches.
 		const options: { -readonly [Key in keyof ResumeDispatchOptions]: ResumeDispatchOptions[Key] } = {
 			...dispatchOptions,
 			// A key the browser would have sent to an element with no handler does nothing there.
 			...(moved ? { ignoreUnmatched: true } : {}),
-			releaseQueue: marklessEditableControl(target)
-				? undefined
-				: input.root.__marklessReleaseDispatch,
+			releaseQueue: input.root.__marklessReleaseDispatch,
 		};
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
@@ -722,7 +720,8 @@ export function createEventWiring(input: {
 				// The caller's writes wait for this symbol's own, so loading its code splits no task.
 				const releaseFlush = held ? input.graph.holdFlush?.() : undefined;
 				try {
-					return (await input.loadSymbol(symbolId))({
+					const symbol = await input.loadSymbol(symbolId);
+					return await marklessRunAtCurrentTarget(context.event, element, symbol, {
 						...context,
 						...(rowScope && isBoundSymbolId(symbolId)
 							? rowScopedSymbolContext(context, rowScope)

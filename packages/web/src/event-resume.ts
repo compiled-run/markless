@@ -10,6 +10,7 @@ import {
 import { marklessAttributeValue, marklessWriteAttribute } from './dom-attribute.ts';
 import { pageNodes } from './resume-anchor-census.ts';
 import { marklessControlWriteHeld, marklessNoteControlEdits } from './control-edit-hold.ts';
+import { marklessRunAtCurrentTarget } from './event-current-target.ts';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -435,7 +436,11 @@ async function runEventRecord(
 		const invokeSymbol = async (symbolId: string, context: EventResumeSymbolContext) => {
 			const loaded = input.loadSymbol(symbolId);
 			const symbol = isPromiseLike(loaded) ? await loaded : loaded;
-			const result = symbol({ ...context, invokeCallback, invokeSymbol });
+			const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
+				...context,
+				invokeCallback,
+				invokeSymbol,
+			});
 			return isPromiseLike(result) ? await result : result;
 		};
 		const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>

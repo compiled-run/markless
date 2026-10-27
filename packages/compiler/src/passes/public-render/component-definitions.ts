@@ -305,6 +305,7 @@ export function collectPublicRenderComponentDefinitions(
 				initialValues,
 				initialValueKinds,
 				...(Object.keys(initializerResidues).length ? { initializerResidues } : {}),
+				...propCaptureEntry(input, componentName),
 				// A set: every component binds its props under one id, so a module
 				// with several of them offers the same node more than once.
 				stateGraphNodeIds: [...new Set([...stateGraphNodeIds, ...slotGraphNodeIds])],
@@ -401,6 +402,24 @@ export function collectPublicRenderComponentDefinitions(
 			};
 		}
 	});
+}
+
+// A render no edge bound, such as a same-module child's own @try re-render, answers its derives' prop captures from its props.
+function propCaptureEntry(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): { readonly propCaptures?: Readonly<Record<string, ReadonlyArray<string>>> } {
+	const propCaptures: Record<string, ReadonlyArray<string>> = {};
+	const bound = new Set(
+		(input.captureAnalysis.boundResolverRows ?? []).map((row) => row.baseSymbolId),
+	);
+	for (const symbol of input.captureAnalysis.extractedSymbols) {
+		if (symbol.kind !== 'sync-computed-derive' || !bound.has(symbol.symbolId)) continue;
+		for (const slot of symbol.captureSlots)
+			if (slot.propName && slot.owner.componentName === componentName)
+				propCaptures[slot.id] = [slot.propName, ...slot.path];
+	}
+	return Object.keys(propCaptures).length > 0 ? { propCaptures } : {};
 }
 
 // A component body's shared seed is a per-instance initial value, so it rides
