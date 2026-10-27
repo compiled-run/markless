@@ -17,12 +17,16 @@ async function type(input: HTMLInputElement, text: string) {
 
 async function exercise(container: HTMLElement) {
 	const list = () => container.querySelector('ul');
+	const looks = () => [list()?.getAttribute('aria-busy') ?? null, list()?.style.opacity];
+	const busy = () => container.querySelectorAll('[aria-busy="true"]').length;
 	await expect.poll(() => container.querySelectorAll('li').length, { timeout: 5_000 }).toBe(7);
-	await type(container.querySelector('input')!, 'ap');
-	expect(list()?.getAttribute('aria-busy')).toBe('true');
-	expect(list()?.style.opacity).toBe('0.5');
+	// The first keystroke wakes a served page; the second starts a refresh over a settled answer.
+	await type(container.querySelector('input')!, 'a');
+	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotbananagrapemango');
+	await type(container.querySelector('input')!, 'p');
+	await expect.poll(looks, { timeout: 700, interval: 10 }).toEqual(['true', '0.5']);
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
-	expect(list()?.style.opacity).toBe('1');
+	await expect.poll(looks).toEqual([null, '1']);
 
 	const input = container.querySelector('input')!;
 	input.value = '';
@@ -31,13 +35,12 @@ async function exercise(container: HTMLElement) {
 		.poll(() => container.textContent?.includes('Search is down'), { timeout: 5_000 })
 		.toBe(true);
 	expect(list()).toBeNull();
-	expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
+	await expect.poll(busy).toBe(0);
 	[...container.querySelectorAll('button')]
 		.find((button) => button.textContent === 'Try again')!
 		.click();
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('blueberry');
-	expect(list()?.style.opacity).toBe('1');
-	expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
+	await expect.poll(() => [list()?.style.opacity, busy()]).toEqual(['1', 0]);
 }
 
 test('CSR: a child reading its query prop searches, fails, retries and recovers', async () => {

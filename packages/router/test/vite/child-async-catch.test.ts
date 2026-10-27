@@ -59,11 +59,11 @@ async function searchFailsThenRetries(page: Page, errors: ReadonlyArray<string>)
 	await page.locator('input').pressSequentially('berry!', { delay: 100 });
 	await expect.poll(() => page.locator('main p').allInnerTexts()).toEqual(['Search is down']);
 	expect(await page.locator('ul').count()).toBe(0);
-	expect(await page.locator('[aria-busy="true"]').count()).toBe(0);
+	await expect.poll(() => page.locator('[aria-busy="true"]').count()).toBe(0);
 	await page.getByText('Try again').click();
 	await expect.poll(() => items(page)).toEqual(['blueberry']);
-	expect(await page.locator('ul').getAttribute('style')).toBe('opacity: 1');
-	expect(await page.locator('[aria-busy="true"]').count()).toBe(0);
+	await expect.poll(() => page.locator('ul').getAttribute('style')).toBe('opacity: 1');
+	await expect.poll(() => page.locator('[aria-busy="true"]').count()).toBe(0);
 	expect(errors).toEqual([]);
 }
 
