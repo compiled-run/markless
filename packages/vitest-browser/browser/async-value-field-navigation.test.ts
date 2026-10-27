@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
-import { dispatchRouteUpdate, startRouteUpdateRenderer } from '@markless/core/router';
+import { dispatchRouteUpdate } from '@markless/core/router';
+import { startRouteUpdateRenderer } from '@markless/router/vite/runtime/route-renderer';
 import AlphaPage from './fixtures/nav-page-alpha.tsrx?markless-route';
 import LedgerPage from './fixtures/async-value-field-route.tsrx?markless-route';
 

@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
-import { dispatchRouteUpdate, startRouteUpdateRenderer } from '@markless/core/router';
+import { dispatchRouteUpdate } from '@markless/core/router';
+import { startRouteUpdateRenderer } from '@markless/router/vite/runtime/route-renderer';
 import { cleanup, render, renderSSR, renderServerHTML, renderStream } from '../../src/index.ts';
 import { answer, asked, forgetLoads } from './gate.ts';
 import TwoBlocks from './two-blocks.tsrx';
