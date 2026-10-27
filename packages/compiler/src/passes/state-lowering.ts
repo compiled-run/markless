@@ -752,12 +752,16 @@ export function staticTemplateReadDiagnostic(
 		sourceSpan: read.sourceSpan,
 		filename: semanticGraph.filename,
 	});
-	const props = read.componentName ? propsOnlyReads(read.source, lookup) : null;
+	const props = read.componentName ? propsOnlyReads(read.source, lookup, semanticGraph.moduleImports) : null;
 	return props ? { ...diagnostic, decidedByProps: { componentName: read.componentName!, props } } : diagnostic;
 }
 
-// Every name the expression reads is a prop: anything else, a body local included, keeps the warning unsettled.
-function propsOnlyReads(source: string, lookup: GraphLookup): ReadonlyArray<string> | null {
+// Every name the expression reads is a prop or an import: anything else, a body local included, keeps the warning unsettled.
+function propsOnlyReads(
+	source: string,
+	lookup: GraphLookup,
+	imports: StateLoweringInput['semanticGraph']['moduleImports'],
+): ReadonlyArray<string> | null {
 	const code = blankLiteralText(source);
 	const props = new Set<string>();
 	for (const match of code.matchAll(/(?<![$\w.])([A-Za-z_$][\w$]*)(?![$\w])/g)) {
@@ -767,6 +771,8 @@ function propsOnlyReads(source: string, lookup: GraphLookup): ReadonlyArray<stri
 		if (/^\s*:/.test(after) && /[{,]\s*$/.test(before)) continue;
 		if (/^(?:true|false|null|undefined|typeof|void|in|instanceof|new)$/.test(name)) continue;
 		const resolved = resolveGraphPath(name, lookup.bindings, lookup.aliases);
+		if (!resolved && imports.some((imported) => imported.localName === name && !imported.typeOnly))
+			continue;
 		if (resolved?.binding.kind !== 'prop') return null;
 		const prop =
 			resolved.binding.id === PROTOCOL_PROPS_GRAPH_NODE_ID
