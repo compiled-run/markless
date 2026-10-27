@@ -5,7 +5,7 @@ import { captionOf } from './term-glossary.ts';
 /** A word in running text that shows a small ink sketch of what it means. `word` must be a key of the glossary in term-glossary.ts. */
 export default function Term({ word }: { readonly word: string }) @{
 	const caption = captionOf(word);
-	const sketch = word === 'events' ? art.events : art.elements;
+	const sketch = word === 'events' ? art.events : word === 'values' ? art.values : word === 'instructions' ? art.instructions : art.elements;
 
 	<tooltip.root class="term">
 		<tooltip.trigger class="word">{word}</tooltip.trigger>

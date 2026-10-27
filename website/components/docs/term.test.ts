@@ -83,6 +83,18 @@ describe('Subtitle', () => {
 		expect(html.replace(/<[^>]*>/g, '')).toContain('Write elements and events in JavaScript.');
 	});
 
+	it('explains values and instructions on the reading page', async () => {
+		const reading = readFileSync(new URL('../../pages/start/reading-tsrx.mdx', import.meta.url), 'utf8');
+		expect(reading).toContain('<Subtitle text="Every .tsrx file is made of two things: values and instructions." terms="values instructions" />');
+		for (const word of ['values', 'instructions'] as const) {
+			const html = await render(Term, { word });
+			expect(html).toContain(GLOSSARY[word]);
+			expect(html).toContain('aria-describedby=');
+		}
+		expect(sketches.values.ink.length).toBeGreaterThan(100);
+		expect(sketches.instructions.ink.length).toBeGreaterThan(100);
+	});
+
 	it('is what the intro page uses', () => {
 		expect(page).toContain(
 			'<Subtitle text="Write elements and events in JavaScript. Markless is designed to compile them to any device." terms="elements events" />',

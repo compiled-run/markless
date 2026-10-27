@@ -670,11 +670,88 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 		};
 	}
 
+	/** An index card lying on the desk, in sheet centimetres: its corner at (u, v), turned by `turn` radians. */
+	function card(c: { u: number; v: number; w: number; h: number; turn: number }, seed: number) {
+		const cu = Math.cos(c.turn);
+		const su = Math.sin(c.turn);
+		const at = (x: number, y: number): P => [c.u + x * cu - y * su, c.v + x * su + y * cu];
+		const lift = 0.04;
+		const world = (x: number, y: number, z = lift) => {
+			const [u, v] = at(x, y);
+			return sheetAt(u, v, z);
+		};
+		const pt = (x: number, y: number) => proj(world(x, y));
+		const n = 24;
+		const edge: P[] = [];
+		for (let i = 0; i < n; i++) edge.push(pt((i / n) * c.w, 0));
+		for (let i = 0; i < n; i++) edge.push(pt(c.w, (i / n) * c.h));
+		for (let i = 0; i < n; i++) edge.push(pt(c.w - (i / n) * c.w, c.h));
+		for (let i = 0; i < n; i++) edge.push(pt(0, c.h - (i / n) * c.h));
+		const castPts = [world(0, 0, 0.3), world(c.w, 0, 0.3), world(c.w, c.h, 0.3), world(0, c.h, 0.3)].map((p) => proj(shadowOnDesk(p)));
+		const cast = hull([...castPts, ...edge]);
+		const rule = (y: number, i: number) => line([pt(0.25, y), pt(c.w - 0.25, y)], { w: 0.45, seed: seed + 10 + i, over: 0 });
+		const ruled: string[] = [];
+		for (let y = 2.7, i = 0; y < c.h - 0.3; y += 1.4, i++) ruled.push(rule(y, i));
+		return {
+			cast: wash(cast, seed, 0.8, 2),
+			castHatch: hatch(cast, -0.5, 2.2, seed + 1, { cluster: 4, skip: 0.3, trim: 0.4 }),
+			paper: pathOf(edge, true),
+			ink: outline(edge, { w: 1.4, heavy: 1.1, centre: centreOf(edge), seed: seed + 2 }),
+			header: line([pt(0.2, 1.25), pt(c.w - 0.2, 1.25)], { w: 0.8, seed: seed + 3, over: 0.2 }),
+			rules: ruled.join(''),
+			/** An SVG matrix at a point on the card whose local unit is a millimetre. */
+			matrix: (x: number, y: number) => matrixOf(pt(x, y), pt(x + 0.1, y), pt(x, y + 0.1)),
+			point: pt,
+			world,
+			/** A quick pen tick at (x, y) on the card, with its length for the draw-on. */
+			tick: (x: number, y: number, k: number, s: number) => {
+				const pts = [pt(x, y - 0.1 * k), pt(x + 0.18 * k, y + 0.12 * k), pt(x + 0.55 * k, y - 0.35 * k)];
+				return { d: pathOf(pts), length: r1(lengthOf(pts) + 1), ink: stroke(pts, { w: 1.6, seed: s, over: 0.2 }) };
+			},
+		};
+	}
+
+	/** A round button in the browser bar with a circular arrow, raised off the page so it can sink. */
+	function reload(u: number, v: number, r: number, seed: number) {
+		const disc = onSheet(ellipse(u, v, r, r, 30), 0.1);
+		const side = onSheet(ellipse(u + 0.08, v + 0.1, r, r, 30));
+		const arc = onSheet(
+			Array.from({ length: 18 }, (_, i) => {
+				const a = -0.9 + (i / 17) * 4.9;
+				return [u + Math.cos(a) * r * 0.55, v + Math.sin(a) * r * 0.55] as P;
+			}),
+			0.12,
+		);
+		const tip = arc.at(-1)!;
+		const before = arc.at(-4)!;
+		const ang = Math.atan2(tip[1] - before[1], tip[0] - before[0]);
+		const head = (sg: number): P[] => [[tip[0] - Math.cos(ang + sg) * 3.2, tip[1] - Math.sin(ang + sg) * 3.2], tip];
+		const a = proj(sheetAt(u, v, 0.1));
+		const b = proj(sheetAt(u + 0.06, v + 0.08, 0));
+		return {
+			side: pathOf(side, true),
+			paper: pathOf(disc, true),
+			wash: wash(disc, seed, 0.8, 1.6),
+			ink: outline(disc, { w: 1.1, heavy: 0.8, seed: seed + 1 }) + line(arc, { w: 0.9, seed: seed + 2, over: 0 }) + stroke(head(0.5), { w: 0.9, seed: seed + 3, over: 0.3 }) + stroke(head(-0.5), { w: 0.9, seed: seed + 4, over: 0.3 }),
+			sink: `--sink-x:${r1(b[0] - a[0])}px;--sink-y:${r1(b[1] - a[1] + 0.8)}px`,
+		};
+	}
+
+	/** A dashed pencil pocket on the page: the hole a value lands in. */
+	function hole(u0: number, v0: number, u1: number, v1: number, seed: number) {
+		const box = onSheet(roundRect(u0, v0, u1, v1, 0.18), 0.02);
+		let dashes = '';
+		const pts = resample([...box, box[0]!], 2.2);
+		for (let i = 0; i + 1 < pts.length; i += 2) dashes += stroke([pts[i]!, pts[i + 1]!], { w: 0.9, seed: seed + i, over: 0, wobble: 0.1 });
+		return { paper: pathOf(box, true), dashes };
+	}
+
 	/** The margin note in the top left corner and its loose arrow to `aim`. */
-	function note(aim: P, seed: number) {
-		const label: P = [2, 18];
-		const from: P = [Math.max(label[0] + 40, Math.min(aim[0] - 60, label[0] + 200)), label[1] + 8];
-		const arrow = resample([from, [from[0] + 8, from[1] + 22], [aim[0] - 22, aim[1] - 26], [aim[0] - 5, aim[1] - 6]], 3);
+	function note(aim: P, seed: number, label: P = [2, 18]) {
+		const below = label[1] > aim[1];
+		const from: P = [Math.max(label[0] + 40, Math.min(aim[0] - 60, label[0] + 200)), below ? label[1] - 16 : label[1] + 8];
+		const dy = below ? -1 : 1;
+		const arrow = resample([from, [from[0] + 8, from[1] + 22 * dy], [aim[0] - 22, aim[1] - 26 * dy], [aim[0] - 5, aim[1] - 6 * dy]], 3);
 		const smooth = arrow.map((p, i, all) => (i === 0 || i === all.length - 1 ? p : ([(all[i - 1]![0] + p[0] + all[i + 1]![0]) / 3, (all[i - 1]![1] + p[1] + all[i + 1]![1]) / 3] as P)));
 		const end = smooth.at(-1)!;
 		const prev = smooth.at(-4)!;
@@ -687,5 +764,5 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 		};
 	}
 
-	return { proj, projAll, onSheet, sheetMatrix, sheetArt, shopArt, cartIcon, pageButton, spot, strike, jarArt, jarTag, jarPoint, radiusAt, beans, cord, alongSheet, crocodile, splice, crate, tag, note };
+	return { proj, projAll, onSheet, sheetMatrix, sheetArt, shopArt, cartIcon, pageButton, spot, strike, jarArt, jarTag, jarPoint, radiusAt, beans, cord, alongSheet, crocodile, splice, crate, card, reload, hole, tag, note };
 }

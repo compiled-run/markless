@@ -1,4 +1,4 @@
-// The two glossary sketches a Term opens: a tiny page of elements, and a cursor clicking a button.
+// The glossary sketches a Term opens: a tiny page of elements, a cursor clicking a button, a value dropping into its hole, and a list of instructions ticked in order.
 import { hatch, line, outline, type P, wash } from '../figures/ink/ink.ts';
 
 export const WIDTH = 200;
@@ -137,6 +137,40 @@ function events(): Sketch {
 	};
 }
 
+/** A button whose number sits in a dashed hole, with the value dropping into it from above. */
+function values(): Sketch {
+	const button = box(30, 70, 150, 104, 8);
+	const hole = box(42, 76, 70, 98, 3);
+	const dashes: string[] = [];
+	for (let i = 0; i < hole.length - 1; i += 2) dashes.push(line([hole[i]!, hole[i + 1]!], { w: 0.7, seed: 860 + i, over: 0 }));
+	const two: P[] = [[50, 24], [56, 18], [62, 22], [52, 38], [64, 38]];
+	return {
+		paper: '',
+		cover: '',
+		pink: wash(box(44, 78, 68, 96, 3), 861, 1, 1.4),
+		hatch: hatch(box(32, 98, 148, 104, 4), -0.35, 1.8, 862, { cluster: 3, skip: 0.2, trim: 0.25 }),
+		ink: outline(button, { w: 1.5, heavy: 0.8, seed: 863 }) + line(two, { w: 1.6, seed: 864, over: 0.3 }) + line(wavy(80, 136, 88, 0.5), { w: 0.9, seed: 865, over: 0.3 }),
+		fine: dashes.join('') + line([[57, 44], [56, 56], [56, 68]], { w: 0.8, seed: 866, over: 0.2 }) + line([[52, 62], [56, 68], [60, 62]], { w: 0.8, seed: 867, over: 0.2 }),
+		labels: [tilt('hole', 84, 30, '{ }', -4)],
+	};
+}
+
+/** An index card of three lines, the first two ticked, read from the top down. */
+function instructions(): Sketch {
+	const card = box(24, 14, 160, 116, 4);
+	const rows = [42, 66, 90];
+	const tick = (y: number, seed: number) => line([[34, y - 2], [39, y + 4], [48, y - 8]], { w: 1.5, seed, over: 0.2 });
+	return {
+		paper: wash(card, 870, 0.4, 0.6),
+		cover: '',
+		pink: '',
+		hatch: hatch(box(24, 108, 160, 116, 4), -0.4, 1.9, 871, { cluster: 3, skip: 0.2, trim: 0.25 }),
+		ink: outline(card, { w: 1.4, heavy: 0.7, seed: 872 }) + rows.map((y, i) => line(wavy(58, 140 - i * 14, y, 0.6), { w: 0.95, seed: 873 + i, over: 0.4 })).join('') + tick(rows[0]!, 880) + tick(rows[1]!, 881),
+		fine: line([[166, 30], [170, 66], [166, 102]], { w: 0.8, seed: 882, over: 0.2 }) + line([[162, 96], [166, 102], [171, 97]], { w: 0.8, seed: 883, over: 0.2 }),
+		labels: [tilt('block', 130, 12, '@{ }', 3)],
+	};
+}
+
 export function drawing() {
-	return { width: WIDTH, height: HEIGHT, elements: elements(), events: events() };
+	return { width: WIDTH, height: HEIGHT, elements: elements(), events: events(), values: values(), instructions: instructions() };
 }
