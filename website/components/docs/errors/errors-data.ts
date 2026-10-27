@@ -5388,6 +5388,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_PRERENDER_CAPTURE_UNBOUND',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: ['MARKLESS_PRERENDER_CAPTURE_UNBOUND: <slotId>'],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/prerender/evaluator.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/prerender/evaluator.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_PRERENDER_CHILD_MISSING',
 		packageName: '@markless/web',
 		stage: 'runtime',

@@ -1189,6 +1189,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_PRERENDER_CAPTURE_UNBOUND',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_PRERENDER_CHILD_MISSING',
 					kind: 'runtime error',
 					guided: false,
