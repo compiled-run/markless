@@ -10,6 +10,7 @@ import type {
 	SemanticLocalDeclaration,
 } from '../../artifacts.ts';
 import { applyMarklessAllowDirectives, type SourceSpan } from '../../diagnostics.ts';
+import { collectStateSnapshots } from './collect-state-snapshots.ts';
 import {
 	collectAsyncBoundary,
 	collectAsyncBoundaryDiagnostics,
@@ -208,6 +209,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	});
 	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
+	collectStateSnapshots(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectInPlaceForms(

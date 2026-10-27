@@ -14461,6 +14461,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_STATE_SHARED_OBJECT',
+		title: 'One object at two state paths',
+		area: 'state',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'One object at two state paths: a Markless build error.',
+		printed: [
+			'MARKLESS_STATE_SHARED_OBJECT: "<name>" is placed in state twice, at <first> and <second>. A change made through one of them would not update what the page shows through the other.',
+			'Markless tracks a change by the state path it was written through. One object reachable from two paths changes under both, but only the path that was written is updated on the page.',
+			'Give each path its own copy (`{ ...<name> }`), or keep the object once and refer to it by an id from the other place.',
+			'https://markless.dev/errors/MARKLESS_STATE_SHARED_OBJECT',
+		],
+		structured: true,
+		why: 'Markless tracks a change by the state path it was written through. One object reachable from two paths changes under both, but only the path that was written is updated on the page.',
+		suggestion:
+			'Give each path its own copy (`{ ...<name> }`), or keep the object once and refer to it by an id from the other place.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/collect-state-snapshots.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/collect-state-snapshots.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
 		title: 'A handler changes a plain variable the page shows',
 		area: 'state',
@@ -15618,6 +15645,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_TEMPLATE_READS_STATE_COPY',
+		title: 'The page shows a copy of state taken once',
+		area: 'components',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'The page shows a copy of state taken once: a Markless build error.',
+		printed: [
+			'MARKLESS_TEMPLATE_READS_STATE_COPY: The page shows `<read>` as it was when the page rendered: "<name>" is a plain value the component body computed once from the state "<source>", so a change to "<source>" never reaches it.',
+			'A component body runs once, when the page renders. A plain const built from state is a copy of that moment; only state, computed() and paths into them update the page.',
+			'Make "<name>" a computed(): `const <name> = computed(() => ...)` with the same expression, or read "<source>" in the template directly.',
+			'https://markless.dev/errors/MARKLESS_TEMPLATE_READS_STATE_COPY',
+		],
+		structured: true,
+		why: 'A component body runs once, when the page renders. A plain const built from state is a copy of that moment; only state, computed() and paths into them update the page.',
+		suggestion:
+			'Make "<name>" a computed(): `const <name> = computed(() => ...)` with the same expression, or read "<source>" in the template directly.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/collect-state-snapshots.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/collect-state-snapshots.ts',
 			},
 		],
 		moreSources: 0,
