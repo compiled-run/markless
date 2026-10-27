@@ -37,7 +37,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'What is Markless',
 				href: '/',
-				icon: 'inkwell',
+				icon: 'nib',
 				number: '1',
 				description:
 					'What Markless is: elements and events in TypeScript, with an API designed to compile to any device. The browser, server rendering and tests work today, and iOS and macOS are early proofs.',
@@ -53,7 +53,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Migrate an app',
 				href: '/start/migrate',
-				icon: 'moving-box',
+				icon: 'box-arrow',
 				number: '3',
 				description:
 					'Your coding agent moves your app to Markless one page at a time, and Markless Migrate checks each page against the original before it switches over.',
@@ -61,7 +61,7 @@ export const nav: readonly NavSection[] = [
 			{
 				title: 'Reading a .tsrx file',
 				href: '/start/reading-tsrx',
-				icon: 'page-lens',
+				icon: 'lens',
 				number: '4',
 				description:
 					'Every part of a .tsrx file, line by line, then the other files in a starter app.',

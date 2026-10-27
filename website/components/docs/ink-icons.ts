@@ -120,17 +120,17 @@ function drumBand(cx: number, top: number, bottom: number, rx: number, ry: numbe
 	return [...rim(top, 180, 0), ...rim(bottom, 0, 180)];
 }
 
-/** A leaf from `a` to `b`, `w` across at its widest; `bulge` moves the widest point toward `b`. A `slit` parts the two halves along the midline, like a feather's vane either side of its shaft. */
-function leaf(a: P, b: P, w: number, bulge = 0.5, slit = 0, n = 18): Ring[] {
+/** A leaf from `a` to `b`, `w` across at its widest. */
+function leaf(a: P, b: P, w: number, n = 18): Ring {
 	const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
 	const len = Math.hypot(dx, dy) || 1;
 	const [nx, ny] = [-dy / len, dx / len];
-	const half = (t: number) => (w / 2) * Math.sin(Math.PI * t ** (Math.log(0.5) / Math.log(bulge)));
-	const at = (t: number, off: number): P => [a[0] + dx * t + nx * off, a[1] + dy * t + ny * off];
+	const at = (t: number, side: number): P => {
+		const off = side * (w / 2) * Math.sin(Math.PI * t);
+		return [a[0] + dx * t + nx * off, a[1] + dy * t + ny * off];
+	};
 	const ts = Array.from({ length: n + 1 }, (_, k) => k / n);
-	if (!slit) return [[...ts.map((t) => at(t, half(t))), ...ts.slice(1, -1).reverse().map((t) => at(t, -half(t)))]];
-	const inner = ts.filter((t) => half(t) > slit * 2);
-	return [1, -1].map((sign) => [...inner.map((t) => at(t, sign * (half(t) - slit))), ...inner.slice().reverse().map((t) => at(t, sign * slit))]);
+	return [...ts.map((t) => at(t, 1)), ...ts.slice(1, -1).reverse().map((t) => at(t, -1))];
 }
 
 function path(...shapes: Shape[]): string {
@@ -146,10 +146,10 @@ const gear = blob(12, 12, (x, y) => {
 
 /** One mark per docs page, keyed by what the page is about. */
 export const ICONS = {
-	inkwell: path(band(rect(1, 14.5, 12.5, 8.5, 2.6), 1.5), rect(3.2, 18.4, 8.1, 2.8, 0.8), rect(3.8, 11.6, 6.9, 2.2, 0.7), bar([[7.6, 11], [22.8, 0.6]], 1.1), leaf([9.4, 9.8], [23.4, 0.2], 9, 0.58, 0.75)),
-	sprout: path(bar([[12, 19.2], [12.2, 15], [11.6, 11.4]], 1.8), leaf([10.6, 12.2], [2.2, 7.4], 5.6), leaf([12.8, 10.6], [21.6, 3.4], 7), arc(12, 23, 9, 180, 360).map(([x, y]): P => [x, 23 + (y - 23) * 0.4])),
-	'moving-box': path(band(rect(1.5, 10.5, 14.5, 12, 0.6), 1.6), [[1.5, 9.7], [8.2, 9.7], [5.6, 5.4], [0, 7]], [[9.4, 9.7], [16, 9.7], [18.6, 6.2], [12, 5]], rect(5.4, 13.6, 6.8, 2.2, 1.1), bar([[16.6, 11], [19.2, 13.6]], 1), turn([[[18.4, 14.4], [21.4, 14.4], [23.4, 16.6], [23.4, 23], [16.4, 23], [16.4, 16.6]], circle(19.9, 17.2, 1.1)], -10, 19.9, 18.5)),
-	'page-lens': path(band(blob(7.5, 8, (x, y) => inRect(x, y, 2, 1.5, 14, 18.5) && !inCircle(x, y, 15.5, 15, 7)), 1.5), rect(4.6, 5, 8.8, 1.4, 0.7), rect(4.6, 8.4, 6.6, 1.4, 0.7), rect(4.6, 11.8, 3.6, 1.4, 0.7), ring(15.5, 15, 5.6, 1.7), rect(12.6, 13.2, 5.8, 1.6, 0.8), rect(12.6, 16.2, 4, 1.6, 0.8), bar([[19.6, 19.1], [22.6, 22.4]], 3)),
+	nib: path([[[12, 1], [18.6, 9.6], [18.6, 12.6], [15.6, 16.6], [8.4, 16.6], [5.4, 12.6], [5.4, 9.6]], circle(12, 10.8, 1.7), rect(11.4, 2.6, 1.2, 6.2)], band(rect(7.4, 18, 9.2, 5, 1), 1.5)),
+	sprout: path(bar([[12, 18.2], [12.2, 14], [11.6, 10.4]], 1.8), leaf([10.6, 11.2], [2.2, 6.4], 5.6), leaf([12.8, 9.6], [21.6, 2.4], 7), arc(12, 22, 9, 180, 360).map(([x, y]): P => [x, 22 + (y - 22) * 0.4])),
+	'box-arrow': path(rect(3, 5.2, 18, 3, 0.8), band(rect(4, 9.4, 16, 13, 0.8), 1.6), [[7.4, 14.9], [12.2, 14.9], [12.2, 12.8], [16.6, 15.95], [12.2, 19.1], [12.2, 17], [7.4, 17]]),
+	lens: path(ring(10, 10, 8, 1.9), bar(arc(10, 10, 4.6, 200, 250, 6), 1.3), bar([[16.2, 16.2], [21.6, 21.6]], 3.4)),
 	jar: path(band(rect(4, 7, 16, 15.5, 3), 1.6), rect(5.5, 2.2, 13, 3.6, 1), turn(ellipse(9.2, 17.5, 1.9, 1.2), -20, 9.2, 17.5), turn(ellipse(14.2, 16.8, 1.9, 1.2), 25, 14.2, 16.8), turn(ellipse(11.6, 12.8, 1.9, 1.2), -5, 11.6, 12.8)),
 	funnel: path(band([[2, 8], [22, 8], [14, 15.5], [14, 21], [10, 23], [10, 15.5]], 1.5), circle(7, 3.6, 2), circle(17, 3.6, 2), circle(12, 2.6, 1.4)),
 	click: path([[9, 8], [9, 22.5], [12.4, 19], [14.8, 23.6], [17.4, 22.4], [15, 17.8], [19.8, 17.6]], bar([[9, 1.5], [9, 4.8]], 1.6), bar([[3.2, 3.8], [5.4, 6]], 1.6), bar([[2.2, 10.5], [5.4, 10.5]], 1.6), bar([[14.8, 3.8], [12.6, 6]], 1.6)),
