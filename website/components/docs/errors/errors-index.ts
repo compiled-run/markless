@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 297,
+	total: 299,
 	guided: 45,
 	groups: [
 		{
@@ -704,6 +704,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_STATE_SHARED_OBJECT',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
 					kind: 'compile error',
 					guided: true,
@@ -780,6 +785,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_TEMPLATE_READS_CHANGING_IMPORT',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_TEMPLATE_READS_STATE_COPY',
 					kind: 'compile error',
 					guided: false,
 				},

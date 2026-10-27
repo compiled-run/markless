@@ -9,6 +9,7 @@ import type {
 } from '../../artifacts.ts';
 import { applyMarklessAllowDirectives, type SourceSpan } from '../../diagnostics.ts';
 import { collectStateEscapes, resolveStateEscapes } from './collect-state-escapes.ts';
+import { collectStateSnapshots } from './collect-state-snapshots.ts';
 import {
 	collectAsyncBoundary,
 	collectAsyncBoundaryDiagnostics,
@@ -179,6 +180,7 @@ export async function buildSemanticGraph(
 	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
 	resolveStateEscapes(state);
+	collectStateSnapshots(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
