@@ -1700,6 +1700,31 @@ function consequenceReach(
 		}
 		return true;
 	};
+	// A branch that does not flip keeps its served arm wired, so a write reaches that arm's records like the page's own.
+	const liveArmReach = (set: ArmRecordSetLike | undefined): boolean => {
+		if (!set) return true;
+		for (const update of (set.domUpdates ?? []) as NonNullable<ProtocolViewPayload['domUpdates']>)
+			if (reads([update])) {
+				recordIds.add(`dom-update:${update.hostNodeId}:${update.symbolId ?? ''}`);
+				if (update.symbolId) symbolIds.add(update.symbolId);
+			}
+		for (const repeat of set.keyedRepeats ?? []) {
+			if (!repeatMoves(repeat)) continue;
+			recordIds.add(`keyed-repeat:${repeat.id}`);
+			for (const event of repeat.rowEvents)
+				for (const id of event.symbolIds ?? []) symbolIds.add(id);
+		}
+		for (const branch of set.branches ?? []) {
+			if (!(reads(branch.testReads) || reads(branch.contentReads))) {
+				for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return false;
+				continue;
+			}
+			if (!branch.symbolId) return false;
+			symbolIds.add(branch.symbolId);
+			for (const arm of branch.armRecords ?? []) if (!armSymbols(arm)) return false;
+		}
+		return true;
+	};
 	for (const branch of view.branches ?? []) {
 		// Every served arm's behaviors install when resume wires the branch.
 		for (const arm of branch.armRecords ?? [])
@@ -1707,7 +1732,10 @@ function consequenceReach(
 				const symbolId = (behavior as { readonly symbolId?: unknown }).symbolId;
 				if (typeof symbolId === 'string') symbolIds.add(symbolId);
 			}
-		if (!branchFlips(branch)) continue;
+		if (!branchFlips(branch)) {
+			for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return 'unknown';
+			continue;
+		}
 		if (branch.escalates || !branch.symbolId) return 'unknown';
 		recordIds.add(`branch:${branch.id}`);
 		symbolIds.add(branch.symbolId);
