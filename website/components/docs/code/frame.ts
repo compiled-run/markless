@@ -42,6 +42,7 @@ async function run(
 	id: number,
 	entryId: string,
 	modules: readonly CompiledModule[],
+	pageStyles: readonly string[],
 ): Promise<void> {
 	latest = id;
 	const previousUrls = urls;
@@ -80,9 +81,11 @@ async function run(
 		return;
 	}
 	if (id !== latest) return;
+	const page = document.createElement('style');
+	page.textContent = pageStyles.join('\n');
 	const style = document.createElement('style');
 	style.textContent = blockStyles(modules);
-	stage.replaceChildren(style, mount);
+	stage.replaceChildren(page, style, mount);
 	for (const old of runs.keys()) if (old < id) runs.delete(old);
 	for (const url of previousUrls) URL.revokeObjectURL(url);
 	mountedRun = id;
@@ -96,7 +99,7 @@ function look(dark: boolean): void {
 window.addEventListener('message', (event: MessageEvent<FrameRequest>) => {
 	if (event.origin !== location.origin || event.source !== parent) return;
 	const message = event.data;
-	if (message.type === 'code:modules') void run(message.id, message.entry, message.modules);
+	if (message.type === 'code:modules') void run(message.id, message.entry, message.modules, message.pageStyles);
 	else if (message.type === 'code:look') look(message.dark);
 });
 
