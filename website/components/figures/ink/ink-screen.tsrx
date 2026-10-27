@@ -100,7 +100,6 @@ export default function InkScreen({
 
 			.paper {
 				fill: var(--screen-paper);
-				transition: fill 360ms ease;
 			}
 
 			.edge {
@@ -109,7 +108,6 @@ export default function InkScreen({
 
 			.lines {
 				fill: var(--screen-ink);
-				transition: fill 360ms ease;
 			}
 
 			.shadow {

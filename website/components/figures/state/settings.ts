@@ -10,9 +10,6 @@ export const describe = (theme: Theme, presses: number): string =>
 
 export const times = (count: number): string => (count === 1 ? '1 time' : count + ' times');
 
-/** Flips between two values each press, so the same CSS animation can replay. */
-export const flip = (beat: string): string => (beat === 'odd' ? 'even' : 'odd');
-
 function sun() {
 	const c: P = [40, 40];
 	const disc = ellipse(c[0], c[1], 17, 17, 40);

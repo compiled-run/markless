@@ -64,7 +64,6 @@ export default function InkButton({
 
 			.face {
 				fill: var(--screen-paper, var(--paper));
-				transition: fill 360ms ease;
 			}
 
 			.side {
@@ -77,13 +76,11 @@ export default function InkButton({
 
 			.edge {
 				fill: var(--screen-ink, var(--ink));
-				transition: fill 360ms ease;
 			}
 
 			.wash {
 				fill: var(--pink);
 				opacity: 0;
-				transition: opacity 240ms ease;
 			}
 
 			.ink-button[aria-pressed='true'] .wash {

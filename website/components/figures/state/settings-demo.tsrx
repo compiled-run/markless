@@ -4,34 +4,30 @@ import InkButton from '../ink/ink-button.tsrx';
 import InkScreen from '../ink/ink-screen.tsrx';
 import { art as ink } from '../ink/screen.art.ts';
 import { art } from './settings.art.ts';
-import { describe, flip, type Theme, times } from './settings.ts';
+import { describe, type Theme, times } from './settings.ts';
 
 export default function SettingsDemo() @{
 	let theme = state<Theme>('light');
 	let presses = state(0);
-	let beat = state('rest');
 	const handlerRan = computed(() => times(presses));
 	const said = computed(() => (presses === 0 ? '' : describe(theme, presses)));
 	const choose = (next: Theme) => {
 		theme = next;
 		presses++;
-		beat = flip(beat);
 	};
 
-	<figure class="settings-demo" data-beat={beat}>
+	<figure class="settings-demo">
 		<div class="layout">
 			<InkScreen url="notes.app/settings" tone={theme} label="Live preview of a settings page">
 				<div class="page">
 					<svg class="ring corner" viewBox="0 0 26 26" aria-hidden="true">
-						<path class="ring-wash" d={ink.ring.wash} />
 						<path class="ring-ink" d={ink.ring.ink} />
 						<text x="13" y="17.5">1</text>
 					</svg>
 					<p class="heading">
 						<span>Theme: {theme}</span>
 						<svg class="ring" viewBox="0 0 26 26" aria-hidden="true">
-							<path class="ring-wash" d={ink.ring.wash} />
-							<path class="ring-ink" d={ink.ring.ink} />
+								<path class="ring-ink" d={ink.ring.ink} />
 							<text x="13" y="17.5">2</text>
 						</svg>
 					</p>
@@ -52,8 +48,7 @@ export default function SettingsDemo() @{
 							}
 						</svg>
 						<svg class="ring" viewBox="0 0 26 26" aria-hidden="true">
-							<path class="ring-wash" d={ink.ring.wash} />
-							<path class="ring-ink" d={ink.ring.ink} />
+								<path class="ring-ink" d={ink.ring.ink} />
 							<text x="13" y="17.5">3</text>
 						</svg>
 					</div>
@@ -192,10 +187,6 @@ export default function SettingsDemo() @{
 				text-anchor: middle;
 			}
 
-			.ring-wash {
-				fill: var(--yellow);
-				opacity: 0;
-			}
 
 			.settings-demo {
 				--ring: oklch(55% 0.17 30);
@@ -210,35 +201,6 @@ export default function SettingsDemo() @{
 				height: 1.35rem;
 			}
 
-			.settings-demo[data-beat='odd'] .ring-wash {
-				animation: flash-a 1100ms ease-out;
-			}
-
-			.settings-demo[data-beat='even'] .ring-wash {
-				animation: flash-b 1100ms ease-out;
-			}
-
-			@keyframes flash-a {
-				from,
-				40% {
-					opacity: 0.95;
-				}
-
-				to {
-					opacity: 0;
-				}
-			}
-
-			@keyframes flash-b {
-				from,
-				40% {
-					opacity: 0.95;
-				}
-
-				to {
-					opacity: 0;
-				}
-			}
 
 			.notes {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
@@ -293,11 +255,6 @@ export default function SettingsDemo() @{
 				white-space: nowrap;
 			}
 
-			@media (prefers-reduced-motion: reduce) {
-				.settings-demo[data-beat] .ring-wash {
-					animation: none;
-				}
-			}
 		</style>
 	</figure>
 }
