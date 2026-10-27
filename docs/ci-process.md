@@ -281,7 +281,7 @@ Markless's own suite passing does not show that real apps still work. The chunke
 2. It opens one issue labelled `ecosystem-ci` that mentions @thejackshelton, or adds a comment to the one already open.
 3. It closes that issue, with a comment, on the next clean run on `main`.
 
-- **Every push to `main`:** the per-PR sample runs on the pushed commit; a newer push cancels the run of an older one.
+- **`main`, every three hours:** the per-PR sample runs on `main`'s head when it moved since the last scheduled run. It ran on every push until 2026-10-27: 19 runs and about 7,600 runner-minutes on 2026-10-26, while pull request jobs queued for runners. A regression still comments on every pull request merged since main's baseline, so batching the commits changes when it reports, not who it names.
 - **On a pull request:** a maintainer comments `/ecosystem-ci run`, or `/ecosystem-ci run shadcn-admin realworld` for some suites. `.github/workflows/ecosystem-ci.yml` builds the pull request's commit, runs each suite in its own job, posts the results table on the pull request and sets an `ecosystem-ci` commit status, which no ruleset requires. Run it on any change that can reach what a site ships: the bundler, the router, the runtime, `web` or the compiler.
 - **Dispatch:** `gh workflow run ecosystem-ci.yml -f ref=<commit> [-f pr=<number>] [-f suites='a b'] [-f lane=full]`.
 - **Release:** the release cut dispatches it on the release commit right after pushing the release branch and goes on without waiting. The GitHub Release notes link the run and say what it found (or that it was still running); a regression notifies as above.
