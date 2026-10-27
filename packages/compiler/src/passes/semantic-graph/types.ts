@@ -131,6 +131,8 @@ export type WalkState = {
 	/** The <style> scope class of the component being walked; every class this component writes carries it. */
 	currentStyleScopeClass: string | null;
 	currentBranchScopeIds: string[];
+	/** The `branch-site:` ids of the @if/@switch blocks enclosing the walk, outermost first. */
+	currentBranchSiteIds: string[];
 	currentKeyedRepeatScopeIds: string[];
 	/** Source span of each keyed repeat's item declaration, by repeat id. */
 	readonly keyedRepeatItemSpans: Map<string, { readonly start: number; readonly end: number }>;
@@ -280,6 +282,7 @@ export function createWalkState(input: {
 		currentComponentId: null,
 		currentStyleScopeClass: null,
 		currentBranchScopeIds: [],
+		currentBranchSiteIds: [],
 		currentKeyedRepeatScopeIds: [],
 		keyedRepeatItemSpans: new Map(),
 		currentHostNodeId: null,

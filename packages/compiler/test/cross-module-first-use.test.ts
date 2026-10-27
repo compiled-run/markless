@@ -502,3 +502,74 @@ test('reach follows structure, not the names in one fixture', async () => {
 	);
 	expect(turn).not.toEqual(expect.arrayContaining(symbolsOfKind(leaf, 'dom-update')));
 });
+
+// Every control's first use, arm controls included, keyed by a marker in its handler source.
+function anyFirstUse(result: CompileTsrxModuleResult, marker: string): RuntimeDemandMapFirstUseReach {
+	const handler = result.symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'event-handler' && symbol.source.includes(marker),
+	)!;
+	const map = result.runtimeDemandMaps.prerender;
+	const action = [...map.actions, ...map.armActions].find((candidate) => {
+		const reach = candidate.firstUse;
+		return reach !== undefined && reach !== 'unknown' && reach.symbolIds.includes(handler.id);
+	})!;
+	return action.firstUse!;
+}
+
+const SEARCH = '/workspace/src/Search.tsrx';
+const search: Module = {
+	filename: SEARCH,
+	importSource: './Search.tsrx',
+	source: `
+		import { computed, state } from '@markless/core';
+		export default function Search() @{
+			let query = state('');
+			const results = computed(async () => [query]);
+			<div>
+				<input value={query} onInput={(event) => (query = (event.target as HTMLInputElement).value)} />
+				@try {
+					<ul>@for (const hit of results; key hit) { <li>{hit}</li> }</ul>
+				} @pending { <p>wait</p> }
+			</div>
+		}
+	`,
+};
+
+test.each([
+	{
+		name: 'an @if on a module constant around both',
+		head: 'const SHOWN = true;',
+		markup: `<>@if (SHOWN) { <div onClick={() => console.info('outer')}><button onClick={() => (tab = 'b')}>b</button>@if (tab === 'a') { <p>A</p> } @else { <p>B</p> }</div> }@if (SHOWN) { <><Search /></> }</>`,
+	},
+	{
+		name: 'an @if on state the control never writes',
+		head: '',
+		markup: `<section>@if (open) { <Search /> }<p onClick={() => console.info('outer')}><button onClick={() => (tab = 'b')}>b</button>{tab}</p></section>`,
+	},
+	{
+		name: 'a @switch case',
+		head: '',
+		markup: `<section><nav onKeydown={() => console.info('outer')}><a onClick={() => (tab = 'b')}>{tab}</a></nav>@switch (mode) { @case 'search': { <aside><Search /></aside> } @default: { <i>none</i> } }</section>`,
+	},
+])('a control whose writes open no block around an imported child leaves the child out: $name', async ({ head, markup }) => {
+	const PAGE = '/workspace/src/Page.tsrx';
+	const { result } = await compile([
+		search,
+		{
+			filename: PAGE,
+			source: `
+				import { state } from '@markless/core';
+				import Search from './Search.tsrx';
+				${head}
+				export default function Page() @{
+					let tab = state('a');
+					let open = state(false);
+					let mode = state('list');
+					${markup}
+				}
+			`,
+		},
+	]);
+	for (const marker of ["tab = 'b'", "console.info('outer')"])
+		expect(foreignIn(anyFirstUse(result(PAGE), marker), SEARCH)).toEqual([]);
+});
