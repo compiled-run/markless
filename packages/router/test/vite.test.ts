@@ -394,14 +394,19 @@ test('wires the routed prerender-wake entry path through the server entry', asyn
 
 test('router resume entry imports TSRX virtual resume modules instead of page modules', async () => {
 	const source = await readFile(
+		new URL('../src/vite/entries/resume-modules.ts', import.meta.url),
+		'utf8',
+	);
+	const entry = await readFile(
 		new URL('../src/vite/entries/resume-entry.ts', import.meta.url),
 		'utf8',
 	);
 
 	expect(source).toContain("query: '?markless-resume'");
-	expect(source).toContain('tsrxResumeModuleLoaders');
+	expect(source).toContain('tsrxResumeModules');
 	expect(source).not.toContain("import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx'])");
-	expect(source).not.toContain('pageModule.resumeContainerEvent');
+	expect(entry).not.toContain('import.meta.glob');
+	expect(entry).not.toContain('pageModule.resumeContainerEvent');
 });
 
 test('router client entry requests self-contained client route artifacts', async () => {

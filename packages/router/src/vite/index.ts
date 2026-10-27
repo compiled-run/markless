@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, normalize, relative, resolve } from 'pathe';
 import {
 	type EnvironmentOptions,
 	minifySync,
+	parseAst,
 	sortUserPlugins,
 	type Plugin,
 	type PluginOption,
@@ -108,6 +109,9 @@ const CLIENT_ENTRY_ID = 'virtual:markless-router/client-entry';
 const RESUME_ENTRY_ID = 'virtual:markless-router/resume-entry';
 const RESUME_ENTRY_ORIGIN = '/entries/resume-entry.ts';
 const RESUME_ENTRY_PATH_ID = 'virtual:markless-router/resume-entry-path';
+const RESUME_MODULES_ID = 'virtual:markless-router/resume-modules';
+const RESUME_MODULES_ORIGIN = '/entries/resume-modules.ts';
+const DEV_RESUME_MODULES_ID = 'virtual:markless-router/dev-resume-modules';
 const PRERENDER_WAKE_ENTRY_ID = 'virtual:markless-router/prerender-wake-entry';
 const PRERENDER_WAKE_ENTRY_ORIGIN = '/entries/prerender-wake-entry.ts';
 const PRERENDER_WAKE_ENTRY_PATH_ID = 'virtual:markless-router/prerender-wake-entry-path';
@@ -125,7 +129,7 @@ const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
 const PUBLIC_VIRTUAL_MODULE_ID_RE =
-	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|prerender-wake-entry|prerender-wake-entry-path|navigation-entry|navigation-entry-path|fragment-entry|fragment-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
+	/^virtual:markless-router\/(?:routes|client-entry|resume-entry|resume-entry-path|resume-modules|dev-resume-modules|prerender-wake-entry|prerender-wake-entry-path|navigation-entry|navigation-entry-path|fragment-entry|fragment-entry-path|route-preloads|server-entry|route-href|options)(?:\?.*)?$/;
 const VITE_PLUGIN_FILE = decodePath(parseURL(import.meta.url).pathname);
 // The app-context entry files ship as SOURCE at src/vite/entries (see the
 // `files` field): running from src, they sit next to this file; running from
@@ -144,6 +148,7 @@ const virtualEntryFiles = {
 	[ROUTE_DISCOVERY_ID]: 'route-discovery.ts',
 	[CLIENT_ENTRY_ID]: 'client-entry.ts',
 	[RESUME_ENTRY_ID]: 'resume-entry.ts',
+	[RESUME_MODULES_ID]: 'resume-modules.ts',
 	[PRERENDER_WAKE_ENTRY_ID]: 'prerender-wake-entry.ts',
 	[NAVIGATION_ENTRY_ID]: 'client-entry.ts',
 	[FRAGMENT_ENTRY_ID]: 'fragment-entry.ts',
@@ -478,6 +483,7 @@ function routerConfigPlugin(
 				navigationEntry.fileName = undefined;
 				fragmentEntry.fileName = undefined;
 				routePreloads.routes = { navigation: {}, ssr: {}, styles: {} };
+				routePreloads.resumeModules = {};
 				routePreloads.persisted = false;
 				routePreloads.importMap = undefined;
 				await removeClientAssetsManifest(clientOutDir);
@@ -499,6 +505,7 @@ function routerConfigPlugin(
 				: undefined;
 			fragmentEntry.imports = manifest.entries.fragmentImports;
 			routePreloads.routes = manifest.routes;
+			routePreloads.resumeModules = manifest.resumeModules ?? {};
 			routePreloads.persisted = true;
 			routePreloads.importMap = manifest.importMap;
 		},
@@ -527,6 +534,10 @@ function routerConfigPlugin(
 				if (resumeChunk) {
 					resumeEntry.fileName = resumeChunk.fileName;
 				}
+				const resumeModulesChunk = Object.values(bundle).find(
+					(item): item is OutputChunk =>
+						item.type === 'chunk' && isVirtualEntryChunk(item, RESUME_MODULES_ORIGIN),
+				);
 				const prerenderWakeChunk = Object.values(bundle).find(
 					(item): item is OutputChunk =>
 						item.type === 'chunk' &&
@@ -569,6 +580,7 @@ function routerConfigPlugin(
 					navigationPolyfillIds,
 					prerenderWakeChunk,
 					resumeChunk,
+					resumeModulesChunk,
 					root: routePreloads.root,
 				});
 				patchRoutePreloadsInBundle(bundle, routePreloads.routes);
@@ -654,6 +666,14 @@ function routerConfigPlugin(
 					...pendingClientAssets,
 					importMap: JSON.parse(String(importMap.source)),
 				};
+			const resumeModules = routeResumeModulesFromBundle(
+				bundle ?? {},
+				routePreloads.base,
+				pendingClientAssets.importMap?.imports ?? {},
+				pendingClientAssets.routes.ssr,
+			);
+			routePreloads.resumeModules = resumeModules;
+			pendingClientAssets = { ...pendingClientAssets, resumeModules };
 			await writeClientAssetsManifest(clientOutDir, pendingClientAssets);
 		},
 	};
@@ -898,6 +918,7 @@ interface RoutePreloadState {
 	persisted: boolean;
 	root: string;
 	routes: RoutePreloadMaps;
+	resumeModules: RouteResumeModules;
 }
 
 type RoutePreloadMaps = MarklessRouterClientAssetRoutes;
@@ -913,6 +934,7 @@ function routePreloadState(): RoutePreloadState {
 		persisted: false,
 		root: '.',
 		routes: { navigation: {}, ssr: {}, styles: {} },
+		resumeModules: {},
 	};
 }
 
@@ -927,17 +949,19 @@ function prerenderWakeChannelEnabled(): boolean {
 
 function routerClientInput(input: InputOption | undefined, root: string): InputOption | undefined {
 	const resumeEntryId = scopedVirtualEntryId(RESUME_ENTRY_ID, root);
+	const resumeModulesId = scopedVirtualEntryId(RESUME_MODULES_ID, root);
 	const prerenderWakeEntryId = scopedVirtualEntryId(PRERENDER_WAKE_ENTRY_ID, root);
 	const navigationEntryId = scopedVirtualEntryId(NAVIGATION_ENTRY_ID, root);
 	const fragmentEntryId = scopedVirtualEntryId(FRAGMENT_ENTRY_ID, root);
 	const wakeEntries = prerenderWakeChannelEnabled() ? [prerenderWakeEntryId] : [];
 	if (input === undefined) {
-		return [resumeEntryId, ...wakeEntries, navigationEntryId, fragmentEntryId];
+		return [resumeEntryId, resumeModulesId, ...wakeEntries, navigationEntryId, fragmentEntryId];
 	}
 
 	if (typeof input === 'string' || Array.isArray(input)) {
 		return [
 			resumeEntryId,
+			resumeModulesId,
 			...wakeEntries,
 			navigationEntryId,
 			fragmentEntryId,
@@ -949,6 +973,7 @@ function routerClientInput(input: InputOption | undefined, root: string): InputO
 		return {
 			...input,
 			'markless-router-resume': resumeEntryId,
+			'markless-router-resume-modules': resumeModulesId,
 			...(prerenderWakeChannelEnabled()
 				? { 'markless-router-prerender-wake': prerenderWakeEntryId }
 				: {}),
@@ -981,6 +1006,7 @@ function virtualModulesPlugin(
 	fragmentEntry: ResumeEntryState = resumeEntryState(),
 ): Plugin {
 	let root = '';
+	let serving = false;
 
 	return {
 		name: 'markless-router:routes',
@@ -994,6 +1020,7 @@ function virtualModulesPlugin(
 		sharedDuringBuild: true,
 		configResolved(config) {
 			root = config.root;
+			serving = config.command === 'serve';
 		},
 		resolveId: {
 			filter: {
@@ -1013,7 +1040,8 @@ function virtualModulesPlugin(
 					baseId === PRERENDER_WAKE_ENTRY_PATH_ID ||
 					baseId === NAVIGATION_ENTRY_PATH_ID ||
 					baseId === FRAGMENT_ENTRY_PATH_ID ||
-					baseId === ROUTE_PRELOADS_ID
+					baseId === ROUTE_PRELOADS_ID ||
+					baseId === DEV_RESUME_MODULES_ID
 				) {
 					return `\0${baseId}${rootScopeQuery(root, id)}`;
 				}
@@ -1065,6 +1093,12 @@ function virtualModulesPlugin(
 						FRAGMENT_ENTRY_ID,
 						root,
 					);
+				}
+				// A built page names its own resume module in its route script; only dev resumes through the table.
+				if (id.startsWith(`\0${DEV_RESUME_MODULES_ID}`)) {
+					return serving
+						? `export * from ${JSON.stringify(scopedVirtualEntryId(RESUME_MODULES_ID, root))};`
+						: 'export const mdxResumeModules = undefined, tsrxResumeModules = undefined;';
 				}
 				if (id.startsWith(`\0${ROUTE_PRELOADS_ID}`)) {
 					return routePreloadsSource(
@@ -1211,7 +1245,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { prerenderWakeEntryPath } from ${JSON.stringify(`${PRERENDER_WAKE_ENTRY_PATH_ID}${query}`)};`,
 		`import { navigationEntryPath } from ${JSON.stringify(`${NAVIGATION_ENTRY_PATH_ID}${query}`)};`,
 		`import { fragmentEntryPath } from ${JSON.stringify(`${FRAGMENT_ENTRY_PATH_ID}${query}`)};`,
-		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, documentImportMap } from ${JSON.stringify(`${ROUTE_PRELOADS_ID}${query}`)};`,
+		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, documentImportMap, routeResumeModules } from ${JSON.stringify(`${ROUTE_PRELOADS_ID}${query}`)};`,
 		`import { pageModuleLoaders, routeFileIds } from ${JSON.stringify(`${ROUTE_DISCOVERY_ID}${query}`)};`,
 		`import { documentNavigation } from ${JSON.stringify(`${ROUTER_OPTIONS_ID}${query}`)};`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
@@ -1229,6 +1263,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		...(options.prefetch === false ? ['  prefetch: false,'] : []),
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
+		`  routeResumeModules,`,
 		`  routeStylesheets,`,
 		`  documentStylesheets,`,
 		`  importMap: documentImportMap,`,
@@ -1286,6 +1321,7 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 				`const documentStylesheetsJson = globalThis.__marklessRouterDocumentStylesheetsJson ?? ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)};`,
 				`export const documentStylesheets = documentStylesheetsJson === ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)} ? [] : JSON.parse(documentStylesheetsJson);`,
 				`export const documentImportMap = ${JSON.stringify(state.persisted && state.importMap ? importMapScript(state.importMap) : '')};`,
+				`export const routeResumeModules = ${JSON.stringify(state.persisted ? state.resumeModules : {})};`,
 			];
 	return [
 		`const routePreloadsJson = globalThis.__marklessRouterRoutePreloadsJson ?? ${JSON.stringify(ROUTE_PRELOADS_PLACEHOLDER)};`,
@@ -1395,6 +1431,7 @@ function routeModulePreloadsFromBundle(input: {
 	readonly navigationPolyfillIds?: ReadonlySet<string>;
 	readonly prerenderWakeChunk: OutputChunkLike | undefined;
 	readonly resumeChunk: OutputChunkLike | undefined;
+	readonly resumeModulesChunk?: OutputChunkLike | undefined;
 	readonly root: string;
 }): RoutePreloadMaps {
 	// The bundler packs runtime no page's payload demands into this chunk; it loads on first import().
@@ -1529,14 +1566,10 @@ function routeModulePreloadsFromBundle(input: {
 		const ssrFileNames = new Set<string>();
 		if (input.resumeChunk) {
 			includeChunk(ssrFileNames, landingScope, input.resumeChunk.fileName);
-			// The resume entry dynamically imports every route's resume module, so
-			// only walk the CURRENT route's resume module (plus its full static and
-			// dynamic closure); other routes' resume modules must stay excluded.
-			// Missing this walk makes the first interaction pay a serial waterfall
-			// fetch on slow networks (the preload-strategy box catches this).
-			for (const fileName of routeScopedDynamicImports(input.resumeChunk, routeFile)) {
-				includeChunk(ssrFileNames, landingScope, fileName, true);
-			}
+			// Only the CURRENT route's resume module and its closure: the first event must not fetch it.
+			for (const table of [input.resumeChunk, input.resumeModulesChunk])
+				for (const fileName of table ? routeScopedDynamicImports(table, routeFile) : [])
+					includeChunk(ssrFileNames, landingScope, fileName, true);
 		}
 		// Empty-delta pages boot through the prerender-wake entry instead of the
 		// resume module; its route-scoped closure obeys the same preload law —
@@ -1605,8 +1638,9 @@ function routeModulePreloadsFromBundle(input: {
 			: []) {
 			if (!entry) continue;
 			includeChunk(firstEventPath, landingScope, entry.fileName);
-			for (const fileName of routeScopedDynamicImports(entry, routeFile))
-				includeChunk(firstEventPath, landingScope, fileName);
+			for (const table of [entry, entry === input.resumeChunk && input.resumeModulesChunk])
+				for (const fileName of table ? routeScopedDynamicImports(table, routeFile) : [])
+					includeChunk(firstEventPath, landingScope, fileName);
 		}
 		for (const fileName of lazySiblings) includeChunk(firstEventPath, landingScope, fileName);
 		// The page's resolver lists no symbol: no handler, trigger or reactive text ever wakes the resume runtime.
@@ -1753,6 +1787,117 @@ function narrowToPlanned(
 	const ordered = [...fileNames].filter((fileName) => kept.has(fileName));
 	fileNames.clear();
 	for (const fileName of [...ordered, ...kept]) fileNames.add(fileName);
+}
+
+type RouteResumeModules = NonNullable<MarklessRouterClientAssetsManifest['resumeModules']>;
+
+// Read from the written bundle, so the URL and loader are the ones the browser fetches and calls.
+function routeResumeModulesFromBundle(
+	bundle: Record<string, unknown>,
+	base: string,
+	importMap: Readonly<Record<string, string>>,
+	landing: Readonly<Record<string, readonly string[]>>,
+): RouteResumeModules {
+	const table = outputChunks(bundle).find((chunk) =>
+		isVirtualEntryChunk(chunk, RESUME_MODULES_ORIGIN),
+	);
+	if (!table?.code) return {};
+	const modules: Record<string, readonly string[]> = {};
+	const loaders = routeResumeLoaders(table.code);
+	for (const { routeFile, specifier, evaluate } of loaders.found) {
+		if (!evaluate)
+			throw new Error(
+				`Markless Router could not read how ${table.fileName} evaluates the resume module of ${routeFile}.`,
+			);
+		const url = /^\.\.?\//.test(specifier)
+			? joinURL(base, normalize(join(dirname(table.fileName), specifier)))
+			: importMap[specifier];
+		if (!url)
+			throw new Error(
+				`Markless Router could not resolve the resume module of ${routeFile} (${specifier}).`,
+			);
+		if (landing[routeFile]?.length && !landing[routeFile]!.includes(url))
+			throw new Error(
+				`Markless Router's landing plan for ${routeFile} does not preload its resume module ${url}: the first event would fetch it.`,
+			);
+		modules[routeFile] = [url, ...evaluate];
+	}
+	if (loaders.found.length !== loaders.imports)
+		throw new Error(
+			`Markless Router read ${loaders.found.length} of the ${loaders.imports} route resume loaders in ${table.fileName}.`,
+		);
+	return modules;
+}
+
+type AstNode = { readonly type: string; readonly [key: string]: unknown };
+
+// `"/pages/x.tsrx":()=>import("./c.js")`, maybe inside Vite's CSS preload helper: a served page links its stylesheets.
+function routeResumeLoaders(code: string) {
+	const found: { routeFile: string; specifier: string; evaluate?: readonly string[] }[] = [];
+	const evaluations = new Map<AstNode, readonly string[] | undefined>();
+	let imports = 0;
+	const visit = (node: unknown, route?: string): void => {
+		if (Array.isArray(node)) return node.forEach((child) => visit(child, route));
+		if (!node || typeof node !== 'object' || typeof (node as AstNode).type !== 'string') return;
+		const current = node as AstNode;
+		const key = current.type === 'Property' ? (current.key as AstNode) : undefined;
+		const routeFile =
+			typeof key?.value === 'string' && /^\/pages\/.+\.(?:tsrx|mdx)$/.test(key.value)
+				? key.value.slice(1)
+				: route;
+		const then = current.type === 'CallExpression' ? (current.callee as AstNode) : undefined;
+		if (
+			then?.type === 'MemberExpression' &&
+			(then.object as AstNode).type === 'ImportExpression' &&
+			(then.property as AstNode).name === 'then'
+		)
+			evaluations.set(then.object as AstNode, packEvaluation(current));
+		if (current.type === 'ImportExpression') {
+			imports++;
+			const specifier = staticString(current.source as AstNode);
+			if (routeFile && specifier)
+				found.push({
+					routeFile,
+					specifier,
+					evaluate: evaluations.has(current) ? evaluations.get(current) : [],
+				});
+		}
+		for (const [field, child] of Object.entries(current))
+			if (field !== 'type') visit(child, routeFile);
+	};
+	visit(parseAst(code));
+	return { found, imports };
+}
+
+function staticString(node: AstNode | undefined): string | undefined {
+	if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
+	const quasis = node?.type === 'TemplateLiteral' ? (node.quasis as AstNode[]) : [];
+	return quasis.length === 1
+		? (quasis[0]!.value as { readonly cooked?: string }).cooked
+		: undefined;
+}
+
+// A module packed with others evaluates on a call: `.then(e=>e.$ml1())` returns it, `.then(e=>(e.a(),e.b))` reads it after.
+function packEvaluation(then: AstNode): readonly string[] | undefined {
+	const [callback] = then.arguments as AstNode[];
+	const [param] = (callback?.params as AstNode[] | undefined) ?? [];
+	if (callback?.type !== 'ArrowFunctionExpression' || param?.type !== 'Identifier') return;
+	const member = (node: AstNode | undefined) =>
+		node?.type === 'MemberExpression' &&
+		!node.computed &&
+		(node.object as AstNode).name === param.name
+			? ((node.property as AstNode).name as string)
+			: undefined;
+	const call = (node: AstNode | undefined) =>
+		node?.type === 'CallExpression' && (node.arguments as AstNode[]).length === 0
+			? member(node.callee as AstNode)
+			: undefined;
+	const body = callback.body as AstNode;
+	const [first, second, ...rest] = (body.expressions as AstNode[] | undefined) ?? [];
+	const init = body.type === 'SequenceExpression' ? call(first) : call(body);
+	const read = body.type === 'SequenceExpression' && !rest.length ? member(second) : undefined;
+	if (body.type === 'SequenceExpression') return init && read ? [init, read] : undefined;
+	return init ? [init] : undefined;
 }
 
 function routeScopedDynamicImports(chunk: OutputChunkLike, routeFile: string): string[] {

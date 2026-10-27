@@ -27,6 +27,8 @@ export interface MarklessRouterClientAssetsManifest {
 		readonly fragmentImports?: readonly string[];
 	};
 	readonly routes: MarklessRouterClientAssetRoutes;
+	// Per route: the chunk holding its resume module, then the export evaluating it inside a pack and the export holding it.
+	readonly resumeModules?: Readonly<Record<string, readonly string[]>>;
 	// Maps the chunk specifiers chunks import each other by to their hashed URLs; every document carries it.
 	readonly importMap?: { readonly imports: Readonly<Record<string, string>> };
 }
@@ -258,6 +260,8 @@ async function validateClientAssetsManifest(
 	};
 	assertMatchingRouteKeys(routes);
 	const importMap = input.importMap === undefined ? undefined : importMapImports(input.importMap);
+	const resumeModules =
+		input.resumeModules === undefined ? undefined : routeResumeModules(input.resumeModules);
 
 	const hrefs = new Set([
 		entries.resume,
@@ -269,6 +273,7 @@ async function validateClientAssetsManifest(
 		...Object.values(routes.ssr).flat(),
 		...Object.values(routes.styles).flat(),
 		...Object.values(importMap?.imports ?? {}),
+		...Object.values(resumeModules ?? {}).map(([href]) => href),
 	]);
 	for (const href of hrefs) {
 		const fileName = clientAssetFileName(href, base);
@@ -298,8 +303,19 @@ async function validateClientAssetsManifest(
 		base,
 		entries,
 		routes,
+		...(resumeModules ? { resumeModules } : {}),
 		...(importMap ? { importMap } : {}),
 	};
+}
+
+function routeResumeModules(input: unknown): Record<string, readonly string[]> {
+	const modules = routeMap(input, 'resumeModules');
+	for (const [routeFile, [href, ...exports]] of Object.entries(modules))
+		if (!href || exports.length > 2 || !exports.every((name) => /^[\w$]+$/.test(name)))
+			throw clientAssetsManifestError(
+				`has an invalid resume module for route ${JSON.stringify(routeFile)}`,
+			);
+	return modules;
 }
 
 function requiredStrings(input: unknown, label: string): readonly string[] {
