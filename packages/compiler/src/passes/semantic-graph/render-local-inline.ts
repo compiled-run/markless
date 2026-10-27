@@ -45,6 +45,7 @@ export type RenderLocalInline =
 			readonly source: string;
 			// The defining expressions spliced in; their graph reads are the expression's too.
 			readonly definitions: ReadonlyArray<AnyNode>;
+			readonly names: ReadonlySet<string>;
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
 	| { readonly kind: 'render-local'; readonly name: string }
@@ -71,19 +72,21 @@ export function inlineRenderLocals(
 	} = {},
 ): RenderLocalInline {
 	const definitions: AnyNode[] = [];
-	const result = inlineWithin(node, state, definitions, new Set(), {
+	const names = new Set<string>();
+	const result = inlineWithin(node, state, definitions, names, new Set(), {
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
 		inlineFunctions: options.inlineFunctions === true,
 		inlineOnly: options.inlineOnly,
 	});
-	return 'source' in result ? { kind: 'inlined', source: result.source, definitions } : result;
+	return 'source' in result ? { kind: 'inlined', source: result.source, definitions, names } : result;
 }
 
 function inlineWithin(
 	node: AnyNode,
 	state: WalkState,
 	definitions: AnyNode[],
+	names: Set<string>,
 	inlining: Set<number>,
 	options: {
 		readonly leaveCaptureOwned: boolean;
@@ -154,10 +157,12 @@ function inlineWithin(
 					} else {
 						const definition = local.init;
 						definitions.push(definition);
+						names.add(name);
 						const inner = inlineWithin(
 							definition,
 							state,
 							definitions,
+							names,
 							new Set([...inlining, symbolId]),
 							options,
 						);

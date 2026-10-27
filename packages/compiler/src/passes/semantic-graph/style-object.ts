@@ -76,6 +76,8 @@ export type StyleObjectLoweringOptions = {
 	readonly usagePos: number;
 	/** True when `node` was substituted from a same-file const, not written inline. */
 	readonly referenced: boolean;
+	/** The source a dynamic value is written with, when it differs from its authored text. */
+	readonly valueSource?: (value: AnyNode) => string | null;
 };
 
 /** Guards accidental spread cycles between consts; real chains stay shallow. */
@@ -210,7 +212,7 @@ function collectStyleEntries(
 			custom,
 			kind: 'dynamic',
 			valueNode: value,
-			valueSource: expressionSource(value, source),
+			valueSource: options?.valueSource?.(value) ?? expressionSource(value, source),
 		});
 	}
 	return null;
