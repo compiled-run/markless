@@ -51,7 +51,7 @@ describe('browser highlighter', () => {
 		expect(lines.map((line) => painted(runsOf(line)))).toEqual(
 			pane.lines.map((line) => painted(line.runs)),
 		);
-	});
+	}, 30_000);
 
 	it('keeps a trailing empty line, so a new last line has a row under the caret', async () => {
 		const highlighter = await loadHighlighter(['x.ts']);

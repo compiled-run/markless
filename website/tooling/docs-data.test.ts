@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { prepareDocsData, docsData, type DocsInputs } from './docs-data.ts';
 import { fillPageProps } from './page-props.ts';
 import { scenes } from '../components/docs/anatomy/scenes.ts';
@@ -23,6 +23,11 @@ const setup = () => {
 const inputs: DocsInputs = { manifest, scenes, order: (family) => metaIfAny(family)?.partOrder };
 const api = "import ApiTable from '../../components/docs/api-table.tsrx';\n\n";
 const anatomy = "import AnatomyTable from '../../components/docs/anatomy-table.tsrx';\n\n";
+// The first call cold-loads the MDX parser and the compiler: setup, so it runs under the hook timeout, not the first test's.
+beforeAll(async () => {
+	const { root, id } = setup();
+	await prepareDocsData('', id, root, inputs);
+});
 
 describe('static docs data', () => {
 	it.each(['accordion', 'tabs'])(

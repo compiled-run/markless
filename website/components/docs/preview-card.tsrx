@@ -198,7 +198,7 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 			<lucide.circlehelp class="ico" aria-hidden="true" />
 		</tooltip.trigger>
 		<tooltip.content class="pg-tip">
-			<span class="tsrx-tip-title">{title}</span>
+			<span class="tsrx-tip-title"><span class="tsrx-tip-code">{title}</span></span>
 			<span class="tsrx-tip-body">{text}</span>
 		</tooltip.content>
 		<style>
@@ -258,12 +258,20 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 			}
 
 			.pg-tip .tsrx-tip-title,
-			.pg-tip .tsrx-tip-body {
+			.pg-tip .tsrx-tip-body,
+			.pg-tip .tsrx-tip-type {
 				display: block;
+				background: transparent;
+				border: 0;
+				color: inherit;
 				overflow-wrap: anywhere;
 			}
 
 			.pg-tip .tsrx-tip-title {
+				font-weight: 700;
+			}
+
+			.pg-tip .tsrx-tip-code {
 				font-family: var(--font-mono);
 				font-weight: 500;
 			}
@@ -276,6 +284,15 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 
 			.pg-tip .tsrx-tip-body:empty {
 				display: none;
+			}
+
+			.pg-tip .tsrx-tip-type {
+				margin-block-start: 0.45rem;
+				padding-block-start: 0.4rem;
+				border-block-start: 1px dashed color-mix(in oklch, var(--ink) 35%, transparent);
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
+				opacity: 0.8;
 			}
 
 			.pg-tip:is([ui-closed], [hidden]) {

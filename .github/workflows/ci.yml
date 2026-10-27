@@ -104,6 +104,7 @@ jobs:
     # beside `typecheck`, not instead of it, until 7.1 is stable and the two
     # have agreed for a while; also checks website/. Known 7.x gaps:
     # https://github.com/tsrx-org/tsrx/issues/136
+    # The website's own tests ride here: no lane skips this job, so a website-only edit still runs them.
     typecheck-ts7:
         runs-on: ubuntu-latest
         timeout-minutes: 10
@@ -134,6 +135,10 @@ jobs:
 
             - name: Typecheck on TypeScript 7.1
               run: pnpm typecheck:ts7
+
+            # website/vitest.config.ts, the same config `pnpm --dir website test` uses.
+            - name: Run the website tests
+              run: pnpm --dir website exec vp test run
 
     # Content-hash gate in front of every lane. Each lane's inputs are hashed
     # into a cache key and probed read-only; a lane whose key already has a
@@ -1110,10 +1115,6 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
-
-            # The website tooling tests ride this lane: its key hashes website/ and the UI API manifest they read.
-            - name: Run website tooling tests
-              run: pnpm --dir website exec vp test run --config vitest.tooling.config.ts
 
             - name: Warm the runner's Chrome before the first timed launch
               run: node scripts/ci/warm-chrome.mjs

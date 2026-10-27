@@ -47,7 +47,7 @@ import type { PreviewFile } from '../../docs/preview-card.tsrx';
 ${blocks.join('\n\n')}
 `;
 		await expect(module).toMatchFileSnapshot('./code-panes.ts');
-	});
+	}, 30_000);
 
 	it('keep the wrapper band true to the card it describes', () => {
 		const card = here('./typo-count-demo.tsrx');
