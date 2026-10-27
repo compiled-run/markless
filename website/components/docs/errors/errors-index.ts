@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 293,
+	total: 294,
 	guided: 45,
 	groups: [
 		{
@@ -1185,6 +1185,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_PRERENDER_BRANCH_MISSING',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_PRERENDER_CAPTURE_UNBOUND',
 					kind: 'runtime error',
 					guided: false,
 				},
