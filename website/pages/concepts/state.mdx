@@ -2,7 +2,6 @@ import PageMeta from '../../components/page-meta.tsrx';
 import StateAnatomy from '../../components/figures/state/state-anatomy.tsrx';
 import SettingsDemo from '../../components/figures/state/settings-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -44,21 +43,6 @@ It is still a `let`, read as `cart` and changed with `cart++`. Before the page r
 
 <StateAnatomy />
 
-<Collapsible sprite="star-badge" summary="How do existing tools handle this?">
-
-Most JavaScript tools ask you to treat the value in a special way, so they can tell when it changes.
-
-Some have you change it through a setter function instead of `cart++`. After each change, they run
-your whole component again and compare the new result with the old one to find what is different.
-
-Others keep the value inside a container. You read it through `.value`, or call it like a function,
-so the tool can see every read and every write as it happens.
-
-Markless keeps it a plain `let`. Your component runs once and never runs again. The wires are
-worked out before the page loads, so a change goes straight to the spots that show it.
-
-</Collapsible>
-
 ## Change it with a click
 
 `theme` is one value, and three spots on this settings page show it: the page's colours, the
@@ -73,7 +57,17 @@ heading and the picture. Press **Dark**, then **Light**.
 Markless reads your component before it runs. It notes every spot that shows `theme`, so a change
 goes straight to those spots.
 
-<Code note="Add a paragraph that also shows {theme}, then press Dark. Then change state('light') to a plain 'light' and read the build error at the end of the line it names.">
+<Collapsible sprite="star-badge" summary="How do existing tools handle this?">
+
+Most tools make you change a value in a special way: through a setter, then they run your whole
+component again and compare, or through a `.value` container they can watch.
+
+Markless keeps `theme` a plain `let`. You write `theme = 'dark'`, your component never runs again,
+and the change goes straight to the spots that show it.
+
+</Collapsible>
+
+<Code note="Add a paragraph that also shows {theme}, then press Dark. Then change state('light') to a plain 'light' and read the build error: a plain let is read once, while the page is set up, so a later change never reaches the screen.">
 ```tsrx title="settings.tsrx"
 import { state } from '@markless/core';
 
@@ -121,21 +115,11 @@ A click changes the text that shows `user.visits`. The text that shows `user.nam
 
 ## Where state can live
 
-Create state at the top of the component body, next to your other variables. Each of these stops
-the build, and each error names the line:
+Make `state()` directly in the component body, next to your other variables. Anywhere else, the
+build stops and the error points at the line:
 
-- A `state()` outside the component function gives `MARKLESS_STATE_MODULE_SCOPE`.
-- A `state()` inside an `@if`, a handler or a `for` statement gives
-  `MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The [conditionals page](/concepts/conditionals) shows why.
-- A change inside the elements, such as `{count++}`, gives `MARKLESS_STATE_WRITE_IN_TEMPLATE`.
+- not outside the component
+- not inside an `@if`, a handler or a loop
+- not changed inside the markup, like `{count++}`
 
-`state()` works inside `.tsrx` files. Call it from a plain `.ts` file and it throws
-`MARKLESS_FRAMEWORK_API_RUNTIME_CALL` the moment it runs.
-
-<Callout
-	sprite="cross"
-	title="Why does my plain let fail the build?"
-	text="If a click handler changes a plain let that the elements show, the build stops. One of the errors, MARKLESS_STATE_STALE_LOCAL_WRITE, says why. The elements read a plain let only while the page is set up. A later change never reaches the screen. Wrap the starting value in state() and the error goes away."
-/>
-
-Next: [values you work out instead of storing](/concepts/computed).
+`state()` only works in `.tsrx` files. In a plain `.ts` file it throws as soon as it runs.
