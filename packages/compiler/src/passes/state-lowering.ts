@@ -745,14 +745,37 @@ export function staticTemplateReadDiagnostic(
 	if (resolveGraphPath(optionalMemberReadSource(read.source), lookup.bindings, lookup.aliases))
 		return null;
 	const readSource = templateExpressionGraphReadSource(read.source, lookup);
-	return readSource
-		? templateExpressionStaticDiagnostic({
-				source: read.source,
-				readSource,
-				sourceSpan: read.sourceSpan,
-				filename: semanticGraph.filename,
-			})
-		: null;
+	if (!readSource) return null;
+	const diagnostic = templateExpressionStaticDiagnostic({
+		source: read.source,
+		readSource,
+		sourceSpan: read.sourceSpan,
+		filename: semanticGraph.filename,
+	});
+	const props = read.componentName ? propsOnlyReads(read.source, lookup) : null;
+	return props ? { ...diagnostic, decidedByProps: { componentName: read.componentName!, props } } : diagnostic;
+}
+
+// Every name the expression reads is a prop: anything else, a body local included, keeps the warning unsettled.
+function propsOnlyReads(source: string, lookup: GraphLookup): ReadonlyArray<string> | null {
+	const code = blankLiteralText(source);
+	const props = new Set<string>();
+	for (const match of code.matchAll(/(?<![$\w.])([A-Za-z_$][\w$]*)(?![$\w])/g)) {
+		const name = match[1]!;
+		const after = code.slice(match.index + name.length);
+		const before = code.slice(0, match.index);
+		if (/^\s*:/.test(after) && /[{,]\s*$/.test(before)) continue;
+		if (/^(?:true|false|null|undefined|typeof|void|in|instanceof|new)$/.test(name)) continue;
+		const resolved = resolveGraphPath(name, lookup.bindings, lookup.aliases);
+		if (resolved?.binding.kind !== 'prop') return null;
+		const prop =
+			resolved.binding.id === PROTOCOL_PROPS_GRAPH_NODE_ID
+				? resolved.path[0]
+				: resolved.binding.id.slice(PROTOCOL_PROP_GRAPH_NODE_PREFIX.length);
+		if (prop === undefined) return null;
+		props.add(prop);
+	}
+	return props.size > 0 ? [...props] : null;
 }
 
 function templateExpressionStaticDiagnostic({

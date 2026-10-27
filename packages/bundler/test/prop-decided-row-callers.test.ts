@@ -130,3 +130,43 @@ export default function Page() @{
 		}),
 	).rejects.toThrow(/<Page> in .*page\.tsrx passes it `nodes`, which changes\./);
 });
+
+const tag = `
+export function Tag({ item }) @{
+	<p title={item.label.toUpperCase()}>tag</p>
+}
+`;
+
+test('an expression into an object prop ships while callers pass it a fixed value, and fails when one passes state', async () => {
+	await expect(
+		buildPage('object-fixed', {
+			'tag.tsrx': tag,
+			'page.tsrx': `
+import { Tag } from './tag.tsrx';
+
+export default function Page() @{
+	<main><Tag item={{ label: 'a' }} /></main>
+}
+`,
+		}),
+	).resolves.toBeUndefined();
+	await expect(
+		buildPage('object-changing', {
+			'tag.tsrx': tag,
+			'page.tsrx': `
+import { state } from '@markless/core';
+import { Tag } from './tag.tsrx';
+
+export default function Page() @{
+	let item = state({ label: 'a' });
+	<main>
+		<button type="button" onClick={() => (item.label = 'b')}>rename</button>
+		<Tag item={item} />
+	</main>
+}
+`,
+		}),
+	).rejects.toThrow(
+		/MARKLESS_TEMPLATE_EXPRESSION_STATIC: .*tag\.tsrx: <Tag>: .*It holds only while the prop `item` never changes, and <Page> in .*page\.tsrx passes it `item`, which changes\./,
+	);
+});

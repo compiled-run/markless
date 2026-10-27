@@ -760,7 +760,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-					kind: 'compile warning',
+					kind: 'compile error or warning',
 					guided: true,
 				},
 				{
