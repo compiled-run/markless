@@ -15,7 +15,11 @@ import initRouterPlugin from '@markless/router/typescript-plugin';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import typeScript from 'typescript';
 import { intrinsicTagNames, snippetCatalog } from '../src/completions.ts';
-import { MARKLESS_TSRX_PARSE_ERROR_CODE, MarklessTsrxVirtualCode } from '../src/language.ts';
+import {
+	MARKLESS_TSRX_COMPILER_WARNING_CODE,
+	MARKLESS_TSRX_PARSE_ERROR_CODE,
+	MarklessTsrxVirtualCode,
+} from '../src/language.ts';
 import {
 	TsserverHarness,
 	copyFixtureProject,
@@ -1136,8 +1140,9 @@ test('M13 real tsserver type-checks construct branches without scaffolding diagn
 	const semantic = await server.semanticDiagnosticsSync(fixture.file);
 
 	expect(syntactic).toEqual([]);
+	// The fixture's prop-decided @if blocks also draw the compiler's own warnings; those are not type diagnostics.
 	expect(
-		semantic,
+		semantic.filter((diagnostic: any) => diagnostic.code !== MARKLESS_TSRX_COMPILER_WARNING_CODE),
 		'M13 clean construct branches must narrow locally and produce no diagnostics from authored code or synthetic IIFE scaffolding.',
 	).toEqual([]);
 }, 20_000);

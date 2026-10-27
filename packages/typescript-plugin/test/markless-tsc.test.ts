@@ -3,7 +3,10 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, vi } from 'vitest';
-import { MARKLESS_TSRX_PARSE_ERROR_CODE } from '../src/language.ts';
+import {
+	MARKLESS_TSRX_COMPILER_WARNING_CODE,
+	MARKLESS_TSRX_PARSE_ERROR_CODE,
+} from '../src/language.ts';
 
 // Each test spawns markless-tsc (and TypeScript 7.1): up to 4.2 s alone at load average 54, past 5 s in the pre-commit unit lane.
 vi.setConfig({ testTimeout: 30_000 });
@@ -59,6 +62,14 @@ test('a .tsrx the compiler cannot parse fails the run instead of passing uncheck
 		`unparsable/broken.tsrx(6,1): error TS${MARKLESS_TSRX_PARSE_ERROR_CODE}`,
 	);
 	expect(run.status).not.toBe(0);
+});
+
+test('a compiler warning is printed at its authored line and does not fail the run', () => {
+	const run = runMarklessTsc('compiler-warning');
+	expect(run.output).toContain(
+		`compiler-warning/rows.tsrx(6,3): warning TS${MARKLESS_TSRX_COMPILER_WARNING_CODE}: MARKLESS_REPEAT_KEY_IS_INDEX: key i identifies each row of rows by its position`,
+	);
+	expect(run.status).toBe(0);
 });
 
 // The gate this replaces. Each of these projects carries the crutch the repo used to
