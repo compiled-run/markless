@@ -1368,6 +1368,8 @@ type ArmRefusal = {
 type ArmPartsContext = {
 	readonly renderData: RenderDataArtifact;
 	readonly asyncComputedNodeIds: ReadonlySet<string>;
+	// Rows inside the arm rebuild the attributes they read off the row item or the page.
+	readonly rowAttributes?: boolean;
 	// Branch flips only: boundary arms re-render through a module that can run components.
 	readonly inline?: {
 		readonly semanticGraph: SemanticGraphArtifact;
@@ -1554,7 +1556,7 @@ function renderBoundaryArms(
 				(candidate): candidate is string => candidate !== undefined,
 			);
 			const arms = chunkIds.map((chunkId) =>
-				renderChunkParts({ renderData, asyncComputedNodeIds }, chunkId),
+				renderChunkParts({ renderData, asyncComputedNodeIds, rowAttributes: true }, chunkId),
 			);
 			if (arms.some((arm) => arm === null)) return [];
 			return [
@@ -1668,6 +1670,13 @@ function renderChunkParts(
 					| { itemPath: ReadonlyArray<string> }
 					| RowAttributePart
 				> = [];
+				// A boundary's update module rebuilds row markup but wires no row handler.
+				const rowAttributes =
+					context.inline !== undefined ||
+					(context.rowAttributes === true &&
+						!renderData.interactions.some((interaction) =>
+							row.hosts.some((host) => host.hostNodeId === interaction.hostNodeId),
+						));
 				for (let rowIndex = 0; rowIndex < row.statics.length; rowIndex++) {
 					const text = (row.statics[rowIndex] ?? '').replace(
 						/<!--markless-slot:\d+-->/g,
@@ -1678,7 +1687,7 @@ function renderChunkParts(
 						(candidate) => candidate.staticIndex === rowIndex,
 					)) {
 						if (
-							context.inline &&
+							rowAttributes &&
 							rowSlot.kind === 'attribute' &&
 							!rowSlot.directClassMatch &&
 							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')

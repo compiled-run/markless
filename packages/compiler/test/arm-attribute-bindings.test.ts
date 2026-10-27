@@ -347,3 +347,61 @@ export function Profile({ who }: { who?: string }) @{
 		`() => (!(!${person}) && !((mode) === ('card'))) ? ${person}.name : undefined`,
 	]);
 });
+
+test('an @try whose keyed rows bind attributes re-settles through its own update module, not the component render', async () => {
+	const result = await compile(
+		'src/Finder.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+export function Finder() @{
+	let term = state('');
+	const hits = computed(async () => [{ key: term, name: term }]);
+	<div>
+		<input value={term} onInput={(event) => (term = event.currentTarget.value)} />
+		@try {
+			<ul>
+				@for (const hit of hits; key hit.key) {
+					<li data-key={hit.key} aria-label={hit.name}>{hit.name}</li>
+				}
+			</ul>
+		} @catch {
+			<p>failed</p>
+		}
+	</div>
+}`,
+	);
+	const update = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-boundary-update',
+	)?.source;
+	expect(update ?? '').toMatch(/"attribute": \{ "name": "data-key", "itemPath": \["key"\] \}/);
+	expect(update ?? '').toMatch(/"attribute": \{ "name": "aria-label", "itemPath": \["name"\] \}/);
+});
+
+test('an @try whose keyed rows bind attributes and handle events keeps the component render that wires the handlers', async () => {
+	const result = await compile(
+		'src/Picker.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+export function Picker() @{
+	let chosen = state('');
+	const options = computed(async () => [{ code: 'x' }]);
+	<div>
+		@try {
+			<ul>
+				@for (const option of options; key option.code) {
+					<li data-code={option.code} onClick={() => (chosen = option.code)}>{option.code}</li>
+				}
+			</ul>
+		} @catch {
+			<p>failed</p>
+		}
+		<output>{chosen}</output>
+	</div>
+}`,
+	);
+	expect(
+		result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update'),
+	).toBeUndefined();
+});
