@@ -66,7 +66,7 @@ export function button(width: number, height: number, seed: number) {
 /** A hand-drawn ring around a number in the margin. */
 export function ring(size: number, seed: number) {
 	const loop = ellipse(size / 2, size / 2, size / 2 - 2, size / 2 - 2.4, 28);
-	return { size, wash: wash(loop, seed + 1, 0.4, 1.4), ink: outline(loop, { w: 1.1, seed }) };
+	return { size, ink: outline(loop, { w: 1.1, seed }) };
 }
 
 export function art() {
