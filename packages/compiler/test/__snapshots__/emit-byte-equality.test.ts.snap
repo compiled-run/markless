@@ -1202,7 +1202,7 @@ function createUnknownSymbolError(id) {
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/HelperState.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"template:App","kind":"template","componentName":"App","statics":["<button><!--markless-slot:0-->","</button>"],"hosts":[{"hostNodeId":"h0","tagName":"button","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:App.count.createCount.count","path":[]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"button","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:App.count.createCount.count","value":{"kind":"constant","value":5}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h0","eventName":"click","symbolIds":["symbol:0"]}]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
 import { marklessSsrAttachSnapshots, marklessSsrMergeBranches, marklessComposeState as marklessSsrComposeState, marklessSsrComposeView, marklessSsrHandedDown } from '@markless/web/fns/ssr';
-import { marklessCloneState } from '@markless/web/fns/state';
+import { marklessCloneState, marklessStateValue } from '@markless/web/fns/state';
 import { marklessSsrReadPublicPath } from '@markless/web/fns/html';
 function createCount() { const count = state(5); return count; }
 const marklessSsrPropEvents = [];
@@ -1212,7 +1212,7 @@ const marklessSsrStateValues = new Map([
 async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext) {
 	const marklessSsrPayloadState = marklessCloneState(payloadState);
 	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);
-	const count = createCount();
+	let App_count_createCount_count = marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, "state:App.count.createCount.count");
 	const marklessSsrChildren = [];
 	const marklessSsrBranches = [];
 	const marklessSsrAsyncSnapshots = [];

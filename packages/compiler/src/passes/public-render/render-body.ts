@@ -97,6 +97,20 @@ export function renderBodyLines(
 			lines.push(stateLine);
 			continue;
 		}
+		const helperLine = helperStateDeclarationLine(
+			statement,
+			rootInfo.componentName,
+			input.semanticGraph.aliases ?? [],
+			stateBindings,
+			stateValueFunctionName,
+			stateValuesName,
+			statePayloadName,
+			input.source.filename,
+		);
+		if (helperLine) {
+			lines.push(helperLine);
+			continue;
+		}
 		const computedLine = computedDeclarationLine(
 			statement,
 			computedBindings,
@@ -388,6 +402,46 @@ function stateDeclarationLine(
 		statePayloadName,
 		JSON.stringify(binding.id),
 		initializerSource,
+	].filter((arg): arg is string => arg !== undefined);
+	return `let ${binding.name} = ${stateValueFunctionName}(${args.join(', ')});`;
+}
+
+// `const count = counterPair()` names the cell the helper's state() made for this
+// component: the render declares that cell, and never calls the helper.
+function helperStateDeclarationLine(
+	statement: AnyNode,
+	componentName: string,
+	aliases: ReadonlyArray<{ readonly name: string; readonly target: string }>,
+	stateBindings: ReadonlyMap<string, GraphBinding>,
+	stateValueFunctionName: string,
+	stateValuesName: string,
+	statePayloadName: string,
+	filename: string,
+): string | null {
+	if (statement.type !== 'VariableDeclaration') return null;
+	const declarations = asNodes(statement.declarations);
+	if (declarations.length !== 1) return null;
+	const declaration = declarations[0]!;
+	const name = getIdentifierName(declaration.id as AnyNode | undefined);
+	const init = declaration.init as AnyNode | undefined;
+	const helperName = init?.type === 'CallExpression' ? frameworkCallName(init) : null;
+	if (!name || !helperName) return null;
+	// The cell a helper call creates is named for the component, the local and the helper.
+	const prefix = `${componentName}_${name}_${helperName}_`;
+	const target = aliases.find(
+		(alias) => alias.name === name && alias.target.startsWith(prefix),
+	)?.target;
+	const binding = target ? stateBindings.get(target) : undefined;
+	if (!binding) return null;
+	const initializer = (binding as GraphBinding & { readonly initializerSource?: string })
+		.initializerSource;
+	const args = [
+		stateValuesName,
+		statePayloadName,
+		JSON.stringify(binding.id),
+		initializer === undefined
+			? undefined
+			: stripAuthoredExpression(initializer, { filename, what: 'a helper state initializer' }),
 	].filter((arg): arg is string => arg !== undefined);
 	return `let ${binding.name} = ${stateValueFunctionName}(${args.join(', ')});`;
 }
