@@ -143,7 +143,7 @@ export async function asyncComputedFromRecord(
 			);
 			const [only] = values;
 			// An object changed in place keeps its identity, so it is never the same key twice.
-			return values.length > 1 || (typeof only === 'object' && only) ? values : only;
+			return values.length > 1 || Object(only) === only ? values : only;
 		},
 		run: async ({ key, signal, read }) => {
 			return (await input.loadSymbol(runnerSymbolId))({
