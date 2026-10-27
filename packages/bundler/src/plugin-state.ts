@@ -215,7 +215,9 @@ export function registerTransformArtifacts(
 				state.executionLogEmittedIds.set(logId, module.id);
 		}
 	}
-	state.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
+	state.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest, {
+		provisional: input.finalPublication === false && input.devServer !== true,
+	});
 	if (input.finalPublication !== false && input.recordSymbolClaims !== false) {
 		recordEmittedClaimOwnership(state, {
 			source: input.source,

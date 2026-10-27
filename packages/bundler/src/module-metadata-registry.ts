@@ -39,6 +39,7 @@ function publicationKey(environment: MarklessEnvironment, source: string): strin
  */
 export class ModuleMetadataRegistry {
 	readonly #captureManifestsBySource = new Map<string, CaptureManifest>();
+	readonly #provisionalCaptureSources = new Set<string>();
 	readonly #symbolClaimsByEmittedModule = new Map<string, MarklessTransformManifest>();
 	// Owners by resolver, each with its position in the map above: a per-source read scanned every owner in the build.
 	readonly #claimOwnersByResolver = new Map<string, Set<string>>();
@@ -140,9 +141,22 @@ export class ModuleMetadataRegistry {
 		return reaches(source) ? [source, ...path] : undefined;
 	}
 
-	recordCaptureMetadata(source: string, manifest: CaptureManifest): void {
+	// A first pass numbers symbols before linking mints more, so it never replaces a final compile's metadata.
+	recordCaptureMetadata(
+		source: string,
+		manifest: CaptureManifest,
+		options: { readonly provisional?: boolean } = {},
+	): void {
+		if (
+			options.provisional &&
+			this.#captureManifestsBySource.has(source) &&
+			!this.#provisionalCaptureSources.has(source)
+		)
+			return;
 		if (manifest.captureMetadata) this.#captureManifestsBySource.set(source, manifest);
 		else this.#captureManifestsBySource.delete(source);
+		if (options.provisional) this.#provisionalCaptureSources.add(source);
+		else this.#provisionalCaptureSources.delete(source);
 	}
 
 	captureMetadataForSource(source: string): CaptureMetadata | undefined {
@@ -151,6 +165,7 @@ export class ModuleMetadataRegistry {
 
 	deleteCaptureMetadata(source: string): void {
 		this.#captureManifestsBySource.delete(source);
+		this.#provisionalCaptureSources.delete(source);
 	}
 
 	recordSymbolClaims(emittedModule: string, manifest: MarklessTransformManifest): void {
