@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import StateSketch from '../../components/sketch/concepts/state-sketch.tsrx';
 import StateAnatomy from '../../components/figures/state/state-anatomy.tsrx';
+import SettingsDemo from '../../components/figures/state/settings-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
@@ -59,59 +59,50 @@ worked out before the page loads, so a change goes straight to the spots that sh
 
 </Collapsible>
 
-## Pour a few cups
+## Change it with a click
 
-Press **Pour a cup** in the preview. The table on the right counts the text each click changed.
-Then switch on **Button shows cups too** and pour again.
+`theme` is one value, and three spots on this settings page show it: the page's colours, the
+heading and the picture. Press **Dark**, then **Light**.
 
-<StateSketch />
+<SettingsDemo />
 
-In the code below, press **Pour a cup** three times. Then press **Start over**. Keep an eye on the
-second line.
+- Every spot that shows `theme` changes together.
+- Only the handler you pressed runs. It assigns `theme`, and that is all it does.
+- The component function never runs again. It ran once, to set up the page.
 
-<Code note="Add a third paragraph that also shows {cups}, then press Pour a cup. Then change state(0) to a plain 0 and read the build error at the end of the line it names.">
-```tsrx title="cups.tsrx"
+Markless reads your component before it runs. It notes every spot that shows `theme`, so a change
+goes straight to those spots.
+
+<Code note="Add a paragraph that also shows {theme}, then press Dark. Then change state('light') to a plain 'light' and read the build error at the end of the line it names.">
+```tsrx title="settings.tsrx"
 import { state } from '@markless/core';
 
-export default function Cups() @{
-	let cups = state(0);
-	const drawn =
-		Math.floor(Math.random() * 90) + 10;
+export default function Settings() @{
+	let theme = state('light');
 
-	<section>
-		<p>Cups of coffee today: {cups}</p>
-		<p>
-			A number drawn once, when the page was set
-			up: {drawn}
-		</p>
-		<button onClick={() => cups++}>
-			Pour a cup
+	<main class={theme}>
+		<h2>Theme: {theme}</h2>
+		<p>{theme === 'dark' ? '🌙' : '☀️'}</p>
+		<button onClick={() => (theme = 'light')}>
+			Light
 		</button>
-		<button onClick={() => (cups = 0)}>
-			Start over
+		<button onClick={() => (theme = 'dark')}>
+			Dark
 		</button>
-	</section>
+		<style>
+			.dark {
+				background: #222;
+				color: #eee;
+			}
+		</style>
+	</main>
 }
 ```
 </Code>
 
-The count moves. The second number never does.
-
-That number comes from `Math.random()`. The component drew it once, while it set up the page.
-Your component runs once, to set up the page. A click does not run it again. The click runs
-`cups++`, and Markless changes the one piece of text that shows `cups`.
-
-## How does Markless know which text to change?
-
-Before your app runs, Markless reads your component the way you do. It sees that `cups` shows up
-in the first paragraph. It sees that the clicks change it, and it writes that down. So when `cups`
-changes, it already knows the one piece of text to update.
-
-This works the same whether the component renders in the browser alone or on a server.
-
 ## Any assignment counts
 
-`cups++`, `cups = 0` and `cups += 2` all change the state. Objects change field by field:
+`theme = 'dark'`, `count++` and `count += 2` all change state. Objects change field by field:
 
 ```tsrx
 import { state } from '@markless/core';
@@ -136,7 +127,7 @@ the build, and each error names the line:
 - A `state()` outside the component function gives `MARKLESS_STATE_MODULE_SCOPE`.
 - A `state()` inside an `@if`, a handler or a `for` statement gives
   `MARKLESS_STATE_CREATION_SITE_UNSTABLE`. The [conditionals page](/concepts/conditionals) shows why.
-- A change inside the elements, such as `{cups++}`, gives `MARKLESS_STATE_WRITE_IN_TEMPLATE`.
+- A change inside the elements, such as `{count++}`, gives `MARKLESS_STATE_WRITE_IN_TEMPLATE`.
 
 `state()` works inside `.tsrx` files. Call it from a plain `.ts` file and it throws
 `MARKLESS_FRAMEWORK_API_RUNTIME_CALL` the moment it runs.
