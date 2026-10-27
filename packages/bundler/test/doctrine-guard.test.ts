@@ -1,8 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { relative, resolve } from 'pathe';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { createLinkedModuleInterfaces } from '../src/build/linked-interfaces.ts';
 import { transformTsrxModule } from '../src/rolldown.ts';
+
+// Compiles every fixture: 3.1 s alone at load average 54, past 5 s in the pre-commit unit lane.
+vi.setConfig({ testTimeout: 30_000 });
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const doctrine =

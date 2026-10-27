@@ -2,9 +2,12 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { build } from 'vite';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { rewriteTemplateDynamicImports } from '../src/template-dynamic-imports.ts';
 import { markless } from '../src/vite/index.ts';
+
+// A whole production build: 2.3 s alone at load average 54, past 5 s in the pre-commit unit lane.
+vi.setConfig({ testTimeout: 30_000 });
 
 test('a template import() in a virtual module becomes a root-relative glob of the authoring directory', () => {
 	const code =
