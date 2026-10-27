@@ -1,4 +1,8 @@
-import type { ElementHandleQualifier, ComposedArmRecordQualifier } from './resume-types.ts';
+import type {
+	ElementHandleQualifier,
+	ComposedArmRecordQualifier,
+	ComposedBoundaryGraph,
+} from './resume-types.ts';
 export type { ElementHandleQualifier, ComposedArmRecordQualifier } from './resume-types.ts';
 
 // Registration stays independent of the materialization and instance-scoping implementations.
@@ -19,9 +23,18 @@ export function qualifiedElementHandleId(
 }
 
 let installedQualifier: ComposedArmRecordQualifier | undefined;
+let installedBoundaryGraph: ComposedBoundaryGraph | undefined;
 
-export function installComposedArmRecordQualifier(qualifier: ComposedArmRecordQualifier): void {
+export function installComposedArmRecordQualifier(
+	qualifier: ComposedArmRecordQualifier,
+	boundaryGraph?: ComposedBoundaryGraph,
+): void {
 	installedQualifier = qualifier;
+	installedBoundaryGraph = boundaryGraph;
+}
+
+export function composedBoundaryGraph(): ComposedBoundaryGraph | undefined {
+	return installedBoundaryGraph;
 }
 
 export function composedArmRecordQualifier(): ComposedArmRecordQualifier | undefined {

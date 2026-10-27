@@ -4,8 +4,14 @@ import {
 	installElementHandleQualifier,
 } from '../resume-handle-qualifier.ts';
 import { marklessCodedError } from '../coded-error.ts';
+import {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP,
+	PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS,
+} from '../../../serializer/src/protocol-constants.ts';
 import { marklessSettled, marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
+	ComposedArmRecordQualifier,
+	ComposedBoundaryGraph,
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
 	ResumeKeyedRepeatRecord,
@@ -1011,7 +1017,7 @@ export function marklessComposedGraphNodeId(
 // were merged into the page graph under this path). Page-space ids (shared,
 // storage) are excepted by marklessComposedGraphNodeId.
 function composedBoundaryArmRecords(
-	boundaryId: string,
+	boundary: Parameters<ComposedArmRecordQualifier>[0],
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
 ): ResumeArmRecordSet {
@@ -1026,19 +1032,31 @@ function composedBoundaryArmRecords(
 		asyncBoundaries: true,
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
-	const prefix = boundaryId.slice(0, boundaryId.lastIndexOf('boundary:'));
+	const prefix = boundary.id.slice(0, boundary.id.lastIndexOf('boundary:'));
 	if (!prefix) return set;
 	// Host/symbol ids take the whole prefix; graph ids only its instance-path part.
 	const instancePath = marklessInstancePath(prefix);
 	const registry = marklessGraphWidgetRegistry(graph);
+	const routes = boundary.composedGraphProps ?? [];
 	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
 		...record,
 		hostNodeId: prefix + record.hostNodeId,
 	});
-	const qualifyRead = <T extends { readonly graphNodeId: string }>(read: T): T => ({
-		...read,
-		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, instancePath, registry),
-	});
+	// A live prop follows the caller's node composition routed it to; anything else is the part's own node.
+	const routeRead = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
+		const spread = graphNodeId === PROPS;
+		const name = spread ? path[0] : graphNodeId.startsWith(PROP) && graphNodeId.slice(PROP.length);
+		const route = routes.find((one) => one.name === name);
+		return route
+			? { graphNodeId: route.graphNodeId, path: [...(route.path ?? []), ...path.slice(+spread)] }
+			: { graphNodeId: marklessComposedGraphNodeId(graphNodeId, instancePath, registry), path };
+	};
+	const qualifyRead = <T extends { readonly graphNodeId: string; readonly path?: ReadonlyArray<string> }>(
+		read: T,
+	): T => {
+		const routed = routeRead(read.graphNodeId, read.path);
+		return { ...read, graphNodeId: routed.graphNodeId, ...(read.path && { path: routed.path }) };
+	};
 	const contentReadsOf = (branch: unknown): BranchContentReads | undefined => {
 		const reads = (branch as { readonly contentReads?: unknown }).contentReads;
 		return Array.isArray(reads) && reads.length > 0 ? (reads as BranchContentReads) : undefined;
@@ -1046,20 +1064,23 @@ function composedBoundaryArmRecords(
 	// Arm-scoped branch records ride the protocol's untyped record bag.
 	const qualifyLooseRead = (record: Record<string, unknown>): Record<string, unknown> =>
 		typeof record.graphNodeId === 'string'
-			? {
-					...record,
-					graphNodeId: marklessComposedGraphNodeId(
-						record.graphNodeId,
-						instancePath,
-						registry,
-					),
-				}
+			? qualifyRead(record as { readonly graphNodeId: string })
 			: record;
 	// A row slot naming a graph node crosses the wire in the child module's own id
 	// space, exactly as the repeat's collection id does; a slot reading the item
 	// carries no graph id and rides through untouched.
-	const qualifyRowSlot = <S extends RowTemplateSlot>(slot: S): S =>
-		qualifyLooseRead(slot as unknown as Record<string, unknown>) as unknown as S;
+	const qualifyRowSlot = <S extends RowTemplateSlot>(slot: S): S => {
+		const loose = slot as unknown as Record<string, unknown>;
+		const reads = loose.reads as ReadonlyArray<{ graphNodeId: string; path: ReadonlyArray<string> }> | undefined;
+		if (reads) return { ...loose, reads: reads.map(qualifyRead) } as unknown as S;
+		if (typeof loose.graphNodeId !== 'string') return slot;
+		const routed = routeRead(loose.graphNodeId, (loose.graphPath as ReadonlyArray<string>) ?? []);
+		return {
+			...loose,
+			graphNodeId: routed.graphNodeId,
+			...(loose.graphPath !== undefined && { graphPath: routed.path }),
+		} as unknown as S;
+	};
 	const qualifySlots = <T extends Pick<RowTemplate, 'textSlots' | 'attributeSlots'>>(owner: T): T => ({
 		...owner,
 		...(owner.textSlots && { textSlots: owner.textSlots.map(qualifyRowSlot) }),
@@ -1100,15 +1121,14 @@ function composedBoundaryArmRecords(
 			id: prefix + repeat.id,
 			parentHostNodeId: prefix + repeat.parentHostNodeId,
 			...(repeat.ownerHostNodeId ? { ownerHostNodeId: prefix + repeat.ownerHostNodeId } : {}),
-			...(repeat.collectionGraphNodeId
-				? {
-						collectionGraphNodeId: marklessComposedGraphNodeId(
-							repeat.collectionGraphNodeId,
-							instancePath,
-							registry,
-						),
-					}
-				: {}),
+			...(repeat.collectionGraphNodeId &&
+				(({ graphNodeId, path }) => ({ collectionGraphNodeId: graphNodeId, collectionPath: path }))(
+					routeRead(repeat.collectionGraphNodeId, repeat.collectionPath),
+				)),
+			...(routes.length > 0 && {
+				instancePath,
+				propRoutes: routes.map((route) => ({ ...route, path: route.path ?? [] })),
+			}),
 			...(repeat.rowTemplate && { rowTemplate: qualifyRowTemplate(repeat.rowTemplate) }),
 			rowEvents: repeat.rowEvents.map((event) => ({
 				...event,
@@ -1162,10 +1182,43 @@ function composedBoundaryArmRecords(
 						...qualifyRead(read),
 						...(read.runnerSymbolId && { runnerSymbolId: prefix + read.runnerSymbolId }),
 					})),
-					...(armRecords && { armRecords: composedBoundaryArmRecords(id, armRecords, graph) }),
+					...(routes.length > 0 && {
+						composedInstancePath: instancePath,
+						composedGraphProps: routes,
+					}),
+					...(armRecords && {
+						armRecords: composedBoundaryArmRecords({ ...boundary, id }, armRecords, graph),
+					}),
 				};
 			}),
 		}),
+	};
+}
+
+// The settle symbol reads ids scoped to its instance; a routed prop answers from the caller's node.
+function composedBoundaryGraph(
+	graph: RuntimeGraph,
+	boundary: Parameters<ComposedBoundaryGraph>[1],
+): RuntimeGraph {
+	const routes = boundary.composedGraphProps;
+	if (!routes?.length) return graph;
+	const scope = boundary.composedInstancePath ?? '';
+	const routed = (route: (typeof routes)[number], path: ReadonlyArray<string>) =>
+		graph.read(route.graphNodeId, [...(route.path ?? []), ...path]);
+	return {
+		...graph,
+		read(id: string, path: ReadonlyArray<string> = []) {
+			const local = id.startsWith(scope) ? id.slice(scope.length) : id;
+			if (local === PROPS && path.length === 0) {
+				const props: Record<string, unknown> = { ...(graph.read(id) as object) };
+				for (const route of routes) props[route.name] = routed(route, []);
+				return props;
+			}
+			const spread = local === PROPS;
+			const name = spread ? path[0] : local.startsWith(PROP) && local.slice(PROP.length);
+			const route = routes.find((one) => one.name === name);
+			return route ? routed(route, path.slice(+spread)) : graph.read(id, path);
+		},
 	};
 }
 
@@ -1178,7 +1231,7 @@ function composedBoundaryArmRecords(
  * `@markless/web` declares `sideEffects: false`.
  */
 export function installMarklessComposedArmRecords(): void {
-	installComposedArmRecordQualifier(composedBoundaryArmRecords);
+	installComposedArmRecordQualifier(composedBoundaryArmRecords, composedBoundaryGraph);
 	// An `@if` arm's handles are filed at resume from the arm record, which the
 	// serializer never qualified: the record's owning id carries the instance.
 	installElementHandleQualifier((handleId, ownerId, graph) =>

@@ -802,6 +802,9 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 			readonly runnerSymbolId?: string;
 		}>;
+		/** As on a branch: the part instance that authored this boundary and where its live props now live, for the arm its own module re-renders on settle. */
+		readonly composedInstancePath?: string;
+		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
 	}>;
 };
 
