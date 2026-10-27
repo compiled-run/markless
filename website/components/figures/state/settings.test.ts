@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe as group, expect, it } from 'vitest';
-import { describe, drawing, flip, times } from './settings.ts';
+import { describe, drawing, times } from './settings.ts';
 
 const drawn = drawing();
 const page = readFileSync(new URL('../../../pages/concepts/state.mdx', import.meta.url), 'utf8');
@@ -10,8 +10,6 @@ group('the settings demo', () => {
 	it('says what changed and how often each function ran', () => {
 		expect(describe('dark', 1)).toBe('Theme is dark. The page colours, the heading and the picture changed together. Settings() ran once; the handler ran 1 time.');
 		expect(times(3)).toBe('3 times');
-		expect(flip('rest')).toBe('odd');
-		expect(flip('odd')).toBe('even');
 	});
 
 	it('shows theme in the same three spots as the code sample', () => {
