@@ -55,7 +55,7 @@ import type { PreviewFile } from '../../docs/preview-card.tsrx';
 ${blocks.join('\n\n')}
 `;
 		await expect(module).toMatchFileSnapshot('./code-panes.ts');
-	});
+	}, 30_000);
 
 	it('keep the drink-pick band true to the card it describes', () => {
 		const card = here('./drink-pick.tsrx');

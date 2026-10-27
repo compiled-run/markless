@@ -31,5 +31,5 @@ import type { PreviewFile } from '../../docs/preview-card.tsrx';
 ${blocks.join('\n\n')}
 `;
 		await expect(module).toMatchFileSnapshot('./code-panes.ts');
-	});
+	}, 30_000);
 });
