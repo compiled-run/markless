@@ -1,10 +1,6 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
-import {
-	boundaryArmRecordSet,
-	composedArmRecordQualifier,
-	composedBoundaryGraph,
-} from './resume-arm-records.ts';
+import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type {
@@ -322,7 +318,7 @@ export async function settleAsyncBoundaryRange(
 	}
 	const symbol = await input.loadSymbol(source.symbolId);
 	const update = await symbol({
-		graph: composedBoundaryGraph()?.(input.graph, boundary) ?? input.graph,
+		graph: composedArmRecordQualifier()?.graph?.(input.graph, boundary) ?? input.graph,
 		status,
 		element: input.root,
 		getElementHandle: input.elementHandles.get,

@@ -20,7 +20,6 @@ import type {
 } from './resume-types.ts';
 export {
 	composedArmRecordQualifier,
-	composedBoundaryGraph,
 	installComposedArmRecordQualifier,
 	type ComposedArmRecordQualifier,
 } from './resume-handle-qualifier.ts';

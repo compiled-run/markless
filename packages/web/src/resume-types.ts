@@ -247,16 +247,15 @@ export type ElementHandleQualifier = (
 	graph?: unknown,
 ) => string;
 
-/** The graph a composed part's settle symbol reads, its live props answered from the caller's nodes. */
-export type ComposedBoundaryGraph = (
-	graph: RuntimeGraph,
-	boundary: Pick<ResumeAsyncBoundaryRecord, 'composedInstancePath' | 'composedGraphProps'>,
-) => RuntimeGraph;
-export type ComposedArmRecordQualifier = (
-	boundary: Pick<ResumeAsyncBoundaryRecord, 'id' | 'composedInstancePath' | 'composedGraphProps'>,
+type ComposedBoundary = Pick<ResumeAsyncBoundaryRecord, 'id' | 'composedInstancePath' | 'composedGraphProps'>;
+export type ComposedArmRecordQualifier = ((
+	boundary: ComposedBoundary,
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
-) => ResumeArmRecordSet;
+) => ResumeArmRecordSet) & {
+	/** The graph a composed part's settle symbol reads, its routed props answered from the caller's nodes. */
+	readonly graph?: (graph: RuntimeGraph, boundary: ComposedBoundary) => RuntimeGraph;
+};
 
 export type ResumeArmRecordSet = {
 	readonly locators: ReadonlyArray<ResumeArmLocator>;
