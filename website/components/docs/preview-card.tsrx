@@ -240,16 +240,17 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 
 			.pg-tip {
 				z-index: 40;
+				box-sizing: border-box;
 				width: max-content;
-				max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
+				max-width: min(24rem, calc(100vw - 4rem));
 				margin: 0;
-				padding: 0.15em 0;
-				border: 0;
-				border-radius: 6px;
-				background: var(--slab);
-				box-shadow: 3px 3px 0 var(--pg-accent);
-				color: var(--slab-ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
+				padding: 0.6rem 0.75rem 0.7rem;
+				border: var(--tip-border);
+				border-radius: var(--tip-radius);
+				background: var(--paper);
+				box-shadow: var(--tip-shadow);
+				color: var(--ink);
+				font-family: var(--tip-font);
 				font-size: var(--step--1);
 				line-height: 1.4;
 				text-align: start;
@@ -257,35 +258,24 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 			}
 
 			.pg-tip .tsrx-tip-title,
-			.pg-tip .tsrx-tip-body,
-			.pg-tip .tsrx-tip-type {
+			.pg-tip .tsrx-tip-body {
 				display: block;
-				background: transparent;
-				border: 0;
-				color: inherit;
+				overflow-wrap: anywhere;
 			}
 
 			.pg-tip .tsrx-tip-title {
-				padding: 0.45em 0.75em 0.35em;
 				font-family: var(--font-mono);
-				font-size: var(--step--2);
-				font-weight: 700;
+				font-weight: 500;
 			}
 
 			.pg-tip .tsrx-tip-body {
-				padding: 0 0.75em 0.5em;
+				margin-block-start: 0.45rem;
+				padding-block-start: 0.4rem;
+				border-block-start: 1px dashed color-mix(in oklch, var(--ink) 35%, transparent);
 			}
 
 			.pg-tip .tsrx-tip-body:empty {
 				display: none;
-			}
-
-			.pg-tip .tsrx-tip-type {
-				padding: 0.4em 0.75em;
-				border-block-start: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
-				opacity: 0.8;
 			}
 
 			.pg-tip:is([ui-closed], [hidden]) {

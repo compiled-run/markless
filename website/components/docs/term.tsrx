@@ -58,12 +58,12 @@ export default function Term({ word }: { readonly word: string }) @{
 				width: min(15rem, calc(100vw - 2rem));
 				margin: 0;
 				padding: 0.6rem 0.75rem 0.7rem;
-				border: 1.5px solid var(--ink);
-				border-radius: 10px;
+				border: var(--tip-border);
+				border-radius: var(--tip-radius);
 				background: var(--paper);
-				box-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--paper));
+				box-shadow: var(--tip-shadow);
 				color: var(--ink);
-				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-family: var(--tip-font);
 				font-size: var(--step--1);
 				line-height: 1.4;
 				opacity: 1;

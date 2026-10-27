@@ -48,16 +48,17 @@ ${accent(card)}
 function tipLook(tip: string): string {
 	return `			${tip} {
 				z-index: 40;
+				box-sizing: border-box;
 				width: max-content;
-				max-width: min(36ch, calc(100vw - 2 * var(--space-s-l)));
+				max-width: min(24rem, calc(100vw - 4rem));
 				margin: 0;
-				padding: 0.15em 0;
-				border: 0;
-				border-radius: 6px;
-				background: var(--slab);
-				box-shadow: 3px 3px 0 var(--pg-accent);
-				color: var(--slab-ink);
-				font-family: 'Joy Elia', system-ui, sans-serif;
+				padding: 0.6rem 0.75rem 0.7rem;
+				border: var(--tip-border);
+				border-radius: var(--tip-radius);
+				background: var(--paper);
+				box-shadow: var(--tip-shadow);
+				color: var(--ink);
+				font-family: var(--tip-font);
 				font-size: var(--step--1);
 				line-height: 1.4;
 				text-align: start;
@@ -71,17 +72,22 @@ function tipLook(tip: string): string {
 				background: transparent;
 				border: 0;
 				color: inherit;
+				overflow-wrap: anywhere;
 			}
 
 			${tip} .tsrx-tip-title {
-				padding: 0.45em 0.75em 0.35em;
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
 				font-weight: 700;
 			}
 
+			${tip} .tsrx-tip-code {
+				font-family: var(--font-mono);
+				font-weight: 500;
+			}
+
 			${tip} .tsrx-tip-body {
-				padding: 0 0.75em 0.5em;
+				margin-block-start: 0.45rem;
+				padding-block-start: 0.4rem;
+				border-block-start: 1px dashed color-mix(in oklch, var(--ink) 35%, transparent);
 			}
 
 			${tip} .tsrx-tip-body:empty {
@@ -89,8 +95,9 @@ function tipLook(tip: string): string {
 			}
 
 			${tip} .tsrx-tip-type {
-				padding: 0.4em 0.75em;
-				border-block-start: 1px solid color-mix(in oklch, var(--slab-ink) 30%, transparent);
+				margin-block-start: 0.45rem;
+				padding-block-start: 0.4rem;
+				border-block-start: 1px dashed color-mix(in oklch, var(--ink) 35%, transparent);
 				font-family: var(--font-mono);
 				font-size: var(--step--2);
 				opacity: 0.8;
@@ -719,6 +726,18 @@ ${tipLook(`${root} .cp-doc`)}
 
 			${root} .tsrx-hover:is(:hover, :focus-visible) {
 				anchor-name: --cp-hot;
+			}
+
+			${root}:has(.tsrx-hover:hover) .cp-doc {
+				animation: tsrx-tip-wait 1ms var(--tip-delay) backwards;
+			}
+
+			${root}:has(.tsrx-hover:focus-visible) .cp-doc {
+				animation: none;
+			}
+
+			html.dark ${root} .cp-doc .tsrx-tip-title span {
+				color: var(--shiki-dark);
 			}
 
 			@supports (position-area: block-end) {
