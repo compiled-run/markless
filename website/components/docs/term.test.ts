@@ -74,18 +74,18 @@ describe('Subtitle', () => {
 	});
 
 	it('turns listed words into terms and leaves the wording as written', async () => {
-		const text = 'Write elements and events in TypeScript. Markless is designed to compile them to any device.';
+		const text = 'Write elements and events in JavaScript. Markless is designed to compile them to any device.';
 		expect(splitTerms(text, 'elements events').map((piece) => piece.text).join('')).toBe(text);
 		expect(splitTerms(text, 'events elements').filter((piece) => piece.term).map((piece) => piece.text)).toEqual(['elements', 'events']);
 		const html = await render(Subtitle, { text, terms: 'elements events' });
 		expect(html).toContain('role="paragraph"');
 		expect(html.match(/aria-describedby=/g)).toHaveLength(2);
-		expect(html.replace(/<[^>]*>/g, '')).toContain('Write elements and events in TypeScript.');
+		expect(html.replace(/<[^>]*>/g, '')).toContain('Write elements and events in JavaScript.');
 	});
 
 	it('is what the intro page uses', () => {
 		expect(page).toContain(
-			'<Subtitle text="Write elements and events in TypeScript. Markless is designed to compile them to any device." terms="elements events" />',
+			'<Subtitle text="Write elements and events in JavaScript. Markless is designed to compile them to any device." terms="elements events" />',
 		);
 	});
 });
