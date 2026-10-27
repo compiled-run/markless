@@ -1,28 +1,27 @@
 import { tree, lucide } from '@markless/ui';
 import type { AnatomyNode } from './hierarchy.ts';
 
-export default function AnatomyBranch({ part, label, name, shapeId, level, leaf, nodes }: {
+export default function AnatomyBranch({ part, label, name, shapeId, level, nodes }: {
 	readonly part: string;
 	readonly label: string;
 	readonly name: string;
 	readonly shapeId: string;
 	readonly level: number;
-	readonly leaf: boolean;
 	readonly nodes: readonly AnatomyNode[];
 }) @{
-	const icon = part === 'root' ? 'M8 1 11 4 8 7 5 4ZM4 5 7 8 4 11 1 8ZM12 5 15 8 12 11 9 8ZM8 9 11 12 8 15 5 12Z' : !leaf ? 'M5 1v14M11 1v14M1 5h14M1 11h14' : part.endsWith('label') ? 'M3 3h10M8 3v10M5 13h6' : 'M2 3h12v10H2Z';
-	<tree.item class="structure-node" open leaf={leaf} level={level} aria-label={name} data-part={part} data-shape={shapeId}>
+	const icon = part === 'root' ? 'M8 1 11 4 8 7 5 4ZM4 5 7 8 4 11 1 8ZM12 5 15 8 12 11 9 8ZM8 9 11 12 8 15 5 12Z' : nodes.length > 0 ? 'M5 1v14M11 1v14M1 5h14M1 11h14' : part.endsWith('label') ? 'M3 3h10M8 3v10M5 13h6' : 'M2 3h12v10H2Z';
+	<tree.item class="structure-node" open leaf={nodes.length === 0} level={level} aria-label={name} data-part={part} data-shape={shapeId}>
 		<div class="structure-row" data-part={part} data-shape={shapeId} style={'--layer-level: ' + level}>
-			<tree.itemtrigger class="structure-trigger" hidden={leaf}>
+			<tree.itemtrigger class="structure-trigger" hidden={nodes.length === 0}>
 				<lucide.chevronright width="12" height="12" aria-hidden="true" />
 			</tree.itemtrigger>
-			<span class="structure-leaf" hidden={!leaf} aria-hidden="true"></span>
+			<span class="structure-leaf" hidden={nodes.length > 0} aria-hidden="true"></span>
 			<svg class="structure-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d={icon} /></svg>
 			<tree.itemlabel class="structure-label">{label}</tree.itemlabel>
 		</div>
 		<tree.itemcontent class="structure-children">
 			@for (const entry of nodes; key entry.id) {
-				<AnatomyBranch part={entry.part} label={entry.label} name={entry.name} shapeId={entry.shapeId} level={entry.level} leaf={entry.children.length === 0} nodes={entry.children} />;
+				<AnatomyBranch part={entry.part} label={entry.label} name={entry.name} shapeId={entry.shapeId} level={entry.level} nodes={entry.children} />;
 			}
 		</tree.itemcontent>
 		<style>

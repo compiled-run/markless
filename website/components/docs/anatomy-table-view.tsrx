@@ -192,7 +192,7 @@ export default function AnatomyTableView({ family: name, data }: { readonly fami
 			<aside class="structure-panel" aria-label="Component structure">
 				<tree.root class="structure-tree" aria-label={name + ' structure'}>
 					<tree.label class="structure-heading">Layers</tree.label>
-					<AnatomyBranch part={study.hierarchy.part} label={study.hierarchy.label} name={study.hierarchy.name} shapeId={study.hierarchy.shapeId} level={study.hierarchy.level} leaf={study.hierarchy.children.length === 0} nodes={study.hierarchy.children} />
+					<AnatomyBranch part={study.hierarchy.part} label={study.hierarchy.label} name={study.hierarchy.name} shapeId={study.hierarchy.shapeId} level={study.hierarchy.level} nodes={study.hierarchy.children} />
 				</tree.root>
 			</aside>
 		<div class="drawing">
