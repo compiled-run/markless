@@ -1,3 +1,4 @@
+import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import type { SsrDataResidue, SsrDataSlot } from '../ssr-data/renderer.ts';
 
 // The direct-DOM renderer runs in the browser against real DOM. Chunk
@@ -116,7 +117,12 @@ export function attachMarklessPublicStaticEvents(
 			for (const symbolId of symbolIds) {
 				const loaded = loadSymbolForEvent(symbolId);
 				const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
-				const value = symbol({ graph, event, element, getElementHandle: () => undefined });
+				const value = marklessRunAtCurrentTarget(event, element, symbol, {
+					graph,
+					event,
+					element,
+					getElementHandle: () => undefined,
+				});
 				if (isMarklessPublicThenable(value)) {
 					graph.flush();
 					await value;
@@ -291,7 +297,12 @@ function attachDirectChunkEvents(
 			for (const symbolId of eventRecord.symbolIds) {
 				const loaded = loadSymbol(symbolId);
 				const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
-				const value = symbol({ graph, event, element, getElementHandle: () => undefined });
+				const value = marklessRunAtCurrentTarget(event, element, symbol, {
+					graph,
+					event,
+					element,
+					getElementHandle: () => undefined,
+				});
 				if (isMarklessPublicThenable(value)) {
 					sync();
 					graph.flush();
@@ -540,7 +551,7 @@ function attachDirectRepeatEvents(
 						if (!record || record.removed) continue;
 						const loaded = loadSymbol(eventControl.symbolId);
 						const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
-						const value = symbol({
+						const value = marklessRunAtCurrentTarget(event, target, symbol, {
 							graph,
 							event,
 							element: target,

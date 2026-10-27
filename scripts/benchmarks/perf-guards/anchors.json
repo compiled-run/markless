@@ -1882,6 +1882,22 @@
 			"from": 2406,
 			"to": 2309,
 			"reason": "shrank: a page's route script names its own resume module, so the entry holds no route table"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
+			"subject": "web/control-edit-hold",
+			"from": 1479,
+			"to": 1651,
+			"reason": "a field's edit hold keeps one note per running dispatch, so a field's async handler releases the dispatch queue at its first await"
+		},
+		{
+			"date": "2026-10-26",
+			"guard": "runtime",
+			"subject": "web/event-current-target",
+			"from": null,
+			"to": 477,
+			"reason": "every handler call site sets currentTarget to the handler's own element for its synchronous part"
 		}
 	],
 	"runtimeModules": {
@@ -1927,10 +1943,11 @@
 		"serializer/value-decode-client-lazy": 230,
 		"serializer/value-decode-extensions": 1720,
 		"web/coded-error": 368,
-		"web/control-edit-hold": 1479,
+		"web/control-edit-hold": 1651,
 		"web/dom-attribute": 874,
 		"web/dom-journal": 7373,
 		"web/dom-journal-direct": 1223,
+		"web/event-current-target": 477,
 		"web/fns/bound-symbol": 1497,
 		"web/fns/closure-action": 7539,
 		"web/fns/composition": 19974,
