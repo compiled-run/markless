@@ -220,6 +220,8 @@ function refusalMessage(
 			return `MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: ${at} The list comes from the prop \`${prop}\`, and ${reason} Pass \`${prop}\` a value that does not change, or keep the row to markup the browser can build.`;
 		case 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED':
 			return `MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: ${at} The rows come from the prop \`${prop}\`, and ${reason} Pass \`${prop}\` a value that does not change, or keep the row to markup the browser can build.`;
+		case 'MARKLESS_TEMPLATE_EXPRESSION_STATIC':
+			return `MARKLESS_TEMPLATE_EXPRESSION_STATIC: ${at} It holds only while the prop \`${prop}\` never changes, and ${reason} Pass \`${prop}\` a value that does not change, or read a plain value from the prop.`;
 		default:
 			return `${decided.code}: ${at} It holds only while the prop \`${prop}\` never changes, and ${reason} Pass \`${prop}\` a value that does not change.`;
 	}

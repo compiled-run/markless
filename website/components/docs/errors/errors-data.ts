@@ -10463,7 +10463,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error-or-warning',
 		description: 'A markup expression assigns a value, so its text never updates.',
 		printed: [
 			'MARKLESS_TEMPLATE_EXPRESSION_STATIC: This text reads `<readSource>`, but only plain reads like `{<readSource>}` update the page today. The expression renders its initial value and never changes when `<readSource>` changes.',
@@ -10653,6 +10653,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/state-lowering.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
 			},
 		],
 		moreSources: 0,

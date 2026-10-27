@@ -49,3 +49,35 @@ test('rows over state warn with nothing a caller can settle', async () => {
 		['MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED', null],
 	]);
 });
+
+async function staticWarnings(source: string) {
+	const result = await compileTsrxModule({ filename: '/app/tag.tsrx', source, symbols: [] });
+	return collectTsrxModuleDiagnostics(result)
+		.filter((diagnostic) => diagnostic.code === 'MARKLESS_TEMPLATE_EXPRESSION_STATIC')
+		.map((diagnostic) => diagnostic.decidedByProps ?? null);
+}
+
+// An expression into an object prop renders its first value; it is right exactly while no caller changes that prop.
+test('a static expression over props names them for the caller check', async () => {
+	expect(
+		await staticWarnings(`export function Tag({ item }) @{
+	const [first] = item.parts;
+	<p title={item.label.toUpperCase()}>{first === 'a' ? 'A' : 'B'}</p>
+}
+`),
+	).toEqual([
+		{ componentName: 'Tag', props: ['item'] },
+		{ componentName: 'Tag', props: ['item'] },
+	]);
+});
+
+test('a static expression that also reads state is not the callers to settle', async () => {
+	expect(
+		await staticWarnings(`import { state } from '@markless/core';
+export function Tag({ item }) @{
+	let shout = state(false);
+	<p onClick={() => (shout = true)} title={item.label.toUpperCase() + shout}>x</p>
+}
+`),
+	).not.toContainEqual(expect.objectContaining({ componentName: 'Tag' }));
+});
