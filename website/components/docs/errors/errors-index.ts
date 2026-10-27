@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 292,
+	total: 293,
 	guided: 45,
 	groups: [
 		{
@@ -650,6 +650,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
 					kind: 'compile error',
 					guided: false,
 				},

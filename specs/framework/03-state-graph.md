@@ -439,6 +439,30 @@ The semantic graph records one graph binding (`count`), one event attribute
 (`{count}`). The event symbol write lowers to `graph.update({ graphNodeId:
 countId, ... })`; the text DOM update lowers to `graph.read(countId)`.
 
+#### Writes through locals in handlers
+
+Markless has no runtime proxies: a change reaches the page only when the
+compiler can name the state path it writes. A write whose target starts at a
+local declared inside a handler, an array callback or an `attach` body is
+therefore decided by the binding that name resolves to (scope analysis, never
+the name alone), and by what that local holds:
+
+| The local holds                             | Example                                                                                                                                                                                                                   | Result                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| its own value                               | `const draft = { name: '' }; draft.name = x`                                                                                                                                                                              | plain JavaScript, no graph write                                                                      |
+| a local that shadows a state name           | `const user = {...}; user.first = x`                                                                                                                                                                                      | plain JavaScript, the state is untouched                                                              |
+| the object at a static state path           | `const p = user.profile; p.name = x`                                                                                                                                                                                      | graph write at `user.profile.name`                                                                    |
+| one element of a state array                | `for (const r of rows) r.n++`, `rows.find(...)`, `rows.at(i)`, the first parameter of `rows.forEach/map/filter/find/some/every/flatMap`                                                                                   | graph write at that element, found at dispatch by identity                                            |
+| a new array or object holding state objects | `const list = rows.filter(...)`, `{ ...user }`, `{ owner: user.owner }`                                                                                                                                                   | writing the container's own members is plain; writing through to a held state object is a build error |
+| state no graph path names                   | a value read out of a state `Map`/`Set` (`m.get(k)`), an element of an element, a value picked by a condition, a `let` assigned again later, a name destructured inside a loop or callback, a row item under another name | build error `MARKLESS_STATE_LOCAL_WRITE_UNTRACKED`, naming what to write instead                      |
+
+A local that no longer holds the value at its path when the write runs (the
+handler replaced `user.profile` first) is a plain object: the write changes only
+it, as JavaScript would. `Object.assign(target, ...sources)` onto a state path or
+onto one of these locals is one graph write per member the sources carry. A
+write through such a local inside `computed()` is the same
+`MARKLESS_STATE_WRITE_IN_COMPUTED` refusal as a direct write.
+
 For object state:
 
 ```tsrx

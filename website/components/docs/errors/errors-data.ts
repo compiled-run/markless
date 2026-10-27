@@ -9226,6 +9226,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'Write through a local changes state Markless cannot track: a Markless build error.',
+		printed: [
+			'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED: Cannot write to "<target>" because <value>.',
+			'Markless has no runtime proxies: a change reaches the page only when the compiler can name the state path it writes. This write would change the state object in place and the page would keep showing the old value.',
+			'https://markless.dev/errors/MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/state-lowering.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_STATE_MODULE_ESCAPE',
 		packageName: '@markless/compiler',
 		stage: 'compile',

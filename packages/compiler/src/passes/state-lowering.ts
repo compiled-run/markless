@@ -8,6 +8,7 @@ import type {
 	SemanticKeyedRepeat,
 	SemanticLocalDeclaration,
 	SemanticStateWrite,
+	SemanticWriteThrough,
 	SourceSpan,
 	StateLoweringArtifact,
 	StateLoweringDiagnostic,
@@ -176,6 +177,19 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		if (write.through) {
+			const through = lowerWriteThrough(
+				write,
+				write.through,
+				input,
+				lookup,
+				sharedDefinitionId,
+			);
+			if (through.kind === 'write') writes.push(through.write);
+			else if (through.kind === 'diagnostic') diagnostics.push(through.diagnostic);
+			continue;
+		}
+
 		const rowWrite = write.rowRepeatId ? lowerRowItemWrite(write, input) : null;
 		if (rowWrite) {
 			if (rowWrite.kind === 'write') writes.push(rowWrite.write);
@@ -191,6 +205,8 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			write.componentName,
 		);
 		if (!resolved) {
+			// Object.assign onto a value that is not state is plain JavaScript.
+			if (write.objectAssign) continue;
 			const excludedAliasPath = findRestAliasExcludedPath(write.target, lookup.aliases);
 			if (excludedAliasPath) {
 				diagnostics.push(
@@ -307,6 +323,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			updateOperator: write.updateOperator,
 			method: write.method,
 			argumentSources: write.argumentSources,
+			...(write.objectAssign ? { objectAssign: true as const } : {}),
 		});
 	}
 
@@ -321,6 +338,122 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		),
 		writes,
 		diagnostics,
+	};
+}
+
+type WriteThroughLowering =
+	| { readonly kind: 'write'; readonly write: LoweredStateWrite }
+	| { readonly kind: 'diagnostic'; readonly diagnostic: StateLoweringDiagnostic }
+	| { readonly kind: 'plain' };
+
+// A local holding state writes the path its value lives at; one holding state no path names refuses.
+function lowerWriteThrough(
+	write: SemanticStateWrite,
+	through: SemanticWriteThrough,
+	input: StateLoweringInput,
+	lookup: GraphLookup,
+	sharedDefinitionId: string | null,
+): WriteThroughLowering {
+	if (through.kind === 'local') return { kind: 'plain' };
+	if (through.kind === 'untracked') {
+		if (isLocalReassignment(write)) return { kind: 'plain' };
+		return {
+			kind: 'diagnostic',
+			diagnostic: untrackedLocalWriteDiagnostic(write, through, input.semanticGraph.filename),
+		};
+	}
+
+	const base = through.kind === 'path' ? through.target : through.collection;
+	const resolved = resolveStateGraphPath(
+		input,
+		base,
+		lookup,
+		sharedDefinitionId,
+		write.componentName,
+	);
+	if (!resolved) {
+		return {
+			kind: 'diagnostic',
+			diagnostic: unresolvedWriteDiagnostic(write, input.semanticGraph.filename),
+		};
+	}
+	if (!resolved.binding.writable) {
+		return { kind: 'diagnostic', diagnostic: readOnlyWriteDiagnostic(write, resolved.binding) };
+	}
+	// Reassigning the local itself changes no state.
+	if (through.path.length === 0 && write.operation !== 'call') return { kind: 'plain' };
+
+	return {
+		kind: 'write',
+		write: {
+			source: write.target,
+			sourceSpan: write.targetSpan,
+			graphNodeId: resolved.binding.id,
+			path: through.kind === 'path' ? [...resolved.path, ...through.path] : resolved.path,
+			operation: write.operation,
+			assignmentOperator: write.assignmentOperator,
+			valueSource: write.valueSource,
+			prefix: write.prefix,
+			updateOperator: write.updateOperator,
+			method: write.method,
+			argumentSources: write.argumentSources,
+			...(write.objectAssign ? { objectAssign: true as const } : {}),
+			through: {
+				local: through.local,
+				element: through.kind === 'element',
+				basePath: resolved.path,
+				path: through.path,
+			},
+		},
+	};
+}
+
+function isLocalReassignment(write: SemanticStateWrite): boolean {
+	return write.operation !== 'call' && splitStaticGraphPath(write.target).length === 1;
+}
+
+function untrackedLocalWriteDiagnostic(
+	write: SemanticStateWrite,
+	through: Extract<SemanticWriteThrough, { readonly kind: 'untracked' }>,
+	filename: string,
+): StateLoweringDiagnostic {
+	const local = through.local;
+	const held: Record<typeof through.reason, string> = {
+		'map-entry': `"${local}" holds a value read out of the Map or Set "${through.source}", and Markless tracks a Map's or Set's contents only through its own methods`,
+		copy: `"${local}" is a new array or object, but what it holds from "${through.source}" are the state objects themselves, so the write changes state no graph path names`,
+		'dynamic-key': `"${local}" holds state read under a key known only when the code runs (\`${through.source}\`), so no graph path names where the write lands`,
+		'nested-element': `"${local}" holds an element of an element (\`${through.source}\`), and Markless finds only a direct element of a state array`,
+		reassigned: `"${local}" holds state but is assigned again later, so the write cannot tell which value it changes`,
+		conditional: `"${local}" holds state chosen by a condition (\`${through.source}\`), so the write cannot tell which state it changes`,
+		'row-item': `"${local}" holds the row item "${through.source}" of a keyed @for under another name, and a write through a row item lowers only under the row's own name`,
+		destructured: `"${local}" was destructured out of the state "${through.source}" inside a loop or callback, and Markless follows a write only through the element itself`,
+	};
+	const suggestion: Record<typeof through.reason, string> = {
+		'map-entry': `Replace the entry instead: \`${through.source}.set(key, { ...${local}, field: value })\`.`,
+		copy: `Write through the state array itself, for example \`const row = ${through.source}.find((item) => item.id === id); if (row) row.field = value;\`.`,
+		'dynamic-key':
+			'Find the element with find() instead, for example `const row = rows.find((item) => item.id === id); if (row) row.field = value;`, or replace the array: `rows = rows.map((item, i) => (i === index ? { ...item, field: value } : item))`.',
+		'nested-element':
+			'Find the inner element directly from its own state array, or replace the outer element with a copy that holds the change.',
+		reassigned: `Declare "${local}" with const, or write through the state path directly.`,
+		conditional: 'Write through each state path in its own branch.',
+		'row-item': `Write through the row item itself: \`${through.source}.field = value\`.`,
+		destructured: `Name the element and write through it, for example \`for (const item of ${through.source}) item.field = value;\`.`,
+	};
+	return {
+		code: 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Write through a local changes state Markless cannot track',
+		message: `Cannot write to "${write.target}" because ${held[through.reason]}.`,
+		why: 'Markless has no runtime proxies: a change reaches the page only when the compiler can name the state path it writes. This write would change the state object in place and the page would keep showing the old value.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [{ message: suggestion[through.reason] }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
 	};
 }
 
@@ -388,6 +521,7 @@ function lowerRowItemWrite(
 			updateOperator: write.updateOperator,
 			method: write.method,
 			argumentSources: write.argumentSources,
+			...(write.objectAssign ? { objectAssign: true as const } : {}),
 			row: {
 				itemName: repeat.itemName,
 				keyPath: repeat.indexKey ? null : repeat.keyPath,
