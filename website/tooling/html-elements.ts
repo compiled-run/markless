@@ -182,10 +182,10 @@ export const SVG_ELEMENTS: Readonly<
 /** The hover for an intrinsic tag: its name as written, what kind of element it is, and one line. */
 export function elementHover(
 	tag: string,
-): { readonly signature: string; readonly doc: string } | undefined {
+): { readonly signature: string; readonly kind: string; readonly doc: string } | undefined {
 	const html = (HTML_ELEMENTS as Readonly<Record<string, string>>)[tag];
-	if (html !== undefined) return { signature: `<${tag}> · HTML element`, doc: html };
+	if (html !== undefined) return { signature: `<${tag}>`, kind: 'HTML element', doc: html };
 	const svg = (SVG_ELEMENTS as Readonly<Record<string, string>>)[tag];
-	if (svg !== undefined) return { signature: `<${tag}> · SVG element`, doc: svg };
+	if (svg !== undefined) return { signature: `<${tag}>`, kind: 'SVG element', doc: svg };
 	return undefined;
 }

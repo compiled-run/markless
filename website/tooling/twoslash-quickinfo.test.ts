@@ -146,14 +146,12 @@ test('every hover is a whole type, and a tag hover names the element instead of 
 		infos.filter((info) => elements.slice(info.start, info.start + info.length) === text);
 	for (const info of infos) expect(isWholeType(info.signature), info.signature).toBe(true);
 	expect(byText('section')[0]).toMatchObject({
-		signature: '<section> · HTML element',
+		signature: '<section>',
+		kind: 'HTML element',
 		doc: HTML_ELEMENTS.section,
 	});
-	expect(byText('button').map((info) => info.signature)).toEqual([
-		'<button> · HTML element',
-		'<button> · HTML element',
-	]);
-	expect(byText('circle')[0]?.signature).toBe('<circle> · SVG element');
+	expect(byText('button').map((info) => info.signature)).toEqual(['<button>', '<button>']);
+	expect(byText('circle')[0]).toMatchObject({ signature: '<circle>', kind: 'SVG element' });
 	expect(byText('clipPath')[0]?.doc).toBe(SVG_ELEMENTS.clipPath);
 	expect(byText('user')[0]?.signature).toMatch(/^let user: \{ .* \}$/);
 	expect(byText('state')[0]?.signature).toBe('(alias) function state<T>(initial: T): T');

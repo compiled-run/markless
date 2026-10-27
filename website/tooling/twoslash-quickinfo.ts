@@ -57,6 +57,8 @@ export type QuickInfo = {
 	readonly signature: string;
 	/** The symbol's doc comment on one line, or empty when it has none. */
 	readonly doc: string;
+	/** Set for a tag, whose title is the tag in the code face and then this word, like `HTML element`. */
+	readonly kind?: string;
 };
 
 export type QuickInfoService = {

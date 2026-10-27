@@ -38,6 +38,21 @@ test('a token named in a painted signature does not grow a hover of its own insi
 	expect(addTsrxHovers(typed).match(/class="tsrx-hover"/g)).toHaveLength(1);
 });
 
+test('a tag hover shows the tag in the code face beside the kind of element, not a painted type', async () => {
+	const paint = signaturePainter(await getHighlighter());
+	const html = addQuickInfoHovers(
+		'<span style="color:#24292E">&lt;</span><span style="color:#22863A">section</span><span style="color:#24292E">&gt;</span>',
+		'<section>',
+		[{ start: 1, length: 7, signature: '<section>', kind: 'HTML element', doc: 'A section.' }],
+		paint,
+	);
+	expect(html).toContain(
+		'<span class="tsrx-tip-title"><span class="tsrx-tip-code">&lt;section&gt;</span> · HTML element</span>',
+	);
+	expect(html).toContain('data-doc-title="&lt;section&gt; · HTML element"');
+	expect(html).toContain('aria-label="&lt;section&gt; · HTML element. A section."');
+});
+
 test('a TSRX keyword hover shows the keyword in the code face beside its kind', () => {
 	const html = addTsrxHovers('<span style="color:#D73A49">state</span>');
 	expect(html).toMatch(
