@@ -838,7 +838,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error',
 		description: 'Nothing on a server-rendered page starts this attach function.',
 		printed: [
 			'MARKLESS_ATTACH_NO_START_TRIGGER: attach={<source>} on <<tagName>> has no event handler on or inside the element, and no onVisible or onIdle on it. On a server-rendered page attach starts only when one of those runs, so <source> never runs there.',
@@ -903,16 +903,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's4',
-					text: ' to start it once the page is idle. If the element only ever renders in the browser, where ',
-				},
-				{
-					id: 's5',
-					text: 'attach',
-					code: true,
-				},
-				{
-					id: 's6',
-					text: ' runs as soon as the element exists, silence the warning with a reason.',
+					text: ' to start it once the page is idle. An element that only ever renders in the browser needs one too: the build cannot tell it apart from one the server renders.',
 				},
 			],
 			example: [
@@ -1033,18 +1024,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 		},
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_ATTACH_NO_START_TRIGGER: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
 		sources: [
 			{
 				id: 'f0',

@@ -112,7 +112,7 @@ be empty:
 <canvas attach={(canvas) => drawChart(canvas)} onVisible={() => {}} />
 ```
 
-If an element has `attach` and none of these, the build warns with
+If an element has `attach` and none of these, the build fails with
 [`MARKLESS_ATTACH_NO_START_TRIGGER`](/errors/MARKLESS_ATTACH_NO_START_TRIGGER), because the function
 would never run on a server-rendered page.
 

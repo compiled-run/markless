@@ -55,7 +55,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
-					kind: 'compile warning',
+					kind: 'compile error',
 					guided: true,
 				},
 				{
