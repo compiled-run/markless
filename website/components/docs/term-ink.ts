@@ -1,4 +1,4 @@
-// The glossary sketches a Term opens: a tiny page of elements, a cursor clicking a button, a value dropping into its hole, and a list of instructions ticked in order.
+// The glossary sketches a Term opens: a tiny page of elements, a cursor clicking a button, a highlighted value in a code line, and code lines bracketed and numbered in run order.
 import { hatch, line, outline, type P, wash } from '../figures/ink/ink.ts';
 
 export const WIDTH = 200;
@@ -137,37 +137,50 @@ function events(): Sketch {
 	};
 }
 
-/** A button whose number sits in a dashed hole, with the value dropping into it from above. */
+/** A printed code line with a pink highlighter swipe over the braces in it, labelled like the elements sketch. */
 function values(): Sketch {
-	const button = box(30, 70, 150, 104, 8);
-	const hole = box(42, 76, 70, 98, 3);
-	const dashes: string[] = [];
-	for (let i = 0; i < hole.length - 1; i += 2) dashes.push(line([hole[i]!, hole[i + 1]!], { w: 0.7, seed: 860 + i, over: 0 }));
-	const two: P[] = [[50, 24], [56, 18], [62, 22], [52, 38], [64, 38]];
+	const sheet = box(14, 8, 128, 120, 5);
+	const swipe: P[] = [
+		[44, 50],
+		[92, 47],
+		[93, 63],
+		[45, 66],
+	];
 	return {
-		paper: '',
+		paper: wash(sheet, 861, 0.4, 0.6),
 		cover: '',
-		pink: wash(box(44, 78, 68, 96, 3), 861, 1, 1.4),
-		hatch: hatch(box(32, 98, 148, 104, 4), -0.35, 1.8, 862, { cluster: 3, skip: 0.2, trim: 0.25 }),
-		ink: outline(button, { w: 1.5, heavy: 0.8, seed: 863 }) + line(two, { w: 1.6, seed: 864, over: 0.3 }) + line(wavy(80, 136, 88, 0.5), { w: 0.9, seed: 865, over: 0.3 }),
-		fine: dashes.join('') + line([[57, 44], [56, 56], [56, 68]], { w: 0.8, seed: 866, over: 0.2 }) + line([[52, 62], [56, 68], [60, 62]], { w: 0.8, seed: 867, over: 0.2 }),
-		labels: [tilt('hole', 84, 30, '{ }', -4)],
+		pink: wash(swipe, 862, 1.4, 2.2),
+		hatch: '',
+		ink:
+			outline(sheet, { w: 1.5, heavy: 0.7, seed: 863 }) +
+			line(wavy(26, 104, 30, 0.6), { w: 0.95, seed: 864, over: 0.5 }) +
+			line(wavy(26, 40, 57, 0.4), { w: 0.95, seed: 865, over: 0.3 }) +
+			line([[50, 50], [47, 52], [47, 56], [44, 57], [47, 58], [47, 62], [50, 64]], { w: 1.2, seed: 866, over: 0.2 }) +
+			line(wavy(54, 82, 57, 0.4), { w: 0.95, seed: 867, over: 0.3 }) +
+			line([[86, 50], [89, 52], [89, 56], [92, 57], [89, 58], [89, 62], [86, 64]], { w: 1.2, seed: 868, over: 0.2 }) +
+			line(wavy(98, 112, 57, 0.4), { w: 0.95, seed: 869, over: 0.3 }) +
+			line(wavy(26, 96, 84, 0.6), { w: 0.95, seed: 870, over: 0.5 }) +
+			line(wavy(26, 76, 102, 0.6), { w: 0.95, seed: 871, over: 0.5 }),
+		fine: line([[96, 56], [112, 52], [134, 50]], { w: 0.55, seed: 872, over: 0.2 }),
+		labels: [tilt('value', 138, 56, 'value', -3)],
 	};
 }
 
-/** An index card of three lines, the first two ticked, read from the top down. */
+/** Three printed code lines held by a pen bracket, numbered in the order they run, labelled like the elements sketch. */
 function instructions(): Sketch {
-	const card = box(24, 14, 160, 116, 4);
-	const rows = [42, 66, 90];
-	const tick = (y: number, seed: number) => line([[34, y - 2], [39, y + 4], [48, y - 8]], { w: 1.5, seed, over: 0.2 });
+	const sheet = box(14, 8, 128, 120, 5);
+	const rows = [36, 62, 88];
 	return {
-		paper: wash(card, 870, 0.4, 0.6),
+		paper: wash(sheet, 880, 0.4, 0.6),
 		cover: '',
 		pink: '',
-		hatch: hatch(box(24, 108, 160, 116, 4), -0.4, 1.9, 871, { cluster: 3, skip: 0.2, trim: 0.25 }),
-		ink: outline(card, { w: 1.4, heavy: 0.7, seed: 872 }) + rows.map((y, i) => line(wavy(58, 140 - i * 14, y, 0.6), { w: 0.95, seed: 873 + i, over: 0.4 })).join('') + tick(rows[0]!, 880) + tick(rows[1]!, 881),
-		fine: line([[166, 30], [170, 66], [166, 102]], { w: 0.8, seed: 882, over: 0.2 }) + line([[162, 96], [166, 102], [171, 97]], { w: 0.8, seed: 883, over: 0.2 }),
-		labels: [tilt('block', 130, 12, '@{ }', 3)],
+		hatch: '',
+		ink:
+			outline(sheet, { w: 1.5, heavy: 0.7, seed: 881 }) +
+			rows.map((y, i) => line(wavy(40, 112 - i * 12, y, 0.6), { w: 0.95, seed: 882 + i, over: 0.4 })).join('') +
+			line([[32, 24], [26, 26], [25, 62], [21, 63], [25, 64], [26, 100], [32, 102]], { w: 1.6, seed: 886, over: 0.3 }),
+		fine: line([[108, 62], [120, 61], [134, 60]], { w: 0.55, seed: 887, over: 0.2 }) + line([[118, 30], [121, 60], [118, 92]], { w: 0.7, seed: 888, over: 0.2 }) + line([[115, 87], [118, 93], [122, 87]], { w: 0.7, seed: 889, over: 0.2 }),
+		labels: [tilt('one', 31, 40, '1', -4), tilt('two', 31, 66, '2', 2), tilt('three', 31, 92, '3', -3), tilt('block', 138, 66, '@{ }', -3)],
 	};
 }
 

@@ -1,8 +1,8 @@
-// A shop page drawn on a sheet on the desk, with the jar, boxes, cords and clips the wired figures share.
+// A page drawn on a sheet on the desk, with the boxes, tags, cords and clips the desk figures share.
 import { eyeOf, fitProjection, iso, perspectiveProjection, type Point3, type Projection } from '../kit/iso-kit.ts';
 import { add3, cross3, dot3, lerp3, mul3, sub3, unit3 } from '../kit/lathe.ts';
 import { bezier, centreOf, ellipse, jitter, LIGHT, matrixOf, roundRect, shadowOnDesk, TAU } from './desk.ts';
-import { clipTo, hatch, hull, lengthOf, line, outline, type P, pathOf, pool, r1, resample, seeded, stroke, wash } from './ink.ts';
+import { hatch, hull, lengthOf, line, outline, type P, pathOf, pool, r1, resample, seeded, stroke, wash } from './ink.ts';
 
 export type { P, Point3 };
 export { bezier, centreOf, ellipse, roundRect, TAU };
@@ -14,23 +14,6 @@ const FOLD = 1.74;
 const CURL_R = 3.4;
 const FOLD_K = Math.hypot(1 / SHEET_W, 1 / SHEET_H);
 const FOLD_N: P = [1 / SHEET_W / FOLD_K, 1 / SHEET_H / FOLD_K];
-
-export const JAR: P = [-5.6, -2.2];
-const JS = 0.86;
-const JAR_PROFILE: P[] = (
-	[
-		[0, 2.5],
-		[0.12, 2.82],
-		[0.45, 3.04],
-		[1, 3.12],
-		[5.9, 3.12],
-		[6.6, 3.02],
-		[7.2, 2.74],
-		[7.65, 2.42],
-		[8.5, 2.36],
-	] as P[]
-).map(([z, r]) => [z * JS, r * JS] as P);
-export const LID = { z0: 8.3 * JS, z1: 9.55 * JS, r: 2.62 * JS };
 
 const sheetLocal = (u: number, v: number): Point3 => {
 	const e = (u / SHEET_W + v / SHEET_H - FOLD) / FOLD_K;
@@ -57,15 +40,17 @@ export interface Crate {
 export interface SceneConfig {
 	width: number;
 	height: number;
-	/** Draw the bean jar on the left of the sheet. */
-	jar: boolean;
 	/** Extra world points the camera must fit, such as a box on the desk. */
 	extra: Point3[];
 	target: Point3;
+	/** Degrees above the desk the camera looks down from; higher is flatter and crisper. */
+	elevation?: number;
+	/** Degrees the camera swings around the desk; 90 squares the sheet to the viewer. */
+	azimuth?: number;
 }
 
-export function createScene({ width, height, jar: withJar, extra, target }: SceneConfig) {
-	const view = { azimuth: 94, elevation: 60, distance: 84, target };
+export function createScene({ width, height, extra, target, elevation = 60, azimuth = 94 }: SceneConfig) {
+	const view = { azimuth, elevation, distance: 84, target };
 	const a0 = (view.azimuth * Math.PI) / 180;
 	const e0 = (view.elevation * Math.PI) / 180;
 	const camera = perspectiveProjection({
@@ -73,12 +58,6 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 		target,
 	});
 	const bounds: Point3[] = [sheetAt(0, -2.6), sheetAt(SHEET_W, -2.6), sheetAt(0, SHEET_H + 0.5), sheetAt(SHEET_W + 0.9, SHEET_H + 0.4), sheetAt(SHEET_W + 0.9, 4), ...extra];
-	if (withJar)
-		for (let k = 0; k < 24; k++) {
-			const a = (k * TAU) / 24;
-			const ring = (r: number, z: number): Point3 => [JAR[0] + Math.cos(a) * r, JAR[1] + Math.sin(a) * r, z];
-			bounds.push(ring(JAR_PROFILE[4]![1], 0), ring(LID.r, LID.z1));
-		}
 	const PROJECTION: Projection = fitProjection(bounds, width, height - 30, { camera, pad: 2, headroom: 30 });
 	const EYE = eyeOf(PROJECTION)!;
 	const proj = (p: Point3): P => iso(p, PROJECTION);
@@ -187,212 +166,10 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 		};
 	}
 
-	/** A cart icon at the top right of the page, with its round badge. */
-	function cartIcon(badge: { u: number; v: number; r: number }) {
-		const basket = onSheet([[17.45, 4.3], [19.35, 4.3], [19.05, 5.4], [17.75, 5.4]]);
-		const disc = onSheet(ellipse(badge.u, badge.v, badge.r, badge.r * 0.95, 30));
-		return {
-			ink:
-				line(onSheet([[16.8, 3.85], [17.25, 3.85], [17.45, 4.3]]), { w: 1.1, seed: 420, over: 0.3 }) +
-				outline(basket, { w: 1.1, heavy: 0.8, centre: centreOf(basket), seed: 421 }) +
-				line(onSheet([[17.6, 4.85], [19.2, 4.85]]), { w: 0.6, seed: 422, over: 0 }) +
-				line(onSheet([[18.05, 4.32], [18.2, 5.38]]), { w: 0.6, seed: 427, over: 0 }) +
-				line(onSheet([[18.7, 4.32], [18.6, 5.38]]), { w: 0.6, seed: 428, over: 0 }) +
-				line(onSheet([[17.75, 5.4], [17.6, 5.75], [19.15, 5.75]]), { w: 1, seed: 429, over: 0.3 }) +
-				[17.85, 18.95].map((u, i) => outline(onSheet(ellipse(u, 6.02, 0.19, 0.19, 14)), { w: 1, seed: 423 + i })).join(''),
-			badge: { paper: pathOf(disc, true), wash: wash(disc, 425, 0.6, 2), ink: outline(disc, { w: 1, heavy: 0.6, centre: centreOf(disc), seed: 426 }), matrix: sheetMatrix(badge.u, badge.v + 0.29), oldMatrix: sheetMatrix(badge.u - 1.55, badge.v - 0.2) },
-		};
-	}
-
-	/** A raised pink button lying on the page, with the offset it sinks by when pressed. */
-	function pageButton(b: { u0: number; v0: number; u1: number; v1: number }, seed: number) {
-		const { u0, v0, u1, v1 } = b;
-		const poly = onSheet(roundRect(u0, v0, u1, v1, Math.min(0.4, (v1 - v0) / 2.2)), 0.12);
-		const side = onSheet([[u1, v0 + 0.3], [u1, v1], [u0 + 0.3, v1], [u0 + 0.3, v1 + 0.2], [u1 + 0.2, v1 + 0.2], [u1 + 0.2, v0 + 0.3]]);
-		const a = proj(sheetAt((u0 + u1) / 2, v0 + 0.5, 0.12));
-		const s = proj(sheetAt((u0 + u1) / 2 + 0.08, v0 + 0.6, 0));
-		return {
-			paper: pathOf(poly, true),
-			wash: wash(poly, seed, 1.5, 3.5),
-			pool: wash(pool(poly, poly[Math.min(8, poly.length - 1)]!, 0.5), seed + 1, 0.6, 2),
-			side: hatch(side, 0.95, 1.4, seed + 2, { cluster: 1 }) + outline(side, { w: 0.8, seed: seed + 3 }),
-			ink: outline(poly, { w: 1.5, heavy: 1.3, centre: centreOf(poly), seed: seed + 4 }),
-			matrix: sheetMatrix((u0 + u1) / 2, (v0 + v1) / 2 + 0.32),
-			sink: `--sink-x:${r1(s[0] - a[0])}px;--sink-y:${r1(s[1] - a[1] + 0.8)}px`,
-		};
-	}
-
 	/** A loose yellow wash over a live number on the page, with its darker pool and edge. */
 	function spot(u: number, v: number, rx: number, ry: number, seed: number) {
 		const poly = onSheet(ellipse(u, v, rx, ry, 30));
 		return { wash: wash(poly, seed, 1.2, 4), pool: wash(pool(poly, centreOf(poly), 0.55), seed + 1, 0.5, 2.5), edge: wash(poly, seed + 2, 0.4, 3.5) };
-	}
-
-	/** One pen stroke that crosses out a number, in the text's own millimetres, with its length for the draw-on. */
-	function strike(x: number, k: number, seed: number) {
-		const rnd = seeded(seed);
-		const pts: P[] = [
-			[x - 1.6 * k, (-1.6 + rnd()) * k],
-			[x + 5 * k, (-3.4 + rnd() * 0.6) * k],
-			[x + 12.4 * k, (-6.4 + rnd()) * k],
-		];
-		return { d: `M${r1(pts[0]![0])} ${r1(pts[0]![1])}Q${r1(pts[1]![0])} ${r1(pts[1]![1])} ${r1(pts[2]![0])} ${r1(pts[2]![1])}`, length: r1(lengthOf(pts) + 1) };
-	}
-
-	const radiusAt = (z: number) => {
-		for (let i = 1; i < JAR_PROFILE.length; i++) {
-			const [z0, r0] = JAR_PROFILE[i - 1]!;
-			const [z1, rv] = JAR_PROFILE[i]!;
-			if (z <= z1) {
-				const t = (z - z0) / (z1 - z0 || 1);
-				return r0 + (rv - r0) * t * t * (3 - 2 * t);
-			}
-		}
-		return JAR_PROFILE.at(-1)![1];
-	};
-	const jarPoint = (a: number, z: number, r = radiusAt(z)): Point3 => [JAR[0] + Math.cos(a) * r, JAR[1] + Math.sin(a) * r, z];
-	const facing = (a: number, z: number) => dot3([Math.cos(a), Math.sin(a), 0], sub3(EYE, jarPoint(a, z))) > 0;
-	const litness = (a: number) => dot3([Math.cos(a), Math.sin(a), 0.1], LIGHT);
-
-	function ringArcs(z: number, r: number, steps = 120) {
-		const front: P[] = [];
-		const back: P[] = [];
-		let start = 0;
-		while (facing((start / steps) * TAU, z) && start < steps) start++;
-		while (!facing((start / steps) * TAU, z) && start < steps * 2) start++;
-		for (let i = 0; i <= steps; i++) {
-			const a = ((start + i) / steps) * TAU;
-			(facing(a, z) ? front : back).push(proj(jarPoint(a, z, r)));
-		}
-		return { front, back, all: Array.from({ length: steps }, (_, i) => proj(jarPoint((i / steps) * TAU, z, r))) };
-	}
-
-	function contours(z0: number, z1: number, r: (z: number) => number, count = 50) {
-		const left: P[] = [];
-		const right: P[] = [];
-		for (let i = 0; i <= count; i++) {
-			const z = z0 + ((z1 - z0) * i) / count;
-			const ring = Array.from({ length: 180 }, (_, k) => proj(jarPoint((k / 180) * TAU, z, r(z))));
-			left.push(ring.reduce((m, p) => (p[0] < m[0] ? p : m)));
-			right.push(ring.reduce((m, p) => (p[0] > m[0] ? p : m)));
-		}
-		return { left, right };
-	}
-
-	function formStrokes(z0: number, z1: number, r: (z: number) => number, below: number, gap: number, seed: number, reach = 0.8): string {
-		const rnd = seeded(seed);
-		let d = '';
-		let left = 0;
-		let tilt = 0;
-		for (let a = rnd() * gap; a < TAU; ) {
-			if (left <= 0) {
-				left = 2 + Math.floor(rnd() * 4);
-				tilt = (rnd() - 0.5) * 0.05;
-				a += gap * rnd();
-			}
-			left--;
-			const lim = below + (rnd() - 0.5) * 0.12;
-			if (litness(a) < lim && facing(a, (z0 + z1) / 2)) {
-				const top = z1 - (z1 - z0) * rnd() * rnd() * 0.5;
-				const bottom = z0 + (z1 - z0) * (1 - reach) * rnd();
-				d += pathOf(projAll(Array.from({ length: 12 }, (_, i) => {
-					const z = bottom + ((top - bottom) * i) / 11;
-					return jarPoint(a + tilt * i, z, r(z) + 0.01);
-				})));
-			}
-			a += gap * (0.6 + rnd() * 0.7);
-		}
-		return d;
-	}
-
-	function ringStrokes(z0: number, z1: number, r: (z: number) => number, below: number, gap: number, seed: number): string {
-		const rnd = seeded(seed);
-		let d = '';
-		for (let z = z0 + gap * rnd(); z < z1; z += gap * (0.7 + rnd() * 0.6)) {
-			let run: P[] = [];
-			const lim = below + (rnd() - 0.5) * 0.1;
-			const flush = () => {
-				if (run.length > 2) d += pathOf(run.slice(Math.floor(rnd() * 3), run.length - Math.floor(rnd() * 3)));
-				run = [];
-			};
-			for (let i = 0; i <= 160; i++) {
-				const a = (i / 160) * TAU;
-				if (facing(a, z) && litness(a) < lim) run.push(proj(jarPoint(a, z, r(z) + 0.01)));
-				else flush();
-			}
-			flush();
-		}
-		return d;
-	}
-
-	function jarArt() {
-		const body = contours(0, LID.z0 + 0.1, radiusAt);
-		const lidR = (z: number) => LID.r - (z > LID.z1 - 0.18 ? (z - (LID.z1 - 0.18)) * 1.2 : 0);
-		const lid = contours(LID.z0, LID.z1, lidR, 16);
-		const base = ringArcs(0.02, radiusAt(0.02) + 0.05);
-		const belly = ringArcs(0.5, radiusAt(0.5));
-		const shoulder = ringArcs(6.9 * JS, radiusAt(6.9 * JS));
-		const neck = ringArcs(LID.z0 - 0.35, radiusAt(LID.z0 - 0.35));
-		const lidBottom = ringArcs(LID.z0, LID.r);
-		const lidTop = ringArcs(LID.z1, LID.r - 0.2);
-		const lidRim = ringArcs(LID.z1 - 0.18, LID.r);
-		const silhouette = hull([...body.left, ...body.right, ...lid.left, ...lid.right, ...base.all, ...lidTop.all]);
-		const centre = centreOf(silhouette);
-		const shadowPts: P[] = [];
-		for (let z = 0; z <= LID.z1; z += 0.5) for (let k = 0; k < 48; k++) shadowPts.push(proj(shadowOnDesk(jarPoint((k / 48) * TAU, z, z > LID.z0 ? LID.r : radiusAt(z)))));
-		const shadow = hull(shadowPts);
-		const lidShadow = hull(Array.from({ length: 96 }, (_, k) => proj(shadowOnDesk(jarPoint((k / 48) * TAU, k < 48 ? LID.z0 : LID.z1, LID.r)))));
-		const footRing = Array.from({ length: 64 }, (_, k) => proj(jarPoint((k / 64) * TAU, 0, JAR_PROFILE[4]![1] + 0.04)));
-		const reach = sub3(proj(shadowOnDesk(jarPoint(0, 1.6))) as unknown as Point3, proj(jarPoint(0, 1.6, radiusAt(1.6))) as unknown as Point3) as unknown as P;
-		const foot = hull([...footRing, ...footRing.map((p) => [p[0] + reach[0] * 0.35, p[1] + reach[1] * 0.35] as P)]);
-		const knurl: string[] = [];
-		for (let k = 0; k < 64; k++) {
-			const a = (k / 64) * TAU;
-			if (facing(a, LID.z0 + 0.5)) knurl.push(pathOf(projAll([jarPoint(a, LID.z0 + 0.12, LID.r + 0.01), jarPoint(a, LID.z1 - 0.26, LID.r + 0.01)])));
-		}
-		const glints = [
-			[2.75, 1.4, 5.6],
-			[2.95, 2.1, 4.4],
-			[2.6, 6.9, 7.4],
-		].map(([a, z0, z1], i) => {
-			const lo = z0! * JS;
-			const hi = z1! * JS;
-			return line(projAll(Array.from({ length: 10 }, (_, k) => jarPoint(a!, lo + ((hi - lo) * k) / 9, radiusAt(lo + ((hi - lo) * k) / 9) + 0.02))), { w: 0.6, seed: 600 + i, over: 0.6 });
-		});
-		const near: P[] = [];
-		for (let z = 0; z <= 3.2; z += 0.4) for (let k = 0; k < 48; k++) near.push(proj(shadowOnDesk(jarPoint((k / 48) * TAU, z))));
-		const core = hull(near);
-		return {
-			shadow: {
-				wash: wash(shadow, 610, 2, 5),
-				lidWash: wash(lidShadow, 611, 1.5, 3),
-				hatch: hatch(shadow, -0.45, 3.2, 612, { cluster: 5, skip: 0.15 }) + hatch(lidShadow, 0.5, 1.7, 613, { cluster: 3 }) + hatch(lidShadow, -0.6, 2.1, 614),
-				foot: hatch(foot, -0.5, 1.5, 615, { cluster: 2, trim: 0.3 }),
-				core: hatch(core, 0.55, 1.5, 616, { cluster: 4, skip: 0.1 }) + hatch(core, -1.2, 1.5, 617, { cluster: 3, skip: 0.2 }),
-			},
-			backInk: line(base.back, { w: 0.7, seed: 620, over: 0.5 }) + line(shoulder.back, { w: 0.5, seed: 621, over: 0.5 }) + line(neck.back, { w: 0.6, seed: 622, over: 0.5 }),
-			glass: {
-				paper: pathOf(silhouette, true),
-				tone: formStrokes(0.3, 5.6, radiusAt, 0.05, 0.11, 630, 0.9) + formStrokes(0.15, 1.8, radiusAt, -0.2, 0.08, 631),
-				ink:
-					line(body.left, { w: 1.5, seed: 632, over: 2.5 }) +
-					line(body.right, { w: 2.4, heavy: 1, centre, seed: 633, over: 2.5 }) +
-					line(base.front, { w: 2.2, heavy: 1.4, centre, seed: 634, over: 3 }) +
-					line(belly.front, { w: 0.7, seed: 635, over: 2 }) +
-					line(shoulder.front, { w: 0.8, seed: 636, over: 2 }) +
-					line(neck.front, { w: 1.1, seed: 637, over: 2 }),
-				glints: glints.join(''),
-			},
-			lid: {
-				paper: pathOf(hull([...lid.left, ...lid.right, ...lidTop.all, ...lidBottom.front]), true),
-				wash: wash(hull([...lid.right.slice(2), ...lidBottom.front.slice(Math.floor(lidBottom.front.length / 2))]), 640, 1, 2),
-				hatch: formStrokes(LID.z0 + 0.05, LID.z1 - 0.2, lidR, 0.32, 0.07, 641, 1) + formStrokes(LID.z0 + 0.05, LID.z1 - 0.2, lidR, -0.05, 0.05, 642, 1),
-				cross: ringStrokes(LID.z0 + 0.08, LID.z1 - 0.25, lidR, 0.02, 0.16, 643),
-				knurl: knurl.join(''),
-				ink: outline(lidTop.all, { w: 1.3, seed: 644 }) + line(lidRim.front, { w: 0.8, seed: 645 }) + line(lidBottom.front, { w: 2.2, heavy: 1.2, centre, seed: 646, over: 2 }) + line(lid.left, { w: 1.4, seed: 647 }) + line(lid.right, { w: 2.2, seed: 648 }),
-			},
-			pencil: [pathOf(jitter(resample([proj([JAR[0], JAR[1], 10]), proj([JAR[0], JAR[1], -1.4])], 8), 650, 0.8)), pathOf(jitter(base.all, 651, 0.6), true), pathOf(jitter(ringArcs(LID.z1, LID.r + 0.4).all, 652, 0.7), true)].join(''),
-		};
 	}
 
 	/** A paper tag on a string, hung from `knot` and turned to face the viewer, with a matrix for its word. */
@@ -415,78 +192,6 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 			string: loop + line(stringPts, { w: 0.8, seed: seed + 4, over: 1 }),
 			matrix: matrixOf(proj(corner(0.3, -1.02)), proj(corner(0.4, -1.02)), proj(corner(0.3, -1.12))),
 		};
-	}
-
-	function jarTag() {
-		const a = 1.85;
-		const knot = jarPoint(a, 7.75 * JS, radiusAt(7.75 * JS) + 0.05);
-		const loop = line(ringArcs(7.75 * JS, radiusAt(7.75 * JS) + 0.06).front, { w: 0.8, seed: 703 });
-		return tag(knot, unit3([Math.cos(a), Math.sin(a), 0]), 700, loop);
-	}
-
-	const BEAN = [0.64, 0.46, 0.34] as const;
-
-	/** Beans settled in a pile on the jar's floor, the first ones toward the front, each with the distance it falls from the lid. */
-	function beans(count: number) {
-		const rnd = seeded(800);
-		const placed: Point3[] = [];
-		const toward = unit3([EYE[0] - JAR[0], EYE[1] - JAR[1], 0]);
-		for (let i = 0; i < count; i++) {
-			let best: Point3 | undefined;
-			let bestScore = Infinity;
-			for (let t = 0; t < 40; t++) {
-				const a = rnd() * TAU;
-				const r = Math.sqrt(rnd()) * 2.05;
-				const x = JAR[0] + Math.cos(a) * r;
-				const y = JAR[1] + Math.sin(a) * r;
-				let z = BEAN[2] + 0.04;
-				for (const q of placed) {
-					const d = Math.hypot(q[0] - x, q[1] - y);
-					if (d < 1.2) z = Math.max(z, q[2] + Math.sqrt(1.2 * 1.2 - d * d) * 0.7);
-				}
-				const score = z * 3 - ((x - JAR[0]) * toward[0] + (y - JAR[1]) * toward[1]) * 0.9 + rnd() * 0.3;
-				if (score < bestScore) {
-					bestScore = score;
-					best = [x, y, z];
-				}
-			}
-			placed.push(best!);
-		}
-		return placed.map((c, i) => {
-			const r = seeded(900 + i);
-			const yaw = r() * TAU;
-			const ax: Point3 = unit3([Math.cos(yaw), Math.sin(yaw), (r() - 0.5) * 0.4]);
-			const ay = unit3(cross3(unit3([(r() - 0.5) * 0.7, (r() - 0.5) * 0.7, 1]), ax));
-			const az = unit3(cross3(ax, ay));
-			const at = (u: number, v: number, w: number): Point3 => add3(add3(add3(c, mul3(ax, u)), mul3(ay, v)), mul3(az, w));
-			const surf: P[] = [];
-			const dark: P[] = [];
-			for (let k = 0; k < 18; k++)
-				for (let j = 0; j < 9; j++) {
-					const th = (k / 18) * TAU;
-					const ph = (j / 8) * Math.PI - Math.PI / 2;
-					const q = proj(at(Math.cos(ph) * Math.cos(th) * BEAN[0], Math.cos(ph) * Math.sin(th) * BEAN[1], Math.sin(ph) * BEAN[2]));
-					surf.push(q);
-					const n = unit3(add3(add3(mul3(ax, (Math.cos(ph) * Math.cos(th)) / BEAN[0]), mul3(ay, (Math.cos(ph) * Math.sin(th)) / BEAN[1])), mul3(az, Math.sin(ph) / BEAN[2])));
-					if (dot3(n, LIGHT) < 0.25) dark.push(q);
-				}
-			const sil = hull(surf);
-			const crease = (off: number) =>
-				projAll(Array.from({ length: 11 }, (_, k) => {
-					const u = -BEAN[0] * 0.78 + (BEAN[0] * 1.56 * k) / 10;
-					return at(u, Math.sin((u / (BEAN[0] * 0.78)) * Math.PI) * 0.07 + off, BEAN[2] * Math.sqrt(Math.max(0, 1 - (u / BEAN[0]) ** 2)) * 0.97);
-				}));
-			const shade = dark.length > 2 ? clipTo(hull(dark), sil) : [];
-			const top = proj(at(0, 0, 0));
-			const lifted = proj(add3(c, [0, 0, LID.z0 - 0.4 - c[2]]));
-			return {
-				key: i,
-				fill: pathOf(sil, true),
-				ink: outline(sil, { w: 0.9, heavy: 0.9, seed: 950 + i, over: 0.6 }) + stroke(crease(0), { w: 1, seed: 990 + i, over: 0.2, wobble: 0.15 }) + stroke(crease(0.06), { w: 0.45, seed: 1020 + i, over: 0, wobble: 0.1 }),
-				hatch: hatch(shade, 0.8 + (i % 3) * 0.3, 1.1, 1050 + i, { cluster: 1, trim: 0.1, bow: 0.3 }),
-				drop: r1(lifted[1] - top[1]),
-			};
-		});
 	}
 
 	/** An inked tube along world points: paper fill, lit and shade edges, twist ticks, and its hatched shadow on the desk. */
@@ -634,12 +339,6 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 		};
 	}
 
-	/** A small knot where a branch leaves a wire. */
-	function splice(at: P, lift: number, seed: number) {
-		const knot = onSheet(ellipse(at[0], at[1], 0.42, 0.34, 18), lift);
-		return { paper: pathOf(knot, true), ink: outline(knot, { w: 1, heavy: 0.6, centre: centreOf(knot), seed }) + hatch(knot, 0.9, 1, seed + 1, { cluster: 1, trim: 0 }) };
-	}
-
 	/** A box standing on the desk beside the sheet: its visible faces, hatched by how much light they get, and its cast shadow. */
 	function crate(c: Crate, seed: number) {
 		const corner = (du: number, dv: number, z: number): Point3 => sheetAt(c.u + du, c.v + dv, z - 0.02);
@@ -670,82 +369,6 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 		};
 	}
 
-	/** An index card lying on the desk, in sheet centimetres: its corner at (u, v), turned by `turn` radians. */
-	function card(c: { u: number; v: number; w: number; h: number; turn: number }, seed: number) {
-		const cu = Math.cos(c.turn);
-		const su = Math.sin(c.turn);
-		const at = (x: number, y: number): P => [c.u + x * cu - y * su, c.v + x * su + y * cu];
-		const lift = 0.04;
-		const world = (x: number, y: number, z = lift) => {
-			const [u, v] = at(x, y);
-			return sheetAt(u, v, z);
-		};
-		const pt = (x: number, y: number) => proj(world(x, y));
-		const n = 24;
-		const edge: P[] = [];
-		for (let i = 0; i < n; i++) edge.push(pt((i / n) * c.w, 0));
-		for (let i = 0; i < n; i++) edge.push(pt(c.w, (i / n) * c.h));
-		for (let i = 0; i < n; i++) edge.push(pt(c.w - (i / n) * c.w, c.h));
-		for (let i = 0; i < n; i++) edge.push(pt(0, c.h - (i / n) * c.h));
-		const castPts = [world(0, 0, 0.3), world(c.w, 0, 0.3), world(c.w, c.h, 0.3), world(0, c.h, 0.3)].map((p) => proj(shadowOnDesk(p)));
-		const cast = hull([...castPts, ...edge]);
-		const rule = (y: number, i: number) => line([pt(0.25, y), pt(c.w - 0.25, y)], { w: 0.45, seed: seed + 10 + i, over: 0 });
-		const ruled: string[] = [];
-		for (let y = 2.7, i = 0; y < c.h - 0.3; y += 1.4, i++) ruled.push(rule(y, i));
-		return {
-			cast: wash(cast, seed, 0.8, 2),
-			castHatch: hatch(cast, -0.5, 2.2, seed + 1, { cluster: 4, skip: 0.3, trim: 0.4 }),
-			paper: pathOf(edge, true),
-			ink: outline(edge, { w: 1.4, heavy: 1.1, centre: centreOf(edge), seed: seed + 2 }),
-			header: line([pt(0.2, 1.25), pt(c.w - 0.2, 1.25)], { w: 0.8, seed: seed + 3, over: 0.2 }),
-			rules: ruled.join(''),
-			/** An SVG matrix at a point on the card whose local unit is a millimetre. */
-			matrix: (x: number, y: number) => matrixOf(pt(x, y), pt(x + 0.1, y), pt(x, y + 0.1)),
-			point: pt,
-			world,
-			/** A quick pen tick at (x, y) on the card, with its length for the draw-on. */
-			tick: (x: number, y: number, k: number, s: number) => {
-				const pts = [pt(x, y - 0.1 * k), pt(x + 0.18 * k, y + 0.12 * k), pt(x + 0.55 * k, y - 0.35 * k)];
-				return { d: pathOf(pts), length: r1(lengthOf(pts) + 1), ink: stroke(pts, { w: 1.6, seed: s, over: 0.2 }) };
-			},
-		};
-	}
-
-	/** A round button in the browser bar with a circular arrow, raised off the page so it can sink. */
-	function reload(u: number, v: number, r: number, seed: number) {
-		const disc = onSheet(ellipse(u, v, r, r, 30), 0.1);
-		const side = onSheet(ellipse(u + 0.08, v + 0.1, r, r, 30));
-		const arc = onSheet(
-			Array.from({ length: 18 }, (_, i) => {
-				const a = -0.9 + (i / 17) * 4.9;
-				return [u + Math.cos(a) * r * 0.55, v + Math.sin(a) * r * 0.55] as P;
-			}),
-			0.12,
-		);
-		const tip = arc.at(-1)!;
-		const before = arc.at(-4)!;
-		const ang = Math.atan2(tip[1] - before[1], tip[0] - before[0]);
-		const head = (sg: number): P[] => [[tip[0] - Math.cos(ang + sg) * 3.2, tip[1] - Math.sin(ang + sg) * 3.2], tip];
-		const a = proj(sheetAt(u, v, 0.1));
-		const b = proj(sheetAt(u + 0.06, v + 0.08, 0));
-		return {
-			side: pathOf(side, true),
-			paper: pathOf(disc, true),
-			wash: wash(disc, seed, 0.8, 1.6),
-			ink: outline(disc, { w: 1.1, heavy: 0.8, seed: seed + 1 }) + line(arc, { w: 0.9, seed: seed + 2, over: 0 }) + stroke(head(0.5), { w: 0.9, seed: seed + 3, over: 0.3 }) + stroke(head(-0.5), { w: 0.9, seed: seed + 4, over: 0.3 }),
-			sink: `--sink-x:${r1(b[0] - a[0])}px;--sink-y:${r1(b[1] - a[1] + 0.8)}px`,
-		};
-	}
-
-	/** A dashed pencil pocket on the page: the hole a value lands in. */
-	function hole(u0: number, v0: number, u1: number, v1: number, seed: number) {
-		const box = onSheet(roundRect(u0, v0, u1, v1, 0.18), 0.02);
-		let dashes = '';
-		const pts = resample([...box, box[0]!], 2.2);
-		for (let i = 0; i + 1 < pts.length; i += 2) dashes += stroke([pts[i]!, pts[i + 1]!], { w: 0.9, seed: seed + i, over: 0, wobble: 0.1 });
-		return { paper: pathOf(box, true), dashes };
-	}
-
 	/** The margin note in the top left corner and its loose arrow to `aim`. */
 	function note(aim: P, seed: number, label: P = [2, 18]) {
 		const below = label[1] > aim[1];
@@ -764,5 +387,5 @@ export function createScene({ width, height, jar: withJar, extra, target }: Scen
 		};
 	}
 
-	return { proj, projAll, onSheet, sheetMatrix, sheetArt, shopArt, cartIcon, pageButton, spot, strike, jarArt, jarTag, jarPoint, radiusAt, beans, cord, alongSheet, crocodile, splice, crate, card, reload, hole, tag, note };
+	return { proj, projAll, onSheet, sheetMatrix, sheetArt, shopArt, spot, cord, alongSheet, crocodile, crate, tag, note };
 }

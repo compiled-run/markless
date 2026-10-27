@@ -2,8 +2,8 @@
 export const GLOSSARY = {
 	elements: 'The building blocks of a page: headings, text, buttons, inputs.',
 	events: 'Things a person does: a click, a tap, a key press.',
-	values: 'Anything that produces a result, like a number, some text or count + 1. Written inside { }.',
-	instructions: 'Lines that run in order, like let total = state(0). Written inside @{ }.',
+	values: 'Anything that produces a result, like guests.length. Written inside {\u00a0}.',
+	instructions: 'Lines that run in order, top to bottom, like let\u00a0guests\u00a0=\u00a0state([]). Written inside @{\u00a0}.',
 } as const;
 
 export type TermWord = keyof typeof GLOSSARY;

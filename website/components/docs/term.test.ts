@@ -58,6 +58,10 @@ describe('Term', () => {
 		for (const caption of Object.values(GLOSSARY)) expect(caption).not.toMatch(/[—;]/);
 	});
 
+	it('keeps each code fragment in a caption on one line', () => {
+		for (const caption of Object.values(GLOSSARY)) expect(caption).not.toMatch(/\{ |[(=] |\w = /);
+	});
+
 	it('draws with filled ink only: no filters, patterns, hrefs or dy', () => {
 		expect(source).not.toMatch(/<(filter|pattern|use)\b|\bhref=|\bdy=/);
 		for (const sketch of [sketches.elements, sketches.events]) {

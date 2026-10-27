@@ -1,101 +1,99 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { addRow, BLOCKS_START, CARD_LINES, describeBlocks, describeBuild, describeSteps, describeValues, flip, FREE_AT, nextBags, ROW_NAMES, STEP_CHIPS, STEP_LINES, VALUES_START } from './model.ts';
-import { drawing as blocksDrawing } from './blocks.ts';
-import { drawing as buildDrawing } from './build.ts';
-import { drawing as stepsDrawing } from './steps.ts';
-import { drawing as valuesDrawing } from './values.ts';
-
-const figures = {
-	build: { drawing: buildDrawing, component: 'BuildAnatomy', heading: '## Watch the page get built' },
-	values: { drawing: valuesDrawing, component: 'ValuesAnatomy', heading: '## `{ }` holds a value' },
-	steps: { drawing: stepsDrawing, component: 'StepsAnatomy', heading: '## `@{ }` holds instructions, run top to bottom' },
-	blocks: { drawing: blocksDrawing, component: 'BlocksAnatomy', heading: '## Blocks that start with `@`' },
-} as const;
+import { BODY, describeMarks, figureOf, flip, LINES, SAID, SOURCE, VALUES } from './model.ts';
+import { drawing } from './marks.ts';
+import { tokensOf } from './tokens.ts';
 
 const page = readFileSync(new URL('../../../pages/start/reading-tsrx.mdx', import.meta.url), 'utf8');
-const piece = (name: string) => readFileSync(new URL(`./${name}-anatomy.tsrx`, import.meta.url), 'utf8');
-const arts = Object.fromEntries(Object.entries(figures).map(([name, figure]) => [name, figure.drawing()]));
+const piece = readFileSync(new URL('./printout-anatomy.tsrx', import.meta.url), 'utf8');
+const tokens = await tokensOf();
+const art = drawing(tokens);
 
-describe('the four figures on the reading page', () => {
-	it.each(Object.keys(figures))('%s: one margin note, reduced motion respected, a tour that stops on touch, Escape and a live sentence', (name) => {
-		const source = piece(name);
-		expect(source.match(/class="hand/g)).toHaveLength(1);
-		expect(source).toContain('WIRED BEFORE THE PAGE RAN');
-		expect(source).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
-		expect(source).toContain('if (!seen || touched) return;');
-		expect(source).toContain("event.key === 'Escape'");
-		expect(source).toContain('aria-live="polite"');
-		expect(source).toContain('<figcaption class="sr">');
+describe('the marked-up printout', () => {
+	it('prints a short file with every kind of { } plus @for and @if', () => {
+		expect(LINES.length).toBeLessThanOrEqual(15);
+		expect(SOURCE).toContain('@for (');
+		expect(SOURCE).toContain('@if (');
+		expect(VALUES.map((value) => value.text)).toEqual(["{name === 'Ada' ? 'host' : ''}", '{name}', '{clear}']);
+		for (const value of VALUES) expect(LINES[value.line]!.text).toContain(value.text);
+		expect(LINES[BODY.from - 1]!.text.endsWith('@{')).toBe(true);
+		expect(LINES[BODY.to + 1]!.text).toBe('}');
 	});
 
-	it.each(Object.entries(figures))('%s: sits under its own heading on the page', (name, figure) => {
-		expect(page).toContain(`import ${figure.component} from '../../components/figures/reading/${name}-anatomy.tsrx';`);
-		const at = page.indexOf(figure.heading);
-		expect(at).toBeGreaterThan(-1);
-		expect(at).toBeLessThan(page.indexOf(`<${figure.component} />`));
+	it('colours the printed text the way the site colours code', () => {
+		expect(tokens.flat().map((token) => token.content).join('')).toBe(SOURCE.replaceAll('\n', ''));
+		const pieces = art.lines.flatMap((line) => line.pieces);
+		expect(pieces.find((p) => p.text === '@for')?.tint).toMatch(/^--c:#/);
+		expect(pieces.map((p) => p.text).join('').replaceAll(' ', '')).toBe(LINES.map((line) => line.text).join('').replaceAll(' ', ''));
 	});
 
-	it.each(Object.entries(figures))('%s: draws the same scene every time', (name, figure) => {
-		expect(JSON.stringify(figure.drawing())).toBe(JSON.stringify(arts[name]));
-	});
-
-	it('never uses the word slot on the page', () => {
-		expect(page).not.toMatch(/\bslots?\b/i);
-	});
-});
-
-describe('build: the card runs, then the value lands', () => {
-	it('has two lines, the last one putting the button on the page', () => {
-		expect(CARD_LINES).toHaveLength(2);
-		expect(CARD_LINES.at(-1)).toContain('button');
-		expect(describeBuild(true)).toContain('top to bottom');
-		expect(piece('build')).toContain("{'{bags}'}");
-	});
-});
-
-describe('values: three holes on one button', () => {
-	it('wires the number and the title, and the click runs back into the jar', () => {
-		const source = piece('values');
-		expect(source.match(/class="pulse to-page"/g)).toHaveLength(2);
-		expect(source.match(/class="pulse to-jar"/g)).toHaveLength(1);
-		for (const tag of ["{'{bags}'}", "{'title={…}'}", "{'onClick={…}'}"]) expect(source).toContain(tag);
-		expect(nextBags(VALUES_START)).toBe(VALUES_START + 1);
-		expect(nextBags(9)).toBe(VALUES_START);
-		expect(describeValues(3, true)).toBe('Clicked. The button shows 3 bags and its title says Add bag 4.');
+	it('marks every value and labels each one, with one bracket of instructions', () => {
+		const { swipes, notes } = art.marks.overview;
+		expect(swipes.filter((swipe) => !swipe.desk)).toHaveLength(VALUES.length);
+		expect(notes.filter((note) => note.text === 'value')).toHaveLength(VALUES.length);
+		expect(notes.map((note) => note.text)).toContain('instructions');
 		expect(flip('odd')).toBe('even');
 	});
-});
 
-describe('steps: four lines run in order', () => {
-	it('leaves one value on the desk for each of the first three lines, and the last shows the receipt', () => {
-		expect(STEP_LINES).toHaveLength(4);
-		expect(STEP_CHIPS.map(([name]) => name)).toEqual(['price', 'bags', 'total']);
-		expect(Number(STEP_CHIPS[0][1]) * Number(STEP_CHIPS[1][1])).toBe(Number(STEP_CHIPS[2][1]));
-		expect(describeSteps(true)).toContain('the last line put the receipt on the page');
+	it('notes what each value produces', () => {
+		expect(art.marks.values.swipes).toHaveLength(VALUES.length);
+		expect(art.marks.values.notes.map((note) => note.text)).toEqual(['Ada, then Grace', "'host' for Ada,", 'empty for Grace', 'a function, run on click']);
 	});
-});
 
-describe('blocks: rows per bag and a flap at three', () => {
-	it('adds a row per press, wraps after the last row, and opens the flap from three bags', () => {
-		expect(addRow(BLOCKS_START)).toBe(BLOCKS_START + 1);
-		expect(addRow(ROW_NAMES.length)).toBe(1);
-		expect(FREE_AT).toBe(3);
-		expect(describeBlocks(3, true)).toBe('Added a bag. The list shows 3 rows, and the Free shipping flap is open.');
-		expect(describeBlocks(2, false)).toBe('The list shows 2 rows, and the Free shipping flap is shut.');
-		const source = piece('blocks');
-		expect(source).toContain('>@for</text>');
-		expect(source).toContain('>@if</text>');
+	it('numbers the instructions in run order and brackets the last one as what shows up', () => {
+		const texts = art.marks.steps.notes.map((note) => note.text);
+		expect(texts.filter((text) => /^\d$/.test(text))).toEqual(['1', '2', '3']);
+		expect(texts).toContain('runs in this order');
+		expect(texts).toContain('this is what shows up');
+		expect(LINES[3]!.text).toBe('<section>');
+		expect(art.marks.steps.swipes).toHaveLength(0);
 	});
-});
 
-describe('frozen art', () => {
-	it.each(Object.keys(figures))('freezes the %s drawing into a plain-data module the compiler can read (run with -u after editing)', async (name) => {
-		const module = `// Written by reading.test.ts from ${name}.ts. Run \`vp test -u\` to refresh.
-import type { drawing } from './${name}.ts';
+	it('boxes @for and @if with what each does, beside what the page shows', () => {
+		const texts = art.marks.blocks.notes.map((note) => note.text);
+		expect(texts).toEqual(expect.arrayContaining(['once per guest', 'only when', "no one's going", 'Ada', 'Grace', 'Clear']));
+		expect(art.marks.blocks.slips).toHaveLength(1);
+	});
 
-export const art: ReturnType<typeof drawing> = ${JSON.stringify(arts[name], null, '\t')};
+	it('says what each mark-up shows, and says so again on a replay', () => {
+		for (const figure of ['overview', 'values', 'steps', 'blocks'] as const) {
+			expect(figureOf(figure)).toBe(figure);
+			expect(describeMarks(figure, true)).toBe('Marked up again. ' + SAID[figure]);
+		}
+		expect(figureOf('nonsense')).toBe('overview');
+	});
+
+	it('respects reduced motion, stops its tour on touch, resets on Escape and speaks each change', () => {
+		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
+		expect(piece).toContain('if (!seen || touched) return;');
+		expect(piece).toContain("event.key === 'Escape'");
+		expect(piece).toContain('aria-live="polite"');
+		expect(piece).toContain('<figcaption class="sr">');
+	});
+
+	it.each([
+		['overview', '## Mark up a whole file'],
+		['values', '## `{ }` holds a value'],
+		['steps', '## `@{ }` holds instructions, run top to bottom'],
+		['blocks', '## Blocks that start with @'],
+	])('puts the %s mark-up under its heading on a page that never says slot', (figure, heading) => {
+		expect(page).toContain("import PrintoutAnatomy from '../../components/figures/reading/printout-anatomy.tsrx';");
+		const at = page.indexOf(`<PrintoutAnatomy figure="${figure}" />`);
+		expect(at).toBeGreaterThan(page.indexOf(heading));
+		expect(page.match(new RegExp(`figure="${figure}"`, 'g'))).toHaveLength(1);
+		expect(page).not.toMatch(/\bslots?\b/i);
+	});
+
+	it('draws the same scene every time', () => {
+		expect(JSON.stringify(drawing(tokens))).toBe(JSON.stringify(art));
+	});
+
+	it('freezes the drawing into a plain-data module the compiler can read (run with -u after editing)', async () => {
+		const module = `// Written by reading.test.ts from marks.ts. Run \`vp test -u\` to refresh.
+import type { drawing } from './marks.ts';
+
+export const art: ReturnType<typeof drawing> = ${JSON.stringify(art, null, '\t')};
 `;
-		await expect(module).toMatchFileSnapshot(`./${name}.art.ts`);
+		await expect(module).toMatchFileSnapshot('./printout.art.ts');
 	});
 });

@@ -1,56 +1,61 @@
-// The words on the instruction card and the sentence the build figure's live region speaks.
-export const SHOP = 'Beanshop';
-export const PRODUCT = 'House blend · 250 g';
-export const PRICE = '$14';
-export const START = 2;
-/** The card's lines, in the order the `@{ }` body runs them. */
-export const CARD_LINES = ['bags starts at 2', 'show a button with bags in it'] as const;
-/** Each press flips the beat, so the press animations restart. */
+// The guest-list file the reading figures print and mark up, and what each figure's live region says.
+
+/** One printed line: how many indent steps it sits in, and its text. */
+export interface Line {
+	readonly indent: number;
+	readonly text: string;
+}
+
+export const LINES: readonly Line[] = [
+	{ indent: 0, text: 'export default function GuestList() @{' },
+	{ indent: 1, text: "let guests = state(['Ada', 'Grace']);" },
+	{ indent: 1, text: 'const clear = () => (guests = []);' },
+	{ indent: 1, text: '<section>' },
+	{ indent: 2, text: '@for (const name of guests; key name) {' },
+	{ indent: 3, text: "<p class={name === 'Ada' ? 'host' : ''}>" },
+	{ indent: 4, text: '{name}' },
+	{ indent: 3, text: '</p>' },
+	{ indent: 2, text: '}' },
+	{ indent: 2, text: '@if (guests.length === 0) {' },
+	{ indent: 3, text: '<p>No one yet</p>' },
+	{ indent: 2, text: '}' },
+	{ indent: 2, text: '<button onClick={clear}>Clear</button>' },
+	{ indent: 1, text: '</section>' },
+	{ indent: 0, text: '}' },
+];
+
+/** The file as it is printed, with a tab per indent step, so a highlighter can colour it. */
+export const SOURCE = LINES.map((line) => '\t'.repeat(line.indent) + line.text).join('\n');
+
+/** Every `{ }` in the markup, as the text it highlights on its line. */
+export const VALUES: readonly { readonly line: number; readonly text: string }[] = [
+	{ line: 5, text: "{name === 'Ada' ? 'host' : ''}" },
+	{ line: 6, text: '{name}' },
+	{ line: 12, text: '{clear}' },
+];
+
+/** The lines the `@{ }` body spans, first and last, by index into LINES. */
+export const BODY = { from: 1, to: 13 } as const;
+
 export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
-export const BUILD_TOUR = ['run', 'rest', 'rest'] as const;
+export const MARK_TOUR = ['mark', 'rest', 'rest'] as const;
 
-export function describeBuild(ran: boolean): string {
-	return ran
-		? `Reloaded. The card's two lines ran top to bottom: bags started at ${START}, then the button went on the page with ${START} in its hole.`
-		: `The page shows a button reading ${START} bags.`;
-}
+export type Figure = 'overview' | 'values' | 'steps' | 'blocks';
 
-export const VALUES_START = 2;
-const VALUES_LAST = 9;
-export const nextBags = (bags: number) => (bags >= VALUES_LAST ? VALUES_START : bags + 1);
-export const VALUES_TOUR = ['add', 'add', 'rest', 'rest', 'reset'] as const;
+/** What each mark-up shows, in plain words: the figure's caption for screen readers, and what the live region says after a replay. */
+export const SAID: Record<Figure, string> = {
+	overview:
+		"Every pair of braces in the markup has a yellow highlighter swipe and a note saying value: {name === 'Ada' ? 'host' : ''} in the class attribute, {name} inside the paragraph, and {clear} on the Clear button. A pen bracket runs down the left margin beside the whole component body, labelled instructions. A legend on the desk reads: yellow swipe equals value, written in { }; bracket equals instructions, written in @{ }.",
+	values:
+		"Each value is highlighted with a note saying what it produces: the class attribute gives 'host' for Ada and an empty string for Grace, {name} gives Ada, then Grace, and {clear} gives a function that runs on click.",
+	steps:
+		'The body is numbered in the order it runs, with a note on the desk saying runs in this order: 1, let guests; 2, const clear; 3, the section element. A bracket down the right side of the section, from its opening tag to its closing tag, is labelled this is what shows up.',
+	blocks:
+		"The @for block is boxed and labelled once per guest. The @if block is boxed and labelled only when no one's going. A slip on the desk, labelled on the page, shows what the file draws: Ada, Grace and a Clear button.",
+};
 
-export function describeValues(bags: number, added: boolean): string {
-	const now = `The button shows ${bags} bags and its title says Add bag ${bags + 1}.`;
-	return added ? `Clicked. ${now}` : now;
-}
+export const figureOf = (name: string): Figure => (name === 'values' || name === 'steps' || name === 'blocks' ? name : 'overview');
 
-/** The receipt card's lines, in the order the `@{ }` body runs them. */
-export const STEP_LINES = ['price is 14', 'bags is 3', 'total is price × bags', 'show the receipt'] as const;
-/** What the first three lines leave on the desk: a name, then its value. */
-export const STEP_CHIPS = [
-	['price', '14'],
-	['bags', '3'],
-	['total', '42'],
-] as const;
-export const STEPS_TOUR = ['run', 'rest', 'rest'] as const;
-
-export function describeSteps(ran: boolean): string {
-	return ran
-		? 'Reloaded. The four lines ran top to bottom: price became 14, bags became 3, total became 42, and the last line put the receipt on the page.'
-		: 'The page shows a receipt: 3 bags at 14 dollars, total 42 dollars.';
-}
-
-/** The cart rows the @for figure can show, one per bag. */
-export const ROW_NAMES = ['House blend', 'Dark roast', 'Decaf', 'Espresso'] as const;
-export const BLOCKS_START = 2;
-/** Shipping is free from this many bags. */
-export const FREE_AT = 3;
-export const addRow = (bags: number) => (bags >= ROW_NAMES.length ? 1 : bags + 1);
-export const BLOCKS_TOUR = ['add', 'rest', 'add', 'rest', 'add', 'rest', 'add', 'rest'] as const;
-
-export function describeBlocks(bags: number, added: boolean): string {
-	const rows = `The list shows ${bags} ${bags === 1 ? 'row' : 'rows'}`;
-	const flap = bags >= FREE_AT ? 'and the Free shipping flap is open.' : 'and the Free shipping flap is shut.';
-	return `${added ? 'Added a bag. ' : ''}${rows}, ${flap}`;
+export function describeMarks(figure: Figure, again: boolean): string {
+	return (again ? 'Marked up again. ' : '') + SAID[figure];
 }

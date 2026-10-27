@@ -16,7 +16,6 @@ export const CLIP = { rear: [17.2, 7.3] as P, tip: [14.6, 8.85] as P };
 const scene = createScene({
 	width: WIDTH,
 	height: HEIGHT,
-	jar: false,
 	extra: [
 		[PARCEL.u + PARCEL.w - 1.6 + 0.6, PARCEL.v - 8.8, 0],
 		[PARCEL.u + PARCEL.w - 1.6 + 0.6, PARCEL.v + PARCEL.d - 8.8, 0],

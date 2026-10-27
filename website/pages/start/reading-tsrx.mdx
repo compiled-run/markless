@@ -3,10 +3,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import BuildAnatomy from '../../components/figures/reading/build-anatomy.tsrx';
-import ValuesAnatomy from '../../components/figures/reading/values-anatomy.tsrx';
-import StepsAnatomy from '../../components/figures/reading/steps-anatomy.tsrx';
-import BlocksAnatomy from '../../components/figures/reading/blocks-anatomy.tsrx';
+import PrintoutAnatomy from '../../components/figures/reading/printout-anatomy.tsrx';
 
 <Sidebar />
 
@@ -18,58 +15,55 @@ import BlocksAnatomy from '../../components/figures/reading/blocks-anatomy.tsrx'
 
 <Subtitle text="Every .tsrx file is made of two things: values and instructions." terms="values instructions" />
 
-```tsrx title="cart.tsrx"
+```tsrx title="guest-list.tsrx"
 import { state } from '@markless/core';
 
-export default function Cart() @{
-	let bags = state(2);
+export default function GuestList() @{
+	let guests = state(['Ada', 'Grace']);
 
-	<button onClick={() => bags++}>{bags} bags</button>
+	<h2>{guests.length} going</h2>
 }
 ```
 
-`{ }` holds a value. `@{ }` holds instructions.
+`{ }` holds a **value**: `{guests.length}` becomes `2`. `@{ }` holds **instructions**: they run top to bottom, and the last one is what shows up.
 
-## Watch the page get built
+## Mark up a whole file
 
-The card is the `@{ }`: its lines run once, top to bottom, and the last one puts the button on the page. The dashed hole is `{bags}`, where the value lands. Press reload to run it again.
+Here's a fuller guest list, printed and marked up: yellow for every value, a bracket for the instructions. Press it to watch the marks go on again.
 
-<BuildAnatomy />
-
-## Values and instructions
-
-A **value** is an *expression*: anything that produces a result. `{total}`, `{bags * 14}`, `{isOpen ? 'Close' : 'Open'}` and `onClick={() => total++}` each hold one. If it could go after `let x =`, it's an expression.
-
-An **instruction** is a *statement*: a line that runs. `let total = state(0);`, `const price = computed(() => bags * 14);`, `@if (…) { … }` and `@for (const bag of bags; key bag.id) { … }` are statements.
-
-Statements usually contain expressions: in `let total = state(0)`, the `state(0)` part is an expression, and in `@if (bags > 3)`, `bags > 3` is.
+<PrintoutAnatomy figure="overview" />
 
 ## `{ }` holds a value
 
-Braces hold one expression. Put them in the text between tags, in an attribute, or hand an element a function to run.
+A value is an *expression*: anything that produces a result. If it fits after `let x =`, it's an expression. One per pair of braces, and it can go:
 
-The jar is `bags`. Each wire ends at a hole: the button's number, the number in its title, and its click. Press the button: the click runs into the jar, and the new value runs out into both holes.
+- in text: `<p>{name}</p>`
+- in an attribute: `class={name === 'Ada' ? 'host' : ''}`
+- as a handler: `onClick={clear}`
 
-<ValuesAnatomy />
+<PrintoutAnatomy figure="values" />
 
-<Code steps={[{ label: 'Click Add a bag. Three spots change, nothing else does.', rewrites: 3 }, { label: 'Make a bag cost `16` instead of `14`.', source: 'bags * 16' }]}>
-```tsrx title="bean-card.tsrx"
+<Code steps={[{ label: 'Click RSVP. All three values change.', shows: 'See you there' }, { label: "Change `'Coming?'` to `'Are you in?'`.", source: 'Are you in?' }]}>
+```tsrx title="rsvp.tsrx"
 import { state } from '@markless/core';
 
-export default function BeanCard() @{
-	let bags = state(1);
+export default function Rsvp() @{
+	let going = state(false);
 
-	<article>
-		<h2>House blend</h2>
-		<p>{bags} {bags === 1 ? 'bag' : 'bags'}</p>
-		<p>{bags * 14} dollars</p>
+	<section>
+		<style>
+			.yes {
+				font-weight: bold;
+			}
+		</style>
+		<h2>{going ? 'See you there' : 'Coming?'}</h2>
 		<button
-			title={'Add bag number ' + (bags + 1)}
-			onClick={() => bags++}
+			class={going ? 'yes' : 'maybe'}
+			onClick={() => (going = !going)}
 		>
-			Add a bag
+			{going ? 'Going' : 'RSVP'}
 		</button>
-	</article>
+	</section>
 }
 ```
 </Code>
@@ -77,106 +71,81 @@ export default function BeanCard() @{
 <Callout
 	sprite="cross"
 	title="Why can't I call my own function in { }?"
-	text="Braces show plain reads, maths and method calls, like {bags * 14} or {name.toUpperCase()}. A function you wrote, as in {format(total)}, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Work it out with computed() and show that instead."
+	text="Braces show plain reads, maths and method calls, like {guests.length} or {name.toUpperCase()}. A function you wrote, as in {format(guest)}, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Work it out with computed() and show that instead."
 />
 
 ## `@{ }` holds instructions, run top to bottom
 
-Statements first, then the one element that shows up. There's no `return`. To show several elements, wrap them in `<>` and `</>`, which adds nothing to the page.
+An instruction is a *statement*: a line that runs, like `let guests = state([])` or `@if (…) { … }`. Most hold a value, such as [`state([])`](/concepts/state) or [`computed(() => …)`](/concepts/computed).
 
-Each line on the card is a statement. Reload: they run from the top, the first three leave a value on the desk, and the last one puts the receipt on the page.
+<PrintoutAnatomy figure="steps" />
 
-<StepsAnatomy />
+- Statements first, then one element. No `return`.
+- Several elements? Wrap them in `<>` and `</>`.
+- Need a few more steps among the elements? Open another `@{ }`.
 
-<Code note="After </section>, add <p>Thanks!</p> and read the build error. Then wrap both in <> and </>.">
-```tsrx title="receipt.tsrx"
-export default function Receipt() @{
-	const price = 14;
-	const bags = 3;
-	const total = price * bags;
+<Code note="After </section>, add <p>See you!</p> and read the build error. Then wrap both in <> and </>.">
+```tsrx title="party.tsrx"
+export default function Party() @{
+	const guests = ['Ada', 'Grace', 'Linus'];
+	const host = guests[0];
 
 	<section>
-		<p>{bags} bags at {price} dollars</p>
+		<p>Hosted by {host}</p>
 		@{
-			const tip = total / 10;
-			<p>Tip: {tip} dollars</p>
+			const others = guests.length - 1;
+			<p>Plus {others} guests</p>
 		}
-		<p>Total: {total} dollars</p>
 	</section>
 }
 ```
 </Code>
 
-A second element at the end, or a statement after it, stops the build with `MARKLESS_PARSE_ERROR`. A nested `@{ }` works inside an element, but not straight inside a top-level `<>` yet.
+- Two elements at the end, or a statement after the element, stops the build with `MARKLESS_PARSE_ERROR`.
+- A nested `@{ }` doesn't work straight inside a top-level `<>` yet.
+- Already use TypeScript? It works here too.
 
-Already use TypeScript? It works here too.
+## Blocks that start with @
 
-## Blocks that start with `@`
+Parentheses hold a value; braces hold instructions.
 
-A line that starts with `@` among the elements is a block. Its parentheses hold a value. Its braces hold instructions.
+| Block | What it does |
+| --- | --- |
+| `@if` / `@else` | show this or that |
+| `@for` / `@empty` | once per item |
+| `@switch` / `@case` | pick one |
+| `@try` / `@pending` / `@catch` | wait for a slow value ([Async](/concepts/async)) |
 
-The list is an `@for`: one row per bag. The flap is an `@if`: it opens once there are three bags. Press Add a bag and watch both.
+<PrintoutAnatomy figure="blocks" />
 
-<BlocksAnatomy />
+<Code steps={[{ label: "Add `'Linus'` to the list. `@for` draws one more line.", source: 'Linus' }, { label: 'Click Clear. The `@if` line shows up.', shows: 'No one yet' }]}>
+```tsrx title="guest-list.tsrx"
+import { state } from '@markless/core';
 
-- `@if (…) { … } @else { … }` shows one side or the other.
-- `@for (const bag of bags; key bag.id) { … } @empty { … }` repeats once per item.
-- `@switch (…) { @case …: { … } @default: { … } }` picks one case.
-- `@try { … } @pending { … } @catch { … }` waits for a slow value. See [Async](/concepts/async).
-
-<Code steps={[{ label: 'Click Add a decaf until shipping is free.', shows: 'Free shipping!' }, { label: 'Click Empty the cart. The `@empty` row takes over.', shows: 'Your cart is empty.' }]}>
-```tsrx title="cart-list.tsrx"
-import { computed, state } from '@markless/core';
-
-export default function CartList() @{
-	let bags = state([
-		{ id: 'house', name: 'House blend' },
-		{ id: 'dark', name: 'Dark roast' },
-	]);
-	const left = computed(() => 3 - bags.length);
+export default function GuestList() @{
+	let guests = state(['Ada', 'Grace']);
 
 	<section>
-		<ul>
-			@for (const bag of bags; key bag.id) {
-				<li>{bag.name}</li>
-			} @empty {
-				<li>Your cart is empty.</li>
-			}
-		</ul>
-		@if (left <= 0) {
-			<p>Free shipping!</p>
-		} @else {
-			<p>Add {left} more for free shipping.</p>
+		<h2>{guests.length} going</h2>
+		@for (const name of guests; key name) {
+			<p>{name}</p>
 		}
-		<button
-			onClick={() =>
-				(bags = [
-					...bags,
-					{
-						id: 'decaf' + bags.length,
-						name: 'Decaf',
-					},
-				])
-			}
-		>
-			Add a decaf
-		</button>
-		<button onClick={() => (bags = [])}>
-			Empty the cart
+		@if (guests.length === 0) {
+			<p>No one yet</p>
+		}
+		<button onClick={() => (guests = [])}>
+			Clear
 		</button>
 	</section>
 }
 ```
 </Code>
 
-Today, an `@if` or `@switch` can't sit inside another `@if`, and a `const` at the top of an `@try` body doesn't work yet.
-
-## Calls that set how a value behaves
-
-- `state(2)` makes a value the page keeps up with. [State](/concepts/state)
-- `computed(() => bags * 14)` works a value out from others. [Computed](/concepts/computed)
-- `element()` gives you a handle to a real element. [Reach a real element](/build/elements)
+- An `@if` or `@switch` can't sit inside another `@if` yet.
+- A `const` at the top of an `@try` body doesn't work yet.
 
 ## Where to go next
 
-[State](/concepts/state), then [Events](/concepts/events).
+- [State](/concepts/state)
+- [Computed](/concepts/computed)
+- [Events](/concepts/events)
