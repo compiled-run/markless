@@ -4,6 +4,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import PrintoutAnatomy from '../../components/figures/reading/printout-anatomy.tsrx';
+import SketchAnatomy from '../../components/figures/reading/sketch-anatomy.tsrx';
 
 <Sidebar />
 
@@ -31,7 +32,7 @@ export default function GuestList() @{
 
 Here's a fuller guest list, printed and marked up: yellow for every value, a bracket for the instructions. Press it to watch the marks go on again.
 
-<PrintoutAnatomy figure="overview" />
+<PrintoutAnatomy />
 
 ## `{ }` holds a value
 
@@ -41,7 +42,7 @@ A value is an *expression*: anything that produces a result. If it fits after `l
 - in an attribute: `class={name === 'Ada' ? 'host' : ''}`
 - as a handler: `onClick={clear}`
 
-<PrintoutAnatomy figure="values" />
+<SketchAnatomy figure="values" />
 
 <Code steps={[{ label: 'Click RSVP. All three values change.', shows: 'See you there' }, { label: "Change `'Coming?'` to `'Are you in?'`.", source: 'Are you in?' }]}>
 ```tsrx title="rsvp.tsrx"
@@ -78,7 +79,7 @@ export default function Rsvp() @{
 
 An instruction is a *statement*: a line that runs, like `let guests = state([])` or `@if (…) { … }`. Most hold a value, such as [`state([])`](/concepts/state) or [`computed(() => …)`](/concepts/computed).
 
-<PrintoutAnatomy figure="steps" />
+<SketchAnatomy figure="steps" />
 
 - Statements first, then one element. No `return`.
 - Several elements? Wrap them in `<>` and `</>`.
@@ -116,7 +117,7 @@ Parentheses hold a value; braces hold instructions.
 | `@switch` / `@case` | pick one |
 | `@try` / `@pending` / `@catch` | wait for a slow value ([Async](/concepts/async)) |
 
-<PrintoutAnatomy figure="blocks" />
+<SketchAnatomy figure="blocks" />
 
 <Code steps={[{ label: "Add `'Linus'` to the list. `@for` draws one more line.", source: 'Linus' }, { label: 'Click Clear. The `@if` line shows up.', shows: 'No one yet' }]}>
 ```tsrx title="guest-list.tsrx"
