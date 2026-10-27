@@ -136,6 +136,7 @@ jobs:
             - name: Typecheck on TypeScript 7.1
               run: pnpm typecheck:ts7
 
+            # website/vitest.config.ts, the same config `pnpm --dir website test` uses.
             - name: Run the website tests
               run: pnpm --dir website exec vp test run
 
