@@ -42,7 +42,6 @@ export type {
 } from './request-files.ts';
 export { navigate } from './navigate.ts';
 export type { NavigateOptions } from './navigate.ts';
-export { startRouteUpdateRenderer } from './route-renderer.ts';
 // Consumed by the published vite-plugin client entry (src/vite/entries/
 // client-entry.ts), which can only reach this module through the package's
 // root export once installed from npm.

@@ -7,8 +7,8 @@ import {
 	buildRouteManifestFromFileIds,
 	ensureNavigationRuntime,
 	matchRouteManifest,
-	startRouteUpdateRenderer,
 } from '@markless/router';
+import { startRouteUpdateRenderer } from '@markless/router/vite/runtime/route-renderer';
 import { preloadRouteModule } from 'virtual:markless-router/route-preloads';
 import { documentNavigation, startLinkIntentPreloading } from 'virtual:markless-router/options';
 
