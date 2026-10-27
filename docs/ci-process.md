@@ -178,7 +178,7 @@ What changed, and the rule going forward:
 
 - The screen-reader family jobs install from the npm registry with no pnpm store cache. Their virtual lane reads with the runner's Chrome and downloads no browser.
 - Box lanes whose boxes only use witness's browser (router, both music players) restore no Playwright browser or system packages: witness drives the runner image's Google Chrome. `boxes-bundler` (its analyzer measurement), `website-boxes` (the mug studio box), `demo-boxes`, `perf-guards`, `unit` and `browser` launch Playwright's Chromium and keep the restore.
-- `prepare-playwright` looks the browser cache up instead of restoring it, and skips the pnpm store cache.
+- `lanes` looks up the browser and system-package caches, and `prepare-playwright` runs only when one of them is missing, so on a warm cache the browser lanes start as soon as `lanes` and `typecheck` finish instead of queuing for a job that would only confirm both caches exist (a median 10.7 minutes of queue on 2026-10-26 for a 10-second lookup). When it runs, it skips the pnpm store cache.
 - `cache-cleanup.yml` deletes a pull request's caches when it closes, and a daily sweep deletes caches of closed pull requests and deleted branches and every main tool cache but the newest per key. Dry run against 2026-10-23: 232 of 722 entries, 6.6 of 10.6 GB.
 - A new cache step needs a reason it pays for itself: what one restore costs, how many jobs restore it per run, and what it saves over downloading. A cache restored by a large matrix is the first suspect.
 
