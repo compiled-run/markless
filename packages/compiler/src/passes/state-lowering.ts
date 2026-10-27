@@ -78,21 +78,10 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 				);
 				continue;
 			}
-			const staticExpressionReadSource = templateExpressionGraphReadSource(
-				read.source,
-				lookup,
-			);
-			if (staticExpressionReadSource) {
-				diagnostics.push(
-					templateExpressionStaticDiagnostic({
-						source: read.source,
-						readSource: staticExpressionReadSource,
-						sourceSpan: read.sourceSpan,
-						filename: input.semanticGraph.filename,
-					}),
-				);
-				continue;
-			}
+			// A keyed row's slot is live when the row mints; the row-mint check reports the rows that do not.
+			if (read.keyedRepeatId) continue;
+			const diagnostic = staticTemplateReadDiagnostic(input.semanticGraph, read);
+			if (diagnostic) diagnostics.push(diagnostic);
 			continue;
 		}
 
@@ -742,6 +731,28 @@ function resolveStateGraphPath(
 	if (sharedDefinitionId) return null;
 
 	return resolveSharedInstanceGraphPath(source, input.semanticGraph, componentName);
+}
+
+export function staticTemplateReadDiagnostic(
+	semanticGraph: StateLoweringInput['semanticGraph'],
+	read: StateLoweringInput['semanticGraph']['templateReads'][number],
+): StateLoweringDiagnostic | null {
+	if (read.computedGraphNodeId) return null;
+	const lookup = {
+		bindings: graphBindingMap(semanticGraph, null, read.componentName),
+		aliases: semanticAliasMap(semanticGraph, null, read.componentName),
+	};
+	if (resolveGraphPath(optionalMemberReadSource(read.source), lookup.bindings, lookup.aliases))
+		return null;
+	const readSource = templateExpressionGraphReadSource(read.source, lookup);
+	return readSource
+		? templateExpressionStaticDiagnostic({
+				source: read.source,
+				readSource,
+				sourceSpan: read.sourceSpan,
+				filename: semanticGraph.filename,
+			})
+		: null;
 }
 
 function templateExpressionStaticDiagnostic({
