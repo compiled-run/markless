@@ -19,6 +19,7 @@ type VirtualCodeSnapshot = {
 export const MARKLESS_TSRX_LANGUAGE_ID = 'markless-tsrx';
 export const MARKLESS_TSRX_EXTENSIONS = ['.tsrx'];
 export const MARKLESS_TSRX_PARSE_ERROR_CODE = 91001;
+export const MARKLESS_TSRX_COMPILER_WARNING_CODE = 91002;
 
 export type MarklessTsrxParseFailure = {
 	readonly message: string;

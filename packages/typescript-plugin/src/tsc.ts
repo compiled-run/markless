@@ -19,6 +19,7 @@ import {
 	clearMarklessCompileErrors,
 	createMarklessTypecheckLanguagePlugin,
 	formatMarklessCompileError,
+	formatMarklessCompilerWarnings,
 	marklessCompileErrors,
 } from './typecheck.ts';
 
@@ -68,10 +69,17 @@ export function runMarklessTsc(argv: readonly string[]): void {
 			// Runs while the program is still being assembled, so a root added here is checked.
 			addMarklessJsxContract(programOptions.rootNames);
 			return [
-				createMarklessTypecheckLanguagePlugin(typescript, (error, source) => {
-					const line = formatMarklessCompileError(error, source, process.cwd());
-					process.stderr.write(`${line}\n`);
-				}),
+				createMarklessTypecheckLanguagePlugin(
+					typescript,
+					(error, source) => {
+						const line = formatMarklessCompileError(error, source, process.cwd());
+						process.stderr.write(`${line}\n`);
+					},
+					(fileName, source) => {
+						for (const line of formatMarklessCompilerWarnings(fileName, source, process.cwd()))
+							process.stderr.write(`${line}\n`);
+					},
+				),
 			];
 		},
 	);
