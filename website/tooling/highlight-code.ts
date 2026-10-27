@@ -105,29 +105,41 @@ function escapeText(text: string): string {
 }
 
 /**
- * The site's one hover shape: `data-doc-title` is the line shown in bold,
+ * The site's one hover shape: `data-doc-title` is the line shown first,
  * `data-doc` the sentence under it, and the inline `.tsrx-tip` is what a reader
  * without a pointer sees. A token with no sentence gets a title-only tip rather
- * than an empty padded strip.
+ * than an empty padded strip. `titleHtml` is the title as markup, already escaped.
  */
-function hoverMarkup(rendered: string, title: string, doc: string, label: string): string {
+function hoverMarkup(
+	rendered: string,
+	title: string,
+	titleHtml: string,
+	doc: string,
+	label: string,
+): string {
 	return [
 		'<span class="tsrx-hover" tabindex="0" role="img"',
 		` aria-label="${escapeAttribute(label)}"`,
 		` data-doc-title="${escapeAttribute(title)}" data-doc="${escapeAttribute(doc)}">`,
 		rendered,
 		'<span class="tsrx-tip" aria-hidden="true">',
-		`<span class="tsrx-tip-title">${escapeText(title)}</span>`,
-		`<span class="tsrx-tip-body">${escapeText(doc)}</span>`,
+		`<span class="tsrx-tip-title">${titleHtml}</span>`,
+		`<span class="tsrx-tip-body">${docHtml(doc)}</span>`,
 		'</span></span>',
 	].join('');
+}
+
+/** A doc sentence as markup: its backticked names in the code face. */
+function docHtml(doc: string): string {
+	return escapeText(doc).replace(/`([^`]+)`/g, '<span class="tsrx-tip-code">$1</span>');
 }
 
 function hoverSpan(token: string, rendered: string): string {
 	const doc = docForToken(token);
 	if (!doc) return rendered;
 	const title = tooltipTitle(token, doc);
-	return hoverMarkup(rendered, title, doc.doc, tooltipLabel(token, doc));
+	const titleHtml = `<span class="tsrx-tip-code">${escapeText(token)}</span>${escapeText(title.slice(token.length))}`;
+	return hoverMarkup(rendered, title, titleHtml, doc.doc, tooltipLabel(token, doc));
 }
 
 /** Alternation of every documented token, longest first, ready to embed in a regex. */
@@ -181,6 +193,7 @@ export function addQuickInfoHovers(
 	html: string,
 	code: string,
 	infos: readonly QuickInfo[],
+	paint: (signature: string) => string = escapeText,
 ): string {
 	if (infos.length === 0) return html;
 	const byEnd = new Map<number, QuickInfo>();
@@ -207,8 +220,9 @@ export function addQuickInfoHovers(
 		const wrapped = hoverMarkup(
 			escapeText(token),
 			info.signature,
+			paint(info.signature),
 			info.doc,
-			info.doc ? `${info.signature}. ${info.doc}` : info.signature,
+			info.doc ? `${info.signature}. ${info.doc.replaceAll('`', '')}` : info.signature,
 		);
 		return `${open}${buffer.slice(0, lead)}${wrapped}${buffer.slice(lead + token.length)}</span>`;
 	};
@@ -236,6 +250,33 @@ export function addQuickInfoHovers(
 		}
 	}
 	return open === undefined ? out : `${out}${open}${buffer}`;
+}
+
+/**
+ * Colours a hover's signature line the way the fence around it is coloured.
+ * Each piece carries a class before its style, so neither hover pass mistakes
+ * the tip's code for the fence's own.
+ */
+export function signaturePainter(
+	highlighter: HighlighterGeneric<string, string>,
+): (signature: string) => string {
+	const light = highlighter.getTheme(LIGHT_THEME).fg;
+	const dark = highlighter.getTheme(DARK_THEME).fg;
+	return (signature) => {
+		const html = useSiteSurface(
+			highlighter.codeToHtml(signature, {
+				lang: 'typescript',
+				themes: { light: LIGHT_THEME, dark: DARK_THEME },
+				defaultColor: 'light',
+			}),
+			light,
+			dark,
+		);
+		const line = /<code><span class="line">([\s\S]*)<\/span><\/code>/.exec(html)?.[1];
+		return line === undefined
+			? escapeText(signature)
+			: line.replaceAll('<span style="', '<span class="tsrx-tip-code" style="');
+	};
 }
 
 /** Renders one fence's code, or undefined when shiki does not know its language. */
@@ -286,6 +327,7 @@ export async function renderFence(
 		),
 		code,
 		hasQuickInfo(fenceLanguage) ? quickInfo().queryFence(code, fenceLanguage) : [],
+		signaturePainter(highlighter),
 	);
 	return addTsrxHovers(typed).replace(
 		'<pre class="shiki',

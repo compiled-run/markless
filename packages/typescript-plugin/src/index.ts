@@ -1,4 +1,5 @@
 import upstreamTsrxTypeScriptPlugin from '@tsrx/typescript-plugin';
+import { collectTsrxAuthorWarnings } from '@markless/compiler/type-service';
 import { join } from 'node:path';
 import { installMarklessCompletions } from './completions.ts';
 import {
@@ -6,6 +7,7 @@ import {
 	setMarklessInlayHintConfiguration,
 } from './inlay-hints.ts';
 import {
+	MARKLESS_TSRX_COMPILER_WARNING_CODE,
 	MARKLESS_TSRX_PARSE_ERROR_CODE,
 	clampMarklessDiagnosticStart,
 	getMarklessTsrxParseFailure,
@@ -136,6 +138,43 @@ const plugin = (modules: TsserverPluginModules) => {
 					},
 				];
 			};
+			const getSemanticDiagnostics =
+				enhancedLanguageService.getSemanticDiagnostics.bind(enhancedLanguageService);
+			enhancedLanguageService.getSemanticDiagnostics = (fileName: string) => {
+				const diagnostics = getSemanticDiagnostics(fileName);
+				if (!isMarklessTsrxFile(fileName)) return diagnostics;
+				const snapshot = getSourceSnapshot(fileName);
+				if (!snapshot) return diagnostics;
+				const warnings = authorWarningsFor(
+					fileName,
+					snapshot.getText(0, snapshot.getLength()),
+					getSourceVersion?.(fileName),
+				);
+				if (warnings.length === 0) return diagnostics;
+				const sourceFile = enhancedLanguageService.getProgram()?.getSourceFile(fileName);
+				const sourceLength = snapshot.getLength();
+				const diagnosticFile =
+					sourceFile?.text.length === 0 && sourceLength > 0 ? undefined : sourceFile;
+				return [
+					...diagnostics,
+					...warnings.map((warning) => {
+						const start = clampMarklessDiagnosticStart(
+							warning.primarySpan?.start ?? 0,
+							sourceLength,
+							diagnosticFile?.text.length,
+						);
+						return {
+							file: diagnosticFile,
+							start,
+							length: Math.max(1, (warning.primarySpan?.end ?? start + 1) - start),
+							category: modules.typescript.DiagnosticCategory.Warning,
+							code: MARKLESS_TSRX_COMPILER_WARNING_CODE,
+							source: 'markless',
+							messageText: `${warning.code}: ${warning.message}`,
+						};
+					}),
+				];
+			};
 			if (nativeCompletionEntryDetails) {
 				const getCompletionEntryDetails =
 					enhancedLanguageService.getCompletionEntryDetails.bind(enhancedLanguageService);
@@ -215,6 +254,21 @@ const plugin = (modules: TsserverPluginModules) => {
 		},
 	};
 };
+
+const authorWarnings = new Map<
+	string,
+	{ readonly key: string; readonly warnings: ReturnType<typeof collectTsrxAuthorWarnings> }
+>();
+
+// Recompiled only when the script version (or, without one, the text) changes.
+function authorWarningsFor(fileName: string, source: string, version: string | undefined) {
+	const key = version ?? source;
+	const cached = authorWarnings.get(fileName);
+	if (cached?.key === key) return cached.warnings;
+	const warnings = collectTsrxAuthorWarnings(source, fileName);
+	authorWarnings.set(fileName, { key, warnings });
+	return warnings;
+}
 
 // Compiling the authored source is what records - or clears - the file's parse failure,
 // so this recompiles it when its script version changes and then leaves the record for

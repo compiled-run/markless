@@ -1270,23 +1270,43 @@ function collectStyleObjectAttribute(
 	walk: SemanticGraphWalk,
 	hostNodeId: string,
 ): void {
+	// A row renders from its item alone, so its consts stay for the row template to splice.
+	const definitions: AnyNode[] = [];
+	const inlinedNames = new Set<string>();
+	const inlineLocals = state.currentKeyedRepeatScopeIds.length === 0;
 	const lowering = lowerStyleObject(objectNode, state.source, {
 		resolver: styleConstResolver(state),
 		usagePos: usageNode.start ?? 0,
 		referenced: objectNode !== usageNode,
+		...(inlineLocals && {
+			valueSource: (value: AnyNode) => {
+				const inlined = inlineRenderLocals(value, state, {
+					leaveCaptureOwned: true,
+					leaveRowItems: true,
+				});
+				if (inlined.kind !== 'inlined' || inlined.definitions.length === 0) return null;
+				definitions.push(...inlined.definitions);
+				for (const name of inlined.names) inlinedNames.add(name);
+				return inlined.source;
+			},
+		}),
 	});
 	if (lowering?.kind === 'static') return;
 
 	const composite =
-		lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, state) : null;
-	if (lowering?.kind === 'dynamic' && composite) {
+		lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, definitions, inlinedNames, state) : null;
+	if (composite) for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+	if (
+		lowering?.kind === 'dynamic' &&
+		(composite || lowering.valueExpressions.every((value) => rendersStyleValue(value, state)))
+	) {
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(usageNode, state.source),
 			sourceSpan: sourceSpan(usageNode, state.filename),
 			target: bindingTargetForAttribute('style', state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
-			computedGraphNodeId: composite.graphNodeId,
+			computedGraphNodeId: composite?.graphNodeId,
 			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(usageNode, state);
@@ -1299,12 +1319,30 @@ function collectStyleObjectAttribute(
 			reason:
 				lowering?.kind === 'unsupported'
 					? lowering.reason
-					: 'a value that is not a plain read of state, a computed value, or a prop',
+					: 'a value that calls a function or reads state in a way the compiler cannot follow',
 			node: usageNode,
 			filename: state.filename,
 		}),
 	);
 	walk(usageNode, state);
+}
+
+// A row's template rewrites its values; elsewhere a pure value must read nothing that changes before a re-render.
+function rendersStyleValue(value: AnyNode, state: WalkState): boolean {
+	if (!pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS)) return false;
+	return (
+		state.currentKeyedRepeatScopeIds.length > 0 ||
+		!readsUnroutedGraphCell(
+			value,
+			state,
+			{
+				bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId),
+				aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId),
+			},
+			TEMPLATE_READ_OPTIONS,
+			true,
+		)
+	);
 }
 
 function styleConstResolver(state: WalkState): StyleConstResolver {
@@ -1314,14 +1352,25 @@ function styleConstResolver(state: WalkState): StyleConstResolver {
 
 function mintStyleObjectComputed(
 	lowering: Extract<StyleObjectLowering, { readonly kind: 'dynamic' }>,
+	definitions: ReadonlyArray<AnyNode>,
+	inlinedNames: ReadonlySet<string>,
 	state: WalkState,
 ): { readonly graphNodeId: string } | null {
 	const readSources = joinReadSources(
-		lowering.valueExpressions.map((value) => pureCompositeReadSources(value, state)),
+		lowering.valueExpressions.map((value) =>
+			pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS),
+		),
 	);
-	if (!readSources || readSources.length === 0) return null;
+	if (!readSources) return null;
+	// An inlined const's definition reads stand in for the const itself.
+	const sources = new Set(
+		readSources.filter((source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? '')),
+	);
+	for (const definition of definitions)
+		for (const dependency of collectGraphDependencies(definition, state)) sources.add(dependency.source);
+	if (sources.size === 0) return null;
 
-	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, readSources, state);
+	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, [...sources], state);
 }
 
 function collectDuplicateAttributeDiagnostics(

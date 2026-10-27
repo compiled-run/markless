@@ -1230,7 +1230,7 @@ function hintFor(control: PlaygroundControl): string {
 							<lucide.circlehelp class="ico" aria-hidden="true" />
 						</tooltip.trigger>
 						<tooltip.content class="pg-tip">
-							<span class="tsrx-tip-title">${control.prop}</span>
+							<span class="tsrx-tip-title"><span class="tsrx-tip-code">${control.prop}</span></span>
 							<span class="tsrx-tip-body">{${quote(control.doc)}}</span>
 							<span class="tsrx-tip-type">{${quote(control.type)}}</span>
 						</tooltip.content>

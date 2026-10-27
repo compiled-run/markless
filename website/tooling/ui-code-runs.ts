@@ -44,6 +44,9 @@ export type Run = {
 
 export type Line = { readonly id: string; readonly runs: readonly Run[] };
 
+/** One coloured piece of a hover's title line. */
+export type TitleRun = { readonly id: string; readonly text: string; readonly class?: string };
+
 export type Doc = {
 	readonly id: string;
 	readonly n: string;
@@ -51,6 +54,8 @@ export type Doc = {
 	readonly b: string;
 	readonly title: string;
 	readonly doc: string;
+	/** The title as the fence's tip paints it; filled from the first token that points here. */
+	sig: TitleRun[];
 };
 
 /** The `Run`, `Line` and `Doc` types as a generated module declares them. */
@@ -65,7 +70,8 @@ export const RUN_TYPES = `type Run = {
 	readonly doc?: string;
 };
 type Line = { readonly id: string; readonly runs: readonly Run[] };
-type Doc = { readonly id: string; readonly n: string; readonly t: string; readonly b: string; readonly title: string; readonly doc: string };`;
+type TitleRun = { readonly id: string; readonly text: string; readonly class?: string };
+type Doc = { readonly id: string; readonly n: string; readonly t: string; readonly b: string; readonly title: string; readonly doc: string; readonly sig: readonly TitleRun[] };`;
 
 /** Every distinct hover doc of one panel, numbered in order of first use. */
 export class DocRegistry {
@@ -89,6 +95,7 @@ export class DocRegistry {
 				b: `${this.idPrefix}-${n}b`,
 				title,
 				doc,
+				sig: [],
 			};
 			this.docs.push(found);
 			this.byText.set(key, found);
@@ -122,9 +129,10 @@ export class ColourTable {
 }
 
 type Frame = {
-	readonly kind: 'line' | 'span' | 'tip';
+	readonly kind: 'line' | 'span' | 'tip' | 'title';
 	readonly style: string;
 	readonly hover?: Doc;
+	readonly code?: boolean;
 };
 
 type Draft = { text: string; style: string; readonly hover?: Doc };
@@ -141,15 +149,30 @@ export function paneLines(html: string, registry: DocRegistry, colours: ColourTa
 	const start = opened < 0 ? -1 : html.indexOf('>', opened);
 	const end = html.lastIndexOf('</code>');
 	const body = start < 0 || end < 0 ? html : html.slice(start + 1, end);
-	return body.split('\n').map((raw, lineIndex) => {
+	const lines = body.split('\n').map((raw, lineIndex) => {
 		const stack: Frame[] = [{ kind: 'line', style: '' }];
+		let titling: Doc | undefined;
 		const drafts: Draft[] = [];
 		TAG_OR_TEXT.lastIndex = 0;
 		for (const match of raw.matchAll(TAG_OR_TEXT)) {
 			const [, closing, , attributes, text] = match;
 			const top = stack[stack.length - 1];
 			if (text !== undefined) {
-				if (top.kind === 'tip') continue;
+				if (top.kind === 'title' && top.hover !== undefined && titling === top.hover) {
+					const colour = colours.classFor(top.style);
+					const classes = [colour, top.code ? 'tsrx-tip-code' : undefined].filter(
+						Boolean,
+					);
+					const run: TitleRun = {
+						id: `s${top.hover.sig.length}`,
+						text: decodeEntities(text),
+					};
+					top.hover.sig.push(
+						classes.length === 0 ? run : { ...run, class: classes.join(' ') },
+					);
+					continue;
+				}
+				if (top.kind === 'tip' || top.kind === 'title') continue;
 				drafts.push({ text: decodeEntities(text), style: top.style, hover: top.hover });
 				continue;
 			}
@@ -161,8 +184,22 @@ export function paneLines(html: string, registry: DocRegistry, colours: ColourTa
 			for (const attribute of (attributes ?? '').matchAll(ATTRIBUTE))
 				attrs.set(attribute[1], decodeEntities(attribute[2]));
 			const classes = (attrs.get('class') ?? '').split(/\s+/);
+			if (top.kind === 'title') {
+				stack.push({
+					...top,
+					style: attrs.get('style') ?? '',
+					code: classes.includes('tsrx-tip-code'),
+				});
+				continue;
+			}
+			if (top.kind === 'tip' && classes.includes('tsrx-tip-title')) {
+				titling =
+					top.hover !== undefined && top.hover.sig.length === 0 ? top.hover : undefined;
+				stack.push({ kind: 'title', style: '', hover: top.hover });
+				continue;
+			}
 			if (top.kind === 'tip' || classes.includes('tsrx-tip')) {
-				stack.push({ kind: 'tip', style: top.style });
+				stack.push({ kind: 'tip', style: top.style, hover: top.hover });
 				continue;
 			}
 			const hover = classes.includes('tsrx-hover')
@@ -206,6 +243,9 @@ export function paneLines(html: string, registry: DocRegistry, colours: ColourTa
 			});
 		return { id: `l${lineIndex}`, runs };
 	});
+	for (const doc of registry.docs)
+		if (doc.sig.length === 0) doc.sig.push({ id: 's0', text: doc.title });
+	return lines;
 }
 
 /** Runs one file through the site's fence highlighter, so panels and fences are coloured by one pipeline. */
@@ -225,7 +265,7 @@ ${indent}}`;
 export function docsMarkup(indent: string): string {
 	return `${indent}<span class="cp-docs" aria-hidden="true">
 ${indent}	@for (const doc of docs; key doc.id) {
-${indent}		<span class="cp-doc" data-doc={doc.n}><span class="tsrx-tip-title" id={doc.t}>{doc.title}</span><span class="tsrx-tip-body" id={doc.b}>{doc.doc}</span></span>
+${indent}		<span class="cp-doc" data-doc={doc.n}><span class="tsrx-tip-title" id={doc.t}>@for (const run of doc.sig; key run.id) {<span class={run.class}>{run.text}</span>}</span><span class="tsrx-tip-body" id={doc.b}>{doc.doc}</span></span>
 ${indent}	}
 ${indent}</span>`;
 }
