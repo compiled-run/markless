@@ -107,6 +107,7 @@ async function runTransformSteps(request: TransformRequest) {
 	let linkedTransformInput = firstPass.input;
 	const reusedLinkedTransform = firstPass.reused;
 	if (currentEnvironment === 'client' && clientRouteArtifact) {
+		reportCompilerWarnings(request, transformed);
 		return await emitClientRouteArtifact(request, transformed);
 	}
 	let barrelComponents: Awaited<ReturnType<typeof linkBarrelComponentInterfaces>> | undefined;
@@ -137,8 +138,17 @@ async function runTransformSteps(request: TransformRequest) {
 		linked.linkedChildHasBrowserTriggers,
 	);
 	registerFinalTransformArtifacts(request, transformed);
+	reportCompilerWarnings(request, transformed);
 	recordLinkedTransform(request, transformed, linkedTransformInput, linked);
 	return await emitTransformResult(request, transformed, linked.resolvedChildren);
+}
+
+function reportCompilerWarnings(request: TransformRequest, transformed: TransformTsrxModuleResult) {
+	request.ctx.state.compilerWarnings.report(
+		request.pluginContext,
+		{ filename: request.source, source: request.code, root: request.ctx.getRoot() },
+		transformed.compilerWarnings,
+	);
 }
 
 // Non-TSRX modules never compile, but the client build still accounts and hooks
