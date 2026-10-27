@@ -1,14 +1,15 @@
 import { commandVariants, type CommandKind } from './commands.ts';
 import type { ManagerId } from './facts.ts';
+import CopyButton from '../copy-button.tsrx';
 
-/** Every package manager's version of one shell block; the one named by `data-package-manager` on <html> shows, npm when none is. With `only`, just that manager's block, always shown. */
-export default function Commands({ kind, only }: { readonly kind: CommandKind; readonly only?: ManagerId }) @{
+/** Every package manager's version of one shell block; the one named by `data-package-manager` on <html> shows, npm when none is. With `only`, just that manager's block, always shown. With `copy`, each block gets the ink Copy button. */
+export default function Commands({ kind, only, copy }: { readonly kind: CommandKind; readonly only?: ManagerId; readonly copy?: boolean }) @{
 	const variants = commandVariants(kind).filter((variant) => !only || variant.manager === only);
 
 	<div class="commands" data-only={only ? 'yes' : 'no'}>
 		@for (const variant of variants; key variant.manager) {
 			<div class="variant" data-package-manager={variant.manager}>
-				<div class="torn-strip">
+				<div class="torn-strip" data-copy={copy ? 'yes' : 'no'}>
 					<span class="torn-art" aria-hidden="true">
 						<span class="torn-cast">
 							<span class="torn-below"></span>
@@ -37,6 +38,9 @@ export default function Commands({ kind, only }: { readonly kind: CommandKind; r
 							}
 						</code>
 					</pre>
+					@if (copy) {
+						<CopyButton text={variant.code} />
+					}
 				</div>
 			</div>;
 		}
@@ -47,6 +51,20 @@ export default function Commands({ kind, only }: { readonly kind: CommandKind; r
 
 			.line {
 				display: block;
+			}
+
+			.torn-strip[data-copy='yes'] {
+				container-type: inline-size;
+			}
+
+			.torn-strip[data-copy='yes'] > pre {
+				padding-inline-end: 7.5rem;
+			}
+
+			@container (width < 32rem) {
+				.torn-strip[data-copy='yes'] > pre {
+					padding-inline-end: 3.75rem;
+				}
 			}
 
 			/* One selector per manager in facts.ts MANAGERS; walkthrough.test.ts checks none is missing. */
