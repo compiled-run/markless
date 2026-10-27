@@ -1,6 +1,9 @@
 import { join, resolve } from 'pathe';
 import { createBuilder, createServer } from 'vite';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+
+// A whole Vite build: 2.6 s alone at load average 54, past 5 s in the pre-commit unit lane.
+vi.setConfig({ testTimeout: 30_000 });
 
 // The page imports one constant from a CLI barrel whose other export spawns processes, the shape
 // that once shipped markless.dev's whole CLI to the browser behind an empty stand-in.

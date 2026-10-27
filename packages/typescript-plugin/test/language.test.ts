@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import ts from 'typescript';
-import { beforeAll, expect, test } from 'vitest';
+import { beforeAll, expect, test, vi } from 'vitest';
 import {
 	MARKLESS_TSRX_LANGUAGE_ID,
 	MARKLESS_TSRX_PARSE_ERROR_CODE,
@@ -22,6 +22,9 @@ import {
 	isMarklessTsrxFile,
 } from '../src/language.ts';
 import { TsserverHarness } from './tsserver-harness.ts';
+
+// A TypeScript program or a tsserver child per test: up to 3.7 s alone at load average 54, past 5 s in the pre-commit unit lane.
+vi.setConfig({ testTimeout: 30_000 });
 
 const require = createRequire(import.meta.url);
 

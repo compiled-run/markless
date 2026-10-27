@@ -2,8 +2,11 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { MARKLESS_TSRX_PARSE_ERROR_CODE } from '../src/language.ts';
+
+// Each test spawns markless-tsc (and TypeScript 7.1): up to 4.2 s alone at load average 54, past 5 s in the pre-commit unit lane.
+vi.setConfig({ testTimeout: 30_000 });
 
 // markless-tsc is a command line, so it is checked the way a user runs it: as a process,
 // on a real project, by the exit code and the text it prints.

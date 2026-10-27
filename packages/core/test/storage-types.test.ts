@@ -15,7 +15,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
+
+// A TypeScript program per test: up to 2.8 s alone at load average 54, past 5 s in the pre-commit unit lane.
+vi.setConfig({ testTimeout: 30_000 });
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const frameworkApiPath = '/framework-api.ts';
