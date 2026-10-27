@@ -62,7 +62,7 @@ export function codeFrameHtml(script: string, preloads: readonly string[] = []):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Code result</title>
-<style>@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/ShantellSans-latin-variable.woff2') format('woff2')}html{background:transparent;color-scheme:light}html.dark{color-scheme:dark}body{margin:0;color:CanvasText;font-family:system-ui,sans-serif}</style>
+<style>@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/ShantellSans-latin-variable.woff2') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:400;font-display:swap;src:url('/fonts/JoyElia-Regular.woff2') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:700;font-display:swap;src:url('/fonts/JoyElia-Bold.woff2') format('woff2')}html{background:transparent;color-scheme:light}html.dark{color-scheme:dark}body{margin:0;color:CanvasText;font-family:system-ui,sans-serif}</style>
 ${preloads.map((href) => `<link rel="modulepreload" href="${href}">`).join('\n')}
 <script type="module" src="${script}"></script>
 </head>
