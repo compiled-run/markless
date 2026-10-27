@@ -156,6 +156,7 @@ jobs:
             queue_run: ${{ steps.queue.outputs.run }}
             playwright_version: ${{ steps.playwright.outputs.version }}
             image_os: ${{ steps.playwright.outputs.image }}
+            playwright_cached: ${{ steps.playwright_browsers.outputs.cache-hit == 'true' && steps.playwright_apt.outputs.cache-hit == 'true' }}
             key_unit: ${{ steps.unit.outputs.cache-primary-key }}
             run_unit: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true') }}
             key_browser: ${{ steps.browser.outputs.cache-primary-key }}
@@ -218,6 +219,23 @@ jobs:
                   if [ -z "$version" ]; then echo 'pnpm-lock.yaml names no playwright-core version'; exit 1; fi
                   echo "version=$version" >> "$GITHUB_OUTPUT"
                   echo "image=${ImageOS:-${{ runner.os }}}" >> "$GITHUB_OUTPUT"
+
+            # Both warm means prepare-playwright has nothing to do, so the browser lanes skip waiting for it.
+            - name: Look up the Playwright browser cache
+              id: playwright_browsers
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  key: playwright-${{ runner.os }}-chromium-webkit-${{ steps.playwright.outputs.version }}
+                  path: ${{ github.workspace }}-ms-playwright
+
+            - name: Look up the Playwright system packages
+              id: playwright_apt
+              uses: actions/cache/restore@v4
+              with:
+                  lookup-only: true
+                  key: playwright-apt-${{ runner.os }}-${{ steps.playwright.outputs.image }}-${{ steps.playwright.outputs.version }}
+                  path: ${{ github.workspace }}-playwright-apt
 
             # Shared inputs every lane depends on. Its evaluated key is written
             # to a file so the per-lane keys below layer on top of it.
@@ -441,7 +459,7 @@ jobs:
     # in it, so a lint of the tree never sees them.
     prepare-playwright:
         needs: lanes
-        if: needs.lanes.outputs.run_playwright == 'true'
+        if: needs.lanes.outputs.run_playwright == 'true' && needs.lanes.outputs.playwright_cached != 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 15
         env:
@@ -555,7 +573,7 @@ jobs:
     # Its fixture tests launch Chromium and WebKit, so it restores the prepared browser cache.
     unit:
         needs: [typecheck, lanes, prepare-playwright]
-        if: needs.lanes.outputs.run_unit == 'true'
+        if: ${{ !cancelled() && !failure() && needs.lanes.outputs.run_unit == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 20
         strategy:
@@ -622,7 +640,7 @@ jobs:
     # made that shard a 15-minute run while the other took under 3.
     browser:
         needs: [typecheck, lanes, prepare-playwright]
-        if: needs.lanes.outputs.run_browser == 'true'
+        if: ${{ !cancelled() && !failure() && needs.lanes.outputs.run_browser == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 25
         strategy:
@@ -747,7 +765,7 @@ jobs:
     # the `receipts` job to validate.
     boxes-bundler:
         needs: [typecheck, lanes, prepare-playwright]
-        if: needs.lanes.outputs.run_boxes_bundler == 'true'
+        if: ${{ !cancelled() && !failure() && needs.lanes.outputs.run_boxes_bundler == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 25
         env:
@@ -1056,7 +1074,7 @@ jobs:
     # 30 seconds of boxes. Not part of the receipt set: they write no analyzer receipts.
     website-boxes:
         needs: [typecheck, lanes, prepare-playwright]
-        if: needs.lanes.outputs.run_website_boxes == 'true'
+        if: ${{ !cancelled() && !failure() && needs.lanes.outputs.run_website_boxes == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 20
         env:
@@ -1137,7 +1155,7 @@ jobs:
     # with the box lanes; docs/ci-process.md has the measured cost.
     perf-guards:
         needs: [typecheck, lanes, prepare-playwright]
-        if: needs.lanes.outputs.run_perf_guards == 'true'
+        if: ${{ !cancelled() && !failure() && needs.lanes.outputs.run_perf_guards == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 30
         env:
@@ -1209,7 +1227,7 @@ jobs:
     # analyzer receipt set, so this lane is not a `boxes-*` lane.
     demo-boxes:
         needs: [typecheck, lanes, prepare-playwright]
-        if: needs.lanes.outputs.run_demo_boxes == 'true'
+        if: ${{ !cancelled() && !failure() && needs.lanes.outputs.run_demo_boxes == 'true' }}
         runs-on: ubuntu-latest
         timeout-minutes: 20
         env:
@@ -1665,7 +1683,8 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 5
         steps:
-            # `skipped` means the lane's content hash already had a green marker.
+            # `skipped` means the lane's content hash already had a green marker, or for
+            # prepare-playwright that both of its caches were already warm.
             # It cannot mean "an upstream job failed": typecheck, lanes and
             # prepare-playwright are the only jobs that can skip a lane, and all
             # three are in `needs`, so their failure lands here as `failure`.
