@@ -1,19 +1,25 @@
-// An @if whose arms cannot be rebuilt but whose test reads only props is safe only if no caller this build compiled can change them.
-import type { CompileTsrxModuleResult, SemanticComponentPropBinding } from '@markless/compiler';
+// A warning that holds only while some props never change is safe only if no caller this build compiled can change them.
+import { propsDeciding, rowsDecidedBy } from '@markless/compiler';
+import type {
+	CompileTsrxModuleResult,
+	CompilerDiagnostic,
+	SemanticComponentPropBinding,
+} from '@markless/compiler';
+import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '@markless/serializer';
 
 type PassedProp =
 	| { readonly kind: 'fixed' }
 	| { readonly kind: 'changing'; readonly source: string }
-	| { readonly kind: 'forwarded'; readonly prop: string; readonly source: string }
+	| { readonly kind: 'forwarded'; readonly props: ReadonlyArray<string>; readonly source: string }
 	| { readonly kind: 'unknown'; readonly source: string };
 
 export type ModulePropFlow = {
 	readonly components: ReadonlyArray<{ readonly name: string; readonly exportName?: string }>;
 	readonly decided: ReadonlyArray<{
+		readonly code: string;
 		readonly componentName: string;
 		readonly props: ReadonlyArray<string>;
 		readonly message: string;
-		readonly test: string;
 	}>;
 	readonly edges: ReadonlyArray<{
 		readonly id: string;
@@ -26,19 +32,28 @@ export type ModulePropFlow = {
 	}>;
 };
 
-export function modulePropFlow(compiled: CompileTsrxModuleResult): ModulePropFlow {
+export function modulePropFlow(
+	compiled: CompileTsrxModuleResult,
+	diagnostics: ReadonlyArray<CompilerDiagnostic>,
+): ModulePropFlow {
 	const graph = compiled.semanticGraph;
 	return {
 		components: (graph.components ?? []).map((component) => ({
 			name: component.name,
 			...(component.exportName ? { exportName: component.exportName } : {}),
 		})),
-		decided: (compiled.symbolModules.propDecidedBranches ?? []).map((branch) => ({
-			componentName: branch.componentName,
-			props: branch.props,
-			message: branch.diagnostic.message,
-			test: branch.diagnostic.source ?? '',
-		})),
+		decided: diagnostics.flatMap((diagnostic) =>
+			diagnostic.decidedByProps && diagnostic.suppressed !== true
+				? [
+						{
+							code: diagnostic.code,
+							componentName: diagnostic.decidedByProps.componentName,
+							props: diagnostic.decidedByProps.props,
+							message: diagnostic.message,
+						},
+					]
+				: [],
+		),
 		edges: (graph.componentEdges ?? []).map((edge) => {
 			const spread = edge.props.find((prop) => prop.kind === 'spread');
 			return {
@@ -49,16 +64,27 @@ export function modulePropFlow(compiled: CompileTsrxModuleResult): ModulePropFlo
 				...(edge.importedName ? { importedName: edge.importedName } : {}),
 				props: Object.fromEntries(
 					edge.props.flatMap((prop) =>
-						prop.kind === 'spread' ? [] : [[prop.name, passedProp(prop)]],
+						prop.kind === 'spread' ? [] : [[prop.name, passedProp(prop, graph, edge.keyedRepeatScopeIds)]],
 					),
 				),
-				...(spread ? { spread: passedProp(spread) } : {}),
+				...(spread ? { spread: passedProp(spread, graph, edge.keyedRepeatScopeIds) } : {}),
 			};
 		}),
 	};
 }
 
-function passedProp(prop: SemanticComponentPropBinding): PassedProp {
+function passedProp(
+	prop: SemanticComponentPropBinding,
+	graph: CompileTsrxModuleResult['semanticGraph'],
+	repeatIds: ReadonlyArray<string> = [],
+): PassedProp {
+	const row = rowValue(prop, graph, repeatIds);
+	if (row !== undefined)
+		return !row
+			? { kind: 'changing', source: prop.source }
+			: row.length === 0
+				? { kind: 'fixed' }
+				: { kind: 'forwarded', props: row, source: prop.source };
 	switch (prop.kind) {
 		case 'serializable':
 		case 'callback':
@@ -70,21 +96,34 @@ function passedProp(prop: SemanticComponentPropBinding): PassedProp {
 		case 'spread': {
 			if (prop.kind === 'graph-reference' && prop.graphBindingKind === 'element')
 				return { kind: 'fixed' };
-			const forwarded =
-				prop.graphNodeId === 'prop:props'
-					? prop.path[0]
-					: prop.graphNodeId.startsWith('prop:')
-						? prop.graphNodeId.slice('prop:'.length)
-						: undefined;
-			if (prop.kind === 'spread' && prop.graphNodeId.startsWith('prop:'))
-				return { kind: 'forwarded', prop: '', source: prop.source };
-			return forwarded !== undefined
-				? { kind: 'forwarded', prop: forwarded, source: prop.source }
-				: { kind: 'changing', source: prop.source };
+			if (prop.kind === 'spread' && prop.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX))
+				return { kind: 'forwarded', props: [], source: prop.source };
+			const deciding = propsDeciding(prop.graphNodeId, prop.path, graph);
+			if (!deciding) return { kind: 'changing', source: prop.source };
+			return deciding.length === 0
+				? { kind: 'fixed' }
+				: { kind: 'forwarded', props: deciding, source: prop.source };
 		}
 		default:
 			return { kind: 'unknown', source: (prop as { source?: string }).source ?? '' };
 	}
+}
+
+// A value read off a @for row changes only when the list it comes from does.
+function rowValue(
+	prop: SemanticComponentPropBinding,
+	graph: CompileTsrxModuleResult['semanticGraph'],
+	repeatIds: ReadonlyArray<string>,
+): ReadonlyArray<string> | null | undefined {
+	if (prop.kind !== 'opaque' || prop.buildTimeValue) return undefined;
+	const root = /^[A-Za-z_$][\w$]*/.exec(prop.source)?.[0];
+	if (!root || !/^[A-Za-z_$][\w$]*(?:(?:\?\.|\.)[A-Za-z_$][\w$]*)*$/.test(prop.source)) return undefined;
+	for (const id of [...repeatIds].reverse()) {
+		const repeat = graph.keyedRepeats.find((candidate) => candidate.id === id);
+		if (repeat && (repeat.itemName === root || repeat.indexName === root))
+			return rowsDecidedBy(repeat, graph);
+	}
+	return undefined;
 }
 
 type Recorded = {
@@ -112,9 +151,7 @@ export class PropFlowRegistry {
 				for (const prop of decided.props) {
 					const reason = this.#changes(source, decided.componentName, prop, new Set());
 					if (reason)
-						refusals.push(
-							`MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: ${source}: <${decided.componentName}>: ${decided.message} Its test reads the prop \`${prop}\`, and ${reason} Pass \`${prop}\` a value that does not change, or show the content outside the @if and hide it with an attribute.`,
-						);
+						refusals.push(refusalMessage(decided, source, prop, reason));
 				}
 		return refusals;
 	}
@@ -138,9 +175,10 @@ export class PropFlowRegistry {
 					return `${where} passes it \`${passed.source}\`, which changes.`;
 				if (passed.kind === 'unknown')
 					return `${where} passes it \`${passed.source}\`, which the build cannot prove never changes.`;
-				const forwarded = passed.prop || prop;
-				const deeper = this.#changes(callerSource, edge.parentComponentName, forwarded, seen);
-				if (deeper) return `${where} hands it its own prop \`${forwarded}\`; ${deeper}`;
+				for (const forwarded of passed.props.length > 0 ? passed.props : [prop]) {
+					const deeper = this.#changes(callerSource, edge.parentComponentName, forwarded, seen);
+					if (deeper) return `${where} hands it its own prop \`${forwarded}\`; ${deeper}`;
+				}
 			}
 		return undefined;
 	}
@@ -165,5 +203,24 @@ export class PropFlowRegistry {
 						(exportName !== 'default' && component.name === exportName)),
 			) ?? false
 		);
+	}
+}
+
+function refusalMessage(
+	decided: ModulePropFlow['decided'][number],
+	source: string,
+	prop: string,
+	reason: string,
+): string {
+	const at = `${source}: <${decided.componentName}>: ${decided.message}`;
+	switch (decided.code) {
+		case 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED':
+			return `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: ${at} Its test reads the prop \`${prop}\`, and ${reason} Pass \`${prop}\` a value that does not change, or show the content outside the @if and hide it with an attribute.`;
+		case 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED':
+			return `MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: ${at} The list comes from the prop \`${prop}\`, and ${reason} Pass \`${prop}\` a value that does not change, or keep the row to markup the browser can build.`;
+		case 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED':
+			return `MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: ${at} The rows come from the prop \`${prop}\`, and ${reason} Pass \`${prop}\` a value that does not change, or keep the row to markup the browser can build.`;
+		default:
+			return `${decided.code}: ${at} It holds only while the prop \`${prop}\` never changes, and ${reason} Pass \`${prop}\` a value that does not change.`;
 	}
 }

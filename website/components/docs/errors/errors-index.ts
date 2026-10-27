@@ -350,7 +350,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
-					kind: 'compile warning',
+					kind: 'compile error or warning',
 					guided: false,
 				},
 				{
@@ -465,7 +465,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
-					kind: 'compile warning',
+					kind: 'compile error or warning',
 					guided: false,
 				},
 				{
