@@ -40,7 +40,16 @@ export const BODY = { from: 1, to: 13 } as const;
 export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
 export const MARK_TOUR = ['mark', 'rest', 'rest'] as const;
 
-export type Sketch = 'values' | 'steps' | 'blocks';
+const GUESTS = ['Ada', 'Grace', 'Linus', 'Margaret', 'Alan', 'Barbara', 'Edsger', 'Frances'];
+
+/** The next guest the demo's Add button invites: the first on the list not already going, numbered once everyone is. */
+export const nextGuest = (going: readonly string[]) => GUESTS.find((name) => !going.includes(name)) ?? 'Guest ' + (going.length + 1);
+
+/** What the blocks demo's live region says after a press. */
+export const describeBlocks = (count: number) =>
+	count === 0 ? 'No guests. The @for draws no rows, and the @if line, No one yet, is shown.' : `${count} ${count === 1 ? 'guest' : 'guests'}. The @for draws ${count === 1 ? 'one row' : count + ' rows'}, and the @if line is hidden.`;
+
+export type Sketch = 'values' | 'steps';
 
 /** What each sketch shows, in plain words, for its caption and the live region. */
 export const SKETCH_SAID: Record<Sketch, string> = {
@@ -48,15 +57,12 @@ export const SKETCH_SAID: Record<Sketch, string> = {
 		"On the left, four lines of guest-list.tsrx on a paper slip, each pair of braces drawn as an empty socket. On the right, a sketched phone showing the list. Arrows carry each value to its spot: the class value lands as a bold, highlighted style on Ada's row labelled host, {name} lands as the names Ada and Grace, and {clear} lands on the Clear button as a pointing hand ready to click.",
 	steps:
 		'Three index cards, read top to bottom with numbers 1, 2 and 3: let guests, const clear, and the section element. Cards 1 and 2 leave nothing on the page. Card 3, the element, is lifted off the stack and placed on a sketched phone as what shows up: Ada, Grace and a Clear button.',
-	blocks:
-		"A slip with the @for block and the @if block, bracketed. On a sketched phone the pen traces the same row once per guest, Ada then Grace. Below the rows a paper flap stays folded shut while there are guests; it holds No one yet and opens only when no one's going.",
 };
 
-export const sketchOf = (name: string): Sketch => (name === 'steps' || name === 'blocks' ? name : 'values');
+export const sketchOf = (name: string): Sketch => (name === 'steps' ? name : 'values');
 
-export function describeSketch(sketch: Sketch, empty: boolean, touched: boolean): string {
+export function describeSketch(sketch: Sketch, touched: boolean): string {
 	if (!touched) return '';
-	if (sketch === 'blocks') return empty ? 'Clear pressed. The rows are gone and the flap opens on No one yet.' : 'Ada and Grace are back, and the flap folds shut.';
 	return sketch === 'values' ? 'The values travel again from their sockets to the screen.' : 'The cards are read again, and the last one lands on the page.';
 }
 

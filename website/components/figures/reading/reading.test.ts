@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { drawings } from './figures.ts';
 import { drawing } from './marks.ts';
-import { BODY, describeMarks, describeSketch, flip, LINES, SAID, SKETCH_SAID, sketchOf, SOURCE, VALUES } from './model.ts';
+import { BODY, describeBlocks, describeMarks, describeSketch, flip, LINES, nextGuest, SAID, SKETCH_SAID, sketchOf, SOURCE, VALUES } from './model.ts';
 import type { Token } from './printout.ts';
 
 // The site's fence renderer runs in a child process: shiki's wasm engine loads under Node but not under the test runner.
@@ -12,6 +12,7 @@ const tokens = fences.figure;
 const page = readFileSync(new URL('../../../pages/start/reading-tsrx.mdx', import.meta.url), 'utf8');
 const printout = readFileSync(new URL('./printout-anatomy.tsrx', import.meta.url), 'utf8');
 const sketch = readFileSync(new URL('./sketch-anatomy.tsrx', import.meta.url), 'utf8');
+const blocksDemo = readFileSync(new URL('./blocks-demo.tsrx', import.meta.url), 'utf8');
 const art = drawing(tokens);
 const sketches = drawings(tokens);
 
@@ -62,7 +63,7 @@ describe('the figures are coloured exactly like the page’s code blocks', () =>
 		for (const block of fences.page) for (const line of block) shared.set(line.map((run) => run.content).join('').trim(), painted(line).filter((_, i, all) => i >= all.findIndex((c) => c.char.trim())));
 		// A lone closing brace takes the colour of the block it closes, so only lines with more than one character are compared.
 		const checked = tokens.filter((line) => line.map((run) => run.content).join('').trim().length > 1 && shared.has(line.map((run) => run.content).join('').trim()));
-		expect(checked.length).toBeGreaterThanOrEqual(6);
+		expect(checked.map((line) => line.map((run) => run.content).join('').trim())).toEqual(expect.arrayContaining(['export default function GuestList() @{', "let guests = state(['Ada', 'Grace']);"]));
 		for (const line of checked) {
 			const ours = painted(line).filter((_, i, all) => i >= all.findIndex((c) => c.char.trim()));
 			expect(ours).toEqual(shared.get(line.map((run) => run.content).join('').trim()));
@@ -109,17 +110,30 @@ describe('the three sketches', () => {
 		expect(sketches.steps.wide.texts.filter((text) => text.cls.includes('lift')).length).toBeGreaterThan(0);
 	});
 
-	it('blocks: a row traced once per guest and a flap that opens when the list is empty', () => {
-		const layout = sketches.blocks.wide;
-		expect(layout.strokes.filter((stroke) => stroke.cls === 'pen row')).toHaveLength(2);
-		expect(layout.texts.find((text) => text.text === 'No one yet')?.cls).toContain('flap open');
-		expect(layout.shapes.some((shape) => shape.cls.includes('flap shut'))).toBe(true);
-		expect(describeSketch('blocks', true, true)).toContain('No one yet');
-		expect(describeSketch('values', false, false)).toBe('');
+	it('speak and caption each sketch', () => {
+		expect(describeSketch('values', false)).toBe('');
+		expect(describeSketch('steps', true)).toContain('last one lands on the page');
 		expect(sketchOf('nonsense')).toBe('values');
-		for (const name of ['values', 'steps', 'blocks'] as const) expect(SKETCH_SAID[name].length).toBeGreaterThan(40);
+		for (const name of ['values', 'steps'] as const) expect(SKETCH_SAID[name].length).toBeGreaterThan(40);
 		expect(sketch).toContain('(prefers-reduced-motion: reduce)');
-		expect(sketch).toContain("event.key === 'Escape'");
+	});
+});
+
+describe('the @ blocks demo', () => {
+	it('adds the next guest not already going and says what the @for and @if show', () => {
+		expect(nextGuest(['Ada', 'Grace'])).toBe('Linus');
+		expect(nextGuest([])).toBe('Ada');
+		expect(describeBlocks(0)).toBe('No guests. The @for draws no rows, and the @if line, No one yet, is shown.');
+		expect(describeBlocks(1)).toBe('1 guest. The @for draws one row, and the @if line is hidden.');
+		expect(describeBlocks(3)).toBe('3 guests. The @for draws 3 rows, and the @if line is hidden.');
+	});
+
+	it('is a live list with @for and @if beside notes naming all four @ blocks', () => {
+		expect(blocksDemo).toContain('@for (const name of guests; key name) {');
+		expect(blocksDemo).toContain('@if (guests.length === 0) {');
+		expect(blocksDemo).toContain("import InkScreen from '../ink/ink-screen.tsrx';");
+		for (const word of ['@for', '@if', '@switch', '@try']) expect(blocksDemo).toContain(`<code>{'${word}`);
+		expect(blocksDemo).toContain('aria-live="polite"');
 	});
 });
 
@@ -127,9 +141,14 @@ describe('the page', () => {
 	it.each([
 		['values', '## `{ }` holds a value'],
 		['steps', '## `@{ }` holds instructions, run top to bottom'],
-		['blocks', '## Blocks that start with @'],
 	])('puts the %s sketch under its heading', (figure, heading) => {
 		expect(page.indexOf(`<SketchAnatomy figure="${figure}" />`)).toBeGreaterThan(page.indexOf(heading));
+	});
+
+	it('carries the @ blocks section on the demo, with no table and no closing link list', () => {
+		expect(page.indexOf('<BlocksDemo />')).toBeGreaterThan(page.indexOf('## Blocks that start with @'));
+		expect(page).not.toContain('| Block |');
+		expect(page).not.toContain('## Where to go next');
 	});
 
 	it('opens with the printout and never says slot', () => {

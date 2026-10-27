@@ -1,4 +1,4 @@
-// The three small figures: a slice of the guest list beside a phone showing what it does. Each comes wide (side by side) and tall (stacked) for narrow screens.
+// The two small figures: a slice of the guest list beside a phone showing what it does. Each comes wide (side by side) and tall (stacked) for narrow screens.
 import { LINES, VALUES } from './model.ts';
 import type { Token } from './printout.ts';
 import { sketcher } from './sketch.ts';
@@ -82,67 +82,12 @@ function steps(tokens: Tokens, tall: boolean) {
 	return { layout: k.out, lift: { x: to[0] - cards[2]!.x0, y: to[1] - cards[2]!.y0 } };
 }
 
-/** `@for` traces the row once per guest; `@if` is a flap that opens on "No one yet" when the list is empty. */
-function blocks(tokens: Tokens, tall: boolean) {
-	const k = tall ? sketcher(400, 540, tokens, 14) : sketcher(760, 290, tokens, 13);
-	const lh = tall ? 30 : 28;
-	const slip = tall ? { x0: 10, y0: 10, x1: 388, y1: 212 } : { x0: 14, y0: 14, x1: 372, y1: 200 };
-	k.paper(slip.x0, slip.y0, slip.x1, slip.y1, 4);
-	const row = [{ line: 5, from: 0, to: 9 }, { text: '{…}' }, { line: 5, from: 39, to: 40 }, { line: 6, from: 0, to: 6 }, { line: 7, from: 0, to: 4 }] as const;
-	const c = k.code([4, row, 8, 9, 10, 11], slip.x0 + 14, slip.y0 + 30, lh);
-	const bx = slip.x1 - 12;
-	const bracket = (r0: number, r1: number, at: number) => {
-		const y0 = c.rows[r0]!.y - lh * 0.65;
-		const y1 = c.rows[r1]!.y + lh * 0.2;
-		k.pen([[bx - 8, y0], [bx, y0 + 4], [bx, (y0 + y1) / 2 - 6], [bx + 6, (y0 + y1) / 2], [bx, (y0 + y1) / 2 + 6], [bx, y1 - 4], [bx - 8, y1]], at);
-		return (y0 + y1) / 2;
-	};
-	const forMid = bracket(0, 2, 100);
-	const ifMid = bracket(3, 5, 1600);
-	const ph = tall ? k.phone(150, 250, 330, 520) : k.phone(520, 10, 700, 280);
-	const x0 = ph.x0 + 10;
-	const x1 = ph.x1 - 10;
-	const rowY = [ph.y0 + 16, ph.y0 + 52];
-	rowY.forEach((y, i) => {
-		k.pen([[x0, y], [x1, y], [x1, y + 30], [x0, y + 30], [x0, y]], 500 + i * 600, 'pen row');
-		k.text(x0 + 12, y + 21, ['Ada', 'Grace'][i]!, i === 0 ? 'ui bold row' : 'ui row');
-		k.text(x1 - 16, y + 21, String(i + 1), 'hand small row');
-	});
-	const flap = ph.y0 + 100;
-	k.paper(x0, flap, x1, flap + 40, 3, 'flap open');
-	k.text(x0 + 12, flap + 26, 'No one yet', 'ui flap open');
-	k.tucked(x0 + 2, flap + 14, x1 - 2, flap + 40, 'flap shut');
-	k.paper(x0, flap, x1, flap + 12, 2, 'flap shut');
-	k.text(x1 - 30, flap + 10, 'fold', 'hand tiny flap shut');
-	const button = { x0: x0 + 4, y0: flap + 62, x1: x0 + 84, y1: flap + 92 };
-	k.paper(button.x0, button.y0, button.x1, button.y1, 6);
-	k.text((button.x0 + button.x1) / 2, button.y1 - 10, 'Clear', 'ui mid');
-	k.cursor(button.x1 - 14, button.y1 - 10, '');
-	if (tall) {
-		k.arrow([bx + 8, forMid], [x1 + 4, rowY[0]! + 30], 300, 'pen', [[30, 40], [60, -40]]);
-		k.arrow([bx + 8, ifMid], [x1 + 4, flap + 8], 1800, 'pen', [[30, 40], [60, -20]]);
-		k.text(14, rowY[0]! + 26, 'once per', 'hand small');
-		k.text(14, rowY[0]! + 46, 'guest', 'hand small');
-		k.text(14, flap + 10, 'only when', 'hand small');
-		k.text(14, flap + 30, "no one's going", 'hand small');
-	} else {
-		k.arrow([bx + 10, forMid], [x0 - 6, rowY[0]! + 30], 300, 'pen', [[50, 0], [-50, 0]]);
-		k.arrow([bx + 10, ifMid], [x0 - 6, flap + 8], 1800, 'pen', [[50, 0], [-50, 0]]);
-		k.text(bx + 18, forMid - 30, 'once per', 'hand small');
-		k.text(bx + 18, forMid - 12, 'guest', 'hand small');
-		k.text(bx + 18, ifMid + 26, 'only when', 'hand small');
-		k.text(bx + 18, ifMid + 44, "no one's going", 'hand small');
-	}
-	return k.out;
-}
-
-/** The three figures in both shapes, frozen into figures.art.ts. */
+/** The two sketches in both shapes, frozen into figures.art.ts. */
 export function drawings(tokens: Tokens) {
 	const wide = steps(tokens, false);
 	const tall = steps(tokens, true);
 	return {
 		values: { wide: values(tokens, false), tall: values(tokens, true) },
 		steps: { wide: wide.layout, tall: tall.layout, lift: { wide: wide.lift, tall: tall.lift } },
-		blocks: { wide: blocks(tokens, false), tall: blocks(tokens, true) },
 	};
 }

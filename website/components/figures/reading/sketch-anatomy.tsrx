@@ -1,38 +1,29 @@
-// A slice of the guest list on a paper slip beside a phone showing what it does; `figure` picks values, steps or blocks.
+// A slice of the guest list on a paper slip beside a phone showing what it does; `figure` picks values or steps.
 import { computed, state } from '@markless/core';
 import { flip, sketchOf, SKETCH_SAID, describeSketch } from './model.ts';
 import { art } from './figures.art.ts';
 
 export default function SketchAnatomy({ figure }: { readonly figure: string }) @{
 	const which = sketchOf(figure);
-	const pair = which === 'steps' ? art.steps : which === 'blocks' ? art.blocks : art.values;
+	const pair = which === 'steps' ? art.steps : art.values;
 	const lift = art.steps.lift;
 	let beat = state('odd');
-	let empty = state(false);
 	let touched = state(false);
-	const said = computed(() => describeSketch(which, empty, touched));
+	const said = computed(() => describeSketch(which, touched));
 
 	<figure class="sketch">
 		<button
 			type="button"
 			class="stage"
-			aria-label={which === 'blocks' ? 'Press Clear on the sketched phone' : 'Play the sketch again'}
+			aria-label="Play the sketch again"
 			onClick={() => {
 				touched = true;
-				if (which === 'blocks') empty = !empty;
-				else beat = flip(beat);
-			}}
-			onKeyDown={(event) => {
-				if (event.key === 'Escape') {
-					touched = true;
-					empty = false;
-				}
+				beat = flip(beat);
 			}}
 		>
 			<svg
 				class="scene wide"
 				data-beat={beat}
-				data-empty={empty ? 'yes' : 'no'}
 				viewBox={'0 0 ' + pair.wide.width + ' ' + pair.wide.height}
 				style={'--code:' + pair.wide.size + 'px;--lift-x:' + lift.wide.x + 'px;--lift-y:' + lift.wide.y + 'px'}
 				aria-hidden="true"
@@ -50,7 +41,6 @@ export default function SketchAnatomy({ figure }: { readonly figure: string }) @
 			<svg
 				class="scene tall"
 				data-beat={beat}
-				data-empty={empty ? 'yes' : 'no'}
 				viewBox={'0 0 ' + pair.tall.width + ' ' + pair.tall.height}
 				style={'--code:' + pair.tall.size + 'px;--lift-x:' + lift.tall.x + 'px;--lift-y:' + lift.tall.y + 'px'}
 				aria-hidden="true"
@@ -205,18 +195,7 @@ export default function SketchAnatomy({ figure }: { readonly figure: string }) @
 				font-size: 14px;
 			}
 
-			.tiny {
-				font-size: 10px;
-				opacity: 0.7;
-			}
 
-			.tucked {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 0.8;
-				stroke-dasharray: 3 4;
-				opacity: 0.45;
-			}
 
 			.pen {
 				fill: none;
@@ -270,37 +249,6 @@ export default function SketchAnatomy({ figure }: { readonly figure: string }) @
 
 			.lift {
 				animation: var(--fly) 1200ms 1500ms ease-in-out both;
-			}
-
-			.row {
-				transition: opacity 300ms ease-out;
-			}
-
-			.flap {
-				transform-box: fill-box;
-				transform-origin: 50% 0;
-				transition: transform 450ms ease-in-out, opacity 450ms;
-			}
-
-			.open {
-				transform: scaleY(0);
-				opacity: 0;
-			}
-
-			.scene[data-empty='yes'] {
-				.row {
-					opacity: 0;
-				}
-
-				.open {
-					transform: none;
-					opacity: 1;
-				}
-
-				.shut {
-					transform: scaleY(0);
-					opacity: 0;
-				}
 			}
 
 			@keyframes draw-a {

@@ -104,11 +104,6 @@ export function sketcher(width: number, height: number, tokens: readonly (readon
 		return screen;
 	}
 
-	/** A dashed pencil outline where a folded flap would open. */
-	function tucked(x0: number, y0: number, x1: number, y1: number, cls: string) {
-		shape(pathOf(jittered(resample([...roundRect(x0, y0, x1, y1, 3), [x0 + 3, y0]], 3), next(), 0.6)), 'tucked ' + cls);
-	}
-
 	/** A loose highlighter pass behind a span of the screen or the slip. */
 	function highlight(x0: number, y: number, x1: number, h: number, cls: string) {
 		shape(wash(roundRect(x0, y - h / 2, x1, y + h / 2, h / 2.2), next(), 1.2, 2.2), cls);
@@ -178,5 +173,5 @@ export function sketcher(width: number, height: number, tokens: readonly (readon
 		pen([...roundRect(x0 - 3, top - 1, x1 + 3, bottom + 1, 6), [x0 - 3 + 6, top - 1]], at, cls);
 	}
 
-	return { out, pen, arrow, paper, phone, highlight, cursor, code, socket, text, shape, tucked, advance };
+	return { out, pen, arrow, paper, phone, highlight, cursor, code, socket, text, shape, advance };
 }
