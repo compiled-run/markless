@@ -520,28 +520,36 @@ subclasses. `user.profile.name = x` and `items.push(x)` are graph writes with
 path-level invalidation semantics, so a deep mutation updates only the DOM updates
 that read that path.
 
-Object identity is part of the state graph contract. If two state paths point to
-the same object before initial-render serialization, they point to the same
-object after resume:
+Object identity is part of the state graph contract: serialization preserves
+it, so an object reachable from two places in the state payload is one object
+after resume, and cycles are serializable when every reachable value is
+otherwise serializable.
+
+One object at two state paths is still not something a page can show
+correctly. A change is tracked by the state path it was written through, so a
+write through one path updates only the DOM that reads that path, while the
+object behind the other path has changed too. Where the compiler can see it
+happen, it refuses:
 
 ```ts
 const user = { id: 1 };
-let task = state({ author: user, assignee: user });
-
-// After resume:
-task.author === task.assignee; // true
+let task = state({ author: user, assignee: user }); // MARKLESS_STATE_SHARED_OBJECT
+// Two objects instead: state({ author: user, assignee: { ...user } })
 ```
 
-Cycles are supported when every reachable value is otherwise serializable:
+Sharing the compiler cannot see (an object that arrives shared from a
+response, a cycle built before `state()` is called, or a handler that assigns
+one state object into a second state path) is preserved by serialization and
+is not tracked across its paths: a write through one path does not update DOM
+that reads the other. Keep one copy and refer to it by an id from other places.
 
-```ts
-const user = { id: 1, manager: null as null | typeof user };
-user.manager = user;
-let session = state({ user });
-
-// After resume:
-session.user.manager === session.user; // true
-```
+A plain `const` in a component body is computed once, when the page renders.
+A template that reads one built from state (`const filled = basket.filter(...)`,
+`const byId = new Map([[id, user]])`, `const word = count > 1 ? 'lines' : 'line'`)
+would show that first value forever and is refused with
+`MARKLESS_TEMPLATE_READS_STATE_COPY`; derive it with `computed()` instead. A
+`const` that names a state path (`const first = basket[0]`) is an alias, not a
+copy, and stays live.
 
 The serializer fails because a reachable value is unsupported, not because the
 graph is circular. Diagnostics must point at the unsupported state path:
