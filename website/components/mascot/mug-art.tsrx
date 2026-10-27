@@ -280,15 +280,9 @@ export default function MugArt({
 						</g>
 					</g>
 					<g class="sleep-signs">
-						<text class="sleep-z" x="132" y="46">
-							z
-						</text>
-						<text class="sleep-z" x="151" y="27">
-							z
-						</text>
-						<text class="sleep-z" x="174" y="8">
-							Z
-						</text>
+						<path class="sleep-z" d="M134 38.5H141L132.5 46H139.5" />
+						<path class="sleep-z" d="M152.8 18H161.3L151 27H159.5" />
+						<path class="sleep-z" d="M177 -7.4H190L174 8H187" />
 					</g>
 					<g class="steam">
 						<path class="wisp" d="M 96 49 c -8 -9 8 -15 0 -26 c -4 -6 -2 -10 2 -14" />
@@ -735,11 +729,11 @@ export default function MugArt({
  .mug[data-state='cheers'] .clink-marks { animation:contact 4s linear infinite; }
  @keyframes clink { 0%,8%,100% { opacity:0; transform:translate(255px,85px) rotate(6deg); } 24%,42% { opacity:1; transform:translate(174px,60px) rotate(-10deg); } 57% { opacity:1; transform:translate(189px,69px) rotate(1deg); } 78% { opacity:0; transform:translate(240px,85px) rotate(6deg); } }
  @keyframes contact { 0%,23%,45%,100% { opacity:0; } 25%,40% { opacity:1; } }
- .sleep-signs { opacity:0; fill:var(--ink); font-family:Georgia,serif; font-style:italic; font-weight:600; font-size:16px; }
+ .sleep-signs { opacity:0; fill:none; stroke:var(--ink); stroke-width:2.3; stroke-linecap:round; stroke-linejoin:round; }
  .mug[data-state='sleep'] .sleep-signs { opacity:1; }
  .mug[data-state='sleep'] .sleep-z { animation:sleep-rise 3.6s ease-out infinite; }
- .sleep-z:nth-child(2) { animation-delay:-1.2s; font-size:19px; }
- .sleep-z:nth-child(3) { animation-delay:-2.4s; font-size:22px; }
+ .sleep-z:nth-child(2) { animation-delay:-1.2s; }
+ .sleep-z:nth-child(3) { animation-delay:-2.4s; stroke-width:2.7; }
  @keyframes sleep-rise { 0% { opacity:0; transform:translate(-5px,12px) scale(.8); } 25%,55% { opacity:.8; } 100% { opacity:0; transform:translate(6px,-10px) scale(1.08); } }
  @media (prefers-reduced-motion: reduce) { .mug .pose, .mug .eye-l, .mug .eye-r, .mug .bean-eye { transition: none; } .mug * { animation-play-state: paused !important; animation-delay: -1.3s !important; } .mug .blink { animation: none; } }
  .coaster-art,.companion-art { display:none; }

@@ -7,6 +7,7 @@ import AgentLogos from '../../components/docs/agent-logos.tsrx';
 import MarkedText from '../../components/docs/marked-text.tsrx';
 import MarkedList from '../../components/docs/marked-list.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import CommandStrip from '../../components/docs/command-strip.tsrx';
 
 <Sidebar />
 
@@ -34,9 +35,7 @@ If anything differs, the page doesn't switch, and your old app keeps serving it.
 
 <MugSpot mood="curious" at="eyes" />
 
-```bash
-npx @markless/migrate setup
-```
+<CommandStrip command="npx @markless/migrate setup" />
 
 It's a preview, so it's not on npm yet. MIT licensed, [source on GitHub](https://github.com/compiled-run/markless-migrate).
 
