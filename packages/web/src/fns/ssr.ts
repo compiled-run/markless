@@ -110,6 +110,8 @@ type SsrBoundaryRecord = SsrAnchoredRecord & {
 	readonly updateSymbolId?: string;
 	readonly asyncReads?: ReadonlyArray<SsrAsyncReadRecord>;
 	readonly armRecords?: SsrArmRecordSet | ReadonlyArray<SsrArmRecordSet>;
+	readonly composedInstancePath?: string;
+	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
 };
 type SsrViewDraft = SsrRecord & {
 	readonly locators: ReadonlyArray<SsrLocatorRecord>;
@@ -1664,9 +1666,6 @@ export function marklessSsrAppendChildView(context: {
 		)
 			continue;
 		const keepSymbol = Boolean(childSymbolId) && (!decided || contentDriven);
-		const composedRoutes = keepSymbol
-			? marklessSsrComposedBranchRoutes(branch, context.child, childInstancePath)
-			: undefined;
 		const mappedBranch = {
 			...unwired,
 			id: context.child.hostPrefix + branch.id,
@@ -1692,12 +1691,7 @@ export function marklessSsrAppendChildView(context: {
 				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId!) }
 				: {}),
 			...(armRecords ? { armRecords } : {}),
-			...(composedRoutes?.props.length
-				? {
-						composedInstancePath: composedRoutes.instancePath,
-						composedGraphProps: composedRoutes.props,
-					}
-				: {}),
+			...(keepSymbol && marklessSsrComposedRoutes(branch, context.child, childInstancePath)),
 			// The arm this child already served keeps its arm-relative
 			// coordinates; only ids and symbols take the child's prefixes.
 			...(branch.servedArmRecords
@@ -1722,6 +1716,8 @@ export function marklessSsrAppendChildView(context: {
 		context.asyncBoundaries.push({
 			...boundary,
 			id: context.child.hostPrefix + boundary.id,
+			...(boundary.updateSymbolId &&
+				marklessSsrComposedRoutes(boundary, context.child, childInstancePath)),
 			...(boundary.runnerGraphNodeId
 				? {
 						runnerGraphNodeId:
@@ -1942,31 +1938,32 @@ export function marklessSsrRemapChildReads<T extends ComposeGraphRead>(
  * child's own, and this child's route table is the answer. `undefined` means
  * there is nothing for this level to say.
  */
-function marklessSsrComposedBranchRoutes(
-	branch: SsrBranchRecord,
+function marklessSsrComposedRoutes(
+	record: Pick<SsrBranchRecord, 'id' | 'composedInstancePath' | 'composedGraphProps'>,
 	child: SsrPrefixChild,
 	childInstancePath: string,
-): { readonly instancePath: string; readonly props: ProtocolComposedGraphProp[] } | undefined {
-	if (branch.composedInstancePath !== undefined)
-		return {
-			instancePath: childInstancePath + branch.composedInstancePath,
-			props: (branch.composedGraphProps ?? []).flatMap((prop) => {
+): Pick<SsrBranchRecord, 'composedInstancePath' | 'composedGraphProps'> | undefined {
+	const nested = record.composedInstancePath !== undefined;
+	if (!nested && marklessInstancePath(record.id) !== '') return undefined;
+	const props = nested
+		? (record.composedGraphProps ?? []).flatMap((prop) => {
 				const mapped = marklessCsrRemapChildGraph(
 					{ graphNodeId: prop.graphNodeId, path: prop.path ?? [] },
 					child.graphProps,
 					childInstancePath,
 				);
 				return mapped ? [marklessSsrComposedGraphProp(prop.name, mapped)] : [];
-			}),
-		};
-	if (marklessInstancePath(branch.id) !== '') return undefined;
-	return {
-		instancePath: childInstancePath,
-		props: (child.graphProps ?? []).flatMap((prop) => {
-			const route = marklessLiveBoundGraphRoute(prop);
-			return route ? [marklessSsrComposedGraphProp(prop.name, route)] : [];
-		}),
-	};
+			})
+		: (child.graphProps ?? []).flatMap((prop) => {
+				const route = marklessLiveBoundGraphRoute(prop);
+				return route ? [marklessSsrComposedGraphProp(prop.name, route)] : [];
+			});
+	return props.length > 0
+		? {
+				composedInstancePath: childInstancePath + (record.composedInstancePath ?? ''),
+				composedGraphProps: props,
+			}
+		: undefined;
 }
 
 function marklessSsrComposedGraphProp(
