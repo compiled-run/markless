@@ -956,7 +956,10 @@ function payloadDemandRecords(
 				recordId: `branch:${record.id}`,
 				kind: 'branch',
 				symbolIds: flipSymbolIds,
-				runtimeModuleIds: unique([...BRANCH, ...symbolIdsDemand(flipSymbolIds, symbolDemand)]),
+				runtimeModuleIds: unique([
+					...BRANCH,
+					...symbolIdsDemand(flipSymbolIds, symbolDemand),
+				]),
 			};
 		}),
 		...(view.asyncBoundaries ?? []).map((record): RuntimeDemandMapRecord => ({
@@ -1700,10 +1703,16 @@ function consequenceReach(
 		}
 		return true;
 	};
-	// A branch that does not flip keeps its served arm wired, so a write reaches that arm's records like the page's own.
+	const readsNothing = (branch: {
+		readonly testReads?: ReadonlyArray<unknown>;
+		readonly contentReads?: ReadonlyArray<unknown>;
+	}) => !branch.testReads?.length && !branch.contentReads?.length;
+	// A branch that reads nothing never flips, so its served arm stays wired and a write reaches that arm's records like the page's own.
 	const liveArmReach = (set: ArmRecordSetLike | undefined): boolean => {
 		if (!set) return true;
-		for (const update of (set.domUpdates ?? []) as NonNullable<ProtocolViewPayload['domUpdates']>)
+		for (const update of (set.domUpdates ?? []) as NonNullable<
+			ProtocolViewPayload['domUpdates']
+		>)
 			if (reads([update])) {
 				recordIds.add(`dom-update:${update.hostNodeId}:${update.symbolId ?? ''}`);
 				if (update.symbolId) symbolIds.add(update.symbolId);
@@ -1716,7 +1725,8 @@ function consequenceReach(
 		}
 		for (const branch of set.branches ?? []) {
 			if (!(reads(branch.testReads) || reads(branch.contentReads))) {
-				for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return false;
+				if (readsNothing(branch))
+					for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return false;
 				continue;
 			}
 			if (!branch.symbolId) return false;
@@ -1733,7 +1743,8 @@ function consequenceReach(
 				if (typeof symbolId === 'string') symbolIds.add(symbolId);
 			}
 		if (!branchFlips(branch)) {
-			for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return 'unknown';
+			if (readsNothing(branch))
+				for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return 'unknown';
 			continue;
 		}
 		if (branch.escalates || !branch.symbolId) return 'unknown';
