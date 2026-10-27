@@ -11,6 +11,7 @@ import {
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
+import { collectStateEscapes } from './collect-state-escapes.ts';
 import { getFrameworkApiForCall } from './imports.ts';
 import type { SemanticStateWrite } from '../../artifacts.ts';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
@@ -204,6 +205,8 @@ export function collectWritesIn(node: AnyNode | undefined, state: WalkState): vo
 		collectCollectionCall(node, state);
 		collectObjectAssign(node, state);
 	}
+	if (node.type === 'CallExpression' || node.type === 'NewExpression')
+		collectStateEscapes(node, state);
 
 	for (const child of childNodes(node)) collectWritesIn(child, state);
 }

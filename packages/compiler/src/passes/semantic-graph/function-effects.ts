@@ -145,7 +145,7 @@ const ALIAS_RETURNING_METHODS = new Set([
 	'values',
 	'with',
 ]);
-// Built-in methods that read the value and hand none of it back.
+// Built-in methods that read the value, or keep only its string, and hand none of it back.
 const READ_METHODS = new Set([
 	'charAt',
 	'charCodeAt',
@@ -181,6 +181,8 @@ const READ_METHODS = new Set([
 	'replace',
 	'replaceAll',
 	'search',
+	'setAttribute',
+	'setAttributeNS',
 	'split',
 	'startsWith',
 	'substring',
@@ -233,7 +235,7 @@ export function summarizeModuleFunctions(input: {
 
 export type FunctionEffects = {
 	readonly ofFunction: (fn: AnyNode) => FunctionEffect;
-	readonly ofCallee: (call: AnyNode, argumentIndex: number) => CalleeEffect;
+	readonly ofCallee: (call: AnyNode, argumentIndex: number, within?: AnyNode) => CalleeEffect;
 };
 
 // `imported` answers for an imported callee by specifier and name; undefined is a function this compile cannot see.
@@ -315,6 +317,12 @@ export function createFunctionEffects(
 				if (isLiteralMember(module, parent, expression)) {
 					path = null;
 					expression = literalOf(module, parent);
+					continue;
+				}
+				// `new Map(entries)` holds what it is handed: followed through the new container.
+				if (isContainerConstruction(module, parent, expression)) {
+					path = null;
+					expression = parent;
 					continue;
 				}
 				if (parent.type === 'MemberExpression' && parent.object === expression) {
@@ -408,7 +416,7 @@ export function createFunctionEffects(
 				case 'NewExpression': {
 					const index = asNodes(parent.arguments).indexOf(expression);
 					if (index < 0) return;
-					const callee = ofCallee(parent, index);
+					const callee = ofCallee(parent, index, fn);
 					if (callee.kind === 'pure') return;
 					if (callee.kind === 'unseen') {
 						unseen.push({ callee: callee.name, path });
@@ -426,7 +434,11 @@ export function createFunctionEffects(
 				case 'SpreadElement': {
 					const holder = parentOf(module, parent);
 					if (holder?.type === 'CallExpression' || holder?.type === 'NewExpression') {
-						const callee = ofCallee(holder, asNodes(holder.arguments).indexOf(parent));
+						const callee = ofCallee(
+							holder,
+							asNodes(holder.arguments).indexOf(parent),
+							fn,
+						);
 						if (callee.kind === 'unseen')
 							unseen.push({ callee: callee.name, path: null });
 						else if (callee.kind === 'effect') retains.push(null);
@@ -445,11 +457,17 @@ export function createFunctionEffects(
 
 		// `x = p` keeps a second name for it; `obj.k = p` stores it somewhere this function does not own.
 		const storeInto = (left: AnyNode, path: string[] | null): void => {
-			const target = unwrapTypeAssertion(left);
+			let target = unwrapTypeAssertion(left);
+			let held = path;
+			// `next[1] = p` puts it into a local the function owns, followed like the local itself.
+			while (target?.type === 'MemberExpression') {
+				target = unwrapTypeAssertion(target.object as AnyNode | undefined);
+				held = null;
+			}
 			if (target?.type === 'Identifier') {
 				const binding = module.bindingOf(target as never);
 				if (binding && isInside(fn, binding.declarations[0] as unknown as AnyNode)) {
-					follow(binding, path);
+					follow(binding, held);
 					return;
 				}
 			}
@@ -466,7 +484,7 @@ export function createFunctionEffects(
 		};
 	};
 
-	const ofCallee = (call: AnyNode, argumentIndex: number): CalleeEffect => {
+	const ofCallee = (call: AnyNode, argumentIndex: number, within?: AnyNode): CalleeEffect => {
 		const callee = unwrapTypeAssertion(call.callee as AnyNode | undefined);
 		if (!callee) return { kind: 'unseen', name: 'the function it computes' };
 		const name = calleeName(callee);
@@ -524,8 +542,10 @@ export function createFunctionEffects(
 			}
 			if (owner.type === 'Identifier' && isStringifyingContainer(module, owner))
 				return { kind: 'pure' };
+			if ((method === 'test' || method === 'exec') && isRegExp(module, owner))
+				return { kind: 'pure' };
 			// A value put into a local array, Map or object is followed through that local where it is written.
-			if (owner.type === 'Identifier' && isLocalContainer(module, owner))
+			if (owner.type === 'Identifier' && isLocalContainer(module, owner, within))
 				return { kind: 'pure' };
 			// An argument put into an array, Map or Set stays there after the call.
 			if (MUTATING_METHODS.has(method)) {
@@ -614,14 +634,51 @@ function isStringifyingContainer(module: ModuleSemantics, identifier: AnyNode): 
 	);
 }
 
+function isRegExp(module: ModuleSemantics, node: AnyNode): boolean {
+	if (node.type === 'Literal' && 'regex' in node) return true;
+	if (node.type !== 'Identifier') return false;
+	const binding = module.bindingOf(node as never);
+	if (!binding || binding.references.some((reference) => reference.isWrite)) return false;
+	const declaration = binding.declarations[0] as unknown as AnyNode | undefined;
+	const declarator = declaration && parentOf(module, declaration);
+	const init =
+		declarator?.type === 'VariableDeclarator'
+			? unwrapTypeAssertion(declarator.init as AnyNode | undefined)
+			: undefined;
+	if (!init) return false;
+	if (init.type === 'Literal' && 'regex' in init) return true;
+	const callee = init.type === 'NewExpression' ? (init.callee as AnyNode | undefined) : undefined;
+	return (
+		callee?.type === 'Identifier' &&
+		callee.name === 'RegExp' &&
+		!module.bindingOf(callee as never)
+	);
+}
+
 const CONTAINER_CONSTRUCTORS = new Set(['Array', 'Map', 'Set', 'WeakMap', 'WeakSet']);
 
-function isLocalContainer(module: ModuleSemantics, identifier: AnyNode): boolean {
+function isContainerConstruction(
+	module: ModuleSemantics,
+	node: AnyNode,
+	argument: AnyNode,
+): boolean {
+	const callee = node.type === 'NewExpression' ? (node.callee as AnyNode | undefined) : undefined;
+	return (
+		callee?.type === 'Identifier' &&
+		CONTAINER_CONSTRUCTORS.has(callee.name as string) &&
+		!module.bindingOf(callee as never) &&
+		asNodes(node.arguments)[0] === argument
+	);
+}
+
+// Inside a summarized function only its own containers count: a module-level one outlives the call.
+function isLocalContainer(module: ModuleSemantics, identifier: AnyNode, within?: AnyNode): boolean {
 	const binding = module.bindingOf(identifier as never);
 	if (!binding || module.imports.some((record) => record.local?.id === binding.id)) return false;
 	const declaration = binding.declarations[0] as unknown as AnyNode | undefined;
 	const declarator = declaration && parentOf(module, declaration);
 	if (declarator?.type !== 'VariableDeclarator') return false;
+	if (within && !isInside(within, declarator)) return false;
 	const init = unwrapTypeAssertion(declarator.init as AnyNode | undefined);
 	if (init?.type === 'ArrayExpression' || init?.type === 'ObjectExpression') return true;
 	const callee =

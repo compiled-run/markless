@@ -292,14 +292,15 @@ function refusalFor(
 				: (path.length > 1 && riskAt(argument, path.slice(0, -1), state)) ||
 					(path.length > 0 && riskAt(argument, path, state)),
 	);
-	if (mutated !== undefined) {
-		return { callee: callee.name, reason: 'mutates', detail: mutated?.join('.') ?? '' };
-	}
+	// A change made now can be tracked after the call; one made later or out of sight cannot.
 	if (effect.retains.some((path) => riskAt(argument, path, state))) {
 		return { callee: callee.name, reason: 'retains' };
 	}
 	const handedOn = effect.unseen.find((pass) => riskAt(argument, pass.path, state));
 	if (handedOn) return { callee: callee.name, reason: 'hands-on', detail: handedOn.callee };
+	if (mutated !== undefined) {
+		return { callee: callee.name, reason: 'mutates', detail: mutated?.join('.') ?? '' };
+	}
 	return null;
 }
 

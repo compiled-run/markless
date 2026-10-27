@@ -163,6 +163,8 @@ export type WalkState = {
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
+	// The identifier each state() binding was declared with; state bindings carry no source span.
+	stateDeclarations: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
 	// components, so a member tag can name the component every pass knows.
 	memberTagTargets: Map<string, string>;
@@ -309,6 +311,7 @@ export function createWalkState(input: {
 		pendingElementHandleIdrefs: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
+		stateDeclarations: new Map(),
 		memberTagTargets: new Map(),
 		styleConstResolver: null,
 		pendingComputedDependencies: [],

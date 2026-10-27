@@ -18,6 +18,15 @@ export function watch(card: { title: string }) { return { later: () => { card.ti
 export function forward(card: { title: string }) { vendorSave(card); }
 export async function settle(card: { title: string }) { await Promise.resolve(); card.title = 'done'; }
 declare function vendorSave(value: unknown): void;
+const remembered = new WeakMap<object, unknown>();
+export function remember(spec: object, card: { title: string }) { remembered.set(spec, card); }
+export function rememberBoxed(spec: object, card: { title: string }) { const box = { card }; remembered.set(spec, box); }
+let stamped: unknown;
+export function stamp(card: { title: string }) { card.title = 'x'; stamped = card; }
+export function stampAndSend(card: { title: string }) { card.title = 'y'; vendorSave(card); }
+export function swapEnds(list: string[]) { const next = [...list]; const first = next[0]!; next[0] = next[next.length - 1]!; next[next.length - 1] = first; return next; }
+export function idsOf(list: Array<{ id: number }>) { const ids = new Set(list.map((entry) => entry.id)); const byId = new Map([[0, list.length]]); return ids.size + byId.size; }
+export function tally(card: { title: string }) { const seen = new Map(); seen.set('c', card); return seen.size; }
 `;
 
 const summaries = {
@@ -29,7 +38,7 @@ async function compile(handlerBody: string) {
 	return compileTsrxModule({
 		filename: 'src/Board.tsrx',
 		source: `import { state } from '@markless/core';
-import { append, caption, forward, retitle, setCount, settle, watch } from './cards.ts';
+import { append, caption, forward, retitle, setCount, settle, stamp, stampAndSend, watch } from './cards.ts';
 import { pack } from 'card-kit';
 
 function local(card: { title: string }) { card.title = card.title.toUpperCase(); }
@@ -79,6 +88,15 @@ test('a module summary says which parameters a function changes, keeps or hands 
 	});
 });
 
+test('a value put into a container that outlives the call is kept; one put into a container of the call is not', () => {
+	const cards = summaries['./cards.ts'];
+	expect(cards.remember!.parameters[1]!.retains).not.toEqual([]);
+	expect(cards.rememberBoxed!.parameters[1]!.retains).not.toEqual([]);
+	expect(cards.tally!.parameters[0]).toEqual({ mutates: [], retains: [], unseen: [] });
+	expect(cards.swapEnds!.parameters[0]!.retains).toEqual([]);
+	expect(cards.idsOf!.parameters[0]).toEqual({ mutates: [], retains: [], unseen: [] });
+});
+
 test('a helper that changes the state it is handed has each change invalidated after it returns', async () => {
 	const result = await compile(
 		`retitle(card, 'b'); append(card.notes, 'm'); setCount(rows, 'k', 2); local(card); picked = caption(card);`,
@@ -117,6 +135,9 @@ test('a change made through a row local found in state is invalidated where that
 
 test.each([
 	['watch(card)', 'watch() keeps a reference to it after it returns'],
+	['picked = String(watch(card))', 'watch() keeps a reference to it after it returns'],
+	['stamp(card)', 'stamp() keeps a reference to it after it returns'],
+	['stampAndSend(card)', 'stampAndSend() hands it on to vendorSave()'],
 	['forward(card)', 'forward() hands it on to vendorSave()'],
 	['settle(card)', 'settle() keeps a reference to it after it returns'],
 	['pack(card)', 'Markless cannot see what pack() does with it'],
@@ -138,10 +159,37 @@ test.each([
 
 test('reading state through pure built-ins, or handing over a primitive, is not a refusal', async () => {
 	const result = await compile(
-		`picked = JSON.stringify(card) + String(card.title) + Object.keys(card).join() + caption(card); pack(card.title); console.log(card, rows);`,
+		`picked = JSON.stringify(card) + String(card.title) + Object.keys(card).join() + caption(card); pack(card.title); console.log(card, rows); const re = /a/; re.test(card as never); re.exec(card as never); /b/.test(card as never); document.body.setAttribute('data-card', card as never);`,
 	);
 
 	expect(errors(result)).toEqual([]);
+});
+
+test('a state declared with a primitive type from a value the compiler cannot read is handed over as a primitive', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Board.tsrx',
+		source: `import { state } from '@markless/core';
+import { pack } from 'card-kit';
+import { initial } from './initial.ts';
+
+export function Board() @{
+	const start = initial();
+	let title = state<string>(start.title);
+	let count = state<number>(start.count);
+	let card = state<{ title: string }>(start.card);
+	<div>
+		<button onClick={() => { pack({ title, count }); }}>{title}</button>
+		<button onClick={() => { pack({ title, card }); }}>{count}</button>
+	</div>
+}
+`,
+		symbols: [],
+		importedFunctionSummaries: summaries,
+	});
+
+	expect(errors(result).map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining('Cannot pass "{ title, card }" to pack() here'),
+	]);
 });
 
 test('without summaries from the host, an imported function is a pending request and not a refusal', async () => {

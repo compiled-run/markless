@@ -268,9 +268,9 @@ export function isScalarState(binding: SemanticGraphBinding, state: WalkState): 
 
 function scalarVerdict(binding: SemanticGraphBinding, state: WalkState): boolean {
 	const semantic = state.semantic();
-	const id = binding.sourceSpan
-		? nodeAt(semantic, binding.sourceSpan.start, binding.sourceSpan.end)
-		: null;
+	const span = binding.sourceSpan ?? state.stateDeclarations.get(binding.id);
+	const id =
+		typeof span?.start === 'number' ? nodeAt(semantic, span.start, span.end as number) : null;
 	const declarator = id && (semantic.parentOf(id as never) as unknown as AnyNode | null);
 	const call =
 		declarator?.type === 'VariableDeclarator'
