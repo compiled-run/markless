@@ -50,6 +50,7 @@ export function evaluate(measurement, anchors) {
 	if (measurement.resumeRows)
 		checkResumeRows(measurement.resumeRows, anchors.resumeRows ?? {}, fail, note);
 	if (measurement.hiddenContent) checkHiddenContent(measurement.hiddenContent, fail, note);
+	if (measurement.routeTable) checkRouteTable(measurement.routeTable, fail, note);
 	for (const [site, siteResult] of Object.entries(measurement.sites))
 		for (const [route, result] of Object.entries(siteResult.routes))
 			if (result.resumeData)
@@ -434,6 +435,29 @@ function checkHiddenContent({ short, long }, fail, note) {
 			`${line}: +${grown} chars run at load for content nobody opened (budget +${BUDGETS.hiddenContentLoadChars}). Code a page has not shown must not run at load: a runtime an idle or visible handler starts must leave row and render code until a reader's input. shadcn-admin /settings/account ran its whole page's render code at load this way (1.5 MB against 100 kB). ${INVARIANT}`,
 		);
 	note('G14', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
+}
+
+function checkRouteTable({ few, many }, fail, note) {
+	const html = many.htmlBytes - few.htmlBytes;
+	const grown = many.executedChars - few.executedChars;
+	const line = `a router page runs ${few.executedChars} chars at load linking a few routes and ${many.executedChars} linking many, whose html is ${kb(html)} bigger`;
+	const errors = [...few.errors, ...many.errors];
+	if (!few.answered || !many.answered || errors.length > 0)
+		return fail(
+			'G15',
+			`the route-table fixture did not answer its menu button${errors.length ? `: ${errors.join('; ')}` : ''}. ${INVARIANT}`,
+		);
+	if (html < BUDGETS.routeTableMinHtmlGrowth)
+		return fail(
+			'G15',
+			`${line}: the many-link page must ship at least ${kb(BUDGETS.routeTableMinHtmlGrowth)} more html, or this guard compares two equal pages. Link more routes.`,
+		);
+	if (grown > BUDGETS.routeTableLoadChars)
+		return fail(
+			'G15',
+			`${line}: +${grown} chars run at load for links nobody touched (budget +${BUDGETS.routeTableLoadChars}). A page's route table must stay inert until idle or a link intent: the shadcn port's docs pages evaluated a 109 kB table of their 136 linked routes at load, 63% of all JavaScript they ran by the load event. ${INVARIANT}`,
+		);
+	note('G15', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
 }
 
 function noteResumeData(subject, data, anchors, note) {

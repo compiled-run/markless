@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { laterLinkBridge, servedLinkBridge } from '../support/link-bridge.ts';
+import { laterLinkBridge, servedLinkBridge, servedRouteTable } from '../support/link-bridge.ts';
 import {
 	createServerEntry,
 	type ServerEntryOptions,
@@ -52,7 +52,8 @@ test('a fragment fetch of a client-navigation app answers the shell head and the
 });
 
 test('a fragment fetch leaves out the import map the landing document already carries', async () => {
-	const importMap = '<script type="importmap">{"imports":{"@markless/c/a":"/build/a.js"}}</script>';
+	const importMap =
+		'<script type="importmap">{"imports":{"@markless/c/a":"/build/a.js"}}</script>';
 	for (const documentNavigation of ['client', 'document'] as const) {
 		const app = entry({ importMap, documentNavigation });
 		const fragment = await (await app.fetch(fragmentRequest('https://app.test/next'))).text();
@@ -106,13 +107,49 @@ test('the link bridge carries each destination landing plan and no client-render
 	const served = entry();
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
 	const bridge = servedLinkBridge(html, served) ?? '';
-	expect(bridge).toContain('"/next":["/landing-next.js"]');
+	expect(servedRouteTable(html)).toEqual({ '/next': ['/landing-next.js'] });
 	// The page bridge only listens; the config and fetch logic load on the first intent or at idle.
 	expect(bridge).not.toContain('"entry":"/fragment.js"');
 	expect(bridge).toContain(served.linkBridgeModules![2]!.path);
 	expect(laterLinkBridge(served)).toContain('"entry":"/fragment.js"');
 	expect(html).not.toContain('/client-render-next.js');
 	expect(html).not.toContain('rel="modulepreload" href="/navigation.js"');
+});
+
+test('the route table is inert JSON listing each preload once, so a page evaluates no table at load', async () => {
+	const linked = ['a', 'b', 'c'];
+	const served = entry({
+		routeSsrModulePreloads: {
+			'pages/index.tsrx': ['/landing-index.js'],
+			...Object.fromEntries(
+				linked.map((name) => [`pages/${name}.tsrx`, ['/shared.js', `/landing-${name}.js`]]),
+			),
+		},
+		pageModuleLoaders: {
+			'pages/index.tsrx': page(
+				`<div data-async-container>${linked.map((name) => `<a href="/${name}" data-markless-router-link>${name}</a>`).join('')}</div>`,
+			),
+			...Object.fromEntries(
+				linked.map((name) => [
+					`pages/${name}.tsrx`,
+					page(`<div data-async-container><h1>${name}</h1></div>`),
+				]),
+			),
+		},
+		routeFileIds: ['/pages/index.tsrx', ...linked.map((name) => `/pages/${name}.tsrx`)],
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	expect(servedLinkBridge(html, served)).not.toContain('/shared.js');
+	const json =
+		/<script type="application\/json" data-markless-router-links>([\s\S]*?)<\/script>/.exec(
+			html,
+		)?.[1];
+	expect(json?.split('"/shared.js"')).toHaveLength(2);
+	expect(servedRouteTable(html)).toEqual(
+		Object.fromEntries(
+			linked.map((name) => [`/${name}`, ['/shared.js', `/landing-${name}.js`]]),
+		),
+	);
 });
 
 test('without the fragment entry, the fragment URL answers the page document', async () => {
@@ -140,7 +177,7 @@ test('plain anchors to pages get their landing plan, and the bridge names every 
 	});
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
 	const bridge = servedLinkBridge(html, served) ?? '';
-	expect(bridge).toContain('"/next":["/landing-next.js"]');
+	expect(servedRouteTable(html)).toEqual({ '/next': ['/landing-next.js'] });
 	expect(bridge).not.toContain('notes.txt');
 	expect(laterLinkBridge(served)).toContain('"pages":["/","/next"]');
 	expect(laterLinkBridge(served)).toContain('"prefetch":true');
@@ -182,5 +219,5 @@ test('a destination with nothing to preload is still listed, so the idle tier fe
 		},
 	});
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
-	expect(servedLinkBridge(html, served)).toContain('"/next":[]');
+	expect(servedRouteTable(html)).toEqual({ '/next': [] });
 });

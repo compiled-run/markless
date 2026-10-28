@@ -47,7 +47,11 @@ import {
 } from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
-import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
+import {
+	LINK_BRIDGE_SCRIPT_ATTRIBUTE,
+	LINK_TABLE_SCRIPT_ATTRIBUTE,
+	linkBridgeModulePath,
+} from './link-bridge-module.ts';
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
 import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../navigation-timing.ts';
@@ -947,7 +951,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}));`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}));`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1112,15 +1116,21 @@ function renderLinkBridgeScript(
 	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
 })();`)}</script>`
 			: '';
+	// Inert JSON, each preload once: parsed at idle or on the first link intent, never evaluated at load.
+	const table =
+		fragment && intentPreloads && Object.keys(intentPreloads).length
+			? (({ preloads, destinations }) =>
+					`<script type="application/json" ${LINK_TABLE_SCRIPT_ATTRIBUTE}>${escapeScriptJson([preloads, destinations])}</script>`)(
+					indexedPreloads(intentPreloads),
+				)
+			: '';
 	const modulePath = modulePaths?.[hashLinks ? 1 : 0];
 	if (modulePath) {
 		const indexed = !fragment && intentPreloads ? indexedPreloads(intentPreloads) : undefined;
-		const args = fragment
-			? [escapeScriptJson(intentPreloads ?? {})]
-			: indexed
-				? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
-				: [];
-		return `${debugBootstrap}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
+		const args = indexed
+			? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
+			: [];
+		return `${debugBootstrap}${table}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
 	}
 	const body = linkBridgeBody(
 		resumeEntryPath,
@@ -1132,7 +1142,7 @@ function renderLinkBridgeScript(
 			hashLinks,
 		},
 	);
-	return `${debugBootstrap}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
+	return `${debugBootstrap}${table}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
 })();`)}</script>`;
 }
 
