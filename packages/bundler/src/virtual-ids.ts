@@ -14,6 +14,8 @@ import {
 } from './served-render-data.ts';
 
 export const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
+/** A request that exports its file as a string or URL (`?raw`, `?url`, `?inline`), never runs it. */
+export const STRING_EXPORT_QUERY = /[?&](?:raw|url|inline)(?:&|=|$)/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const MARKLESS_RENDER_DATA_SOURCE_QUERY_RE = /[?&]markless-render-data(?:[&#]|$)/;
