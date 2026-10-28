@@ -314,14 +314,17 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	return {
 		...graph,
 		...(serverOnlyProps.length > 0 ? { serverOnlyProps } : {}),
-		diagnostics: applyMarklessAllowDirectives({
-			source: input.source,
-			filename: input.filename,
-			diagnostics: graph.diagnostics,
-			phase: 'semantic-graph',
-			passId: 'tsrx-semantic-graph',
-			artifactKeys: ['semanticGraph'],
-		}) as SemanticGraphArtifact['diagnostics'],
+		diagnostics: applyMarklessAllowDirectives(
+			{
+				source: input.source,
+				filename: input.filename,
+				diagnostics: graph.diagnostics,
+				phase: 'semantic-graph',
+				passId: 'tsrx-semantic-graph',
+				artifactKeys: ['semanticGraph'],
+			},
+			{ reportUnused: false },
+		) as SemanticGraphArtifact['diagnostics'],
 	};
 }
 

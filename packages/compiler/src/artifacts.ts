@@ -2811,6 +2811,8 @@ export type CompilerPassGraph = {
 
 export type CompileTsrxModuleResult = {
 	readonly passGraph: CompilerPassGraph;
+	/** The authored source, read once more for `markless-allow` comments that name any pass's warning. */
+	readonly allowScan?: { readonly filename: string; readonly source: string };
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly stateLowering: StateLoweringArtifact;

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildSemanticGraph } from '../src/index.ts';
+import { buildSemanticGraph, collectTsrxModuleDiagnostics, compileTsrxModule } from '../src/index.ts';
 import type { AnyNode } from '../src/ast/nodes.ts';
 import { collectKeyedRepeat } from '../src/passes/semantic-graph/collect-repeat.ts';
 import {
@@ -376,9 +376,17 @@ test('buildSemanticGraph warns when markless-allow omits the required reason', a
 	);
 });
 
-test('buildSemanticGraph warns when markless-allow is stale for a site', async () => {
-	const diagnostics = await repeatDiagnostics(
-		repeatSite('const row of rows; key row.id', 'MARKLESS_REPEAT_KEY_IS_INDEX: stale'),
+// A later pass can raise the named warning, so staleness is decided over the whole module's diagnostics.
+test('a compiled module warns when markless-allow is stale for a site', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Repeat.tsrx',
+		source: repeatAllowSource(
+			repeatSite('const row of rows; key row.id', 'MARKLESS_REPEAT_KEY_IS_INDEX: stale'),
+		),
+		symbols: [],
+	});
+	const diagnostics = collectTsrxModuleDiagnostics(result).filter(
+		(diagnostic) => diagnostic.code.startsWith('MARKLESS_ALLOW'),
 	);
 
 	expect(diagnostics).toEqual([
