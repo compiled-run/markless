@@ -15,7 +15,8 @@ export type { FragmentNavigationConfig } from './entries/fragment-entry.ts';
 export function startFragmentNavigation(
 	d: Document,
 	linkAttributeOf: () => string,
-	routes: FragmentRouteCode,
+	// The attribute marking the page's route table, inert JSON `[preloads, destinations]` parsed on first lookup.
+	tableAttribute: string,
 	importModule: (href: string) => Promise<unknown>,
 	loadRun: () => Promise<FragmentNavigationRun>,
 	// What a press may start before the run half arrives; null when the app fetches nothing ahead of a click. A thunk, like the config.
@@ -24,13 +25,36 @@ export function startFragmentNavigation(
 	const w = d.defaultView as (Window & typeof globalThis) | null;
 	if (!w) return;
 	const host = d as Document & {
-		__marklessFragmentNav?: FragmentNavigationState;
-		__marklessFragmentWake?: FragmentRouteCode;
+		__marklessFragmentTables?: () => void;
 		__marklessFragmentIdle?: Promise<boolean>;
 	};
-	const known = host.__marklessFragmentNav?.routes ?? host.__marklessFragmentWake;
-	if (known) return void Object.assign(known, routes);
-	host.__marklessFragmentWake = routes;
+	// A later page's bridge adds its table to the one the first page started.
+	if (host.__marklessFragmentTables) return host.__marklessFragmentTables();
+	const read = new WeakSet<Element>();
+	const table: Record<string, readonly FragmentPreload[]> = {};
+	let unread = true;
+	host.__marklessFragmentTables = () => void (unread = true);
+	const fill = () => {
+		if (!unread) return table;
+		unread = false;
+		for (const script of d.querySelectorAll(`script[${tableAttribute}]`)) {
+			if (read.has(script)) continue;
+			read.add(script);
+			const [preloads, destinations] = JSON.parse(script.textContent!) as [
+				FragmentPreload[],
+				Record<string, number[]>,
+			];
+			for (const path in destinations)
+				table[path] = destinations[path]!.map((at) => preloads[at]!);
+		}
+		return table;
+	};
+	const routes: FragmentRouteCode = new Proxy(table, {
+		get: (_, key) => fill()[key as string],
+		has: (_, key) => key in fill(),
+		ownKeys: () => Reflect.ownKeys(fill()),
+		getOwnPropertyDescriptor: (_, key) => Reflect.getOwnPropertyDescriptor(fill(), key),
+	});
 	// Nothing idle may compete with the page's own first-click code: wait for the load event and every modulepreload it landed with.
 	const landed = new Promise<void>((done) => {
 		const start = () => {
@@ -138,7 +162,6 @@ export function startFragmentNavigation(
 	};
 	const wake = (event?: Event) => {
 		starting ??= loadRun().then((run) => {
-			delete host.__marklessFragmentWake;
 			return (running = run(d, routes, importModule, scrolled, arriving, pressed));
 		});
 		starting.then(
@@ -203,7 +226,7 @@ export function startFragmentNavigation(
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
-	if (Object.keys(routes).length)
+	if (d.querySelector(`script[${tableAttribute}]`))
 		void landed.then(() =>
 			w.requestIdleCallback
 				? w.requestIdleCallback(() => wake(), { timeout: 3000 })

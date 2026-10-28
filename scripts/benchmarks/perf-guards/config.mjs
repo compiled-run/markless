@@ -31,6 +31,10 @@ export const BUDGETS = {
 	hiddenContentLoadChars: 512,
 	// Below this the long panel no longer ships more code, and G14 would compare two equal pages.
 	hiddenContentMinShippedGrowth: 8 * 1024,
+	// The two pages run the same code at load; only the route table they ship differs.
+	routeTableLoadChars: 512,
+	// Below this the many-link page no longer ships a bigger route table, and G15 would compare two equal pages.
+	routeTableMinHtmlGrowth: 4 * 1024,
 	executionGrowth: 0.25,
 	executionMinChars: 2048,
 	initializerMinExtra: 2,
