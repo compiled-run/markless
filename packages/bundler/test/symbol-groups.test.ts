@@ -215,11 +215,12 @@ test('a group stays first-use code when the page names every member before input
 	expect(closureOf('h2')).toContain(group);
 });
 
-test('a group some member of which nothing on the page names before input loads on first use instead', () => {
+test('a page that needs one member of a group loads the whole group with the page, so no first click fetches', () => {
 	const { group, lone, closureOf } = routeClosures([
 		['h1', ['symbol:0']],
 		['h3', ['symbol:2']],
 	]);
-	expect(closureOf('h1')).not.toContain(group);
+	expect(closureOf('h1')).toContain(group);
 	expect(closureOf('h3')).toContain(lone);
+	expect(closureOf('h3')).not.toContain(group);
 });
