@@ -1235,14 +1235,40 @@ function hostIdsForChunkTree(
 	];
 }
 
+// Branch sites inside a keyed row, below any @try the row itself does not hold.
+function branchSitesInRows(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	const data = renderDataOf(input);
+	const found = new Set<string>();
+	const seen = new Set<string>();
+	const visit = (chunkId: string) => {
+		if (seen.has(chunkId)) return;
+		seen.add(chunkId);
+		for (const slot of data.chunks.find((chunk) => chunk.id === chunkId)?.slots ?? []) {
+			if (slot.kind === 'branch') {
+				found.add(slot.branchSiteId);
+				for (const armId of slot.armTemplateIds) visit(armId);
+			} else if (slot.kind === 'repeat') {
+				visit(slot.rowTemplateId);
+				if (slot.emptyTemplateId) visit(slot.emptyTemplateId);
+			} else if (slot.kind === 'dynamic-host') visit(slot.childChunkId);
+		}
+	};
+	for (const chunk of data.chunks) if (chunk.kind === 'repeat-row') visit(chunk.id);
+	return found;
+}
+
 function armScopedBranchRecords(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,
 	arm: number,
 ): ReadonlyArray<NonNullable<ProtocolViewArmRecordSet['branches']>[number]> | undefined {
+	// One @if per row is no single arm-local branch: the row's own record flips it, or the arm re-renders.
+	const inRows = branchSitesInRows(input);
 	const branches = renderDataOf(input).branches.filter(
 		(branch) =>
-			branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm,
+			branch.asyncBoundaryId === boundaryId &&
+			branch.asyncBoundaryArm === arm &&
+			!inRows.has(branch.branchSiteId),
 	);
 	if (branches.length === 0) return undefined;
 	const branchSymbols = new Map(
