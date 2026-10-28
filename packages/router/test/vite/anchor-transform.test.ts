@@ -176,13 +176,15 @@ export default function Home() {
 
 	it('runs as a Vite transform for TSRX modules', () => {
 		const plugin = anchorTransformPlugin();
-		const transformFilter = (
-			plugin.transform as {
-				filter: { id: RegExp };
-			}
-		).filter;
+		expect(transformsId(plugin, '/project/pages/index.tsrx')).toBe(true);
+		expect(transformsId(plugin, '/project/pages/index.tsrx?markless-symbols')).toBe(true);
+	});
 
-		expect(transformFilter.id.test('/project/pages/index.tsrx')).toBe(true);
+	it('leaves virtual modules, whose ids can end in .tsrx, to the plugin that made them', () => {
+		const plugin = anchorTransformPlugin();
+
+		expect(transformsId(plugin, '\0virtual:markless:render-data:pages%2Fdocs%2Findex.tsrx')).toBe(false);
+		expect(transformsId(plugin, '\0virtual:markless:payload:pages%2Fdocs%2Findex.tsrx')).toBe(false);
 	});
 
 	it('transforms route-pattern markup from ids with package-cache-looking segments', async () => {
@@ -302,6 +304,13 @@ function transform(source: string) {
 		parseAst(source, { astType: 'ts', lang: 'tsx', range: true }, '/project/page.tsx'),
 		routePatterns,
 	);
+}
+
+function transformsId(plugin: ReturnType<typeof anchorTransformPlugin>, id: string): boolean {
+	const { include, exclude } = (
+		plugin.transform as { filter: { id: { include: RegExp; exclude: RegExp } } }
+	).filter.id;
+	return include.test(id) && !exclude.test(id);
 }
 
 function routeTypegenFs(): RouteTypegenFileSystem {
