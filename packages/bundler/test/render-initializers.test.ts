@@ -60,7 +60,7 @@ export default function ${name}({ ${prop} }) @{
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test.each(['Total', 'Meter'])(
-	'a packed loader imports what render data imports statically only through its export-star entry (%s)',
+	'a packed loader imports the initializer render data imports statically, with no re-export module between (%s)',
 	async (name) => {
 		const result = await transformTsrxModule({
 			filename: `/workspace/${name}.tsrx`,
@@ -81,18 +81,14 @@ export default function ${name}({ amount }) @{
 		expect(imported.length).toBeGreaterThan(0);
 		const dynamicImport = (id: string) =>
 			new RegExp(`import\\((?:/\\*[^*]*\\*/\\s*)?["']${escapeRegExp(id)}["']\\)`);
-		for (const symbol of imported) {
-			const entry = result.virtualModules.find(
+		for (const symbol of imported)
+			expect(resolver.source).toMatch(dynamicImport(symbol.virtualModuleId));
+		expect(
+			result.virtualModules.some(
 				(module) =>
-					module.type === 'symbol-entry' &&
-					module.source.includes(JSON.stringify(symbol.virtualModuleId)),
-			)!;
-			expect(entry.source).toBe(`export * from ${JSON.stringify(symbol.virtualModuleId)};`);
-			for (const loader of [resolver.source, result.code]) {
-				expect(loader).not.toMatch(dynamicImport(symbol.virtualModuleId));
-			}
-			expect(resolver.source).toMatch(dynamicImport(entry.id));
-		}
+					module.source.startsWith('export * from ') && module.id.includes(':symbol:'),
+			),
+		).toBe(false);
 		const handler = result.manifest.symbols.find((symbol) => symbol.kind === 'event-handler')!;
 		expect(resolver.source).toMatch(dynamicImport(handler.virtualModuleId));
 	},

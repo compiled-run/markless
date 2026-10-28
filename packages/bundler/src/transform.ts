@@ -54,7 +54,6 @@ import {
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
 	settleVirtualModuleId,
-	symbolEntryVirtualModuleId,
 	symbolVirtualModuleId,
 	type BoundSymbolDescriptor,
 	type BoundSymbolDescriptorMap,
@@ -320,17 +319,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			? withServedScalarDemand(classDemandMap, servedScalarPlans)
 			: classDemandMap,
 	};
-	// Only packed loaders name every symbol with a literal specifier; a computed table import is no module edge.
-	const renderDataInitializers = input.experimentalNativePacking
-		? renderDataInitializerSymbolIds(compiled)
-		: new Set<string>();
 	const compilerSymbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
 		exportName: scopedSymbolExportName(input.moduleId ?? input.filename, module.exportName),
-		...(renderDataInitializers.has(module.symbolId)
-			? { lazyChunk: symbolEntryVirtualModuleId(input.filename, module.symbolId) }
-			: {}),
 	}));
 	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
 		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
@@ -726,17 +718,6 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			}),
 		),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
-		...compilerSymbolRows.flatMap((row): MarklessVirtualModule[] =>
-			row.lazyChunk
-				? [
-						{
-							id: row.lazyChunk,
-							type: 'symbol-entry',
-							source: `export * from ${JSON.stringify(row.chunk)};`,
-						},
-					]
-				: [],
-		),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
 				async (module, index): Promise<MarklessVirtualModule> => ({
@@ -928,18 +909,6 @@ function initializerModuleSymbolIds(compiled: CompileTsrxModuleResult): Set<stri
 			)
 			.map((module) => module.symbolId),
 	);
-}
-
-// Every initializer module render data imports statically; a packed loader reaches these through their export-star entry.
-function renderDataInitializerSymbolIds(compiled: CompileTsrxModuleResult): Set<string> {
-	const initializerSymbolIds = initializerModuleSymbolIds(compiled);
-	const ids = new Set<string>();
-	for (const definition of compiled.publicRenderModule.componentDefinitions as ReadonlyArray<InitializerDefinition>)
-		for (const initial of definition.initialValues ?? []) {
-			const symbolId = renderDataInitializerSymbolId(definition, initial, initializerSymbolIds);
-			if (symbolId) ids.add(symbolId);
-		}
-	return ids;
 }
 
 // A served page evaluates a component only where the browser renders part of it; one it merely walks

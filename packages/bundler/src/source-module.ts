@@ -24,8 +24,6 @@ export type SourceSymbolRow = {
 	readonly id: string;
 	readonly chunk: string;
 	readonly exportName: string;
-	/** What `import()` names when `chunk` is also imported statically; see SymbolResolverModuleInput. */
-	readonly lazyChunk?: string;
 };
 
 export type SourceSymbolRoute = {
@@ -76,10 +74,6 @@ const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
 
 export function symbolVirtualModuleId(filename: string, symbolId: string) {
 	return `${SYMBOL_VIRTUAL_PREFIX}${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
-}
-
-export function symbolEntryVirtualModuleId(filename: string, symbolId: string) {
-	return `${symbolVirtualModuleId(filename, symbolId)}:entry`;
 }
 
 export function encodedSymbolSource(filename: string): string {
@@ -2240,7 +2234,7 @@ function emitDirectSourceSymbolLoader(
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import(${singleQuoted(symbol.lazyChunk ?? symbol.chunk)})`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import(${singleQuoted(symbol.chunk)})`,
 			`		.then((mod) => ${readerName}(mod, ${JSON.stringify(symbol.exportName)}));`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',

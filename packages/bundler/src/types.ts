@@ -51,8 +51,6 @@ export type MarklessVirtualModuleType =
 	| 'resume'
 	| 'settle'
 	| 'symbol'
-	// `export *` of a symbol module that render data imports statically: loaders `import()` this instead.
-	| 'symbol-entry'
 	| 'symbol-bundle'
 	| 'trigger-group'
 	| 'style';
