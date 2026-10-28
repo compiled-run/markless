@@ -747,6 +747,33 @@ export function stateElementHandleUnsupportedDiagnostic(input: {
 	};
 }
 
+export function stateFunctionValueUnsupportedDiagnostic(input: {
+	readonly stateName: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A function cannot be stored in state',
+		message: `state "${input.stateName}" holds a function, \`${input.source}\`, in its initial value. A function cannot be written into the page, so the browser would read a value that is not callable.`,
+		why: 'state() values are serialized into the page and the browser resumes from them without running the component body, so only data (strings, numbers, booleans, null, arrays and plain objects) survives the trip.',
+		primarySpan: input.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		statePath: input.stateName,
+		source: input.source,
+		suggestions: [
+			{
+				message:
+					'Keep the function outside state(): declare it in the component body or at module scope, and store only the data it needs, for example a name to pick it by.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+	};
+}
+
 export function templateAsValueDiagnostic(input: {
 	readonly siteSource: string;
 	readonly name?: string;

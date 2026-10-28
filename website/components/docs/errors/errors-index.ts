@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 294,
+	total: 295,
 	guided: 45,
 	groups: [
 		{
@@ -645,6 +645,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
 					kind: 'compile error',
 					guided: false,
 				},
