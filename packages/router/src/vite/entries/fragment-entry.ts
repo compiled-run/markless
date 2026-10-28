@@ -402,12 +402,18 @@ async function mergeHead(d: Document, next: Document) {
 		else current.set(element.outerHTML, [element]);
 	}
 	const stylesheets: HTMLLinkElement[] = [];
+	const hidden: [Element, string | null][] = [];
 	const scripts: HTMLScriptElement[] = [];
 	let cursor: Element | null = null;
 	for (const element of Array.from(next.head.children)) {
 		const reused = current.get(element.outerHTML)?.shift();
 		const node = reused ?? d.adoptNode(element);
 		if (!reused) {
+			// An arriving stylesheet applies only with its page: applied before, it restyles the leaving page for nothing.
+			if (isStyleNode(node)) {
+				hidden.push([node, node.getAttribute('media')]);
+				node.setAttribute('media', 'not all');
+			}
 			if (cursor) cursor.after(node);
 			else d.head.prepend(node);
 			if (node.localName === 'link' && (node as HTMLLinkElement).rel === 'stylesheet')
@@ -425,7 +431,19 @@ async function mergeHead(d: Document, next: Document) {
 		else if ((element as HTMLScriptElement).type !== 'importmap') element.remove();
 	}
 	await loaded(d.defaultView!, stylesheets);
-	return { stale, scripts };
+	const show = () => {
+		for (const [node, media] of hidden)
+			if (media === null) node.removeAttribute('media');
+			else node.setAttribute('media', media);
+	};
+	return { stale, scripts, show };
+}
+
+function isStyleNode(node: Element): boolean {
+	return (
+		node.localName === 'style' ||
+		(node.localName === 'link' && (node as HTMLLinkElement).rel === 'stylesheet')
+	);
 }
 
 // A swap applies only what the server changed between its documents; a script's own changes (a theme class) stay.
@@ -724,8 +742,22 @@ function resetControl(element: Element): void {
 
 // A kept node takes the next page's classes in one step: a CSS transition between two pages' styles shows as morphing.
 // Transitions stay off until the frame after the swap has computed its styles; turning them on then starts none.
+// Transitions the swap starts are cancelled before each of its first frames paints; a sheet turning them off restyles the whole document twice.
 function withoutTransitions(d: Document): () => void {
 	const w = d.defaultView as Window & typeof globalThis;
+	if (w.ResizeObserver && w.CSSTransition && d.getAnimations) {
+		const running = new Set(d.getAnimations());
+		const beforePaint = (frames: number) => {
+			const observer = new w.ResizeObserver(() => {
+				observer.disconnect();
+				for (const animation of d.getAnimations())
+					if (!running.has(animation) && animation instanceof w.CSSTransition) animation.cancel();
+				if (frames > 1) w.requestAnimationFrame(() => beforePaint(frames - 1));
+			});
+			observer.observe(d.documentElement);
+		};
+		return () => beforePaint(3);
+	}
 	const sheet = new w.CSSStyleSheet();
 	sheet.replaceSync('*,*::before,*::after{transition:none!important}');
 	d.adoptedStyleSheets = [...d.adoptedStyleSheets, sheet];
@@ -1092,6 +1124,7 @@ export async function navigate(
 					left: box.left,
 					behavior: 'instant',
 				});
+		head.show();
 		for (const element of head.stale) element.remove();
 		if (next.title && d.title !== next.title) d.title = next.title;
 		settle();
