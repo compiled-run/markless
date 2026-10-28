@@ -49,7 +49,11 @@ import {
 } from '../optimized-deps.ts';
 import { RESUME_ENTRY_SPECIFIER, STORAGE_FREE_RESUME_ENTRY_SPECIFIER } from '../source-module.ts';
 import { createMarklessRolldownPlugin } from '../rolldown.ts';
-import { isCompilerStatefulModuleId, sharedReachedRenderDataRequest } from '../virtual-ids.ts';
+import {
+	isCompilerStatefulModuleId,
+	sharedReachedRenderDataRequest,
+	STRING_EXPORT_QUERY,
+} from '../virtual-ids.ts';
 
 // The slice of Vitest's `configureVitest` context this plugin uses; vitest stays out of the bundler's dependencies.
 type VitestCacheKeyContext = {
@@ -454,7 +458,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		transform: {
 			async handler(code, id, transformOptions) {
-				if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
+				if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id) && !STRING_EXPORT_QUERY.test(id)) {
 					transformedTsrxSources.set(parsePath(id).pathname, code);
 				}
 				try {

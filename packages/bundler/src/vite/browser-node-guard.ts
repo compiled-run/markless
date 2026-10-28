@@ -3,6 +3,7 @@ import { isCSSRequest, type Plugin } from 'vite';
 import { relative } from 'pathe';
 import { analyze, type Module, type Reference } from 'yuku/analyzer';
 import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
+import { STRING_EXPORT_QUERY } from '../virtual-ids.ts';
 
 export const NODE_IN_BROWSER_ERROR = 'MARKLESS_NODE_IN_BROWSER';
 
@@ -289,8 +290,6 @@ function devChain(environment: GuardedEnvironment, id: string): ChainLink[] {
 	);
 }
 
-// These requests export their file as a string or URL, never run it.
-const STRING_EXPORT_QUERY = /[?&](?:raw|url|inline)(?:&|=|$)/;
 // Rolldown's helper module: its Node-only helpers are emitted only for Node output.
 const ROLLDOWN_RUNTIME = '\0rolldown/runtime.js';
 
