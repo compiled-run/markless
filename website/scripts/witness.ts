@@ -397,6 +397,49 @@ try {
 		check(await tooltipIsVisible(tip), 'the tooltip shows on keyboard focus');
 		await hover.blur();
 
+		// A hover doc never covers the token it explains and never leaves the screen:
+		// first and last tokens, each pushed to the top, middle and bottom of the
+		// viewport, on a desktop and a 390px phone, in prose fences and a playground.
+		const placement = await browser.newPage();
+		for (const width of [1280, 390]) {
+			await placement.setViewportSize({ width, height: 800 });
+			for (const path of ['/concepts/state', '/build/elements', '/router/pages', '/ui/accordion']) {
+				await placement.goto(`${origin}${path}`, { waitUntil: 'load' });
+				const tokens = placement.locator('.tsrx-hover:visible');
+				const count = await tokens.count();
+				for (const index of new Set([0, Math.floor(count / 2), count - 1])) {
+					for (const edge of ['top', 'middle', 'bottom'] as const) {
+						const placed = await tokens.nth(index).evaluate((node, edge) => {
+							node.scrollIntoView({ block: 'center' });
+							const start = node.getBoundingClientRect();
+							if (edge === 'top') scrollBy(0, start.top - 70);
+							if (edge === 'bottom') scrollBy(0, start.bottom - innerHeight + 4);
+							(node as HTMLElement).focus({ preventScroll: true });
+							const docs = [node.querySelector('.tsrx-tip'), ...document.querySelectorAll('.cp-doc')];
+							const doc = docs.find((one) => one && getComputedStyle(one).display !== 'none');
+							if (!doc) return { shown: false };
+							const a = node.getBoundingClientRect();
+							const b = doc.getBoundingClientRect();
+							(node as HTMLElement).blur();
+							return {
+								shown: true,
+								token: node.textContent?.slice(0, 24),
+								covers: !(b.bottom <= a.top || b.top >= a.bottom || b.right <= a.left || b.left >= a.right),
+								inside: b.top >= 0 && b.left >= 0 && b.right <= innerWidth + 0.5 && b.bottom <= innerHeight + 0.5,
+								rects: `token ${Math.round(a.top)}-${Math.round(a.bottom)}, doc ${Math.round(b.top)}-${Math.round(b.bottom)} x ${Math.round(b.left)}-${Math.round(b.right)}`,
+							};
+						}, edge);
+						const where = `${path} at ${width}px, token ${index} of ${count} at the ${edge}`;
+						check(placed.shown, `${where}: focusing the token shows its doc`);
+						if (!placed.shown) continue;
+						check(!placed.covers, `${where}: the doc does not cover "${placed.token}"`, placed.rects);
+						check(placed.inside, `${where}: the doc stays inside the viewport`, placed.rects);
+					}
+				}
+			}
+		}
+		await placement.close();
+
 		// --- the island still resumes -----------------------------------------
 		const button = page.locator('.code-block [data-code-stage]').getByRole('button', { name: 'Pour a cup' }).first();
 		const cupsLine = page.locator('.code-block [data-code-stage] p').first();

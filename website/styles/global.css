@@ -764,10 +764,14 @@ html {
 	--torn-guide: color-mix(in oklch, var(--pink) 55%, transparent);
 	position: relative;
 	margin-block: var(--space-m) var(--space-l);
+}
+
+/* Only the paper tilts: a rotated ancestor would trap the code's fixed hover docs inside the strip. */
+.prose .torn-strip > .torn-art {
 	rotate: -0.3deg;
 }
 
-.prose .torn-strip:nth-child(even of .torn-strip) {
+.prose .torn-strip:nth-child(even of .torn-strip) > .torn-art {
 	rotate: 0.3deg;
 }
 
@@ -956,12 +960,11 @@ html.dark .prose .torn-strip {
 	outline: 2px solid var(--ink);
 }
 
-/* The doc sits directly above the token it explains, and the block reserves no
-   room for it: a block at rest ends at its last line and does not move when one
-   is pointed at. A `<pre>` that scrolls clips its children, so where the browser
-   supports anchor positioning the box is taken out to the viewport and pinned to
-   the token; without it the box is placed against the token and a token on the
-   first line has its doc clipped by the block's top edge. */
+/* The doc sits just above the token it explains, or just below when the viewport
+   has no room above, and never over it. A `<pre>` that scrolls clips its children,
+   so where the browser supports anchor positioning the box is taken out to the
+   viewport and pinned to the token; without it the box is placed against the token
+   and a token on the first line has its doc clipped by the block's top edge. */
 .tsrx-tip {
 	position: absolute;
 	left: 0;
@@ -1022,17 +1025,32 @@ html.dark .prose .torn-strip {
 		anchor-scope: --tsrx-token;
 	}
 
+	/* anchor() insets, not position-area: when no area fits, the area form slides the doc over its token. */
 	.tsrx-tip {
 		position: fixed;
 		position-anchor: --tsrx-token;
 		inset: auto;
-		position-area: block-start span-inline-end;
+		bottom: anchor(top);
+		left: anchor(left);
+		margin: 0 0 0.4rem;
 		position-try-fallbacks:
-			flip-inline,
 			flip-block,
-			flip-block flip-inline;
-		margin-block: 0.4rem;
+			flip-inline,
+			flip-block flip-inline,
+			--tsrx-tip-above-edge,
+			--tsrx-tip-below-edge;
 	}
+}
+
+@position-try --tsrx-tip-above-edge {
+	left: 1rem;
+}
+
+@position-try --tsrx-tip-below-edge {
+	bottom: auto;
+	top: anchor(bottom);
+	left: 1rem;
+	margin: 0.4rem 0 0;
 }
 
 .tsrx-tip-title {
