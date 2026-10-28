@@ -5048,9 +5048,15 @@ export function Page() @{
 	expect(output.html).toContain('data-capture-literal="true"');
 	expect(output.html).toContain('>Server spruce</button>');
 	expect(output.html).toContain('>Server copper</button>');
-	expect(output.view.domUpdates).toEqual([
+	expect(output.view.domUpdates).toContainEqual(
 		expect.objectContaining({ hostNodeId: 'c0:h0', graphNodeId: 'state:graphLabel' }),
-	]);
+	);
+	// The marker attributes read props alone; a parent passing state would move them.
+	expect(
+		output.view.domUpdates
+			.filter((update) => update.graphNodeId !== 'state:graphLabel')
+			.every((update) => update.graphNodeId.includes('computed:templateExpression:')),
+	).toBe(true);
 });
 
 test('compileTsrxModule offsets sibling children by element count, not locator count', async () => {

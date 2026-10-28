@@ -797,7 +797,7 @@ export function evaluatePrerenderDataComponent(input: {
 		const scope = composer;
 		// Slot routes name the composer's nodes bare and any other instance by its path in the module; a minted row knows only its composer.
 		const deriveRead: PrerenderRead =
-			boundSymbolId && scope && !input.graph
+			boundSymbolId && scope
 				? (graphNodeId, path) => {
 						const at = marklessInstancePath(graphNodeId),
 							local = graphNodeId.slice(at.length),

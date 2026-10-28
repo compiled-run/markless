@@ -37,10 +37,8 @@ test('SSR resume: children text and plain prop reads from another module stay cu
 	await expectPropsFollow(screen.container);
 });
 
-// Expected red: an expression recombining props alone (`hot ? 'true' : 'false'`) mints no
-// update record, on the premise that nothing writes a prop after the render that read
-// it; a parent passing live state does, so these render once.
-test.fails('CSR: a child expression over props alone follows the parent write', async () => {
+// An expression recombining props alone (`hot ? 'true' : 'false'`) follows a parent that passes live state.
+test('CSR: a child expression over props alone follows the parent write', async () => {
 	const screen = await render(CrossFileProps);
 	const container = screen.container as HTMLElement;
 	click(container);
