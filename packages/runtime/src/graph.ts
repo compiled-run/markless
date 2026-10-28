@@ -221,6 +221,8 @@ export type RuntimeGraphSubscription = {
 		| RuntimeGraphCommit
 		| void
 		| Promise<DomJournalResult | RuntimeGraphCommit | void>;
+	/** False while `run` still has code to load; a write observer then leaves its DOM to the pass, so the task's writes land together. */
+	readonly ready?: () => boolean;
 };
 
 /**
@@ -406,6 +408,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (writeObservers.length === 0 || flushing || notifyingWrite) return;
 
 		const write: DirtyPath = { graphNodeId, path };
+		if (passWaitsOnCode()) return;
 		notifyingWrite = true;
 		try {
 			// A copy: an observer is free to release itself or another.
@@ -420,6 +423,17 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			notifyingWrite = false;
 		}
 	};
+
+	const passWaitsOnCode = (): boolean =>
+		dirtyPaths.some(({ graphNodeId, path }) =>
+			subscriptionsByNode
+				.get(graphNodeId)
+				?.some(
+					(subscription) =>
+						subscription.ready?.() === false &&
+						pathsIntersect(path, subscription.path ?? []),
+				),
+		);
 
 	const scheduleFlush = (): void => {
 		if (flushScheduled || flushing) return;
