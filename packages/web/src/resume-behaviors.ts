@@ -153,7 +153,8 @@ export function createBehaviorRuntime(input: {
 			for (const record of records)
 				for (const node of record.removedNodes) collectRemovedElements(node, removed);
 			for (const id of hostIdsInsideRemovedElements(input.elementsByHostId, removed))
-				input.disposeHost(id);
+				// A script that moves markup within the page reports it removed, yet it is still here.
+				if (!input.root.contains?.(input.elementsByHostId.get(id)!)) input.disposeHost(id);
 		});
 		removalObserver.observe(input.root, { childList: true, subtree: true });
 	}
