@@ -1,156 +1,110 @@
-# Markless
-
 <p align="center">
-  <img src="./assets/markless-logo.png" alt="Markless logo" width="200" />
+  <img src="./assets/markless-mug.svg" alt="The Markless mug" width="150" />
 </p>
 
-Markless is a UI framework for building web and native apps from one web-like
-component model.
+<h1 align="center">Markless</h1>
 
-You write `.tsrx` files that look close to normal components: HTML-like
-markup, JavaScript variables, and plain reads and writes. Markless's compiler
-records the important parts of that UI: state, text updates, events, and the
-code that should run later.
+<p align="center">
+  <strong>Build for any device, the web way.</strong><br />
+  Write elements and events in TypeScript. Markless is designed to compile them to any device.
+</p>
 
-Then Markless can render that same model to different places:
+<p align="center">
+  <a href="https://markless.dev">Docs</a> ·
+  <a href="https://markless.dev/start/new-app">Create an app</a> ·
+  <a href="https://markless.dev/start/migrate">Migrate an app</a> ·
+  <a href="https://markless.dev/how-it-works">How it works</a>
+</p>
 
-- browser DOM for web apps;
-- UIKit controls for iOS apps;
-- AppKit controls for macOS apps;
-- future native targets.
+## What it looks like
 
 ```tsx
-import { state } from '@markless/core';
+import { computed, state } from '@markless/core';
 
-export function Counter() @{
-  let count = state(0);
+export default function Order() @{
+	let mugs = state(1);
+	const total = computed(() => mugs * 4);
 
-  <button onClick={() => count++}>
-    Clicked {count}
-  </button>
+	<section>
+		<p>Mugs: {mugs}</p>
+		<p>Total: {total} dollars</p>
+		<button onClick={() => mugs++}>Add a mug</button>
+		@if (mugs > 3) {
+			<p>That is a lot of coffee.</p>
+		}
+	</section>
 }
 ```
 
-Markless turns that `.tsrx` file into:
+- `@{ }` is a component body. Statements come first, then the elements it shows.
+- `{ }` inside the elements holds a value. When `mugs` changes, every spot that shows it, or `total`, changes too.
+- Lines that start with `@` (`@if`, `@for`, `@switch`, `@try`) control which elements show.
+- `mugs` is a plain `let`. You read it and assign to it like any variable.
 
-- state, like `count`;
-- text that depends on that state;
-- events, like the button click;
-- small code chunks that execute only when needed.
+[Reading a .tsrx file](https://markless.dev/start/reading-tsrx) walks through it line by line.
 
-On the web, Markless turns this into HTML and DOM updates. The browser does not
-rerun `Counter()` or rebuild a virtual tree: the server's HTML arrives already
-wired, and code loads only when an event needs it. When the button
-is clicked, Markless executes the click code and updates only the text that depends
-on `count`.
+## What makes it different
 
-On native targets, Markless can turn the same kind of model into real native
-controls. The current proof fixtures show the counter driving iOS
-`UIButton`/`UILabel` and macOS `NSButton`/`NSTextField` through JavaScriptCore.
-Those proofs do not use Electron, Tauri, React Native, Capacitor, Ionic, or a
-WebView.
+**Compiled reactivity.** `state()` and `computed()` are plain function calls, with nothing else to mark up. The compiler reads your code at build time and works out which text, attribute or list each value feeds. The update graph is built before anything runs, so the browser never has to discover it. Nothing to mark is also where the name comes from.
 
-In short:
+**Resumable.** The server sends HTML that arrives already wired, and the browser picks up where the server left off without running your components again. A click loads only the code for that handler, and only the text that reads the changed value updates.
 
-```txt
-Markless .tsrx source
-  -> Markless state/events/text model
-  -> web DOM
-  -> iOS UIKit
-  -> macOS AppKit
-  -> future targets
+**Rendering is data, interactions are JavaScript.** The compiler turns what a page shows into data: the state, the planned updates, and where each one lands. Your event handlers stay JavaScript, split into small pieces that load when they are needed. Data can be drawn by any host, and that is why Markless is designed to render on any device.
+
+## Where it runs today
+
+| Target | Status |
+| --- | --- |
+| Web: browser, server rendering, streaming, tests | Works today. This is what ships on npm. |
+| iOS (UIKit) and macOS (AppKit) | Early proofs. A hand-written counter drives real native buttons through JavaScriptCore, with no WebView. The compiler does not produce native output yet. See [native targets](https://markless.dev/how-it-works/native-targets). |
+| Android, Windows, Linux | Not started. [Help us get there.](https://markless.dev/contributing) |
+
+## Quick start
+
+```sh
+npm create markless@latest
 ```
 
-## What It Is
+Every question has a default, so pressing Enter is fine. Then run `npm run dev` in the new folder and open `localhost:3000`. [Create an app](https://markless.dev/start/new-app) covers the rest, including production builds and deploying.
 
-- `.tsrx` components with familiar JavaScript reads and writes.
-- Authoring APIs from `@markless/core`: `state`, `computed`, `shared`, and
-  `element`.
-- Compiler-owned state, payloads, and lazy code execution.
-- One web-like authoring model that can target more than the browser.
-- Target adapters for DOM, UIKit, AppKit, and future hosts.
-- No VDOM, and components never rerun in the browser.
+## Migrate an existing app
 
-## What This Does Not Mean
+[Markless Migrate](https://github.com/compiled-run/markless-migrate) moves a web app to Markless one page at a time. Your coding agent rewrites a page. Then a checker opens the old page and the new one side by side and compares what people see, what search engines get, what screen readers get, how fast it loads, and how each control behaves when it is used. A page switches over only once it matches the original.
 
-Markless does not try to force one exact UI tree to work everywhere.
+It is a preview. These are work-in-progress ports of public sites, not official ones. JavaScript executed at page load, before and after:
 
-An app can have routes or screens that are shared across targets, and it can
-also have routes or screens that are only for web, iOS, macOS, or another
-target. Markless gives those targets the same framework model: state, events,
-async work, lazy code execution, and resumability. The target owns the real
-controls. On the web that means DOM. On iOS that means UIKit. On macOS that
-means AppKit.
+| Port | Original | Markless |
+| --- | --- | --- |
+| shadcn/ui docs, home page | 1,660 kB | 143 kB |
+| Docusaurus website | ~650 kB | ~107 kB |
 
-## Resumability
+More ports and their full reports: [markless.dev/start/migrate](https://markless.dev/start/migrate).
 
-On the web, Markless is resumable. A server-rendered page can stay as HTML and CSS
-until the user interacts with a handler, like clicking a button. Markless then
-executes only the code needed for that interaction.
+## Packages
 
-## Status
+| Package | What it is |
+| --- | --- |
+| [`@markless/core`](./packages/core) | What you write against: `state()`, `computed()`, `element()`, `shared()`, rendering, and the Vite plugin |
+| [`@markless/router`](./packages/router) | File-based routes on [Nitro](https://nitro.build), with streaming server rendering and links that load the next page early |
+| [`create-markless`](./packages/cli) | `npm create markless`, the app scaffolder |
+| [`@markless/ui`](./packages/headless/components) | Headless, accessible components (work in progress) |
+| [`@markless/vitest-browser`](./packages/vitest-browser) | Test components in a real browser with Vitest |
+| [`@markless/typescript-plugin`](./packages/typescript-plugin) | Types and editor support for `.tsrx` files |
+| [`@markless/analyzer`](./packages/analyzer) | Browser QA checks, with an optional Playwright driver |
+| [`@markless/compiler`](./packages/compiler), [`runtime`](./packages/runtime), [`web`](./packages/web), [`serializer`](./packages/serializer), [`bundler`](./packages/bundler) | The internals behind `@markless/core`. You don't import these directly. |
 
-Markless is under active implementation. The specs are the behavior contract, and
-production package work lives under `packages/*`.
-
-The `poc/` tree contains proof fixtures and earlier proof packages. Treat it as
-design evidence, not the public package surface.
-
-Relevant native-rendering proofs:
-
-- [`ios-native-rendering-target`](./poc/fixtures/proofs/ios-native-rendering-target/)
-  proves Markless's model can create UIKit controls, run click code through
-  JavaScriptCore, and update native button text.
-- [`macos-native-rendering-target`](./poc/fixtures/proofs/macos-native-rendering-target/)
-  proves the same idea can create AppKit controls, run click code through
-  JavaScriptCore, and update native button text.
-
-These proofs validate the runtime idea. The next step is making the compiler
-produce these target outputs automatically from one `.tsrx` source shape.
-
-## Development
+## Contributing
 
 ```sh
 pnpm install
 pnpm test
-pnpm check
-pnpm lint
-pnpm fmt
-pnpm build
+pnpm run typecheck
 ```
 
-## Editor support
+Start with [CONTRIBUTING.md](./CONTRIBUTING.md) for the workspace layout and [markless.dev/contributing](https://markless.dev/contributing) for the guided version. Agent rules live in [`.ruler/`](./.ruler/) and are generated into `AGENTS.md` and `CLAUDE.md` with `pnpm rules`.
 
-For VS Code, install the upstream TSRX extension, which owns the `.tsrx` language
-id, syntax highlighting, and the TSRX language server:
+For editor support, install the TSRX extension (`ripple-ts.ripple-ts-vscode-plugin`). Apps made with `npm create markless` come with the editor settings already in place.
 
-```sh
-code --install-extension ripple-ts.ripple-ts-vscode-plugin
-```
+## License
 
-`.vscode/extensions.json` already recommends it, so VS Code offers to install it
-when you open this repository. Markless no longer ships its own extension; if you
-sideloaded an earlier build, remove it (`code --uninstall-extension markless.markless`)
-so two extensions do not contend for `.tsrx` files.
-
-The Markless-specific editor behaviour is wired through `tsconfig.json` rather
-than through an extension: the top-level `tsrx.compiler` key points the TSRX
-language server at `@markless/typescript-plugin/volar`, and the
-`compilerOptions.plugins` entries load `@markless/typescript-plugin` and
-`@markless/router/typescript-plugin` into TypeScript's own language server.
-Zed reads the same plugins through `.zed/settings.json`. Apps created with the
-CLI ship both editor configurations.
-
-Read these first when changing the repo:
-
-- [CONTRIBUTING.md](./CONTRIBUTING.md) for the package map and workflow.
-- [AGENTS.md](./AGENTS.md) for project rules.
-- [specs/framework-design.md](./specs/framework-design.md) for the spec index.
-
-## Agent Guidance
-
-AI agent rules, skills, and MCP config are sourced from [`.ruler/`](.ruler/) and
-generated with [Ruler](https://github.com/intellectronica/ruler) via `pnpm rules`.
-`AGENTS.md`, `CLAUDE.md`, and the per-agent skill copies are generated files —
-edit `.ruler/` instead and rerun `pnpm rules`. CI and the pre-commit hook fail
-when generated files drift from their sources.
+[MIT](./LICENSE)
