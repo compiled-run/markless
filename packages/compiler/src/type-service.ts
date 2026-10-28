@@ -6,6 +6,10 @@ import {
 	type MarklessParserComment,
 } from './js-ast.ts';
 import { rawElementText } from './ast/raw-text.ts';
+import type { CompilerDiagnostic } from './diagnostics.ts';
+import { buildSemanticGraphSync } from './passes/semantic-graph/index.ts';
+import { frameworkApiSources } from './passes/semantic-graph/imports.ts';
+import { lowerStateAccess } from './passes/state-lowering.ts';
 
 export interface MarklessMappingData {
 	verification: boolean;
@@ -132,6 +136,34 @@ export function compileTsrxForTypeService(
 }
 
 export const compile_to_volar_mappings = compileTsrxForTypeService;
+
+/**
+ * The warnings one file decides on its own - shapes that compile but do not
+ * behave the way they read - for the editor and the type checker. Errors stay
+ * with the build, which links the imports a single file cannot see.
+ */
+export function collectTsrxAuthorWarnings(
+	source: string,
+	filename = 'module.tsrx',
+): ReadonlyArray<CompilerDiagnostic> {
+	let semanticGraph: ReturnType<typeof buildSemanticGraphSync>;
+	try {
+		semanticGraph = buildSemanticGraphSync({ filename, source });
+	} catch {
+		return [];
+	}
+	// An imported value can be graph state the build links in, so what lowering says about
+	// a read or a write is decided by the build unless this file sees every binding alone.
+	const seesEveryBinding = semanticGraph.moduleImports.every(
+		(entry) => entry.typeOnly === true || FRAMEWORK_API_SOURCES.has(entry.source),
+	);
+	const lowering = seesEveryBinding ? lowerStateAccess({ semanticGraph }).diagnostics : [];
+	return [...semanticGraph.diagnostics, ...lowering].filter(
+		(diagnostic) => diagnostic.severity === 'warning' && diagnostic.suppressed !== true,
+	);
+}
+
+const FRAMEWORK_API_SOURCES = frameworkApiSources();
 
 function emitProgramForTypeService(
 	program: Program,

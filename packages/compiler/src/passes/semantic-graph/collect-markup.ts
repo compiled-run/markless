@@ -1089,6 +1089,9 @@ function expressionResidue(
 			(expression.type === 'ObjectExpression' || expression.type === 'Identifier'),
 	);
 	if (residue.kind !== 'authored-expression' || residue.source !== source) return residue;
+	// No computed stands behind it, so the render writes the object's CSS text itself.
+	const styleSource = attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
+	if (styleSource !== null) return { kind: 'authored-expression', source: styleSource };
 	const inlined = context.nestedLocalSource?.(expression);
 	return inlined ? { kind: 'authored-expression', source: inlined } : residue;
 }
@@ -1321,6 +1324,24 @@ function staticStyleObjectCss(
 		referenced: objectNode !== expression,
 	});
 	return lowering?.kind === 'static' ? lowering.css : null;
+}
+
+function styleObjectCssSource(expression: AnyNode, context: CollectionContext): string | null {
+	const objectNode =
+		expression.type === 'Identifier'
+			? markupStyleConstResolver(context).resolveObject(
+					getIdentifierName(expression) ?? '',
+					expression.start ?? 0,
+				)?.object
+			: expression;
+	if (objectNode?.type !== 'ObjectExpression') return null;
+	const lowering = lowerStyleObject(objectNode, context.source, {
+		resolver: markupStyleConstResolver(context),
+		usagePos: expression.start ?? 0,
+		referenced: objectNode !== expression,
+		valueSource: (value) => context.nestedLocalSource?.(value) ?? null,
+	});
+	return lowering?.kind === 'dynamic' ? lowering.expressionSource : null;
 }
 
 function markupStyleConstResolver(context: CollectionContext): StyleConstResolver {

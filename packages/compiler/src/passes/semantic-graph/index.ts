@@ -84,6 +84,11 @@ import { collectDirectEvalDiagnostics } from './direct-eval.ts';
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
 ): Promise<SemanticGraphArtifact> {
+	return buildSemanticGraphSync(input);
+}
+
+/** The same pass, for a caller that cannot await: the editor and the type checker. */
+export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraphArtifact {
 	const ast = parseModule(input.source, input.filename) as unknown as AnyNode;
 	const statements = asNodes(ast.body);
 	const moduleId = moduleIdOf(input);

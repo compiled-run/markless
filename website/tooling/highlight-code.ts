@@ -217,12 +217,15 @@ export function addQuickInfoHovers(
 		const start = bufferStart + lead;
 		const info = byEnd.get(start + token.length);
 		if (!info || info.start < start) return plain;
+		const title = info.kind ? `${info.signature} · ${info.kind}` : info.signature;
 		const wrapped = hoverMarkup(
 			escapeText(token),
-			info.signature,
-			paint(info.signature),
+			title,
+			info.kind
+				? `<span class="tsrx-tip-code">${escapeText(info.signature)}</span>${escapeText(` · ${info.kind}`)}`
+				: paint(info.signature),
 			info.doc,
-			info.doc ? `${info.signature}. ${info.doc.replaceAll('`', '')}` : info.signature,
+			info.doc ? `${title}. ${info.doc.replaceAll('`', '')}` : title,
 		);
 		return `${open}${buffer.slice(0, lead)}${wrapped}${buffer.slice(lead + token.length)}</span>`;
 	};

@@ -298,7 +298,7 @@ test('escapes a literal less-than in markup text so the generated TSX type-check
 	}
 });
 
-test('tsserver protocol opens configured .tsrx files without JSX or parser diagnostics', async () => {
+test('tsserver protocol opens configured .tsrx files without JSX or parser diagnostics, and shows compiler warnings', async () => {
 	const result = await runTsrxTsserverProbe();
 
 	expect(result.loadedPlugin).toBe(true);
@@ -308,7 +308,31 @@ test('tsserver protocol opens configured .tsrx files without JSX or parser diagn
 		{ file: 'NoImports.tsrx', syntactic: [], semantic: [] },
 		{ file: 'Style.tsrx', syntactic: [], semantic: [] },
 		{ file: 'List.tsrx', syntactic: [], semantic: [] },
-		{ file: 'Control.tsrx', syntactic: [], semantic: [] },
+		{
+			file: 'Control.tsrx',
+			syntactic: [],
+			// The compiler's own warning for a prop call inside @try reaches the editor.
+			semantic: [
+				expect.objectContaining({
+					category: 'warning',
+					code: 91002,
+					text: expect.stringContaining('MARKLESS_TEMPLATE_EXPRESSION_STATIC'),
+				}),
+			],
+		},
+		{
+			file: 'Rows.tsrx',
+			syntactic: [],
+			semantic: [
+				expect.objectContaining({
+					category: 'warning',
+					code: 91002,
+					source: 'markless',
+					start: { line: 5, offset: 3 },
+					text: expect.stringContaining('MARKLESS_REPEAT_KEY_IS_INDEX: key i identifies each row'),
+				}),
+			],
+		},
 	]);
 }, 20_000);
 
@@ -547,6 +571,18 @@ export function App() @{
 }`,
 		},
 	];
+	fixtures.push({
+		name: 'Rows.tsrx',
+		source: `import { state } from '@markless/core';
+export function Rows() @{
+	let rows = state(['a']);
+	<ul>
+		@for (const row of rows; index i; key i) {
+			<li onClick={() => rows.push('b')}>{row}</li>
+		}
+	</ul>
+}`,
+	});
 	mkdirSync(join(project, 'node_modules/@markless/core'), { recursive: true });
 	writeFileSync(
 		join(project, 'node_modules/@markless/core/package.json'),

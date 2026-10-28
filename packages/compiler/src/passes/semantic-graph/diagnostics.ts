@@ -1822,7 +1822,7 @@ export function styleObjectUnsupportedDiagnostic(
 		code: 'MARKLESS_STYLE_OBJECT_UNSUPPORTED',
 		severity: 'error',
 		title: 'This style object shape is not supported',
-		message: `style={${input.valueSource}} uses ${input.reason}, which style objects do not support. Supported: an object literal written on the element, or an unmodified same-file \`const\` object literal referenced by name or flattened with \`...spread\`, with keys that are plain names or compile-time strings and values that are literals, state, computed values, or props.`,
+		message: `style={${input.valueSource}} uses ${input.reason}, which style objects do not support. Supported: an object literal written on the element, or an unmodified same-file \`const\` object literal referenced by name or flattened with \`...spread\`, with keys that are plain names or compile-time strings and values built from literals, state, computed values, props, row items and consts without calling a function.`,
 		why: 'A style object is turned into CSS text while compiling, so every key must be readable from the source and every value must be one the compiler can recombine into the same text the server renders and the browser rewrites. Objects that are imported, held in state, mutated, aliased, or built at runtime cannot be frozen that way.',
 		suggestion:
 			'Write the declarations directly on the element, such as style={{ color: theme, marginTop: 8 }}, move the object into an unmodified same-file const, or pass a CSS string.',

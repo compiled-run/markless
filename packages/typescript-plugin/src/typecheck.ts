@@ -1,4 +1,7 @@
-import type { MarklessTsrxTypeServiceResult } from '@markless/compiler/type-service';
+import {
+	type MarklessTsrxTypeServiceResult,
+	collectTsrxAuthorWarnings,
+} from '@markless/compiler/type-service';
 import type { CodeMapping, LanguagePlugin, VirtualCode } from '@volar/language-core';
 // Side-effect type import: @volar/typescript augments LanguagePlugin with the `typescript`
 // field the TS program reads, and without it that field is an unknown property.
@@ -6,6 +9,7 @@ import type {} from '@volar/typescript';
 import type * as ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 import {
+	MARKLESS_TSRX_COMPILER_WARNING_CODE,
 	MARKLESS_TSRX_EXTENSIONS,
 	MARKLESS_TSRX_LANGUAGE_ID,
 	MARKLESS_TSRX_PARSE_ERROR_CODE,
@@ -93,6 +97,23 @@ export function formatMarklessCompileError(
 	return `${fileName}(${line},${column}): error TS${MARKLESS_TSRX_PARSE_ERROR_CODE}: Markless TSRX parse error: ${error.message}`;
 }
 
+/** `path/to/file.tsrx(12,5): warning TS91002: MARKLESS_CODE: ...` - warnings never fail the run. */
+export function formatMarklessCompilerWarnings(
+	fileName: string,
+	source: string,
+	directory = '',
+): string[] {
+	const prefix = directory.endsWith('/') ? directory : `${directory}/`;
+	const shownName =
+		directory !== '' && fileName.startsWith(prefix) ? fileName.slice(prefix.length) : fileName;
+	return collectTsrxAuthorWarnings(source, fileName).map((warning) => {
+		const upToPos = source.slice(0, Math.max(0, warning.primarySpan?.start ?? 0));
+		const line = upToPos.split('\n').length;
+		const column = upToPos.length - (upToPos.lastIndexOf('\n') + 1) + 1;
+		return `${shownName}(${line},${column}): warning TS${MARKLESS_TSRX_COMPILER_WARNING_CODE}: ${warning.code}: ${warning.message}`;
+	});
+}
+
 type TsrxServiceScript = {
 	readonly code: VirtualCode;
 	readonly extension: '.tsx';
@@ -133,7 +154,9 @@ class MarklessTypecheckVirtualCode implements VirtualCode {
 export function createMarklessTypecheckLanguagePlugin(
 	typescript: typeof ts,
 	reportCompileError: (error: MarklessCompileError, source: string) => void = () => {},
+	reportCompilerWarnings: (fileName: string, source: string) => void = () => {},
 ): LanguagePlugin<string> {
+	const warned = new Set<string>();
 	return {
 		getLanguageId(scriptId) {
 			return isMarklessTsrxFile(scriptId) ? MARKLESS_TSRX_LANGUAGE_ID : undefined;
@@ -141,6 +164,10 @@ export function createMarklessTypecheckLanguagePlugin(
 		createVirtualCode(scriptId, languageId, snapshot) {
 			if (languageId !== MARKLESS_TSRX_LANGUAGE_ID) return undefined;
 			const source = snapshot.getText(0, snapshot.getLength());
+			if (!warned.has(scriptId)) {
+				warned.add(scriptId);
+				reportCompilerWarnings(scriptId, source);
+			}
 			return new MarklessTypecheckVirtualCode(source, scriptId, (error) => {
 				const recorded = recordCompileError(scriptId, error);
 				if (recorded) reportCompileError(recorded, source);

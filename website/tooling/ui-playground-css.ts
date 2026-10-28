@@ -109,12 +109,14 @@ function tipLook(tip: string): string {
  * above (and to the other side) when that would leave the viewport. Fixed, so
  * the card's clip never cuts it; the caller names the anchor.
  */
-function anchored(anchor: string, area: string): string {
+/** A hover doc may also take the whole width above or below, so a wide one on a phone neither leaves the screen nor covers its token. */
+function anchored(anchor: string, area: string, doc = false): string {
+	const wide = doc ? ', block-end span-all, block-start span-all' : '';
 	return `position: fixed;
 				inset: auto;
 				position-anchor: ${anchor};
 				position-area: ${area};
-				position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;`;
+				position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline${wide};`;
 }
 
 /** The site's select: a 2px ink frame, paper inside, the sidebar's caret. */
@@ -385,7 +387,7 @@ ${tipLook('.pg-tip')}
 				}
 
 				.pg-tip {
-					${anchored('--pg-hint', 'block-end span-inline-end')}
+					${anchored('--pg-hint', 'block-end span-inline-end', true)}
 					margin-block: 0.35em;
 				}
 			}
@@ -742,7 +744,7 @@ ${tipLook(`${root} .cp-doc`)}
 
 			@supports (position-area: block-end) {
 				${root} .cp-doc {
-					${anchored('--cp-hot', 'block-end span-inline-end')}
+					${anchored('--cp-hot', 'block-end span-inline-end', true)}
 					margin-block: 0.35em;
 				}
 			}`;
