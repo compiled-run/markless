@@ -94,12 +94,13 @@ test('a handler reading a reassignable component-scope function is still refused
 
 // The markup reads the computed, and the computed is what closes over the
 // component-scope local, so the refusal lands on the derive the markup depends on.
+// A `const` body function is spliced into the recipe instead; a `let` one can be swapped.
 const DERIVE_CAPTURES_COMPONENT_LOCAL = `
 import { state, computed } from '@markless/core';
 
 export default function Panel() @{
 	const s = state({ label: 'a', seen: '' });
-	const decorate = (text) => text + '!';
+	let decorate = (text) => text + '!';
 	const loud = computed(() => decorate(s.label));
 	<button data-panel onClick={() => { s.seen = 'b'; }}>{loud}</button>
 }

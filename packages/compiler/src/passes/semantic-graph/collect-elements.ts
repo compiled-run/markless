@@ -223,7 +223,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
-		source: joined?.source ?? expressionSource(expression, state.source),
+		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -234,6 +234,17 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		computedGraphNodeId: composite?.graphNodeId,
 		componentName: state.currentComponentName ?? undefined,
 	});
+}
+
+function templateReadSource(
+	composite: { readonly graphNodeId: string; readonly splicedSource?: string } | null,
+	expression: AnyNode,
+	state: WalkState,
+): { readonly source: string; readonly authoredSource?: string } {
+	const authored = expressionSource(expression, state.source);
+	return composite?.splicedSource
+		? { source: composite.splicedSource, authoredSource: authored }
+		: { source: authored };
 }
 
 // The first interpolation carries the joined text's computed; the rest carry null and ship nothing.
@@ -1235,7 +1246,7 @@ function collectAttribute(
 		}
 		state.graph.templateReads.push({
 			hostNodeId,
-			source: expressionSource(expressionValue, state.source),
+			...templateReadSource(composite, expressionValue, state),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,

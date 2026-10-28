@@ -52,7 +52,7 @@ import {
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
-import { inlineRenderLocals } from './render-local-inline.ts';
+import { inlineRenderLocals, writesOutside } from './render-local-inline.ts';
 import { ownedModuleAst, type ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
@@ -403,9 +403,7 @@ export function collectComputedBinding(input: {
 	}
 	// A shared() factory's locals are carried by the factory scope, not recomputed here.
 	const inlined =
-		body && !state.currentSharedDefinitionId
-			? inlineRenderLocals(body, state, { leaveCaptureOwned: true })
-			: null;
+		body && !state.currentSharedDefinitionId ? inlineRecipeLocals(body, state) : null;
 	if (inlined && inlined.kind !== 'inlined') {
 		state.graph.diagnostics.push(
 			computedReadsRenderLocalDiagnostic({
@@ -446,6 +444,15 @@ export function collectComputedBinding(input: {
 	collectExpressionReads(body, state);
 	if (isAsync) collectAsyncComputedPostAwaitReads(name, body, state);
 	return binding;
+}
+
+// A body function the recipe calls is spliced in, unless it writes; that one stays a capture to refuse.
+function inlineRecipeLocals(body: AnyNode, state: WalkState) {
+	const spliced = inlineRenderLocals(body, state, { leaveCaptureOwned: true, inlineFunctions: true });
+	return spliced.kind === 'inlined' &&
+		!spliced.definitions.some((definition) => writesOutside(definition, state))
+		? spliced
+		: inlineRenderLocals(body, state, { leaveCaptureOwned: true });
 }
 
 export function collectModuleGraphInterface(input: {
