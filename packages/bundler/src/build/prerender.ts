@@ -10,6 +10,10 @@ import {
 	type SsrRenderOutput,
 } from '../../../web/src/render-to-string.ts';
 import { evaluateBuiltPageClosure } from '../../../web/src/prerender/evaluator.ts';
+import {
+	SETTLE_TEMPLATE_PROPERTY_SEEDS_SOURCE,
+	templatePropertySeeds,
+} from '../../../web/src/served-property-seeds.ts';
 import { prepareSsrResumeRecords } from '../../../web/src/prerender/records.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 
@@ -173,8 +177,7 @@ function holeProxy(
 	path: HolePath,
 	options: { readonly rows: number | null; readonly tag: number },
 ): unknown {
-	const target: object =
-		options.rows === null ? {} : Array.from({ length: options.rows });
+	const target: object = options.rows === null ? {} : Array.from({ length: options.rows });
 	return new Proxy(target, {
 		get(_target, key) {
 			if (typeof key === 'symbol') return undefined;
@@ -294,9 +297,7 @@ export function planArmEmission(
 			skipped.push({ id, reason: 'probe-dependent residue survived in the template' });
 			continue;
 		}
-		if (
-			rest.some((other) => JSON.stringify(other!.plan) !== JSON.stringify(primary.plan))
-		) {
+		if (rest.some((other) => JSON.stringify(other!.plan) !== JSON.stringify(primary.plan))) {
 			skipped.push({ id, reason: 'probe-dependent plan' });
 			continue;
 		}
@@ -346,8 +347,9 @@ function runnerSnapshot(
 	node: string,
 	state: unknown,
 ): { readonly key?: unknown; readonly version?: number } {
-	const computed = (state as { readonly computed?: ReadonlyArray<Record<string, any>> } | undefined)
-		?.computed;
+	const computed = (
+		state as { readonly computed?: ReadonlyArray<Record<string, any>> } | undefined
+	)?.computed;
 	const snapshot = computed?.find((entry) => entry.graphNodeId === node)?.snapshot;
 	if (!snapshot) return {};
 	return {
@@ -357,9 +359,12 @@ function runnerSnapshot(
 }
 
 function derivedSymbolIds(plan: ArmBoundaryPlan): ReadonlyArray<string> {
-	return [...plan.holes, ...(plan.repeat?.holes ?? []), ...(plan.repeat?.emptyHoles ?? [])].flatMap(
-		(hole) =>
-			Array.isArray(hole.from) ? [] : [(hole.from as { readonly symbolId: string }).symbolId],
+	return [
+		...plan.holes,
+		...(plan.repeat?.holes ?? []),
+		...(plan.repeat?.emptyHoles ?? []),
+	].flatMap((hole) =>
+		Array.isArray(hole.from) ? [] : [(hole.from as { readonly symbolId: string }).symbolId],
 	);
 }
 
@@ -391,7 +396,8 @@ function initialScalarsFor(
 		const envelope = cell?.value as { readonly root?: unknown; readonly records?: unknown[] };
 		if (!envelope || (envelope.records?.length ?? 0) > 0) return undefined;
 		const root = envelope.root;
-		if (root !== null && !['string', 'number', 'boolean'].includes(typeof root)) return undefined;
+		if (root !== null && !['string', 'number', 'boolean'].includes(typeof root))
+			return undefined;
 		initial[node] = root;
 	}
 	return initial;
@@ -523,10 +529,22 @@ function buildBoundary(
 			: {}),
 	};
 	const escaped = `${escapeArmId(boundaryId)}`;
+	const armTemplate = `${prefix}${repeat ? holeAnchor(rowAnchorCoordinate) : ''}${suffix}`;
+	const seeds = (
+		[
+			['arm', templatePropertySeeds(armTemplate, armHoles)],
+			['row', repeat ? templatePropertySeeds(row, rowHoles) : []],
+			['empty', repeat ? templatePropertySeeds(empty, emptyHoles) : []],
+		] as const
+	).filter(([, list]) => list.length > 0);
 	const markup = [
-		`<template m:arm="${escaped}">${prefix}${repeat ? holeAnchor(rowAnchorCoordinate) : ''}${suffix}</template>`,
+		`<template m:arm="${escaped}">${armTemplate}</template>`,
 		repeat ? `<template m:row="${escaped}">${row}</template>` : '',
 		repeat ? `<template m:empty="${escaped}">${empty}</template>` : '',
+		// Only an arm whose markup carries a property-only member ships this.
+		seeds.length > 0
+			? `<script>(${SETTLE_TEMPLATE_PROPERTY_SEEDS_SOURCE})(${JSON.stringify(boundaryId).replace(/</g, '\\u003c')},${JSON.stringify(seeds)})</script>`
+			: '',
 	].join('');
 	if (markup.includes(SENTINEL_OPEN)) unsupported('sentinel leaked into emitted markup');
 	return { plan, markup };
@@ -734,7 +752,9 @@ function assertCoverage(
 	repeat: Record<string, any> | undefined,
 ): void {
 	const pathHoles = new Set(
-		holes.filter((hole) => Array.isArray(hole.from)).map((hole) => (hole.from as HolePath).join('.')),
+		holes
+			.filter((hole) => Array.isArray(hole.from))
+			.map((hole) => (hole.from as HolePath).join('.')),
 	);
 	const derivedHoles = new Set(
 		holes

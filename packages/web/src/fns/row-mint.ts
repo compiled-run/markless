@@ -1,3 +1,7 @@
+import {
+	PROTOCOL_LIVE_PROPERTY_MEMBERS,
+	PROTOCOL_PROPERTY_ONLY_MEMBERS,
+} from '../../../serializer/src/protocol-dom-properties.ts';
 import { markupNodes, type MarkupParent } from '../markup-nodes.ts';
 import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
 import type { RuntimeGraph } from '@markless/runtime';
@@ -44,7 +48,11 @@ export function renderEmptyArm(
 			'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
 			'has no document to render its @empty arm markup with.',
 		);
-	const nodes = markupNodes<ResumeDomNode>(template, repeat.emptyArm!.html, parent as MarkupParent);
+	const nodes = markupNodes<ResumeDomNode>(
+		template,
+		repeat.emptyArm!.html,
+		parent as MarkupParent,
+	);
 	if (nodes.length === 0)
 		throw repeatRuntimeError(
 			repeat,
@@ -149,7 +157,10 @@ export function mintRowNodes(
 			'MARKLESS_REPEAT_ROW_MINT_EMPTY',
 			'built no row from its markup, and half a row is worse than none.',
 		);
-	if (anchors.some((anchor) => !anchor?.replaceWith) || hosts.some((element) => !element?.setAttribute))
+	if (
+		anchors.some((anchor) => !anchor?.replaceWith) ||
+		hosts.some((element) => !element?.setAttribute)
+	)
 		throw empty();
 	const valueAt = (at: number, slot: ProtocolRowTemplateSlotValue) =>
 		values ? values[at] : slotValue(slot, item, graph);
@@ -198,7 +209,8 @@ export function patchRow(
 	rewire?: () => void,
 ): boolean {
 	// Its arms stand between the row's elements, so a row with an @if is patched by the code that counts them.
-	if (repeat.rowTemplate!.branchSlots) return rowBranches!.patch(row, repeat, before, after, rewire);
+	if (repeat.rowTemplate!.branchSlots)
+		return rowBranches!.patch(row, repeat, before, after, rewire);
 	const template = repeat.rowTemplate!,
 		texts = template.textSlots ?? [],
 		writes: Array<() => void> = [];
@@ -269,6 +281,10 @@ export function writeAttribute(
 	value: unknown,
 	rest: string | null | undefined,
 ): void {
+	if (PROTOCOL_PROPERTY_ONLY_MEMBERS.includes(name) && name in element) {
+		(element as unknown as Record<string, unknown>)[name] = value;
+		return;
+	}
 	const text = marklessAttributeValue(name, value);
 	marklessWriteAttribute(
 		element,
@@ -279,8 +295,9 @@ export function writeAttribute(
 				? rest + (text ?? '')
 				: (text ?? '') + (rest ?? ''),
 	);
-	if ((name === 'checked' || name === 'selected' || name === 'value') && name in element)
-		element[name] = name === 'value' ? (text ?? '') : text !== null;
+	if (PROTOCOL_LIVE_PROPERTY_MEMBERS.includes(name) && name in element)
+		(element as unknown as Record<string, unknown>)[name] =
+			name === 'value' ? (text ?? '') : text !== null;
 }
 
 /** Where focus sits inside a row about to be rebuilt, as element indexes under the row root. */
@@ -377,11 +394,7 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}
 	return cursor;
 }
-function repeatRuntimeError(
-	repeat: ResumeKeyedRepeatRecord,
-	code: string,
-	detail: string,
-): Error {
+function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
 	const error = new Error(`${code}: ${repeat.id} ${detail}`) as Error & Record<string, unknown>;
 	error.name = 'KeyedRepeatRuntimeError';
 	error.code = code;

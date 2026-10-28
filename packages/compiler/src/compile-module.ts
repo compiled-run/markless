@@ -1,3 +1,4 @@
+import { withPropertyMembers } from './passes/link/property-members.ts';
 import type {
 	CaptureAnalysisArtifact,
 	CompileTsrxModuleInput,
@@ -104,6 +105,11 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 	};
 
+	const propertyMembersInput = {
+		componentEdges: artifacts.semanticGraph.componentEdges,
+		chunks: artifacts.semanticGraph.markup.chunks,
+		importedModuleInterfaces: input.importedModuleInterfaces,
+	};
 	const storageCellsInput = {
 		componentEdges: artifacts.semanticGraph.componentEdges,
 		protocolState: artifacts.protocolState,
@@ -116,7 +122,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 			withClosureActionOwners(
 				withRosterDerivations(
 					withRowSlotReaders(
-						withSeedsFromProps(withStorageCells(artifacts.semanticGraph.moduleGraphInterface, storageCellsInput), {
+						withSeedsFromProps(withStorageCells(withPropertyMembers(artifacts.semanticGraph.moduleGraphInterface, propertyMembersInput), storageCellsInput), {
 							symbolResolver: artifacts.symbolResolver,
 							protocolState: artifacts.protocolState,
 						}),

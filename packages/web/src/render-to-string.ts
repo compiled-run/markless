@@ -53,6 +53,11 @@ import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defe
 import { prepareSsrResumeRecords } from './prerender/records.ts';
 import { CONTAINER_ATTRIBUTE } from './fns/container-region.ts';
 import {
+	APPLY_PROPERTY_SEEDS_SOURCE,
+	servedPropertySeeds,
+	type PropertySeed,
+} from './served-property-seeds.ts';
+import {
 	marklessSsrRosterCounted,
 	marklessSsrRosterPositionContext,
 } from './fns/roster-position.ts';
@@ -275,9 +280,9 @@ export async function assembleSsrContainer(
 				)
 			: '';
 	const policyTable = createSyncPolicyTable();
-	const pageHtml = resumerScript
-		? withEventHostMarks(view, output.html, policyTable)
-		: output.html;
+	const seeded = servedPropertySeeds(output.html);
+	const servedHtml = seeded?.html ?? output.html;
+	const pageHtml = resumerScript ? withEventHostMarks(view, servedHtml, policyTable) : servedHtml;
 	const storageSeedScript = renderStorageSeedScript(
 		artifactStorageSeeds(component),
 		options.nonce,
@@ -294,6 +299,7 @@ export async function assembleSsrContainer(
 			options.containerId,
 			[
 				pageHtml,
+				renderPropertySeedScript(seeded?.seeds, options.nonce),
 				payloadScripts?.stateScript,
 				payloadScripts?.viewScript,
 				renderSyncPolicyTableScript(policyTable.policies),
@@ -375,10 +381,13 @@ export async function assemblePrerenderPageParts(
 		.filter(Boolean)
 		.join('');
 	const policyTable = createSyncPolicyTable();
+	const seeded = servedPropertySeeds(output.html);
+	const servedHtml = seeded?.html ?? output.html;
 	const container = renderContainer(
 		options.containerId,
 		[
-			resumerScript ? withEventHostMarks(view, output.html, policyTable) : output.html,
+			resumerScript ? withEventHostMarks(view, servedHtml, policyTable) : servedHtml,
+			renderPropertySeedScript(seeded?.seeds, options.nonce),
 			options.armEmission,
 			renderSyncPolicyTableScript(policyTable.policies),
 			resumerScript,
@@ -1037,6 +1046,16 @@ function deferredEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
 		]),
 	];
+}
+
+// Only a page whose markup carries a member with no live attribute gets this, right behind that markup.
+function renderPropertySeedScript(
+	seeds: ReadonlyArray<PropertySeed> | undefined,
+	nonce: string | undefined,
+): string {
+	if (!seeds) return '';
+	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
+	return `<script${nonceAttribute}>${escapeInlineScript(`(${APPLY_PROPERTY_SEEDS_SOURCE})(document.currentScript.parentElement,${escapeScriptJson(JSON.stringify(seeds))})`)}</script>`;
 }
 
 function renderContainer(

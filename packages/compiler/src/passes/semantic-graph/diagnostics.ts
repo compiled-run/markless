@@ -1892,6 +1892,31 @@ export function submoduleUnsupportedDiagnostic(
 // text plus a swallowed body, so the page renders the word "else" and the arm's
 // escaped source instead of the branch the author wrote. Nothing downstream can
 // recover the intent, so the spelling is refused at the graph.
+export function srcObjectServedValueDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_SRC_OBJECT_SERVED_VALUE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'srcObject is given a value the page would have to serve',
+		message:
+			'srcObject takes a MediaStream or other object that exists only in the browser, and it has no HTML attribute, so the server cannot render it. A value written here would never reach the element.',
+		why: 'The page is rendered before any browser code runs, so the only value srcObject can start with is none. A stream from the camera or a peer is set after load, from state the browser fills in.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Bind it to state that starts as null and is set in the browser: `let stream = state(null);` with `srcObject={stream}`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SRC_OBJECT_SERVED_VALUE',
+	};
+}
+
 export function branchElseSpellingDiagnostic(input: {
 	readonly node: AnyNode;
 	readonly filename: string;

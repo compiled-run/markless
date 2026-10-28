@@ -1,4 +1,5 @@
 import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
+import { propertySeedImport } from './property-seed-import.ts';
 import {
 	addressedHostNodeIds,
 	withInertHostsFolded,
@@ -130,7 +131,7 @@ export function collectServedRenderData(
 		),
 	};
 	return {
-		renderDataModuleSource: `export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(renderData, addressedHostNodeIds(input.protocolView))) ?? 'undefined'};`,
+		renderDataModuleSource: `${propertySeedImport(renderData)}export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(renderData, addressedHostNodeIds(input.protocolView))) ?? 'undefined'};`,
 		readers,
 		imports: prelude.imports,
 		declarations: prelude.declarations,

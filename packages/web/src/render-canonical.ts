@@ -66,6 +66,9 @@ function clientOutputFromHtml(
 ): CsrRenderOutput {
 	const template = ownerDocument.createElement('template');
 	template.innerHTML = html;
+	(globalThis as { __marklessPropertySeeds?: (nodes: ArrayLike<unknown>) => void }).__marklessPropertySeeds?.(
+		template.content.childNodes,
+	);
 	const root =
 		template.content.childNodes.length === 1
 			? template.content.firstChild

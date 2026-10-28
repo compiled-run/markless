@@ -1,3 +1,8 @@
+import {
+	PROTOCOL_LIVE_PROPERTY_MEMBERS,
+	PROTOCOL_PROPERTY_ONLY_MEMBERS,
+	PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES,
+} from '@markless/serializer';
 import { isEventAttribute, normalizeEventName } from '../../ast/events.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
@@ -1294,8 +1299,11 @@ function collectStyleObjectAttribute(
 	if (lowering?.kind === 'static') return;
 
 	const composite =
-		lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, definitions, inlinedNames, state) : null;
-	if (composite) for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+		lowering?.kind === 'dynamic'
+			? mintStyleObjectComputed(lowering, definitions, inlinedNames, state)
+			: null;
+	if (composite)
+		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
 	if (
 		lowering?.kind === 'dynamic' &&
 		(composite || lowering.valueExpressions.every((value) => rendersStyleValue(value, state)))
@@ -1364,13 +1372,20 @@ function mintStyleObjectComputed(
 	if (!readSources) return null;
 	// An inlined const's definition reads stand in for the const itself.
 	const sources = new Set(
-		readSources.filter((source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? '')),
+		readSources.filter(
+			(source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? ''),
+		),
 	);
 	for (const definition of definitions)
-		for (const dependency of collectGraphDependencies(definition, state)) sources.add(dependency.source);
+		for (const dependency of collectGraphDependencies(definition, state))
+			sources.add(dependency.source);
 	if (sources.size === 0) return null;
 
-	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, [...sources], state);
+	return mintTemplateExpressionComputed(
+		`() => ${lowering.expressionSource}`,
+		[...sources],
+		state,
+	);
 }
 
 function collectDuplicateAttributeDiagnostics(
@@ -1876,6 +1891,8 @@ function bindingTargetForAttribute(
 			: { kind: 'class' };
 	if (attributeName === 'style') return { kind: 'style' };
 
+	const reflected = PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES[attributeName];
+	if (reflected) return { kind: 'attribute', name: reflected };
 	if (isDomPropertyBindingName(attributeName)) {
 		return {
 			kind: 'property',
@@ -1890,7 +1907,10 @@ function bindingTargetForAttribute(
 }
 
 function isDomPropertyBindingName(attributeName: string): boolean {
-	return attributeName === 'value' || attributeName === 'checked' || attributeName === 'selected';
+	return (
+		PROTOCOL_LIVE_PROPERTY_MEMBERS.includes(attributeName) ||
+		PROTOCOL_PROPERTY_ONLY_MEMBERS.includes(attributeName)
+	);
 }
 
 /**

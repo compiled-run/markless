@@ -8535,6 +8535,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_SRC_OBJECT_SERVED_VALUE',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'srcObject is given a value the page would have to serve: a Markless build error.',
+		printed: [
+			'MARKLESS_SRC_OBJECT_SERVED_VALUE: srcObject takes a MediaStream or other object that exists only in the browser, and it has no HTML attribute, so the server cannot render it. A value written here would never reach the element.',
+			'The page is rendered before any browser code runs, so the only value srcObject can start with is none. A stream from the camera or a peer is set after load, from state the browser fills in.',
+			'Bind it to state that starts as null and is set in the browser: `let stream = state(null);` with `srcObject={stream}`.',
+			'https://markless.dev/errors/MARKLESS_SRC_OBJECT_SERVED_VALUE',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_SSR_DATA_ANCHOR_MISSING',
 		packageName: '@markless/web',
 		stage: 'runtime',

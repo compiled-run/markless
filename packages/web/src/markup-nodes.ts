@@ -12,5 +12,9 @@ export function markupNodes<Node>(
 	const svg = !!parent && 'ownerSVGElement' in parent && parent.localName !== 'foreignObject';
 	template.innerHTML = svg ? `<svg>${html}</svg>` : html;
 	const holder = svg ? (template.content?.firstChild as MarkupHolder) : template.content;
-	return Array.from(holder?.childNodes ?? []) as ReadonlyArray<Node>;
+	const nodes = Array.from(holder?.childNodes ?? []) as ReadonlyArray<Node>;
+	(
+		globalThis as { __marklessPropertySeeds?: (nodes: ArrayLike<unknown>) => void }
+	).__marklessPropertySeeds?.(nodes);
+	return nodes;
 }

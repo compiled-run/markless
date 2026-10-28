@@ -33,6 +33,11 @@ export {
 } from './protocol-constants.ts';
 export { PROTOCOL_CONTAINER_HOST_NODE_ID } from './protocol-page-markers.ts';
 export {
+	PROTOCOL_LIVE_PROPERTY_MEMBERS,
+	PROTOCOL_PROPERTY_ONLY_MEMBERS,
+	PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES,
+} from './protocol-dom-properties.ts';
+export {
 	protocolBoundSymbolBase,
 	protocolBoundSymbolBaseEnd,
 	protocolBoundSymbolPrefix,

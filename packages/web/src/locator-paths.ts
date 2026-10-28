@@ -184,7 +184,7 @@ export function withElementAttributes(
 	return out + html.slice(cursor);
 }
 
-function endOfTag(html: string, from: number): number {
+export function endOfTag(html: string, from: number): number {
 	let quote = '';
 	for (let at = from; at < html.length; at++) {
 		const char = html[at]!;
