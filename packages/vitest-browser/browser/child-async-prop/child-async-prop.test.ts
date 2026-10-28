@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { Page } from './page.tsrx';
+import { holdSearches } from './search-fruit.ts';
 
 // A child declared beside its parent, whose async value and staleness check read a prop, behaves like the one-component form.
 afterEach(() => cleanup());
@@ -23,8 +24,10 @@ async function exercise(container: HTMLElement) {
 	// The first keystroke wakes a served page; the second starts a refresh over a settled answer.
 	await type(container.querySelector('input')!, 'a');
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotbananagrapemango');
+	const release = holdSearches();
 	await type(container.querySelector('input')!, 'p');
-	await expect.poll(looks, { timeout: 700, interval: 10 }).toEqual(['true', '0.5']);
+	await expect.poll(looks, { timeout: 5_000 }).toEqual(['true', '0.5']);
+	release();
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
 	await expect.poll(looks).toEqual([null, '1']);
 

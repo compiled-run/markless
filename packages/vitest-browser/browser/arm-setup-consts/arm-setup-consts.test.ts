@@ -4,6 +4,7 @@ import { Counter } from './if-arm.tsrx';
 import { Rows } from './for-row.tsrx';
 import { Tabs } from './switch-arm.tsrx';
 import { Search } from './try-arm.tsrx';
+import { holdSearches } from './search-fruit.ts';
 
 // A const written at the top of an arm or row body re-runs with that block, so markup reading it stays live.
 afterEach(() => cleanup());
@@ -55,8 +56,10 @@ for (const [mode, mount] of modes) {
 		await type(container.querySelector('input')!, 'a');
 		await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotbananagrapemango');
 		await expect.poll(looks).toEqual([null, 'opacity: 1']);
+		const release = holdSearches();
 		await type(container.querySelector('input')!, 'p');
-		await expect.poll(looks, { timeout: 700, interval: 10 }).toEqual(['true', 'opacity: 0.5']);
+		await expect.poll(looks, { timeout: 5_000 }).toEqual(['true', 'opacity: 0.5']);
+		release();
 		await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
 		await expect.poll(looks).toEqual([null, 'opacity: 1']);
 	});
