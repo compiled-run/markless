@@ -1,169 +1,117 @@
 import PageMeta from '../../components/page-meta.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import LineToPart from '../../components/sketch/start/line-to-part.tsrx';
+import PrintoutAnatomy from '../../components/figures/reading/printout-anatomy.tsrx';
+import SketchAnatomy from '../../components/figures/reading/sketch-anatomy.tsrx';
+import BlocksDemo from '../../components/figures/reading/blocks-demo.tsrx';
 
 <Sidebar />
 
-# A .tsrx file is TypeScript with elements in it
+# Reading a .tsrx file
 
-<PageMeta time="4 min" assumes="nothing" />
+<PageMeta time="5 min" assumes="nothing" />
 
 <ThemeToggle />
 
-Open a `.tsrx` file and most of it looks familiar. Imports are imports. A component is a function. Types are types.
+<Subtitle text="Every .tsrx file is made of two things: values and instructions." terms="values instructions" />
 
-A few things are new. This page goes through each of them. Then it walks through the other files in a starter app.
-
-## The counter, line by line
-
-Here is the counter again. Click a line of the file to see which part of the button it made. Then click the button.
-
-<LineToPart />
-
-**`import { state } from '@markless/core'`** is a normal import. `@markless/core` is the main Markless package.
-
-**`export default function Counter() @{`** starts a function. Its body opens with `@{` instead of `{`. Inside `@{`, you can write elements like `<button>` and TypeScript statements like `let`.
-
-**`let count = state(0)`** makes a value the page follows. It is still a `let`, and it starts at `0`.
-
-**`<button ...>`** is an element. It works like HTML, with a few extras: `{count}` shows a value, and `onClick` runs code on a click. You do not `return` it. You write it after the statements: a body runs its statements first, then shows the one element at its end.
-
-**`onClick={() => count++}`** handles a click. An event prop is `on` plus the event name, so `onInput` and `onKeyDown` work the same way.
-
-**`{count}`** is a hole in the elements. Curly braces hold an expression, in text or in an attribute: a read like `{count}`, or math like `{count * 2}`. When `count` changes, that text changes with it.
-
-## More than one element
-
-A body shows one element. To show several, put them inside `<>` and `</>`. That pair is a fragment: it holds elements together and adds nothing to the page. The same goes for the body of each `@if`, `@for`, `@switch` and `@try` block below.
-
-<Code note="Add a third line that shows count times two, with {count * 2}. Then move the paragraph below the button.">
-```tsrx title="labelled-counter.tsrx"
+```tsrx title="guest-list.tsrx"
 import { state } from '@markless/core';
 
-export default function LabelledCounter() @{
-	let count = state(0);
+export default function GuestList() @{
+	let guests = state(['Ada', 'Grace']);
 
-	<>
-		<p>You clicked {count} times.</p>
-		<button onClick={() => count++}>
-			Click me
+	<h2>{guests.length} going</h2>
+}
+```
+
+`{ }` holds a **value**: `{guests.length}` becomes `2`. `@{ }` holds **instructions**: they run top to bottom, and the last one is what shows up.
+
+## Mark up a whole file
+
+Here's a fuller guest list, printed and marked up: yellow for every value, a bracket for the instructions. Press it to watch the marks go on again.
+
+<PrintoutAnatomy />
+
+## `{ }` holds a value
+
+A value is an *expression*: anything that produces a result. If it fits after `let x =`, it's an expression. One per pair of braces, and it can go:
+
+- in text: `<p>{name}</p>`
+- in an attribute: `class={name === 'Ada' ? 'host' : ''}`
+- as a handler: `onClick={clear}`
+
+<SketchAnatomy figure="values" />
+
+<Code steps={[{ label: 'Click RSVP. All three values change.', shows: 'See you there' }, { label: "Change `'Coming?'` to `'Are you in?'`.", source: 'Are you in?' }]}>
+```tsrx title="rsvp.tsrx"
+import { state } from '@markless/core';
+
+export default function Rsvp() @{
+	let going = state(false);
+
+	<section>
+		<style>
+			.yes {
+				font-weight: bold;
+			}
+		</style>
+		<h2>{going ? 'See you there' : 'Coming?'}</h2>
+		<button
+			class={going ? 'yes' : 'maybe'}
+			onClick={() => (going = !going)}
+		>
+			{going ? 'Going' : 'RSVP'}
 		</button>
-	</>
+	</section>
 }
 ```
 </Code>
 
-The paragraph reads `count`. Click the button, and only the number in the paragraph changes. Without the fragment, Markless stops with an error that shows where to add it.
+<Callout
+	sprite="cross"
+	title="Why can't I call my own function in { }?"
+	text="Braces show plain reads, maths and method calls, like {guests.length} or {name.toUpperCase()}. A function you wrote, as in {format(guest)}, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Work it out with computed() and show that instead."
+/>
 
-## Lines that start with @ control the elements
+## `@{ }` holds instructions, run top to bottom
 
-An at sign at the start of a line among the elements starts a block. `@if` shows its elements only while a condition is true. `@for` repeats its elements for each item in a list.
+An instruction is a *statement*: a line that runs, like `let guests = state([])` or `@if (…) { … }`. Most hold a value, such as [`state([])`](/concepts/state) or [`computed(() => …)`](/concepts/computed).
 
-<Code note="After the closing brace of the @if, add @else { <p>The note is hidden.</p> } and press the button. Then change the note text, and the class name in both places.">
-```tsrx title="tea-note.tsrx"
-import { state } from '@markless/core';
+<SketchAnatomy figure="steps" />
 
-export default function TeaNote() @{
-	let open = state(false);
+- Statements first, then one element. No `return`.
+- Several elements? Wrap them in `<>` and `</>`.
+- Need a few more steps among the elements? Open another `@{ }`.
+
+<Code note="After </section>, add <p>See you!</p> and read the build error. Then wrap both in <> and </>.">
+```tsrx title="party.tsrx"
+export default function Party() @{
+	const guests = ['Ada', 'Grace', 'Linus'];
+	const host = guests[0];
 
 	<section>
-		<style>
-			.note {
-				font-style: italic;
-			}
-		</style>
-		<button onClick={() => (open = !open)}>
-			{open ? 'Hide' : 'Show'} the note
-		</button>
-		@if (open) {
-			<p class="note">
-				Steep it for three minutes.
-			</p>
+		<p>Hosted by {host}</p>
+		@{
+			const others = guests.length - 1;
+			<p>Plus {others} guests</p>
 		}
 	</section>
 }
 ```
 </Code>
 
-This file shows one more thing: the `<style>` block. Its rules reach the elements in this file and nothing else. Another file can use the class `note` for something different.
+- Two elements at the end, or a statement after the element, stops the build with `MARKLESS_PARSE_ERROR`.
+- A nested `@{ }` doesn't work straight inside a top-level `<>` yet.
+- Already use TypeScript? It works here too.
 
-[Conditionals](/concepts/conditionals), [Lists](/concepts/lists) and [Styling](/concepts/styling) go deeper on each of these.
+## Blocks that start with @
 
-<Callout
-	sprite="cross"
-	title="Can I keep my .tsx files?"
-	text="No. Markless reads components from .tsrx files only. It does not support JSX or TSX components."
-/>
+A line that starts with `@` decides what the page shows. Press Add and Clear:
 
-## The other files in a starter app
+<BlocksDemo />
 
-A new app from `npm create markless` has more files around your components. Here is the `app` starter:
-
-```txt
-my-app/
-  pages/
-    index.tsrx
-    404.tsrx
-    500.tsrx
-  public/
-  scripts/
-    markless-doctor.mjs
-  .vscode/
-  .zed/
-  document.tsrx
-  vite.config.ts
-  tsconfig.json
-  package.json
-  README.md
-  .gitignore
-```
-
-The default `minimal` starter has the same files, minus `document.tsrx`, `404.tsrx` and `500.tsrx`.
-
-| File | What it does |
-| --- | --- |
-| `pages/index.tsrx` | The page at `/`. It holds the counter. |
-| `pages/404.tsrx` | The page you get when no page matches the URL. It says "Not found". |
-| `pages/500.tsrx` | The page you get when a page fails with an error. It says "Something went wrong". |
-| `document.tsrx` | The HTML shell around every page, built with `<Html>` from `@markless/router`. |
-| `public/` | Files your app serves as they are, like images. It starts empty. |
-| `vite.config.ts` | Adds the `markless()` and `router()` plugins. |
-| `tsconfig.json` | Lets your editor read `.tsrx` files. |
-| `scripts/markless-doctor.mjs` | Checks your setup. Run it with `npm run doctor`. |
-| `.vscode/`, `.zed/` | Editor settings. VS Code suggests the TSRX extension, `ripple-ts.ripple-ts-vscode-plugin`. |
-
-Every starter has this `vite.config.ts`:
-
-```ts
-import { markless } from '@markless/core/vite';
-import { router } from '@markless/router/vite';
-import { defineConfig } from 'vite-plus';
-
-export default defineConfig({
-	plugins: [markless(), router()],
-});
-```
-
-The `router()` plugin is what turns `pages/` into URLs.
-
-The `full-stack` starter adds two more files. `api/health.ts` answers a request with `ok`. `middleware/request.ts` adds a header to every response.
-
-<Callout
-	sprite="cross"
-	title="Where did .output come from?"
-	text="Your first dev run or build writes an .output folder and a markless-router-env.d.ts file. The starter's .gitignore does not list .output yet, so add it yourself."
-/>
-
-<Callout
-	sprite="cross"
-	title="Do I add nitro() to vite.config.ts?"
-	text="No. router() already sets up Nitro. If you add nitro() as well, the router stops with Markless Router wires Nitro internally."
-/>
-
-## Where to go next
-
-[State](/concepts/state) is about `state()`, the one new word in the counter.
-
-[Events](/concepts/events) is about `onClick` and the other event props.
+- An `@if` or `@switch` can't sit inside another `@if` yet.
+- A `const` at the top of an `@try` body doesn't work yet.

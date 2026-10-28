@@ -1,6 +1,6 @@
 // Run: node --experimental-strip-types scripts/witness.ts
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -863,73 +863,24 @@ try {
 
 		// --- widgets on the reading-tsrx page ------------------------------------
 		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
-		// The page walks through counter.tsrx line by line, so the card's code box
-		// is the file the home page runs, not a second counter that differs.
-		const trimmedLines = (text: string) =>
-			text
-				.split('\n')
-				.map((line) => line.trim())
-				.filter((line) => line !== '');
-		const lineCard = page.locator('section[data-preview="line-to-part"]');
-		const counterFile = trimmedLines(
-			await readFile(`${root}/components/demos/start/counter.tsrx`, 'utf8'),
-		);
-		const cardLines = trimmedLines(await lineCard.locator('.code').innerText());
-		check(
-			cardLines.join('\n') === counterFile.join('\n'),
-			'the reading-tsrx card prints the counter file line by line',
-			cardLines.join(' | '),
-		);
-		const lineWatch = lineCard.locator('.pv-watch-text');
-		check(
-			(await lineWatch.innerText()).includes('made the number'),
-			'the line card opens on the state line and the number it made',
-			await lineWatch.innerText(),
-		);
-		await lineCard.getByRole('button', { name: /^\s*<button onClick/ }).click();
-		await settleInner(
-			lineWatch,
-			(text) => text.includes('The markup made the button'),
-			'clicking the markup line names the button it made',
-		);
-		await lineCard.locator('.count').click();
-		await settleInner(
-			lineCard.locator('.count'),
-			(text) => text === 'Count 1',
-			'the counter inside the line card counts',
-		);
+		check((await page.locator('figure.anatomy').count()) === 1, 'the marked-up printout is on the reading page');
+		check((await page.locator('figure.sketch').count()) === 2, 'the values and instructions sketches are on the reading page');
 		const readingDemos = page.locator('.code-block [data-code-stage]');
-		const labelledLine = readingDemos.nth(0).locator('p').first();
-		await labelledLine.waitFor();
-		check(
-			((await labelledLine.textContent()) ?? '').trim() === 'You clicked 0 times.',
-			'the fragment demo serves its paragraph at 0',
-			((await labelledLine.textContent()) ?? '').trim(),
-		);
-		await readingDemos.nth(0).getByRole('button', { name: 'Click me' }).click();
-		await settleText(
-			labelledLine,
-			(text) => text === 'You clicked 1 times.',
-			'the paragraph beside the button follows its click',
-		);
-		const teaToggle = readingDemos.nth(1).getByRole('button');
-		const teaNote = readingDemos.nth(1).locator('p.note');
-		check(
-			((await teaToggle.textContent()) ?? '').trim() === 'Show the note' &&
-				(await teaNote.count()) === 0,
-			'the @if demo starts with no note in the page',
-		);
-		await teaToggle.click();
-		await teaNote.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-		check(
-			((await teaNote.textContent()) ?? '').trim() === 'Steep it for three minutes.' &&
-				((await teaToggle.textContent()) ?? '').trim() === 'Hide the note',
-			'opening the branch puts the note into the page',
-			((await teaToggle.textContent()) ?? '').trim(),
-		);
-		await teaToggle.click();
-		await teaNote.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-		check((await teaNote.count()) === 0, 'closing the branch takes the note out of the page');
+		const rsvp = readingDemos.nth(0);
+		const rsvpHeading = rsvp.locator('h2');
+		await rsvpHeading.waitFor();
+		check(((await rsvpHeading.textContent()) ?? '').trim() === 'Coming?', 'the values playground serves its question', ((await rsvpHeading.textContent()) ?? '').trim());
+		await rsvp.getByRole('button', { name: 'RSVP' }).click();
+		await settleText(rsvpHeading, (text) => text === 'See you there', 'every value in the RSVP playground follows the click');
+		check(((await readingDemos.nth(1).locator('p').nth(1).textContent()) ?? '').trim() === 'Plus 2 guests', 'the nested statement block renders its own element');
+		const blocks = page.locator('figure.blocks-demo');
+		const guestRows = blocks.locator('.row');
+		check((await guestRows.count()) === 2, 'the @for in the blocks demo serves one row per guest', String(await guestRows.count()));
+		await blocks.getByRole('button', { name: 'Clear' }).click();
+		await settleText(blocks.locator('.list'), (text) => text.includes('No one yet'), 'the @if line shows once no one is going');
+		check((await guestRows.count()) === 0, 'Clear removes every @for row');
+		await blocks.getByRole('button', { name: 'Add' }).click();
+		await settleText(blocks.locator('.list'), (text) => text.includes('Ada') && !text.includes('No one yet'), 'Add brings a row back and hides the @if line');
 		await page.screenshot({
 			path: `${shotsDir}/T005-reading-tsrx-after.png`,
 			fullPage: true,

@@ -4,6 +4,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import WaitAnatomy from '../../components/figures/async/wait-anatomy.tsrx';
 
 <Sidebar />
 
@@ -112,6 +113,12 @@ is on the page, picking again keeps it there while the next answer loads.
 	title="Why does the build fail when I show my async value?"
 	text="Every read of an async value in the elements needs a @try around it. A read outside one stops the build with MARKLESS_ASYNC_BOUNDARY_REQUIRED. The block is what tells Markless what to show before the value exists."
 />
+
+## Watch a spot wait
+
+The parcel is `arrives`, a value still on its way. Until it lands, the `@pending` words hold its spot in pencil, and the rest of the page is already there. When the answer comes back down the wire, only that spot is inked in.
+
+<WaitAnatomy />
 
 ## While a new answer loads
 
