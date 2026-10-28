@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { awaitChildClaimPublications, sourceSymbolManifest } from '../src/link-driver.ts';
+import {
+	awaitChildClaimPublications,
+	forceImportedModules,
+	sourceSymbolManifest,
+} from '../src/link-driver.ts';
 import { ModuleMetadataRegistry } from '../src/module-metadata-registry.ts';
 import type { MarklessTransformManifest } from '../src/types.ts';
 
@@ -439,6 +443,52 @@ describe('module metadata identity registry', () => {
 			'/app/c.tsrx',
 			'/app/a.tsrx',
 		]);
+	});
+
+	test('a sibling variant’s first pass never replaces capture metadata a final compile recorded', () => {
+		// Linking can mint symbols, so a first pass numbers them differently from the final compile whose claims importers read.
+		const source = '/workspace/app/components/Card.tsrx';
+		const capture = (symbolId: string) =>
+			({
+				captureMetadata: {
+					passId: 'capture-analysis',
+					extractedSymbols: [{ symbolId }],
+					boundResolverRows: [],
+					diagnostics: [],
+				},
+			}) as unknown as Pick<MarklessTransformManifest, 'captureMetadata'>;
+		const registry = new ModuleMetadataRegistry();
+		const firstSymbol = () =>
+			registry.captureMetadataForSource(source)?.extractedSymbols[0]?.symbolId;
+
+		registry.recordCaptureMetadata(source, capture('symbol:first'), { provisional: true });
+		expect(firstSymbol()).toBe('symbol:first');
+		registry.recordCaptureMetadata(source, capture('symbol:final'));
+		registry.recordCaptureMetadata(source, capture('symbol:sibling-first'), { provisional: true });
+		expect(firstSymbol()).toBe('symbol:final');
+		registry.recordCaptureMetadata(source, capture('symbol:sibling-final'));
+		expect(firstSymbol()).toBe('symbol:sibling-final');
+	});
+
+	test('a client build forces a child no variant has compiled through its symbols module, never its plain module', async () => {
+		// A plain client module loaded only here brought its own import() targets into rolldown's module order on cold builds alone.
+		const parent = '/workspace/app/pages/docs.tsrx?markless-route';
+		const child = '/workspace/app/components/Badge.tsrx';
+		const force = async (environment: 'client' | 'server') => {
+			const loaded: string[] = [];
+			await forceImportedModules(
+				{ load: ({ id }) => void loaded.push(id) },
+				[{ parent, specifier: './Badge.tsrx', source: child, externalized: false }],
+				new Map(),
+				new ModuleMetadataRegistry(),
+				{ dev: false },
+				environment,
+			);
+			return loaded;
+		};
+
+		expect(await force('client')).toEqual([`${child}?markless-symbols`]);
+		expect(await force('server')).toEqual([child]);
 	});
 
 	test('reading one source’s claims does not scan every owner in the build', () => {

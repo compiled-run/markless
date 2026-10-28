@@ -37,8 +37,9 @@ export default box(
 			// The load turn: one line, not one per preloaded entry module.
 			await expect.page.attribute(page, 'html', RENDER_LOG_LINES, '1', WAIT);
 
-			// The first click wakes this button's trigger group, which is a second
-			// render turn — and therefore exactly one more line.
+			// The first click runs its handler in an interaction turn, which prints a
+			// collapsed group, not a render line: the client build no longer pulls the
+			// child's plain module into its packs, so there is no trigger group to wake.
 			await page.click(LIBRARY_BUTTON, WAIT);
 			await expect.page.attribute(
 				page,
@@ -49,7 +50,7 @@ export default box(
 			);
 
 			// Two more clicks, each with an observable state change, wake nothing
-			// further: no new render turn, so no new line. Asserting the exact total
+			// either: no new render turn, so no new line. Asserting the exact total
 			// only after the third click's state change means a broken coalesce has
 			// had three full turns to print its extra lines by the time it is read.
 			await page.click(LIBRARY_BUTTON, WAIT);
@@ -62,10 +63,10 @@ export default box(
 				'library active-library',
 				WAIT,
 			);
-			await expect.page.attribute(page, 'html', RENDER_LOG_LINES, '2', WAIT);
+			await expect.page.attribute(page, 'html', RENDER_LOG_LINES, '1', WAIT);
 
 			await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
-			receipt.note('load turn + first waking click = 2 render lines across 3 clicks');
+			receipt.note('load turn = 1 render line across 3 clicks');
 		} finally {
 			await preview.close();
 		}

@@ -84,7 +84,9 @@ export function registerFirstPassArtifacts(
 			updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 		});
 	} else {
-		moduleMetadata.recordCaptureMetadata(source, transformed.manifest);
+		moduleMetadata.recordCaptureMetadata(source, transformed.manifest, {
+			provisional: internalOptions.dev !== true,
+		});
 		moduleMetadata.recordSymbolClaims(
 			manifestSource,
 			renderDataClaimManifest(transformed.manifest, manifestSource),

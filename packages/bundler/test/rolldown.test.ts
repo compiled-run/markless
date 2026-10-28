@@ -1507,8 +1507,8 @@ export default function Page() @{ <main><StaticFrame /><StyledChild /></main> }`
 			return null;
 		});
 		const load = vi.fn(async ({ id }: { readonly id: string }) => {
-			if (id !== childFilename) return null;
-			return await callTransform(plugin, childSource, childFilename, {
+			if (id.split('?')[0] !== childFilename) return null;
+			return await callTransform(plugin, childSource, id, {
 				resolve: resolveImport,
 				getModuleInfo: () => ({ isEntry: false }),
 			});
@@ -1582,7 +1582,7 @@ export default function Panel() @{ <section><Badge /></section> }`;
 						: null,
 		);
 		const load = vi.fn(async ({ id }: { readonly id: string }) => {
-			const code = sources.get(id);
+			const code = sources.get(id.split('?')[0]!);
 			if (code === undefined) return null;
 			return await callTransform(plugin, code, id, {
 				resolve: resolveImport,

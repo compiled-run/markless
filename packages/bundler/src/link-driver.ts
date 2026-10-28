@@ -430,7 +430,7 @@ export async function forceImportedModules(
 				: artifact?.provisionalUntil;
 		const loadSource =
 			linkedModuleLoadSource(child, artifact !== undefined && pendingRequest === undefined) &&
-			(pendingRequest ?? child.source);
+			(pendingRequest ?? firstLoadSource(child.source, environment, options));
 		if (loadSource !== undefined) {
 			await metadata.whileWaiting(
 				environment,
@@ -476,6 +476,15 @@ export async function forceImportedModules(
 		if (plan.seal) await metadata.sealSourceSymbolClaims(environment, child.source);
 	}
 	return await awaitChildClaimPublications(metadata, children, environment);
+}
+
+// The claim plan loads the symbols module anyway; a plain one forced here joins the graph only when no variant had started yet.
+function firstLoadSource(
+	source: string,
+	environment: MarklessEnvironment,
+	options: LinkForceOptions,
+): string {
+	return environment === 'client' && options.dev !== true ? symbolRouteSource(source) : source;
 }
 
 /**
