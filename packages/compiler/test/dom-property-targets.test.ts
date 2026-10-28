@@ -38,3 +38,34 @@ export function Members() @{
 		.join('');
 	expect(markup).not.toMatch(/default(?:value|checked|muted)/i);
 });
+
+test('srcObject never reaches the served markup, and a value the page would have to serve fails the build', async () => {
+	const compile = (attribute: string) =>
+		compileTsrxModule({
+			filename: 'src/Camera.tsrx',
+			symbols: [],
+			source: `import { state } from '@markless/core';
+export function Camera() @{
+	let stream = state(null);
+	<video ${attribute} onClick={() => (stream = null)} />
+}
+`,
+		});
+	const live = await compile('srcObject={stream}');
+	expect(
+		live.semanticGraph.markup.chunks.map((chunk) => chunk.statics.join('')).join(''),
+	).not.toMatch(/srcobject/i);
+	expect(live.protocolView.domUpdates.map((update) => update.target)).toEqual([
+		{ kind: 'property', name: 'srcObject' },
+	]);
+	const codes = async (attribute: string) =>
+		(await compile(attribute)).semanticGraph.diagnostics.map((diagnostic) => [
+			diagnostic.code,
+			diagnostic.severity,
+		]);
+	expect(await codes('srcObject={stream}')).toEqual([]);
+	expect(await codes('srcObject="camera"')).toEqual([
+		['MARKLESS_SRC_OBJECT_SERVED_VALUE', 'error'],
+	]);
+	expect(await codes('srcObject')).toEqual([['MARKLESS_SRC_OBJECT_SERVED_VALUE', 'error']]);
+});

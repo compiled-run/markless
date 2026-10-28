@@ -392,6 +392,13 @@ export function emitPublicSsrRenderModule(
 		.replaceAll('readMarklessPublicPath', 'marklessSsrReadPublicPath');
 	const helperReferenceSource = [...sameModuleComponents, bodySource].join('\n');
 	return [
+		// Installs the step that moves a built element's property-only attributes onto its properties.
+		...(input.semanticGraph.markup.chunks.some((chunk) => chunk.propertyMembers)
+			? [
+					"import { installMarklessPropertySeeds } from '@markless/web/fns/property-seeds';",
+					'installMarklessPropertySeeds();',
+				]
+			: []),
 		...references.filter(hasComponentImportSource).map(emitComponentImport),
 		...valueImports.map(emitValueImport),
 		...foreignScope.importLines,

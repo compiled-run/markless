@@ -1,6 +1,7 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page } from 'vitest/browser';
 import { afterEach, expect, test } from 'vitest';
+import ArmMixedPage from './arm-mixed-page.tsrx';
 import MediaPage from './media-page.tsrx';
 import MixedPage from './mixed-page.tsrx';
 import ServedMixedPage from './served-mixed-page.tsrx';
@@ -39,10 +40,31 @@ test('CSR: a mixed checkbox and a mixed row follow state, and read as partially 
 	await checkMixed((await render(MixedPage)).container as HTMLElement);
 });
 
-// Expected red: indeterminate has no attribute, so a page that loads "mixed" needs a script to set it at load.
-test.fails('SSR: a checkbox that is mixed before any interaction reads as partially checked at load', async () => {
-	await renderSSR(ServedMixedPage);
-	await expect.element(allFiles(), { timeout: 500 }).toBePartiallyChecked();
+async function checkServedMixed(container: HTMLElement) {
+	const mixed = (selector: string) => box(container, selector).indeterminate;
+	expect([
+		mixed('#all'),
+		mixed('#fixed'),
+		mixed('[data-id="docs"]'),
+		mixed('[data-id="pics"]'),
+	]).toEqual([true, true, true, false]);
+	expect(container.querySelector<HTMLAudioElement>('#sound')!.volume).toBe(0.5);
+	expect(container.innerHTML).not.toMatch(/<[^>]*\s(?:indeterminate|volume)[\s=>]/i);
+	await expect.element(allFiles()).toBePartiallyChecked();
+	await expect
+		.element(page.getByRole('checkbox', { name: 'Always mixed' }))
+		.toBePartiallyChecked();
+	await expect.element(page.getByRole('checkbox', { name: 'docs' })).toBePartiallyChecked();
+	box(container, '#all').click();
+	await expect.poll(() => mixed('#all')).toBe(false);
+}
+
+test('SSR: checkboxes mixed from state, a constant and a row read as partially checked at load', async () => {
+	await checkServedMixed((await renderSSR(ServedMixedPage)).container as HTMLElement);
+});
+
+test('CSR: checkboxes mixed from state, a constant and a row read as partially checked at first render', async () => {
+	await checkServedMixed((await render(ServedMixedPage)).container as HTMLElement);
 });
 
 async function checkMedia(container: HTMLElement) {
@@ -73,4 +95,42 @@ test('SSR: muted, volume, scrollTop and defaultValue follow state after resume',
 
 test('CSR: muted, volume, scrollTop and defaultValue follow state', async () => {
 	await checkMedia((await render(MediaPage)).container as HTMLElement);
+});
+
+async function checkBuiltInBrowser(container: HTMLElement) {
+	box(container, '#open').click();
+	box(container, '#add').click();
+	await expect
+		.poll(
+			() =>
+				container.querySelector('#inner') !== null &&
+				container.querySelector('[data-id="pics"]') !== null,
+		)
+		.toBe(true);
+	const mixed = () =>
+		[...container.querySelectorAll<HTMLInputElement>('input')].map(
+			(input) =>
+				`${input.id || `${input.className}:${input.dataset.id}`}=${input.indeterminate}`,
+		);
+	await expect
+		.poll(mixed)
+		.toEqual([
+			'inner=true',
+			'inner-fixed=true',
+			'folder:docs=false',
+			'fixed:docs=true',
+			'folder:pics=true',
+			'fixed:pics=true',
+		]);
+	await expect
+		.element(page.getByRole('checkbox', { name: 'Inner', exact: true }))
+		.toBePartiallyChecked();
+}
+
+test('SSR: an @if arm and a row the browser builds after resume carry their mixed state', async () => {
+	await checkBuiltInBrowser((await renderSSR(ArmMixedPage)).container as HTMLElement);
+});
+
+test('CSR: an @if arm and a row the browser builds after the first render carry their mixed state', async () => {
+	await checkBuiltInBrowser((await render(ArmMixedPage)).container as HTMLElement);
 });

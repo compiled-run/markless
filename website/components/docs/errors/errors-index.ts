@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 294,
+	total: 295,
 	guided: 45,
 	groups: [
 		{
@@ -566,6 +566,11 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_SPREAD_STATIC_SNAPSHOT',
 					kind: 'compile warning',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_SRC_OBJECT_SERVED_VALUE',
+					kind: 'compile error',
 					guided: false,
 				},
 				{

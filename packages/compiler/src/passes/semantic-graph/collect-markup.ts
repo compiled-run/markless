@@ -1,4 +1,4 @@
-import { PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES } from '@markless/serializer';
+import { PROTOCOL_PROPERTY_ONLY_MEMBERS, PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES } from '@markless/serializer';
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -35,6 +35,7 @@ import type {
 import { resolveSharedInstanceGraphPath, sharedInstanceVisibleFrom } from './collect-shared.ts';
 import {
 	branchElseSpellingDiagnostic,
+	srcObjectServedValueDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
 import { isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
@@ -95,6 +96,7 @@ type ChunkBuilder = {
 	readonly statics: string[];
 	readonly hosts: SemanticMarkupChunk['hosts'][number][];
 	readonly slots: SemanticMarkupSlot[];
+	readonly propertyMembers: Set<string>;
 };
 
 type WithoutStaticIndex<Slot> = Slot extends unknown ? Omit<Slot, 'staticIndex'> : never;
@@ -191,11 +193,11 @@ function createChunk(
 	kind: SemanticMarkupChunk['kind'],
 	componentName: string,
 ): ChunkBuilder {
-	return { id, kind, componentName, statics: [''], hosts: [], slots: [] };
+	return { id, kind, componentName, statics: [''], hosts: [], slots: [], propertyMembers: new Set() };
 }
 
-function finishChunk(builder: ChunkBuilder): SemanticMarkupChunk {
-	return { ...builder };
+function finishChunk({ propertyMembers, ...builder }: ChunkBuilder): SemanticMarkupChunk {
+	return propertyMembers.size > 0 ? { ...builder, propertyMembers: [...propertyMembers].sort() } : builder;
 }
 
 function append(builder: ChunkBuilder, value: string): void {
@@ -527,6 +529,8 @@ function emitNode(
 		const authoredName = getIdentifierName(attribute.name as AnyNode | undefined);
 		const name =
 			(authoredName && PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES[authoredName]) ?? authoredName;
+		if (name && name !== 'srcObject' && PROTOCOL_PROPERTY_ONLY_MEMBERS.includes(name))
+			builder.propertyMembers.add(name);
 		// overlay lowers to one normalized valueless attribute, never to whatever
 		// staticAttributeValue would have made of the authored spelling: bare and
 		// `={true}` both write ` overlay=""`, `={false}` writes nothing, and a
@@ -576,6 +580,14 @@ function emitNode(
 			continue;
 		}
 		const literal = staticAttributeValue(value, expression);
+		// The page never serves a srcObject: a stream exists only in the browser.
+		if (name === 'srcObject') {
+			if (literal || !expression)
+				context.graph.diagnostics.push(
+					srcObjectServedValueDiagnostic({ node: attribute, filename: context.filename }),
+				);
+			continue;
+		}
 		if (literal) {
 			const text = staticAttributeText(name, literal.value);
 			if (text !== null)
@@ -959,6 +971,14 @@ function emitDynamicHost(
 			continue;
 		}
 		const literal = staticAttributeValue(value, expression);
+		// The page never serves a srcObject: a stream exists only in the browser.
+		if (name === 'srcObject') {
+			if (literal || !expression)
+				context.graph.diagnostics.push(
+					srcObjectServedValueDiagnostic({ node: attribute, filename: context.filename }),
+				);
+			continue;
+		}
 		if (literal) {
 			const text = staticAttributeText(name, literal.value);
 			if (text !== null) staticAttributes[name] = text;

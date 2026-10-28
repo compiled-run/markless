@@ -1,4 +1,5 @@
 import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
+import { propertySeedImport } from './property-seed-import.ts';
 import { parseModule } from '../../js-ast.ts';
 import {
 	addressedHostNodeIds,
@@ -117,7 +118,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	return {
 		passId: 'public-render-module',
 		renderDataModuleSource: root
-			? `export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(input.renderData, addressedHostNodeIds(input.protocolView))) ?? 'undefined'};`
+			? `${propertySeedImport(input.renderData)}export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(input.renderData, addressedHostNodeIds(input.protocolView))) ?? 'undefined'};`
 			: '',
 		moduleSource,
 		rootExportName: moduleSource ? (rootComponentName ?? null) : null,

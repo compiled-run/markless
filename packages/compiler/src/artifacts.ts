@@ -383,6 +383,11 @@ export type ModuleGraphInterfaceArtifact = {
 			 */
 			readonly storageCells?: true;
 			/**
+			 * Present when this component's tree renders a member with no live attribute
+			 * (indeterminate, volume, scrollTop...), so a page placing it moves those onto properties.
+			 */
+			readonly propertyMembers?: true;
+			/**
 			 * What runs in the browser when a composing module changes one of this
 			 * component's props or creates an instance of it. Read by the build-time
 			 * pack planner only.
@@ -829,6 +834,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_ROWS_FROZEN'
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
+		| 'MARKLESS_SRC_OBJECT_SERVED_VALUE'
 		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
@@ -1285,6 +1291,8 @@ export type SemanticMarkupChunk = {
 		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
 	}>;
 	readonly slots: ReadonlyArray<SemanticMarkupSlot>;
+	/** Members with no live attribute this chunk renders as attributes; the browser moves each onto its property. */
+	readonly propertyMembers?: ReadonlyArray<string>;
 };
 
 export type SemanticMarkupArtifact = {

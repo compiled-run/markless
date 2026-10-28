@@ -436,6 +436,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const storageCells = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.storageCells === true,
 	);
+	const propertyMembers = compiled.moduleGraphInterface.render.components.some(
+		(component) => component.propertyMembers === true,
+	);
 	const pageNeedsFullResume = needsFullResume(
 		compiled.protocolState,
 		compiled.protocolView,
@@ -642,6 +645,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				linkedRowBranches: importedRowBranchMints(input.importedModuleInterfaces),
 				rosterDerivation,
 				storageCells,
+				propertyMembers,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
 				symbols: symbolRows,
@@ -671,6 +675,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							})),
 							rosterDerivation,
 							storageCells,
+							propertyMembers,
 							installResumeSummary: true,
 							recordsOnly: true,
 							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,

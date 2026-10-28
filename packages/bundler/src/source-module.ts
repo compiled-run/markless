@@ -564,6 +564,10 @@ function payloadHasComputed(payloadState: unknown): boolean {
 	return Array.isArray(computed) && computed.length > 0;
 }
 
+// Explicit, not a bare import: `@markless/web` declares `sideEffects: false`.
+const PROPERTY_SEEDS_INSTALL =
+	"import { installMarklessPropertySeeds } from '@markless/web/fns/property-seeds';\ninstallMarklessPropertySeeds();";
+
 export function emitIdleTriggerInstall(): string {
 	return [
 		"import { installMarklessIdle } from '@markless/web/fns/idle-trigger';",
@@ -816,6 +820,8 @@ export function emitResumeModule(input: {
 	readonly rosterDerivation?: boolean;
 	// The page's tree reaches a storage() cell, possibly in a child module whose cells this payload never holds.
 	readonly storageCells?: boolean;
+	// The page's tree renders a member with no live attribute, so markup it builds moves those onto properties.
+	readonly propertyMembers?: boolean;
 	readonly installResumeSummary?: boolean;
 	// Some async boundary authors an @pending arm, so a served page of this module can stream it.
 	readonly streamsArms?: boolean;
@@ -919,6 +925,7 @@ export function emitResumeModule(input: {
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
 		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		input.propertyMembers ? PROPERTY_SEEDS_INSTALL : null,
 		input.hasIdleEvents ? emitIdleTriggerInstall() : null,
 		// Row building is pay-per-use the same way: this module is the ONLY place
 		// the mint's specifier is written, so an app whose repeats carry neither
