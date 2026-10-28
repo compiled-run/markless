@@ -27,6 +27,7 @@
 		"./vite/runtime/create-route-discovery": "./src/vite/runtime/create-route-discovery.ts",
 		"./vite/runtime/mdx-route": "./src/vite/runtime/mdx-route.ts",
 		"./vite/runtime/create-server-entry": "./src/vite/runtime/create-server-entry.ts",
+		"./vite/runtime/route-renderer": "./src/route-renderer.ts",
 		"./vite/route-href": "./src/vite/entries/route-href.ts",
 		"./typescript-plugin": "./dist/typescript-plugin.cjs"
 	},
@@ -52,6 +53,10 @@
 			"./vite/runtime/create-server-entry": {
 				"types": "./dist/vite/runtime/create-server-entry.d.ts",
 				"default": "./dist/vite/runtime/create-server-entry.js"
+			},
+			"./vite/runtime/route-renderer": {
+				"types": "./dist/vite/runtime/route-renderer.d.ts",
+				"default": "./dist/vite/runtime/route-renderer.js"
 			},
 			"./vite/route-href": {
 				"types": "./dist/vite/route-href.d.ts",

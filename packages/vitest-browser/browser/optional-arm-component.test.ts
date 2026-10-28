@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
-import { dispatchRouteUpdate, startRouteUpdateRenderer } from '@markless/core/router';
+import { dispatchRouteUpdate } from '@markless/core/router';
+import { startRouteUpdateRenderer } from '@markless/router/vite/runtime/route-renderer';
 import OptionalContextPage from './fixtures/optional-context-page.tsrx?markless-route';
 
 // T115 / D2: a component inside a FALSY @if arm must never execute during a
