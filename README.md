@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Build for any device, the web way.</strong><br />
-  Write elements and events in TypeScript. Markless is designed to compile them to any device.
+  Write elements and events in JavaScript. Markless is designed to compile them to any device.
 </p>
 
 <p align="center">
