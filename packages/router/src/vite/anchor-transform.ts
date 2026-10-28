@@ -13,6 +13,7 @@ import {
 
 const ROUTE_HREF_HELPER_ID = 'virtual:markless-router/route-href';
 const JSX_FILE_FILTER = /\.(?:[jt]sx|tsrx)(?:$|\?)/;
+const VIRTUAL_MODULE_ID = /^\0/;
 const REWRITE_CACHE_LIMIT = 2048;
 const ROUTER_IMPORT_SOURCES = new Set(['@markless/router', '@markless/core/router']);
 
@@ -56,7 +57,8 @@ export function anchorTransformPlugin(): Plugin {
 		transform: {
 			order: 'pre',
 			filter: {
-				id: JSX_FILE_FILTER,
+				// A virtual module is another plugin's output, never authored markup, and render data alone is megabytes.
+				id: { include: JSX_FILE_FILTER, exclude: VIRTUAL_MODULE_ID },
 			},
 			async handler(code, id) {
 				if (!isTransformCandidateCode(code)) {
