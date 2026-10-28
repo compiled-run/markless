@@ -16,6 +16,7 @@ import {
 	rowBranchMints,
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
+import { staticTemplateReadDiagnostic } from '../state-lowering.ts';
 import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	keyedRepeatRowsUnplacedDiagnostic,
@@ -87,6 +88,11 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 				filename: input.filename,
 			}),
 		);
+		for (const read of input.semanticGraph.templateReads) {
+			if (read.keyedRepeatId !== repeat.id) continue;
+			const stale = staticTemplateReadDiagnostic(input.semanticGraph, read);
+			if (stale) diagnostics.push(stale);
+		}
 		const rowChunk = input.semanticGraph.markup.chunks.find(
 			(chunk) => chunk.id === `repeat:${repeat.id}:row`,
 		);

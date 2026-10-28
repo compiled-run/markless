@@ -944,6 +944,8 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
+	readonly keyedRepeatId?: string;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).
