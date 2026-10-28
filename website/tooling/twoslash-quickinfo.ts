@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { elementHover } from './html-elements.ts';
 
 const require = createRequire(import.meta.url);
 const volarRequire = createRequire(require.resolve('@markless/typescript-plugin/language'));
@@ -56,6 +57,8 @@ export type QuickInfo = {
 	readonly signature: string;
 	/** The symbol's doc comment on one line, or empty when it has none. */
 	readonly doc: string;
+	/** Set for a tag, whose title is the tag in the code face and then this word, like `HTML element`. */
+	readonly kind?: string;
 };
 
 export type QuickInfoService = {
@@ -112,13 +115,37 @@ function displayPartsToString(parts: readonly ts.SymbolDisplayPart[] | undefined
 	return (parts ?? []).map((part) => part.text).join('');
 }
 
-/** One line, the way a tooltip shows it. Quick info puts the signature on the first. */
+/** The whole quick info on one line, without an alias's trailing import line, its long object types folded to fit. */
 function signatureLine(parts: readonly ts.SymbolDisplayPart[] | undefined): string {
-	return displayPartsToString(parts)
-		.split('\n', 1)[0]
-		.replace(INTERNAL_NAMESPACE, '')
-		.replace(/\s+/g, ' ')
-		.trim();
+	const text = displayPartsToString(parts).replace(/\n(?:import|export) [^\n]*$/, '');
+	return readableSignature(flatten(text.replace(INTERNAL_NAMESPACE, '')));
+}
+
+const READABLE_SIGNATURE_LENGTH = 90;
+
+/** Folds the largest `{ ... }` body to `{ … }` until the line fits, so a type is shortened but never cut mid-way. */
+export function readableSignature(text: string): string {
+	let line = text;
+	while (line.length > READABLE_SIGNATURE_LENGTH) {
+		const largest = largestObjectBody(line);
+		if (!largest) break;
+		line = `${line.slice(0, largest.open + 1)} … ${line.slice(largest.close)}`;
+	}
+	return line;
+}
+
+function largestObjectBody(line: string): { open: number; close: number } | undefined {
+	const opens: number[] = [];
+	let largest: { open: number; close: number } | undefined;
+	for (let at = 0; at < line.length; at++) {
+		if (line[at] === '{') opens.push(at);
+		else if (line[at] === '}' && opens.length > 0) {
+			const open = opens.pop()!;
+			if (line.slice(open + 1, at).trim() === '…') continue;
+			if (!largest || at - open > largest.close - largest.open) largest = { open, close: at };
+		}
+	}
+	return largest;
 }
 
 /** A doc comment as the plain sentences a tooltip reads: a closing link-only paragraph goes, other links keep their text, emphasis marks go, backticks stay. */
@@ -387,6 +414,13 @@ function createService(): {
 
 let shared: ReturnType<typeof createService> | undefined;
 
+/** A tag name written straight after `<` or `</`, which the checker reads as a property of the element table. */
+function isIntrinsicTag(code: string, start: number, length: number, info: ts.QuickInfo): boolean {
+	if (info.kind !== ts.ScriptElementKind.memberVariableElement) return false;
+	const before = code.slice(Math.max(0, start - 2), start);
+	return (before.endsWith('<') || before === '</') && code[start + length] !== '.';
+}
+
 export function createQuickInfoService(): QuickInfoService {
 	shared ??= createService();
 	const { selectFence, proxy } = shared;
@@ -419,6 +453,13 @@ export function createQuickInfoService(): QuickInfoService {
 				if (!info || info.kind === ts.ScriptElementKind.moduleElement) continue;
 				const { length, start } = info.textSpan;
 				if (length <= 0 || start + length > code.length || seen.has(start)) continue;
+				if (isIntrinsicTag(code, start, length, info)) {
+					const element = elementHover(code.slice(start, start + length));
+					if (!element) continue;
+					seen.add(start);
+					found.push({ ...element, length, start });
+					continue;
+				}
 				const signature = signatureLine(info.displayParts);
 				if (!signature) continue;
 				seen.add(start);

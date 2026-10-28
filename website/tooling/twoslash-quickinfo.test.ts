@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { beforeAll, expect, test } from 'vitest';
 import ts from 'typescript';
-import { createQuickInfoService } from './twoslash-quickinfo.ts';
+import { HTML_ELEMENTS, SVG_ELEMENTS } from './html-elements.ts';
+import { createQuickInfoService, readableSignature } from './twoslash-quickinfo.ts';
 
 const fences = (file: string) =>
 	[
@@ -112,4 +113,66 @@ test('switching fences retains parsed imported type documents', () => {
 	} finally {
 		timing.disable();
 	}
+});
+
+const OPENERS: Readonly<Record<string, string>> = { ')': '(', ']': '[', '}': '{' };
+
+/** Every bracket closes, and the line does not stop on something that needs more after it. */
+function isWholeType(signature: string): boolean {
+	const open: string[] = [];
+	for (const char of signature.replaceAll('=>', '')) {
+		if (char === '(' || char === '[' || char === '{') open.push(char);
+		else if (char in OPENERS && open.pop() !== OPENERS[char]) return false;
+	}
+	return open.length === 0 && !/[{<(&|,]$/.test(signature.trimEnd());
+}
+
+const elements = `import { state } from '@markless/core';
+
+export default function Visitor() @{
+	let user = state({ name: 'Ada', visits: 0, address: { street: 'Main', city: 'Bath' } });
+
+	<section>
+		<p>{user.name}</p>
+		<button onClick={(event) => user.visits++}>Visits: {user.visits}</button>
+		<input onInput={(event) => (user.name = event.currentTarget.value)} />
+		<svg viewBox="0 0 4 4"><circle r="2" /><clipPath id="c" /></svg>
+	</section>
+}`;
+
+test('every hover is a whole type, and a tag hover names the element instead of its attribute type', () => {
+	const infos = createQuickInfoService().queryFence(elements, 'tsrx');
+	const byText = (text: string) =>
+		infos.filter((info) => elements.slice(info.start, info.start + info.length) === text);
+	for (const info of infos) expect(isWholeType(info.signature), info.signature).toBe(true);
+	expect(byText('section')[0]).toMatchObject({
+		signature: '<section>',
+		kind: 'HTML element',
+		doc: HTML_ELEMENTS.section,
+	});
+	expect(byText('button').map((info) => info.signature)).toEqual(['<button>', '<button>']);
+	expect(byText('circle')[0]).toMatchObject({ signature: '<circle>', kind: 'SVG element' });
+	expect(byText('clipPath')[0]?.doc).toBe(SVG_ELEMENTS.clipPath);
+	expect(byText('user')[0]?.signature).toMatch(/^let user: \{ .* \}$/);
+	expect(byText('state')[0]?.signature).toBe('(alias) function state<T>(initial: T): T');
+});
+
+test('a long type folds its largest object body and stays whole', () => {
+	const long = `let user: { name: string; visits: number; address: { street: string; city: string; postcode: string; country: string; }; }`;
+	const folded = readableSignature(long);
+	expect(folded.length).toBeLessThan(long.length);
+	expect(isWholeType(folded)).toBe(true);
+	expect(folded).toContain('{ … }');
+	expect(readableSignature('let count: number')).toBe('let count: number');
+});
+
+test('every tag written in a site code sample has an element line', () => {
+	const pages = readdirSync(new URL('../pages/', import.meta.url), { recursive: true })
+		.filter((file) => String(file).endsWith('.mdx'))
+		.map((file) => readFileSync(new URL(`../pages/${String(file)}`, import.meta.url), 'utf8'));
+	const known = { ...HTML_ELEMENTS, ...SVG_ELEMENTS } as Readonly<Record<string, string>>;
+	for (const page of pages)
+		for (const fence of page.matchAll(/^```tsrx[^\n]*\n([\s\S]*?)^```/gm))
+			for (const tag of fence[1]!.matchAll(/<\/?([a-z][A-Za-z0-9]*)(?![\w.-])/g))
+				expect(known, tag[1]).toHaveProperty(tag[1]!);
 });

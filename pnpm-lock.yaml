@@ -1281,6 +1281,9 @@ importers:
       '@markless/typescript-plugin':
         specifier: workspace:*
         version: link:../packages/typescript-plugin
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../packages/web
       '@tsrx/content-mapper':
         specifier: 0.1.2
         version: 0.1.2
