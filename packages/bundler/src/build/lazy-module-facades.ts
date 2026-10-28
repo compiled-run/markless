@@ -20,7 +20,7 @@ import { CHUNK_WORKER_MIN_CODE_LENGTH, runChunkTask } from './chunk-workers.ts';
 import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 import { rootRelativeId } from '../module-id.ts';
 import { withoutMachinePaths } from './machine-paths.ts';
-import { startupPackOfLazy } from './route-pack-groups.ts';
+import { packOfPiece, startupPackOfLazy } from './route-pack-groups.ts';
 import { warmPacksSuffix } from './warm-packs.ts';
 
 export function lazyModuleFacadesPlugin(
@@ -682,7 +682,7 @@ function chunkPack(
 	const names = new Set(chunk.moduleIds.map((id) => startupPackOfLazy(packOf?.(id) ?? '')));
 	const [name] = names;
 	return names.size === 1
-		? /^(route:.+?|shared(?::[0-9a-z]+)?)(?:~\d+)?$/.exec(name ?? '')?.[1]
+		? /^(route:.+|shared(?::[0-9a-z]+)?)$/.exec(packOfPiece(name ?? ''))?.[1]
 		: undefined;
 }
 
@@ -691,7 +691,12 @@ function ownPack(
 	chunk: Chunk,
 	packOf: ((moduleId: string) => string | undefined) | undefined,
 ): string | undefined {
-	const names = new Set(chunk.moduleIds.map((id) => packOf?.(id)?.replace(/~\d+$/, '')));
+	const names = new Set(
+		chunk.moduleIds.map((id) => {
+			const pack = packOf?.(id);
+			return pack === undefined ? undefined : packOfPiece(pack);
+		}),
+	);
 	const [name] = names;
 	return names.size === 1 ? name : undefined;
 }
@@ -759,8 +764,15 @@ export async function prefetchFacadeChunkFacts(
 			.map((chunk) =>
 				runChunkTask('facadeChunkFacts', chunk.fileName, chunk.code).then(
 					(facts) => {
-						if (facts.dynamicImports !== undefined || mayContainDynamicImport(chunk.code))
-							rememberChunkDynamicImports(chunk.fileName, chunk.code, facts.dynamicImports);
+						if (
+							facts.dynamicImports !== undefined ||
+							mayContainDynamicImport(chunk.code)
+						)
+							rememberChunkDynamicImports(
+								chunk.fileName,
+								chunk.code,
+								facts.dynamicImports,
+							);
 						rememberChunkLocalExportSpecifiers(
 							chunk.fileName,
 							chunk.code,
