@@ -1,6 +1,9 @@
 /** Marks the page's link bridge script: inline in dev, a module stub importing the shared bridge in a build. */
 export const LINK_BRIDGE_SCRIPT_ATTRIBUTE = 'data-markless-router-link-resumer';
 
+/** Marks the page's route table: inert JSON `[preloads, destinations]`, each destination a list of indexes into preloads. */
+export const LINK_TABLE_SCRIPT_ATTRIBUTE = 'data-markless-router-links';
+
 /** The client output folder a build writes its link bridge files into, served as immutable static assets. */
 // Its own folder under `_markless/`: an immutable header rule on Vercel ends routing, so it must not cover navigation fetches.
 export const LINK_BRIDGE_DIR = '_markless/links';

@@ -35,6 +35,7 @@ const guards = {
 	G12: 'compiler-emitted glue per construct within its anchor',
 	G13: 'resume data each list row adds within its anchor',
 	G14: 'code for content a page has not shown does not run at load',
+	G15: 'a page runs no more code at load for linking more routes',
 } as const;
 
 for (const [guard, title] of Object.entries(guards)) {
