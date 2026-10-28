@@ -154,14 +154,15 @@ jobs:
             # The browsers are a function of the Playwright version, the system packages of that and the runner image:
             # a lockfile change elsewhere keeps both caches, so no job downloads them from the CDN or the apt mirror.
             queue_run: ${{ steps.queue.outputs.run }}
+            workflow_hash: ${{ steps.workflow.outputs.hash }}
             playwright_version: ${{ steps.playwright.outputs.version }}
             image_os: ${{ steps.playwright.outputs.image }}
             key_unit: ${{ steps.unit.outputs.cache-primary-key }}
-            run_unit: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true') }}
+            run_unit: ${{ steps.queue.outputs.tested != 'true' && steps.unit.outputs.cache-hit != 'true' && steps.reuse.outputs.unit != 'true' }}
             key_browser: ${{ steps.browser.outputs.cache-primary-key }}
-            run_browser: ${{ steps.queue.outputs.tested != 'true' && (steps.browser.outputs.cache-hit != 'true') }}
+            run_browser: ${{ steps.queue.outputs.tested != 'true' && steps.browser.outputs.cache-hit != 'true' && steps.reuse.outputs.browser != 'true' }}
             key_completion_matrix: ${{ steps.completion_matrix.outputs.cache-primary-key }}
-            run_completion_matrix: ${{ steps.queue.outputs.tested != 'true' && (steps.completion_matrix.outputs.cache-hit != 'true') }}
+            run_completion_matrix: ${{ steps.queue.outputs.tested != 'true' && steps.completion_matrix.outputs.cache-hit != 'true' && steps.reuse.outputs.completion_matrix != 'true' }}
             key_boxes_bundler: ${{ steps.boxes_bundler.outputs.cache-primary-key }}
             run_boxes_bundler: ${{ steps.queue.outputs.tested != 'true' && (steps.boxes_bundler.outputs.cache-hit != 'true') }}
             key_boxes_router: ${{ steps.boxes_router.outputs.cache-primary-key }}
@@ -173,15 +174,15 @@ jobs:
             key_receipts: ${{ steps.receipts.outputs.cache-primary-key }}
             run_receipts: ${{ steps.queue.outputs.tested != 'true' && (steps.receipts.outputs.cache-hit != 'true') }}
             key_website_boxes: ${{ steps.website_boxes.outputs.cache-primary-key }}
-            run_website_boxes: ${{ steps.queue.outputs.tested != 'true' && (steps.website_boxes.outputs.cache-hit != 'true') }}
+            run_website_boxes: ${{ steps.queue.outputs.tested != 'true' && steps.website_boxes.outputs.cache-hit != 'true' && steps.reuse.outputs.website_boxes != 'true' }}
             key_perf_guards: ${{ steps.perf_guards.outputs.cache-primary-key }}
-            run_perf_guards: ${{ steps.queue.outputs.tested != 'true' && (steps.perf_guards.outputs.cache-hit != 'true') }}
+            run_perf_guards: ${{ steps.queue.outputs.tested != 'true' && steps.perf_guards.outputs.cache-hit != 'true' && steps.reuse.outputs.perf_guards != 'true' }}
             key_demo_boxes: ${{ steps.demo_boxes.outputs.cache-primary-key }}
-            run_demo_boxes: ${{ steps.queue.outputs.tested != 'true' && (steps.demo_boxes.outputs.cache-hit != 'true') }}
+            run_demo_boxes: ${{ steps.queue.outputs.tested != 'true' && steps.demo_boxes.outputs.cache-hit != 'true' && steps.reuse.outputs.demo_boxes != 'true' }}
             key_build_scale: ${{ steps.build_scale.outputs.cache-primary-key }}
-            run_build_scale: ${{ steps.queue.outputs.tested != 'true' && (steps.build_scale.outputs.cache-hit != 'true') }}
+            run_build_scale: ${{ steps.queue.outputs.tested != 'true' && steps.build_scale.outputs.cache-hit != 'true' && steps.reuse.outputs.build_scale != 'true' }}
             key_build_warnings: ${{ steps.build_warnings.outputs.cache-primary-key }}
-            run_build_warnings: ${{ steps.queue.outputs.tested != 'true' && (steps.build_warnings.outputs.cache-hit != 'true') }}
+            run_build_warnings: ${{ steps.queue.outputs.tested != 'true' && steps.build_warnings.outputs.cache-hit != 'true' && steps.reuse.outputs.build_warnings != 'true' }}
             run_playwright: ${{ steps.queue.outputs.tested != 'true' && (steps.unit.outputs.cache-hit != 'true' || steps.browser.outputs.cache-hit != 'true' ||
                 steps.boxes_bundler.outputs.cache-hit != 'true' ||
                 steps.website_boxes.outputs.cache-hit != 'true' ||
@@ -210,6 +211,10 @@ jobs:
                   else
                     echo "no green merge-queue run for ${GITHUB_SHA}; running every lane"
                   fi
+
+            - name: Hash this workflow
+              id: workflow
+              run: echo "hash=${{ hashFiles('.github/workflows/ci.yml') }}" >> "$GITHUB_OUTPUT"
 
             - name: Name the Playwright caches
               id: playwright
@@ -416,6 +421,33 @@ jobs:
                       'boxes-music-player-ssr-key.txt', 'packages/analyzer/**/*',
                       'packages/web/**/*', '!**/node_modules/**', '!**/dist/**', '!**/.witness/**')
                       }}
+
+            # A merge group's lane whose exact inputs, under this exact workflow, already passed in a same-repository
+            # pull request run skips: that run's marker cache is scoped to its pull request, so it leaves an artifact.
+            - name: Find lanes a pull request already passed on these inputs
+              id: reuse
+              if: github.event_name == 'merge_group'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPO_ID: ${{ github.repository_id }}
+                  WORKFLOW_HASH: ${{ steps.workflow.outputs.hash }}
+                  KEY_UNIT: ${{ steps.unit.outputs.cache-hit != 'true' && steps.unit.outputs.cache-primary-key || '' }}
+                  KEY_BROWSER: ${{ steps.browser.outputs.cache-hit != 'true' && steps.browser.outputs.cache-primary-key || '' }}
+                  KEY_COMPLETION_MATRIX: ${{ steps.completion_matrix.outputs.cache-hit != 'true' && steps.completion_matrix.outputs.cache-primary-key || '' }}
+                  KEY_WEBSITE_BOXES: ${{ steps.website_boxes.outputs.cache-hit != 'true' && steps.website_boxes.outputs.cache-primary-key || '' }}
+                  KEY_PERF_GUARDS: ${{ steps.perf_guards.outputs.cache-hit != 'true' && steps.perf_guards.outputs.cache-primary-key || '' }}
+                  KEY_DEMO_BOXES: ${{ steps.demo_boxes.outputs.cache-hit != 'true' && steps.demo_boxes.outputs.cache-primary-key || '' }}
+                  KEY_BUILD_SCALE: ${{ steps.build_scale.outputs.cache-hit != 'true' && steps.build_scale.outputs.cache-primary-key || '' }}
+                  KEY_BUILD_WARNINGS: ${{ steps.build_warnings.outputs.cache-hit != 'true' && steps.build_warnings.outputs.cache-primary-key || '' }}
+              run: |
+                  for lane in unit browser completion_matrix website_boxes perf_guards demo_boxes build_scale build_warnings; do
+                    var="KEY_$(printf '%s' "$lane" | tr '[:lower:]' '[:upper:]')"
+                    key="${!var}"
+                    [ -n "$key" ] || continue
+                    found=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=lane-pass-$key-$WORKFLOW_HASH&per_page=20" \
+                      --jq "[.artifacts[] | select(.expired == false and .workflow_run.head_repository_id == $REPO_ID)] | length" || echo 0)
+                    if [ "$found" -gt 0 ]; then echo "$lane=true" >> "$GITHUB_OUTPUT"; echo "$lane: passed on these inputs in a pull request run"; fi
+                  done
 
             - name: Report the lane decisions
               run: |
@@ -741,6 +773,14 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_completion_matrix }}
                   path: completion-matrix-completed.txt
+
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_completion_matrix }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: completion-matrix-completed.txt
+                  retention-days: 7
 
     # Bundler pipeline boxes. Boxes drive a real browser through @async/witness,
     # so every box lane installs the cached Chromium too. The receipts this lane
@@ -1135,6 +1175,14 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_website_boxes }}
                   path: website-boxes-completed.txt
 
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_website_boxes }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: website-boxes-completed.txt
+                  retention-days: 7
+
     # The deterministic performance guards (scripts/benchmarks/perf-guards):
     # bytes, fetch rounds, requests and executed code on production builds of
     # the benchmark app and the docs site, never wall-clock time, so a busy
@@ -1210,6 +1258,14 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_perf_guards }}
                   path: perf-guards-completed.txt
+
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_perf_guards }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: perf-guards-completed.txt
+                  retention-days: 7
 
     # Witness boxes of two demos no other lane builds, and the compiler-only
     # half of demos/executed-at-load. The box receipts are not part of the
@@ -1294,6 +1350,14 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_demo_boxes }}
                   path: demo-boxes-completed.txt
+
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_demo_boxes }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: demo-boxes-completed.txt
+                  retention-days: 7
 
     # Reassembles the receipt tree the split box lanes wrote on four different
     # runners, adds the @markless/web receipt that receipts:generate writes
@@ -1472,6 +1536,14 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_unit }}
                   path: unit-completed.txt
 
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request' && needs.lanes.outputs.run_unit == 'true' && needs.unit.result == 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_unit }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: unit-completed.txt
+                  retention-days: 7
+
             - name: Mark the browser lane complete
               if: needs.lanes.outputs.run_browser == 'true' && needs.browser.result == 'success'
               run: echo ok > browser-completed.txt
@@ -1482,6 +1554,14 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_browser }}
                   path: browser-completed.txt
+
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request' && needs.lanes.outputs.run_browser == 'true' && needs.browser.result == 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_browser }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: browser-completed.txt
+                  retention-days: 7
 
     # The required status check. It holds the name branch protection already
     # points at, and it is red unless every lane above went green or hit its
@@ -1756,6 +1836,14 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_build_scale }}
                   path: build-scale-completed.txt
 
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_build_scale }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: build-scale-completed.txt
+                  retention-days: 7
+
     # The docs site and the demo apps build without a single warning on stderr
     # (scripts/ci/build-warnings.mjs) and ship no Node-only code to the browser
     # (scripts/ci/browser-output-scan.mjs); the starters are held to the same in the unit lane.
@@ -1792,6 +1880,14 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_build_warnings }}
                   path: build-warnings-completed.txt
+
+            - name: Record the pass where a merge group can find it
+              if: github.event_name == 'pull_request'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: lane-pass-${{ needs.lanes.outputs.key_build_warnings }}-${{ needs.lanes.outputs.workflow_hash }}
+                  path: build-warnings-completed.txt
+                  retention-days: 7
 
     changes:
         runs-on: ubuntu-latest

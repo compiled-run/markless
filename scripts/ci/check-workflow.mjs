@@ -359,6 +359,30 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 		fail(`Job \`${LANES_JOB}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
 }
 
+// 7b. A merge group may skip a lane that passed on identical inputs in a pull request run, found by an artifact
+// name. The name has to carry the workflow's hash (a run that edited this file proves nothing), the upload has to
+// come from a pull request run, and the lookup has to refuse artifacts from forks.
+for (const name of jobNames) {
+	for (const step of stepsOf(name)) {
+		if (!usesAction(step, 'actions/upload-artifact')) continue;
+		const artifact = String(withOf(step).name ?? '');
+		if (!artifact.startsWith('lane-pass-')) continue;
+		if (!/needs\.lanes\.outputs\.workflow_hash/.test(artifact))
+			fail(`\`${step.name ?? 'an upload'}\` in \`${name}\` names a lane pass without \`needs.lanes.outputs.workflow_hash\`, so a run that edited the workflow could vouch for a lane.`);
+		if (!/github\.event_name == 'pull_request'/.test(String(step.if ?? '')))
+			fail(`\`${step.name ?? 'an upload'}\` in \`${name}\` records a lane pass outside a pull request run.`);
+	}
+}
+{
+	const reuse = stepsOf(LANES_JOB).find((step) => step.id === 'reuse');
+	if (reuse !== undefined) {
+		if (!/head_repository_id == \$REPO_ID/.test(String(reuse.run ?? '')))
+			fail(`The \`reuse\` step in \`${LANES_JOB}\` accepts lane passes without checking they came from this repository, so a fork could vouch for a lane.`);
+		if (String(reuse.if ?? '').trim() !== "github.event_name == 'merge_group'")
+			fail(`The \`reuse\` step in \`${LANES_JOB}\` must run only for merge groups.`);
+	}
+}
+
 // 8. A sharded lane must not save its own marker: one green shard next to a red
 // one would let the whole lane skip on the next identical tree.
 for (const name of jobNames) {
