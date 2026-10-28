@@ -818,3 +818,48 @@ test.each([
 	for (const record of branches)
 		for (const symbolId of record.symbolIds ?? []) expect(shipped).toContain(symbolId);
 });
+
+test.each([
+	{
+		name: 'attributes on tabs inside an @if on a module constant',
+		source: `
+			import { state } from '@markless/core';
+			const SHOWN = true;
+			export default function Tabs() @{
+				let tab = state(0);
+				<>@if (SHOWN) { <main><button aria-selected={tab === 0 ? 'true' : 'false'} onClick={() => (tab = 0)}>One</button><button aria-selected={tab === 1 ? 'true' : 'false'} onClick={() => (tab = 1)}>Two</button></main> }</>
+			}
+		`,
+		updates: 2,
+	},
+	{
+		name: 'text and a class inside a @switch on a module constant',
+		source: `
+			import { state } from '@markless/core';
+			const MODE = 'wide';
+			export default function Panel() @{
+				let label = state('x');
+				<section>@switch (MODE) { @case 'wide': { <nav><a class={label === 'y' ? 'on' : 'off'} onClick={() => (label = 'y')}>{label}</a></nav> } @default: { <i>narrow</i> } }</section>
+			}
+		`,
+		updates: 2,
+	},
+])(
+	'a control inside a branch that never flips takes the updates its write reaches into its first use: $name',
+	async ({ source, updates }) => {
+		const { compileTsrxModule } = await import('../src/index.ts');
+		const result = await compileTsrxModule({ filename: '/workspace/src/Page.tsrx', symbols: [], source });
+		const map = result.runtimeDemandMaps.prerender;
+		const domUpdates = map.symbols
+			.filter((symbol) => symbol.kind === 'dom-update')
+			.map((symbol) => symbol.symbolId);
+		expect(domUpdates).toHaveLength(updates);
+		const clicks = map.armActions.filter((action) => action.eventName === 'click');
+		expect(clicks.length).toBeGreaterThan(0);
+		for (const action of clicks) {
+			expect(action.firstUse).toBeTypeOf('object');
+			const firstUse = action.firstUse as { readonly symbolIds: ReadonlyArray<string> };
+			for (const symbolId of domUpdates) expect(firstUse.symbolIds).toContain(symbolId);
+		}
+	},
+);

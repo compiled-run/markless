@@ -179,6 +179,31 @@ const files: Record<string, string> = {
 		'\t</main>',
 		'}',
 	].join('\n'),
+	'parts/aside.tsrx': [
+		"import { state } from '@markless/core';",
+		'export default function Aside({ label }: { readonly label: string }) @{',
+		'\tlet open = state(false);',
+		'\t<aside><button type="button" data-aside onClick={() => (open = !open)}>{label}</button>@if (open) {<p>Aside</p>}</aside>',
+		'}',
+	].join('\n'),
+	'pages/tabs.tsrx': [
+		"import { state } from '@markless/core';",
+		"import Aside from '../parts/aside.tsrx';",
+		'const SHOWN = true;',
+		'export default function Tabs() @{',
+		'\tlet tab = state(0);',
+		'\t<>@if (SHOWN) {<main>',
+		'\t\t<Aside label="Menu" />',
+		'\t\t<div role="tablist">',
+		"\t\t\t<button type=\"button\" role=\"tab\" data-tab=\"0\" aria-selected={tab === 0 ? 'true' : 'false'} onClick={() => (tab = 0)}>One</button>",
+		"\t\t\t<button type=\"button\" role=\"tab\" data-tab=\"1\" aria-selected={tab === 1 ? 'true' : 'false'} onClick={() => (tab = 1)}>Two</button>",
+		'\t\t</div>',
+		'\t\t@if (tab === 0) {<section data-panel="0">First panel</section>}',
+		'\t\t@if (tab === 1) {<section data-panel="1">Second panel</section>}',
+		'\t\t<Aside label="Footer" />',
+		'\t</main>}</>',
+		'}',
+	].join('\n'),
 	'pages/wake.tsrx': [
 		"import { state } from '@markless/core';",
 		'export default function Wake() @{',
@@ -342,5 +367,25 @@ test('a script that swaps an element Markless updates breaks only that element',
 		['h1', 'p'],
 		['h2', 'span'],
 	]);
+	await page.close();
+}, 30_000);
+
+test('once the page is idle, the first click on a tab fetches no code and shows its panel', async () => {
+	const { page, errors } = await open('/tabs');
+	await page.waitForLoadState('networkidle');
+	const fetched: string[] = [];
+	page.on('request', (request) => {
+		if (request.resourceType() === 'script' || request.url().endsWith('.js'))
+			fetched.push(new URL(request.url()).pathname);
+	});
+	await page.click('[data-tab="1"]');
+	await page.waitForFunction(
+		() =>
+			document.querySelector('[data-tab="1"]')?.getAttribute('aria-selected') === 'true' &&
+			!!document.querySelector('[data-panel="1"]') &&
+			!document.querySelector('[data-panel="0"]'),
+	);
+	expect(fetched).toEqual([]);
+	expect(errors).toEqual([]);
 	await page.close();
 }, 30_000);
