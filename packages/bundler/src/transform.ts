@@ -54,6 +54,7 @@ import {
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
 	settleVirtualModuleId,
+	symbolGroupVirtualModuleId,
 	symbolVirtualModuleId,
 	type BoundSymbolDescriptor,
 	type BoundSymbolDescriptorMap,
@@ -77,6 +78,7 @@ import {
 } from './trigger-groups.ts';
 import { adaptImportedCaptureResolver } from './bound-resolver.ts';
 import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundles.ts';
+import { planSymbolGroups, symbolGroupKey } from './build/symbol-groups.ts';
 
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
@@ -319,10 +321,45 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			? withServedScalarDemand(classDemandMap, servedScalarPlans)
 			: classDemandMap,
 	};
-	const compilerSymbolRows = compiled.symbolModules.modules.map((module) => ({
+	const executionLogModuleHookMode =
+		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
+	const symbolExportNames = compiled.symbolModules.modules.map((module) =>
+		scopedSymbolExportName(input.moduleId ?? input.filename, module.exportName),
+	);
+	const symbolSources = await Promise.all(
+		compiled.symbolModules.modules.map(async (module, index) =>
+			injectExecutionLogModuleHook(
+				await stripEmittedTypes(
+					rewriteSymbolModuleExport(module.source, module.exportName, symbolExportNames[index]!),
+					symbolVirtualModuleId(input.filename, module.symbolId),
+				),
+				`symbol:${module.symbolId}`,
+				executionLogModuleHookMode,
+			),
+		),
+	);
+	const symbolGroups =
+		input.experimentalNativePacking &&
+		normalizeExecutionLogMode(executionLogModuleHookMode) === 'never'
+			? planSymbolGroups(
+					compiled.symbolModules.modules.map((module, index) => ({
+						symbolId: module.symbolId,
+						kind: module.kind,
+						source: symbolSources[index]!,
+					})),
+					(member) => symbolGroupKey(member.symbolId, member.kind, compiled.runtimeDemandMap),
+				)
+			: [];
+	const symbolModuleIds = new Map<string, string>();
+	for (const group of symbolGroups)
+		for (const symbolId of group.symbolIds)
+			symbolModuleIds.set(symbolId, symbolGroupVirtualModuleId(input.filename, group.groupId));
+	const symbolModuleIdOf = (symbolId: string) =>
+		symbolModuleIds.get(symbolId) ?? symbolVirtualModuleId(input.filename, symbolId);
+	const compilerSymbolRows = compiled.symbolModules.modules.map((module, index) => ({
 		id: module.symbolId,
-		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
-		exportName: scopedSymbolExportName(input.moduleId ?? input.filename, module.exportName),
+		chunk: symbolModuleIdOf(module.symbolId),
+		exportName: symbolExportNames[index]!,
 	}));
 	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
 		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
@@ -368,14 +405,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					: input.importedModuleInterfaces?.[route.importSource],
 			),
 	);
-	const executionLogModuleHookMode =
-		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const symbolManifestEntries = [
 		...compiled.symbolModules.modules.map((module, index) => ({
 			symbolId: module.symbolId,
 			kind: module.kind,
 			exportName: compilerSymbolRows[index]!.exportName,
-			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
+			virtualModuleId: symbolModuleIdOf(module.symbolId),
 		})),
 		...linkedBoundarySymbols.map((symbol) => symbol.manifest),
 	];
@@ -461,6 +496,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		},
 		symbols: manifestOwnsSymbolRoutes ? symbolManifestEntries : [],
 		runtimeDemandMap: compiled.runtimeDemandMap,
+		...(symbolGroups.length
+			? {
+					symbolGroups: Object.fromEntries(
+						symbolGroups.flatMap((group) =>
+							group.symbolIds.map((symbolId) => [symbolId, group.groupId]),
+						),
+					),
+				}
+			: {}),
 		...(input.directCsr === true && compiled.publicRenderModule.moduleSource
 			? { directCsr: true }
 			: {}),
@@ -718,28 +762,27 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			}),
 		),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
-		...(await Promise.all(
-			compiled.symbolModules.modules.map(
-				async (module, index): Promise<MarklessVirtualModule> => ({
-					id: symbolVirtualModuleId(input.filename, module.symbolId),
-					type: 'symbol',
-					symbolId: module.symbolId,
-					exportName: symbolRows[index]!.exportName,
-					source: injectExecutionLogModuleHook(
-						await stripEmittedTypes(
-							rewriteSymbolModuleExport(
-								module.source,
-								module.exportName,
-								symbolRows[index]!.exportName,
-							),
-							symbolVirtualModuleId(input.filename, module.symbolId),
-						),
-						`symbol:${module.symbolId}`,
-						executionLogModuleHookMode,
-					),
-				}),
-			),
-		)),
+		...compiled.symbolModules.modules.flatMap((module, index): MarklessVirtualModule[] =>
+			symbolModuleIds.has(module.symbolId)
+				? []
+				: [
+						{
+							id: symbolVirtualModuleId(input.filename, module.symbolId),
+							type: 'symbol',
+							symbolId: module.symbolId,
+							exportName: symbolExportNames[index]!,
+							source: symbolSources[index]!,
+						},
+					],
+		),
+		...symbolGroups.map(
+			(group): MarklessVirtualModule => ({
+				id: symbolGroupVirtualModuleId(input.filename, group.groupId),
+				type: 'symbol',
+				source: group.source,
+				groupedSymbolIds: group.symbolIds,
+			}),
+		),
 	];
 
 	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';

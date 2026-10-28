@@ -68,6 +68,8 @@ export interface MarklessVirtualModule {
 	exportName?: string;
 	canonicalRenderData?: boolean;
 	symbolClaims?: ReadonlyArray<string>;
+	/** A grouped symbol module: the symbols whose code it holds. */
+	groupedSymbolIds?: ReadonlyArray<string>;
 	/** `symbol-bundle` only: the symbol module ids this bundle ships as one chunk. */
 	bundledSymbolModuleIds?: ReadonlyArray<string>;
 	/** Symbols and resolvers may resolve during linking, but never serve first-pass code. */
@@ -176,6 +178,8 @@ export interface MarklessTransformManifest {
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];
 	runtimeDemandMap?: RuntimeDemandMapManifest;
+	/** Symbols this module ships inside a grouped module, by the group's symbol id. */
+	symbolGroups?: Readonly<Record<string, string>>;
 	/** This client module mounts through the direct-DOM renderer, which never reaches render()'s other paths. */
 	directCsr?: boolean;
 }
@@ -267,6 +271,7 @@ export type MarklessRolldownPluginApi = {
 	runtimeDemandSources: () => Iterable<{
 		readonly source: string;
 		readonly map: RuntimeDemandMapManifest | undefined;
+		readonly symbolGroups?: ReadonlyMap<string, string>;
 	}>;
 	/** Whether every compiled module of this build mounts through the direct-DOM renderer. */
 	directCsrOnly: () => boolean;

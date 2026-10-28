@@ -81,6 +81,8 @@ export type InteractionDemandSource = {
 	// The emitted module's source request; the file is everything before `?`.
 	readonly source: string;
 	readonly map: RuntimeDemandMapManifest | undefined;
+	// Symbols that ship inside a grouped module, by the group's own symbol id.
+	readonly symbolGroups?: ReadonlyMap<string, string>;
 };
 
 export type InteractionConsumerKind = 'boot' | 'render' | 'action';
@@ -168,6 +170,46 @@ export function computeInteractionClosures(input: {
 	const runtimeIdOf = memoById((id: string) => runtimeModuleIdFromOrigin(id.split('?')[0]!));
 	const sources = [...input.demand];
 	const demand = mergeDemand(sources, input.landingArmsServed === true);
+	// Each compile of a file names its groups by their members, so a symbol may sit in more than one group.
+	const groupOf = new Map<string, Map<string, Set<string>>>();
+	const groupSizes = new Map<string, Set<string>>();
+	for (const { source, symbolGroups } of sources) {
+		if (!symbolGroups?.size) continue;
+		const file = source.split('?')[0]!;
+		const groups = groupOf.get(file) ?? groupOf.set(file, new Map()).get(file)!;
+		for (const [symbolId, group] of symbolGroups) {
+			(groups.get(symbolId) ?? groups.set(symbolId, new Set()).get(symbolId)!).add(group);
+			const key = `${file}\0${group}`;
+			(groupSizes.get(key) ?? groupSizes.set(key, new Set()).get(key)!).add(symbolId);
+		}
+	}
+	// Seeds name symbols; a grouped symbol seeds its groups, and the route keeps which members anything named.
+	const symbolSeeds = (seeds: Set<string>, need: Map<string, Set<string>>) => {
+		const seeded = new Set<string>();
+		return {
+			seeded,
+			add(file: string, symbolId: string): boolean {
+				const groups = groupOf.get(file)?.get(symbolId);
+				if (!groups) {
+					const id = byVirtualId.get(symbolVirtualModuleId(file, symbolId));
+					if (id) seeds.add(id);
+					return id !== undefined;
+				}
+				let found = false;
+				for (const group of groups) {
+					const id = byVirtualId.get(symbolVirtualModuleId(file, group));
+					if (!id) continue;
+					found = true;
+					seeds.add(id);
+					seeded.add(id);
+					groupSizeOf.set(id, groupSizes.get(`${file}\0${group}`)!.size);
+					(need.get(id) ?? need.set(id, new Set()).get(id)!).add(symbolId);
+				}
+				return found;
+			},
+		};
+	};
+	const groupSizeOf = new Map<string, number>();
 	const byRuntimeId = new Map<string, string[]>();
 	const byVirtualId = new Map<string, string>();
 	const symbolsByFile = new Map<string, string[]>();
@@ -351,10 +393,12 @@ export function computeInteractionClosures(input: {
 		const bootSeeds = new Set(bootRoots);
 		let bootBounded =
 			resume !== 'unknown' && [...files].every((file) => !demand.get(file)!.replaced);
+		// Grouped members anything on this route names before input, and the consumers whose walk took a group whole.
+		const groupNeed = new Map<string, Set<string>>();
+		const seededBy = new Map<InteractionConsumer, ReadonlySet<string>>();
+		const bootSymbols = symbolSeeds(bootSeeds, groupNeed);
 		const seedSymbol = (file: string, symbolId: string) => {
-			const id = byVirtualId.get(symbolVirtualModuleId(file, symbolId));
-			if (id) bootSeeds.add(id);
-			else bootBounded = false;
+			if (!bootSymbols.add(file, symbolId)) bootBounded = false;
 		};
 		for (const file of files)
 			for (const symbolId of demand.get(file)!.landingSymbols) seedSymbol(file, symbolId);
@@ -396,6 +440,7 @@ export function computeInteractionClosures(input: {
 					]
 				: []),
 		];
+		if (bootBounded) seededBy.set(consumers[0]!, bootSymbols.seeded);
 		for (const file of [...files].sort()) {
 			const merged = demand.get(file)!;
 			const fileSymbols = symbolsByFile.get(file) ?? [];
@@ -423,6 +468,7 @@ export function computeInteractionClosures(input: {
 					continue;
 				}
 				const seeds = new Set<string>();
+				const actionSymbols = symbolSeeds(seeds, groupNeed);
 				let conservative: string | undefined;
 				const widen = (reason: string) => {
 					conservative ??= reason;
@@ -430,9 +476,8 @@ export function computeInteractionClosures(input: {
 				};
 				for (const [owner, symbolIds] of joined?.symbols ?? []) {
 					for (const symbolId of symbolIds) {
-						const id = byVirtualId.get(symbolVirtualModuleId(owner, symbolId));
-						if (id) seeds.add(id);
-						else if (owner === file) widen('unresolved-symbol');
+						if (actionSymbols.add(owner, symbolId)) continue;
+						if (owner === file) widen('unresolved-symbol');
 						else {
 							conservative ??= 'unresolved-symbol';
 							for (const known of symbolsByFile.get(owner) ?? []) seeds.add(known);
@@ -445,11 +490,8 @@ export function computeInteractionClosures(input: {
 						widen('unlisted-record');
 						continue;
 					}
-					for (const symbolId of symbolIds) {
-						const id = byVirtualId.get(symbolVirtualModuleId(file, symbolId));
-						if (id) seeds.add(id);
-						else widen('unresolved-symbol');
-					}
+					for (const symbolId of symbolIds)
+						if (!actionSymbols.add(file, symbolId)) widen('unresolved-symbol');
 				}
 				// A lean action also demands the full runtime it escalates to; its first use names only what it runs.
 				const runtimeIds = new Set([
@@ -471,18 +513,46 @@ export function computeInteractionClosures(input: {
 				}
 				for (const runtimeId of runtimeIds)
 					for (const id of byRuntimeId.get(runtimeId) ?? []) seeds.add(id);
-				consumers.push({
+				const consumer: InteractionConsumer = {
 					key: `action:${display(file, input.root)}#${actionKey}`,
 					kind: 'action',
 					...(conservative ? { conservative } : {}),
 					...(lean ? { lean: true } : {}),
 					modules: actionClosure(seeds, runtimeIds),
-				});
+				};
+				seededBy.set(consumer, actionSymbols.seeded);
+				consumers.push(consumer);
 			}
 		}
-		result.push({ route, consumers });
+		result.push({
+			route,
+			consumers: withoutPartlyNamedGroups(consumers, seededBy, groupNeed, groupSizeOf),
+		});
 	}
 	return result;
+}
+
+// A group is first-use code on a route only when that route names every member before input, or some walk took it
+// whole; otherwise it leaves the route's first-use consumers and its members load when first called.
+function withoutPartlyNamedGroups(
+	consumers: readonly InteractionConsumer[],
+	seededBy: ReadonlyMap<InteractionConsumer, ReadonlySet<string>>,
+	need: ReadonlyMap<string, ReadonlySet<string>>,
+	sizeOf: ReadonlyMap<string, number>,
+): InteractionConsumer[] {
+	const partial = new Set<string>();
+	for (const [id, members] of need) if (members.size < sizeOf.get(id)!) partial.add(id);
+	for (const consumer of consumers) {
+		if (consumer.kind === 'render') continue;
+		const seeded = seededBy.get(consumer);
+		for (const id of consumer.modules) if (partial.has(id) && !seeded?.has(id)) partial.delete(id);
+	}
+	if (!partial.size) return [...consumers];
+	return consumers.map((consumer) =>
+		consumer.kind === 'render' || !consumer.modules.some((id) => partial.has(id))
+			? consumer
+			: { ...consumer, modules: consumer.modules.filter((id) => !partial.has(id)) },
+	);
 }
 
 export function interactionClosuresAsset(input: {
