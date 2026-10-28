@@ -3,9 +3,10 @@
 // runs in /_code-frame.html and compiles in the one Web Worker the session starts, where the
 // bundler's Node-only imports are swapped for in-memory stand-ins.
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import type { Plugin } from 'vite';
 import { CODE_PREFETCH_FILE } from '../components/docs/code/prefetch.ts';
@@ -21,6 +22,18 @@ async function siteRuntimeSources(): Promise<Record<string, string[]>> {
 		{ maxBuffer: 64 * 1024 * 1024 },
 	);
 	return JSON.parse(stdout) as Record<string, string[]>;
+}
+
+async function warmPackReader(): Promise<(code: string) => string[]> {
+	const core = createRequire(createRequire(import.meta.url).resolve('@markless/core'));
+	const preload = await import(pathToFileURL(core.resolve('@markless/bundler/preload')).href);
+	return preload.warmEvaluatedImports;
+}
+
+/** The import map the bundler wrote into a built page. */
+function importMapOf(html: string): Record<string, string> {
+	const map = /<script type="?importmap"?>([\s\S]*?)<\/script>/.exec(html)?.[1];
+	return map ? (JSON.parse(map) as { imports: Record<string, string> }).imports : {};
 }
 
 const CODE_DIR = fileURLToPath(new URL('../components/docs/code/', import.meta.url));
@@ -173,7 +186,8 @@ export function codeClient(): Plugin[] {
 					if (!frameRef || this.environment?.name !== 'client' || !options.dir) return;
 					const dir = options.dir;
 					const file = join(dir, CODE_FRAME_FILE);
-					writeFileSync(file, dropSitePreloads(readFileSync(file, 'utf8')));
+					const frameHtml = readFileSync(file, 'utf8');
+					writeFileSync(file, dropSitePreloads(frameHtml));
 					const manifest = codePrefetchManifest(bundle as unknown as PrefetchBundle, {
 						base,
 						sessionEntry: BROWSER_ENTRIES['virtual:code-session-url']!.file,
@@ -182,6 +196,8 @@ export function codeClient(): Plugin[] {
 						runtimeTable: FRAME_RUNTIME,
 						frameFile: `${base}${CODE_FRAME_FILE}`,
 						blocks: await runtimeSources!,
+						warmImports: await warmPackReader(),
+						importMap: importMapOf(frameHtml),
 					});
 					const listed = [manifest.session, manifest.live, manifest.cache, ...Object.values(manifest.blocks)].flat();
 					const missing = listed.filter((url) => !existsSync(join(dir, url.slice(base.length))));
