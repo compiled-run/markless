@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const workflowPath = resolve(process.argv[2] ?? resolve(repoRoot, '.github/workflows/ci.yml'));
 const source = readFileSync(workflowPath, 'utf8');
-// The suite-shape invariants below (test/boxes/receipts jobs, no advisory
+// The suite-shape invariants below (test/boxes jobs, receipts in the gate, no advisory
 // checks, the self-check step) describe ci.yml specifically; other workflows
 // get only the universal hygiene rules.
 const isCiSuite = workflowPath.endsWith('/ci.yml');
@@ -62,6 +62,8 @@ const NON_TEST_JOBS = new Set([
 	'save-lane-markers',
 	// Copies a merge-queue run's markers onto main for a push that queue run already tested.
 	'carry-queue-markers',
+	// Fills the browser caches the lanes restore; each lane installs its own copy on a miss.
+	'prepare-playwright',
 ]);
 
 const GATE_JOB = 'test';
@@ -69,12 +71,16 @@ const BOX_JOB_PREFIX = 'boxes-';
 const LANES_JOB = 'lanes';
 const PLAYWRIGHT_JOB = 'prepare-playwright';
 
+// The analyzer receipt set is checked inside the gate, after its result step.
+const RECEIPTS_JOB = GATE_JOB;
+const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-chromium-webkit-';
+
 // Jobs the gate depends on that are wiring rather than a content-hashed lane.
-const GATE_INFRASTRUCTURE = new Set([LANES_JOB, PLAYWRIGHT_JOB]);
+const GATE_INFRASTRUCTURE = new Set([LANES_JOB]);
 
 // Jobs whose failure skips a lane. The gate reads `skipped` as a content-hash
 // hit, so each of these has to reach the gate under its own name.
-const SKIP_CAUSING_JOBS = ['typecheck', LANES_JOB, PLAYWRIGHT_JOB];
+const SKIP_CAUSING_JOBS = ['typecheck', LANES_JOB];
 
 // `boxes-music-player` -> `boxes_music_player`: GitHub expressions read `-` as
 // subtraction, so lane outputs and probe step ids use underscores.
@@ -216,47 +222,69 @@ if (!jobNames.includes(GATE_JOB)) {
 	}
 }
 
-// 6. Receipt aggregation: every box lane must upload, and the receipts job must
-// need those lanes and download what they uploaded before it checks them.
+// 6. Receipt aggregation: every box lane must upload, and the gate must need
+// those lanes and download what they uploaded before it checks them, only after
+// its result step found every lane green.
 const boxJobs = jobNames.filter((name) => name.startsWith(BOX_JOB_PREFIX));
 if (isCiSuite && boxJobs.length === 0) fail('No `boxes-*` jobs found; the box lanes went missing.');
-if (isCiSuite && !jobNames.includes('receipts')) {
-	fail('No `receipts` job found; nothing validates the analyzer receipt set.');
+if (isCiSuite && !jobNames.includes(RECEIPTS_JOB)) {
+	fail(`No \`${RECEIPTS_JOB}\` job found; nothing validates the analyzer receipt set.`);
 } else if (isCiSuite) {
-	const receiptsNeeds = new Set(needsOf('receipts'));
-	const receiptsText = jobText('receipts');
+	const receiptsNeeds = new Set(needsOf(RECEIPTS_JOB));
+	const receiptsText = jobText(RECEIPTS_JOB);
+	const receiptSteps = stepsOf(RECEIPTS_JOB);
+	const gateStep = receiptSteps.findIndex((step) => step.id === 'gate' && /needs\.\*\.result/.test(String(step.run ?? '')));
+	const checkStep = receiptSteps.findIndex((step) => /receipts:check/.test(String(step.run ?? '')));
+	if (gateStep === -1 || checkStep === -1 || checkStep < gateStep)
+		fail(`Job \`${RECEIPTS_JOB}\` must check the receipts after its \`gate\` step reads \`needs.*.result\`, so a receipt set built on a red lane never passes.`);
+	if (!/needs\.lanes\.outputs\.run_receipts(?![A-Za-z0-9_])/.test(receiptsText))
+		fail(`Job \`${RECEIPTS_JOB}\` never reads \`needs.lanes.outputs.run_receipts\`, so the receipts content hash decides nothing.`);
+	const receiptsProbe = stepsOf(LANES_JOB).find((step) => step.id === 'receipts');
+	const receiptsSave = receiptSteps.find(
+		(step) => usesAction(step, 'actions/cache/save') && /needs\.lanes\.outputs\.key_receipts(?![A-Za-z0-9_])/.test(String(withOf(step).key ?? '')),
+	);
+	if (receiptsSave === undefined)
+		fail(`Job \`${RECEIPTS_JOB}\` never saves the receipts marker under \`needs.lanes.outputs.key_receipts\`, so receipts re-run forever on an unchanged tree.`);
+	for (const name of jobNames) {
+		for (const step of stepsOf(name)) {
+			if (!usesAction(step, 'actions/cache/save')) continue;
+			if (!/needs\.lanes\.outputs\.key_receipts(?![A-Za-z0-9_])/.test(String(withOf(step).key ?? ''))) continue;
+			if (receiptsProbe !== undefined && pathList(step) !== pathList(receiptsProbe))
+				fail(`\`${step.name ?? 'a cache save'}\` in \`${name}\` saves the receipts marker under paths [${pathList(step)}] but its probe looks up [${pathList(receiptsProbe)}], so the probe never finds it.`);
+		}
+	}
 	for (const boxJob of boxJobs) {
 		if (!receiptsNeeds.has(boxJob))
-			fail(`Job \`receipts\` does not need \`${boxJob}\`, so it would check stale or missing receipts.`);
+			fail(`Job \`${RECEIPTS_JOB}\` does not need \`${boxJob}\`, so it would check stale or missing receipts.`);
 		const artifact = boxJob.replace(BOX_JOB_PREFIX, 'receipts-');
 		if (!new RegExp(`receipts-${boxJob.slice(BOX_JOB_PREFIX.length)}(?![\\w-])`).test(jobText(boxJob)))
 			fail(`Job \`${boxJob}\` does not upload an artifact named \`${artifact}\`.`);
 		if (!new RegExp(`receipts-${boxJob.slice(BOX_JOB_PREFIX.length)}(?![\\w-])`).test(receiptsText))
-			fail(`Job \`receipts\` does not download the \`${artifact}\` artifact.`);
+			fail(`Job \`${RECEIPTS_JOB}\` does not download the \`${artifact}\` artifact.`);
 	}
 	if (!/receipts:check/.test(receiptsText))
-		fail('Job `receipts` never runs `receipts:check`.');
+		fail(`Job \`${RECEIPTS_JOB}\` never runs \`receipts:check\`.`);
 	if (!/analyzer-contract-receipts/.test(receiptsText))
-		fail('Job `receipts` never uploads the `analyzer-contract-receipts` artifact.');
+		fail(`Job \`${RECEIPTS_JOB}\` never uploads the \`analyzer-contract-receipts\` artifact.`);
 	// A skipped box lane uploads nothing, so its receipts have to come back out
 	// of the cache entry its last green run saved under the very key whose hit
 	// is the reason the lane skipped.
 	for (const boxJob of boxJobs) {
 		const slug = slugOf(boxJob);
 		if (!new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(receiptsText))
-			fail(`Job \`receipts\` never restores \`${boxJob}\` receipts from \`needs.lanes.outputs.key_${slug}\`, so a skipped box lane would leave the receipt set short.`);
+			fail(`Job \`${RECEIPTS_JOB}\` never restores \`${boxJob}\` receipts from \`needs.lanes.outputs.key_${slug}\`, so a skipped box lane would leave the receipt set short.`);
 	}
 	// `fail-on-cache-miss` has to be set to true, not merely mentioned: the
 	// key's default is false, and false is exactly the value that would turn a
 	// missing receipt set into a silent pass.
-	const receiptRestores = stepsOf('receipts').filter((step) =>
+	const receiptRestores = receiptSteps.filter((step) =>
 		usesAction(step, 'actions/cache/restore'),
 	);
 	if (receiptRestores.length < boxJobs.length)
-		fail(`Job \`receipts\` has ${receiptRestores.length} cache restore step(s) for ${boxJobs.length} box lane(s); a skipped lane would leave the receipt set short.`);
+		fail(`Job \`${RECEIPTS_JOB}\` has ${receiptRestores.length} cache restore step(s) for ${boxJobs.length} box lane(s); a skipped lane would leave the receipt set short.`);
 	for (const step of receiptRestores) {
 		if (withOf(step)['fail-on-cache-miss'] !== true)
-			fail(`Job \`receipts\` restores \`${step.name ?? 'a cache entry'}\` without \`fail-on-cache-miss: true\`, so a missing cache entry would pass as an empty receipt set.`);
+			fail(`Job \`${RECEIPTS_JOB}\` restores \`${step.name ?? 'a cache entry'}\` without \`fail-on-cache-miss: true\`, so a missing cache entry would pass as an empty receipt set.`);
 	}
 }
 
@@ -331,6 +359,30 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 		fail(`Job \`${LANES_JOB}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
 }
 
+// 7b. A merge group may skip a lane that passed on identical inputs in a pull request run, found by an artifact
+// name. The name has to carry the workflow's hash (a run that edited this file proves nothing), the upload has to
+// come from a pull request run, and the lookup has to refuse artifacts from forks.
+for (const name of jobNames) {
+	for (const step of stepsOf(name)) {
+		if (!usesAction(step, 'actions/upload-artifact')) continue;
+		const artifact = String(withOf(step).name ?? '');
+		if (!artifact.startsWith('lane-pass-')) continue;
+		if (!/needs\.lanes\.outputs\.workflow_hash/.test(artifact))
+			fail(`\`${step.name ?? 'an upload'}\` in \`${name}\` names a lane pass without \`needs.lanes.outputs.workflow_hash\`, so a run that edited the workflow could vouch for a lane.`);
+		if (!/github\.event_name == 'pull_request'/.test(String(step.if ?? '')))
+			fail(`\`${step.name ?? 'an upload'}\` in \`${name}\` records a lane pass outside a pull request run.`);
+	}
+}
+{
+	const reuse = stepsOf(LANES_JOB).find((step) => step.id === 'reuse');
+	if (reuse !== undefined) {
+		if (!/head_repository_id == \$REPO_ID/.test(String(reuse.run ?? '')))
+			fail(`The \`reuse\` step in \`${LANES_JOB}\` accepts lane passes without checking they came from this repository, so a fork could vouch for a lane.`);
+		if (String(reuse.if ?? '').trim() !== "github.event_name == 'merge_group'")
+			fail(`The \`reuse\` step in \`${LANES_JOB}\` must run only for merge groups.`);
+	}
+}
+
 // 8. A sharded lane must not save its own marker: one green shard next to a red
 // one would let the whole lane skip on the next identical tree.
 for (const name of jobNames) {
@@ -352,8 +404,13 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 		if (!/playwright install(?!-deps)/.test(jobText(name))) continue;
 		if (!/PLAYWRIGHT_BROWSERS_PATH/.test(jobText(name)))
 			fail(`Job \`${name}\` installs a Playwright browser without \`PLAYWRIGHT_BROWSERS_PATH\`, so it cannot share the prepared cache.`);
-		if (name !== PLAYWRIGHT_JOB && !needsOf(name).includes(PLAYWRIGHT_JOB))
-			fail(`Job \`${name}\` installs a Playwright browser but does not need \`${PLAYWRIGHT_JOB}\`.`);
+		if (name !== PLAYWRIGHT_JOB && !restoresBrowserCache(name))
+			fail(`Job \`${name}\` installs a Playwright browser without first restoring the \`${BROWSER_CACHE_KEY}\` cache \`${PLAYWRIGHT_JOB}\` fills.`);
+	}
+	// Each \`needs:\` hop waits for a runner again, so no lane waits on the cache-filling job.
+	for (const name of jobNames) {
+		if (needsOf(name).includes(PLAYWRIGHT_JOB))
+			fail(`Job \`${name}\` needs \`${PLAYWRIGHT_JOB}\`; a lane restores the browser cache itself instead of queueing behind the job that fills it.`);
 	}
 	// actions/cache rejects `..` (a warning, not a failure), and a path inside the checkout gets linted.
 	for (const name of jobNames) {
@@ -372,12 +429,21 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 	if (launchers.length > 0 && jobNames.includes('unit')) {
 		const unitText = jobText('unit');
 		if (
-			!needsOf('unit').includes(PLAYWRIGHT_JOB) ||
+			!restoresBrowserCache('unit') ||
 			!/PLAYWRIGHT_BROWSERS_PATH/.test(unitText) ||
 			!/playwright install/.test(unitText)
 		)
 			fail(`Job \`unit\` runs node tests that launch a Playwright browser (${launchers[0]} and ${launchers.length - 1} more) but does not restore the browsers \`${PLAYWRIGHT_JOB}\` installs.`);
 	}
+}
+
+function restoresBrowserCache(name) {
+	return stepsOf(name).some(
+		(step) =>
+			usesAction(step, 'actions/cache/restore') &&
+			String(withOf(step).key ?? '').startsWith(BROWSER_CACHE_KEY) &&
+			withOf(step)['lookup-only'] !== true,
+	);
 }
 
 function nodeTestsLaunchingBrowsers() {
