@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import type { Plugin } from 'vite';
-import { CODE_PREFETCH_FILE } from '../components/docs/code/prefetch.ts';
+import { CODE_PREFETCH_FILE, type CodePrefetchManifest } from '../components/docs/code/prefetch.ts';
 import { codePrefetchManifest, type PrefetchBundle } from './code-prefetch.ts';
 
 const RUNTIME_SOURCES_SCRIPT = fileURLToPath(new URL('./code-runtime-sources.ts', import.meta.url));
@@ -91,6 +91,17 @@ export function codeCompilerSwaps(): Plugin {
 	};
 }
 
+/** The dev server has no bundle to list, so dev prefetches the entries it serves unbundled. */
+function devPrefetchManifest(base: string): CodePrefetchManifest {
+	const url = (name: string) => `${base}@fs${BROWSER_ENTRIES[name]!.file}`;
+	return {
+		session: [url('virtual:code-session-url')],
+		live: [url('virtual:code-live-url')],
+		cache: [`${base}${CODE_FRAME_FILE}`],
+		blocks: {},
+	};
+}
+
 export function codeClient(): Plugin[] {
 	let base = '/';
 	let frameRef = '';
@@ -111,6 +122,11 @@ export function codeClient(): Plugin[] {
 			configureServer(server) {
 				server.middlewares.use((req, res, next) => {
 					const path = (req.url ?? '').split('?', 1)[0];
+					if (path === `${base}${CODE_PREFETCH_FILE}`) {
+						res.setHeader('content-type', 'application/json; charset=utf-8');
+						res.end(JSON.stringify(devPrefetchManifest(base)));
+						return;
+					}
 					if (path !== `${base}${CODE_FRAME_FILE}`) return next();
 					res.setHeader('content-type', 'text/html; charset=utf-8');
 					res.end(codeFrameHtml(`${base}@fs${FRAME_ENTRY}`));

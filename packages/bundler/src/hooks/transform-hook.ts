@@ -29,6 +29,7 @@ import type {
 	TransformTsrxModuleResult,
 } from '../types.ts';
 import {
+	STRING_EXPORT_QUERY,
 	TSRX_SOURCE_FILE,
 	executionLogRuntimeModuleId,
 	isMarklessRuntimeModule,
@@ -64,7 +65,7 @@ export async function transformHook(
 ) {
 	const currentEnvironment = ctx.getEnvironment(pluginContext);
 	const virtualId = normalizeVirtualId(id);
-	if (!TSRX_SOURCE_FILE.test(id)) {
+	if (!TSRX_SOURCE_FILE.test(id) || STRING_EXPORT_QUERY.test(id)) {
 		return transformNonTsrxModule(ctx, pluginContext, code, id, currentEnvironment);
 	}
 	if (virtualId.startsWith(MARKLESS_VIRTUAL_PREFIX)) {
