@@ -405,21 +405,17 @@ function routerConfigPlugin(
 
 			const serverWatch = withWatchIgnores(config.server?.watch);
 
-			return {
-				nitro: createNitroConfig(
-					config.nitro,
-					config.root,
-					serverWatch.ignored,
-					env?.command === 'build',
-					serverBuild,
-					devNitro,
-					compressedAssets,
-				),
-				server: {
-					...config.server,
-					watch: serverWatch,
-				},
-			};
+			// Replaced in place: Vite deep-merges a returned config and concatenates its arrays, so the app's handlers would run twice.
+			config.nitro = createNitroConfig(
+				config.nitro,
+				config.root,
+				serverWatch.ignored,
+				env?.command === 'build',
+				serverBuild,
+				devNitro,
+				compressedAssets,
+			);
+			config.server = { ...config.server, watch: serverWatch };
 		},
 		configResolved(config) {
 			productionBuild = config.command === 'build';
