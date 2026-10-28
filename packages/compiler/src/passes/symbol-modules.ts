@@ -28,6 +28,7 @@ import type {
 	SymbolModulesInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
+import { rowsDecidedBy } from '../artifact-helpers/prop-deciders.ts';
 import {
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
@@ -1432,29 +1433,34 @@ function renderBranchArms(
 					candidate.branchSiteId === branch.branchSiteId,
 			);
 			if (symbol) {
-				const diagnostic = branchArmUnsupportedDiagnostic(
+				const refused = branchArmUnsupportedDiagnostic(
 					branch,
 					refusals[0],
 					symbol.id,
 					input.semanticGraph,
 				);
-				diagnostics.push(diagnostic);
 				const componentName = renderData.chunks.find(
 					(chunk) => chunk.id === branch.armChunkIds[0],
 				)?.componentName;
-				if (diagnostic.severity === 'warning' && componentName)
-					propDecided.push({
-						componentName,
-						props: [
-							...new Set(
-								branch.testReads.flatMap((read) =>
-									readPropNames(read.graphNodeId, read.path, input.semanticGraph),
-								),
-							),
-						],
-						symbolId: symbol.id,
-						diagnostic,
-					});
+				const props = [
+					...new Set([
+						...branch.testReads.flatMap((read) =>
+							readPropNames(read.graphNodeId, read.path, input.semanticGraph),
+						),
+						...(rowListDeciders(branch, input.semanticGraph) ?? []),
+					]),
+				];
+				// A row's item can change under its key in a list state holds, so that warning stays printed.
+				const decided =
+					refused.severity === 'warning' &&
+					componentName !== undefined &&
+					rowListDeciders(branch, input.semanticGraph) !== null;
+				const diagnostic = decided
+					? { ...refused, decidedByProps: { componentName, props } }
+					: refused;
+				diagnostics.push(diagnostic);
+				if (decided)
+					propDecided.push({ componentName, props, symbolId: symbol.id, diagnostic });
 				// Every refusal escalatable, or none: a branch that also holds a shape
 				// no re-render answers stays plainly refused. A refusal that only warns
 				// blocks no build, so its branch keeps shipping the plan it ships today.
@@ -1497,6 +1503,23 @@ function readsOnlyProps(
 	return binding.dependencies.every((dependency) =>
 		readsOnlyProps(dependency.graphNodeId, semanticGraph, seen),
 	);
+}
+
+// A branch inside a @for row also flips when its row's item changes, so the list's deciders join its test's.
+function rowListDeciders(
+	branch: RenderDataBranch,
+	semanticGraph: SemanticGraphArtifact | undefined,
+): ReadonlyArray<string> | null {
+	if (!semanticGraph) return [];
+	const row = semanticGraph.markup.chunks.find(
+		(chunk) =>
+			/^repeat:.*:row$/.test(chunk.id) &&
+			chunk.slots.some((slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId),
+	);
+	const repeat = row
+		? semanticGraph.keyedRepeats.find((candidate) => row.id === `repeat:${candidate.id}:row`)
+		: undefined;
+	return repeat ? rowsDecidedBy(repeat, semanticGraph) : [];
 }
 
 function readPropNames(
