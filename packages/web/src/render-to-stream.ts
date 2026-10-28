@@ -30,6 +30,7 @@ import {
 	withArmEventHostMarks,
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
+import { STREAMED_ARM_PROPERTY_SEEDS_SOURCE, servedPropertySeeds } from './served-property-seeds.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -366,7 +367,8 @@ function renderArmAppend(
 	);
 	if (!renderedAnchor)
 		throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
-	const armHtml = renderedAnchor.html;
+	const seeded = servedPropertySeeds(renderedAnchor.html);
+	const armHtml = seeded?.html ?? renderedAnchor.html;
 
 	const boundary = (output.view?.asyncBoundaries ?? []).find(
 		(candidate) => candidate.id === arm.boundaryId,
@@ -416,6 +418,9 @@ function renderArmAppend(
 
 	return (
 		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armRecords as ProtocolArmRecordSet, armHtml)}</template>` +
+		(seeded
+			? `<script${nonceAttribute}>${escapeInlineScript(`(${STREAMED_ARM_PROPERTY_SEEDS_SOURCE})(${escapeScriptJson(JSON.stringify(arm.boundaryId))},${escapeScriptJson(JSON.stringify(seeded.seeds))})`)}</script>`
+			: '') +
 		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`

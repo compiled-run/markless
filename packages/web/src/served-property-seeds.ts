@@ -52,3 +52,9 @@ export function servedPropertySeeds(
 // Runs in the page as text, so it is written small by hand: set each seeded element's property.
 export const APPLY_PROPERTY_SEEDS_SOURCE =
 	'(r,s)=>{for(const[p,n,v]of s){let e=r;for(const i of p)e=e&&e.children[i];if(e&&e!==r)e[n]=v}}';
+
+// A streamed arm's markup waits in a template until its commit moves it into the page, which may come
+// before or after the resume code: whoever reads the template's content gets it, and once that read has
+// moved the nodes into place, a microtask sets each seeded property on its element.
+export const STREAMED_ARM_PROPERTY_SEEDS_SOURCE =
+	'(i,s)=>{const t=document.querySelector(\'template[m\\\\:arm="\'+i+\'"]\'),c=t.content,l=s.map(([p,n,v])=>{let e=c;for(const x of p)e=e&&e.children[x];return[e,n,v]});Object.defineProperty(t,"content",{get(){queueMicrotask(()=>{for(const[e,n,v]of l)if(e&&e!==c)e[n]=v});return c}})}';
