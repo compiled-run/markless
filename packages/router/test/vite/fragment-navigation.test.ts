@@ -1191,8 +1191,20 @@ for (const [name, browserType] of [
 		test('the idle tier starts only once the code the page landed with has arrived', async () => {
 			const held = new URL(landing['pages/index.tsrx']!.at(-1)!, origin).pathname;
 			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-			let arrived = Infinity;
-			const fragments: number[] = [];
+			// The page reads its link as fast whatever this machine's load: transfers that took 300 ms on a busy runner read slow and the tier never ran.
+			await page.addInitScript(() => {
+				const entries = performance.getEntriesByType.bind(performance);
+				performance.getEntriesByType = (type: string) =>
+					entries(type).map(
+						(entry) =>
+							new Proxy(entry, {
+								get: (target, key) =>
+									key === 'responseEnd'
+										? (target as PerformanceResourceTiming).responseStart
+										: Reflect.get(target, key, target),
+							}),
+					);
+			});
 			await page.route(
 				(url) => url.pathname === held,
 				async (route) => {
@@ -1200,15 +1212,20 @@ for (const [name, browserType] of [
 					await route.continue();
 				},
 			);
-			page.on('requestfinished', (request) => {
-				if (new URL(request.url()).pathname === held) arrived = Date.now();
-			});
-			page.on('request', (request) => {
-				if (fragmentPageUrl(new URL(request.url()))) fragments.push(Date.now());
-			});
+			const arrival = page.waitForEvent(
+				'requestfinished',
+				(request) => new URL(request.url()).pathname === held,
+			);
+			const fragment = page.waitForRequest((request) =>
+				Boolean(fragmentPageUrl(new URL(request.url()))),
+			);
+			let arrived = Infinity;
+			let fetched = -Infinity;
+			void arrival.then(() => (arrived = Date.now()));
+			void fragment.then(() => (fetched = Date.now()));
 			await page.goto(origin + '/');
-			await expect.poll(() => fragments.length, { timeout: 10_000 }).toBeGreaterThan(0);
-			expect(Math.min(...fragments)).toBeGreaterThanOrEqual(arrived);
+			await Promise.all([arrival, fragment]);
+			expect(fetched).toBeGreaterThanOrEqual(arrived);
 			await page.close();
 		});
 
