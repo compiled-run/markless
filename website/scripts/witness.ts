@@ -357,7 +357,10 @@ try {
 			);
 		const preHeightAtRest = await hoverBlockHeight();
 		await hover.hover();
-		await page.waitForTimeout(120);
+		// Pointer hover opens after the --tip-delay intent wait; focus opens at once.
+		for (let waited = 0; waited < 2000 && !(await tooltipIsVisible(tip)); waited += 100) {
+			await page.waitForTimeout(100);
+		}
 		check(await tooltipIsVisible(tip), 'the tooltip shows on hover');
 		const preHeightOnHover = await hoverBlockHeight();
 		check(

@@ -27,6 +27,7 @@
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*",
 		"@markless/typescript-plugin": "workspace:*",
+		"@markless/web": "workspace:*",
 		"@tsrx/content-mapper": "0.1.2",
 		"@tsrx/yuku": "0.8.0",
 		"@types/node": "24.12.2",
