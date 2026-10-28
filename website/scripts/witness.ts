@@ -863,19 +863,24 @@ try {
 
 		// --- widgets on the reading-tsrx page ------------------------------------
 		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
+		check((await page.locator('figure.anatomy').count()) === 1, 'the marked-up printout is on the reading page');
+		check((await page.locator('figure.sketch').count()) === 2, 'the values and instructions sketches are on the reading page');
 		const readingDemos = page.locator('.code-block [data-code-stage]');
-		const beanCard = readingDemos.nth(0);
-		const bagLine = beanCard.locator('p').first();
-		await bagLine.waitFor();
-		check(((await bagLine.textContent()) ?? '').trim() === '1 bag', 'the expression demo serves 1 bag', ((await bagLine.textContent()) ?? '').trim());
-		await beanCard.getByRole('button', { name: 'Add a bag' }).click();
-		await settleText(bagLine, (text) => text === '2 bags', 'both expressions in the line follow the click');
-		check(((await readingDemos.nth(1).locator('p').nth(1).textContent()) ?? '').trim() === 'Tip: 4.2 dollars', 'the nested statement block renders its own element');
-		const listDemo = readingDemos.nth(2);
-		await listDemo.getByRole('button', { name: 'Add a decaf' }).click();
-		await settleText(listDemo.locator('p').first(), (text) => text === 'Free shipping!', 'the @if branch flips when the list grows');
-		await listDemo.getByRole('button', { name: 'Empty the cart' }).click();
-		await settleText(listDemo.locator('li').first(), (text) => text === 'Your cart is empty.', 'the @empty row takes over');
+		const rsvp = readingDemos.nth(0);
+		const rsvpHeading = rsvp.locator('h2');
+		await rsvpHeading.waitFor();
+		check(((await rsvpHeading.textContent()) ?? '').trim() === 'Coming?', 'the values playground serves its question', ((await rsvpHeading.textContent()) ?? '').trim());
+		await rsvp.getByRole('button', { name: 'RSVP' }).click();
+		await settleText(rsvpHeading, (text) => text === 'See you there', 'every value in the RSVP playground follows the click');
+		check(((await readingDemos.nth(1).locator('p').nth(1).textContent()) ?? '').trim() === 'Plus 2 guests', 'the nested statement block renders its own element');
+		const blocks = page.locator('figure.blocks-demo');
+		const guestRows = blocks.locator('.row');
+		check((await guestRows.count()) === 2, 'the @for in the blocks demo serves one row per guest', String(await guestRows.count()));
+		await blocks.getByRole('button', { name: 'Clear' }).click();
+		await settleText(blocks.locator('.list'), (text) => text.includes('No one yet'), 'the @if line shows once no one is going');
+		check((await guestRows.count()) === 0, 'Clear removes every @for row');
+		await blocks.getByRole('button', { name: 'Add' }).click();
+		await settleText(blocks.locator('.list'), (text) => text.includes('Ada') && !text.includes('No one yet'), 'Add brings a row back and hides the @if line');
 		await page.screenshot({
 			path: `${shotsDir}/T005-reading-tsrx-after.png`,
 			fullPage: true,

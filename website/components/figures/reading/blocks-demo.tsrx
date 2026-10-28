@@ -21,9 +21,11 @@ export default function BlocksDemo() @{
 							<path class="ring-ink" d={ink.ring.ink} />
 							<text x="13" y="17.5">1</text>
 						</svg>
-						@for (const name of guests; key name) {
-							<p class="row">{name}</p>
-						}
+						<div class="rows">
+							@for (const name of guests; key name) {
+								<p class="row">{name}</p>
+							}
+						</div>
 						@if (guests.length === 0) {
 							<p class="empty">
 								No one yet
@@ -120,6 +122,12 @@ export default function BlocksDemo() @{
 				min-height: 5.4rem;
 				min-width: 12rem;
 				align-content: center;
+			}
+
+			.rows {
+				display: grid;
+				justify-items: center;
+				gap: 0.35rem;
 			}
 
 			.row {
