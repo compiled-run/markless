@@ -287,27 +287,46 @@ export function runFragmentNavigation(
 	// A same-origin anchor, router Link or plain, counts only when its path names one of the app's pages.
 	const underEndpoints = (pathname: string) =>
 		config.endpointPrefixes.some((prefix) => (pathname + '/').startsWith(prefix + '/'));
-	const pages = config.pages.map(
-		(page) => [underEndpoints(page), page.split('/').filter(Boolean)] as const,
-	);
+	const decoded = (part: string) => {
+		try {
+			return decodeURIComponent(part);
+		} catch {
+			return part;
+		}
+	};
+	// Every link on a large site is checked after each swap: a page with no parameter is one lookup, not one comparison per page.
+	const staticPages = new Map<string, boolean[]>();
+	const patterns: (readonly [boolean, string[]])[] = [];
+	for (const page of config.pages) {
+		const segments = page.split('/').filter(Boolean);
+		const under = underEndpoints(page);
+		if (segments.some((segment) => segment === '**' || segment === ':'))
+			patterns.push([under, segments]);
+		else {
+			const key = JSON.stringify(segments);
+			staticPages.set(key, [...(staticPages.get(key) ?? []), under]);
+		}
+	}
+	const known = new Map<string, boolean>();
 	// Server endpoints are never fetched ahead of a click or as a fragment: a GET there may have side effects.
 	// Only a page file under the endpoint prefix itself (pages/api/) answers a path there.
 	const isPage = (pathname: string) => {
+		const cached = known.get(pathname);
+		if (cached !== undefined) return cached;
 		const endpoint = underEndpoints(pathname);
-		const parts = pathname.split('/').filter(Boolean);
-		return pages.some(([under, page]) => {
-			if (endpoint && !under) return false;
-			const rest = page.indexOf('**');
-			if (rest === -1 ? page.length !== parts.length : parts.length <= rest) return false;
-			return page.every((segment, index) => {
-				if (segment === '**' || segment === ':') return true;
-				try {
-					return segment === decodeURIComponent(parts[index]!);
-				} catch {
-					return segment === parts[index];
-				}
+		const parts = pathname.split('/').filter(Boolean).map(decoded);
+		const answer =
+			!!staticPages.get(JSON.stringify(parts))?.some((under) => !endpoint || under) ||
+			patterns.some(([under, page]) => {
+				if (endpoint && !under) return false;
+				const rest = page.indexOf('**');
+				if (rest === -1 ? page.length !== parts.length : parts.length <= rest) return false;
+				return page.every(
+					(segment, index) => segment === '**' || segment === ':' || segment === parts[index],
+				);
 			});
-		});
+		known.set(pathname, answer);
+		return answer;
 	};
 	const eligible = (anchor: Element | null | undefined, forClick = false): URL | undefined => {
 		if (!anchor || anchor.localName !== 'a') return;
