@@ -200,6 +200,11 @@ function armRebuildsFromGraph(state: WalkState): boolean {
 	return !!state.currentArmScope && state.currentKeyedRepeatScopeIds.length === 0;
 }
 
+function rowScope(state: WalkState): { readonly keyedRepeatId?: string } {
+	const id = state.currentKeyedRepeatScopeIds.at(-1);
+	return id ? { keyedRepeatId: id } : {};
+}
+
 export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
 	if (readsShadowingRowItem(expression, state)) return;
@@ -222,6 +227,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		state.currentProjectionScope.hostNodeId === state.currentHostNodeId;
 
 	state.graph.templateReads.push({
+		...rowScope(state),
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
 		sourceSpan: sourceSpan(expression, state.filename),
@@ -609,6 +615,7 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 	};
 	for (const hostNodeId of [consequent.hostNodeId, alternate.hostNodeId]) {
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
 			source,
 			sourceSpan: sourceSpanValue,
@@ -1173,6 +1180,7 @@ function collectAttribute(
 			TEMPLATE_READ_OPTIONS,
 		);
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
 			source: expressionSource(conditionalClass.test, state.source),
 			sourceSpan: sourceSpan(conditionalClass.test, state.filename),
@@ -1245,6 +1253,7 @@ function collectAttribute(
 			return;
 		}
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
 			...templateReadSource(composite, expressionValue, state),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
@@ -1302,6 +1311,7 @@ function collectStyleObjectAttribute(
 		(composite || lowering.valueExpressions.every((value) => rendersStyleValue(value, state)))
 	) {
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
 			source: expressionSource(usageNode, state.source),
 			sourceSpan: sourceSpan(usageNode, state.filename),

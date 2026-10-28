@@ -4850,11 +4850,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must render an element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY: Each row of this @for over <itemName> is one <branchLabel> (<testSource>) with no <value>, so a row whose test fails renders nothing. After the page loads, the browser finds a list’s rows as one element each, so this list would show the rows the server sent and never update.',
+			'The browser adds, moves and removes a list’s rows by counting the parent’s child elements, one element per row. A row that renders nothing has no element to count, so the browser cannot tell which rows are which.',
+			'Filter the list before the @for instead: `<filter>` and `@for (const <itemName> of shown; ...)`. Or give the @if an @else that renders one element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
-		description: 'This list can never grow in the browser: a Markless build warning.',
+		severity: 'error-or-warning',
+		description: 'This list can never grow in the browser: a Markless build error.',
 		printed: [
 			'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: <message> The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.',
 			'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text and attributes read off the row item or off a state cell the page holds, and nothing else, so a row needing anything more ships no template at all.',
@@ -4873,6 +4895,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 				],
 			},
 		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must be one element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: Each row of this @for over <itemName> renders <rowShape>. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.',
+			'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+			'Wrap each row in one element, such as `<span>...</span>`, so every row of <itemName> is a single element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		],
+		structured: true,
 		sources: [
 			{
 				id: 'f0',
@@ -7289,9 +7338,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error-or-warning',
 		description:
-			'This <branchLabel> in a @for row never changes in the browser: a Markless build warning.',
+			'This <branchLabel> in a @for row never changes in the browser: a Markless build error.',
 		printed: [
 			'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: <message> So each row keeps the arm the server rendered for <branchLabel> (<testSource>): when <testSource> changes after the page loads, the row does not show the other arm.',
 			"A row flips its own <branchLabel> from the row markup the payload carries: the test read per row, and each arm's elements, text and attributes. A row needing anything more ships no markup at all, so nothing can rebuild an arm in it.",
@@ -7315,6 +7364,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
 			},
 		],
 		moreSources: 0,
@@ -10453,7 +10507,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error-or-warning',
 		description: 'A markup expression assigns a value, so its text never updates.',
 		printed: [
 			'MARKLESS_TEMPLATE_EXPRESSION_STATIC: This text reads `<readSource>`, but only plain reads like `{<readSource>}` update the page today. The expression renders its initial value and never changes when `<readSource>` changes.',
@@ -10643,6 +10697,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/state-lowering.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
 			},
 		],
 		moreSources: 0,
