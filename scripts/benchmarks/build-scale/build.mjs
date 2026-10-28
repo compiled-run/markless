@@ -57,13 +57,24 @@ const retainedHeapPlugin = {
 		phases.map((phase) => [phase, { order: 'post', handler: retainedAt(phase) }]),
 	),
 };
+// Modules in each environment's graph: Rolldown's memory and time grow with this count, and unlike memory it does not vary between runs.
+const modules = {};
+const moduleCountPlugin = {
+	name: 'build-scale-module-count',
+	buildEnd: {
+		order: 'post',
+		handler() {
+			modules[this.environment?.name ?? 'default'] = [...this.getModuleIds()].length;
+		},
+	},
+};
 const started = performance.now();
 const cpuBefore = process.cpuUsage();
 const builder = await createBuilder({
 	root: app.dir,
 	configFile: false,
 	logLevel: 'silent',
-	plugins: [markless(), router(), retainedHeapPlugin],
+	plugins: [markless(), router(), retainedHeapPlugin, moduleCountPlugin],
 });
 await builder.buildApp();
 const seconds = (performance.now() - started) / 1000;
@@ -99,6 +110,7 @@ console.log(
 		peakHeapTotalBytes: peakHeapTotal,
 		peakExternalBytes: peakExternal,
 		...(retained.length ? { retained } : {}),
+		modules,
 		largestServerChunk: largest(
 			output,
 			(path) => isCode(path) && path.startsWith('.output/server/'),

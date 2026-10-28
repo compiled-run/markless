@@ -25,6 +25,14 @@
 			"bytes": 6291456,
 			"reason": "6 MB: measured 4.63 MB (interaction-closures.json) at 180 pages; origin/main before wrote a 22.6 MB execution-demand.json."
 		},
+		"clientModules": {
+			"value": 15028,
+			"reason": "Client graph modules at 180 pages, measured 15,028 on main f79073248 (2026-10-28); the count is the same on every run, so the budget is the measurement. Rolldown spends about 90 KB of native memory per module whatever its size (#268), so a rise is a memory and time regression; lower it as module-cutting changes land."
+		},
+		"clientModulesPerPage": {
+			"value": 79.8,
+			"reason": "Client modules per extra page between 60 and 180 pages: (15,028 - 5,452) / 120 on main f79073248 (2026-10-28), the same on every run. Each page adds its own symbol modules; this catches a change that multiplies them."
+		},
 		"buildCpuPerPageInReferenceRuns": {
 			"value": 0.5,
 			"byPlatform": { "darwin-arm64": 0.7 },
