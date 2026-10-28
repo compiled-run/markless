@@ -46,7 +46,7 @@ async function exercise(container: HTMLElement) {
 // QUARANTINED, owner in docs/ci-process.md "Quarantined tests": a keystroke over a settled answer sometimes paints @pending instead of the dimmed list.
 const quarantined = Date.now() < Date.parse('2026-11-10');
 test.runIf(!quarantined)('the quarantine is still in date', () => {
-	expect.fail('Quarantine expired on 2026-11-10: fix the race or remove the tests.');
+	expect.fail('Quarantine expired on 2026-11-10: land the settleAsyncBoundaryRange fix (#322, test/hold-search-in-stale-checks) and drop the quarantine.');
 });
 
 test.skipIf(quarantined)('CSR: a child reading its query prop searches, fails, retries and recovers', async () => {
