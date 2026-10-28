@@ -177,6 +177,7 @@ export function createResumeRuntime(
 				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
+				ready: () => typeof input.loadSymbol(domUpdate.symbolId!) === 'function',
 				async run(value) {
 					const symbol = await input.loadSymbol(domUpdate.symbolId!);
 					return (await symbol({
