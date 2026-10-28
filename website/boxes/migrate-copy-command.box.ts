@@ -46,6 +46,11 @@ export default box(
 
 			const button = page.getByRole('button', { name: 'Copy the command: ' + COMMAND });
 			const status = page.locator('.command-strip [role="status"]');
+			const sprite = await page.request.get(new URL('/ink-marks.svg', server.url).href).then((response) => response.text());
+			for (const [part, mark] of [['idle', 'copy'], ['done', 'copied']] as const) {
+				expect(await button.locator(`.icon .${part} use`).getAttribute('href'), `the ${part} icon is the hand-drawn ${mark} mark`).toBe(`/ink-marks.svg#${mark}`);
+				expect(sprite).toContain(`<symbol id="${mark}"`);
+			}
 			for (const [theme, key] of [['light', 'Enter'], ['dark', ' ']] as const) {
 				if (theme === 'dark') {
 					await page.click('[data-theme-toggle="dark"]');
@@ -55,6 +60,8 @@ export default box(
 				await button.scrollIntoViewIfNeeded();
 				const before = await button.boundingBox();
 				const strip = await page.locator('.command-strip').boundingBox();
+				await expect(button.locator('.icon .idle')).toBeVisible();
+				await expect(button.locator('.icon .done')).toBeHidden();
 				await page.screenshot({ path: resolve(directory, theme + '-idle.png') });
 				await button.focus();
 				const pressed = Date.now();
@@ -63,6 +70,8 @@ export default box(
 				await expect(status).toHaveText('Copied to your clipboard');
 				await expect(button.locator('.words .done')).toBeVisible();
 				await expect(button.locator('.words .idle')).toBeHidden();
+				await expect(button.locator('.icon .done')).toBeVisible();
+				await expect(button.locator('.icon .idle')).toBeHidden();
 				expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(COMMAND);
 				expect(await button.boundingBox()).toEqual(before);
 				expect(await page.locator('.command-strip').boundingBox()).toEqual(strip);
@@ -71,6 +80,7 @@ export default box(
 				expect(Date.now() - pressed, 'the Copied state stays long enough to read').toBeGreaterThanOrEqual(1_500);
 				await expect(status).toHaveText('');
 				await expect(button.locator('.words .idle')).toBeVisible();
+				await expect(button.locator('.icon .idle')).toBeVisible();
 			}
 			await button.click();
 			await expect(status).toHaveText('Copied to your clipboard');
