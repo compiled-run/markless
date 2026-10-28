@@ -159,7 +159,7 @@ function Book() @{
 						<path class="hatch deep" d={ink.browser.shadow.core} />
 					</g>
 					@for (const t of view.browser.tabs; key t.key) {
-						<>
+						<g>
 							<g transform={t.vee}>
 								<path class="sheet shade" d={ink.tab.vee} />
 								<path class="hatch" d={ink.tab.veeHatch} />
@@ -170,7 +170,7 @@ function Book() @{
 								<path class="hatch light" d={ink.tab.tone} />
 								<path class="ink" d={ink.tab.ink} />
 							</g>
-						</>
+						</g>
 					}
 					<g transform={view.browser.at}>
 						<path class="edge" d={ink.browser.edge} />
@@ -204,9 +204,9 @@ function Book() @{
 							</g>
 						}
 						@for (const card of view.cards; key card.key) {
-							<>
+							<g>
 								@for (const tab of card.tabs; key tab.key) {
-									<>
+									<g>
 									<g class={'piece' + (card.kept ? ' kept' : '')} transform={tab.vee.start} data-keys={tab.vee.keys} style={'opacity:' + tab.vee.fade0}>
 											<path class="sheet shade" d={ink.tab.vee} />
 											<path class="hatch" d={ink.tab.veeHatch} />
@@ -217,7 +217,7 @@ function Book() @{
 											<path class="hatch light" d={ink.tab.tone} />
 											<path class="ink" d={ink.tab.ink} />
 										</g>
-								</>
+								</g>
 								}
 								<g class={'piece' + (card.kept ? ' kept' : '')} transform={card.face.start} data-keys={card.face.keys}>
 									<g class={ink.cards[card.i]!.once ? 'win leftover' : 'win'} style={show4(SHOW.paper)}>
@@ -236,7 +236,7 @@ function Book() @{
 										</g>
 									</g>
 								</g>
-							</>
+							</g>
 						}
 						@for (const mark of ink.marks; key mark.key) {
 							<g class="piece kept" transform={view.cards[mark.i]!.face.start} data-keys={view.cards[mark.i]!.face.keys}>
@@ -252,18 +252,18 @@ function Book() @{
 					</g>
 
 					@for (const thread of view.threads; key thread.d) {
-						<>
+						<g>
 							<path class="thread win" style={show4(SHOW.threads)} d={thread.d} />
 							<path class="string win" style={show4(SHOW.red)} d={thread.d} />
-						</>
+						</g>
 					}
 					<g class="win" style={show4([1.3, 1.9, 4.1, 4.35])}>
 						@for (const pin of view.pins; key pin.key) {
-							<>
+							<g>
 								<path class="pin-head" d={pin.head} />
 								<path class="ink" d={pin.ink} />
 								<path class="glint" d={pin.glint} />
-							</>
+							</g>
 						}
 					</g>
 					<g class="map win" style={show4(SHOW.strings)}>
@@ -274,11 +274,11 @@ function Book() @{
 							<path class="string" d={s.d} />
 						}
 						@for (const pin of view.knots; key pin.key) {
-							<>
+							<g>
 								<path class="pin-head" d={pin.head} />
 								<path class="ink" d={pin.ink} />
 								<path class="glint" d={pin.glint} />
-							</>
+							</g>
 						}
 					</g>
 					<path class="pulse" d={view.pulse.d} style={'--l:' + view.pulse.length} />

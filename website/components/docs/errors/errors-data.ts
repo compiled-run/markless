@@ -4850,6 +4850,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must render an element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY: Each row of this @for over <itemName> is one <branchLabel> (<testSource>) with no <value>, so a row whose test fails renders nothing. After the page loads, the browser finds a list’s rows as one element each, so this list would show the rows the server sent and never update.',
+			'The browser adds, moves and removes a list’s rows by counting the parent’s child elements, one element per row. A row that renders nothing has no element to count, so the browser cannot tell which rows are which.',
+			'Filter the list before the @for instead: `<filter>` and `@for (const <itemName> of shown; ...)`. Or give the @if an @else that renders one element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -4883,6 +4905,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f1',
 				file: 'packages/bundler/src/prop-flow.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must be one element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: Each row of this @for over <itemName> renders <rowShape>. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.',
+			'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+			'Wrap each row in one element, such as `<span>...</span>`, so every row of <itemName> is a single element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
 			},
 		],
 		moreSources: 0,

@@ -1,4 +1,10 @@
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import {
+	isStaticTextNode,
+	literalContainerText,
+	markupInterpolationExpression,
+	staticTextValue,
+} from '../../ast/tsrx.ts';
 import { expressionSource } from '../../ast/source.ts';
 import type {
 	CompilerDiagnostic,
@@ -17,9 +23,15 @@ import {
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
 import { staticTemplateReadDiagnostic } from '../state-lowering.ts';
-import { joinDeciders, propsDeciding, rowsDecidedBy } from '../../artifact-helpers/prop-deciders.ts';
 import {
+	joinDeciders,
+	propsDeciding,
+	rowsDecidedBy,
+} from '../../artifact-helpers/prop-deciders.ts';
+import {
+	keyedRepeatRowCanBeEmptyDiagnostic,
 	keyedRepeatRowMintUnsupportedDiagnostic,
+	keyedRepeatRowNotOneElementDiagnostic,
 	keyedRepeatRowsUnplacedDiagnostic,
 	rowBranchFlipUnsupportedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
@@ -60,8 +72,58 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			repeatRowsUnplaceable(input.semanticGraph.markup.chunks, repeat.id)
 		)
 			diagnostics.push(
-				keyedRepeatRowsUnplacedDiagnostic({ itemName: repeat.itemName, node, filename: input.filename }),
+				keyedRepeatRowsUnplacedDiagnostic({
+					itemName: repeat.itemName,
+					node,
+					filename: input.filename,
+				}),
 			);
+		// A list nothing can change never builds or moves a row; one decided by props is checked against every caller.
+		const shapeDecidedBy = rowsDecidedBy(repeat, input.semanticGraph);
+		const shapeChecked =
+			shapeDecidedBy === null
+				? {}
+				: {
+						severity: 'warning' as const,
+						decidedByProps: {
+							componentName: componentOf(input.semanticGraph, repeat.id),
+							props: shapeDecidedBy,
+						},
+					};
+		const rowNodes = asNodes((node.body as AnyNode | undefined)?.body);
+		const emptyBranch = shapeDecidedBy?.length === 0 ? null : rowBranchWithEmptyArm(rowNodes);
+		if (emptyBranch) {
+			diagnostics.push({
+				...keyedRepeatRowCanBeEmptyDiagnostic({
+					itemName: repeat.itemName,
+					collectionSource: repeat.collectionSource,
+					branchLabel: emptyBranch.type === 'JSXSwitchExpression' ? '@switch' : '@if',
+					testSource: expressionSource(
+						(emptyBranch.type === 'JSXSwitchExpression'
+							? emptyBranch.discriminant
+							: emptyBranch.test) as AnyNode,
+						input.source,
+					),
+					node,
+					filename: input.filename,
+				}),
+				...shapeChecked,
+			});
+			return;
+		}
+		const rowShape = shapeDecidedBy?.length === 0 ? null : rowShapeBesidesOneElement(rowNodes);
+		if (rowShape) {
+			diagnostics.push({
+				...keyedRepeatRowNotOneElementDiagnostic({
+					itemName: repeat.itemName,
+					rowShape,
+					node,
+					filename: input.filename,
+				}),
+				...shapeChecked,
+			});
+			return;
+		}
 		const refusal = rowMintRefusal({
 			chunks: input.semanticGraph.markup.chunks,
 			componentEdges: input.semanticGraph.componentEdges,
@@ -72,12 +134,16 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 				: {}),
 			...(input.recordHostIds ? { recordHostIds: input.recordHostIds } : {}),
 			...(input.liveHostIds ? { liveHostIds: input.liveHostIds } : {}),
-			...(input.unregistrableHostIds ? { unregistrableHostIds: input.unregistrableHostIds } : {}),
+			...(input.unregistrableHostIds
+				? { unregistrableHostIds: input.unregistrableHostIds }
+				: {}),
 			repeatId: repeat.id,
 			itemName: repeat.itemName,
 			graph: input.semanticGraph,
 			rowNames: new Set(
-				[repeat.itemName, repeat.indexName].filter((name): name is string => name !== undefined),
+				[repeat.itemName, repeat.indexName].filter(
+					(name): name is string => name !== undefined,
+				),
 			),
 		});
 		if (!refusal) return;
@@ -107,9 +173,14 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 		}
 		for (const slot of rowChunk?.slots ?? []) {
 			if (slot.kind !== 'branch') continue;
-			const site = input.semanticGraph.branchSites.find((candidate) => candidate.id === slot.branchSiteId);
+			const site = input.semanticGraph.branchSites.find(
+				(candidate) => candidate.id === slot.branchSiteId,
+			);
 			if (!site) continue;
-			const flippedBy = joinDeciders(deciding, testDecidedBy(site.testSource, repeat, input.semanticGraph));
+			const flippedBy = joinDeciders(
+				deciding,
+				testDecidedBy(site.testSource, repeat, input.semanticGraph),
+			);
 			if (flippedBy?.length === 0) continue;
 			diagnostics.push({
 				...rowBranchFlipUnsupportedDiagnostic({
@@ -121,7 +192,12 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 					filename: input.filename,
 				}),
 				...(flippedBy && rowChunk?.componentName
-					? { decidedByProps: { componentName: rowChunk.componentName, props: flippedBy } }
+					? {
+							decidedByProps: {
+								componentName: rowChunk.componentName,
+								props: flippedBy,
+							},
+						}
 					: {}),
 			});
 		}
@@ -138,7 +214,11 @@ function testDecidedBy(
 	graph: SemanticGraphArtifact,
 ): ReadonlyArray<string> | null {
 	const rowNames = new Set<string>();
-	for (let at: Repeat | undefined = repeat; at; at = graph.keyedRepeats.find((candidate) => candidate.id === at!.enclosingRepeatId)) {
+	for (
+		let at: Repeat | undefined = repeat;
+		at;
+		at = graph.keyedRepeats.find((candidate) => candidate.id === at!.enclosingRepeatId)
+	) {
 		rowNames.add(at.itemName);
 		if (at.indexName) rowNames.add(at.indexName);
 	}
@@ -159,6 +239,105 @@ function testDecidedBy(
 	return [...props];
 }
 
+// Mirrors how the markup collector counts a row's top-level nodes; null when the row is one element, or one @if or @switch whose every arm is.
+function rowShapeBesidesOneElement(nodes: ReadonlyArray<AnyNode>): string | null {
+	const top = topLevelNodes(nodes);
+	if (top.length === 1) {
+		const [only] = top;
+		if (only === 'text') return 'only text';
+		if (only === 'node' || !only) return null;
+		const label = only.type === 'JSXSwitchExpression' ? '@switch' : '@if';
+		for (const arm of branchArmNodes(only)) {
+			const shape = nodesShape(topLevelNodes(arm));
+			if (shape) return `one ${label} with an arm of ${shape}`;
+		}
+		return null;
+	}
+	return nodesShape(top);
+}
+
+function nodesShape(top: ReadonlyArray<'text' | 'node' | AnyNode>): string | null {
+	if (top.length === 1) return top[0] === 'text' ? 'only text' : null;
+	if (top.length < 2) return null;
+	const texts = top.filter((kind) => kind === 'text').length;
+	return texts > 0
+		? `${top.length} nodes side by side, ${texts} of them text`
+		: `${top.length} nodes side by side`;
+}
+
+function topLevelNodes(nodes: ReadonlyArray<AnyNode>): Array<'text' | 'node' | AnyNode> {
+	const top: Array<'text' | 'node' | AnyNode> = [];
+	const visit = (node: AnyNode | undefined): void => {
+		if (!node) return;
+		if (node.type === 'ExpressionStatement') {
+			const expression = node.expression as AnyNode | undefined;
+			if (expression?.type?.startsWith('JSX')) visit(expression);
+			return;
+		}
+		if (node.type === 'JSXCodeBlock') return visit(node.render as AnyNode | undefined);
+		if (node.type === 'Fragment' || node.type === 'JSXFragment') {
+			for (const child of asNodes(node.children)) visit(child);
+			return;
+		}
+		if (isStaticTextNode(node)) {
+			if (staticTextValue(node)) top.push('text');
+			return;
+		}
+		const literal = literalContainerText(node);
+		if (literal !== null) {
+			if (literal) top.push('text');
+			return;
+		}
+		if (node.type === 'JSXExpressionContainer') {
+			if ((node.expression as AnyNode | undefined)?.type !== 'JSXEmptyExpression')
+				top.push('text');
+			return;
+		}
+		if (markupInterpolationExpression(node)) {
+			top.push('text');
+			return;
+		}
+		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') top.push(node);
+		else if (node.type?.startsWith('JSX') || node.type === 'Element') top.push('node');
+	};
+	for (const node of nodes) visit(node);
+	return top;
+}
+
+// A row that is one @if with no @else, or one @switch with no default, renders no element when its test fails.
+function rowBranchWithEmptyArm(nodes: ReadonlyArray<AnyNode>): AnyNode | null {
+	const top = topLevelNodes(nodes);
+	const [only] = top;
+	if (top.length !== 1 || !only || typeof only === 'string') return null;
+	if (only.type === 'JSXSwitchExpression')
+		return asNodes(only.cases).some((switchCase) => !switchCase.test) ? null : only;
+	let branch: AnyNode | undefined = only;
+	while (branch?.type === 'JSXIfExpression') {
+		const alternate = branch.alternate as AnyNode | undefined;
+		if (!alternate) return only;
+		branch = alternate;
+	}
+	return null;
+}
+
+function branchArmNodes(node: AnyNode): AnyNode[][] {
+	if (node.type === 'JSXIfExpression')
+		return [node.consequent, node.alternate].flatMap((arm) => {
+			const candidate = arm as AnyNode | undefined;
+			if (!candidate) return [];
+			if (candidate.type === 'JSXIfExpression') return branchArmNodes(candidate);
+			return [candidate.type === 'BlockStatement' ? asNodes(candidate.body) : [candidate]];
+		});
+	return asNodes(node.cases).map((switchCase) => asNodes(switchCase.consequent));
+}
+
+function componentOf(graph: SemanticGraphArtifact, repeatId: string): string {
+	return (
+		graph.markup.chunks.find((chunk) => chunk.id === `repeat:${repeatId}:row`)?.componentName ??
+		''
+	);
+}
+
 // The same identity the markup collector paired chunks by, so the node this
 // reports on is the node whose row chunk was measured.
 function pairedRepeat(
@@ -174,7 +353,8 @@ function pairedRepeat(
 		(candidate) =>
 			!paired.has(candidate.id) &&
 			candidate.itemName === itemName &&
-			candidate.collectionSource === (collection ? expressionSource(collection, source) : '') &&
+			candidate.collectionSource ===
+				(collection ? expressionSource(collection, source) : '') &&
 			candidate.keySource === (key ? expressionSource(key, source) : ''),
 	);
 }
@@ -268,10 +448,7 @@ function rowMintRefusal(input: {
 }
 
 // A nested @for builds its own rows inside a minted row when it could build them anywhere.
-function nestedRepeatMints(
-	input: Parameters<typeof rowMintRefusal>[0],
-	repeatId: string,
-): boolean {
+function nestedRepeatMints(input: Parameters<typeof rowMintRefusal>[0], repeatId: string): boolean {
 	const nested = input.graph.keyedRepeats.find(
 		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === input.repeatId,
 	);
@@ -285,7 +462,9 @@ function nestedRepeatMints(
 			repeatId,
 			itemName: nested.itemName,
 			rowNames: new Set(
-				[nested.itemName, nested.indexName].filter((name): name is string => name !== undefined),
+				[nested.itemName, nested.indexName].filter(
+					(name): name is string => name !== undefined,
+				),
 			),
 		}) === null
 	);

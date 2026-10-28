@@ -51,7 +51,11 @@ export function Tree({ nodes }) @{
 async function buildPage(name: string, files: Readonly<Record<string, string>>) {
 	const directory = await mkdtemp(resolve(root, `.prop-decided-rows-${name}-`));
 	try {
-		for (const [file, source] of Object.entries({ 'chip.tsrx': chip, 'list.tsrx': list, ...files }))
+		for (const [file, source] of Object.entries({
+			'chip.tsrx': chip,
+			'list.tsrx': list,
+			...files,
+		}))
 			await writeFile(resolve(directory, file), source);
 		await viteBuild({
 			configFile: false,
@@ -168,5 +172,49 @@ export default function Page() @{
 		}),
 	).rejects.toThrow(
 		/MARKLESS_TEMPLATE_EXPRESSION_STATIC: .*tag\.tsrx: <Tag>: .*It holds only while the prop `item` never changes, and <Page> in .*page\.tsrx passes it `item`, which changes\./,
+	);
+});
+
+const runs = `
+export function Runs({ runs }) @{
+	<p>
+		@for (const run of runs; key run.id) {
+			@if (run.bold) { <b>{run.text}</b> } @else { <>{run.text}</> }
+		}
+	</p>
+}
+`;
+
+test('a list of rows that are not one element ships while callers pass it a fixed list, and fails when one passes state', async () => {
+	await expect(
+		buildPage('runs-fixed', {
+			'runs.tsrx': runs,
+			'page.tsrx': `
+import { Runs } from './runs.tsrx';
+
+export default function Page() @{
+	<Runs runs={[{ id: 1, bold: true, text: 'a' }, { id: 2, bold: false, text: 'b' }]} />
+}
+`,
+		}),
+	).resolves.toBeUndefined();
+	await expect(
+		buildPage('runs-changing', {
+			'runs.tsrx': runs,
+			'page.tsrx': `
+import { state } from '@markless/core';
+import { Runs } from './runs.tsrx';
+
+export default function Page() @{
+	let list = state([{ id: 1, bold: true, text: 'a' }]);
+	<main>
+		<button type="button" onClick={() => list.push({ id: 2, bold: false, text: 'b' })}>add</button>
+		<Runs runs={list} />
+	</main>
+}
+`,
+		}),
+	).rejects.toThrow(
+		/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: .*runs\.tsrx: <Runs>: .*passes it `list`, which changes\./,
 	);
 });

@@ -219,6 +219,64 @@ export function keyedRepeatRowsUnplacedDiagnostic(input: {
 	};
 }
 
+export function keyedRepeatRowNotOneElementDiagnostic(input: {
+	readonly itemName: string;
+	readonly rowShape: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		severity: 'error',
+		phase: PUBLIC_RENDER_PHASE,
+		title: 'Each row of this list must be one element',
+		message: `Each row of this @for over ${input.itemName} renders ${input.rowShape}. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.`,
+		why: 'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message: `Wrap each row in one element, such as \`<span>...</span>\`, so every row of ${input.itemName} is a single element.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+	};
+}
+
+export function keyedRepeatRowCanBeEmptyDiagnostic(input: {
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly branchLabel: string;
+	readonly testSource: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	const filter =
+		input.branchLabel === '@if'
+			? `const shown = computed(() => ${input.collectionSource}.filter((${input.itemName}) => ${input.testSource}));`
+			: undefined;
+	return {
+		code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		severity: 'error',
+		phase: PUBLIC_RENDER_PHASE,
+		title: 'Each row of this list must render an element',
+		message: `Each row of this @for over ${input.itemName} is one ${input.branchLabel} (${input.testSource}) with no ${input.branchLabel === '@if' ? '@else' : 'default case'}, so a row whose test fails renders nothing. After the page loads, the browser finds a list’s rows as one element each, so this list would show the rows the server sent and never update.`,
+		why: 'The browser adds, moves and removes a list’s rows by counting the parent’s child elements, one element per row. A row that renders nothing has no element to count, so the browser cannot tell which rows are which.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message: filter
+					? `Filter the list before the @for instead: \`${filter}\` and \`@for (const ${input.itemName} of shown; ...)\`. Or give the @if an @else that renders one element.`
+					: `Filter the list before the @for in a computed(), or give the @switch a default case that renders one element.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+	};
+}
+
 function refusalCause(
 	itemName: string,
 	refusal: KeyedRepeatRowMintRefusal,
