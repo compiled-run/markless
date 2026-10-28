@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { codePane, FIRST_TAB, findCodeBlocks, rewriteCodeBlocks } from './code-blocks.ts';
 
 const PAGE = '/site/pages/concepts/demo.mdx';
@@ -94,6 +94,9 @@ export default function Card() @{
 \`\`\`
 </Code>
 `;
+
+// The first highlight stands up shiki and the quick-info TypeScript program, seconds on a cold runner.
+beforeAll(() => codePane({ name: 'Warm.tsrx', code: 'export default function Warm() {}' }), 60_000);
 
 describe('several .tsrx files in one block', () => {
 	it('runs the first .tsrx fence when no entry is named', () => {
