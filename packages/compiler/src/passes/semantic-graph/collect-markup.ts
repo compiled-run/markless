@@ -1,3 +1,4 @@
+import { PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES } from '@markless/serializer';
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -523,7 +524,9 @@ function emitNode(
 			}
 			continue;
 		}
-		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		const authoredName = getIdentifierName(attribute.name as AnyNode | undefined);
+		const name =
+			(authoredName && PROTOCOL_REFLECTED_PROPERTY_ATTRIBUTES[authoredName]) ?? authoredName;
 		// overlay lowers to one normalized valueless attribute, never to whatever
 		// staticAttributeValue would have made of the authored spelling: bare and
 		// `={true}` both write ` overlay=""`, `={false}` writes nothing, and a
@@ -1090,7 +1093,8 @@ function expressionResidue(
 	);
 	if (residue.kind !== 'authored-expression' || residue.source !== source) return residue;
 	// No computed stands behind it, so the render writes the object's CSS text itself.
-	const styleSource = attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
+	const styleSource =
+		attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
 	if (styleSource !== null) return { kind: 'authored-expression', source: styleSource };
 	const inlined = context.nestedLocalSource?.(expression);
 	return inlined ? { kind: 'authored-expression', source: inlined } : residue;
