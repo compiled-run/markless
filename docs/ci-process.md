@@ -169,6 +169,12 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
 
+### Merge queue timeout
+
+The queue drops a group whose required checks have not reported within `check_response_timeout_minutes` (set in the `main` ruleset, not in this repository). It was 90. On 2026-10-28, with the org's 60 runners shared with markless-migrate's pull request CI, merge groups took about 145 minutes, roughly 10 of them running jobs and the rest waiting for runners. So the queue dropped groups that went on to pass: #328 was removed at 09:47Z with `checks_timed_out` while its group run 40655720022 finished green at 10:32Z, and #336 and #310 were dropped the same way. Every drop rebuilt the groups behind it, so nothing merged. The timeout is now 240 minutes. Lower it once the shorter merge gate (#337) and lane reuse (#350) have landed and a week of group times is measured, to about twice the slowest of those groups.
+
+Jumping the queue (`jump: true`) is ignored even for an admin token unless that actor is a ruleset bypass actor; that setting is unchanged.
+
 ### The Actions cache is a budget
 
 Restoring a cache counts against the repository's cache egress limit. On 2026-10-23 it ran out: restores failed with `Egress is over the account limit`, and pnpm restores in unrelated jobs stalled until the job was cancelled. Most of the traffic was restores, not saves:
