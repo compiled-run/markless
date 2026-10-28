@@ -7,6 +7,7 @@ export { DEBUGGING_PLAYBOOK_HINT } from './debugging-playbook.ts';
 export { compileTsrxModule } from './compile-module.ts';
 export {
 	clearCompileCache,
+	setCompileCacheLimit,
 	useCompileRunner,
 	usePersistentCompileStore,
 	type CompileRunner,
