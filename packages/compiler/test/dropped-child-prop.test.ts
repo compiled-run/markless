@@ -129,7 +129,8 @@ test('a negation over an opaque call is still refused loudly, not dropped', asyn
 
 // The negation of a prop is settled by the render that read it, so it owes no
 // computed - the same rule the binary shapes already follow.
-test('a negated prop alone stays opaque and mints no computed', async () => {
+// Panel's own parent may pass state as `flat`, so `!flat` moves with it.
+test('a negated prop alone lifts to a computed the child follows', async () => {
 	const results = await compileTsrxModulesWithInterfaces([
 		{ filename: 'src/child.tsrx', source: CHILD, importSource: './child.tsrx' },
 		{
@@ -145,8 +146,10 @@ export function Panel({ flat, children }: { flat?: boolean; children?: unknown }
 	]);
 	const parent = results[results.length - 1]!;
 
-	expect(edgeProp(parent, 'tall')?.kind).toBe('opaque');
-	expect(mintedComputeds(parent)).toEqual([]);
+	expect(edgeProp(parent, 'tall')?.kind).toBe('graph-reference');
+	expect(mintedComputeds(parent).map((binding) => binding.functionSource)).toEqual([
+		'() => !flat',
+	]);
 	expect(propExpressionDiagnostics(parent)).toEqual([]);
 });
 

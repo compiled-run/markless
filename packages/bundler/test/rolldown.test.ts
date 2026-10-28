@@ -2011,12 +2011,18 @@ export function App() @{
 			expect(rendered.html).toContain('data-capture-literal="true"');
 			expect(rendered.html).toContain('>Server spruce</button>');
 			expect(rendered.html).toContain('>Server copper</button>');
-			expect(rendered.view.domUpdates).toEqual([
+			expect(rendered.view.domUpdates).toContainEqual(
 				expect.objectContaining({
 					hostNodeId: 'c0:h0',
 					graphNodeId: 'state:graphLabel',
 				}),
-			]);
+			);
+			// The marker attributes read props alone; a parent passing state would move them.
+			expect(
+				rendered.view.domUpdates
+					.filter((update) => update.graphNodeId !== 'state:graphLabel')
+					.every((update) => update.graphNodeId.includes('computed:templateExpression:')),
+			).toBe(true);
 		} finally {
 			await rm(ssrOutputDirectory, { recursive: true, force: true });
 		}

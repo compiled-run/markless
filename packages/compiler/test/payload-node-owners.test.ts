@@ -174,8 +174,17 @@ export function Entry({ name, locked }) @{
 		protocolState: compiled.protocolState,
 		protocolView: compiled.protocolView,
 	};
+	// Box's own `{on ? 'on' : 'off'}` mints one too; only the two edge expressions are Entry's.
+	const edgeIds = new Set(
+		compiled.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.id.startsWith('computed:templateExpression:') &&
+			binding.functionSource?.includes('held.')
+				? [binding.id]
+				: [],
+		),
+	);
 	const edgeComputed = input.protocolState.computed.flatMap((computed, index) =>
-		computed.graphNodeId.startsWith('computed:templateExpression:') ? [index] : [],
+		edgeIds.has(computed.graphNodeId) ? [index] : [],
 	);
 	expect(edgeComputed.length).toBe(2);
 	expect(componentOwnedStateNodes(input, 'Entry', 'Group').computedIndexes).toEqual(edgeComputed);
