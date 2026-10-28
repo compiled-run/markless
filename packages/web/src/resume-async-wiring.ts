@@ -309,14 +309,14 @@ export async function settleAsyncBoundaryRange(
 			...rendered,
 			html: rendered.html,
 			arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
-			armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords, input.graph) ?? armRecords),
+			armRecords: (composedArmRecordQualifier()?.(boundary, armRecords, input.graph) ?? armRecords),
 		});
 		input.settleTracker?.markSettled(boundary.id);
 		return;
 	}
 	const symbol = await input.loadSymbol(source.symbolId);
 	const update = await symbol({
-		graph: input.graph,
+		graph: composedArmRecordQualifier()?.graph?.(input.graph, boundary) ?? input.graph,
 		status,
 		element: input.root,
 		getElementHandle: input.elementHandles.get,
@@ -341,7 +341,7 @@ export async function settleAsyncBoundaryRange(
 				...(cells && { cells }),
 				html: update.html,
 				arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
-				armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords, input.graph) ?? armRecords),
+				armRecords: (composedArmRecordQualifier()?.(boundary, armRecords, input.graph) ?? armRecords),
 			});
 			input.settleTracker?.markSettled(boundary.id);
 			return;

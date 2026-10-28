@@ -1910,6 +1910,14 @@
 		{
 			"date": "2026-10-27",
 			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 18241,
+			"to": 20104,
+			"reason": "a composed child's @try settle routes its live props to the caller's nodes, so rows and attributes in a settled arm follow the parent; loads only on pages with component edges and runs on a settle"
+		},
+		{
+			"date": "2026-10-27",
+			"guard": "runtime",
 			"subject": "web/resume-async-wiring",
 			"from": 9728,
 			"to": 9858,
@@ -1970,7 +1978,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 18241,
+		"web/fns/instance-scope": 20104,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,

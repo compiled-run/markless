@@ -16,7 +16,7 @@ export function Results({ query }: { query: string }) @{
 			style={results.q !== query || results.attempt !== attempt ? 'opacity: 0.5' : 'opacity: 1'}
 		>
 			@for (const item of results.items; key item.id) {
-				<li>{item.name}</li>
+				<li data-match={item.name.startsWith(query) ? 'yes' : 'no'}>{item.name}</li>
 			}
 		</ul>
 	} @pending {
