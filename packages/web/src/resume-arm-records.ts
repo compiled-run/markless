@@ -232,10 +232,17 @@ function materializeArmBranchRecords(
 	// instance-prefixed id, so the anchor text is the exact page-wide address.
 	const composed = (record: ResumeArmBranchRecord) =>
 		planned(record.startAnchor)?.strategy === 'dom-order-comment';
-	const census = records.some(
+	const counted = records.filter(
 		(record) => !composed(record) && planned(record.startAnchor)?.index !== undefined,
-	)
-		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
+	);
+	// Only the planned branches' own anchors count: a row's @if repeats its anchors once per row.
+	const census = counted.length
+		? armBranchCommentCensus(
+				input.root,
+				input.startAnchor,
+				input.endAnchor,
+				counted.map((record) => record.id),
+			)
 		: [];
 	let pageComments: ReadonlyArray<ResumeDomComment> | undefined;
 	const anchorNamed = (text: string): ResumeDomComment | undefined => {
@@ -267,7 +274,13 @@ function armBranchCommentCensus(
 	root: ResumeDomElement,
 	startAnchor: ResumeDomComment,
 	endAnchor: ResumeDomComment | undefined,
+	// An arm the browser renders writes the site's own id; a served one, its instance-prefixed id.
+	ids: ReadonlyArray<string>,
 ): ReadonlyArray<ResumeDomComment> {
+	const planned = (comment: ResumeDomComment) => {
+		const id = commentText(comment).replace(/^\/?markless:arm-branch:/, '');
+		return ids.some((each) => each === id || each.endsWith(`:${id}`));
+	};
 	const census: ResumeDomComment[] = [];
 	let within = false;
 	let done = false;
@@ -282,6 +295,7 @@ function armBranchCommentCensus(
 			return;
 		}
 		if (within && node.nodeType === 8 && isArmBranchAnchorComment(node as ResumeDomComment)) {
+			if (!planned(node as ResumeDomComment)) return;
 			census.push(node as ResumeDomComment);
 		}
 		for (const child of node.childNodes ?? []) visit(child);
