@@ -40,8 +40,8 @@ const checkouts = (job: Job) =>
 
 describe('ecosystem-ci.yml', () => {
 	test('starts on a maintainer comment or a dispatch, in this repository only', () => {
-		expect(Object.keys(workflow.on)).toEqual(['push', 'issue_comment', 'workflow_dispatch']);
-		expect(workflow.on.push).toEqual({ branches: ['main'] });
+		expect(Object.keys(workflow.on)).toEqual(['schedule', 'issue_comment', 'workflow_dispatch']);
+		expect(workflow.on.schedule).toEqual([{ cron: '7 */3 * * *' }]);
 		expect(plan.if).toContain("github.repository == 'compiled-run/markless'");
 		expect(plan.if).toContain('github.event.issue.pull_request');
 		expect(plan.if).toContain("startsWith(github.event.comment.body, '/ecosystem-ci run ')");
@@ -73,18 +73,21 @@ describe('ecosystem-ci.yml', () => {
 		).toBe(true);
 	});
 
-	test('a push, which names no suites, passes the suite-name check', () => {
+	test('a scheduled run, which names no suites, passes the suite-name check, and skips a main it already checked', () => {
 		const resolve = plan.steps.find((step) =>
 			step.run?.includes('ecosystem-ci.ts list --matrix'),
 		)!;
 		// grep exits 1 on empty input, which turned every push run red in its first step.
 		expect(resolve.run).toContain('if [[ ! "$requested" =~ ^[a-z0-9\\ -]*$ ]]; then');
 		expect(resolve.run).not.toContain('grep -Eq');
+		expect(resolve.run).toContain('if [ "$last" = "$GITHUB_SHA" ]; then');
+		expect(build.if).toBe("needs.plan.outputs.skip != 'true'");
+		expect(report.if).toContain("needs.plan.outputs.skip != 'true'");
 	});
 
-	test('every push to main gets a complete run of its own', () => {
+	test('every scheduled main commit gets a complete run of its own', () => {
 		expect(workflow.concurrency.group).toContain(
-			"github.event_name == 'push' && format('main-{0}', github.sha)",
+			"github.event_name == 'schedule' && format('main-{0}', github.sha)",
 		);
 		expect(workflow.concurrency['cancel-in-progress']).toBe(false);
 	});
@@ -132,7 +135,7 @@ describe('ecosystem-ci.yml', () => {
 			"format('Ecosystem CI on {0}{1}', inputs.ref, inputs.gate != '' && format(' ({0} gate)', inputs.gate) || '')",
 		);
 		expect(report.needs).toEqual(['plan', 'build', 'suites']);
-		expect(report.if).toBe("always() && needs.plan.result == 'success'");
+		expect(report.if).toBe("always() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true'");
 		expect(report.steps.at(-1)!.run).toContain('exit 1');
 	});
 });

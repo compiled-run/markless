@@ -4,7 +4,8 @@
 # and the release cut does not wait for it. It notifies instead (see the report job).
 #
 # Four ways in, none of which needs a stored secret:
-#   - every push to main (a newer push cancels the run of an older one);
+#   - main every three hours, when it moved since the last scheduled run (a run per push took 7,600 runner-minutes on
+#     2026-10-26 while pull requests queued; a regression still names every pull request merged in the range);
 #   - a maintainer comments `/ecosystem-ci run` (optionally followed by suite names) on a pull request;
 #   - a dispatch: gh workflow run ecosystem-ci.yml -f ref=<commit> [-f pr=<number>] [-f suites='a b'];
 #   - the release cut dispatches it on the release commit (release.yml), and the GitHub Release links the result.
@@ -17,12 +18,12 @@ name: Ecosystem CI
 run-name: >-
     ${{ github.event_name == 'workflow_dispatch'
     && format('Ecosystem CI on {0}{1}', inputs.ref, inputs.gate != '' && format(' ({0} gate)', inputs.gate) || '')
-    || github.event_name == 'push' && format('Ecosystem CI on main {0}', github.sha)
+    || github.event_name == 'schedule' && format('Ecosystem CI on main {0}', github.sha)
     || format('Ecosystem CI on pull request {0}', github.event.issue.number) }}
 
 on:
-    push:
-        branches: [main]
+    schedule:
+        - cron: '7 */3 * * *'
     issue_comment:
         types: [created]
     workflow_dispatch:
@@ -63,7 +64,7 @@ on:
 
 # One complete run per main commit; see the same block in ci.yml.
 concurrency:
-    group: ecosystem-ci-${{ github.event_name == 'push' && format('main-{0}', github.sha) || github.event.issue.number || inputs.pr || inputs.ref }}
+    group: ecosystem-ci-${{ github.event_name == 'schedule' && format('main-{0}', github.sha) || github.event.issue.number || inputs.pr || inputs.ref }}
     cancel-in-progress: false
 
 permissions: {}
@@ -75,7 +76,7 @@ jobs:
     plan:
         if: >-
             github.repository == 'compiled-run/markless' &&
-            (github.event_name == 'workflow_dispatch' || github.event_name == 'push' ||
+            (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' ||
             (github.event.issue.pull_request &&
             (github.event.comment.body == '/ecosystem-ci run' || startsWith(github.event.comment.body, '/ecosystem-ci run ')) &&
             contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)))
@@ -85,12 +86,15 @@ jobs:
             contents: read
             # React to the comment and say the run started.
             pull-requests: write
+            # Reads the last scheduled run's commit.
+            actions: read
         outputs:
             sha: ${{ steps.plan.outputs.sha }}
             pr: ${{ steps.plan.outputs.pr }}
             jobs: ${{ steps.plan.outputs.jobs }}
             suites: ${{ steps.plan.outputs.suites }}
             lane: ${{ steps.plan.outputs.lane }}
+            skip: ${{ steps.plan.outputs.skip }}
         steps:
             - uses: actions/checkout@v4
               with:
@@ -116,7 +120,13 @@ jobs:
                   INPUT_LANE: ${{ inputs.lane }}
               run: |
                   set -euo pipefail
-                  if [ "$EVENT" = push ]; then
+                  if [ "$EVENT" = schedule ]; then
+                    last="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ecosystem-ci.yml/runs?event=schedule&status=completed&per_page=1" --jq '.workflow_runs[0].head_sha // empty' || true)"
+                    if [ "$last" = "$GITHUB_SHA" ]; then
+                      echo "main has not moved since the last scheduled run checked ${GITHUB_SHA}"
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      exit 0
+                    fi
                     pr=''
                     sha="$GITHUB_SHA"
                     requested=''
@@ -147,6 +157,7 @@ jobs:
 
     build:
         needs: plan
+        if: needs.plan.outputs.skip != 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 20
         permissions:
@@ -233,7 +244,7 @@ jobs:
 
     report:
         needs: [plan, build, suites]
-        if: always() && needs.plan.result == 'success'
+        if: always() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 10
         permissions:
@@ -295,10 +306,10 @@ jobs:
                   gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state="$state" -f context=ecosystem-ci -f description="$text" -f target_url="$RUN_URL" >/dev/null
 
             - name: Notify on main and release runs
-              if: github.event_name == 'push' || inputs.gate == 'release' || inputs.notify
+              if: github.event_name == 'schedule' || inputs.gate == 'release' || inputs.notify
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-                  CONTEXT: ${{ github.event_name == 'push' && 'main' || inputs.gate == 'release' && 'the release commit' || inputs.ref }}
+                  CONTEXT: ${{ github.event_name == 'schedule' && 'main' || inputs.gate == 'release' && 'the release commit' || inputs.ref }}
                   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
               run: node ecosystem-ci/scripts/notify.ts --summary summary.json --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL" --context "$CONTEXT" --mention thejackshelton --label ecosystem-ci
 
