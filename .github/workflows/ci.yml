@@ -433,12 +433,11 @@ jobs:
                   echo "build-scale=${{ steps.build_scale.outputs.cache-hit != 'true' }}"
                   echo "build-warnings=${{ steps.build_warnings.outputs.cache-hit != 'true' }}"
 
-    # One browser download for the whole run: the unit, browser and box lanes
-    # restore this cache instead of each fetching its own copy, which is what
-    # used to hang a runner for 28 minutes. Keyed by the lockfile, so the pinned
-    # Playwright version is part of the key. WebKit rides along for the node
-    # tests that drive both engines. The browsers sit beside the checkout, not
-    # in it, so a lint of the tree never sees them.
+    # Fills the browser and system-package caches the unit, browser and box lanes restore. Keyed by the
+    # lockfile, so the pinned Playwright version is part of the key; WebKit rides along for the node tests
+    # that drive both engines; the browsers sit beside the checkout, so a lint of the tree never sees them.
+    # No lane needs this job: waiting on it cost a merge group a second runner queue (12 minutes on
+    # 2026-10-27), and only a Playwright bump misses the cache, when each lane installs its own copy.
     prepare-playwright:
         needs: lanes
         if: needs.lanes.outputs.run_playwright == 'true'
@@ -554,7 +553,7 @@ jobs:
     # Node vitest project, split by test file across three runners (~200 files).
     # Its fixture tests launch Chromium and WebKit, so it restores the prepared browser cache.
     unit:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_unit == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 20
@@ -600,10 +599,12 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-apt-${{ runner.os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
+              if: steps.apt-cache.outputs.cache-matched-key != ''
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
@@ -621,7 +622,7 @@ jobs:
     # @markless/ui runs 670 s of files serially, 125 s of it in one conformance file; on one shard it
     # made that shard a 15-minute run while the other took under 3.
     browser:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_browser == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 25
@@ -655,9 +656,7 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
-            # prepare-playwright already downloaded Chromium into this key. The
-            # system libraries it needs are per-runner, so install-deps still
-            # runs here; the browser itself only downloads if the cache missed.
+            # The system libraries are per-runner, so install-deps always runs; the browser only downloads if the cache missed.
             - name: Restore the Playwright browser cache
               id: playwright-cache
               uses: actions/cache/restore@v4
@@ -670,10 +669,12 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-apt-${{ runner.os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
+              if: steps.apt-cache.outputs.cache-matched-key != ''
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
@@ -746,7 +747,7 @@ jobs:
     # writes are the only copy of that evidence, so they leave as an artifact for
     # the `receipts` job to validate.
     boxes-bundler:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_bundler == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 25
@@ -788,10 +789,12 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-apt-${{ runner.os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
+              if: steps.apt-cache.outputs.cache-matched-key != ''
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
@@ -1055,7 +1058,7 @@ jobs:
     # and components, so copy and markup edits that strand them fail here. About
     # 30 seconds of boxes. Not part of the receipt set: they write no analyzer receipts.
     website-boxes:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_website_boxes == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 20
@@ -1097,10 +1100,12 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-apt-${{ runner.os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
+              if: steps.apt-cache.outputs.cache-matched-key != ''
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
@@ -1136,7 +1141,7 @@ jobs:
     # runner gives the same answer. The full set runs on every PR in parallel
     # with the box lanes; docs/ci-process.md has the measured cost.
     perf-guards:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_perf_guards == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 30
@@ -1178,10 +1183,12 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-apt-${{ runner.os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
+              if: steps.apt-cache.outputs.cache-matched-key != ''
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
@@ -1208,7 +1215,7 @@ jobs:
     # half of demos/executed-at-load. The box receipts are not part of the
     # analyzer receipt set, so this lane is not a `boxes-*` lane.
     demo-boxes:
-        needs: [typecheck, lanes, prepare-playwright]
+        needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_demo_boxes == 'true'
         runs-on: ubuntu-latest
         timeout-minutes: 20
@@ -1250,10 +1257,12 @@ jobs:
               uses: actions/cache/restore@v4
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
+                  restore-keys: |
+                      playwright-apt-${{ runner.os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
-              if: steps.apt-cache.outputs.cache-hit == 'true'
+              if: steps.apt-cache.outputs.cache-matched-key != ''
               run: sudo cp ${{ github.workspace }}-playwright-apt/*.deb /var/cache/apt/archives/
 
             - name: Install Playwright system dependencies
@@ -1292,168 +1301,6 @@ jobs:
     # serial job. Every receipt records `git rev-parse HEAD` and a source-file
     # hash, and all lanes check out the same run SHA, so receipts written
     # elsewhere still match here.
-    # A skipped box lane still has to contribute its receipts, so every box lane
-    # saves them into the cache entry under its own key. This job downloads the
-    # artifact from a lane that ran and restores that cache for a lane that was
-    # skipped, which is only possible because a skip means the key already hit.
-    # `always()` is required: a skipped dependency would otherwise skip this job.
-    receipts:
-        needs: [lanes, boxes-bundler, boxes-router, boxes-music-player, boxes-music-player-ssr]
-        if: always() && needs.lanes.outputs.run_receipts == 'true'
-        runs-on: ubuntu-latest
-        timeout-minutes: 20
-        env:
-            NPM_CONFIG_AUDIT: 'false'
-            NPM_CONFIG_FUND: 'false'
-            NPM_CONFIG_PREFER_OFFLINE: 'true'
-            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
-            PUPPETEER_SKIP_DOWNLOAD: '1'
-            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
-
-        steps:
-            # `always()` above also lets this job start after a failed box lane,
-            # so refuse to validate a receipt set built on a red lane.
-            - name: Verify prerequisites
-              if: |
-                  !(
-                    needs.lanes.result == 'success' &&
-                    (needs['boxes-bundler'].result == 'success' || needs['boxes-bundler'].result == 'skipped') &&
-                    (needs['boxes-router'].result == 'success' || needs['boxes-router'].result == 'skipped') &&
-                    (needs['boxes-music-player'].result == 'success' || needs['boxes-music-player'].result == 'skipped') &&
-                    (needs['boxes-music-player-ssr'].result == 'success' || needs['boxes-music-player-ssr'].result == 'skipped')
-                  )
-              run: exit 1
-
-            - uses: actions/checkout@v4
-              with:
-                  persist-credentials: false
-
-            - uses: pnpm/action-setup@v4
-              with:
-                  version: 10.33.2
-
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: 24
-                  cache: pnpm
-
-            - name: Install Markless dependencies
-              run: pnpm install --frozen-lockfile
-
-            # One download per artifact with an explicit destination: a merged
-            # download would flatten each artifact to its own root and lose the
-            # package prefix the manifest checks. A lane that skipped uploaded
-            # nothing this run, so its receipts come back out of the cache entry
-            # its last green run saved under the same key.
-            - name: Download bundler analyzer receipts
-              if: needs.lanes.outputs.run_boxes_bundler == 'true'
-              uses: actions/download-artifact@v4
-              with:
-                  name: receipts-bundler
-                  path: packages/bundler/.witness/receipts
-
-            - name: Restore cached bundler analyzer receipts
-              if: needs.lanes.outputs.run_boxes_bundler != 'true'
-              uses: actions/cache/restore@v4
-              with:
-                  key: ${{ needs.lanes.outputs.key_boxes_bundler }}
-                  fail-on-cache-miss: true
-                  path: |
-                      boxes-bundler-completed.txt
-                      packages/bundler/.witness/receipts
-
-            - name: Download router analyzer receipts
-              if: needs.lanes.outputs.run_boxes_router == 'true'
-              uses: actions/download-artifact@v4
-              with:
-                  name: receipts-router
-                  path: packages/router/.witness/receipts
-
-            - name: Restore cached router analyzer receipts
-              if: needs.lanes.outputs.run_boxes_router != 'true'
-              uses: actions/cache/restore@v4
-              with:
-                  key: ${{ needs.lanes.outputs.key_boxes_router }}
-                  fail-on-cache-miss: true
-                  path: |
-                      boxes-router-completed.txt
-                      packages/router/.witness/receipts
-
-            - name: Download music-player analyzer receipts
-              if: needs.lanes.outputs.run_boxes_music_player == 'true'
-              uses: actions/download-artifact@v4
-              with:
-                  name: receipts-music-player
-                  path: demos/music-player/.witness/receipts
-
-            - name: Restore cached music-player analyzer receipts
-              if: needs.lanes.outputs.run_boxes_music_player != 'true'
-              uses: actions/cache/restore@v4
-              with:
-                  key: ${{ needs.lanes.outputs.key_boxes_music_player }}
-                  fail-on-cache-miss: true
-                  path: |
-                      boxes-music-player-completed.txt
-                      demos/music-player/.witness/receipts
-
-            - name: Download music-player-ssr analyzer receipts
-              if: needs.lanes.outputs.run_boxes_music_player_ssr == 'true'
-              uses: actions/download-artifact@v4
-              with:
-                  name: receipts-music-player-ssr
-                  path: demos/music-player-ssr/.witness/receipts
-
-            - name: Restore cached music-player-ssr analyzer receipts
-              if: needs.lanes.outputs.run_boxes_music_player_ssr != 'true'
-              uses: actions/cache/restore@v4
-              with:
-                  key: ${{ needs.lanes.outputs.key_boxes_music_player_ssr }}
-                  fail-on-cache-miss: true
-                  path: |
-                      boxes-music-player-ssr-completed.txt
-                      demos/music-player-ssr/.witness/receipts
-
-            - name: List the receipt folders the lane caches restored
-              run: |
-                  : > "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_bundler }}' = true ] || echo packages/bundler/ >> "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_router }}' = true ] || echo packages/router/ >> "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_music_player }}' = true ] || echo demos/music-player/ >> "$RUNNER_TEMP/lane-restored-receipts"
-                  [ '${{ needs.lanes.outputs.run_boxes_music_player_ssr }}' = true ] || echo demos/music-player-ssr/ >> "$RUNNER_TEMP/lane-restored-receipts"
-                  cat "$RUNNER_TEMP/lane-restored-receipts"
-
-            - name: Generate analyzer unit-contract receipts
-              run: pnpm receipts:generate
-
-            - name: Validate required analyzer consumer receipts
-              run: |
-                  if [ -f "$RUNNER_TEMP/lane-restored-receipts" ]; then export MARKLESS_LANE_RESTORED_RECEIPTS="$RUNNER_TEMP/lane-restored-receipts"; fi
-                  pnpm receipts:check
-
-            - name: Upload analyzer contract receipts
-              if: always()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: analyzer-contract-receipts
-                  path: |
-                      packages/*/.witness/receipts/*.json
-                      demos/*/.witness/receipts/*.json
-                  # .witness is a dot-directory; upload-artifact v4.4+ skips
-                  # hidden paths unless told otherwise (receipts:check reads
-                  # the same files and passes, so silence here means missed
-                  # evidence, not missing receipts).
-                  include-hidden-files: true
-                  if-no-files-found: error
-
-            - name: Mark the receipts lane complete
-              run: echo ok > receipts-completed.txt
-
-            - name: Save the receipts lane marker
-              uses: actions/cache/save@v4
-              with:
-                  key: ${{ needs.lanes.outputs.key_receipts }}
-                  path: receipts-completed.txt
-
     # Saves the green markers for the sharded lanes. A shard cannot save its own
     # marker: one green shard next to a red one would let the whole lane skip on
     # the next identical tree. This job only saves once the lane as a whole won.
@@ -1646,7 +1493,6 @@ jobs:
                 typecheck,
                 typecheck-ts7,
                 lanes,
-                prepare-playwright,
                 unit,
                 browser,
                 completion-matrix,
@@ -1654,7 +1500,6 @@ jobs:
                 boxes-router,
                 boxes-music-player,
                 boxes-music-player-ssr,
-                receipts,
                 website-boxes,
                 perf-guards,
                 demo-boxes,
@@ -1663,13 +1508,22 @@ jobs:
             ]
         if: always()
         runs-on: ubuntu-latest
-        timeout-minutes: 5
+        timeout-minutes: 20
+        env:
+            RUN_RECEIPTS: ${{ needs.lanes.outputs.run_receipts }}
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
         steps:
             # `skipped` means the lane's content hash already had a green marker.
-            # It cannot mean "an upstream job failed": typecheck, lanes and
-            # prepare-playwright are the only jobs that can skip a lane, and all
-            # three are in `needs`, so their failure lands here as `failure`.
+            # It cannot mean "an upstream job failed": typecheck and lanes are the
+            # only jobs that can skip a lane, and both are in `needs`, so their
+            # failure lands here as `failure`.
             - name: Fail unless every test lane succeeded or hit its content hash
+              id: gate
               run: |
                   results="${{ join(needs.*.result, ',') }}"
                   echo "lane results: $results"
@@ -1683,6 +1537,148 @@ jobs:
                       echo "::error::A test lane did not succeed: $results"
                       exit 1
                   fi
+
+            # The analyzer receipt set, once the step above found every lane green. As a job of its own it waited
+            # for a runner again after the box lanes (9 minutes on 2026-10-27). A skipped box lane's receipts come
+            # back out of the cache entry its last green run saved under the key whose hit skipped it.
+            - uses: actions/checkout@v4
+              if: env.RUN_RECEIPTS == 'true'
+              with:
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@v4
+              if: env.RUN_RECEIPTS == 'true'
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              if: env.RUN_RECEIPTS == 'true'
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              if: env.RUN_RECEIPTS == 'true'
+              run: pnpm install --frozen-lockfile
+
+            # One download per artifact with an explicit destination: a merged
+            # download would flatten each artifact to its own root and lose the
+            # package prefix the manifest checks. A lane that skipped uploaded
+            # nothing this run, so its receipts come back out of the cache entry
+            # its last green run saved under the same key.
+            - name: Download bundler analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_bundler == 'true'
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-bundler
+                  path: packages/bundler/.witness/receipts
+
+            - name: Restore cached bundler analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_bundler != 'true'
+              uses: actions/cache/restore@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_bundler }}
+                  fail-on-cache-miss: true
+                  path: |
+                      boxes-bundler-completed.txt
+                      packages/bundler/.witness/receipts
+
+            - name: Download router analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_router == 'true'
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-router
+                  path: packages/router/.witness/receipts
+
+            - name: Restore cached router analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_router != 'true'
+              uses: actions/cache/restore@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_router }}
+                  fail-on-cache-miss: true
+                  path: |
+                      boxes-router-completed.txt
+                      packages/router/.witness/receipts
+
+            - name: Download music-player analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player == 'true'
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-music-player
+                  path: demos/music-player/.witness/receipts
+
+            - name: Restore cached music-player analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player != 'true'
+              uses: actions/cache/restore@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_music_player }}
+                  fail-on-cache-miss: true
+                  path: |
+                      boxes-music-player-completed.txt
+                      demos/music-player/.witness/receipts
+
+            - name: Download music-player-ssr analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player_ssr == 'true'
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-music-player-ssr
+                  path: demos/music-player-ssr/.witness/receipts
+
+            - name: Restore cached music-player-ssr analyzer receipts
+              if: env.RUN_RECEIPTS == 'true' && needs.lanes.outputs.run_boxes_music_player_ssr != 'true'
+              uses: actions/cache/restore@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_boxes_music_player_ssr }}
+                  fail-on-cache-miss: true
+                  path: |
+                      boxes-music-player-ssr-completed.txt
+                      demos/music-player-ssr/.witness/receipts
+
+            - name: List the receipt folders the lane caches restored
+              if: env.RUN_RECEIPTS == 'true'
+              run: |
+                  : > "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_bundler }}' = true ] || echo packages/bundler/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_router }}' = true ] || echo packages/router/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_music_player }}' = true ] || echo demos/music-player/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  [ '${{ needs.lanes.outputs.run_boxes_music_player_ssr }}' = true ] || echo demos/music-player-ssr/ >> "$RUNNER_TEMP/lane-restored-receipts"
+                  cat "$RUNNER_TEMP/lane-restored-receipts"
+
+            - name: Generate analyzer unit-contract receipts
+              if: env.RUN_RECEIPTS == 'true'
+              run: pnpm receipts:generate
+
+            - name: Validate required analyzer consumer receipts
+              if: env.RUN_RECEIPTS == 'true'
+              run: |
+                  if [ -f "$RUNNER_TEMP/lane-restored-receipts" ]; then export MARKLESS_LANE_RESTORED_RECEIPTS="$RUNNER_TEMP/lane-restored-receipts"; fi
+                  pnpm receipts:check
+
+            - name: Upload analyzer contract receipts
+              if: steps.gate.outcome == 'success' && !cancelled() && env.RUN_RECEIPTS == 'true'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: analyzer-contract-receipts
+                  path: |
+                      packages/*/.witness/receipts/*.json
+                      demos/*/.witness/receipts/*.json
+                  # .witness is a dot-directory; upload-artifact v4.4+ skips
+                  # hidden paths unless told otherwise (receipts:check reads
+                  # the same files and passes, so silence here means missed
+                  # evidence, not missing receipts).
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+            - name: Mark the receipts lane complete
+              if: env.RUN_RECEIPTS == 'true'
+              run: echo ok > receipts-completed.txt
+
+            - name: Save the receipts lane marker
+              if: env.RUN_RECEIPTS == 'true'
+              uses: actions/cache/save@v4
+              with:
+                  key: ${{ needs.lanes.outputs.key_receipts }}
+                  path: receipts-completed.txt
 
     # Separate from `test` on purpose. The CLI workspace matrix needs npm, pnpm,
     # yarn (via corepack) and bun all on PATH and runs real installs, so it
