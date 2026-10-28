@@ -26,6 +26,28 @@ test('a same-pack namespace object is built on first read, once', () => {
 	expect(next).toContain('({ lazy_exports:lazy_exports$namespace() })');
 });
 
+test('a namespace re-exported inside another namespace is read through its own getter', () => {
+	const code =
+		'import { __exportAll } from "./runtime.js";\nvar a_exports = __exportAll({ kind: () => kind });\nvar kind = "a";\nvar index_exports = __exportAll({ A: () => a_exports });\nexport const load = () => Object.values(index_exports);';
+	const next = apply(code);
+	expect(next).toContain(
+		'function index_exports$namespace(){return index_exports$namespace.value||(index_exports$namespace.value=__exportAll({ A: () => a_exports$namespace() }))}',
+	);
+	expect(next).not.toMatch(/[^$\w]a_exports[^$]/);
+	const values = new Function(
+		'__exportAll',
+		`${next.replace(/^import .*\n/, '').replace('export const load', 'const load')}\nreturn load();`,
+	)((all: Record<string, () => unknown>) =>
+		Object.defineProperties(
+			{},
+			Object.fromEntries(
+				Object.entries(all).map(([key, get]) => [key, { get, enumerable: true }]),
+			),
+		),
+	);
+	expect(values.map((value: { kind: string }) => value.kind)).toEqual(['a']);
+});
+
 test('an exported, shadowed or reassigned namespace stays eager', () => {
 	for (const tail of [
 		'export { lazy_exports };',
