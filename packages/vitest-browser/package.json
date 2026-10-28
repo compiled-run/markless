@@ -1,6 +1,6 @@
 {
 	"name": "@markless/vitest-browser",
-	"version": "0.9.0",
+	"version": "0.10.0",
 	"description": "Vitest browser-mode provider for Markless components.",
 	"license": "MIT",
 	"repository": {
