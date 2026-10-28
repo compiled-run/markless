@@ -2365,11 +2365,6 @@ export type SymbolResolverModuleInput = {
 		// callback slot alone and leaves the child's own captures to the child.
 		readonly claimKind?: 'prop-bound' | 'widget-callback';
 		readonly captureSymbol?: ExtractedCaptureSymbol;
-		/**
-		 * The module a literal `import()` of this symbol names when something else
-		 * imports `chunk` statically: an `export *` entry, so no module is imported both ways.
-		 */
-		readonly lazyChunk?: string;
 	}>;
 	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;
 };
