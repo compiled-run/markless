@@ -1922,6 +1922,14 @@
 			"from": 28332,
 			"to": 29345,
 			"reason": "measured: an in-place navigation restyles the document once instead of three times (arriving sheets held at media=\"not all\" until the swap, transitions the swap starts cancelled before paint), 85+79+54 ms of style passes at 4x on the shadcn port down to one; +1013 B rendered, loaded on link intent, never at page load"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "runtime",
+			"subject": "runtime/graph",
+			"from": 10187,
+			"to": 10407,
+			"reason": "a write observer stands down while an update due in the same pass still loads its code, so one task's writes land together (edit-row demo)"
 		}
 	],
 	"runtimeModules": {
@@ -1938,7 +1946,7 @@
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
-		"runtime/graph": 10187,
+		"runtime/graph": 10407,
 		"runtime/graph-async": 4122,
 		"runtime/graph-collections": 4282,
 		"runtime/graph-computed": 2313,
