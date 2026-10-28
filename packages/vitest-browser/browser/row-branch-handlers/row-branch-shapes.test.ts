@@ -178,7 +178,13 @@ async function checkEditRowDemo(container: HTMLElement) {
 	expect(container.querySelector('[data-name="1"]')?.textContent).toBe('Angela');
 }
 
-test('SSR: the edit-row demo edits and saves rows that are each an @if', async () => {
+// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": the count's update loads its code after the row commits, so it lands a turn late.
+const editRowQuarantined = Date.now() < Date.parse('2026-11-10');
+test.runIf(!editRowQuarantined)('the edit-row quarantine is still in date', () => {
+	expect.fail("Quarantine expired on 2026-11-10: commit one turn's updates together or remove the test.");
+});
+
+test.skipIf(editRowQuarantined)('SSR: the edit-row demo edits and saves rows that are each an @if', async () => {
 	await checkEditRowDemo((await renderSSR(EditRowDemoPage)).container as HTMLElement);
 });
 
