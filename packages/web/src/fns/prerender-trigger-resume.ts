@@ -462,6 +462,9 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 			}
 			return result;
 		},
+		touch: (touch) => {
+			for (const segment of owners(touch.graphNodeId)) segment.graph.touch?.(touch);
+		},
 		delete: (deletion) => {
 			let deleted = false;
 			for (const segment of matching(deletion.graphNodeId))

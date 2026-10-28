@@ -31,6 +31,7 @@ import type {
 	SemanticStateWrite,
 	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
+	SemanticGraphInput,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
@@ -85,6 +86,7 @@ export type MutableSemanticGraphArtifact = {
 	markup: SemanticMarkupArtifact;
 	diagnostics: SemanticGraphDiagnostic[];
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
+	importedFunctionRequests?: string[];
 };
 
 /**
@@ -121,6 +123,7 @@ export type WalkState = {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly importedFunctionSummaries?: SemanticGraphInput['importedFunctionSummaries'];
 	/** Props the host provides only while rendering on the server, by component export. */
 	readonly serverOnlyProps: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
 	readonly hostIds: WeakMap<object, string>;
@@ -160,6 +163,8 @@ export type WalkState = {
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
+	// The identifier each state() binding was declared with; state bindings carry no source span.
+	stateDeclarations: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
 	// components, so a member tag can name the component every pass knows.
 	memberTagTargets: Map<string, string>;
@@ -260,7 +265,11 @@ export function createWalkState(input: {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
-	readonly serverOnlyProps?: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
+	readonly importedFunctionSummaries?: SemanticGraphInput['importedFunctionSummaries'];
+	readonly serverOnlyProps?: ReadonlyArray<{
+		readonly exportName: string;
+		readonly propName: string;
+	}>;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -275,6 +284,9 @@ export function createWalkState(input: {
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		importedModuleConstants: input.importedModuleConstants ?? {},
+		...(input.importedFunctionSummaries
+			? { importedFunctionSummaries: input.importedFunctionSummaries }
+			: {}),
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		hostIds: new WeakMap<object, string>(),
 		handledTemplateValues: new WeakSet<object>(),
@@ -299,6 +311,7 @@ export function createWalkState(input: {
 		pendingElementHandleIdrefs: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
+		stateDeclarations: new Map(),
 		memberTagTargets: new Map(),
 		styleConstResolver: null,
 		pendingComputedDependencies: [],

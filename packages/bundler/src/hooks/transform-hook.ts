@@ -3,6 +3,7 @@
 import { compileTsrxModuleLinkArtifact, overlayBarrelInterfaces } from '@markless/compiler';
 import type { TransformPluginContext } from 'rolldown';
 import { importedModuleConstants, missingConstantSources } from './module-constants.ts';
+import { importedFunctionSummaries, missingFunctionSummaries } from './module-functions.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	injectExecutionLogModuleHook,
@@ -237,6 +238,7 @@ async function runFirstPassTransform(
 			cached.importedInterfaceHashes === cachedLink.signature &&
 			cached.importedSymbolClaims === cachedLink.claimSignature &&
 			(await importedConstantsUnchanged(pluginContext, manifestSource, cached.input)) &&
+			(await importedFunctionsUnchanged(pluginContext, manifestSource, cached.input)) &&
 			childStyleModuleIds.join('\n') ===
 				[...cached.linkedStyleModuleIds].toSorted().join('\n')
 		) {
@@ -336,12 +338,42 @@ async function runFirstPassTransform(
 			};
 			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
 		}
+		const missingFunctions = missingFunctionSummaries(
+			linkedTransformResult.importedFunctionRequests,
+			linkedTransformInput.importedFunctionSummaries,
+		);
+		if (missingFunctions.length > 0) {
+			linkedTransformInput = {
+				...linkedTransformInput,
+				importedFunctionSummaries: {
+					...linkedTransformInput.importedFunctionSummaries,
+					...(await importedFunctionSummaries(
+						pluginContext,
+						manifestSource,
+						missingFunctions,
+					)),
+				},
+			};
+			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
+		}
 	}
 	return {
 		result: linkedTransformResult,
 		input: linkedTransformInput,
 		reused: reusedLinkedTransform,
 	};
+}
+
+// A helper module edited under an unchanged importer can change which of its calls are refused.
+async function importedFunctionsUnchanged(
+	pluginContext: TransformPluginContext,
+	importer: string,
+	input: TransformTsrxModuleInput,
+): Promise<boolean> {
+	const known = input.importedFunctionSummaries;
+	if (!known || Object.keys(known).length === 0) return true;
+	const current = await importedFunctionSummaries(pluginContext, importer, Object.keys(known));
+	return JSON.stringify(current) === JSON.stringify(known);
 }
 
 // A constant module edited under an unchanged importer changes what its props send.

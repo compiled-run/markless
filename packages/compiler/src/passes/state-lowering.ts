@@ -312,7 +312,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		}
 
 		writes.push({
-			source: write.target,
+			source: write.changedByCall?.callSource ?? write.target,
 			sourceSpan: write.targetSpan,
 			graphNodeId: resolved.binding.id,
 			path: resolved.path,
@@ -324,6 +324,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			method: write.method,
 			argumentSources: write.argumentSources,
 			...(write.objectAssign ? { objectAssign: true as const } : {}),
+			...(write.changedByCall ? { changedByCall: true as const } : {}),
 		});
 	}
 
@@ -386,7 +387,7 @@ function lowerWriteThrough(
 	return {
 		kind: 'write',
 		write: {
-			source: write.target,
+			source: write.changedByCall?.callSource ?? write.target,
 			sourceSpan: write.targetSpan,
 			graphNodeId: resolved.binding.id,
 			path: through.kind === 'path' ? [...resolved.path, ...through.path] : resolved.path,
@@ -398,6 +399,7 @@ function lowerWriteThrough(
 			method: write.method,
 			argumentSources: write.argumentSources,
 			...(write.objectAssign ? { objectAssign: true as const } : {}),
+			...(write.changedByCall ? { changedByCall: true as const } : {}),
 			through: {
 				local: through.local,
 				element: through.kind === 'element',
@@ -425,6 +427,7 @@ function untrackedLocalWriteDiagnostic(
 		'nested-element': `"${local}" holds an element of an element (\`${through.source}\`), and Markless finds only a direct element of a state array`,
 		reassigned: `"${local}" holds state but is assigned again later, so the write cannot tell which value it changes`,
 		conditional: `"${local}" holds state chosen by a condition (\`${through.source}\`), so the write cannot tell which state it changes`,
+		returned: `"${local}" holds what ${through.source}() returned after it was handed state, which may be that state itself`,
 		'row-item': `"${local}" holds the row item "${through.source}" of a keyed @for under another name, and a write through a row item lowers only under the row's own name`,
 		destructured: `"${local}" was destructured out of the state "${through.source}" inside a loop or callback, and Markless follows a write only through the element itself`,
 	};
@@ -437,6 +440,8 @@ function untrackedLocalWriteDiagnostic(
 			'Find the inner element directly from its own state array, or replace the outer element with a copy that holds the change.',
 		reassigned: `Declare "${local}" with const, or write through the state path directly.`,
 		conditional: 'Write through each state path in its own branch.',
+		returned:
+			'Write through the state path itself, or have the function return a new value and assign it to the state path.',
 		'row-item': `Write through the row item itself: \`${through.source}.field = value\`.`,
 		destructured: `Name the element and write through it, for example \`for (const item of ${through.source}) item.field = value;\`.`,
 	};
@@ -522,6 +527,7 @@ function lowerRowItemWrite(
 			method: write.method,
 			argumentSources: write.argumentSources,
 			...(write.objectAssign ? { objectAssign: true as const } : {}),
+			...(write.changedByCall ? { changedByCall: true as const } : {}),
 			row: {
 				itemName: repeat.itemName,
 				keyPath: repeat.indexKey ? null : repeat.keyPath,

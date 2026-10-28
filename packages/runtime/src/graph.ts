@@ -207,6 +207,12 @@ export type RuntimeGraphDelete = {
 	readonly path: ReadonlyArray<string>;
 };
 
+/** A path whose value changed in place, inside a function the compiler saw change it. */
+export type RuntimeGraphTouch = {
+	readonly graphNodeId: string;
+	readonly path?: ReadonlyArray<string>;
+};
+
 /** DOM work a subscription holds back until its whole pass has run, so it lands in one task with that pass's journal. */
 export type RuntimeGraphCommit = () => void | Promise<void>;
 
@@ -276,6 +282,7 @@ export type RuntimeGraph = {
 	readonly update: (update: RuntimeGraphUpdate) => unknown;
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
+	readonly touch?: (touch: RuntimeGraphTouch) => void;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
@@ -625,6 +632,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			}
 
 			return outcome.result;
+		},
+		touch(touch) {
+			markDirtyPath(touch.graphNodeId, touch.path ?? []);
 		},
 		defineAsyncComputed(asyncComputed) {
 			const id = asyncComputed.graphNodeId;

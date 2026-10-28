@@ -9,12 +9,13 @@ import {
 import type { SemanticWriteThrough } from '../../artifacts.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
+import { isPrimitiveExpression, isPrimitivePath } from './primitive-values.ts';
 import type { WalkState } from './types.ts';
 
 type Binding = ModuleSemantics['bindings'][number];
 
 /** What a local declared inside a handler, callback or attach body holds. */
-type LocalOrigin =
+export type LocalOrigin =
 	| { readonly kind: 'plain' }
 	| { readonly kind: 'path'; readonly target: string }
 	| {
@@ -217,7 +218,9 @@ function originOfBinding(binding: Binding, state: WalkState, seen: Set<number>):
 		}
 		if (!init) return { kind: 'plain' };
 		const origin = originOfExpression(init, state, seen);
-		if (origin.kind === 'plain') return storedStateOrigin(binding, state, seen);
+		if (origin.kind === 'plain') {
+			return isFreshContainer(init) ? storedStateOrigin(binding, state, seen) : origin;
+		}
 		if (origin.kind !== 'container' && isReassigned(binding)) {
 			return { kind: 'untracked', reason: 'reassigned', source: binding.name };
 		}
@@ -337,7 +340,7 @@ function storedStateOrigin(binding: Binding, state: WalkState, seen: Set<number>
 	return { kind: 'plain' };
 }
 
-function originSource(origin: Exclude<LocalOrigin, { readonly kind: 'plain' }>): string {
+export function originSource(origin: Exclude<LocalOrigin, { readonly kind: 'plain' }>): string {
 	if (origin.kind === 'path') return origin.target;
 	if (origin.kind === 'element') return origin.collection;
 	return origin.source;
@@ -380,6 +383,11 @@ function elementOrigin(
 		return { kind: 'untracked', reason: 'map-entry', source: collection.target };
 	}
 	return { kind: 'element', anchor: binding.name, collection: collection.target, itemPath: [] };
+}
+
+/** What an expression in a handler, callback or attach body evaluates to, as state goes. */
+export function stateOriginOf(node: AnyNode, state: WalkState): LocalOrigin {
+	return originOfExpression(node, state, new Set());
 }
 
 function originOfExpression(node: AnyNode, state: WalkState, seen: Set<number>): LocalOrigin {
@@ -435,9 +443,10 @@ function originOfExpression(node: AnyNode, state: WalkState, seen: Set<number>):
 					if (COPYING_METHODS.has(method))
 						return { kind: 'container', source: originSource(owner) };
 				}
+				if (owner.kind !== 'plain') return { kind: 'plain' };
 			}
 		}
-		return { kind: 'plain' };
+		return returnedOrigin(expression, callee, state, seen);
 	}
 
 	if (expression.type === 'ArrayExpression' || expression.type === 'ObjectExpression') {
@@ -474,6 +483,43 @@ function originOfExpression(node: AnyNode, state: WalkState, seen: Set<number>):
 		}
 	}
 
+	return { kind: 'plain' };
+}
+
+function isFreshContainer(node: AnyNode): boolean {
+	const value = unwrapExpression(node);
+	if (value?.type === 'ArrayExpression' || value?.type === 'ObjectExpression') return true;
+	const callee = value?.type === 'NewExpression' ? (value.callee as AnyNode | undefined) : undefined;
+	return callee?.type === 'Identifier' && /^(Array|Map|Set|WeakMap|WeakSet)$/.test(callee.name as string);
+}
+
+// Calls that hand back a value of their own, never the one they were given.
+const FRESH_RESULT_CALLS = new Set([
+	'structuredClone',
+	'JSON.parse',
+	'JSON.stringify',
+	'String',
+	'Number',
+	'Boolean',
+]);
+
+// What a function returns after it was handed state may be that state: a write through it cannot be followed.
+function returnedOrigin(
+	call: AnyNode,
+	callee: AnyNode | undefined,
+	state: WalkState,
+	seen: Set<number>,
+): LocalOrigin {
+	const name = callee ? expressionSource(callee, state.source) : '';
+	if (FRESH_RESULT_CALLS.has(name)) return { kind: 'plain' };
+	for (const argument of asNodes(call.arguments)) {
+		const value = argument.type === 'SpreadElement' ? (argument.argument as AnyNode) : argument;
+		if (isPrimitiveExpression(value, state)) continue;
+		const origin = originOfExpression(value, state, seen);
+		if (origin.kind === 'plain') continue;
+		if (origin.kind === 'path' && isPrimitivePath(origin.target, state)) continue;
+		return { kind: 'untracked', reason: 'returned', source: name || 'a function' };
+	}
 	return { kind: 'plain' };
 }
 
@@ -519,6 +565,10 @@ function memberOrigin(node: AnyNode, state: WalkState, seen: Set<number>): Local
 	}
 
 	if (binding && isRowItem(binding, state)) {
+		const collection = rowCollectionSource(binding, state);
+		if (collection === undefined) return null;
+		if (collection && segments)
+			return { kind: 'element', anchor: '', collection, itemPath: segments.slice(1) };
 		return { kind: 'untracked', reason: 'row-item', source: binding.name };
 	}
 	const text = expressionSource(node, state.source);
@@ -570,6 +620,27 @@ function isRowItem(binding: Binding, state: WalkState): boolean {
 		if (declaration.start >= span.start && (declaration.end as number) <= span.end) return true;
 	}
 	return false;
+}
+
+// The state array a keyed @for row item comes from; undefined when the rows are not state at all.
+function rowCollectionSource(binding: Binding, state: WalkState): string | null | undefined {
+	const declaration = binding.declarations[0] as unknown as AnyNode | undefined;
+	if (typeof declaration?.start !== 'number') return null;
+	for (const [repeatId, span] of state.keyedRepeatItemSpans) {
+		if (declaration.start < span.start || (declaration.end as number) > span.end) continue;
+		const repeat = state.graph.keyedRepeats.find((candidate) => candidate.id === repeatId);
+		if (!repeat) return null;
+		if (!repeat.collectionGraphNodeId && !repeat.enclosingRepeatId) return undefined;
+		const collection = state.graph.graphBindings.find(
+			(binding) => binding.id === repeat.collectionGraphNodeId,
+		);
+		// Rows of a value derived from no state at all, such as a module constant, are not state.
+		if (collection?.kind === 'computed' && (collection.dependencies ?? []).length === 0)
+			return undefined;
+		if (!repeat.collectionGraphNodeId || repeat.enclosingRepeatId) return null;
+		return resolvesToGraph(repeat.collectionSource, state) ? repeat.collectionSource : null;
+	}
+	return null;
 }
 
 function appendSegment(base: string, segment: string): string {

@@ -257,6 +257,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 						: {}),
 			};
 			state.graph.graphBindings.push(binding);
+			state.stateDeclarations.set(binding.id, id);
 		}
 
 		// The render lowering already treats an in-body storage() declaration as a state initializer.

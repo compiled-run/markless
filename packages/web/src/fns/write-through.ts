@@ -17,10 +17,16 @@ type WriteThroughContext = {
 			},
 		): unknown;
 		delete(deletion: GraphOperation & { readonly path: ReadonlyArray<string> }): boolean;
+		touch?(touch: GraphOperation): void;
 	};
 };
 
-type WriteThroughGraph = Pick<WriteThroughContext['graph'], 'write' | 'update' | 'call' | 'delete'>;
+type WriteThroughGraph = Pick<
+	WriteThroughContext['graph'],
+	'write' | 'update' | 'call' | 'delete'
+> & {
+	touch(touch: GraphOperation): void;
+};
 
 // A value no longer where the local found it is a plain object: the write changes only it, as JavaScript would.
 export function marklessWriteThrough(
@@ -39,7 +45,31 @@ export function marklessWriteThrough(
 		update: (update) => graph.update({ ...update, path: full(update.path) }),
 		call: (call) => graph.call({ ...call, path: full(call.path) }),
 		delete: (deletion) => graph.delete({ ...deletion, path: full(deletion.path) }),
+		touch: (touch) => touchGraph(graph, { ...touch, path: full(touch.path) }),
 	};
+}
+
+function touchGraph(graph: WriteThroughContext['graph'], touch: GraphOperation): void {
+	if (!graph.touch) {
+		throw Object.assign(new Error('This graph cannot be told a value changed in place.'), {
+			code: 'MARKLESS_GRAPH_TOUCH_UNSUPPORTED',
+			graphNodeId: touch.graphNodeId,
+		});
+	}
+	graph.touch(touch);
+}
+
+/**
+ * The value a call returned, once the path a function the compiler saw it
+ * change in place (`rename(user, 'Cy')`) has been invalidated.
+ */
+export function marklessAfterCall<T>(
+	result: T,
+	graph: WriteThroughContext['graph'] | Pick<WriteThroughGraph, 'touch'>,
+	touch: GraphOperation,
+): T {
+	touchGraph(graph as WriteThroughContext['graph'], touch);
+	return result;
 }
 
 function locate(
@@ -86,6 +116,7 @@ function plainTarget(local: unknown): WriteThroughGraph {
 			return Reflect.apply(method, target, [...(call.args ?? [])]);
 		},
 		delete: (deletion) => delete parentOf(deletion.path)[last(deletion.path)],
+		touch: () => {},
 	};
 }
 
