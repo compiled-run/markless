@@ -1930,6 +1930,14 @@
 			"from": 10187,
 			"to": 10407,
 			"reason": "a write observer stands down while an update due in the same pass still loads its code, so one task's writes land together (edit-row demo)"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 18371,
+			"to": 18824,
+			"reason": "rows counted from the parent's start are placed after the last row, so the first row after a list empties lands ahead of an @if that follows it (+204 B minified, +78 B gzip standalone)"
 		}
 	],
 	"runtimeModules": {
@@ -2035,7 +2043,7 @@
 		"web/resume-events": 17992,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 18371,
+		"web/resume-keyed-repeats": 18824,
 		"web/resume-keyed-repeats-lazy": 227,
 		"web/resume-locators": 5644,
 		"web/resume-refresh-busy": 987,

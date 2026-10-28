@@ -124,7 +124,9 @@ const resumeOnDemandEntries = [
 // minified+gzip 4,653 -> 4,653 bytes (rolldown, workspace packages external, same method both sides).
 // 2026-10-26: an idle-started runtime defers row code for @if rows with no arm events: 30,156 -> 30,164 raw;
 // minified 12,365 -> 12,365, gzip 4,821 -> 4,827 bytes (rolldown, workspace packages external, same method both sides).
-const sourceByteLimit = 30164;
+// 2026-10-27: rows counted from the parent's start are placed after the last row, ahead of an @if that follows: 30,164 -> 30,849 raw;
+// minified 12,229 -> 12,433, gzip 4,782 -> 4,860 bytes (rolldown, workspace packages external, same method both sides).
+const sourceByteLimit = 30849;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
