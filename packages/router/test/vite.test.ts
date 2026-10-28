@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { expect, onTestFinished, test } from 'vitest';
 import { nitro } from 'nitro/vite';
-import type { Plugin } from 'vite';
+import { mergeConfig, type Plugin } from 'vite';
 import {
 	clientAssetsManifestPath,
 	clientAssetFileName,
@@ -161,12 +161,14 @@ test('preserves user Nitro config while adding Markless request scanning default
 		},
 	};
 
-	const result = plugin.config?.(userConfig, {
+	const userNitro = userConfig.nitro;
+	plugin.config?.(userConfig, {
 		command: 'serve',
 		mode: 'development',
 		isSsrBuild: false,
 		isPreview: false,
 	});
+	const result = userConfig as typeof userConfig & { nitro: Record<string, any> };
 
 	expect(userConfig.environments.ssr.build.rolldownOptions.input).toContain(
 		'virtual:markless-router/server-entry',
@@ -218,7 +220,7 @@ test('preserves user Nitro config while adding Markless request scanning default
 	});
 
 	expect(result?.nitro?.devServer?.watch).toEqual({ include: ['api/**'] });
-	expect(userConfig.nitro.publicAssets).toBeUndefined();
+	expect((userNitro as { publicAssets?: unknown }).publicAssets).toBeUndefined();
 
 	const nitroConfig = result?.nitro;
 	const requestPlugin = Array.isArray(nitroConfig?.rolldownConfig?.plugins)
@@ -241,6 +243,49 @@ test('preserves user Nitro config while adding Markless request scanning default
 	).toContain('defineHandler');
 });
 
+test("the app's own Nitro handlers, server assets and traced dependencies are configured once", () => {
+	const [plugin] = flattenPlugins([router()]);
+	const userConfig: Record<string, any> = {
+		root: '/project',
+		nitro: {
+			handlers: [{ middleware: true, handler: './server/count.ts' }],
+			serverAssets: [{ baseName: 'a', dir: './server/assets-a' }],
+			traceDeps: ['zod'],
+			publicAssets: [{ baseURL: '/files', dir: './files' }],
+			modules: ['./server/module.ts'],
+			scanDirs: ['server'],
+		},
+		server: { fs: { allow: ['..'] }, watch: { ignored: ['**/custom/**'] } },
+	};
+	const result = hookHandler(plugin.config)?.(userConfig, {
+		command: 'build',
+		mode: 'production',
+		isSsrBuild: false,
+		isPreview: false,
+	});
+	// What Vite does with a config hook's return value: deep-merges it into the config, concatenating arrays.
+	const merged = mergeConfig(userConfig, (result ?? {}) as Record<string, any>) as Record<
+		string,
+		any
+	>;
+	expect(merged.nitro.handlers).toEqual([{ middleware: true, handler: './server/count.ts' }]);
+	expect(merged.nitro.serverAssets).toEqual([{ baseName: 'a', dir: './server/assets-a' }]);
+	expect(merged.nitro.traceDeps).toEqual(['zod']);
+	expect(
+		merged.nitro.publicAssets.filter(
+			(asset: { baseURL: string }) => asset.baseURL === '/files',
+		),
+	).toHaveLength(1);
+	expect(
+		merged.nitro.modules.filter((module: unknown) => module === './server/module.ts'),
+	).toHaveLength(1);
+	expect(merged.nitro.scanDirs).toEqual(['.', 'server']);
+	expect(merged.server.fs.allow).toEqual(['..']);
+	expect(
+		merged.server.watch.ignored.filter((pattern: string) => pattern === '**/custom/**'),
+	).toHaveLength(1);
+});
+
 test('production Nitro config serves hashed Markless chunks immutable and fixed-name build metadata revalidated', () => {
 	const buildRoute = `/${MARKLESS_BUILD_PREFIX}**`;
 	const linkBridgeRoute = `/${LINK_BRIDGE_DIR}/**`;
@@ -251,11 +296,17 @@ test('production Nitro config serves hashed Markless chunks immutable and fixed-
 	);
 	const nitroFor = (command: 'build' | 'serve', nitro: Record<string, unknown> = {}) => {
 		const [plugin] = flattenPlugins([router()]);
-		const result = hookHandler(plugin.config)?.(
-			{ nitro, root: '/project' },
-			{ command, mode: 'production', isSsrBuild: false, isPreview: false },
-		) as { nitro?: { routeRules?: Record<string, unknown> } } | undefined;
-		return result?.nitro;
+		const config: { nitro?: { routeRules?: Record<string, unknown> }; root: string } = {
+			nitro,
+			root: '/project',
+		};
+		hookHandler(plugin.config)?.(config, {
+			command,
+			mode: 'production',
+			isSsrBuild: false,
+			isPreview: false,
+		});
+		return config.nitro;
 	};
 
 	expect(nitroFor('build')?.routeRules).toEqual({
