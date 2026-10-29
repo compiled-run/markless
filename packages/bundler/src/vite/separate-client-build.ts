@@ -97,7 +97,7 @@ export async function buildClientInChildProcess(
 		if (exit === `exit code ${CLIENT_CONFIG_MISMATCH_EXIT}`) return undefined;
 		if (exit)
 			throw new Error(
-				`The client build failed in its own process (${exit}); its error is printed above. Set ${SEPARATE_CLIENT_BUILD_ENV}=0 to build every environment in this process.`,
+				`MARKLESS_CLIENT_BUILD_FAILED: the client build failed in its own process (${exit}); its error is printed above. Set ${SEPARATE_CLIENT_BUILD_ENV}=0 to build every environment in one process.`,
 			);
 		return JSON.parse(readFileSync(handoffFile, 'utf8')) as ClientBuildHandoff;
 	} finally {
