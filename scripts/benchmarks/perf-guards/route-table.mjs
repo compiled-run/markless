@@ -103,7 +103,7 @@ async function buildVariant(links, log) {
 	return root;
 }
 
-// Source V8 ran by the load event, before any idle work, and the page still answers its own control.
+// Source V8 ran by the load event and its preloads landing, before any idle work, and the page still answers its own control.
 async function runAtLoad(browser, origin) {
 	const context = await browser.newContext();
 	const page = await context.newPage();
@@ -124,6 +124,13 @@ async function runAtLoad(browser, origin) {
 	try {
 		const coverage = await startCoverage(context, page);
 		const response = await page.goto(origin, { waitUntil: 'load' });
+		// Low-priority modulepreloads may land after the load event; what runs once they have is the same for both pages.
+		await page.waitForFunction(() =>
+			[...document.querySelectorAll('link[rel="modulepreload"]')].every(
+				(link) => performance.getEntriesByName(link.href, 'resource').length > 0,
+			),
+		);
+		await page.waitForTimeout(300);
 		const scripts = await coverage.take();
 		await coverage.stop();
 		await page.evaluate(() => window.__releaseIdle());

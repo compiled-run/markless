@@ -68,7 +68,7 @@ async function buildApp(count: number): Promise<Built> {
 async function landing(built: Built, path: string) {
 	const html = await (await fetch(`${built.server.origin}${path}`)).text();
 	const hrefs = [
-		...html.matchAll(/<link rel="modulepreload" href="([^"]+)"[^>]*fetchpriority="high"/g),
+		...html.matchAll(/<link rel="modulepreload" href="(\/(?!_markless\/)[^"]+)"/g),
 	].map((match) => match[1]!);
 	const chunks = await Promise.all(
 		hrefs.map((href) => readFile(join(built.root, '.output/public', href), 'utf8')),
