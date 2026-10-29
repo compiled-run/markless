@@ -152,6 +152,24 @@ test('the route table is inert JSON listing each preload once, so a page evaluat
 	);
 });
 
+test('the landing modulepreloads come right after the import map, ahead of the document head scripts a speculative parser stops at', async () => {
+	const importMap =
+		'<script type="importmap">{"imports":{"@markless/c/a":"/build/a.js"}}</script>';
+	const served = entry({
+		importMap,
+		shell: '<html><head><meta charset="utf-8"><link rel="stylesheet" href="/site.css"><script>document.documentElement.dataset.theme = "dark"</script><title>Shell</title></head><body>__children__</body></html>',
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
+	expect(preloads.length).toBeGreaterThan(0);
+	const theme = html.indexOf('<script>document.documentElement');
+	for (const preload of preloads) {
+		expect(preload.index).toBeGreaterThan(html.indexOf(importMap));
+		expect(preload.index).toBeLessThan(theme);
+	}
+	expect(html.indexOf('<title>Shell</title>')).toBeLessThan(html.indexOf('</head>'));
+});
+
 test('without the fragment entry, the fragment URL answers the page document', async () => {
 	const response = await entry({ fragmentEntryPath: undefined }).fetch(
 		fragmentRequest('https://app.test/next'),

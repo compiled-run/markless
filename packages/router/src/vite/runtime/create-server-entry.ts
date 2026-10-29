@@ -820,10 +820,15 @@ async function renderDocumentShell(
 	);
 	const attributes = htmlAttributes(documentModule, pageProps, written);
 	if (documentHtml !== undefined) {
+		// Firefox and Safari fetch a modulepreload only once the parser reaches it, and a head script waits for every stylesheet above it.
+		const preloads = headHtml.match(MODULE_PRELOAD_TAG) ?? [];
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertImportMap(insertHeadHtml(documentHtml, headHtml), importMap),
+			insertImportMap(
+				insertHeadHtml(documentHtml, headHtml.replace(MODULE_PRELOAD_TAG, '')),
+				importMap + preloads.join(''),
+			),
 			'</html>',
 		].join('');
 	}
@@ -913,6 +918,8 @@ function documentStorageRecords(state: unknown): ReadonlyArray<{ readonly key: s
 	const storage = (state as { readonly storage?: unknown }).storage;
 	return Array.isArray(storage) ? (storage as ReadonlyArray<{ readonly key: string }>) : [];
 }
+
+const MODULE_PRELOAD_TAG = /<link rel="modulepreload"[^>]*>/g;
 
 function insertHeadHtml(documentHtml: string, headHtml: string): string {
 	if (!headHtml) return documentHtml;

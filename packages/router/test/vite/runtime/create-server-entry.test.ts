@@ -780,7 +780,7 @@ describe('server entry rendering', () => {
 
 		expect(response.status).toBe(200);
 		expect(html).toContain(
-			'<!doctype html><html lang="en" data-status="200"><head><title>/docs</title><link rel="modulepreload" href="/build/docs-current.js"',
+			'<!doctype html><html lang="en" data-status="200"><head><link rel="modulepreload" href="/build/docs-current.js" crossorigin="anonymous" fetchpriority="high"><title>/docs</title>',
 		);
 		expect(html).toContain('</head><body class="docs" data-async-container');
 		expect(html).toContain('<main><button m:on="click:0">Docs</button></main>');
