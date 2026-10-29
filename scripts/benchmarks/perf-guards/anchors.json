@@ -2072,6 +2072,90 @@
 				"jsGzipBytes": 417354
 			},
 			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11370,
+				"jsGzipBytes": 88497
+			},
+			"to": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87007
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11386,
+				"jsGzipBytes": 88497
+			},
+			"to": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87007
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11443,
+				"jsGzipBytes": 88497
+			},
+			"to": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87007
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 113031,
+				"jsGzipBytes": 1579694
+			},
+			"to": {
+				"executedChars": 110779,
+				"jsGzipBytes": 1564841
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 124826,
+				"jsGzipBytes": 1693361
+			},
+			"to": {
+				"executedChars": 121829,
+				"jsGzipBytes": 1678055
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22657,
+				"jsGzipBytes": 417354
+			},
+			"to": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
 		}
 	],
 	"runtimeModules": {
@@ -2263,27 +2347,27 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11370,
-				"jsGzipBytes": 88497
+				"jsGzipBytes": 87007
 			},
 			"bench /records": {
 				"executedChars": 11386,
-				"jsGzipBytes": 88497
+				"jsGzipBytes": 87007
 			},
 			"bench /settings": {
 				"executedChars": 11443,
-				"jsGzipBytes": 88497
+				"jsGzipBytes": 87007
 			},
 			"docs /": {
-				"executedChars": 113031,
-				"jsGzipBytes": 1579694
+				"executedChars": 110779,
+				"jsGzipBytes": 1564841
 			},
 			"docs /concepts/state": {
-				"executedChars": 124826,
-				"jsGzipBytes": 1693361
+				"executedChars": 121829,
+				"jsGzipBytes": 1678055
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,
-				"jsGzipBytes": 417354
+				"jsGzipBytes": 406069
 			}
 		}
 	}
