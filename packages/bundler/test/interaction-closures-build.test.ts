@@ -44,7 +44,7 @@ test('native packing always plans packs from interaction closures', () => {
 
 // An import() of a module whose chunk kept a module-free facade fetches the facade first; a landing
 // that preloads only the pack would fetch that facade at first use.
-test('planned first-use files list the facade chunk an import() fetches in front of its pack', () => {
+test('planned first-use files list the facade chunk an import() fetches in front of its pack', async () => {
 	const page = '/app/pages/feed.tsrx';
 	const adopt = '/repo/packages/web/src/resume-stream-patches.ts';
 	const graph: Record<string, { imports: string[]; dynamic: string[] }> = {
@@ -82,8 +82,11 @@ test('planned first-use files list the facade chunk an import() fetches in front
 		}),
 	});
 	let asset = '';
-	(packing!.generateBundle as Hook).call(
-		{ emitFile: (file: { source: string }) => (asset = file.source) },
+	await (packing!.generateBundle as Hook).call(
+		{
+			emitFile: (file: { source: string }) => (asset = file.source),
+			getModuleInfo: () => ({ code: 'x' }),
+		},
 		{},
 		{
 			'pack.js': {
@@ -104,4 +107,69 @@ test('planned first-use files list the facade chunk an import() fetches in front
 		JSON.parse(asset) as { routes: { route: string; files: { firstUse: string[] } }[] }
 	).routes.find((candidate) => candidate.route === 'pages/feed.tsrx')!;
 	expect(route.files.firstUse).toEqual(['adopt-facade.js', 'pack.js']);
+});
+
+// A route's checks are reused while the code it can run is unchanged: each module's hash follows its own code, never the pack it lands in.
+test('each module a route can run is listed with a hash of its own code', async () => {
+	const page = '/app/pages/feed.tsrx';
+	const handler = 'virtual:markless:symbol:%2Fapp%2Fpages%2Ffeed.tsrx:symbol%3A0';
+	const other = 'virtual:markless:symbol:%2Fapp%2Fpages%2Ffeed.tsrx:symbol%3A1';
+	const build = async (code: Record<string, string>) => {
+		const graph: Record<string, string[]> = {
+			[`${page}?markless-route`]: [`${page}?markless-resume`],
+			[`${page}?markless-resume`]: [handler, other],
+			[handler]: [],
+			[other]: [],
+		};
+		const map = {
+			version: 1,
+			recordKinds: [],
+			symbols: [],
+			payloadRecords: [],
+			actions: [],
+			unknownRecordModuleIds: [],
+			firstUsePage: {
+				resume: { symbolIds: [], runtimeModuleIds: [] },
+				pageSpaceReaders: [],
+				passedProps: [],
+				callbackSlots: [],
+			},
+		};
+		const [packing] = nativePackingPlugins(
+			() => '/app',
+			() => [],
+			() => [{ source: `${page}?markless-resume`, map }],
+		);
+		type Hook = (this: unknown, ...args: unknown[]) => unknown;
+		const info = (id: string) => ({
+			importedIds: graph[id]!,
+			dynamicallyImportedIds: [],
+			isEntry: id === `${page}?markless-route`,
+			code: code[id] ?? `export const id = ${JSON.stringify(id)};`,
+		});
+		(packing!.buildEnd as Hook).call({
+			getModuleIds: () => Object.keys(graph)[Symbol.iterator](),
+			getModuleInfo: info,
+		});
+		let asset = '';
+		await (packing!.generateBundle as Hook).call(
+			{ emitFile: (file: { source: string }) => (asset = file.source), getModuleInfo: info },
+			{},
+			{
+				'pack.js': {
+					type: 'chunk',
+					fileName: 'pack.js',
+					moduleIds: Object.keys(graph),
+					facadeModuleId: null,
+				},
+			},
+		);
+		return readInteractionClosuresAsset(asset).moduleHashes!;
+	};
+	const before = await build({});
+	const after = await build({ [handler]: 'export const id = "changed";' });
+	const shown = 'virtual:markless:symbol:pages%2Ffeed.tsrx:symbol%3A0';
+	expect(Object.keys(before)).toContain(shown);
+	expect(after[shown]).not.toBe(before[shown]);
+	for (const id of Object.keys(before)) if (id !== shown) expect(after[id]).toBe(before[id]);
 });
