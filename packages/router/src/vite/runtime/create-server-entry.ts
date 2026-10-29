@@ -681,15 +681,15 @@ function landingModulePreloads(
 ): readonly ModulePreloadInput[] | undefined {
 	const preloads: ModulePreloadInput[] = [];
 	addModulePreloads(preloads, new Set(), routePreloads);
-	// The first click waits on the landing plan: below high, a font the stylesheet asks for late is sent ahead of it.
-	const landing = preloads.map(highFetchPriority);
+	// Low: Chromium sends a high-priority script ahead of first paint, and Lighthouse counts every one finished before it as render-blocking.
+	const landing = preloads.map(lowFetchPriority);
 	if (linkBridgePath) landing.push({ href: linkBridgePath, fetchPriority: 'low' });
 	return landing.length > 0 ? landing : undefined;
 }
 
-function highFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
-	if (typeof preload === 'string') return { href: preload, fetchPriority: 'high' };
-	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'high' };
+function lowFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
+	if (typeof preload === 'string') return { href: preload, fetchPriority: 'low' };
+	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'low' };
 }
 
 function routerLinkHrefs(html: string): string[] {

@@ -678,7 +678,7 @@ describe('server entry rendering', () => {
 	});
 
 	it.each(['blocking', 'streaming'] as const)(
-		'%s render preloads the landing plan at high fetch priority and the link bridge at low',
+		'%s render preloads the landing plan and the link bridge at low fetch priority',
 		async (render) => {
 			const entry = createServerEntry({
 				render,
@@ -713,8 +713,8 @@ describe('server entry rendering', () => {
 			expect(
 				[...head.matchAll(/<link rel="modulepreload"[^>]*>/g)].map(([tag]) => tag),
 			).toEqual([
-				'<link rel="modulepreload" href="/assets/wake.js" crossorigin="anonymous" fetchpriority="high">',
-				'<link rel="modulepreload" href="/assets/item-cart.js" crossorigin="anonymous" fetchpriority="high">',
+				'<link rel="modulepreload" href="/assets/wake.js" crossorigin="anonymous" fetchpriority="low">',
+				'<link rel="modulepreload" href="/assets/item-cart.js" crossorigin="anonymous" fetchpriority="low">',
 				'<link rel="modulepreload" href="/assets/hero-zoom.js" crossorigin="anonymous" fetchpriority="low">',
 				expect.stringMatching(
 					/^<link rel="modulepreload" href="\/_markless\/links\/[0-9a-z]+\.js" crossorigin="anonymous" fetchpriority="low">$/,
@@ -780,7 +780,7 @@ describe('server entry rendering', () => {
 
 		expect(response.status).toBe(200);
 		expect(html).toContain(
-			'<!doctype html><html lang="en" data-status="200"><head><link rel="modulepreload" href="/build/docs-current.js" crossorigin="anonymous" fetchpriority="high"><title>/docs</title>',
+			'<!doctype html><html lang="en" data-status="200"><head><link rel="modulepreload" href="/build/docs-current.js" crossorigin="anonymous" fetchpriority="low"><title>/docs</title>',
 		);
 		expect(html).toContain('</head><body class="docs" data-async-container');
 		expect(html).toContain('<main><button m:on="click:0">Docs</button></main>');
