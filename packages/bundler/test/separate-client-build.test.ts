@@ -115,11 +115,23 @@ test(
 	},
 );
 
-const fakeBuilder = (inlineConfig: Record<string, unknown>) =>
+const fakeBuilder = (inlineConfig: Record<string, unknown>, build: Record<string, unknown> = {}) =>
 	({
 		environments: { client: {}, ssr: {} },
-		config: { root: '/app', configFile: '/app/vite.config.ts', inlineConfig, plugins: [] },
+		config: {
+			root: '/app',
+			configFile: '/app/vite.config.ts',
+			inlineConfig,
+			plugins: [],
+			build,
+			environments: { client: { build }, ssr: { build: {} } },
+		},
 	}) as never;
+
+test('a watching build keeps the client in this process', () => {
+	expect(clientBuildRequest(fakeBuilder({}), 'client')).toBeDefined();
+	expect(clientBuildRequest(fakeBuilder({}, { watch: {} }), 'client')).toBeUndefined();
+});
 
 test('an inline config holding a function builds the client in this process', () => {
 	const scss = { additionalData: (source: string) => source };

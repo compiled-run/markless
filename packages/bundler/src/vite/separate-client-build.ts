@@ -38,6 +38,9 @@ export function clientBuildRequest(
 	const { config } = builder;
 	// Plugins passed in code cannot cross a process boundary; only a config file's plugins can be loaded again.
 	if (typeof config?.configFile !== 'string') return undefined;
+	// A watching build keeps rebuilding the client, so its graph has to stay in this process.
+	if (config.build?.watch || Object.values(config.environments ?? {}).some((e) => e.build?.watch))
+		return undefined;
 	const inline = config.inlineConfig ?? {};
 	if ('plugins' in inline) return undefined;
 	const vite = viteEntry(config.root);
