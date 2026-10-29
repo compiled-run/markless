@@ -275,4 +275,16 @@ export type MarklessRolldownPluginApi = {
 	}>;
 	/** Whether every compiled module of this build mounts through the direct-DOM renderer. */
 	directCsrOnly: () => boolean;
+	/** What the client build leaves for the environments built after it, so they can build in another process. */
+	clientBuildHandoff: () => ClientBuildHandoff;
+	/** Starts the later environments from a client build that ran in another process. */
+	adoptClientBuildHandoff: (handoff: ClientBuildHandoff) => void;
+};
+
+export type ClientBuildHandoff = {
+	readonly resumeModuleUrls: ReadonlyArray<readonly [string, string]>;
+	readonly prerenderWakeModuleUrls: ReadonlyArray<readonly [string, string]>;
+	readonly settleModuleUrls: ReadonlyArray<readonly [string, string]>;
+	readonly prerenderWakeCapabilities: ReadonlyArray<readonly [string, boolean]>;
+	readonly styleClosures: ReadonlyArray<readonly [string, ReadonlyArray<string>]>;
 };
