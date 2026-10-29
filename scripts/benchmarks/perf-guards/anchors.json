@@ -2156,6 +2156,90 @@
 				"jsGzipBytes": 406069
 			},
 			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 11016,
+				"jsGzipBytes": 87498
+			},
+			"to": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87007
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 11032,
+				"jsGzipBytes": 87498
+			},
+			"to": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87007
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10982,
+				"jsGzipBytes": 87498
+			},
+			"to": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87007
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 147105,
+				"jsGzipBytes": 1563808
+			},
+			"to": {
+				"executedChars": 110612,
+				"jsGzipBytes": 1566081
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 149654,
+				"jsGzipBytes": 1667412
+			},
+			"to": {
+				"executedChars": 121354,
+				"jsGzipBytes": 1678656
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 47829,
+				"jsGzipBytes": 408451
+			},
+			"to": {
+				"executedChars": 22480,
+				"jsGzipBytes": 406068
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
 		}
 	],
 	"runtimeModules": {
@@ -2320,28 +2404,28 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 11016,
-				"jsGzipBytes": 87498
+				"executedChars": 10775,
+				"jsGzipBytes": 87007
 			},
 			"bench /records": {
-				"executedChars": 11032,
-				"jsGzipBytes": 87498
+				"executedChars": 10791,
+				"jsGzipBytes": 87007
 			},
 			"bench /settings": {
-				"executedChars": 10982,
-				"jsGzipBytes": 87498
+				"executedChars": 10741,
+				"jsGzipBytes": 87007
 			},
 			"docs /": {
-				"executedChars": 147105,
-				"jsGzipBytes": 1563808
+				"executedChars": 110612,
+				"jsGzipBytes": 1566081
 			},
 			"docs /concepts/state": {
-				"executedChars": 149654,
-				"jsGzipBytes": 1667412
+				"executedChars": 121354,
+				"jsGzipBytes": 1678656
 			},
 			"docs /ui/accordion": {
-				"executedChars": 47829,
-				"jsGzipBytes": 408451
+				"executedChars": 22480,
+				"jsGzipBytes": 406068
 			}
 		},
 		"linux-x64": {
