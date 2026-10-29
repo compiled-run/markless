@@ -1111,6 +1111,7 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		// Its five 3.5 s idle windows spend 17.5 s of the budget before any navigation runs.
 		test('the idle tier fetches each page at most once a session, even after its fetch was used or a page was left', async () => {
 			const { page, errors } = await open(browser);
 			// Requests made while the page sits idle after landing: the idle tier's, not a hover's or a click's.
@@ -1140,7 +1141,7 @@ for (const [name, browserType] of [
 			expect(idle.toSorted()).toEqual([...new Set(idle)].toSorted());
 			expect(errors).toEqual([]);
 			await page.close();
-		});
+		}, 60_000);
 
 		test('the idle tier stops a page whose region passes its byte budget, and a hover fetches that page whole', async () => {
 			const whole = await (await fetch(`${origin}/_markless/fragment/large`)).arrayBuffer();
