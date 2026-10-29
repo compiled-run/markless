@@ -172,6 +172,20 @@ test("the head's modulepreloads, the document's own included, come right after t
 	expect(html.indexOf('/in-body.js')).toBeGreaterThan(html.indexOf('<body'));
 });
 
+test('a modulepreload written as text inside a head script, style or comment stays where it is', async () => {
+	const script = `<script>document.head.insertAdjacentHTML('beforeend', '<link rel="modulepreload" href="/widget.js">')</script>`;
+	const style = '<style>/* <link rel="modulepreload" href="/in-style.js"> */</style>';
+	const comment = '<!-- <link rel="modulepreload" href="/in-comment.js"> -->';
+	const served = entry({
+		importMap: '<script type="importmap">{"imports":{}}</script>',
+		shell: `<html><head><meta charset="utf-8">${script}${style}${comment}<title>Shell</title></head><body>__children__</body></html>`,
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	expect(html).toContain(script);
+	expect(html).toContain(style);
+	expect(html).toContain(comment);
+});
+
 test('without the fragment entry, the fragment URL answers the page document', async () => {
 	const response = await entry({ fragmentEntryPath: undefined }).fetch(
 		fragmentRequest('https://app.test/next'),

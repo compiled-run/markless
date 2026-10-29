@@ -915,7 +915,9 @@ function documentStorageRecords(state: unknown): ReadonlyArray<{ readonly key: s
 	return Array.isArray(storage) ? (storage as ReadonlyArray<{ readonly key: string }>) : [];
 }
 
-const MODULE_PRELOAD_TAG = /<link\b[^>]*\brel=["']?modulepreload\b[^>]*>/gi;
+// A modulepreload tag, or text a preload scan must step over whole: a comment or the content of a raw-text element.
+const HEAD_SCAN =
+	/<!--[\s\S]*?-->|<(script|style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\1\s*>|(<link\b[^>]*\brel=["']?modulepreload\b[^>]*>)/gi;
 
 // Firefox and Safari fetch a modulepreload only once the parser reaches it, and a head script waits for every stylesheet above it:
 // the head's modulepreloads, the document's own included, move up beside the import map.
@@ -925,9 +927,13 @@ function takeHeadModulePreloads(html: string): {
 } {
 	const headEnd = html.search(/<\/head>/i);
 	if (headEnd === -1) return { html, preloads: '' };
-	const head = html.slice(0, headEnd);
-	const preloads = head.match(MODULE_PRELOAD_TAG)?.join('') ?? '';
-	return { html: head.replace(MODULE_PRELOAD_TAG, '') + html.slice(headEnd), preloads };
+	let preloads = '';
+	const head = html.slice(0, headEnd).replace(HEAD_SCAN, (match, _raw, preload) => {
+		if (!preload) return match;
+		preloads += preload;
+		return '';
+	});
+	return { html: head + html.slice(headEnd), preloads };
 }
 
 function insertHeadHtml(documentHtml: string, headHtml: string): string {
