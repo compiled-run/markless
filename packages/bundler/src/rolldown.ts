@@ -43,6 +43,7 @@ import { encodedSymbolSource } from './source-module.ts';
 import { moduleIdFor } from './module-id.ts';
 import { importedRouteModules } from './composed-route-modules.ts';
 import type {
+	ClientBuildHandoff,
 	MarklessEnvironment,
 	MarklessRolldownOptions,
 	MarklessRolldownPluginApi,
@@ -53,6 +54,7 @@ import type { BuiltPrerenderRecords } from './build/prerender.ts';
 
 export type {
 	BundleGraphAdder,
+	ClientBuildHandoff,
 	GlobalInjections,
 	PreloadGraphContext,
 	PreloadGraphEntries,
@@ -206,6 +208,41 @@ export function createMarklessRolldownPlugin(input: {
 			declarePackOwnership: (packs: PackOwnership) => {
 				declaredPacks = packs;
 			},
+			clientBuildHandoff: () => ({
+				resumeModuleUrls: [...(internalOptions.productionResumeModuleUrls ?? [])],
+				prerenderWakeModuleUrls: [
+					...(internalOptions.productionPrerenderWakeModuleUrls ?? []),
+				],
+				settleModuleUrls: [...(internalOptions.productionSettleModuleUrls ?? [])],
+				prerenderWakeCapabilities: [...state.prerenderWakeCapabilities],
+				styleClosures: [...state.styleClosures].map(([source, ids]) => [source, [...ids]]),
+			}),
+			adoptClientBuildHandoff: (handoff: ClientBuildHandoff) => {
+				const fill = (
+					target: Map<string, string> | undefined,
+					rows: ClientBuildHandoff['resumeModuleUrls'],
+				) => {
+					const map = target ?? new Map<string, string>();
+					for (const [source, url] of rows) map.set(source, url);
+					return map;
+				};
+				internalOptions.productionResumeModuleUrls = fill(
+					internalOptions.productionResumeModuleUrls,
+					handoff.resumeModuleUrls,
+				);
+				internalOptions.productionPrerenderWakeModuleUrls = fill(
+					internalOptions.productionPrerenderWakeModuleUrls,
+					handoff.prerenderWakeModuleUrls,
+				);
+				internalOptions.productionSettleModuleUrls = fill(
+					internalOptions.productionSettleModuleUrls,
+					handoff.settleModuleUrls,
+				);
+				for (const [source, capable] of handoff.prerenderWakeCapabilities)
+					state.prerenderWakeCapabilities.set(source, capable);
+				for (const [source, ids] of handoff.styleClosures)
+					state.styleClosures.set(source, new Set(ids));
+			},
 		},
 		name,
 		options(input: InputOptions) {
@@ -316,7 +353,10 @@ export function createMarklessRolldownPlugin(input: {
 					`Markless emitted chunks that import specifiers its import map does not resolve to an emitted chunk: ${unmapped.join(', ')}. A plugin changed chunk code or file names after the Markless finalize pass. ${DEBUGGING_PLAYBOOK_HINT}`,
 				);
 			if (output.dir) {
-				await moveImportMapOutOfClientOutput(output.dir, MARKLESS_IMPORT_MAP_ASSET in bundle);
+				await moveImportMapOutOfClientOutput(
+					output.dir,
+					MARKLESS_IMPORT_MAP_ASSET in bundle,
+				);
 				await moveBuildMetadataOutOfClientOutput(output.dir, new Set(Object.keys(bundle)), {
 					executionLogActive:
 						executionLogActivationInjection(internalOptions.executionLog) !== null,
