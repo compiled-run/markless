@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -5,7 +6,11 @@ import { join } from 'pathe';
 import { createBuilder } from 'vite';
 import { expect, test } from 'vitest';
 import { generateBuildScaleApp } from '../../../scripts/benchmarks/build-scale/generate.mjs';
-import { SEPARATE_CLIENT_BUILD_ENV } from '../src/vite/separate-client-build.ts';
+import {
+	clientBuildRequest,
+	parseInlineConfig,
+	SEPARATE_CLIENT_BUILD_ENV,
+} from '../src/vite/separate-client-build.ts';
 
 const packages = join(import.meta.dirname, '../..');
 
@@ -109,3 +114,38 @@ test(
 		}
 	},
 );
+
+const fakeBuilder = (inlineConfig: Record<string, unknown>) =>
+	({
+		environments: { client: {}, ssr: {} },
+		config: { root: '/app', configFile: '/app/vite.config.ts', inlineConfig, plugins: [] },
+	}) as never;
+
+test('an inline config holding a function builds the client in this process', () => {
+	const scss = { additionalData: (source: string) => source };
+	expect(
+		clientBuildRequest(fakeBuilder({ css: { preprocessorOptions: { scss } } }), 'client'),
+	).toBeUndefined();
+});
+
+test('regular expressions in the inline config reach the child as regular expressions', () => {
+	const request = clientBuildRequest(
+		fakeBuilder({ build: { rolldownOptions: { external: [/^node:/u, 'fs'] } } }),
+		'client',
+	);
+	expect(parseInlineConfig(request!.inlineConfig)).toEqual({
+		build: { rolldownOptions: { external: [/^node:/u, 'fs'] } },
+	});
+});
+
+test('a build started with node --eval builds the client in this process, since a child would run the eval again', () => {
+	const module = join(import.meta.dirname, '../src/vite/separate-client-build.ts');
+	const source = `import { clientBuildRequest } from ${JSON.stringify(module)};
+const builder = { environments: { client: {}, ssr: {} }, config: { root: '/app', configFile: '/app/vite.config.ts', inlineConfig: {}, plugins: [] } };
+console.log(String(clientBuildRequest(builder, 'client')));`;
+	expect(
+		execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
+			encoding: 'utf8',
+		}).trim(),
+	).toBe('undefined');
+});

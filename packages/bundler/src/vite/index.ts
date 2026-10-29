@@ -385,6 +385,10 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				const clientEnvironment = viteEnvironmentName('client', options);
 				const childRequest = clientBuildRequest(builder, clientEnvironment);
 				const handoff = childRequest && (await buildClientInChildProcess(childRequest));
+				if (childRequest && !handoff)
+					builder.config.logger.warn(
+						'markless: the client builds in this process, because a child process resolved this config differently.',
+					);
 				if (handoff) {
 					basePlugin.api.adoptClientBuildHandoff(handoff);
 					builder.environments[clientEnvironment]!.isBuilt = true;
@@ -646,7 +650,10 @@ function configDefaults(
 		: dynamicImportVars.exclude
 			? [dynamicImportVars.exclude]
 			: [];
-	dynamicImportVars.exclude = [...exclude, /\.tsrx(?:[?#]|$)/];
+	const tsrxFiles = /\.tsrx(?:[?#]|$)/;
+	// A client build in its own process resolves this config again from the inline config this hook already wrote to.
+	if (!exclude.some((item) => item instanceof RegExp && item.source === tsrxFiles.source))
+		dynamicImportVars.exclude = [...exclude, tsrxFiles];
 
 	if (config.build?.lib || config.build?.ssr) {
 		return;

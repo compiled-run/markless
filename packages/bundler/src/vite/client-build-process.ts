@@ -5,6 +5,7 @@ import {
 	CLIENT_CONFIG_MISMATCH_EXIT,
 	configFingerprint,
 	MARKLESS_VITE_PLUGIN_NAME,
+	parseInlineConfig,
 	type ClientBuildRequest,
 } from './separate-client-build.ts';
 
@@ -15,7 +16,7 @@ type ClientBuildPlugin = Plugin & {
 const request = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as ClientBuildRequest;
 try {
 	const { createBuilder } = (await import(request.vite)) as typeof import('vite');
-	const builder = await createBuilder(request.inlineConfig, null);
+	const builder = await createBuilder(parseInlineConfig(request.inlineConfig), null);
 	if (configFingerprint(builder.config) !== request.configFingerprint)
 		process.exit(CLIENT_CONFIG_MISMATCH_EXIT);
 	const plugin = builder.config.plugins.find(

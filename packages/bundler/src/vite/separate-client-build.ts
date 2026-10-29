@@ -14,10 +14,13 @@ export const MARKLESS_VITE_PLUGIN_NAME = 'vite-plugin-markless';
 
 export type ClientBuildRequest = {
 	readonly vite: string;
-	readonly inlineConfig: InlineConfig;
+	/** The inline config as JSON, regular expressions tagged so the child can rebuild them. */
+	readonly inlineConfig: string;
 	readonly configFingerprint: string;
 	readonly handoffFile: string;
 };
+
+const REGEXP_TAG = '__marklessRegExp';
 
 // The child exits with this when the config it resolved differs from this process's, and the client builds here.
 export const CLIENT_CONFIG_MISMATCH_EXIT = 86;
@@ -27,7 +30,8 @@ export function clientBuildRequest(
 	builder: ViteBuilder,
 	clientEnvironment: string,
 ): Omit<ClientBuildRequest, 'handoffFile'> | undefined {
-	if (process.env[SEPARATE_CLIENT_BUILD_ENV] === '0') return undefined;
+	if (process.env[SEPARATE_CLIENT_BUILD_ENV] === '0' || childExecArgv() === undefined)
+		return undefined;
 	const environments = Object.keys(builder.environments);
 	if (!environments.includes(clientEnvironment) || environments.length < 2) return undefined;
 	if (builder.environments[clientEnvironment]?.isBuilt) return undefined;
@@ -37,33 +41,58 @@ export function clientBuildRequest(
 	const inline = config.inlineConfig ?? {};
 	if ('plugins' in inline) return undefined;
 	const vite = viteEntry(config.root);
-	// Config hooks write into the inline config; the child runs them again on what is left of it.
-	const inlineConfig = plainData(inline) as InlineConfig;
-	return vite ? { vite, inlineConfig, configFingerprint: configFingerprint(config) } : undefined;
+	const inlineConfig = inlineConfigText(inline);
+	return vite && inlineConfig !== undefined
+		? { vite, inlineConfig, configFingerprint: configFingerprint(config) }
+		: undefined;
 }
 
-/** What the client build reads from a resolved config, as text; equal text means the child resolved the same build. */
+export function parseInlineConfig(text: string): InlineConfig {
+	return JSON.parse(text, (_key, value: unknown) =>
+		value && typeof value === 'object' && REGEXP_TAG in value
+			? new RegExp(...(value as Record<string, [string, string]>)[REGEXP_TAG]!)
+			: value,
+	) as InlineConfig;
+}
+
+// Functions and class instances cannot be sent to another process, so such a config builds in this one.
+function inlineConfigText(inline: InlineConfig): string | undefined {
+	let sendable = true;
+	const text = JSON.stringify(inline, (_key, value: unknown) => {
+		if (value instanceof RegExp) return { [REGEXP_TAG]: [value.source, value.flags] };
+		if (typeof value === 'function' || typeof value === 'symbol' || typeof value === 'bigint')
+			sendable = false;
+		else if (value && typeof value === 'object' && !Array.isArray(value)) {
+			const prototype = Object.getPrototypeOf(value);
+			if (prototype !== Object.prototype && prototype !== null) sendable = false;
+		}
+		return value;
+	});
+	return sendable ? text : undefined;
+}
+
+// Per process, or holding what the child loads again for itself.
+const UNCOMPARED_CONFIG_KEYS = new Set([
+	'inlineConfig',
+	'plugins',
+	'logger',
+	'webSocketToken',
+	'additionalAllowedHosts',
+]);
+
+/** The resolved config as text, functions by presence only; equal text means the child resolved the same build. */
 export function configFingerprint(config: ResolvedConfig): string {
 	const seen = new WeakSet<object>();
 	return JSON.stringify(
 		{
-			root: config.root,
-			base: config.base,
-			mode: config.mode,
-			define: config.define,
-			environments: Object.fromEntries(
-				Object.entries(config.environments).map(([name, environment]) => [
-					name,
-					{
-						consumer: environment.consumer,
-						build: environment.build,
-						resolve: environment.resolve,
-					},
-				]),
+			...Object.fromEntries(
+				Object.entries(config).filter(([key]) => !UNCOMPARED_CONFIG_KEYS.has(key)),
 			),
+			plugins: config.plugins.map((plugin) => plugin.name),
 		},
 		(_key, value: unknown) => {
 			if (typeof value === 'function') return 'function';
+			if (typeof value === 'bigint' || typeof value === 'symbol') return String(value);
 			if (value instanceof RegExp) return String(value);
 			if (value && typeof value === 'object') {
 				if (seen.has(value)) return 'seen';
@@ -72,6 +101,19 @@ export function configFingerprint(config: ResolvedConfig): string {
 			return value;
 		},
 	);
+}
+
+// Flags that run code of their own or hold a port would make the child something other than the client build.
+function childExecArgv(): string[] | undefined {
+	const args: string[] = [];
+	const argv = process.execArgv;
+	for (let index = 0; index < argv.length; index++) {
+		const arg = argv[index]!;
+		if (/^(-e|-p|--eval|--print)(=|$)/.test(arg)) return undefined;
+		if (/^--(inspect|debug|watch|test)/.test(arg)) continue;
+		args.push(arg);
+	}
+	return args;
 }
 
 /** The client build's handoff, or `undefined` when the child resolved a different config and built nothing. */
@@ -85,7 +127,7 @@ export async function buildClientInChildProcess(
 		writeFileSync(requestFile, JSON.stringify({ ...request, handoffFile }));
 		const child = spawn(
 			process.execPath,
-			[...process.execArgv, clientBuildProcessFile(), requestFile],
+			[...(childExecArgv() ?? []), clientBuildProcessFile(), requestFile],
 			{ stdio: 'inherit', env: process.env },
 		);
 		const exit = await new Promise<string | null>((resolve, reject) => {
@@ -127,18 +169,4 @@ function viteEntry(root: string): string | undefined {
 			return undefined;
 		}
 	}
-}
-
-function plainData(value: unknown): unknown {
-	if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return value;
-	if (Array.isArray(value)) return value.map(plainData).filter((item) => item !== undefined);
-	if (typeof value !== 'object') return undefined;
-	const prototype = Object.getPrototypeOf(value);
-	if (prototype !== Object.prototype && prototype !== null) return undefined;
-	return Object.fromEntries(
-		Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => {
-			const plain = plainData(item);
-			return plain === undefined ? [] : [[key, plain]];
-		}),
-	);
 }
