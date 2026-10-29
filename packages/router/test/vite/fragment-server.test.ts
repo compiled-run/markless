@@ -152,12 +152,12 @@ test('the route table is inert JSON listing each preload once, so a page evaluat
 	);
 });
 
-test('the landing modulepreloads come right after the import map, ahead of the document head scripts a speculative parser stops at', async () => {
+test("the head's modulepreloads, the document's own included, come right after the import map, ahead of the head scripts a speculative parser stops at", async () => {
 	const importMap =
 		'<script type="importmap">{"imports":{"@markless/c/a":"/build/a.js"}}</script>';
 	const served = entry({
 		importMap,
-		shell: '<html><head><meta charset="utf-8"><link rel="stylesheet" href="/site.css"><script>document.documentElement.dataset.theme = "dark"</script><title>Shell</title></head><body>__children__</body></html>',
+		shell: '<html><head><meta charset="utf-8"><link rel="stylesheet" href="/site.css"><script>document.documentElement.dataset.theme = "dark"</script><link rel="modulepreload" href="/site-script.js"><title>Shell</title></head><body>__children__<link rel="modulepreload" href="/in-body.js"></body></html>',
 	});
 	const html = await (await served.fetch(new Request('https://app.test/'))).text();
 	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
@@ -165,9 +165,11 @@ test('the landing modulepreloads come right after the import map, ahead of the d
 	const theme = html.indexOf('<script>document.documentElement');
 	for (const preload of preloads) {
 		expect(preload.index).toBeGreaterThan(html.indexOf(importMap));
-		expect(preload.index).toBeLessThan(theme);
+		if (!preload[0].includes('/in-body.js')) expect(preload.index).toBeLessThan(theme);
 	}
+	expect(preloads.some((preload) => preload[0].includes('/site-script.js'))).toBe(true);
 	expect(html.indexOf('<title>Shell</title>')).toBeLessThan(html.indexOf('</head>'));
+	expect(html.indexOf('/in-body.js')).toBeGreaterThan(html.indexOf('<body'));
 });
 
 test('without the fragment entry, the fragment URL answers the page document', async () => {
