@@ -492,6 +492,8 @@ export function interactionClosuresAsset(input: {
 	readonly partition: 'tiers' | 'unsplit:entry-roots';
 	// Output files an import of each module fetches, when the asset is written after rendering.
 	readonly chunkOf?: ReadonlyMap<string, readonly string[]>;
+	// A hash of each module's own code, so a route's runnable code is compared without the packs it lands in.
+	readonly moduleHashes?: ReadonlyMap<string, string>;
 }): string {
 	const filesFor = (route: RouteInteractionClosures, render: boolean) => {
 		const files = new Set<string>();
@@ -510,6 +512,12 @@ export function interactionClosuresAsset(input: {
 			for (const id of consumer.modules)
 				if (!displayed.has(id)) displayed.set(id, display(id, input.root));
 	const modules = [...new Set(displayed.values())].sort();
+	const rawOf = new Map<string, string[]>();
+	for (const [id, shown] of displayed) push(rawOf, shown, id);
+	const displayedHash = (shown: string) => {
+		const hashes = rawOf.get(shown)!.map((id) => input.moduleHashes!.get(id) ?? '');
+		return hashes.includes('') ? '' : hashes.sort().join('+');
+	};
 	const moduleIndex = new Map(modules.map((id, index) => [id, index]));
 	const closureSets: number[][] = [];
 	const closureIndex = new Map<readonly string[], number>();
@@ -535,6 +543,7 @@ export function interactionClosuresAsset(input: {
 		partition: input.partition,
 		modules,
 		closures: closureSets,
+		...(input.moduleHashes ? { moduleHashes: modules.map((id) => displayedHash(id)) } : {}),
 		routes: input.closures.map((route) => ({
 			route: route.route,
 			...(route.fallback ? { fallback: route.fallback } : {}),
@@ -824,6 +833,8 @@ export type InteractionClosuresAssetView = {
 	}>;
 	readonly packs: Readonly<Record<string, readonly string[]>>;
 	readonly packFiles?: Readonly<Record<string, readonly string[]>>;
+	/** Each listed module's code hash, by the module id the consumers name. */
+	readonly moduleHashes?: Readonly<Record<string, string>>;
 };
 
 /** The asset with every consumer's closure spelled out as module ids again. */
@@ -839,9 +850,18 @@ export function readInteractionClosuresAsset(source: string): InteractionClosure
 			}
 		>;
 	};
-	const { modules, closures, ...rest } = parsed;
+	const { modules, closures, moduleHashes, ...rest } = parsed as typeof parsed & {
+		readonly moduleHashes?: readonly string[];
+	};
 	return {
 		...rest,
+		...(moduleHashes
+			? {
+					moduleHashes: Object.fromEntries(
+						modules.map((id, index) => [id, moduleHashes[index]!]),
+					),
+				}
+			: {}),
 		routes: parsed.routes.map((route) => ({
 			...route,
 			consumers: route.consumers.map(({ closure, ...consumer }) => ({

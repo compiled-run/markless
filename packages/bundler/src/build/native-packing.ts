@@ -159,7 +159,9 @@ export function nativePackingPlugins(
 				if (!routeSources.size && directCsrOnly()) {
 					for (const entry of ['@markless/web/render', '@markless/core']) {
 						const resolved = await this.resolve(entry);
-						for (const target of (resolved && modules.get(resolved.id)?.dynamicDependencies) ?? [])
+						for (const target of (resolved &&
+							modules.get(resolved.id)?.dynamicDependencies) ??
+							[])
 							renderFallbacks.add(target);
 					}
 					for (const module of modules.values())
@@ -261,8 +263,18 @@ export function nativePackingPlugins(
 					},
 				};
 			},
-			generateBundle(_output, bundle) {
+			async generateBundle(_output, bundle) {
 				if (!closures) return;
+				const moduleHashes = new Map<string, string>();
+				for (const route of closures)
+					for (const consumer of route.consumers)
+						for (const id of consumer.modules)
+							if (!moduleHashes.has(id)) moduleHashes.set(id, '');
+				// An empty hash means the code was not available: a reader must treat that module as changed.
+				for (const id of moduleHashes.keys()) {
+					const code = this.getModuleInfo(id)?.code;
+					moduleHashes.set(id, typeof code === 'string' ? await codeHash(code) : '');
+				}
 				const chunkOf = new Map<string, string[]>();
 				const add = (id: string, fileName: string) =>
 					chunkOf.set(id, [...(chunkOf.get(id) ?? []), fileName]);
@@ -282,6 +294,7 @@ export function nativePackingPlugins(
 						packs: groups,
 						partition: partitioned ? 'tiers' : 'unsplit:entry-roots',
 						chunkOf,
+						moduleHashes,
 					}),
 				});
 			},
@@ -290,4 +303,11 @@ export function nativePackingPlugins(
 		packTopLevelPlugin(),
 		shortExportNamesPlugin(() => facades.api.removedChunks()),
 	];
+}
+
+async function codeHash(code: string): Promise<string> {
+	const digest = new Uint8Array(
+		await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(code)),
+	);
+	return [...digest.subarray(0, 12)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
