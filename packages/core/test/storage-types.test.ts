@@ -61,15 +61,19 @@ test('storage() rejects three arguments', () => {
 // assertion that ties the SHIPPED declaration to the SHIPPED doc: both files
 // travel inside the same tarball, and their disagreement was the whole defect.
 const packedDeclaration = resolve(packageRoot, 'dist/index.d.ts');
+const packedEntry = resolve(packageRoot, 'dist/index.js');
 
 describe.skipIf(!existsSync(packedDeclaration))(
 	'packed declaration agrees with the packed agent doc (run `pnpm build` first)',
 	() => {
-		test('dist/index.d.ts declares both storage overloads', () => {
-			const declaration = readFileSync(packedDeclaration, 'utf8');
+		// Through the package's types entry, as a consumer resolves it: the pack may move the overloads into any chunk it emits.
+		test('the packed types accept both storage forms and refuse a call without a fallback', () => {
+			const callSite = (body: string) =>
+				diagnosticsForCallSite(body, `import { storage } from ${JSON.stringify(packedEntry)};`);
 
-			expect(declaration).toMatch(/storage\(fallback: string\): string/);
-			expect(declaration).toMatch(/storage\(key: string, fallback: string\): string/);
+			expect(callSite("const theme: string = storage('light');")).toEqual([]);
+			expect(callSite("const theme: string = storage('theme', 'light');")).toEqual([]);
+			expect(callSite('storage();').join('\n')).toMatch(/argument/i);
 		});
 
 		test('agent/markless.md documents both forms the declaration accepts', () => {
@@ -86,10 +90,13 @@ describe.skipIf(!existsSync(packedDeclaration))(
  * Typechecks `body` against the real framework API source and returns the
  * flattened diagnostic messages. Empty means the call site typechecks.
  */
-function diagnosticsForCallSite(body: string): string[] {
+function diagnosticsForCallSite(
+	body: string,
+	imports = "import { storage } from './framework-api';",
+): string[] {
 	const sources = new Map([
 		[frameworkApiPath, frameworkApiSource],
-		[callSitePath, `import { storage } from './framework-api';\n${body}\n`],
+		[callSitePath, `${imports}\n${body}\n`],
 	]);
 	const program = ts.createProgram(
 		[callSitePath],
@@ -104,8 +111,10 @@ function diagnosticsForCallSite(body: string): string[] {
 		createMemoryCompilerHost(sources),
 	);
 
+	// Only the call site's own: the packed types import workspace packages whose sources TypeScript checks on their own terms.
 	return ts
 		.getPreEmitDiagnostics(program)
+		.filter((diagnostic) => diagnostic.file?.fileName === callSitePath)
 		.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
 }
 
