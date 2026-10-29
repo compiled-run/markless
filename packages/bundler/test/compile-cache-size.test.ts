@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readdir, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
-import { createBuilder } from 'vite';
+import { createBuilder, type Plugin } from 'vite';
 import { expect, test } from 'vitest';
 import { clearCompileCache, setCompileCacheLimit } from '@markless/compiler';
 import { markless } from '../../core/src/vite.ts';
@@ -10,12 +10,26 @@ import { router } from '../../router/src/vite/index.ts';
 import { compileCacheSize } from '../../compiler/src/compile-cache.ts';
 import { generateBuildScaleApp } from '../../../scripts/benchmarks/build-scale/generate.mjs';
 
+let heldAtBuildEnd = 0;
+
+// Each environment drops the memo at its own buildEnd, so the size is read just before it does.
+const memoProbe: Plugin = {
+	name: 'compile-memo-probe',
+	buildEnd: {
+		order: 'pre',
+		handler() {
+			heldAtBuildEnd = Math.max(heldAtBuildEnd, compileCacheSize());
+		},
+	},
+};
+
 async function build(root: string): Promise<Map<string, string>> {
+	heldAtBuildEnd = 0;
 	const builder = await createBuilder({
 		root,
 		configFile: false,
 		logLevel: 'silent',
-		plugins: [markless(), router()],
+		plugins: [memoProbe, markless(), router()],
 	});
 	await builder.buildApp();
 	const output = join(await realpath(root), '.output/public');
@@ -55,11 +69,11 @@ test(
 				});
 			clearCompileCache();
 			const fromKept = await build(kept);
-			const keptEntries = compileCacheSize();
+			const keptEntries = heldAtBuildEnd;
 			clearCompileCache();
 			setCompileCacheLimit(1);
 			const fromEvicted = await build(evicted);
-			const evictedEntries = compileCacheSize();
+			const evictedEntries = heldAtBuildEnd;
 			expect(keptEntries).toBeGreaterThan(10);
 			expect(evictedEntries).toBeLessThanOrEqual(2);
 			expect(fromKept.size).toBeGreaterThan(0);

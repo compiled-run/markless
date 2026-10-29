@@ -429,6 +429,10 @@ function renderDataNativeDependencies(
 const specifiersByCode = new Map<string, readonly string[]>();
 const SPECIFIERS_LIMIT = 2048;
 
+export function clearModuleSpecifiers(): void {
+	specifiersByCode.clear();
+}
+
 export function moduleSpecifiers(code: string): readonly string[] {
 	let specifiers = specifiersByCode.get(code);
 	if (specifiers) return specifiers;
