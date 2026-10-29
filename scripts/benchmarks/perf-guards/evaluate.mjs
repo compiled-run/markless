@@ -32,6 +32,14 @@ export function evaluate(measurement, anchors) {
 			checkFirstUse(subject, result.controls, fail, note);
 			if (result.waste) checkWaste(subject, result.waste, note);
 			if (result.payPerUse) checkPayPerUse(subject, result.payPerUse, fail, note);
+			if (result.load)
+				checkLoadWeight(
+					subject,
+					result.load,
+					anchors.loadWeight?.[LOAD_PLATFORM]?.[subject],
+					fail,
+					note,
+				);
 		}
 		if (siteResult.runtimeModules)
 			checkRuntimeModules(site, siteResult, anchors.runtimeModules ?? {}, fail, note);
@@ -71,6 +79,38 @@ const breakdown = (attribution) =>
 				.map(([category, bytes]) => `${category} ${kb(bytes)}`)
 				.join(', ')})`
 		: '';
+
+// The owner weighs a page by the code it runs and downloads before a reader touches it, so neither may grow.
+// Linux CI's Chromium runs a few hundred chars more of one build at load than a Mac does, so each platform has its anchors.
+export const LOAD_PLATFORM = `${process.platform}-${process.arch}`;
+
+function checkLoadWeight(subject, load, anchor, fail, note) {
+	const line = `${subject} (${LOAD_PLATFORM}): runs ${load.executedChars} chars of JS source and downloads ${load.jsGzipBytes} B gzip in ${load.files.length} JS files at load`;
+	if (!anchor) {
+		fail('G16', `${line}, with no anchor for this platform. ${acceptHint('load', subject)}`);
+		return;
+	}
+	const ran = load.executedChars - anchor.executedChars;
+	const grew = load.jsGzipBytes - anchor.jsGzipBytes;
+	const problems = [
+		...(ran > BUDGETS.loadExecutionSwingChars
+			? [
+					`runs +${ran} chars more than its anchor ${anchor.executedChars} (allowed swing ${BUDGETS.loadExecutionSwingChars})`,
+				]
+			: []),
+		...(grew > 0
+			? [`downloads +${grew} B gzip more than its anchor ${anchor.jsGzipBytes}`]
+			: []),
+	];
+	if (problems.length) {
+		fail('G16', `${line}: ${problems.join('; ')}. ${acceptHint('load', subject)}`, subject);
+		return;
+	}
+	note(
+		'G16',
+		`${line}; anchor ${anchor.executedChars} chars run, ${anchor.jsGzipBytes} B gzip downloaded`,
+	);
+}
 
 function checkPreload(subject, preload, fail, note) {
 	if (preload.missingFiles.length)

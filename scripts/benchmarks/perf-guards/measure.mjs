@@ -39,6 +39,7 @@ import {
 	BENCH_APP_DIR,
 	BENCH_ROUTE_SOURCES,
 	EXECUTION_ACTIONS,
+	LOAD_WEIGHT_RUNS,
 	NAVIGATIONS,
 	PORTS,
 	ROOT_DIR,
@@ -356,6 +357,42 @@ async function executionCost(browser, origin, name, caseId, read) {
 	}
 }
 
+// What a reader's browser downloads and runs from load until the page goes idle, before any input: JS downloaded
+// (gzip bytes of the files fetched, read from the build) and JS executed (V8 coverage), each the lowest of `loads` runs.
+// The window ends where G2's first input starts, at the first idle period that starts no request.
+async function loadWeight(browser, origin, route, read, loads = LOAD_WEIGHT_RUNS) {
+	let executedChars = Infinity;
+	let jsGzipBytes = Infinity;
+	let files = [];
+	for (let run = 0; run < loads; run++) {
+		const visit = await openPage(browser, { coverage: true });
+		try {
+			await visit.goto(new URL(route, origin).href);
+			// The page as G2's first input finds it: idle, with what idle-time work fetches already fetched.
+			await visit.idle();
+			executedChars = Math.min(
+				executedChars,
+				windowExecution(await visit.coverage.take()).executedChars,
+			);
+			const loaded = [
+				...new Set(
+					visit.state.fetched.load
+						.filter((url) => new URL(url).origin === origin)
+						.map((url) => new URL(url).pathname),
+				),
+			].sort();
+			const bytes = loaded.reduce((total, path) => total + (read(path)?.gzipBytes ?? 0), 0);
+			if (bytes < jsGzipBytes) {
+				jsGzipBytes = bytes;
+				files = loaded;
+			}
+		} finally {
+			await visit.close();
+		}
+	}
+	return { executedChars, jsGzipBytes, files };
+}
+
 async function sameTask(browser, origin, probe) {
 	const visit = await openPage(browser);
 	const results = [];
@@ -541,6 +578,8 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 						? { waste: wasteForRoute(staticInfo, sweep, read, server.origin) }
 						: {}),
 				};
+				log(`${site} ${route}: load weight`);
+				routes[route].load = await loadWeight(browser, server.origin, route, read);
 				routes[route].html = staticInfo.html;
 				routes[route].resumeData = resumeDataBreakdown(staticInfo.html).total;
 			}
