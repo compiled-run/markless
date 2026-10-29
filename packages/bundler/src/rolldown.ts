@@ -1,10 +1,15 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import {
 	DEBUGGING_PLAYBOOK_HINT,
+	clearCompileCache,
 	computeExecutionAttribution,
+	resetParseCache,
 	type LinkedModuleChildResolution,
 } from '@markless/compiler';
 import { clearParsedChunkCode } from './build/chunk-ast.ts';
+import { clearModuleSpecifiers } from './hooks/transform-emit.ts';
+import { clearFactoredRenderDataLiterals } from './render-data-literals.ts';
+import { clearStrippedCode } from './transform.ts';
 import {
 	moveBuildMetadataOutOfClientOutput,
 	moveImportMapOutOfClientOutput,
@@ -298,7 +303,10 @@ export function createMarklessRolldownPlugin(input: {
 			const hook = packing?.buildEnd;
 			await (typeof hook === 'function' ? hook : hook?.handler)?.call(this, error);
 			// Kept only to reuse a compile within the module graph; render and later environments never read it.
-			if (internalOptions.dev !== true) state.linkedTransformCache.clear();
+			if (internalOptions.dev !== true) {
+				state.linkedTransformCache.clear();
+				releaseTransformMemos();
+			}
 		},
 		renderStart: facades?.renderStart,
 		renderChunk: facades?.renderChunk,
@@ -366,6 +374,16 @@ export function createMarklessRolldownPlugin(input: {
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
 	return plugin;
+}
+
+// Memos that spare repeat work while a module graph is built; rendering chunks reads none of them, and a later
+// environment's compiles come back from the persistent compile store.
+function releaseTransformMemos(): void {
+	clearCompileCache();
+	resetParseCache();
+	clearStrippedCode();
+	clearModuleSpecifiers();
+	clearFactoredRenderDataLiterals();
 }
 
 function pluginName(environment: Environment) {

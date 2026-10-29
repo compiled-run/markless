@@ -92,6 +92,10 @@ let persistentStrippedCode:
 	| { get(key: string): string | undefined; set(key: string, value: string): void }
 	| undefined;
 
+export function clearStrippedCode(): void {
+	strippedCode.clear();
+}
+
 export function usePersistentStrippedCode(memo: typeof persistentStrippedCode): void {
 	persistentStrippedCode = memo;
 }

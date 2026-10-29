@@ -9,6 +9,10 @@ type FactoredLiterals = { records: string[]; factories: string[] };
 const factored = new Map<string, FactoredLiterals>();
 const FACTORED_LIMIT = 512;
 
+export function clearFactoredRenderDataLiterals(): void {
+	factored.clear();
+}
+
 export function factorRenderDataLiterals(
 	records: readonly string[],
 	declarations: string,
