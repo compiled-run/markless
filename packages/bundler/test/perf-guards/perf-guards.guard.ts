@@ -36,6 +36,7 @@ const guards = {
 	G13: 'resume data each list row adds within its anchor',
 	G14: 'code for content a page has not shown does not run at load',
 	G15: 'a page runs no more code at load for linking more routes',
+	G16: 'no page runs or downloads more JS at load than its anchor',
 } as const;
 
 for (const [guard, title] of Object.entries(guards)) {

@@ -33,9 +33,7 @@
 		}
 	},
 	"lean": {
-		"/": [
-			"click@counter-increment"
-		],
+		"/": ["click@counter-increment"],
 		"/records": [],
 		"/settings": []
 	},
@@ -167,9 +165,7 @@
 			"guard": "lean",
 			"subject": "/",
 			"from": null,
-			"to": [
-				"click@counter-increment"
-			],
+			"to": ["click@counter-increment"],
 			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
 		},
 		{
@@ -1944,6 +1940,138 @@
 			"from": 10187,
 			"to": 10407,
 			"reason": "a write observer stands down while an update due in the same pass still loads its code, so one task's writes land together (edit-row demo)"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 11016,
+				"jsGzipBytes": 87498
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 11032,
+				"jsGzipBytes": 87498
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 10982,
+				"jsGzipBytes": 87498
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 147105,
+				"jsGzipBytes": 1563808
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 149654,
+				"jsGzipBytes": 1667412
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 47829,
+				"jsGzipBytes": 408451
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 11370,
+				"jsGzipBytes": 88497
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 11386,
+				"jsGzipBytes": 88497
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 11443,
+				"jsGzipBytes": 88497
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 113031,
+				"jsGzipBytes": 1579694
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 124826,
+				"jsGzipBytes": 1693361
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 22657,
+				"jsGzipBytes": 417354
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
 		}
 	],
 	"runtimeModules": {
@@ -2103,6 +2231,60 @@
 		"docs /ui/accordion": {
 			"raw": 312457,
 			"gzip": 27737
+		}
+	},
+	"loadWeight": {
+		"darwin-arm64": {
+			"bench /": {
+				"executedChars": 11016,
+				"jsGzipBytes": 87498
+			},
+			"bench /records": {
+				"executedChars": 11032,
+				"jsGzipBytes": 87498
+			},
+			"bench /settings": {
+				"executedChars": 10982,
+				"jsGzipBytes": 87498
+			},
+			"docs /": {
+				"executedChars": 147105,
+				"jsGzipBytes": 1563808
+			},
+			"docs /concepts/state": {
+				"executedChars": 149654,
+				"jsGzipBytes": 1667412
+			},
+			"docs /ui/accordion": {
+				"executedChars": 47829,
+				"jsGzipBytes": 408451
+			}
+		},
+		"linux-x64": {
+			"bench /": {
+				"executedChars": 11370,
+				"jsGzipBytes": 88497
+			},
+			"bench /records": {
+				"executedChars": 11386,
+				"jsGzipBytes": 88497
+			},
+			"bench /settings": {
+				"executedChars": 11443,
+				"jsGzipBytes": 88497
+			},
+			"docs /": {
+				"executedChars": 113031,
+				"jsGzipBytes": 1579694
+			},
+			"docs /concepts/state": {
+				"executedChars": 124826,
+				"jsGzipBytes": 1693361
+			},
+			"docs /ui/accordion": {
+				"executedChars": 22657,
+				"jsGzipBytes": 417354
+			}
 		}
 	}
 }
