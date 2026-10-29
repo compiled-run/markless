@@ -76,6 +76,11 @@ export function symbolVirtualModuleId(filename: string, symbolId: string) {
 	return `${SYMBOL_VIRTUAL_PREFIX}${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
 }
 
+/** One module holding several of a source's symbols; it reads back as a symbol module of that source. */
+export function symbolGroupVirtualModuleId(filename: string, groupId: string) {
+	return symbolVirtualModuleId(filename, groupId);
+}
+
 export function encodedSymbolSource(filename: string): string {
 	return encodeURIComponent(filename);
 }

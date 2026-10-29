@@ -334,8 +334,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -569,8 +569,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -861,8 +861,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -1064,8 +1064,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -1269,8 +1269,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -1409,8 +1409,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -1689,8 +1689,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -2057,8 +2057,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -2171,8 +2171,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -2419,8 +2419,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -2742,8 +2742,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -2856,8 +2856,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -3078,8 +3078,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}
@@ -3293,8 +3293,8 @@ export async function loadSymbol(id) {
 }
 
 function runGeneratedSymbolChunkInitializers(mod) {
-	for (const name in mod) {
-		if (!name.startsWith("init__virtual_markless_symbol")) continue;
+	for (const name of Reflect.ownKeys(mod)) {
+		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;
 		const init = mod[name];
 		if (typeof init === "function") init();
 	}

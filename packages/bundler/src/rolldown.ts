@@ -138,7 +138,13 @@ export function createMarklessRolldownPlugin(input: {
 
 	function* runtimeDemandSources() {
 		for (const manifest of state.moduleMetadata.symbolClaimManifests())
-			yield { source: manifest.source, map: manifest.runtimeDemandMap };
+			yield {
+				source: manifest.source,
+				map: manifest.runtimeDemandMap,
+				...(manifest.symbolGroups
+					? { symbolGroups: new Map(Object.entries(manifest.symbolGroups)) }
+					: {}),
+			};
 	}
 
 	// `resolveSpecifier`/`encodeSource` are the bundler's; the compiler pass owns
