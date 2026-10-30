@@ -2240,6 +2240,34 @@
 				"jsGzipBytes": 406068
 			},
 			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110779,
+				"jsGzipBytes": 1564841
+			},
+			"to": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1564960
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's dev-error module; clipping long-line frames and building pluginCode on first read adds 119 B gzip (measured on CI, PR #375 on main 587f11549)"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121829,
+				"jsGzipBytes": 1678055
+			},
+			"to": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678174
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's dev-error module; clipping long-line frames and building pluginCode on first read adds 119 B gzip (measured on CI, PR #375 on main 587f11549)"
 		}
 	],
 	"runtimeModules": {
@@ -2442,12 +2470,12 @@
 				"jsGzipBytes": 87007
 			},
 			"docs /": {
-				"executedChars": 110779,
-				"jsGzipBytes": 1564841
+				"executedChars": 110778,
+				"jsGzipBytes": 1564960
 			},
 			"docs /concepts/state": {
-				"executedChars": 121829,
-				"jsGzipBytes": 1678055
+				"executedChars": 121828,
+				"jsGzipBytes": 1678174
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,
