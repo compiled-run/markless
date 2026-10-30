@@ -7,17 +7,13 @@ import type { ShowcaseApp } from './types.ts';
 
 const grid = readFileSync(new URL('./showcase-grid.tsrx', import.meta.url), 'utf8');
 const sample = showcaseApps[0]!;
-const counted = (ported: number, total: number): ShowcaseApp => ({
-	...sample,
-	coverage: { ...sample.coverage!, ported, total },
-});
+const counted = (ported: number, total: number): ShowcaseApp => ({ ...sample, coverage: { ...sample.coverage!, ported, total } });
 
 describe('the showcase cards', () => {
 	it('says how many pages moved in words', () => {
 		expect(progressLine(counted(212, 498))).toBe('212 of 498 pages moved');
 		expect(progressLine({ ...sample, coverage: null })).toBe('Pages not counted yet');
-		for (const card of cards)
-			expect(card.progress).toMatch(/^(\d+ of \d+ pages moved|Pages not counted yet)$/);
+		for (const card of cards) expect(card.progress).toMatch(/^(\d+ of \d+ pages moved|Pages not counted yet)$/);
 	});
 
 	it('piles the pages in proportion, never taller than the cap, and at least one sheet when a pile holds any', () => {
@@ -31,19 +27,16 @@ describe('the showcase cards', () => {
 
 	it('hides the JavaScript figure when the home page was not measured, rather than showing 0 kB', () => {
 		expect(appView({ ...sample, headline: null }).headline).toBeNull();
-		for (const card of cards)
-			expect(card.before === '0.0 kB' && card.after === '0.0 kB').toBe(false);
+		for (const card of cards) expect(card.before === '0.0 kB' && card.after === '0.0 kB').toBe(false);
 		expect(grid).toContain('@if (card.before && card.after)');
 	});
 
 	it('points at the Markless port when the front door and the original are no longer hosted', () => {
-		const retired = appView({
-			...sample,
-			links: { ...sample.links, frontDoor: null, old: null, report: null },
-		});
-		expect(retired.links.map((link) => link.id)).not.toContain('front');
-		expect(retired.links.map((link) => link.id)).not.toContain('old');
-		expect(retired.links.map((link) => link.id)).not.toContain('report');
+		const retired = appView({ ...sample, links: { ...sample.links, frontDoor: null, old: null, report: null } });
+		const ids = retired.links.map((link) => link.id);
+		expect(ids).not.toContain('front');
+		expect(ids).not.toContain('old');
+		expect(ids).not.toContain('report');
 		expect(retired.links.find((link) => link.main)?.href).toBe(sample.links.markless);
 		expect(retired.hostName).toBe(new URL(sample.links.markless).host);
 	});

@@ -84,11 +84,7 @@ export type ShowcaseApp = {
 	readonly gaps: readonly ShowcaseGap[];
 	readonly downloadedBasis: string;
 	/** `null` when the check measured no JavaScript on the home page. */
-	readonly headline: {
-		readonly route: string;
-		readonly before: number;
-		readonly after: number;
-	} | null;
+	readonly headline: { readonly route: string; readonly before: number; readonly after: number } | null;
 	readonly links: {
 		/** `null` once the front door is no longer hosted. */
 		readonly frontDoor: string | null;

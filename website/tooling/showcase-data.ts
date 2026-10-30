@@ -545,10 +545,7 @@ function buildApp(
 	const checks = [...checkTotals.values()];
 	const green = checks.every((one) => one.failed === 0) && red.size === 0;
 	const home = report.routes.find(
-		(one) =>
-			one.route === '/' &&
-			one.weight &&
-			one.weight.old.executed + one.weight.new.executed > 0,
+		(one) => one.route === '/' && one.weight && one.weight.old.executed + one.weight.new.executed > 0,
 	);
 	const checkedPatterns = new Set(routes.map((one) => one.pattern));
 	const basis = fromLog
@@ -571,13 +568,15 @@ function buildApp(
 		switchedWithoutCheck: switched
 			.filter((one) => !checkedPatterns.has(one.route) && one.forced)
 			.map((one) => ({ route: one.route, reason: one.forced!.reason })),
-		accepted: [...accepted.values()].map((entry): ShowcaseAccepted => ({
-			reason: entry.reason,
-			by: entry.by,
-			count: entry.count,
-			checks: [...entry.checks],
-			routes: [...entry.routes],
-		})),
+		accepted: [...accepted.values()].map(
+			(entry): ShowcaseAccepted => ({
+				reason: entry.reason,
+				by: entry.by,
+				count: entry.count,
+				checks: [...entry.checks],
+				routes: [...entry.routes],
+			}),
+		),
 		red: [...red.values()],
 		gaps: app.gaps ? app.gaps(log) : [],
 		downloadedBasis: app.downloadedNote

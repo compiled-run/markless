@@ -55,9 +55,7 @@ export function checksPassed(app: ShowcaseApp): string {
 
 /** `212 of 498 pages moved`, or `Pages not counted yet` before a coverage run. */
 export function progressLine(app: ShowcaseApp): string {
-	return app.coverage
-		? `${app.coverage.ported} of ${app.coverage.total} pages moved`
-		: 'Pages not counted yet';
+	return app.coverage ? `${app.coverage.ported} of ${app.coverage.total} pages moved` : 'Pages not counted yet';
 }
 
 const marks: readonly (readonly [RegExp, Mark])[] = [
@@ -72,8 +70,7 @@ const marks: readonly (readonly [RegExp, Mark])[] = [
 ];
 
 /** The ink logo for what an app was built with, by the first framework its description names. */
-export const markFor = (builtWith: string): Mark | null =>
-	marks.find(([pattern]) => pattern.test(builtWith))?.[1] ?? null;
+export const markFor = (builtWith: string): Mark | null => marks.find(([pattern]) => pattern.test(builtWith))?.[1] ?? null;
 
 export type Card = {
 	readonly slug: string;
@@ -278,18 +275,14 @@ export function appView(app: ShowcaseApp): AppView {
 						},
 					]
 				: []),
-			...(app.links.old
-				? [{ id: 'old', label: 'Original', href: app.links.old, main: false }]
-				: []),
+			...(app.links.old ? [{ id: 'old', label: 'Original', href: app.links.old, main: false }] : []),
 			{
 				id: 'markless',
 				label: app.links.frontDoor ? 'Markless only' : 'Visit the Markless port',
 				href: app.links.markless,
 				main: !app.links.frontDoor,
 			},
-			...(app.links.report
-				? [{ id: 'report', label: 'Full report', href: app.links.report, main: false }]
-				: []),
+			...(app.links.report ? [{ id: 'report', label: 'Full report', href: app.links.report, main: false }] : []),
 			{ id: 'port', label: 'Source of the port', href: app.links.port, main: false },
 			...(app.links.originalRepo
 				? [
