@@ -46,7 +46,7 @@ export class MarklessCompileError extends Error {
 	readonly loc?: MarklessErrorLocation;
 	readonly frame?: string;
 	readonly plugin = 'markless';
-	readonly pluginCode: string;
+	#pluginCode: string | undefined;
 
 	constructor(payload: MarklessDevErrorPayload) {
 		super(payload.details);
@@ -59,7 +59,15 @@ export class MarklessCompileError extends Error {
 				? { file: primary.filename, line: primary.line, column: primary.column }
 				: undefined;
 		this.frame = primary?.frame;
-		this.pluginCode = serializeMarklessDevError(this.payload);
+	}
+
+	// A build holds compile errors that a wider link input later clears; most are never shown.
+	get pluginCode(): string {
+		return (this.#pluginCode ??= serializeMarklessDevError(this.payload));
+	}
+
+	set pluginCode(value: string) {
+		this.#pluginCode = value;
 	}
 }
 
@@ -123,21 +131,33 @@ export function formatMarklessSourceFrame(source: string, span: SourceSpan): str
 	const firstLine = Math.max(1, start.line - 2);
 	const lastLine = Math.min(lines.length, start.line + 2);
 	const width = String(lastLine).length;
+	// Generated and converted modules carry lines megabytes long; the frame shows a window around the caret.
+	const from = Math.max(0, start.column - 1 - FRAME_CONTEXT_COLUMNS);
+	const to = start.column - 1 + FRAME_CONTEXT_COLUMNS;
 	const frame: string[] = [];
 	for (let line = firstLine; line <= lastLine; line += 1) {
 		const active = line === start.line;
 		const text = lines[line - 1] ?? '';
-		frame.push(`${active ? '>' : ' '} ${String(line).padStart(width)} | ${text}`);
+		const shown = active
+			? `${from > 0 ? '…' : ''}${text.slice(from, to)}${text.length > to ? '…' : ''}`
+			: text.length > 2 * FRAME_CONTEXT_COLUMNS
+				? `${text.slice(0, 2 * FRAME_CONTEXT_COLUMNS)}…`
+				: text;
+		frame.push(`${active ? '>' : ' '} ${String(line).padStart(width)} | ${shown}`);
 		if (active) {
 			const firstLineEnd = start.line === end.line ? end.column : text.length + 1;
-			const caretLength = Math.max(1, firstLineEnd - start.column);
-			frame.push(
-				`  ${' '.repeat(width)} | ${' '.repeat(start.column - 1)}${'^'.repeat(caretLength)}`,
+			const caretLength = Math.min(
+				Math.max(1, firstLineEnd - start.column),
+				to - (start.column - 1),
 			);
+			const indent = start.column - 1 - from + (from > 0 ? 1 : 0);
+			frame.push(`  ${' '.repeat(width)} | ${' '.repeat(indent)}${'^'.repeat(caretLength)}`);
 		}
 	}
 	return frame.join('\n');
 }
+
+const FRAME_CONTEXT_COLUMNS = 80;
 
 export function renderMarklessDevErrorDocument(
 	payload: MarklessDevErrorPayload,
