@@ -15,10 +15,23 @@ import { codeBlocks } from './tooling/code-blocks.ts';
 import { codeClient } from './tooling/code-client.ts';
 import { seoFiles } from './tooling/seo-files.ts';
 import { siteBase } from './site-base.ts';
+import { flatNav } from './nav.ts';
+
+// On Cloudflare every page and its fragment URL is a static file, so a page view never runs the Worker.
+const cloudflare = (process.env.NITRO_PRESET ?? '').startsWith('cloudflare');
+const prerendered = Object.fromEntries(
+	flatNav.flatMap(({ href }) => [
+		[href, { prerender: true }],
+		[`/_markless/fragment${href === '/' ? '/' : href}`, { prerender: true }],
+	]),
+);
 
 export default {
 	base: siteBase,
-	nitro: { baseURL: siteBase },
+	nitro: {
+		baseURL: siteBase,
+		...(cloudflare ? { routeRules: prerendered, compressPublicAssets: false } : {}),
+	},
 	// pageProps, codeBlocks and uiDemos run before router(): they rewrite the .mdx source router() parses.
 	// highlightMdx runs after router(): it rewrites the module router() emits.
 	lint: {
