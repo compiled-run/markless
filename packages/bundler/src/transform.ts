@@ -310,7 +310,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const settleId = settleVirtualModuleId(input.filename);
 	const { compiled: compiledForAllClasses, blockingDiagnostics } =
 		await compileWithBlockingDiagnostics(input, resolverId);
-	throwIfBlocked(input, blockingDiagnostics);
+	const linkPendingDiagnostics = linkPendingRefusals(
+		input,
+		compiledForAllClasses,
+		blockingDiagnostics,
+	);
+	throwIfBlocked(
+		input,
+		blockingDiagnostics.filter((diagnostic) => !linkPendingDiagnostics.includes(diagnostic)),
+	);
 	const runtimeDemandClass = input.runtimeDemandClass ?? 'prerender';
 	const servedScalarPlans =
 		input.servedScalarPlans === true && runtimeDemandClass === 'prerender' && !input.prerenderRecords
@@ -914,7 +922,34 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],
 			),
 		),
+		...(linkPendingDiagnostics.length > 0 ? { linkPendingDiagnostics } : {}),
 	};
+}
+
+// An imported component with no interface yet counts as an unknown number of elements, so an
+// element beside it is refused until the link supplies the component's size.
+function linkPendingRefusals(
+	input: TransformTsrxModuleInput,
+	compiled: CompileTsrxModuleResult,
+	blockingDiagnostics: readonly CompilerDiagnostic[],
+): readonly CompilerDiagnostic[] {
+	if (
+		input.linkPending !== true ||
+		input.importedModuleInterfaces !== undefined ||
+		prerenderInterfacesComplete(compiled, input)
+	)
+		return [];
+	return blockingDiagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_UNADDRESSABLE',
+	);
+}
+
+/** Throws the refusals a `linkPending` compile held when no compile against linked imports replaced it. */
+export function throwIfLinkPending(
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source'>,
+	result: Pick<TransformTsrxModuleResult, 'linkPendingDiagnostics'>,
+): void {
+	throwIfBlocked(input, result.linkPendingDiagnostics ?? []);
 }
 
 // A relative specifier in the render-data virtual module would resolve against

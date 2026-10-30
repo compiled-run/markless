@@ -185,6 +185,8 @@ export function planTransformHookRequest(
 		prerenderRecordData:
 			currentEnvironment === 'client' ? ctx.prerenderRecordsBySource?.get(source) : undefined,
 		serverRenderedPages: internalOptions.routeModules !== undefined,
+		// A route artifact emits its first pass unlinked, so its refusals have to stand.
+		linkPending: !clientRouteArtifact,
 	};
 	return {
 		ctx,
