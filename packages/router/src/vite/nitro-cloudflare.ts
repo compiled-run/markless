@@ -45,14 +45,13 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 				const serverDir = nitro.options.output.serverDir;
 				const config = JSON.parse(
 					await readFile(join(serverDir, 'wrangler.json'), 'utf8').catch(() => '{}'),
-				) as { main?: string; assets?: { run_worker_first?: boolean | readonly string[] } };
-				// Pages routes by _routes.json and has no `main`; only a Worker with static assets is pruned.
-				const workerFirst = config.assets?.run_worker_first ?? [];
-				if (!config.main || workerFirst === true) return;
+				) as WranglerConfig;
+				const workerFirst = workerFirstPatterns(config);
+				if (workerFirst === undefined || !config.main) return;
 				const { pages, bytes } = await pruneRenderedPages(
 					serverDir,
 					prerendered,
-					workerFirst || [],
+					workerFirst,
 					config.main,
 				);
 				if (pages > 0)
@@ -62,6 +61,36 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 			});
 		},
 	};
+}
+
+interface WranglerAssets {
+	readonly html_handling?: string;
+	readonly run_worker_first?: boolean | readonly string[];
+}
+
+interface WranglerConfig {
+	readonly main?: string;
+	readonly pages_build_output_dir?: string;
+	readonly assets?: WranglerAssets;
+	readonly env?: Readonly<Record<string, { readonly assets?: WranglerAssets }>>;
+}
+
+// Every run_worker_first pattern of the config and its environments, or undefined when pruning is not safe:
+// Pages routes by _routes.json, and only Cloudflare's default html handling serves `/guide` from guide.html.
+export function workerFirstPatterns(config: WranglerConfig): string[] | undefined {
+	if (config.pages_build_output_dir !== undefined) return undefined;
+	const patterns: string[] = [];
+	for (const assets of [
+		config.assets,
+		...Object.values(config.env ?? {}).map((env) => env.assets),
+	]) {
+		if (!assets) continue;
+		if (assets.html_handling !== undefined && assets.html_handling !== 'auto-trailing-slash')
+			return undefined;
+		if (assets.run_worker_first === true) return undefined;
+		if (Array.isArray(assets.run_worker_first)) patterns.push(...assets.run_worker_first);
+	}
+	return patterns;
 }
 
 const PAGE_IMPORT = /"(\/?pages\/[^"]+)"\s*:\s*\(\)\s*=>\s*import\(\s*"(\.{1,2}\/[^"]+)"\s*\)/g;
@@ -78,20 +107,20 @@ export async function pruneRenderedPages(
 	workerFirst: readonly string[] = [],
 	main = 'index.mjs',
 ): Promise<{ pages: number; bytes: number }> {
-	// A URL that `assets.run_worker_first` sends to the Worker is rendered there even when its file exists.
-	const runsWorker = workerFirst
-		.filter((pattern) => !pattern.startsWith('!'))
-		.map(
-			(pattern) =>
-				new RegExp(
-					`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
-				),
-		);
+	// A URL that `assets.run_worker_first` sends to the Worker is rendered there even when its file exists; a `!` pattern wins.
+	const glob = (pattern: string) =>
+		new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
+	const include = workerFirst.filter((pattern) => !pattern.startsWith('!')).map(glob);
+	const exclude = workerFirst
+		.filter((pattern) => pattern.startsWith('!'))
+		.map((pattern) => glob(pattern.slice(1)));
+	const runsWorker = (url: string) =>
+		include.some((pattern) => pattern.test(url)) &&
+		!exclude.some((pattern) => pattern.test(url));
 	const servedAsFile = (path: string) => {
 		const spellings = [path.replace(/\/$/, '') || '/', `${path.replace(/\/$/, '')}/`];
 		return (
-			spellings.some((spelling) => prerendered.has(spelling)) &&
-			!spellings.some((spelling) => runsWorker.some((pattern) => pattern.test(spelling)))
+			spellings.some((spelling) => prerendered.has(spelling)) && !spellings.some(runsWorker)
 		);
 	};
 	const files = (await readdir(serverDir, { recursive: true }))

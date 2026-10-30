@@ -9,7 +9,7 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
-import { pruneRenderedPages } from '../../src/vite/nitro-cloudflare.ts';
+import { pruneRenderedPages, workerFirstPatterns } from '../../src/vite/nitro-cloudflare.ts';
 import { FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
 
 // A Nitro `cloudflare-module` build served by wrangler's local workerd, which applies Workers static
@@ -241,7 +241,42 @@ test('a page whose URL, in either spelling, run_worker_first sends to the Worker
 			pages: 1,
 		});
 		expect((await readdir(dir)).toSorted()).toEqual(['b.mjs', 'index.mjs']);
+		expect(
+			await pruneRenderedPages(dir, prerendered, [
+				'/*',
+				'!/b',
+				'!/b/',
+				'!/_markless/fragment/*',
+			]),
+		).toMatchObject({
+			pages: 1,
+		});
+		expect((await readdir(dir)).toSorted()).toEqual(['index.mjs']);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
+});
+
+test('pages are left out only when every environment serves prerendered URLs from their files', () => {
+	expect(
+		workerFirstPatterns({ main: 'index.mjs', assets: { run_worker_first: ['/api/*'] } }),
+	).toEqual(['/api/*']);
+	expect(
+		workerFirstPatterns({
+			main: 'index.mjs',
+			env: { production: { assets: { run_worker_first: true } } },
+		}),
+	).toBeUndefined();
+	expect(
+		workerFirstPatterns({
+			main: 'index.mjs',
+			env: { staging: { assets: { run_worker_first: ['/x'] } } },
+		}),
+	).toEqual(['/x']);
+	expect(
+		workerFirstPatterns({ main: 'index.mjs', assets: { html_handling: 'none' } }),
+	).toBeUndefined();
+	expect(
+		workerFirstPatterns({ main: 'index.mjs', pages_build_output_dir: '..' }),
+	).toBeUndefined();
 });
