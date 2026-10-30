@@ -45,13 +45,15 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 				const serverDir = nitro.options.output.serverDir;
 				const config = JSON.parse(
 					await readFile(join(serverDir, 'wrangler.json'), 'utf8').catch(() => '{}'),
-				) as { assets?: { run_worker_first?: boolean | readonly string[] } };
+				) as { main?: string; assets?: { run_worker_first?: boolean | readonly string[] } };
+				// Pages routes by _routes.json and has no `main`; only a Worker with static assets is pruned.
 				const workerFirst = config.assets?.run_worker_first ?? [];
-				if (workerFirst === true) return;
+				if (!config.main || workerFirst === true) return;
 				const { pages, bytes } = await pruneRenderedPages(
 					serverDir,
 					prerendered,
 					workerFirst || [],
+					config.main,
 				);
 				if (pages > 0)
 					nitro.logger?.info(
@@ -74,6 +76,7 @@ export async function pruneRenderedPages(
 	serverDir: string,
 	prerendered: ReadonlySet<string>,
 	workerFirst: readonly string[] = [],
+	main = 'index.mjs',
 ): Promise<{ pages: number; bytes: number }> {
 	// A URL that `assets.run_worker_first` sends to the Worker is rendered there even when its file exists.
 	const runsWorker = workerFirst
@@ -84,11 +87,13 @@ export async function pruneRenderedPages(
 					`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
 				),
 		);
-	const servedAsFile = (path: string) =>
-		[path, `${path.replace(/\/$/, '')}/`].some(
-			(spelling) =>
-				prerendered.has(spelling) && !runsWorker.some((pattern) => pattern.test(spelling)),
+	const servedAsFile = (path: string) => {
+		const spellings = [path.replace(/\/$/, '') || '/', `${path.replace(/\/$/, '')}/`];
+		return (
+			spellings.some((spelling) => prerendered.has(spelling)) &&
+			!spellings.some((spelling) => runsWorker.some((pattern) => pattern.test(spelling)))
 		);
+	};
 	const files = (await readdir(serverDir, { recursive: true }))
 		.filter((file) => file.endsWith('.mjs'))
 		.map((file) => join(serverDir, file));
@@ -121,7 +126,7 @@ export async function pruneRenderedPages(
 	}
 	if (pages === 0) return { pages, bytes: 0 };
 	const reached = new Set<string>();
-	const pending = [join(serverDir, 'index.mjs')];
+	const pending = [resolve(serverDir, main)];
 	for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
 		if (reached.has(file)) continue;
 		reached.add(file);

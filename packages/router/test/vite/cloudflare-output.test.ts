@@ -222,7 +222,7 @@ test('the Worker leaves out the modules of pages it never renders, because every
 	expect(missing.status).toBe(404);
 });
 
-test('a page whose URL run_worker_first sends to the Worker keeps its module', async () => {
+test('a page whose URL, in either spelling, run_worker_first sends to the Worker keeps its module', async () => {
 	const dir = await mkdtemp(join(tmpdir(), 'markless-cloudflare-prune-'));
 	try {
 		await writeFile(
@@ -237,7 +237,7 @@ test('a page whose URL run_worker_first sends to the Worker keeps its module', a
 			'/b',
 			`${FRAGMENT_PATH_PREFIX}/b`,
 		]);
-		expect(await pruneRenderedPages(dir, prerendered, ['/b', '!/b/static/*'])).toMatchObject({
+		expect(await pruneRenderedPages(dir, prerendered, ['/b/', '!/b/static/*'])).toMatchObject({
 			pages: 1,
 		});
 		expect((await readdir(dir)).toSorted()).toEqual(['b.mjs', 'index.mjs']);
