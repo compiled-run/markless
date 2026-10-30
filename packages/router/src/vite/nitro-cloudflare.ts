@@ -42,9 +42,16 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 				);
 			});
 			nitro.hooks?.hook('compiled', async () => {
+				const serverDir = nitro.options.output.serverDir;
+				const config = JSON.parse(
+					await readFile(join(serverDir, 'wrangler.json'), 'utf8').catch(() => '{}'),
+				) as { assets?: { run_worker_first?: boolean | readonly string[] } };
+				const workerFirst = config.assets?.run_worker_first ?? [];
+				if (workerFirst === true) return;
 				const { pages, bytes } = await pruneRenderedPages(
-					nitro.options.output.serverDir,
+					serverDir,
 					prerendered,
+					workerFirst || [],
 				);
 				if (pages > 0)
 					nitro.logger?.info(
@@ -66,15 +73,28 @@ const RELATIVE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)["'](\.{1,2}\
 export async function pruneRenderedPages(
 	serverDir: string,
 	prerendered: ReadonlySet<string>,
+	workerFirst: readonly string[] = [],
 ): Promise<{ pages: number; bytes: number }> {
+	// A URL that `assets.run_worker_first` sends to the Worker is rendered there even when its file exists.
+	const runsWorker = workerFirst
+		.filter((pattern) => !pattern.startsWith('!'))
+		.map(
+			(pattern) =>
+				new RegExp(
+					`^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
+				),
+		);
+	const servedAsFile = (path: string) =>
+		[path, `${path.replace(/\/$/, '')}/`].some(
+			(spelling) =>
+				prerendered.has(spelling) && !runsWorker.some((pattern) => pattern.test(spelling)),
+		);
 	const files = (await readdir(serverDir, { recursive: true }))
 		.filter((file) => file.endsWith('.mjs'))
 		.map((file) => join(serverDir, file));
 	const sources = new Map(
 		await Promise.all(files.map(async (file) => [file, await readFile(file, 'utf8')] as const)),
 	);
-	const isPrerendered = (path: string) =>
-		prerendered.has(path) || prerendered.has(`${path.replace(/\/$/, '')}/`);
 	let pages = 0;
 	for (const [file, source] of sources) {
 		const imports = [...source.matchAll(PAGE_IMPORT)];
@@ -85,8 +105,8 @@ export async function pruneRenderedPages(
 				.filter(
 					(route) =>
 						route.params.length === 0 &&
-						isPrerendered(route.pathname) &&
-						isPrerendered(`${FRAGMENT_PATH_PREFIX}${route.pathname}`),
+						servedAsFile(route.pathname) &&
+						servedAsFile(`${FRAGMENT_PATH_PREFIX}${route.pathname}`),
 				)
 				.map((route) => route.file),
 		);

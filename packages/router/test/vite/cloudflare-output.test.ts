@@ -1,15 +1,15 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
-import { createServer, request, type IncomingHttpHeaders, type ServerResponse } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { brotliCompressSync, constants } from 'node:zlib';
 import { join, resolve } from 'pathe';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { pruneRenderedPages } from '../../src/vite/nitro-cloudflare.ts';
 import { FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
 
 // A Nitro `cloudflare-module` build served by wrangler's local workerd, which applies Workers static
@@ -181,63 +181,30 @@ test('a page that is not prerendered streams from the Worker, its @pending arm a
 	expect(all).not.toContain(SERVED_FROM_ASSETS);
 });
 
-function getRaw(path: string, acceptEncoding: string) {
-	return new Promise<{ status: number; headers: IncomingHttpHeaders; body: Buffer }>(
-		(done, fail) => {
-			const req = request(
-				origin + path,
-				{ headers: { 'accept-encoding': acceptEncoding } },
-				(res) => {
-					const chunks: Buffer[] = [];
-					res.on('data', (chunk: Buffer) => chunks.push(chunk));
-					res.on('end', () =>
-						done({
-							status: res.statusCode!,
-							headers: res.headers,
-							body: Buffer.concat(chunks),
-						}),
-					);
-				},
-			);
-			req.on('error', fail);
-			req.end();
-		},
-	);
-}
-
-test('a client chunk is sent as its brotli copy written at quality 11, kept by browsers for a year', async () => {
-	const dir = join(root, '.output/public', MARKLESS_BUILD_PREFIX);
-	const scripts = (await readdir(dir)).filter((file) => /\.(?:js|css)$/.test(file));
-	const sized = await Promise.all(
-		scripts.map(async (file) => ({ file, source: await readFile(join(dir, file)) })),
-	);
-	const { file, source } = sized.sort((a, b) => b.source.length - a.source.length)[0]!;
-	const br = await getRaw(`/${MARKLESS_BUILD_PREFIX}${file}`, 'br');
-	expect(br.status).toBe(200);
-	expect(br.headers['content-encoding']).toBe('br');
-	expect(br.headers['content-type']).toMatch(/javascript|css/);
-	expect(br.headers['cache-control']).toContain('immutable');
-	expect(String(br.headers.vary)).toMatch(/accept-encoding/i);
+test('a client chunk is a static file kept by browsers for a year, and no compressed copy is uploaded beside it', async () => {
+	const publicDir = join(root, '.output/public');
+	const chunk = (await readdir(join(publicDir, MARKLESS_BUILD_PREFIX))).find((file) =>
+		file.endsWith('.js'),
+	)!;
+	const response = await get(`/${MARKLESS_BUILD_PREFIX}${chunk}`);
+	expect(response.status).toBe(200);
+	expect(response.headers.get('content-type')).toMatch(/javascript/);
+	expect(response.headers.get('cache-control')).toContain('immutable');
 	expect(
-		br.body.equals(
-			brotliCompressSync(source, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }),
+		Buffer.from(await response.arrayBuffer()).equals(
+			await readFile(join(publicDir, MARKLESS_BUILD_PREFIX, chunk)),
 		),
 	).toBe(true);
-	const plain = await getRaw(`/${MARKLESS_BUILD_PREFIX}${file}`, 'identity');
-	expect(plain.status).toBe(200);
-	expect(plain.headers['content-encoding']).toBeUndefined();
-	expect(plain.headers['cache-control']).toContain('immutable');
-	expect(plain.body.equals(source)).toBe(true);
-});
-
-test('the only compressed copies uploaded are the client chunks the Worker sends', async () => {
-	const publicDir = join(root, '.output/public');
+	const config = JSON.parse(
+		await readFile(join(root, '.output/server/wrangler.json'), 'utf8'),
+	) as {
+		assets: { run_worker_first?: unknown };
+	};
+	expect(config.assets.run_worker_first).toBeUndefined();
 	const copies = (await readdir(publicDir, { recursive: true })).filter((file) =>
 		/\.(?:br|gz|zst)$/.test(file),
 	);
-	expect(copies.length).toBeGreaterThan(0);
-	for (const copy of copies)
-		expect(copy).toMatch(new RegExp(`^${MARKLESS_BUILD_PREFIX}.+\\.(?:js|css)\\.br$`));
+	expect(copies).toEqual([]);
 });
 
 test('the Worker leaves out the modules of pages it never renders, because every URL of theirs is a prerendered file', async () => {
@@ -253,4 +220,28 @@ test('the Worker leaves out the modules of pages it never renders, because every
 	expect(shipped('loading report')).toBe(true);
 	const missing = await get('/no-such-page');
 	expect(missing.status).toBe(404);
+});
+
+test('a page whose URL run_worker_first sends to the Worker keeps its module', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'markless-cloudflare-prune-'));
+	try {
+		await writeFile(
+			join(dir, 'index.mjs'),
+			'export const pages = { "/pages/a.tsrx": () => import("./a.mjs"), "/pages/b.tsrx": () => import("./b.mjs") };\n',
+		);
+		await writeFile(join(dir, 'a.mjs'), 'export default "a";\n');
+		await writeFile(join(dir, 'b.mjs'), 'export default "b";\n');
+		const prerendered = new Set([
+			'/a',
+			`${FRAGMENT_PATH_PREFIX}/a`,
+			'/b',
+			`${FRAGMENT_PATH_PREFIX}/b`,
+		]);
+		expect(await pruneRenderedPages(dir, prerendered, ['/b', '!/b/static/*'])).toMatchObject({
+			pages: 1,
+		});
+		expect((await readdir(dir)).toSorted()).toEqual(['b.mjs', 'index.mjs']);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
 });

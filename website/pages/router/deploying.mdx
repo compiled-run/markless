@@ -80,10 +80,8 @@ Pages that are not prerendered render in the Worker and stream, so a `@pending` 
 before its data is ready. A Worker can be at most 64 MiB, so the router leaves out of it the code of
 every page whose page and fragment URLs were both prerendered: those requests never reach it.
 
-Browser code under `/build/` is the one exception: the Worker sends each file as a brotli copy
-written at the highest quality, about 14% smaller than what Cloudflare's edge compresses on its own.
-That runs the Worker for those requests. To serve them as plain static files instead, set
-`compressPublicAssets: false` under the `nitro` key.
+Browser code under `/build/` is static too, kept by browsers for a year. Cloudflare compresses it at
+its edge, so the router writes no `.gz` or `.br` copies for this preset.
 
 Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`; Nitro merges that file
 into the one it writes.
