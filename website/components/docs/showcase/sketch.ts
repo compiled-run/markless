@@ -10,7 +10,15 @@ export const ANGLES = [-3, 2, -2, 2.5];
 export const HATCH = -0.8;
 export const PILES = { base: 166, max: 88, w: 30, dx: 9, dy: -7, old: 210, moved: 266 };
 /** The layers of every sketch file, bottom to top; each is a `<g id>` the card draws with `<use>` in its own colour. */
-export const DESK_LAYERS = ['ground', 'pile-shadow', 'pile-paper', 'pile-tone', 'pile-wash', 'pile-hatch', 'pile-ink'] as const;
+export const DESK_LAYERS = [
+	'ground',
+	'pile-shadow',
+	'pile-paper',
+	'pile-tone',
+	'pile-wash',
+	'pile-hatch',
+	'pile-ink',
+] as const;
 export const CAST_LAYERS = ['sheet-shade', 'sheet-hatch'] as const;
 /** Drawn over the sheet: the paper under the screenshot, then the hatching and ink over it. */
 export const SHEET_UNDER = 'sheet-paper';
@@ -30,8 +38,12 @@ export function shotPlacement(at: number) {
 }
 
 /** Pages still on the old app and pages moved; `null` before a coverage run. */
-export function pileCounts(app: ShowcaseApp): { readonly old: number; readonly moved: number } | null {
-	return app.coverage ? { old: app.coverage.total - app.coverage.ported, moved: app.coverage.ported } : null;
+export function pileCounts(
+	app: ShowcaseApp,
+): { readonly old: number; readonly moved: number } | null {
+	return app.coverage
+		? { old: app.coverage.total - app.coverage.ported, moved: app.coverage.ported }
+		: null;
 }
 
 /** A pile's drawn height: in proportion to every page of the app, at least one sheet when it holds any. */

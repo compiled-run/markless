@@ -255,17 +255,26 @@ function tableRows(text: string): string[][] {
 		);
 }
 
-function deployedLinks(log: string): { front: string; old: string | null; markless: string } {
+function deployedLinks(log: string): {
+	front: string | null;
+	old: string | null;
+	oldRetired: boolean;
+	markless: string;
+} {
 	const rows = tableRows(section(log, /^## Deployed/));
 	const url = (row: string[] | undefined) => row?.[1]?.match(/https:\/\/[^\s,|]+/)?.[0] ?? null;
-	const front = url(rows.find((row) => row[0].startsWith('Front door')));
-	const old = url(rows.find((row) => /^Old (app|site)/.test(row[0])));
+	// A row the log marks "taken down" names a host that no longer answers.
+	const retired = (row: string[] | undefined) => /taken down/.test(row?.[1] ?? '');
+	const frontRow = rows.find((row) => row[0].startsWith('Front door'));
+	const oldRow = rows.find((row) => /^Old (app|site)/.test(row[0]));
+	const front = retired(frontRow) ? null : url(frontRow);
+	const old = retired(oldRow) ? null : url(oldRow);
 	const markless = url(
 		rows.find((row) => /^(New app|Markless app|The Markless app alone)/.test(row[0])),
 	);
-	if (!front || !markless)
+	if ((!front && !retired(frontRow)) || !markless)
 		throw new Error('showcase: the Deployed table names no front door or Markless app');
-	return { front, old, markless };
+	return { front, old, oldRetired: retired(oldRow), markless };
 }
 
 const range = (values: readonly number[]): BytesRange => ({
@@ -536,7 +545,10 @@ function buildApp(
 	const checks = [...checkTotals.values()];
 	const green = checks.every((one) => one.failed === 0) && red.size === 0;
 	const home = report.routes.find(
-		(one) => one.route === '/' && one.weight && one.weight.old.executed + one.weight.new.executed > 0,
+		(one) =>
+			one.route === '/' &&
+			one.weight &&
+			one.weight.old.executed + one.weight.new.executed > 0,
 	);
 	const checkedPatterns = new Set(routes.map((one) => one.pattern));
 	const basis = fromLog
@@ -559,15 +571,13 @@ function buildApp(
 		switchedWithoutCheck: switched
 			.filter((one) => !checkedPatterns.has(one.route) && one.forced)
 			.map((one) => ({ route: one.route, reason: one.forced!.reason })),
-		accepted: [...accepted.values()].map(
-			(entry): ShowcaseAccepted => ({
-				reason: entry.reason,
-				by: entry.by,
-				count: entry.count,
-				checks: [...entry.checks],
-				routes: [...entry.routes],
-			}),
-		),
+		accepted: [...accepted.values()].map((entry): ShowcaseAccepted => ({
+			reason: entry.reason,
+			by: entry.by,
+			count: entry.count,
+			checks: [...entry.checks],
+			routes: [...entry.routes],
+		})),
 		red: [...red.values()],
 		gaps: app.gaps ? app.gaps(log) : [],
 		downloadedBasis: app.downloadedNote
@@ -578,14 +588,14 @@ function buildApp(
 			: null,
 		links: {
 			frontDoor: links.front,
-			old: links.old ?? oldOrigin,
+			old: links.oldRetired ? null : (links.old ?? oldOrigin),
 			markless: links.markless,
-			report: `${links.front}/_migrate/report.html`,
+			report: links.front ? `${links.front}/_migrate/report.html` : null,
 			port: portBase + app.example,
 			originalRepo: app.originalRepo
 				? checkedFact(app.originalRepo, log, 'originalRepo')
 				: null,
-			originalSite: links.old ? null : oldOrigin,
+			originalSite: links.old || links.oldRetired ? null : oldOrigin,
 			licence: licenceText(root, app.licence, log),
 		},
 		shot: `/showcase/${app.slug}.webp`,
