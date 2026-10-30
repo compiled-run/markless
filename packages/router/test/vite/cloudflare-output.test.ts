@@ -239,3 +239,18 @@ test('the only compressed copies uploaded are the client chunks the Worker sends
 	for (const copy of copies)
 		expect(copy).toMatch(new RegExp(`^${MARKLESS_BUILD_PREFIX}.+\\.(?:js|css)\\.br$`));
 });
+
+test('the Worker leaves out the modules of pages it never renders, because every URL of theirs is a prerendered file', async () => {
+	const serverDir = join(root, '.output/server');
+	const code = await Promise.all(
+		(await readdir(serverDir, { recursive: true }))
+			.filter((file) => file.endsWith('.mjs'))
+			.map((file) => readFile(join(serverDir, file), 'utf8')),
+	);
+	const shipped = (text: string) => code.some((source) => source.includes(text));
+	expect(shipped('Prerendered guide')).toBe(false);
+	expect(shipped('Prerendered intro')).toBe(false);
+	expect(shipped('loading report')).toBe(true);
+	const missing = await get('/no-such-page');
+	expect(missing.status).toBe(404);
+});
