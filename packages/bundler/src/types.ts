@@ -118,7 +118,7 @@ export interface TransformTsrxModuleInput {
 	// A client module served as a payload document: a conservative demand class still runs
 	// plain-ssr scalar plans, resolved only through served locators.
 	servedScalarPlans?: boolean;
-	/** Compiled before its imports are linked: a refusal an imported interface could clear is held on the result, not thrown. */
+	/** Compiled while imports may still be unlinked: a refusal a missing component interface could clear is held on the result, not thrown. */
 	linkPending?: boolean;
 }
 
@@ -137,7 +137,7 @@ export interface TransformTsrxModuleResult {
 		readonly source: string;
 		readonly exportName: string;
 	}>;
-	/** Refusals a `linkPending` compile held; a compile against the linked imports decides them. */
+	/** Refusals a `linkPending` compile held; a compile with every component interface decides them. */
 	linkPendingDiagnostics?: ReadonlyArray<CompilerDiagnostic>;
 }
 

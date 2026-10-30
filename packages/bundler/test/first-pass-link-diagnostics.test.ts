@@ -41,7 +41,11 @@ export default function Page() @{
 	</main>
 }`;
 
-async function buildPage(card: string, page = PAGE) {
+async function buildPage(
+	card: string,
+	page = PAGE,
+	extraFiles: Readonly<Record<string, string>> = {},
+) {
 	const directory = await realpath(await mkdtemp(join(tmpdir(), 'markless-first-pass-')));
 	const compiles: Array<{ readonly linked: boolean }> = [];
 	useCompileRunner((input) => {
@@ -52,6 +56,8 @@ async function buildPage(card: string, page = PAGE) {
 	try {
 		await writeFile(join(directory, 'Card.tsrx'), card);
 		await writeFile(join(directory, 'Page.tsrx'), page);
+		for (const [name, text] of Object.entries(extraFiles))
+			await writeFile(join(directory, name), text);
 		await writeFile(join(directory, 'entry.js'), `export { default } from './Page.tsrx';\n`);
 		const build = await rolldown({
 			input: join(directory, 'entry.js'),
@@ -94,4 +100,15 @@ test('a refusal held for the link throws if nothing linked replaces the compile'
 	await expect(transformTsrxModule({ ...input, linkPending: false })).rejects.toThrow(
 		/MARKLESS_ELEMENT_UNADDRESSABLE/,
 	);
+});
+
+test('a page importing one component directly and another through a barrel still links the direct one', async () => {
+	const page = PAGE.replace(
+		"import Card from './Card.tsrx';",
+		"import Card from './Card.tsrx';\nimport { Badge } from './parts.ts';",
+	).replace('<main>', '<main>\n\t\t<Badge />');
+	await buildPage(CARD, page, {
+		'Badge.tsrx': `export default function Badge() @{\n\t<span>new</span>\n}`,
+		'parts.ts': `export { default as Badge } from './Badge.tsrx';\n`,
+	});
 });

@@ -927,18 +927,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 }
 
 // An imported component with no interface yet counts as an unknown number of elements, so an
-// element beside it is refused until the link supplies the component's size.
+// element beside it is refused until a compile with every component's interface decides it.
 function linkPendingRefusals(
 	input: TransformTsrxModuleInput,
 	compiled: CompileTsrxModuleResult,
 	blockingDiagnostics: readonly CompilerDiagnostic[],
 ): readonly CompilerDiagnostic[] {
-	if (
-		input.linkPending !== true ||
-		input.importedModuleInterfaces !== undefined ||
-		prerenderInterfacesComplete(compiled, input)
-	)
-		return [];
+	if (input.linkPending !== true || prerenderInterfacesComplete(compiled, input)) return [];
 	return blockingDiagnostics.filter(
 		(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_UNADDRESSABLE',
 	);
