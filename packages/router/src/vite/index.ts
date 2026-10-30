@@ -85,6 +85,7 @@ import {
 	serverBuildState,
 	type ServerBuildState,
 } from './nitro-prerender.ts';
+import { cloudflareModule } from './nitro-cloudflare.ts';
 import {
 	buildRouteManifestFromFileIds,
 	isPageModuleFile,
@@ -797,6 +798,9 @@ function createNitroConfig(
 				nitroConfig?.compressPublicAssets !== undefined,
 				compressedAssets,
 			),
+			cloudflareModule({
+				autoSubfolderIndex: nitroConfig?.prerender?.autoSubfolderIndex !== undefined,
+			}),
 			...(isBuild
 				? [prerenderRendererModule(serverBuild, [MARKLESS_BUILD_PREFIX, LINK_BRIDGE_DIR])]
 				: [devNitroModule(devNitro)]),

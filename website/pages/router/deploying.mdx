@@ -61,8 +61,35 @@ NITRO_PRESET=vercel npm run build
 The output goes to `.vercel/output/`, with a `static/` folder and a `functions/` folder. This
 website deploys the same way.
 
-Nitro has presets for many other hosts. We have tested two of them with Markless: the default Node
-server and Vercel. Treat the others as untested for now, and try a preview deploy first.
+## Cloudflare Workers
+
+This build writes output for a Cloudflare Worker with static assets:
+
+```bash
+NITRO_PRESET=cloudflare-module npm run build
+npx wrangler deploy --config .output/server/wrangler.json
+```
+
+Cloudflare answers a request for a file in `.output/public/` without running your Worker, and those
+requests are free. So everything you prerender costs nothing to serve: give a page
+`prerender: true` in its route rule, and give its `/_markless/fragment/...` path the same rule, so
+links to it are served from files too. The router writes `/guide` as `guide.html` and `/guide/` as
+`guide/index.html`, the names Cloudflare serves at exactly those URLs without a redirect.
+
+Pages that are not prerendered render in the Worker and stream, so a `@pending` arm still shows
+before its data is ready.
+
+Browser code under `/build/` is the one exception: the Worker sends each file as a brotli copy
+written at the highest quality, about 14% smaller than what Cloudflare's edge compresses on its own.
+That runs the Worker for those requests. To serve them as plain static files instead, set
+`compressPublicAssets: false` under the `nitro` key.
+
+Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`; Nitro merges that file
+into the one it writes.
+
+Nitro has presets for many other hosts. We have tested three of them with Markless: the default Node
+server, Vercel and Cloudflare Workers. Treat the others as untested for now, and try a preview
+deploy first.
 
 ## Caches in front of your server
 
