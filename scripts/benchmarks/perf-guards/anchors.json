@@ -2268,6 +2268,34 @@
 				"jsGzipBytes": 1678174
 			},
 			"reason": "the docs pages' in-browser compiler carries the bundler's dev-error module; clipping long-line frames and building pluginCode on first read adds 119 B gzip (measured on CI, PR #375 on main 587f11549)"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1564960
+			},
+			"to": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1565036
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's transform; holding link-pending refusals on a first pass adds 76 B gzip (measured on CI, PR #377 on #375)"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678174
+			},
+			"to": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678250
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's transform; holding link-pending refusals on a first pass adds 76 B gzip (measured on CI, PR #377 on #375)"
 		}
 	],
 	"runtimeModules": {
@@ -2471,11 +2499,11 @@
 			},
 			"docs /": {
 				"executedChars": 110778,
-				"jsGzipBytes": 1564960
+				"jsGzipBytes": 1565036
 			},
 			"docs /concepts/state": {
 				"executedChars": 121828,
-				"jsGzipBytes": 1678174
+				"jsGzipBytes": 1678250
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,
