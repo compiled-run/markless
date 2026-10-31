@@ -82,6 +82,8 @@ beforeAll(async () => {
 		logLevel: 'silent',
 		nitro: {
 			preset: 'cloudflare-module',
+			// Nitro defaults to today's date, which the pinned wrangler's workerd refuses once UTC passes its release day.
+			compatibilityDate: '2026-10-01',
 			compressPublicAssets: { gzip: true, brotli: true },
 			routeRules: Object.fromEntries(
 				prerendered.flatMap((path) => [
