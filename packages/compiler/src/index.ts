@@ -17,7 +17,11 @@ export {
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
 export { parseJavaScriptModule, resetParseCache, type JavaScriptAstNode } from './js-ast.ts';
 export { isEventAttribute, normalizeEventName } from './ast/events.ts';
-export { callsImportedOrFreeName } from './module-free-calls.ts';
+export {
+	callsImportedOrFreeName,
+	importedOrFreeNameCalls,
+	type ImportedOrFreeNameCall,
+} from './module-free-calls.ts';
 export { LEAN_DISPATCH_MARKER_MODULES } from './lean-dispatch-modules.ts';
 export { CompilerPassGraphError, validateCompilerPassGraph } from './pass-graph.ts';
 export { formatCompilerArtifactDump, runCompilerPassPipeline } from './pass-pipeline.ts';

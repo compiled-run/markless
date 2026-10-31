@@ -212,4 +212,31 @@ describe('Vite preload cleanup', () => {
 			'import{__esmMin as e}from"./shared.js";function run(q){for(let l of q)g(),l(),h();try{g()}catch(l){g(),l(),h()}}var A=e((()=>{f(),m=["./symbol.js"]}));e((()=>{A()}))();',
 		);
 	});
+
+	test('removes the helper init called inside a catch whose pattern has a key named like it', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";function run(){try{g()}catch({n:r}){g(),n(),h(r)}}var A=e((()=>{f(),n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";function run(){try{g()}catch({n:r}){g(),h(r)}}var A=e((()=>{f()}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps a method called through a sequence without its receiver', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var A=e((()=>{(n(),o.m)()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var A=e((()=>{(0,o.m)()}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps a call to a var declared in a loop head and read after the loop', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";function run(q){for(var n=q.next;0;);g(),n(),h()}var A=e((()=>{f(),n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";function run(q){for(var n=q.next;0;);g(),n(),h()}var A=e((()=>{f()}));e((()=>{A()}))();',
+		);
+	});
 });

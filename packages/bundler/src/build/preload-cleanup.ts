@@ -1,6 +1,8 @@
 import {
 	callsImportedOrFreeName,
+	importedOrFreeNameCalls,
 	parseJavaScriptModule,
+	type ImportedOrFreeNameCall,
 	type JavaScriptAstNode,
 } from '@markless/compiler';
 import { calleeOffsets, parseChunkCode, spansAnyOffset } from './chunk-ast.ts';
@@ -188,73 +190,53 @@ export function stripImportedVitePreloadHelper(code: string): string {
 	return removeInitCalls(withoutImport, helper.initFunction) ?? code;
 }
 
-// Minified output calls the init inside comma sequences; only calls that reach the removed import go, so a
-// local the minifier gave the same short name keeps its calls.
-function withoutInitSequenceCalls(code: string, name: string): string | undefined {
-	const offsets = calleeOffsets(code, name);
-	if (offsets.length === 0) return code;
-	const program = tryParseJavaScriptModule(code);
-	if (!program) return undefined;
-	const removals: Array<{ readonly start: number; readonly end: number }> = [];
-	walkReferenceScopes(program, [], { removedImports: new Set(), offsets }, (node, scopes) => {
-		if (node.type !== 'SequenceExpression' || isDeclaredInScope(name, scopes)) return;
-		const items = asNodes(node.expressions) as unknown as Array<
-			JavaScriptAstNode & { readonly start: number; readonly end: number }
-		>;
+// Removes argument-free calls to `name` where the compiler's scope tables resolve it to the removed import, so a
+// local the minifier gave the same short name keeps its calls. Undefined when a call is left in a shape the
+// removal cannot take out without changing what runs; the caller then keeps the helper.
+function removeInitCalls(code: string, name: string): string | undefined {
+	const calls = importedOrFreeNameCalls(code, name);
+	if (!calls) return undefined;
+	const sequences = new Map<object, ImportedOrFreeNameCall[]>();
+	const edits: Array<{ start: number; end: number; text: string }> = [];
+	for (const site of calls) {
+		if (site.call.argumentCount > 0) return undefined;
+		if (site.parent?.type === 'SequenceExpression') {
+			const list = sequences.get(site.parent) ?? [];
+			list.push(site);
+			sequences.set(site.parent, list);
+		} else if (site.parent?.type === 'ExpressionStatement') {
+			const before = code.slice(0, site.parent.start).trimEnd();
+			const own = before === '' || /[;{]$/.test(before);
+			edits.push({ start: site.parent.start, end: site.parent.end, text: own ? '' : ';' });
+		} else return undefined;
+	}
+	for (const sites of sequences.values()) {
+		const sequence = sites[0]!.parent!;
+		const items = sequence.expressions ?? [];
+		const removed = new Set(sites.map((site) => site.call.start));
 		const removable = items.map(
-			(item) =>
-				item.type === 'CallExpression' &&
-				identifierName(item.callee as JavaScriptAstNode) === name &&
-				asNodes(item.arguments).length === 0,
+			(item) => removed.has(item.start) && item.type === 'CallExpression',
 		);
-		if (removable.every(Boolean)) return;
+		const kept = removable.filter((value) => !value).length;
+		if (kept === 0) return undefined;
+		// `(init(), obj.method)()` calls the method without `obj` as `this`; a leading 0 keeps that.
+		const keepsReceiver = kept === 1 && sites[0]!.parentIsInvoked;
 		for (let first = 0; first < items.length; first++) {
 			if (!removable[first]) continue;
 			let last = first;
 			while (removable[last + 1]) last++;
-			removals.push(
-				last + 1 < items.length
-					? { start: items[first]!.start, end: items[last + 1]!.start }
-					: { start: items[first - 1]!.end, end: items[last]!.end },
-			);
+			if (keepsReceiver)
+				edits.push({ start: items[first]!.start, end: items[last]!.end, text: '0' });
+			else if (last + 1 < items.length)
+				edits.push({ start: items[first]!.start, end: items[last + 1]!.start, text: '' });
+			else edits.push({ start: items[first - 1]!.end, end: items[last]!.end, text: '' });
 			first = last;
 		}
-	});
-	let next = code;
-	for (const { start, end } of removals.sort((left, right) => right.start - left.start))
-		next = next.slice(0, start) + next.slice(end);
-	return next;
-}
-
-// Unminified output calls the init as a statement of its own; a call left in any other shape keeps the import.
-function withoutInitStatements(code: string, name: string): string | undefined {
-	const offsets = calleeOffsets(code, name);
-	if (offsets.length === 0) return code;
-	const program = tryParseJavaScriptModule(code);
-	if (!program) return undefined;
-	const statements: Array<{ readonly start: number; readonly end: number }> = [];
-	walkReferenceScopes(program, [], { removedImports: new Set(), offsets }, (node, scopes) => {
-		const call =
-			node.type === 'ExpressionStatement'
-				? (node.expression as JavaScriptAstNode)
-				: undefined;
-		if (
-			call?.type !== 'CallExpression' ||
-			identifierName(call.callee as JavaScriptAstNode) !== name ||
-			asNodes(call.arguments).length > 0 ||
-			isDeclaredInScope(name, scopes)
-		)
-			return;
-		statements.push(node as unknown as { start: number; end: number });
-	});
-	let next = code;
-	for (const { start, end } of statements.sort((left, right) => right.start - left.start)) {
-		const before = next.slice(0, start).trimEnd();
-		const own = before === '' || /[;{]$/.test(before);
-		next = next.slice(0, start) + (own ? '' : ';') + next.slice(end);
 	}
-	const after = tryParseJavaScriptModule(next);
-	return after && !callsFreeName(next, after, name, new Set()) ? next : undefined;
+	let next = code;
+	for (const { start, end, text } of edits.sort((left, right) => right.start - left.start))
+		next = next.slice(0, start) + text + next.slice(end);
+	return callsImportedOrFreeName(next, name) === false ? next : undefined;
 }
 
 function findImportedVitePreloadHelper(code: string): ImportedVitePreloadHelper | undefined {
@@ -397,11 +379,6 @@ function findVitePreloadHelperInitChain(
 		removeStart: match.index,
 		removeEnd: match.index + match[0].length,
 	};
-}
-
-function removeInitCalls(code: string, name: string): string | undefined {
-	const sequences = withoutInitSequenceCalls(code, name);
-	return sequences && withoutInitStatements(sequences, name);
 }
 
 function readIdentifierBefore(code: string, index: number): string | undefined {
@@ -567,30 +544,6 @@ function walkReferenceScopes(
 		const nextScopes = [...scopes, scope];
 		visit(node, nextScopes);
 		walkReferenceScopes(node.body as JavaScriptAstNode | undefined, nextScopes, scan, visit);
-		return;
-	}
-
-	// A loop head's declarations and a catch parameter shadow outer names for everything under them.
-	const head =
-		node.type === 'CatchClause'
-			? (node.param as JavaScriptAstNode | undefined)
-			: node.type === 'ForStatement'
-				? (node.init as JavaScriptAstNode | undefined)
-				: node.type === 'ForInStatement' || node.type === 'ForOfStatement'
-					? (node.left as JavaScriptAstNode | undefined)
-					: undefined;
-	if (head && (node.type === 'CatchClause' || head.type === 'VariableDeclaration')) {
-		const scope = new Set<string>();
-		if (head.type === 'VariableDeclaration')
-			for (const declaration of asNodes(head.declarations))
-				collectBindingNames(declaration.id as JavaScriptAstNode | undefined, scope);
-		else collectBindingNames(head, scope);
-		const nextScopes = [...scopes, scope];
-		visit(node, nextScopes);
-		for (const child of childNodes(node)) {
-			if (spansAnyOffset(scan.offsets, child))
-				walkReferenceScopes(child, nextScopes, scan, visit);
-		}
 		return;
 	}
 
