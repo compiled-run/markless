@@ -1,6 +1,8 @@
 import {
 	callsImportedOrFreeName,
+	importedOrFreeNameCalls,
 	parseJavaScriptModule,
+	type ImportedOrFreeNameCall,
 	type JavaScriptAstNode,
 } from '@markless/compiler';
 import { calleeOffsets, parseChunkCode, spansAnyOffset } from './chunk-ast.ts';
@@ -185,45 +187,60 @@ export function stripImportedVitePreloadHelper(code: string): string {
 		return code;
 	}
 
-	const initCall = `${escapeRegExp(helper.initFunction)}\\(\\)`;
-	const stripped = withoutImport
-		.replace(new RegExp(String.raw`,${initCall},`, 'g'), ',')
-		.replace(new RegExp(String.raw`\{${initCall},`, 'g'), '{')
-		.replace(new RegExp(String.raw`,${initCall},`, 'g'), ',')
-		.replace(new RegExp(String.raw`,${initCall}\}`, 'g'), '}')
-		.replace(new RegExp(String.raw`\{${initCall}\}`, 'g'), '{}');
-	return withoutInitStatements(stripped, helper.initFunction) ?? code;
+	return removeInitCalls(withoutImport, helper.initFunction) ?? code;
 }
 
-// Unminified output calls the init as a statement of its own; a call left in any other shape keeps the import.
-function withoutInitStatements(code: string, name: string): string | undefined {
-	const offsets = calleeOffsets(code, name);
-	if (offsets.length === 0) return code;
-	const program = tryParseJavaScriptModule(code);
-	if (!program) return undefined;
-	const statements: Array<{ readonly start: number; readonly end: number }> = [];
-	walkReferenceScopes(program, [], { removedImports: new Set(), offsets }, (node, scopes) => {
-		const call =
-			node.type === 'ExpressionStatement'
-				? (node.expression as JavaScriptAstNode)
-				: undefined;
-		if (
-			call?.type !== 'CallExpression' ||
-			identifierName(call.callee as JavaScriptAstNode) !== name ||
-			asNodes(call.arguments).length > 0 ||
-			isDeclaredInScope(name, scopes)
-		)
-			return;
-		statements.push(node as unknown as { start: number; end: number });
-	});
-	let next = code;
-	for (const { start, end } of statements.sort((left, right) => right.start - left.start)) {
-		const before = next.slice(0, start).trimEnd();
-		const own = before === '' || /[;{]$/.test(before);
-		next = next.slice(0, start) + (own ? '' : ';') + next.slice(end);
+// Removes argument-free calls to `name` where the compiler's scope tables resolve it to the removed import, so a
+// local the minifier gave the same short name keeps its calls. Undefined when a call is left in a shape the
+// removal cannot take out without changing what runs; the caller then keeps the helper.
+function removeInitCalls(code: string, name: string): string | undefined {
+	const calls = importedOrFreeNameCalls(code, name);
+	if (!calls) return undefined;
+	const sequences = new Map<object, ImportedOrFreeNameCall[]>();
+	const edits: Array<{ start: number; end: number; text: string }> = [];
+	for (const site of calls) {
+		if (site.call.argumentCount > 0) return undefined;
+		if (site.parent?.type === 'SequenceExpression') {
+			const list = sequences.get(site.parent) ?? [];
+			list.push(site);
+			sequences.set(site.parent, list);
+		} else if (site.parent?.type === 'ExpressionStatement') {
+			const before = code.slice(0, site.parent.start).trimEnd();
+			const own = before === '' || /[;{]$/.test(before);
+			edits.push({ start: site.parent.start, end: site.parent.end, text: own ? '' : ';' });
+		} else return undefined;
 	}
-	const after = tryParseJavaScriptModule(next);
-	return after && !callsFreeName(next, after, name, new Set()) ? next : undefined;
+	for (const sites of sequences.values()) {
+		const sequence = sites[0]!.parent!;
+		const items = sequence.expressions ?? [];
+		const removed = new Set(sites.map((site) => site.call.start));
+		const removable = items.map(
+			(item) => removed.has(item.start) && item.type === 'CallExpression',
+		);
+		const kept = removable.filter((value) => !value).length;
+		if (kept === 0) return undefined;
+		// `(init(), obj.method)()` calls the method without `obj` as `this`; a leading 0 keeps that.
+		const keepsReceiver = kept === 1 && sites[0]!.parentIsInvoked;
+		const valueUsed = !sites[0]!.parentValueDiscarded;
+		for (let first = 0; first < items.length; first++) {
+			if (!removable[first]) continue;
+			let last = first;
+			while (removable[last + 1]) last++;
+			// The init returns undefined; a sequence whose value is read keeps that value when the init ends it.
+			if (last + 1 === items.length && valueUsed)
+				edits.push({ start: items[first]!.start, end: items[last]!.end, text: 'void 0' });
+			else if (keepsReceiver)
+				edits.push({ start: items[first]!.start, end: items[last]!.end, text: '0' });
+			else if (last + 1 < items.length)
+				edits.push({ start: items[first]!.start, end: items[last + 1]!.start, text: '' });
+			else edits.push({ start: items[first - 1]!.end, end: items[last]!.end, text: '' });
+			first = last;
+		}
+	}
+	let next = code;
+	for (const { start, end, text } of edits.sort((left, right) => right.start - left.start))
+		next = next.slice(0, start) + text + next.slice(end);
+	return callsImportedOrFreeName(next, name) === false ? next : undefined;
 }
 
 function findImportedVitePreloadHelper(code: string): ImportedVitePreloadHelper | undefined {
@@ -290,16 +307,16 @@ function stripUnusedVitePreloadHelper(code: string): string {
 		return code;
 	}
 
-	let withoutHelper = outsideHelper;
+	let withoutHelper: string | undefined = outsideHelper;
 	const chain = findVitePreloadHelperInitChain(withoutHelper, helper.moduleVariable);
 	if (chain) {
-		withoutHelper = removeInitCall(
+		withoutHelper = removeInitCalls(
 			withoutHelper.slice(0, chain.removeStart) + withoutHelper.slice(chain.removeEnd),
 			chain.entryVariable,
 		);
 	}
 
-	return removeInitCall(withoutHelper, helper.moduleVariable);
+	return (withoutHelper && removeInitCalls(withoutHelper, helper.moduleVariable)) ?? code;
 }
 
 function findVitePreloadHelperModule(
@@ -366,13 +383,6 @@ function findVitePreloadHelperInitChain(
 		removeStart: match.index,
 		removeEnd: match.index + match[0].length,
 	};
-}
-
-function removeInitCall(code: string, entryVariable: string): string {
-	return code
-		.replace(new RegExp(`,${escapeRegExp(entryVariable)}\\(\\)`), '')
-		.replace(new RegExp(`${escapeRegExp(entryVariable)}\\(\\),`), '')
-		.replace(new RegExp(`\\{${escapeRegExp(entryVariable)}\\(\\)\\}`), '{}');
 }
 
 function readIdentifierBefore(code: string, index: number): string | undefined {
