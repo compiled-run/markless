@@ -30,8 +30,10 @@ export type ImportedOrFreeNameCall = {
 	readonly call: Span & { readonly argumentCount: number };
 	/** Its parent, past any parentheses. */
 	readonly parent: (Span & { readonly expressions?: readonly Span[] }) | null;
-	/** Whether that parent, through any parentheses, is what a call or tagged template invokes or `delete` deletes. */
+	/** Whether that parent, through any parentheses, is what a call or tagged template invokes, or `delete` or `typeof` reads as a reference. */
 	readonly parentIsInvoked: boolean;
+	/** Whether that parent's value is thrown away: it is a statement of its own. */
+	readonly parentValueDiscarded: boolean;
 };
 
 /**
@@ -79,7 +81,7 @@ export function importedOrFreeNameCalls(
 			holder?.node?.callee === holder?.child ||
 			holder?.node?.tag === holder?.child ||
 			(holder?.node?.type === 'UnaryExpression' &&
-				holder.node.operator === 'delete' &&
+				(holder.node.operator === 'delete' || holder.node.operator === 'typeof') &&
 				holder.node.argument === holder.child);
 		calls.push({
 			call: {
@@ -90,6 +92,7 @@ export function importedOrFreeNameCalls(
 			},
 			parent: parent as ImportedOrFreeNameCall['parent'],
 			parentIsInvoked: Boolean(holder?.node) && invoked,
+			parentValueDiscarded: holder?.node?.type === 'ExpressionStatement',
 		});
 	}
 	return calls;

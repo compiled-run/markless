@@ -221,11 +221,15 @@ function removeInitCalls(code: string, name: string): string | undefined {
 		if (kept === 0) return undefined;
 		// `(init(), obj.method)()` calls the method without `obj` as `this`; a leading 0 keeps that.
 		const keepsReceiver = kept === 1 && sites[0]!.parentIsInvoked;
+		const valueUsed = !sites[0]!.parentValueDiscarded;
 		for (let first = 0; first < items.length; first++) {
 			if (!removable[first]) continue;
 			let last = first;
 			while (removable[last + 1]) last++;
-			if (keepsReceiver)
+			// The init returns undefined; a sequence whose value is read keeps that value when the init ends it.
+			if (last + 1 === items.length && valueUsed)
+				edits.push({ start: items[first]!.start, end: items[last]!.end, text: 'void 0' });
+			else if (keepsReceiver)
 				edits.push({ start: items[first]!.start, end: items[last]!.end, text: '0' });
 			else if (last + 1 < items.length)
 				edits.push({ start: items[first]!.start, end: items[last + 1]!.start, text: '' });

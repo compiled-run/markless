@@ -239,4 +239,22 @@ describe('Vite preload cleanup', () => {
 			'import{__esmMin as e}from"./shared.js";function run(q){for(var n=q.next;0;);g(),n(),h()}var A=e((()=>{f()}));e((()=>{A()}))();',
 		);
 	});
+
+	test('keeps the value of a sequence the helper init ends', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var get=()=>(f(),n()),A=e((()=>{n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var get=()=>(f(),void 0),A=e((()=>{}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps a typeof of a sequence reading its operand as a value', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var A=e((()=>{k=typeof(n(),maybeGlobal)}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var A=e((()=>{k=typeof(0,maybeGlobal)}));e((()=>{A()}))();',
+		);
+	});
 });
