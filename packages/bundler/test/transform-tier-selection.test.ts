@@ -57,7 +57,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 			},
 			symbolModules: { modules: [] },
 			boundSymbolResolver: { rows: [] },
-			publicRenderPlan: { styleScopes: [] },
+			publicRenderPlan: { styleScopes: [], stylesheetImports: [] },
 			payloadScripts: { state: compiler.protocolState, view: compiler.protocolView },
 			publicRenderModule: {
 				renderDataModuleSource: '',

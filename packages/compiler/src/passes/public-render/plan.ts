@@ -5,7 +5,7 @@ import type {
 	PublicRenderPlanArtifact,
 	PublicRenderPlanInput,
 } from '../../artifacts.ts';
-import { collectModuleStyleScopes } from './style-scopes.ts';
+import { collectModuleStyleScopes, collectStylesheetImports } from './style-scopes.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
 import { resolveBoundaryRunners } from './boundary-runner.ts';
@@ -143,6 +143,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	return {
 		passId: 'public-render-plan',
 		styleScopes: styles.styleScopes,
+		stylesheetImports: collectStylesheetImports(ast),
 		diagnostics: [
 			...styles.diagnostics,
 			...sameModuleChildBoundaryDiagnostics(

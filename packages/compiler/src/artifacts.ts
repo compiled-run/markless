@@ -2737,6 +2737,8 @@ export type PublicRenderPlanAsyncBoundaryGate =
 export type PublicRenderPlanArtifact = {
 	readonly passId: 'public-render-plan';
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
+	/** Stylesheets the module imports for their effect (`import './site.css'`), in source order. */
+	readonly stylesheetImports: ReadonlyArray<string>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
