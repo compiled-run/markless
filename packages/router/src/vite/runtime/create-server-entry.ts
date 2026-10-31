@@ -806,6 +806,23 @@ function addModulePreloads(
 // The document with the children placeholder INTACT: blocking responses fill
 // it in one piece; streaming responses split at it so everything after the
 // page (and the closing tags) flushes only when the last boundary settled.
+// Measurement only, never merged: MARKLESS_FIRST_CLICK_EXPERIMENT picks how a page's low first-click preloads are sent.
+function firstClickExperiment(preloads: string): string {
+	const mode = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+		?.MARKLESS_FIRST_CLICK_EXPERIMENT;
+	if (mode === 'auto')
+		return preloads.replace(/<link rel="modulepreload" href="(\/build\/[^"]+)" crossorigin="anonymous" fetchpriority="low">/g, '<link rel="modulepreload" href="$1" crossorigin="anonymous">');
+	if (mode === 'intent' && preloads.includes('fetchpriority="low"'))
+		return `${preloads}<script>(()=>{let done=false;const go=()=>{if(done)return;done=true;for(const l of document.querySelectorAll('link[rel=modulepreload][fetchpriority=low]'))fetch(l.href,{priority:'high',mode:'cors',credentials:'same-origin'}).catch(()=>{})};for(const t of ['pointerdown','touchstart','focusin'])addEventListener(t,go,{capture:true,once:true,passive:true})})()</script>`;
+	if (mode === 'after-paint') {
+		const hrefs: string[] = [];
+		const rest = preloads.replace(/<link rel="modulepreload" href="(\/build\/[^"]+)" crossorigin="anonymous" fetchpriority="low">/g, (_m, href: string) => (hrefs.push(href), ''));
+		if (!hrefs.length) return preloads;
+		return `${rest}<script>(()=>{const h=${JSON.stringify(hrefs)},go=()=>{for(const href of h){const l=document.createElement('link');l.rel='modulepreload';l.crossOrigin='anonymous';l.fetchPriority='high';l.href=href;document.head.appendChild(l)}};new PerformanceObserver((list,o)=>{if(list.getEntries().some((e)=>e.name==='first-contentful-paint')){o.disconnect();go()}}).observe({type:'paint',buffered:true})})()</script>`;
+	}
+	return preloads;
+}
+
 async function renderDocumentShell(
 	documentModule: DocumentModule | undefined,
 	pageProps: PageComponentProps,
@@ -824,7 +841,7 @@ async function renderDocumentShell(
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertImportMap(html, importMap + preloads),
+			insertImportMap(html, importMap + firstClickExperiment(preloads)),
 			'</html>',
 		].join('');
 	}
