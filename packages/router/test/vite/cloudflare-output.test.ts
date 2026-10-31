@@ -1,5 +1,15 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+	cp,
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	realpath,
+	rm,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -9,7 +19,11 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
-import { pruneRenderedPages, workerFirstPatterns } from '../../src/vite/nitro-cloudflare.ts';
+import {
+	cloudflareNodeBuildsPlugin,
+	pruneRenderedPages,
+	workerFirstPatterns,
+} from '../../src/vite/nitro-cloudflare.ts';
 import { FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
 
 // A Nitro `cloudflare-module` build served by wrangler's local workerd, which applies Workers static
@@ -72,9 +86,51 @@ beforeAll(async () => {
 		join(root, 'package.json'),
 		'{ "name": "markless-cloudflare-test", "private": true }\n',
 	);
+	// Like unicorn-magic: its default build, for runtimes without Node's APIs, lacks what its Node build exports.
+	const nodeOnly = join(root, 'node_modules/node-build-only');
+	await mkdir(nodeOnly, { recursive: true });
+	await writeFile(
+		join(nodeOnly, 'package.json'),
+		JSON.stringify({
+			name: 'node-build-only',
+			type: 'module',
+			exports: { node: { import: './node.js' }, default: { import: './default.js' } },
+		}),
+	);
+	await writeFile(
+		join(nodeOnly, 'node.js'),
+		"import { fileURLToPath } from 'node:url';\nexport const toPath = (url) => fileURLToPath(url);\n",
+	);
+	await writeFile(join(nodeOnly, 'default.js'), 'export const other = 1;\n');
+	await mkdir(join(root, 'api'), { recursive: true });
+	// Like typescript.js inside ts-morph: CommonJS that reads __filename as it loads.
+	const commonjs = join(root, 'node_modules/reads-filename');
+	await mkdir(commonjs, { recursive: true });
+	await writeFile(
+		join(commonjs, 'package.json'),
+		JSON.stringify({ name: 'reads-filename', main: 'index.js' }),
+	);
+	await writeFile(
+		join(commonjs, 'index.js'),
+		'exports.where = typeof __filename + ":" + typeof __dirname;\n',
+	);
+	await writeFile(
+		join(root, 'api/where.ts'),
+		"import { where } from 'reads-filename';\nexport default () => Response.json({ where });\n",
+	);
+	await mkdir(join(root, 'api'), { recursive: true });
+	await writeFile(
+		join(root, 'api/path.ts'),
+		"import { toPath } from 'node-build-only';\nexport default () => Response.json({ path: toPath('file:///a/b') });\n",
+	);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
+	await symlink(
+		resolve(packagesRoot, 'router/node_modules/nitro'),
+		join(root, 'node_modules/nitro'),
+		'dir',
+	);
 	const prerendered = ['/', '/guide', '/docs/intro'];
 	const builder = await createBuilder({
 		root,
@@ -281,4 +337,60 @@ test('pages are left out only when every environment serves prerendered URLs fro
 	expect(
 		workerFirstPatterns({ main: 'index.mjs', pages_build_output_dir: '..' }),
 	).toBeUndefined();
+});
+
+test('a dependency with only a Node build and a default one runs its Node build in the Worker', async () => {
+	const response = await get('/api/path');
+	expect(response.status).toBe(200);
+	expect(await response.json()).toEqual({ path: '/a/b' });
+});
+
+test('a require of such a package gets its Node require build, an import its Node import build', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'markless-cloudflare-node-'));
+	try {
+		const pkg = join(dir, 'node_modules/dual');
+		await mkdir(pkg, { recursive: true });
+		await writeFile(
+			join(pkg, 'package.json'),
+			JSON.stringify({
+				name: 'dual',
+				exports: {
+					node: { import: './node.mjs', require: './node.cjs' },
+					default: './default.js',
+				},
+			}),
+		);
+		const hook = cloudflareNodeBuildsPlugin().resolveId as {
+			handler: (
+				source: string,
+				importer: string,
+				options: { kind: string },
+			) => Promise<string | undefined>;
+		};
+		const importer = join(dir, 'api.ts');
+		const real = await realpath(pkg);
+		expect(await hook.handler('dual', importer, { kind: 'import-statement' })).toBe(
+			join(real, 'node.mjs'),
+		);
+		expect(await hook.handler('dual', importer, { kind: 'require-call' })).toBe(
+			join(real, 'node.cjs'),
+		);
+		await writeFile(
+			join(dir, 'package.json'),
+			JSON.stringify({ name: 'app', exports: { node: './x.js' } }),
+		);
+		for (const relative of ['./dual', '../dual', '..', '.'])
+			expect(
+				await hook.handler(relative, join(dir, 'src/api.ts'), { kind: 'import-statement' }),
+				relative,
+			).toBeUndefined();
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test('CommonJS code that reads __filename as it loads runs in the Worker', async () => {
+	const response = await get('/api/where');
+	expect(response.status).toBe(200);
+	expect(await response.json()).toEqual({ where: 'string:string' });
 });
