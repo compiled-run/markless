@@ -141,14 +141,12 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		],
 	},
 	MARKLESS_ASYNC_POST_AWAIT_READ: {
-		summary: 'An async computed() reads state after an await.',
-		what: 'Markless records which state an async `computed()` reads before its first `await`. A read after the `await` is invisible to it.',
-		how: 'Copy the value into a local before the first `await`. Use the local after it.',
+		summary: 'An async computed() looks a value up with a key that comes from an await.',
+		what: 'Markless reads every state an async `computed()` names when it starts running, including reads after an `await`, and runs it again when one of them changes. A lookup whose key is the awaited answer, such as `items[res.id]`, cannot be read before the answer arrives.',
+		how: 'Return the answer from the async `computed()`. Do the lookup in a plain `computed()` that reads it.',
 		example: [
-			'const details = computed(async ({ signal }) => {',
-			'\tconst q = name;',
-			'\treturn { title: await loadGreeting(q, signal) };',
-			'});',
+			'const picked = computed(async ({ signal }) => loadPick(signal));',
+			'const item = computed(() => items[picked.id]);',
 		],
 	},
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: {

@@ -31,7 +31,7 @@ In the card above, pick a mug, then another. The old answer stays on the page un
 In the code below, press **Tall mug** and wait a moment. Press **Small mug**. Then press **Cracked
 mug**.
 
-<Code note="Delete the @catch block and pick the cracked mug. Then change the return line to return { text: (await loadMugFact(which)) + mug }; and read the build error.">
+<Code note="Delete the @catch block and pick the cracked mug. Then change the return line to return { text: (await loadMugFact(mug)) + mug }; and pick again.">
 ```tsrx title="mug-facts.tsrx"
 import { computed, state } from '@markless/core';
 import { loadMugFact } from './mug-facts.ts';
@@ -39,8 +39,7 @@ import { loadMugFact } from './mug-facts.ts';
 export default function MugFacts() @{
 	let mug = state('');
 	const fact = computed(async () => {
-		const which = mug;
-		return { text: await loadMugFact(which) };
+		return { text: await loadMugFact(mug) };
 	});
 
 	<section>
@@ -134,10 +133,15 @@ To tell screen reader users something changed, put the message in a status eleme
 block, such as `<p role="status">`. Some screen readers, NVDA in Firefox for one, stay silent about
 live regions inside a busy element.
 
-## Read state before the first await
+## Read state before or after an await
 
-The recipe copies `mug` into `which` before it awaits anything. That is on purpose. The reads before
-the first `await` tell Markless when to run the recipe again. A state read after an `await` stops the
-build with `MARKLESS_ASYNC_POST_AWAIT_READ`.
+A recipe can read state anywhere, before or after an `await`. Markless reads every state the recipe
+names when the recipe starts, and runs it again when any of them changes, even while it is still
+waiting for an answer.
+
+One read stops the build with `MARKLESS_ASYNC_POST_AWAIT_READ`: a lookup whose key is the answer
+itself, like `shelf[(await loadPick()).id]`. Markless cannot know which entry that is until the
+answer arrives. Return the answer from the recipe, and do the lookup in a second, plain
+`computed()`.
 
 Next: [two components that both call something .card](/concepts/styling).
