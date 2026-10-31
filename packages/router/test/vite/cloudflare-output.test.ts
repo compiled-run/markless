@@ -103,6 +103,19 @@ beforeAll(async () => {
 	);
 	await writeFile(join(nodeOnly, 'default.js'), 'export const other = 1;\n');
 	await mkdir(join(root, 'api'), { recursive: true });
+	// Each answer counts itself, so an answer from the edge cache shows the count of the one it stored.
+	await writeFile(
+		join(root, 'api/counted.ts'),
+		[
+			'let answers = 0;',
+			'export default (event) => {',
+			'\tanswers++;',
+			"\tconst headers = { 'cache-control': 'public, max-age=0, s-maxage=600' };",
+			"\tif (event.url.searchParams.has('session')) headers['set-cookie'] = 'sid=1';",
+			'\treturn Response.json({ answers }, { headers });',
+			'};',
+		].join('\n'),
+	);
 	// Like typescript.js inside ts-morph: CommonJS that reads __filename as it loads.
 	const commonjs = join(root, 'node_modules/reads-filename');
 	await mkdir(commonjs, { recursive: true });
@@ -393,4 +406,16 @@ test('CommonJS code that reads __filename as it loads runs in the Worker', async
 	const response = await get('/api/where');
 	expect(response.status).toBe(200);
 	expect(await response.json()).toEqual({ where: 'string:string' });
+});
+
+test('a Worker answer marked for shared caches is answered from the edge cache for the same URL, never with a cookie on either side', async () => {
+	const answers = async (path: string, init?: RequestInit) =>
+		((await (await fetch(origin + path, init)).json()) as { answers: number }).answers;
+	const first = await answers('/api/counted?a=1');
+	expect(await answers('/api/counted?a=1')).toBe(first);
+	expect(await answers('/api/counted?a=2')).toBeGreaterThan(first);
+	const fresh = await answers('/api/counted?a=1', { headers: { cookie: 'sid=2' } });
+	expect(fresh).toBeGreaterThan(first);
+	const cookie = await answers('/api/counted?session=1');
+	expect(await answers('/api/counted?session=1')).toBeGreaterThan(cookie);
 });
