@@ -262,6 +262,18 @@ export function createMarklessRolldownPlugin(input: {
 				preserveEntrySignatures: packing
 					? 'allow-extension'
 					: (input.preserveEntrySignatures ?? 'allow-extension'),
+				// Leaves off the pass a route build never ran while its page modules awaited; facade merging stays on.
+				...(packing && internalOptions.routeModules
+					? {
+							experimental: {
+								...input.experimental,
+								chunkOptimization: {
+									mergeCommonChunks: true,
+									avoidRedundantChunkLoads: false,
+								},
+							},
+						}
+					: {}),
 			};
 		},
 		async buildStart(input) {
