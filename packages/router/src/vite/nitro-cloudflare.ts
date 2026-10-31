@@ -15,6 +15,10 @@ interface CloudflareNitro {
 	readonly hooks?: {
 		hook(name: 'compiled', handler: () => Promise<void>): unknown;
 		hook(
+			name: 'rollup:before',
+			handler: (nitro: unknown, config: { output?: { codeSplitting?: unknown } }) => void,
+		): unknown;
+		hook(
 			name: 'prerender:done',
 			handler: (result: {
 				readonly prerenderedRoutes?: readonly {
@@ -35,6 +39,19 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 		setup(nitro: CloudflareNitro) {
 			if (nitro.options.dev || !isCloudflarePreset(nitro.options.preset)) return;
 			if (!configured.autoSubfolderIndex) nitro.options.prerender.autoSubfolderIndex = false;
+			// Nitro puts every module of a package in one chunk, so a page importing one helper evaluates the whole package
+			// (the shadcn port's preset helpers brought @babel/core, 2.2 MB). A Worker loads chunks from memory, not over a
+			// network: chunks follow which modules each route reaches instead.
+			nitro.hooks?.hook('rollup:before', (_nitro, config) => {
+				const splitting = config.output?.codeSplitting as
+					| { groups?: { debugName?: string }[] }
+					| false
+					| undefined;
+				if (splitting && splitting.groups)
+					splitting.groups = splitting.groups.filter(
+						(group) => group.debugName !== 'nitro-libs',
+					);
+			});
 			// Nitro prerenders before it writes the Worker, so the pages are left out once it is written.
 			let prerendered = new Set<string>();
 			nitro.hooks?.hook('prerender:done', async ({ prerenderedRoutes = [] }) => {

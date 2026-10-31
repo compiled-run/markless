@@ -102,6 +102,23 @@ beforeAll(async () => {
 		"import { fileURLToPath } from 'node:url';\nexport const toPath = (url) => fileURLToPath(url);\n",
 	);
 	await writeFile(join(nodeOnly, 'default.js'), 'export const other = 1;\n');
+	// One package, two unrelated modules: a page needs only the first, an endpoint the second.
+	const twoPart = join(root, 'node_modules/two-part');
+	await mkdir(twoPart, { recursive: true });
+	await writeFile(
+		join(twoPart, 'package.json'),
+		JSON.stringify({
+			name: 'two-part',
+			type: 'module',
+			exports: { './small': './small.js', './large': './large.js' },
+		}),
+	);
+	await writeFile(join(twoPart, 'small.js'), "export const small = 'small-part-text';\n");
+	await writeFile(join(twoPart, 'large.js'), "export const large = 'large-part-text';\n");
+	await writeFile(
+		join(root, 'pages/small.tsrx'),
+		'import { small } from \'two-part/small\';\n\nexport default function Small() @{\n\t<main data-page="small">{small}</main>\n}\n',
+	);
 	await mkdir(join(root, 'api'), { recursive: true });
 	// Like typescript.js inside ts-morph: CommonJS that reads __filename as it loads.
 	const commonjs = join(root, 'node_modules/reads-filename');
@@ -113,6 +130,10 @@ beforeAll(async () => {
 	await writeFile(
 		join(commonjs, 'index.js'),
 		'exports.where = typeof __filename + ":" + typeof __dirname;\n',
+	);
+	await writeFile(
+		join(root, 'api/large.ts'),
+		"import { large } from 'two-part/large';\nexport default () => Response.json({ large });\n",
 	);
 	await writeFile(
 		join(root, 'api/where.ts'),
@@ -393,4 +414,24 @@ test('CommonJS code that reads __filename as it loads runs in the Worker', async
 	const response = await get('/api/where');
 	expect(response.status).toBe(200);
 	expect(await response.json()).toEqual({ where: 'string:string' });
+});
+
+test('a page evaluates only the modules of a package it reaches, not the whole package', async () => {
+	const serverDir = join(root, '.output/server');
+	const files = (await readdir(serverDir, { recursive: true })).filter((file) =>
+		file.endsWith('.mjs'),
+	);
+	const sources = new Map(
+		await Promise.all(
+			files.map(
+				async (file) => [file, await readFile(join(serverDir, file), 'utf8')] as const,
+			),
+		),
+	);
+	const holding = (text: string) =>
+		[...sources].filter(([, source]) => source.includes(text)).map(([file]) => file);
+	expect(holding('small-part-text')).toHaveLength(1);
+	expect(holding('small-part-text')).not.toEqual(holding('large-part-text'));
+	expect(await (await get('/small')).text()).toContain('small-part-text');
+	expect(await (await get('/api/large')).json()).toEqual({ large: 'large-part-text' });
 });
