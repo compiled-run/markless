@@ -13,7 +13,7 @@ const announcer = (code: string) => {
 };
 
 test('the fragment swap and the client renderer announce pages with the same code', () => {
-	const shared = announcer(source('route-announcer.ts'));
+	const shared = announcer(source('spa-navigation.ts'));
 	expect(shared).toContain('function announcePage');
 	expect(announcer(source('vite/entries/fragment-entry.ts'))).toBe(shared);
 });

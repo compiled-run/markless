@@ -2296,6 +2296,106 @@
 				"jsGzipBytes": 1678250
 			},
 			"reason": "the docs pages' in-browser compiler carries the bundler's transform; holding link-pending refusals on a first pass adds 76 B gzip (measured on CI, PR #377 on #375)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "runtime",
+			"subject": "router/spa-navigation",
+			"from": 6391,
+			"to": 8056,
+			"reason": "a #/ route render announces the new page to screen readers; the route announcer is inlined here, as a shared module it became one more file per navigation (measured on a local bench build whose fragment-entry size matches CI, PR #387 on main 93b3265ce)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 29345,
+			"to": 30726,
+			"reason": "a fragment swap announces the new page to screen readers; the route announcer is inlined here, as a shared module it became one more file per navigation (measured on CI, PR #387 on main 93b3265ce)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87387
+			},
+			"reason": "the fragment swap module, fetched at idle, carries the route announcer: +380 B gzip downloaded, same file count, no growth in JS executed at load (measured on CI, PR #387 on main 93b3265ce)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87387
+			},
+			"reason": "the fragment swap module, fetched at idle, carries the route announcer: +380 B gzip downloaded, same file count, no growth in JS executed at load (measured on CI, PR #387 on main 93b3265ce)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87387
+			},
+			"reason": "the fragment swap module, fetched at idle, carries the route announcer: +380 B gzip downloaded, same file count, no growth in JS executed at load (measured on CI, PR #387 on main 93b3265ce)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1565036
+			},
+			"to": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1565417
+			},
+			"reason": "the fragment swap module, fetched at idle, carries the route announcer: +381 B gzip downloaded, same file count, no growth in JS executed at load (measured on CI, PR #387 on main 93b3265ce)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678250
+			},
+			"to": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678630
+			},
+			"reason": "the fragment swap module, fetched at idle, carries the route announcer: +380 B gzip downloaded, same file count, no growth in JS executed at load (measured on CI, PR #387 on main 93b3265ce)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
+			},
+			"to": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406450
+			},
+			"reason": "the fragment swap module, fetched at idle, carries the route announcer: +381 B gzip downloaded, same file count, no growth in JS executed at load (measured on CI, PR #387 on main 93b3265ce)"
 		}
 	],
 	"runtimeModules": {
@@ -2306,9 +2406,9 @@
 		"router/route-manifest": 7039,
 		"router/route-renderer": 1735,
 		"router/route-state": 805,
-		"router/spa-navigation": 6391,
+		"router/spa-navigation": 8056,
 		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 29345,
+		"router/vite/entries/fragment-entry": 30726,
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
@@ -2487,27 +2587,27 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11370,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87387
 			},
 			"bench /records": {
 				"executedChars": 11386,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87387
 			},
 			"bench /settings": {
 				"executedChars": 11443,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87387
 			},
 			"docs /": {
 				"executedChars": 110778,
-				"jsGzipBytes": 1565036
+				"jsGzipBytes": 1565417
 			},
 			"docs /concepts/state": {
 				"executedChars": 121828,
-				"jsGzipBytes": 1678250
+				"jsGzipBytes": 1678630
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,
-				"jsGzipBytes": 406069
+				"jsGzipBytes": 406450
 			}
 		}
 	}

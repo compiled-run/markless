@@ -1196,7 +1196,7 @@ export async function navigate(
 }
 
 // Tells screen readers which page a swap landed on, as Next.js's route announcer does.
-// src/route-announcer.ts carries a copy: one shared module would add a file to every navigation's fetches.
+// src/spa-navigation.ts carries a copy: one shared module would add a file to every navigation's fetches.
 type Announcer = { readonly region: HTMLElement; timer?: number };
 const ANNOUNCER = '__marklessRouteAnnouncer';
 
