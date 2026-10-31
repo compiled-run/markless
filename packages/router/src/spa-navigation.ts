@@ -12,6 +12,7 @@ import {
 	type RouteUpdate,
 } from './route-state.ts';
 import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from './link-attributes.ts';
+import { announcePage, pageAddress, pageName } from './vite/entries/route-announcer.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
 const LINK_INFO = '__marklessRouterLink';
@@ -146,15 +147,24 @@ export function handleNavigateEvent(event: NavigateEvent, context: NavigationCon
 		return false;
 	}
 
+	const leaving = {
+		address: pageAddress(context.window.location.href),
+		name: pageName(context.window.document),
+	};
 	event.intercept({
 		focusReset: 'after-transition',
 		scroll: navigationScroll(event),
-		handler: () => renderRoute(url, context, event.signal),
+		handler: () => renderRoute(url, context, event.signal, leaving),
 	});
 	return true;
 }
 
-async function renderRoute(url: URL, context: NavigationContext, signal?: AbortSignal) {
+async function renderRoute(
+	url: URL,
+	context: NavigationContext,
+	signal?: AbortSignal,
+	leaving?: { readonly address: string; readonly name: string },
+) {
 	if (signal?.aborted) {
 		return;
 	}
@@ -209,6 +219,8 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 	await new Promise<void>((resolve) => {
 		dispatchRouteUpdate(context.window.document, { ...update, onRendered: resolve });
 	});
+	if (leaving && !signal?.aborted)
+		announcePage(context.window.document, leaving.address, leaving.name);
 }
 
 // A '#/...' URL cannot fall back to a server document load (assigning a hash

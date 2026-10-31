@@ -66,3 +66,37 @@ test('a #/ address from a hash-routed app lands on its route and later hash chan
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a #/ route change announces the first heading when the document has no title, and nothing when the title stays the same', async () => {
+	const { page, errors } = await open('/#/story/1');
+	await expect.poll(() => page.locator('.page').textContent()).toBe('story 1');
+	const announcement = () =>
+		page.evaluate(
+			() =>
+				document
+					.querySelector('markless-route-announcer')
+					?.shadowRoot?.querySelector('[role="alert"]')?.textContent ?? null,
+		);
+	expect(await announcement()).toBeNull();
+	await page.evaluate(() => {
+		document.title = '';
+		location.hash = '#/story/2';
+	});
+	await expect.poll(() => page.locator('.page').textContent()).toBe('story 2');
+	await expect.poll(announcement).toBe('story 2');
+	await page.evaluate(
+		() =>
+			new Promise<void>((done) => {
+				document.title = 'Stories';
+				document
+					.querySelector('markless-route-announcer')!
+					.shadowRoot!.querySelector('[role="alert"]')!.textContent = '';
+				navigation.addEventListener('navigatesuccess', () => done(), { once: true });
+				location.hash = '#/story/4';
+			}),
+	);
+	expect(await page.locator('.page').textContent()).toBe('story 4');
+	expect(await announcement()).toBe('');
+	expect(errors).toEqual([]);
+	await page.close();
+});

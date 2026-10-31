@@ -28,6 +28,7 @@
 		"./vite/runtime/mdx-route": "./src/vite/runtime/mdx-route.ts",
 		"./vite/runtime/create-server-entry": "./src/vite/runtime/create-server-entry.ts",
 		"./vite/route-href": "./src/vite/entries/route-href.ts",
+		"./vite/route-announcer": "./src/vite/entries/route-announcer.ts",
 		"./typescript-plugin": "./dist/typescript-plugin.cjs"
 	},
 	"publishConfig": {
@@ -56,6 +57,10 @@
 			"./vite/route-href": {
 				"types": "./dist/vite/route-href.d.ts",
 				"default": "./dist/vite/route-href.js"
+			},
+			"./vite/route-announcer": {
+				"types": "./dist/vite/route-announcer.d.ts",
+				"default": "./dist/vite/route-announcer.js"
 			},
 			"./typescript-plugin": {
 				"types": "./dist/typescript-plugin.d.ts",
