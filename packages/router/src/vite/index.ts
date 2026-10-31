@@ -1373,23 +1373,31 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 	].join('\n');
 }
 
-// A page rendered in the browser (a '#/' route) brings the stylesheets its document lacks, as files.
+// A page rendered in the browser (a '#/' route) brings the stylesheets its document lacks, as files; one that fails fails the render.
 function clientRouteStylesheetsSource(): string[] {
 	const key = JSON.stringify(STYLESHEET_KEY_ATTRIBUTE);
 	return [
 		`const pageStylesheets = routePreloadData.styles ?? {};`,
+		`const stylesheetLoads = new Map();`,
 		`export function loadRouteStylesheets(file, document = globalThis.document) {`,
 		`  const hrefs = pageStylesheets[file];`,
 		`  if (!hrefs?.length || !document?.head) return Promise.resolve();`,
 		`  const have = new Set([...document.head.children].map((node) => node.getAttribute(${key}) ?? (node.rel === 'stylesheet' ? node.getAttribute('href') : null)));`,
-		`  return Promise.all(hrefs.filter((href) => !have.has(href)).map((href) => new Promise((done) => {`,
-		`    const link = document.createElement('link');`,
-		`    link.rel = 'stylesheet';`,
-		`    link.href = href;`,
-		`    link.setAttribute(${key}, href);`,
-		`    link.onload = link.onerror = done;`,
-		`    document.head.appendChild(link);`,
-		`  })));`,
+		`  return Promise.all(hrefs.map((href) => {`,
+		`    if (stylesheetLoads.has(href)) return stylesheetLoads.get(href);`,
+		`    if (have.has(href)) return undefined;`,
+		`    const load = new Promise((done, fail) => {`,
+		`      const link = document.createElement('link');`,
+		`      link.rel = 'stylesheet';`,
+		`      link.href = href;`,
+		`      link.setAttribute(${key}, href);`,
+		`      link.onload = () => { stylesheetLoads.delete(href); done(); };`,
+		`      link.onerror = () => { stylesheetLoads.delete(href); link.remove(); fail(new Error('Unable to load the stylesheet ' + href)); };`,
+		`      document.head.appendChild(link);`,
+		`    });`,
+		`    stylesheetLoads.set(href, load);`,
+		`    return load;`,
+		`  }));`,
 		`}`,
 	];
 }

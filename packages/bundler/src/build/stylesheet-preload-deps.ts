@@ -1,3 +1,4 @@
+import { dirname, join } from 'pathe';
 import { parseChunkCode } from './chunk-ast.ts';
 
 type Node = {
@@ -22,7 +23,11 @@ export function stylesheetlessPreloads(
 	const table = dependencyTable(program);
 	if (!table) return code;
 	const named = new Set(stylesheets);
-	const dropped = new Set(table.files.flatMap((file, index) => (named.has(file) ? [index] : [])));
+	// A relative base writes each file relative to the chunk that waits for it.
+	const output = (file: string) => (file.startsWith('.') ? join(dirname(fileName), file) : file);
+	const dropped = new Set(
+		table.files.flatMap((file, index) => (named.has(output(file)) ? [index] : [])),
+	);
 	if (dropped.size === 0) return code;
 	const edits: Edit[] = [];
 	let keptCalls = 0;
