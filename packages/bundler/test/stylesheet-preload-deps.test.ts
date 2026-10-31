@@ -25,3 +25,9 @@ test('a chunk with no stylesheet dependency is left as it is', () => {
 	const code = `${table(['build/other.js'])}const a=()=>e(()=>import("./a.js"),__vite__mapDeps([0]));export{a};`;
 	expect(stylesheetlessPreloads('chunk.js', code, ['assets/page.css'])).toBe(code);
 });
+
+test('with a relative base, a file written relative to the chunk is matched to the stylesheet it names', () => {
+	const code = `${table(['../assets/page.css'])}const a=()=>e(()=>import("./a.js"),__vite__mapDeps([0]));export{a};`;
+	const next = stylesheetlessPreloads('build/chunk.js', code, ['assets/page.css']);
+	expect(next).toContain('e(()=>import("./a.js"),[])');
+});
