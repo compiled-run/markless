@@ -200,3 +200,18 @@ test('a compile process retired while it boots exits, and starts no other', asyn
 	expect(compileWorkerPids()).toEqual([]);
 	await pool.close();
 });
+
+test('retiring returns once the compile processes have exited, their store writes done', async () => {
+	const directory = join(scratch, 'retire-writes');
+	const fingerprint = compilerFingerprint();
+	const cache = createPersistentCompileCache({ directory, fingerprint });
+	const pool = await onlinePool({ size: 1, store: { cache, directory, fingerprint } });
+	const pids = compileWorkerPids();
+	void pool.run(input('Retired'), 'retired');
+	await retireCompileWorkers();
+	expect(pids.filter(alive)).toEqual([]);
+	expect(
+		readdirSync(directory, { recursive: true }).some((name) => String(name).endsWith('.bin')),
+	).toBe(true);
+	await pool.close();
+});
