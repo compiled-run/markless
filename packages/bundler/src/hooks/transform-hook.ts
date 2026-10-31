@@ -22,7 +22,7 @@ import {
 } from '../link-driver.ts';
 import { isReExportOnlySource } from '../build/undemanded-runtime.ts';
 import { yieldToEventLoop } from '../event-loop.ts';
-import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from '../transform.ts';
+import { MARKLESS_VIRTUAL_PREFIX, throwIfLinkPending, transformTsrxModule } from '../transform.ts';
 import type {
 	MarklessEnvironment,
 	TransformTsrxModuleInput,
@@ -136,6 +136,7 @@ async function runTransformSteps(request: TransformRequest) {
 		linkedTransformInput,
 		linked.linkedChildHasBrowserTriggers,
 	);
+	throwIfLinkPending(request.transformInput, transformed);
 	registerFinalTransformArtifacts(request, transformed);
 	recordLinkedTransform(request, transformed, linkedTransformInput, linked);
 	return await emitTransformResult(request, transformed, linked.resolvedChildren);

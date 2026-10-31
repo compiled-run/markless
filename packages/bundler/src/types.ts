@@ -1,6 +1,7 @@
 import type { PackOwnership } from './build/native-packing.ts';
 import type {
 	ArtifactChildMaterialization,
+	CompilerDiagnostic,
 	ModuleGraphInterfaceArtifact,
 	SemanticGraphArtifact,
 	SemanticGraphInput,
@@ -117,6 +118,8 @@ export interface TransformTsrxModuleInput {
 	// A client module served as a payload document: a conservative demand class still runs
 	// plain-ssr scalar plans, resolved only through served locators.
 	servedScalarPlans?: boolean;
+	/** Compiled while imports may still be unlinked: a refusal a missing component interface could clear is held on the result, not thrown. */
+	linkPending?: boolean;
 }
 
 export interface TransformTsrxModuleResult {
@@ -134,6 +137,8 @@ export interface TransformTsrxModuleResult {
 		readonly source: string;
 		readonly exportName: string;
 	}>;
+	/** Refusals a `linkPending` compile held; a compile with every component interface decides them. */
+	linkPendingDiagnostics?: ReadonlyArray<CompilerDiagnostic>;
 }
 
 export type ArtifactChildCandidate = {
