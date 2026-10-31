@@ -55,6 +55,7 @@ type Handle = {
 	ref(): void;
 	unref(): void;
 	exit(): void;
+	readonly exited: Promise<void>;
 	readonly pid?: number;
 };
 
@@ -116,6 +117,7 @@ const compiles: Lane = {
 					(child.channel as { unref?: () => void } | undefined)?.unref?.();
 				},
 				exit: () => child.send({ kind: 'exit' }),
+				exited: new Promise((resolve) => child.once('exit', () => resolve())),
 				pid: child.pid,
 			},
 			on: (event, listener) => {
@@ -143,6 +145,7 @@ const chunkReads: Lane = {
 				ref: () => worker.ref(),
 				unref: () => worker.unref(),
 				exit: () => void worker.terminate(),
+				exited: new Promise((resolve) => worker.once('exit', () => resolve())),
 			},
 			on: (event, listener) => {
 				if (event === 'online') worker.once('online', listener);
@@ -319,7 +322,10 @@ const compileRuns = new Set<Promise<unknown>>();
  */
 export async function retireCompileWorkers(): Promise<void> {
 	while (compileRuns.size) await Promise.all(compileRuns);
-	for (const entry of compiles.workers.splice(0)) entry.handle.exit();
+	const retired = compiles.workers.splice(0);
+	for (const entry of retired) entry.handle.exit();
+	// A process exits once its store writes land, so the build it served ends with its cache on disk.
+	await Promise.all(retired.map((entry) => entry.handle.exited));
 }
 
 /** Process ids of the compile processes running now. */
