@@ -220,6 +220,20 @@ test('a ">" inside a quoted stylesheet attribute does not split the tag, and an 
 	}
 });
 
+test('a classic script with any JavaScript type keeps the preloads ahead of it, and a stylesheet in a nested template does not count', async () => {
+	const served = entry({
+		importMap: '<script type="importmap">{"imports":{}}</script>',
+		shell: '<html><head><meta charset="utf-8"><link rel="stylesheet" href="/a.css"><template><template></template><link rel="stylesheet" href="/inert.css"></template><script type="text/ecmascript">window.theme = 1</script><link rel="stylesheet" href="/b.css"><title>Shell</title></head><body>__children__</body></html>',
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
+	expect(preloads.length).toBeGreaterThan(0);
+	for (const preload of preloads) {
+		expect(preload.index).toBeGreaterThan(html.indexOf('/a.css'));
+		expect(preload.index).toBeLessThan(html.indexOf('<template>'));
+	}
+});
+
 test('a modulepreload written as text inside a head script, style or comment stays where it is', async () => {
 	const script = `<script>document.head.insertAdjacentHTML('beforeend', '<link rel="modulepreload" href="/widget.js">')</script>`;
 	const style = '<style>/* <link rel="modulepreload" href="/in-style.js"> */</style>';

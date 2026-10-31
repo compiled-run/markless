@@ -935,9 +935,11 @@ function takeHeadModulePreloads(html: string): {
 	return { html: head + html.slice(headEnd), preloads };
 }
 
-// Steps over comments and raw-text elements whole; captures a script's attributes and a link tag.
+// Steps over comments and raw-text elements whole; captures a script's attributes, a template open or close, and a link tag.
 const HEAD_ORDER_SCAN =
-	/<!--[\s\S]*?-->|<script\b((?:[^"'>]|"[^"]*"|'[^']*')*)>[\s\S]*?<\/script\s*>|<(style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\2\s*>|(<link\b(?:[^"'>]|"[^"]*"|'[^']*')*>)/gi;
+	/<!--[\s\S]*?-->|<script\b((?:[^"'>]|"[^"]*"|'[^']*')*)>[\s\S]*?<\/script\s*>|<(style|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\2\s*>|<(\/?)template\b[^>]*>|(<link\b(?:[^"'>]|"[^"]*"|'[^']*')*>)/gi;
+const JAVASCRIPT_TYPE =
+	/^(?:(?:text|application)\/(?:x-)?(?:java|ecma)script|text\/(?:javascript1\.[0-5]|jscript|livescript))$/;
 
 // WebKit holds first paint for modulepreloads above a stylesheet, yet a classic head script waits for every stylesheet above it:
 // the preloads go after the stylesheets that come before the first such script.
@@ -947,9 +949,12 @@ function insertHeadModulePreloads(html: string, importMap: string, preloads: str
 	const headEnd = html.slice(start).search(/<\/head\s*>/i);
 	const head = headEnd === -1 ? html.slice(start) : html.slice(start, start + headEnd);
 	let at = 0;
+	let templates = 0;
 	for (const match of head.matchAll(HEAD_ORDER_SCAN)) {
+		if (match[3] !== undefined) templates = Math.max(0, templates + (match[3] ? -1 : 1));
+		if (templates > 0) continue;
 		if (match[1] !== undefined && isParserBlockingScript(match[1])) break;
-		if (match[3] && /\brel=["']?(?:[^"'>]*\s)?stylesheet\b/i.test(match[3]))
+		if (match[4] && /\brel=["']?(?:[^"'>]*\s)?stylesheet\b/i.test(match[4]))
 			at = match.index + match[0].length;
 	}
 	return html.slice(0, start + at) + preloads + html.slice(start + at);
@@ -957,7 +962,7 @@ function insertHeadModulePreloads(html: string, importMap: string, preloads: str
 
 function isParserBlockingScript(attributes: string): boolean {
 	const type = /(?:^|\s)type=["']?([^"'\s>]*)/i.exec(attributes)?.[1]?.toLowerCase() ?? '';
-	if (type && type !== 'text/javascript' && type !== 'application/javascript') return false;
+	if (type && !JAVASCRIPT_TYPE.test(type)) return false;
 	return !(/(?:^|\s)src=/i.test(attributes) && /(?:^|\s)(?:async|defer)(?=[\s=/]|$)/i.test(attributes));
 }
 
