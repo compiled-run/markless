@@ -26,8 +26,11 @@ test.each([false, true])(
 				exportName: `run${index}`,
 			})),
 		});
-		for (let index = 0; index < 9; index++)
+		for (let index = 0; index < 9; index++) {
 			expect(source).toContain(`import("./action-${index}.js")`);
+			// The table's URL list would be dead text the bundler rewrites after rendering.
+			expect(source.split(`"./action-${index}.js"`)).toHaveLength(2);
+		}
 		expect(source).not.toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
 	},
 );
