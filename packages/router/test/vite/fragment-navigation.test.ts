@@ -486,6 +486,66 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('an in-place navigation announces the new page title in one alert region a landing never creates', async () => {
+			const { page, errors } = await open(browser);
+			const region = () =>
+				page.evaluate(() => {
+					const hosts = document.querySelectorAll('markless-route-announcer');
+					const alert = hosts[0]?.shadowRoot?.querySelector('[role="alert"]') as
+						| HTMLElement
+						| null
+						| undefined;
+					if (!alert) return { count: hosts.length };
+					const box = alert.getBoundingClientRect();
+					return {
+						count: hosts.length,
+						text: alert.textContent,
+						live: alert.getAttribute('aria-live'),
+						size: [box.width, box.height],
+						hostPosition: getComputedStyle(hosts[0]!).position,
+					};
+				});
+			expect(await region()).toEqual({ count: 0 });
+			await page.locator('[data-nav="other"]').click();
+			await landedOn(page, 'other');
+			await expect.poll(region).toEqual({
+				count: 1,
+				text: 'Other page',
+				live: 'assertive',
+				size: [1, 1],
+				hostPosition: 'absolute',
+			});
+			await page.evaluate(() => {
+				const alert = document
+					.querySelector('markless-route-announcer')!
+					.shadowRoot!.querySelector('[role="alert"]')!;
+				alert.textContent = '';
+				const anchor = document.createElement('a');
+				anchor.href = '#section';
+				anchor.dataset.hashLink = '';
+				anchor.textContent = 'Section';
+				document.querySelector('main')!.append(anchor);
+			});
+			await page.locator('[data-hash-link]').click();
+			const rendered = page.evaluate(
+				() =>
+					new Promise<void>((done) =>
+						document.addEventListener('marklessrouterrendered', () => done(), {
+							once: true,
+						}),
+					),
+			);
+			await page.locator('[data-nav="other"]').click();
+			await rendered;
+			expect((await region()).text).toBe('');
+			await page.locator('[data-nav="home"]').click();
+			await landedOn(page, 'home');
+			await expect.poll(async () => (await region()).text).toBe('Home page');
+			expect((await region()).count).toBe(1);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('async work of the old page never writes into the new page or storage', async () => {
 			const { page, errors } = await open(browser);
 			await page.locator('[data-late-write]').click();

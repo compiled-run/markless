@@ -68,6 +68,12 @@ function routePathname(url: URL, _context?: NavigationContext): string {
 	return hashRoutePath(url) ?? url.pathname;
 }
 
+// An in-page anchor or the same URL again is not a new page to announce.
+function pageAddress(href: string): string {
+	const url = new URL(href);
+	return url.pathname + url.search + (hashRoutePath(url) === undefined ? '' : url.hash);
+}
+
 export async function __marklessRouterStartSpaNavigation(options: StartSpaNavigationOptions) {
 	const runtimeWindow = options.window ?? browserWindow();
 	const state = runtimeWindow as unknown as Record<string, unknown>;
@@ -146,15 +152,24 @@ export function handleNavigateEvent(event: NavigateEvent, context: NavigationCon
 		return false;
 	}
 
+	const leaving = {
+		address: pageAddress(context.window.location.href),
+		name: pageName(context.window.document),
+	};
 	event.intercept({
 		focusReset: 'after-transition',
 		scroll: navigationScroll(event),
-		handler: () => renderRoute(url, context, event.signal),
+		handler: () => renderRoute(url, context, event.signal, leaving),
 	});
 	return true;
 }
 
-async function renderRoute(url: URL, context: NavigationContext, signal?: AbortSignal) {
+async function renderRoute(
+	url: URL,
+	context: NavigationContext,
+	signal?: AbortSignal,
+	leaving?: { readonly address: string; readonly name: string },
+) {
 	if (signal?.aborted) {
 		return;
 	}
@@ -209,6 +224,12 @@ async function renderRoute(url: URL, context: NavigationContext, signal?: AbortS
 	await new Promise<void>((resolve) => {
 		dispatchRouteUpdate(context.window.document, { ...update, onRendered: resolve });
 	});
+	if (
+		leaving &&
+		!signal?.aborted &&
+		pageAddress(context.window.location.href) !== leaving.address
+	)
+		announcePage(context.window.document, leaving.name);
 }
 
 // A '#/...' URL cannot fall back to a server document load (assigning a hash
@@ -346,4 +367,48 @@ function isEligibleLink(anchor: HTMLAnchorElement) {
 
 function browserWindow(): MarklessRouterNavigationWindow {
 	return window as unknown as MarklessRouterNavigationWindow;
+}
+
+// Tells screen readers which page a client render landed on, as Next.js's route announcer does.
+// vite/entries/fragment-entry.ts carries a copy: one shared module would add a file to every navigation's fetches.
+type Announcer = { readonly region: HTMLElement; timer?: number };
+const ANNOUNCER = '__marklessRouteAnnouncer';
+
+function pageName(d: Document): string {
+	if (d.title) return d.title;
+	const heading = d.querySelector?.('h1') as HTMLElement | null | undefined;
+	return heading?.innerText || heading?.textContent || '';
+}
+
+function announcePage(d: Document, leftName: string): void {
+	const body = d.body;
+	const w = d.defaultView;
+	if (!body || !w) return;
+	const slot = d as unknown as Record<string, Announcer | undefined>;
+	let announcer = slot[ANNOUNCER];
+	// A pending announcement names the page being left.
+	if (announcer) w.clearTimeout(announcer.timer);
+	const name = pageName(d);
+	if (!name || name === leftName) return;
+	if (!announcer) {
+		const host = d.createElement('markless-route-announcer');
+		host.style.cssText = 'position:absolute';
+		const region = d.createElement('div');
+		region.setAttribute('aria-live', 'assertive');
+		region.setAttribute('role', 'alert');
+		region.style.cssText =
+			'position:absolute;border:0;height:1px;margin:-1px;padding:0;width:1px;clip:rect(0 0 0 0);overflow:hidden;white-space:nowrap;word-wrap:normal';
+		host.attachShadow({ mode: 'open' }).append(region);
+		slot[ANNOUNCER] = announcer = { region };
+	}
+	const { region } = announcer;
+	const host = (region.getRootNode() as ShadowRoot).host;
+	if (host.isConnected) {
+		region.textContent = name;
+		return;
+	}
+	// Screen readers may skip text a live region is inserted with, so the text lands once the region is in place.
+	region.textContent = '';
+	body.append(host);
+	announcer.timer = w.setTimeout(() => (region.textContent = name), 100);
 }
