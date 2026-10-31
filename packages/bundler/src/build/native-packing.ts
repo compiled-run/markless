@@ -79,6 +79,8 @@ export function nativePackingPlugins(
 		(id) => groups.get(id),
 		(pack) => routeSets.get(pack),
 		(pack) => eagerLazyRoutes.get(pack),
+		// Builds loading one route per page collapsed every lazy load when its artifact awaited, which made facade chunks.
+		() => partitioned,
 	);
 	return [
 		{

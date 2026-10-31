@@ -1,0 +1,197 @@
+import { rolldown, type OutputChunk, type Plugin } from 'rolldown';
+import { expect, test } from 'vitest';
+import { lazyModuleFacadesPlugin } from '../src/build/lazy-module-facades.ts';
+import { packTopLevelPlugin } from '../src/build/pack-top-level.ts';
+import { shortExportNamesPlugin } from '../src/build/short-export-names.ts';
+import { clientRouteArtifactReference } from '../src/virtual-ids.ts';
+
+const TOP_LEVEL_AWAIT_MODULE = 'const value = await Promise.resolve(1); export default value;';
+
+function memory(sources: Record<string, string>): Plugin {
+	return {
+		name: 'memory',
+		resolveId: (id) => (id in sources ? id : null),
+		load: (id) => sources[id],
+	};
+}
+
+async function build(
+	sources: Record<string, string>,
+	packed: (id: string) => string | null,
+	options: { minify?: boolean } = {},
+) {
+	let rendered = 0;
+	const facades = lazyModuleFacadesPlugin();
+	const bundle = await rolldown({
+		input: 'entry',
+		preserveEntrySignatures: 'allow-extension',
+		logLevel: 'silent',
+		plugins: [
+			memory(sources),
+			{
+				name: 'render-count',
+				renderChunk() {
+					rendered++;
+				},
+			},
+			facades,
+			packTopLevelPlugin(),
+			shortExportNamesPlugin(() => facades.api.removedChunks()),
+		],
+	});
+	try {
+		const { output } = await bundle.generate({
+			format: 'es',
+			strictExecutionOrder: true,
+			minifyInternalExports: false,
+			minify: options.minify ?? false,
+			chunkFileNames: '[name].js',
+			codeSplitting: {
+				groups: [
+					{
+						debugName: 'packs',
+						name: packed,
+						priority: 1000,
+						includeDependenciesRecursively: false,
+					},
+				],
+			},
+		});
+		return {
+			rendered,
+			chunks: output.filter((item): item is OutputChunk => item.type === 'chunk'),
+		};
+	} finally {
+		await bundle.close();
+	}
+}
+
+test('a router page module adds no chunk of its own for each module a page loads lazily', async () => {
+	const page = '/pages/home.tsrx';
+	const sources: Record<string, string> = {
+		entry: `export const pages = { home: () => import(${JSON.stringify(`${page}?markless-route`)}) };`,
+		[`${page}?markless-route`]: clientRouteArtifactReference(page),
+		[`${page}?markless-symbols`]:
+			'export const loadSymbol = { first: () => import("first"), second: () => import("second") };',
+		[`${page}?markless-render-data`]: 'export const marklessPrerenderData = { title: "home" };',
+		first: 'globalThis.trace?.push("first"); export const onClick = () => 1;',
+		second: 'globalThis.trace?.push("second"); export const onInput = () => 2;',
+	};
+	const { rendered, chunks } = await build(sources, (id) =>
+		id === 'entry' ? null : id.startsWith(page) ? 'route' : 'lazy',
+	);
+	expect(chunks.map((chunk) => chunk.moduleIds.length)).not.toContain(0);
+	expect(rendered).toBe(chunks.length);
+});
+
+const lazySources: Record<string, string> = {
+	entry: 'export const load = { first: () => import("first"), second: () => import("second"), registry: () => import("registry") };',
+	first: 'import { shared } from "shared"; globalThis.trace?.push("first"); export let count = shared; export function read() { return count; } export default function bump() { return ++count; }',
+	second: 'globalThis.trace?.push("second"); let count = 2; export { count as "odd name" }; export const write = (next) => { count = next; };',
+	registry: 'globalThis.trace?.push("registry"); export const later = () => import("first");',
+	shared: 'globalThis.trace?.push("shared"); export const shared = Math.max(1, 0);',
+};
+const lazyPack = (id: string) => (id === 'entry' || id === 'blocker' ? null : 'pack');
+
+// Rolldown writes facade chunks only when some module of the graph awaits at its top level.
+function withTopLevelAwait(sources: Record<string, string>): Record<string, string> {
+	return {
+		...sources,
+		entry: `${sources.entry}export const blocker = () => import("blocker");`,
+		blocker: TOP_LEVEL_AWAIT_MODULE,
+	};
+}
+
+// Chunks named by the modules they hold, without the module that only forces facade chunks.
+function comparable(chunks: readonly OutputChunk[]) {
+	const names = new Map(
+		chunks.map((chunk) => [chunk.fileName, `[${[...chunk.moduleIds].sort().join('+')}]`]),
+	);
+	const rename = (code: string) =>
+		[...names].reduce((text, [from, to]) => text.replaceAll(`./${from}`, to), code);
+	return chunks
+		.filter((chunk) => !chunk.moduleIds.includes('blocker'))
+		.map((chunk) => ({
+			name: names.get(chunk.fileName),
+			code: rename(chunk.code),
+		}))
+		.sort((a, b) => (a.name! < b.name! ? -1 : 1));
+}
+
+test('a lazy load Rolldown writes as a namespace read gets the same loader a facade chunk got', async () => {
+	const facades = await build(withTopLevelAwait(lazySources), lazyPack, { minify: true });
+	const namespaces = await build(lazySources, lazyPack, { minify: true });
+	expect(facades.rendered).toBeGreaterThan(facades.chunks.length);
+	expect(namespaces.rendered).toBe(namespaces.chunks.length);
+	const pack = namespaces.chunks.find((chunk) => chunk.moduleIds.includes('first'))!;
+	expect(pack.code).toContain('$ml');
+	expect(pack.code).not.toMatch(/_exports\b|__exportAll/);
+	const shared = (chunks: OutputChunk[]) => comparable(chunks.filter((chunk) => !chunk.isEntry));
+	expect(shared(namespaces.chunks)).toEqual(shared(facades.chunks));
+	const loads = (chunks: OutputChunk[]) =>
+		chunks.find((chunk) => chunk.isEntry)!.code.match(/\$ml\w+/g);
+	expect(loads(namespaces.chunks)).toEqual(loads(facades.chunks));
+});
+
+test('a namespace a module imports as a whole stays beside the loader built for a lazy load of it', async () => {
+	const sources: Record<string, string> = {
+		entry: 'export const load = () => import("first"); export const whole = () => import("reader");',
+		first: 'globalThis.trace?.push("first"); export const value = Math.max(1, 0);',
+		reader: 'import * as first from "first"; export const keys = () => Object.keys(first);',
+	};
+	const { chunks } = await build(sources, (id) => (id === 'entry' ? null : 'pack'));
+	const pack = chunks.find((chunk) => chunk.moduleIds.includes('first'))!;
+	expect(pack.code).toContain('$ml');
+	expect(pack.code).toMatch(/first_exports/);
+});
+
+test('lazy namespace loads run each module once and in the order a facade load ran them', async () => {
+	const run = async (sources: Record<string, string>) => {
+		const { chunks } = await build(sources, lazyPack);
+		const files = new Map(chunks.map((chunk) => [`./${chunk.fileName}`, chunk.code]));
+		const trace: string[] = [];
+		const urls = new Map<string, string>();
+		for (const [name, code] of files) {
+			const rewritten = code.replace(/(["'`])\.\/([\w.-]+\.js)\1/g, (_, _q, file) =>
+				JSON.stringify(`@@${file}`),
+			);
+			urls.set(name, rewritten);
+		}
+		const linked = new Map<string, string>();
+		const link = (name: string): string => {
+			const cached = linked.get(name);
+			if (cached) return cached;
+			const code = urls
+				.get(name)!
+				.replace(/"@@([\w.-]+\.js)"/g, (_, file) => JSON.stringify(link(`./${file}`)));
+			const url = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+			linked.set(name, url);
+			return url;
+		};
+		const entry = chunks.find((chunk) => chunk.isEntry)!;
+		(globalThis as { trace?: string[] }).trace = trace;
+		try {
+			const module = await import(link(`./${entry.fileName}`));
+			const first = await module.load.first();
+			const again = await module.load.first();
+			const registry = await module.load.registry();
+			const later = await registry.later();
+			const second = await module.load.second();
+			second.write(7);
+			return {
+				trace,
+				same: first === again && first === later,
+				count: first.read(),
+				bumped: first.default(),
+				odd: second['odd name'],
+				keys: Object.keys(first),
+			};
+		} finally {
+			delete (globalThis as { trace?: string[] }).trace;
+		}
+	};
+	const facades = await run(withTopLevelAwait(lazySources));
+	const namespaces = await run(lazySources);
+	expect(namespaces).toEqual(facades);
+	expect(namespaces.trace).toEqual(['shared', 'first', 'registry', 'second']);
+});

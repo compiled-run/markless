@@ -11,7 +11,7 @@ export function createRouteDiscovery(
 	const pageModuleLoaders = Object.fromEntries(
 		Object.entries(discoveredPageModuleLoaders).map(([file, loader]) => [
 			normalizeRouteFileId(file),
-			loader,
+			() => loader().then(withSettledPage),
 		]),
 	);
 
@@ -19,4 +19,11 @@ export function createRouteDiscovery(
 		pageModuleLoaders,
 		routeFileIds: Object.keys(pageModuleLoaders),
 	};
+}
+
+// A client page module exports its artifact as a promise.
+async function withSettledPage(module: unknown): Promise<unknown> {
+	const exported = (module as { default?: unknown }).default;
+	const page = await exported;
+	return page === exported ? module : { ...(module as object), default: page };
 }
