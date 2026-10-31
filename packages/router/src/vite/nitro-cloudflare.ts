@@ -34,6 +34,7 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 		name: 'markless-router:cloudflare',
 		setup(nitro: CloudflareNitro) {
 			if (nitro.options.dev || !isCloudflarePreset(nitro.options.preset)) return;
+			trim.pages = nitro.options.preset === 'cloudflare-pages';
 			if (!configured.autoSubfolderIndex) nitro.options.prerender.autoSubfolderIndex = false;
 			// Nitro prerenders before it writes the Worker, so the pages are left out once it is written.
 			let prerendered = new Set<string>();
@@ -265,6 +266,9 @@ const EMPTY_PUBLIC_ASSETS = '\0markless-router:cloudflare-public-assets';
  * the assets. Cloudflare serves those files before the Worker runs, so the Worker drops the list (2.7 MB to parse on
  * every cold isolate for 11,664 files), unless an app's run_worker_first sends asset URLs to the Worker.
  */
+// Pages routes requests by _routes.json, which can send public files to the Function: it keeps the list.
+const trim = { pages: false };
+
 export function cloudflareWorkerTrimPlugin(): Plugin {
 	let keepTable = false;
 	return {
@@ -282,7 +286,8 @@ export function cloudflareWorkerTrimPlugin(): Plugin {
 		resolveId: {
 			order: 'pre',
 			handler(source) {
-				if (source === PUBLIC_ASSETS_DATA && !keepTable) return EMPTY_PUBLIC_ASSETS;
+				if (source === PUBLIC_ASSETS_DATA && !keepTable && !trim.pages)
+					return EMPTY_PUBLIC_ASSETS;
 			},
 		},
 		load(id) {
