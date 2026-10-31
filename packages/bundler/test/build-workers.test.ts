@@ -189,3 +189,14 @@ test('a build retires its compile processes once its module graph is built', asy
 	await pool.close();
 	expect(await exited(pids)).toEqual([]);
 });
+
+test('a compile process retired while it boots exits, and starts no other', async () => {
+	const pool = createCompileWorkerPool({ size: 2 });
+	pool.run(input('Booting'), 'booting');
+	const pids = compileWorkerPids();
+	expect(pids.length).toBe(1);
+	await retireCompileWorkers();
+	expect(await exited(pids)).toEqual([]);
+	expect(compileWorkerPids()).toEqual([]);
+	await pool.close();
+});

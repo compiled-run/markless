@@ -174,6 +174,8 @@ function addWorker(lane: Lane): void {
 	lane.workers.push(entry);
 	entry.handle.unref();
 	started.on('online', () => {
+		// Retired while it booted: the exit sent then reached no listener yet.
+		if (!lane.workers.includes(entry)) return entry.handle.exit();
 		entry.online = true;
 		addWorker(lane);
 		dispatch(lane);
