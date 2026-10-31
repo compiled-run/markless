@@ -86,6 +86,11 @@ beforeAll(async () => {
 		join(root, 'package.json'),
 		'{ "name": "markless-cloudflare-test", "private": true }\n',
 	);
+	// An app that names its own version binding: the edge cache keys on that one.
+	await writeFile(
+		join(root, 'wrangler.json'),
+		JSON.stringify({ version_metadata: { binding: 'APP_VERSION' } }),
+	);
 	// Like unicorn-magic: its default build, for runtimes without Node's APIs, lacks what its Node build exports.
 	const nodeOnly = join(root, 'node_modules/node-build-only');
 	await mkdir(nodeOnly, { recursive: true });
