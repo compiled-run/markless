@@ -177,10 +177,13 @@ const WORKER_CONDITIONS = ['workerd', 'worker', 'browser'];
 
 type ExportsEntry = string | { readonly [condition: string]: ExportsEntry } | null | undefined;
 
-function hasWorkerBuild(entry: ExportsEntry): boolean {
+// Only the branches this kind of request can take: a require never takes an import branch's Worker build.
+function hasWorkerBuild(entry: ExportsEntry, other: string): boolean {
 	if (!entry || typeof entry !== 'object') return false;
 	return Object.entries(entry).some(
-		([condition, value]) => WORKER_CONDITIONS.includes(condition) || hasWorkerBuild(value),
+		([condition, value]) =>
+			condition !== other &&
+			(WORKER_CONDITIONS.includes(condition) || hasWorkerBuild(value, other)),
 	);
 }
 
@@ -248,9 +251,9 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 						? exportsMap
 						: undefined;
 				if (!entry || typeof entry !== 'object' || !('node' in entry)) return;
-				if (hasWorkerBuild(entry)) return;
 				const required =
 					(options as { kind?: string } | undefined)?.kind === 'require-call';
+				if (hasWorkerBuild(entry, required ? 'import' : 'require')) return;
 				const node = conditionTarget(
 					entry.node,
 					required

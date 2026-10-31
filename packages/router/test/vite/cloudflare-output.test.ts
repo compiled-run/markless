@@ -394,6 +394,23 @@ test('a require of such a package gets its Node require build, an import its Nod
 		expect(
 			await hook.handler('nested', importer, { kind: 'import-statement' }),
 		).toBeUndefined();
+		const split = join(dir, 'node_modules/split');
+		await mkdir(split, { recursive: true });
+		await writeFile(
+			join(split, 'package.json'),
+			JSON.stringify({
+				name: 'split',
+				exports: {
+					node: { require: './node.cjs' },
+					import: { workerd: './worker.mjs' },
+					default: './default.js',
+				},
+			}),
+		);
+		expect(await hook.handler('split', importer, { kind: 'require-call' })).toBe(
+			join(await realpath(split), 'node.cjs'),
+		);
+		expect(await hook.handler('split', importer, { kind: 'import-statement' })).toBeUndefined();
 		for (const relative of ['./dual', '../dual', '..', '.'])
 			expect(
 				await hook.handler(relative, join(dir, 'src/api.ts'), { kind: 'import-statement' }),
