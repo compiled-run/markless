@@ -7,6 +7,7 @@ import {
 	type LinkedModuleChildResolution,
 } from '@markless/compiler';
 import { clearParsedChunkCode } from './build/chunk-ast.ts';
+import { retireCompileWorkers } from './build-workers.ts';
 import { clearModuleSpecifiers } from './hooks/transform-emit.ts';
 import { clearFactoredRenderDataLiterals } from './render-data-literals.ts';
 import { clearStrippedCode } from './transform.ts';
@@ -306,6 +307,7 @@ export function createMarklessRolldownPlugin(input: {
 			if (internalOptions.dev !== true) {
 				state.linkedTransformCache.clear();
 				releaseTransformMemos();
+				await retireCompileWorkers();
 			}
 		},
 		renderStart: facades?.renderStart,
