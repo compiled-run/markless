@@ -436,10 +436,15 @@ export function runFragmentNavigation(
 			'link[rel="stylesheet"][href]',
 		)) {
 			const href = new URL(link.getAttribute('href')!, d.baseURI).href;
+			const key = link.getAttribute(config.stylesheetKeyAttribute);
 			if (
 				[...d.querySelectorAll<HTMLLinkElement>('link[href]')].some(
 					(own) => own.href === href,
-				)
+				) ||
+				(key !== null &&
+					[...d.head.children].some(
+						(own) => own.getAttribute(config.stylesheetKeyAttribute) === key,
+					))
 			)
 				continue;
 			const preload = d.createElement('link');
@@ -825,6 +830,8 @@ export function runFragmentNavigation(
 
 // A fragment fetch asks for the page path under this prefix, so a cache keyed on the URL, or a host rewrite that drops the query, keeps it apart from the page.
 export const FRAGMENT_PATH_PREFIX = '/_markless/fragment';
+// Names the stylesheet a page's inline <style> or reference <link> carries, so a navigation keeps one it already has.
+export const STYLESHEET_KEY_ATTRIBUTE = 'data-markless-css';
 /** Set on every fragment response, so a redirect it answers can be pointed back at a fragment. */
 export const FRAGMENT_RESPONSE_HEADER = 'x-markless-fragment';
 

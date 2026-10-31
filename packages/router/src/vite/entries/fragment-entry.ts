@@ -11,6 +11,8 @@ export interface FragmentNavigationConfig {
 	readonly routeScriptType: string;
 	readonly servedHtmlAttributesProperty: string;
 	readonly servedBodyAttributesProperty: string;
+	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
+	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
@@ -394,19 +396,23 @@ function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> 
 }
 
 // Existing head nodes stay where they are (moving a stylesheet re-applies it); new ones go in the destination's order.
-async function mergeHead(d: Document, next: Document) {
+async function mergeHead(d: Document, next: Document, stylesheetKey: string) {
+	const key = (element: Element) => {
+		const stylesheet = element.getAttribute(stylesheetKey);
+		return stylesheet === null ? element.outerHTML : `${stylesheetKey}:${stylesheet}`;
+	};
 	const current = new Map<string, Element[]>();
 	for (const element of d.head.children) {
-		const list = current.get(element.outerHTML);
+		const list = current.get(key(element));
 		if (list) list.push(element);
-		else current.set(element.outerHTML, [element]);
+		else current.set(key(element), [element]);
 	}
 	const stylesheets: HTMLLinkElement[] = [];
 	const hidden: [Element, string | null][] = [];
 	const scripts: HTMLScriptElement[] = [];
 	let cursor: Element | null = null;
 	for (const element of Array.from(next.head.children)) {
-		const reused = current.get(element.outerHTML)?.shift();
+		const reused = current.get(key(element))?.shift();
 		const node = reused ?? d.adoptNode(element);
 		if (!reused) {
 			// An arriving stylesheet applies only with its page: applied before, it restyles the leaving page for nothing.
@@ -1003,7 +1009,7 @@ export async function navigate(
 			),
 		);
 	const ranFiles = filesRan(d);
-	const head = await mergeHead(d, next);
+	const head = await mergeHead(d, next, state.config.stylesheetKeyAttribute);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (stale()) return abandon();
 	let restore = scroll;

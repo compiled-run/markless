@@ -68,6 +68,7 @@ import {
 	FRAGMENT_PREFETCH_CONNECTIONS,
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
+	STYLESHEET_KEY_ATTRIBUTE,
 	fragmentPageUrl,
 	runFragmentNavigation,
 	startFragmentNavigation,
@@ -91,6 +92,8 @@ export interface ServerEntryOptions {
 	readonly routeStylesheets?: Record<string, readonly string[]>;
 	// The document shell's scoped CSS, linked on every route ahead of the route's own.
 	readonly documentStylesheets?: readonly string[];
+	// The text of the stylesheets above: a page carries each one inline instead of requesting it.
+	readonly stylesheetSources?: Readonly<Record<string, string>>;
 	// `<script type="importmap">` resolving the chunk specifiers built chunks import each other by.
 	readonly importMap?: string;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
@@ -215,6 +218,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		: (options.linkBridgePaths ??
 			(linkBridgeModules && [linkBridgeModules[0].path, linkBridgeModules[1].path]));
 
+	const inlineStylesheets = inlineStylesheetPlan(options);
 	// A press preloads the stylesheets a destination adds beside its page: its route's, and those its document writes for its URL.
 	const documentHeads = new Map<string, Promise<readonly string[]>>();
 	function pageStylesheetsAt(
@@ -241,6 +245,17 @@ export function createServerEntry(options: ServerEntryOptions) {
 			documentHeads.set(key, head);
 		}
 		return head.then((hrefs) => [...new Set([...own, ...hrefs])]);
+	}
+	// A destination's own stylesheets arrive inside its fragment, so a press preloads only those it would request.
+	function requestedStylesheetsAt(
+		url: URL,
+		match: NonNullable<ReturnType<typeof matchRouteManifest>>,
+		documentModule: DocumentModule | undefined,
+		request: Request,
+	): Promise<readonly string[]> {
+		return pageStylesheetsAt(url, match, documentModule, request).then((hrefs) =>
+			hrefs.filter((href) => !inlineStylesheets.inlines(href)),
+		);
 	}
 
 	async function fetch(request: Request): Promise<Response> {
@@ -389,7 +404,9 @@ export function createServerEntry(options: ServerEntryOptions) {
 					: {}),
 			},
 			options.navigationEntryPath,
-			pageStylesheets(options, file),
+			(pageStylesheets(options, file) ?? []).map((href) =>
+				inlineStylesheets.injection(href, fragment),
+			),
 			documentModule?.default?.headInjections ?? [],
 			linkIntent
 				? (html: string) =>
@@ -401,7 +418,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 							fragmentNavigation,
 							fragmentNavigation
 								? (destination, match) =>
-										pageStylesheetsAt(
+										requestedStylesheetsAt(
 											destination,
 											match,
 											documentModule,
@@ -574,12 +591,45 @@ function dedupeHeadLinks(
 ): ReadonlyArray<RenderHeadInjection> {
 	const seen = new Set<string>();
 	return injections.filter((injection) => {
-		const href = injection.tag === 'link' ? injection.attributes?.href : undefined;
+		const href =
+			injection.attributes?.[STYLESHEET_KEY_ATTRIBUTE] ??
+			(injection.tag === 'link' ? injection.attributes?.href : undefined);
 		if (typeof href !== 'string') return true;
 		if (seen.has(href)) return false;
 		seen.add(href);
 		return true;
 	});
+}
+
+// A stylesheet the build holds the text of rides inside the page. A fragment names the ones every page
+// carries without their text; the link stands in only for a document that somehow lacks one.
+function inlineStylesheetPlan(options: ServerEntryOptions) {
+	const sources = options.stylesheetSources ?? {};
+	const routes = Object.values(options.routeStylesheets ?? {});
+	const everyPage = new Set([
+		...(options.documentStylesheets ?? []),
+		...(routes[0] ?? []).filter((href) => routes.every((hrefs) => hrefs.includes(href))),
+	]);
+	const inlines = (href: string) => Object.hasOwn(sources, href);
+	return {
+		inlines,
+		injection(href: string, fragment: boolean): RenderHeadInjection {
+			if (!inlines(href))
+				return { tag: 'link', location: 'head', attributes: { rel: 'stylesheet', href } };
+			if (fragment && everyPage.has(href))
+				return {
+					tag: 'link',
+					location: 'head',
+					attributes: { rel: 'stylesheet', href, [STYLESHEET_KEY_ATTRIBUTE]: href },
+				};
+			return {
+				tag: 'style',
+				location: 'head',
+				attributes: { [STYLESHEET_KEY_ATTRIBUTE]: href },
+				children: sources[href]!,
+			};
+		},
+	};
 }
 
 function pageStylesheets(options: ServerEntryOptions, file: string): readonly string[] | undefined {
@@ -595,7 +645,7 @@ function routedPageArtifact(
 	pageProps: PageComponentProps,
 	route: RouteScript,
 	navigationEntryPath: string | undefined,
-	stylesheetHrefs: readonly string[] | undefined,
+	stylesheetInjections: ReadonlyArray<RenderHeadInjection>,
 	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
 	intentPreloads?: (html: string) => Promise<Record<string, readonly FragmentPreload[]>>,
 	documentLoads = false,
@@ -606,11 +656,7 @@ function routedPageArtifact(
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
-			tag: 'link',
-			location: 'head',
-			attributes: { rel: 'stylesheet', href },
-		})),
+		...stylesheetInjections,
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -1197,6 +1243,7 @@ function fragmentConfig(
 		routeScriptType: ROUTE_SCRIPT_TYPE,
 		servedHtmlAttributesProperty: SERVED_HTML_ATTRIBUTES_PROPERTY,
 		servedBodyAttributesProperty: SERVED_BODY_ATTRIBUTES_PROPERTY,
+		stylesheetKeyAttribute: STYLESHEET_KEY_ATTRIBUTE,
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,

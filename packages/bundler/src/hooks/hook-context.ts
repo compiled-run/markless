@@ -17,6 +17,8 @@ export type Environment = MarklessEnvironment | ((context: unknown) => MarklessE
 export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	// Chunks name each other through an import map every document must carry, so it stays opt-in.
 	chunkImportMap?: boolean;
+	// The host's documents carry every stylesheet their pages' code can load.
+	documentStylesheets?: boolean;
 	serverOnlyProps?: (moduleId: string) => SemanticGraphInput['serverOnlyProps'];
 	routeModules?: (moduleId: string) => boolean;
 	// Set per build: a page no file imports, so only the router renders it and its props never change.
