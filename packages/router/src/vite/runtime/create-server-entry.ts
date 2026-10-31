@@ -824,7 +824,7 @@ async function renderDocumentShell(
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertImportMap(html, importMap + preloads),
+			insertHeadModulePreloads(insertImportMap(html, importMap), importMap, preloads),
 			'</html>',
 		].join('');
 	}
@@ -919,8 +919,7 @@ function documentStorageRecords(state: unknown): ReadonlyArray<{ readonly key: s
 const HEAD_SCAN =
 	/<!--[\s\S]*?-->|<(script|style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\1\s*>|(<link\b[^>]*\brel=["']?modulepreload\b[^>]*>)/gi;
 
-// Firefox and Safari fetch a modulepreload only once the parser reaches it, and a head script waits for every stylesheet above it:
-// the head's modulepreloads, the document's own included, move up beside the import map.
+// Firefox and Safari fetch a modulepreload only once the parser reaches it: the head's modulepreloads, the document's own included, are gathered and placed together.
 function takeHeadModulePreloads(html: string): {
 	readonly html: string;
 	readonly preloads: string;
@@ -934,6 +933,32 @@ function takeHeadModulePreloads(html: string): {
 		return '';
 	});
 	return { html: head + html.slice(headEnd), preloads };
+}
+
+// Steps over comments and raw-text elements whole; captures a script's attributes and a link tag.
+const HEAD_ORDER_SCAN =
+	/<!--[\s\S]*?-->|<script\b([^>]*)>[\s\S]*?<\/script\s*>|<(style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\2\s*>|(<link\b[^>]*>)/gi;
+
+// WebKit holds first paint for modulepreloads above a stylesheet, yet a classic head script waits for every stylesheet above it:
+// the preloads go after the stylesheets that come before the first such script.
+function insertHeadModulePreloads(html: string, importMap: string, preloads: string): string {
+	if (!preloads) return html;
+	const start = importMap ? html.indexOf(importMap) + importMap.length : headContentStart(html);
+	const headEnd = html.indexOf('</head>', start);
+	const head = html.slice(start, headEnd === -1 ? html.length : headEnd);
+	let at = 0;
+	for (const match of head.matchAll(HEAD_ORDER_SCAN)) {
+		if (match[1] !== undefined && isParserBlockingScript(match[1])) break;
+		if (match[3] && /\brel=["']?(?:[^"'>]*\s)?stylesheet\b/i.test(match[3]))
+			at = match.index + match[0].length;
+	}
+	return html.slice(0, start + at) + preloads + html.slice(start + at);
+}
+
+function isParserBlockingScript(attributes: string): boolean {
+	const type = /(?:^|\s)type=["']?([^"'\s>]*)/i.exec(attributes)?.[1]?.toLowerCase() ?? '';
+	if (type && type !== 'text/javascript' && type !== 'application/javascript') return false;
+	return !(/(?:^|\s)src=/i.test(attributes) && /(?:^|\s)(?:async|defer)(?=[\s=/]|$)/i.test(attributes));
 }
 
 function insertHeadHtml(documentHtml: string, headHtml: string): string {
@@ -1276,14 +1301,17 @@ function isNitroApiPathname(pathname: string) {
 // Ahead of every module script and modulepreload, after <meta charset> so the charset stays in the first 1024 bytes.
 function insertImportMap(html: string, importMap: string): string {
 	if (!importMap) return html;
+	const at = headContentStart(html);
+	return `${html.slice(0, at)}${importMap}${html.slice(at)}`;
+}
+
+function headContentStart(html: string): number {
 	const head = /<head(?:\s[^>]*)?>/i.exec(html);
-	if (!head) return `${importMap}${html}`;
+	if (!head) return 0;
 	const afterHead = head.index + head[0].length;
 	const headEnd = html.indexOf('</head>', afterHead);
 	const charset = /<meta\s[^>]*charset[^>]*>(?:<\/meta>)?/i.exec(html.slice(afterHead));
-	const at =
-		charset && (headEnd === -1 || afterHead + charset.index < headEnd)
-			? afterHead + charset.index + charset[0].length
-			: afterHead;
-	return `${html.slice(0, at)}${importMap}${html.slice(at)}`;
+	return charset && (headEnd === -1 || afterHead + charset.index < headEnd)
+		? afterHead + charset.index + charset[0].length
+		: afterHead;
 }
