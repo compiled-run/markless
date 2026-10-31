@@ -10,6 +10,7 @@ import {
 	isMarklessNavigationPack,
 	isStartupPack,
 	lazyStartupPackName,
+	packOfPiece,
 	MARKLESS_DEFERRED_PACK,
 	planRoutePackGroups,
 	startupPackOfLazy,
@@ -259,7 +260,10 @@ test('code only a client render needs leaves the landing packs for navigation pa
 test('a navigation or deferred pack over the size cap splits into parts under it, one source per part', () => {
 	const input = tierInput(undefined, 300_000);
 	const modules = new Map(input.modules);
-	modules.set('a-draw', { ...modules.get('a-draw')!, dependencies: ['chrome', 'a-chrome', 'a-draw-art'] });
+	modules.set('a-draw', {
+		...modules.get('a-draw')!,
+		dependencies: ['chrome', 'a-chrome', 'a-draw-art'],
+	});
 	modules.set('a-draw-art', { dependencies: [], source: 'a-draw-art', size: 300_000 });
 	const groups = planRoutePackGroups({ ...input, modules, maxPackBytes: 500_000 });
 	const parts = new Map<string, { size: number; sources: Set<string> }>();
@@ -271,12 +275,169 @@ test('a navigation or deferred pack over the size cap splits into parts under it
 		parts.set(name, part);
 	}
 	expect(parts.size).toBeGreaterThan(2);
-	for (const part of parts.values()) expect(part.size <= 500_000 || part.sources.size === 1).toBe(true);
+	for (const part of parts.values())
+		expect(part.size <= 500_000 || part.sources.size === 1).toBe(true);
 	expect(isMarklessDeferredPack(groups.get('idle-helper'))).toBe(true);
 	expect(groups.get('idle-helper')).not.toBe(groups.get('a-idle'));
 	expect(isMarklessNavigationPack(groups.get('a-draw'))).toBe(true);
 	expect(isMarklessNavigationPack(groups.get('chrome'))).toBe(true);
 	expect(groups.get('a')).toBe(planRoutePackGroups(input).get('a'));
+});
+
+// Names are shuffled against execution order, so only a cut that follows imports keeps pieces from importing each other both ways.
+function shuffledChain(prefix: string, count: number, step: number) {
+	const ids = Array.from(
+		{ length: count },
+		(_, index) => `${prefix}-${String((index * step) % count).padStart(2, '0')}`,
+	);
+	return { ids, dependenciesOf: (index: number) => (index + 1 < count ? [ids[index + 1]!] : []) };
+}
+
+function pieceGraphIsAcyclic(
+	groups: ReadonlyMap<string, string>,
+	modules: ReadonlyMap<string, { readonly dependencies: readonly string[] }>,
+): boolean {
+	const edges = new Map<string, Set<string>>();
+	for (const [id, module] of modules)
+		for (const dependency of module.dependencies) {
+			const from = groups.get(id)!;
+			const to = groups.get(dependency)!;
+			if (from !== to) edges.set(from, (edges.get(from) ?? new Set()).add(to));
+		}
+	const state = new Map<string, 'open' | 'done'>();
+	const acyclic = (node: string): boolean => {
+		if (state.get(node) === 'done') return true;
+		if (state.get(node) === 'open') return false;
+		state.set(node, 'open');
+		for (const next of edges.get(node) ?? []) if (!acyclic(next)) return false;
+		state.set(node, 'done');
+		return true;
+	};
+	return [...edges.keys()].every(acyclic);
+}
+
+// A routed page preloads every piece at once; pieces cut in execution order import only earlier pieces, so the bundler keeps each whole.
+test.each([
+	{ page: 'pages/docs', prefix: 'part', count: 24, step: 7, size: 60_000 },
+	{ page: 'pages/shop', prefix: 'widget', count: 13, step: 5, size: 110_000 },
+])(
+	'a routed startup pack over the size cap cuts into a few pieces in execution order: $page',
+	({ page, prefix, count, step, size }) => {
+		const { ids, dependenciesOf } = shuffledChain(prefix, count, step);
+		const modules = new Map<
+			string,
+			{ dependencies: string[]; source: string; size: number; firstEvent: boolean }
+		>();
+		ids.forEach((id, index) =>
+			modules.set(id, {
+				dependencies: dependenciesOf(index),
+				source: id,
+				size,
+				firstEvent: true,
+			}),
+		);
+		modules.set(page, { dependencies: [ids[0]!], source: page, size: 1_000, firstEvent: true });
+		const input = { modules, routes: new Map([[page, [page]]]), pagesLoadOneRoute: true };
+		const whole = planRoutePackGroups(input);
+		const groups = planRoutePackGroups({ ...input, maxPackBytes: 500_000 });
+		const pieces = new Map<string, number>();
+		for (const [id, name] of groups) {
+			expect(packOfPiece(name)).toBe(packOfPiece(whole.get(id)!));
+			pieces.set(name, (pieces.get(name) ?? 0) + modules.get(id)!.size);
+		}
+		const total = [...modules.values()].reduce((sum, module) => sum + module.size, 0);
+		expect(pieces.size).toBeGreaterThan(new Set(whole.values()).size);
+		expect(pieces.size).toBeLessThanOrEqual(Math.ceil(total / 500_000) + 1);
+		for (const bytes of pieces.values()) expect(bytes).toBeLessThanOrEqual(500_000);
+		expect(pieceGraphIsAcyclic(groups, modules)).toBe(true);
+	},
+);
+
+test('Rolldown keeps each execution-order piece of a startup pack whole and runs modules in source order', async () => {
+	const { ids } = shuffledChain('piece', 9, 4);
+	const sources = new Map<string, string>([
+		['entry', `import "${ids[0]}"; globalThis.__pieceTrace.push("entry");`],
+		...ids.map((id, index): [string, string] => [
+			id,
+			`${index + 1 < ids.length ? `import "${ids[index + 1]}";` : ''}globalThis.__pieceTrace.push("${id}");export const pad${index} = "${'x'.repeat(40_000)}";`,
+		]),
+	]);
+	const modules = new Map(
+		[...sources].map(([id, code]) => [
+			id,
+			{
+				dependencies:
+					id === 'entry'
+						? [ids[0]!]
+						: ids.slice(ids.indexOf(id) + 1, ids.indexOf(id) + 2),
+				source: id,
+				size: code.length,
+				firstEvent: true,
+			},
+		]),
+	);
+	const groups = planRoutePackGroups({
+		modules,
+		routes: new Map([['entry', ['entry']]]),
+		pagesLoadOneRoute: true,
+		maxPackBytes: 150_000,
+	});
+	const pieces = new Set(groups.values());
+	expect(pieces.size).toBeGreaterThan(1);
+	const build = await rolldown({
+		input: 'entry',
+		plugins: [
+			{
+				name: 'memory',
+				resolveId: (id) => (sources.has(id) ? id : null),
+				load: (id) => sources.get(id),
+			},
+		],
+	});
+	try {
+		const output = await build.generate({
+			format: 'es',
+			strictExecutionOrder: true,
+			codeSplitting: {
+				groups: [
+					{
+						name: (id) => groups.get(id) ?? null,
+						priority: 1000,
+						includeDependenciesRecursively: false,
+					},
+				],
+			},
+		});
+		const chunks = output.output.filter((item) => item.type === 'chunk');
+		expect(chunks.length).toBeLessThanOrEqual(pieces.size + 1);
+		const directory = await mkdtemp(join(tmpdir(), 'markless-startup-pieces-'));
+		try {
+			for (const chunk of chunks)
+				await writeFile(join(directory, chunk.fileName), chunk.code);
+			const entry = chunks.find((chunk) => chunk.isEntry)!;
+			const trace = execFileSync(
+				process.execPath,
+				[
+					'--input-type=module',
+					'-e',
+					`globalThis.__pieceTrace=[];await import(${JSON.stringify(pathToFileURL(join(directory, entry.fileName)).href)});console.log(JSON.stringify(__pieceTrace));`,
+				],
+				{ encoding: 'utf8' },
+			);
+			expect(JSON.parse(trace)).toEqual([...ids].reverse().concat('entry'));
+		} finally {
+			await rm(directory, { recursive: true, force: true });
+		}
+	} finally {
+		await build.close();
+	}
+});
+
+test('an entry-rooted startup pack stays whole over the size cap', () => {
+	const input = { ...tierInput(undefined, 300_000), pagesLoadOneRoute: false };
+	const capped = planRoutePackGroups({ ...input, maxPackBytes: 500_000 });
+	const whole = planRoutePackGroups(input);
+	for (const [id, name] of whole) if (isStartupPack(name)) expect(capped.get(id)).toBe(name);
 });
 
 test('code no boot, first use or render needs is deferred', () => {
@@ -1337,7 +1498,15 @@ test('an app module importing several deferred targets gets one deferred pack pe
 	const groups = planRoutePackGroups({
 		modules: new Map([
 			['page', { dependencies: ['table'], source: 'page', app: true }],
-			['table', { dependencies: [], dynamicDependencies: ['one', 'two', 'runtime-a', 'runtime-b'], source: 'table', app: true }],
+			[
+				'table',
+				{
+					dependencies: [],
+					dynamicDependencies: ['one', 'two', 'runtime-a', 'runtime-b'],
+					source: 'table',
+					app: true,
+				},
+			],
 			['one', { dependencies: ['one-part', 'common'], source: 'one', app: true }],
 			['one-part', { dependencies: [], source: 'one-part', app: true }],
 			['two', { dependencies: ['common'], source: 'two', app: true }],

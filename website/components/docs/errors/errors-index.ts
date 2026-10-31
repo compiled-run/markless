@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 294,
+	total: 299,
 	guided: 45,
 	groups: [
 		{
@@ -349,8 +349,18 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
-					kind: 'compile warning',
+					kind: 'compile error or warning',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+					kind: 'compile error',
 					guided: false,
 				},
 				{
@@ -465,7 +475,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
-					kind: 'compile warning',
+					kind: 'compile error or warning',
 					guided: false,
 				},
 				{
@@ -649,6 +659,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
 					kind: 'compile error',
 					guided: false,
@@ -760,7 +775,7 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
-					kind: 'compile warning',
+					kind: 'compile error or warning',
 					guided: true,
 				},
 				{
@@ -800,6 +815,16 @@ export const errorIndex: ErrorIndex = {
 			codes: [
 				{
 					code: 'MARKLESS_CHILD_SYMBOL_MISSING',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_CLIENT_BUILD_FAILED',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_CLIENT_BUILD_PROCESS',
 					kind: 'build error',
 					guided: false,
 				},

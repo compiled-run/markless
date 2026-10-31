@@ -274,7 +274,7 @@ export function templateExpressionUnsupportedDiagnostic(input: {
 		why: 'An expression with no graph node behind it renders once, from whatever the value was at render, and a later write never reaches it - so the page would show a stale value and nothing would say so.',
 		span: sourceSpan(input.node, input.filename),
 		suggestion:
-			'Write a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads. If the value needs a function of your own, put that function inside a `computed()` and read the computed here.',
+			'Write a plain read (`group.value`), an expression built from reads, operators and method calls, or a call to a function declared with `function` or `const` that does not change state. A function held in a `let`, or one that writes state, cannot be followed: move the write into an event handler.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 	});
 }
@@ -744,6 +744,33 @@ export function stateElementHandleUnsupportedDiagnostic(input: {
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+	};
+}
+
+export function stateFunctionValueUnsupportedDiagnostic(input: {
+	readonly stateName: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A function cannot be stored in state',
+		message: `state "${input.stateName}" holds a function, \`${input.source}\`, in its initial value. A function cannot be written into the page, so the browser would read a value that is not callable.`,
+		why: 'state() values are serialized into the page and the browser resumes from them without running the component body, so only data (strings, numbers, booleans, null, arrays and plain objects) survives the trip.',
+		primarySpan: input.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		statePath: input.stateName,
+		source: input.source,
+		suggestions: [
+			{
+				message:
+					'Keep the function outside state(): declare it in the component body or at module scope, and store only the data it needs, for example a name to pick it by.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
 	};
 }
 

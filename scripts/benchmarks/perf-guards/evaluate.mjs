@@ -32,6 +32,14 @@ export function evaluate(measurement, anchors) {
 			checkFirstUse(subject, result.controls, fail, note);
 			if (result.waste) checkWaste(subject, result.waste, note);
 			if (result.payPerUse) checkPayPerUse(subject, result.payPerUse, fail, note);
+			if (result.load)
+				checkLoadWeight(
+					subject,
+					result.load,
+					anchors.loadWeight?.[LOAD_PLATFORM]?.[subject],
+					fail,
+					note,
+				);
 		}
 		if (siteResult.runtimeModules)
 			checkRuntimeModules(site, siteResult, anchors.runtimeModules ?? {}, fail, note);
@@ -50,6 +58,7 @@ export function evaluate(measurement, anchors) {
 	if (measurement.resumeRows)
 		checkResumeRows(measurement.resumeRows, anchors.resumeRows ?? {}, fail, note);
 	if (measurement.hiddenContent) checkHiddenContent(measurement.hiddenContent, fail, note);
+	if (measurement.routeTable) checkRouteTable(measurement.routeTable, fail, note);
 	for (const [site, siteResult] of Object.entries(measurement.sites))
 		for (const [route, result] of Object.entries(siteResult.routes))
 			if (result.resumeData)
@@ -70,6 +79,38 @@ const breakdown = (attribution) =>
 				.map(([category, bytes]) => `${category} ${kb(bytes)}`)
 				.join(', ')})`
 		: '';
+
+// The owner weighs a page by the code it runs and downloads before a reader touches it, so neither may grow.
+// Linux CI's Chromium runs a few hundred chars more of one build at load than a Mac does, so each platform has its anchors.
+export const LOAD_PLATFORM = `${process.platform}-${process.arch}`;
+
+function checkLoadWeight(subject, load, anchor, fail, note) {
+	const line = `${subject} (${LOAD_PLATFORM}): runs ${load.executedChars} chars of JS source and downloads ${load.jsGzipBytes} B gzip in ${load.files.length} JS files at load`;
+	if (!anchor) {
+		fail('G16', `${line}, with no anchor for this platform. ${acceptHint('load', subject)}`);
+		return;
+	}
+	const ran = load.executedChars - anchor.executedChars;
+	const grew = load.jsGzipBytes - anchor.jsGzipBytes;
+	const problems = [
+		...(ran > BUDGETS.loadExecutionSwingChars
+			? [
+					`runs +${ran} chars more than its anchor ${anchor.executedChars} (allowed swing ${BUDGETS.loadExecutionSwingChars})`,
+				]
+			: []),
+		...(grew > 0
+			? [`downloads +${grew} B gzip more than its anchor ${anchor.jsGzipBytes}`]
+			: []),
+	];
+	if (problems.length) {
+		fail('G16', `${line}: ${problems.join('; ')}. ${acceptHint('load', subject)}`, subject);
+		return;
+	}
+	note(
+		'G16',
+		`${line}; anchor ${anchor.executedChars} chars run, ${anchor.jsGzipBytes} B gzip downloaded`,
+	);
+}
 
 function checkPreload(subject, preload, fail, note) {
 	if (preload.missingFiles.length)
@@ -434,6 +475,29 @@ function checkHiddenContent({ short, long }, fail, note) {
 			`${line}: +${grown} chars run at load for content nobody opened (budget +${BUDGETS.hiddenContentLoadChars}). Code a page has not shown must not run at load: a runtime an idle or visible handler starts must leave row and render code until a reader's input. shadcn-admin /settings/account ran its whole page's render code at load this way (1.5 MB against 100 kB). ${INVARIANT}`,
 		);
 	note('G14', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
+}
+
+function checkRouteTable({ few, many }, fail, note) {
+	const html = many.htmlBytes - few.htmlBytes;
+	const grown = many.executedChars - few.executedChars;
+	const line = `a router page runs ${few.executedChars} chars at load linking a few routes and ${many.executedChars} linking many, whose html is ${kb(html)} bigger`;
+	const errors = [...few.errors, ...many.errors];
+	if (!few.answered || !many.answered || errors.length > 0)
+		return fail(
+			'G15',
+			`the route-table fixture did not answer its menu button${errors.length ? `: ${errors.join('; ')}` : ''}. ${INVARIANT}`,
+		);
+	if (html < BUDGETS.routeTableMinHtmlGrowth)
+		return fail(
+			'G15',
+			`${line}: the many-link page must ship at least ${kb(BUDGETS.routeTableMinHtmlGrowth)} more html, or this guard compares two equal pages. Link more routes.`,
+		);
+	if (grown > BUDGETS.routeTableLoadChars)
+		return fail(
+			'G15',
+			`${line}: +${grown} chars run at load for links nobody touched (budget +${BUDGETS.routeTableLoadChars}). A page's route table must stay inert until idle or a link intent: the shadcn port's docs pages evaluated a 109 kB table of their 136 linked routes at load, 63% of all JavaScript they ran by the load event. ${INVARIANT}`,
+		);
+	note('G15', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
 }
 
 function noteResumeData(subject, data, anchors, note) {

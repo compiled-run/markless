@@ -1,4 +1,4 @@
-// Builds the generated app at two sizes and fails when build memory, the largest chunk or the largest
+// Builds the generated app at two sizes and fails when build memory, build CPU, the client module count, the largest chunk or the largest
 // build artifact passes its budget, or the built server cannot answer a page.
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -104,6 +104,7 @@ try {
 	const referenceMs = Math.min(referenceBefore, await referenceCpuMs());
 	const [atSmall, atLarge] = results;
 	const perPage = (key) => (atLarge[key] - atSmall[key]) / (large - small);
+	const perPageOf = (read) => (read(atLarge) - read(atSmall)) / (large - small);
 	const rows = [
 		['peak resident memory', atLarge.peakRssBytes, budgets.peakRssBytes],
 		['peak resident memory per page', perPage('peakRssBytes'), budgets.peakRssBytesPerPage],
@@ -126,6 +127,21 @@ try {
 		console.log(
 			`${over ? 'FAIL' : 'ok  '} ${name}: ${(value / MB).toFixed(2)} MB (budget ${(budget / MB).toFixed(2)} MB)`,
 		);
+		if (over) failures.push(name);
+	}
+	// Module counts do not vary between runs, so any rise is real: Rolldown spends memory and time on every module.
+	const countRows = [
+		['client modules', atLarge.modules.client, budgets.clientModules],
+		[
+			'client modules per page',
+			perPageOf((build) => build.modules.client),
+			budgets.clientModulesPerPage,
+		],
+	];
+	for (const [name, measured, budget] of countRows) {
+		const value = Math.round(measured * 10) / 10;
+		const over = value > budget;
+		console.log(`${over ? 'FAIL' : 'ok  '} ${name}: ${value} (budget ${budget})`);
 		if (over) failures.push(name);
 	}
 	// Build time: CPU, which a busy runner moves far less than wall time, per page and as growth with page count.

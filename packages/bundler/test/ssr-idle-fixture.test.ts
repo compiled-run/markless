@@ -5,10 +5,13 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium, webkit } from '@playwright/test';
 import { resolve } from 'pathe';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
 
 const exec = promisify(execFile);
+
+// Each poll waits on a real browser loading, idling and fetching code, which takes seconds on a loaded machine.
+vi.setConfig({ expect: { poll: { timeout: 15_000 } } });
 const root = resolve(import.meta.dirname, '../../..');
 const fixtureDir = (wake: boolean) =>
 	resolve(root, `packages/bundler/fixtures/vite-ssr-idle${wake ? '-wake' : ''}`);

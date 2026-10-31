@@ -3,17 +3,19 @@ export type * from './diagnostics.ts';
 export type * from './type-service.ts';
 
 export { collectTsrxModuleDiagnostics } from './collect-diagnostics.ts';
+export { propsDeciding, rowsDecidedBy } from './artifact-helpers/prop-deciders.ts';
 export { DEBUGGING_PLAYBOOK_HINT } from './debugging-playbook.ts';
 export { compileTsrxModule } from './compile-module.ts';
 export {
 	clearCompileCache,
+	setCompileCacheLimit,
 	useCompileRunner,
 	usePersistentCompileStore,
 	type CompileRunner,
 	type PersistentCompileStore,
 } from './compile-cache.ts';
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
-export { parseJavaScriptModule, type JavaScriptAstNode } from './js-ast.ts';
+export { parseJavaScriptModule, resetParseCache, type JavaScriptAstNode } from './js-ast.ts';
 export { isEventAttribute, normalizeEventName } from './ast/events.ts';
 export { callsImportedOrFreeName } from './module-free-calls.ts';
 export { LEAN_DISPATCH_MARKER_MODULES } from './lean-dispatch-modules.ts';

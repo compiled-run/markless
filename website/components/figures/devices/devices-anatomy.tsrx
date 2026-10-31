@@ -70,10 +70,10 @@ export default function DevicesAnatomy() @{
 				</g>
 
 				@for (const note of view.findings; key note.key) {
-					<>
+					<g>
 						<path class="ink" d={note.lead} />
 						<text class={'finding ' + note.key} x={note.x} y={note.y}>{note.text}</text>
-					</>
+					</g>
 				}
 
 				@for (const part of view.parts; key part.key) {
@@ -133,10 +133,10 @@ export default function DevicesAnatomy() @{
 
 				@for (const arrow of view.arrows; key arrow.key) {
 					@if (arrow.stack) {
-						<>
+						<g>
 							<text class={'press ' + arrow.status} x={arrow.x} y={arrow.top}><tspan class="wrote">{WROTE}</tspan></text>
 							<text class={'press ' + arrow.status} x={arrow.x} y={arrow.y}><tspan class="said">{'→ ' + arrow.word}</tspan></text>
-						</>
+						</g>
 					} @else {
 						<text class={'press ' + arrow.status} x={arrow.x} y={arrow.y}><tspan class="wrote">{WROTE + ' '}</tspan><tspan class="said">{'→ ' + arrow.word}</tspan></text>
 					}

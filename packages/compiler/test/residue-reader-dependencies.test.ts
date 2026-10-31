@@ -94,10 +94,10 @@ test.each([
 });
 
 test.each([
-	{ expression: '`${live(label)}`', expected: 'OK' },
-	{ expression: '({ live }).live(label)', expected: 'OK' },
-	{ expression: 'Object.keys({ [live(label)]: label })[0]', expected: 'OK' },
-	{ expression: 'make(label).value', expected: 'OK' },
+	{ expression: '`${live(item.label)}`', expected: 'OK' },
+	{ expression: '({ live }).live(item.label)', expected: 'OK' },
+	{ expression: 'Object.keys({ [live(item.label)]: item.label })[0]', expected: 'OK' },
+	{ expression: 'make(item.label).value', expected: 'OK' },
 	{ expression: 'make().value', expected: 'DEFAULT' },
 	{ expression: 'new Field().value', expected: 'FIELD' },
 ])(
@@ -110,7 +110,7 @@ test.each([
 	class Box { value; constructor(value = live('default')) { this.value = live(value); } }
 	class Field { value = live('field'); }
 	function make(value) { return new Box(value); }
-	export function Text({ label }) @{ <p title={${expression}} /> }`,
+	export function Text({ item }) @{ <p title={${expression}} /> }`,
 		});
 		const definition = result.publicRenderModule.componentDefinitions.find(
 			(entry) => entry.name === 'Text',
@@ -126,7 +126,7 @@ test.each([
 			'live',
 			`${(definition.residueReaderDeclarations as string[] | undefined)?.join('\n') ?? ''}; return (${definition.residueReaderSource});`,
 		)((text: string) => text.toUpperCase());
-		expect(reader({ source: expression }, { read: () => 'ok' })).toBe(expected);
+		expect(reader({ source: expression }, { read: () => ({ label: 'ok' }) })).toBe(expected);
 	},
 );
 
@@ -152,7 +152,7 @@ test('unreadable residue analysis retains a conservative dependency set', async 
 	const source = {
 		filename: '/failure.tsrx',
 		symbols: [],
-		source: `import { ghost } from './helpers'; const fallback = ghost(); export function Text({ label }) @{ <p title={label + '!'} /> }`,
+		source: `import { ghost } from './helpers'; const fallback = ghost(); function mark(value) { return value + '!'; } export function Text({ label }) @{ const marked = mark(label); <p title={marked} /> }`,
 	};
 	const result = await compileTsrxModule(source);
 	const renderData = {
@@ -177,7 +177,7 @@ test('repeat bindings do not hide module references outside the repeat', async (
 		symbols: [],
 		source: `import { row } from './live';
 		export function List({ rows, label }) @{
-			<section title={row(label)}>@for (const row of rows; key row.id) { <p>{row.label}</p> }</section>
+			<section title={row(label.text)}>@for (const row of rows; key row.id) { <p>{row.label}</p> }</section>
 		}`,
 	});
 	const definition = result.publicRenderModule.componentDefinitions.find(
@@ -199,7 +199,7 @@ test('component locals do not shadow imports used inside module helpers', async 
 		source: `import { format } from './live';
 		function caption(value) { return format(value); }
 		export function Label({ value }) @{
-			const format = value + '!';
+			const format = value.text + '!';
 			<p title={caption(format)} />
 		}`,
 	});
@@ -217,7 +217,7 @@ test('component locals do not shadow imports used inside module helpers', async 
 		'format',
 		`${(definition.residueReaderDeclarations as string[]).join('\n')}; return (${definition.residueReaderSource});`,
 	)((text: string) => text.toUpperCase());
-	expect(reader({ source: 'caption(format)' }, { read: () => 'ready' })).toBe('READY!');
+	expect(reader({ source: 'caption(format)' }, { read: () => ({ text: 'ready' }) })).toBe('READY!');
 });
 
 test.each([

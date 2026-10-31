@@ -39,6 +39,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Native module packing applies only to the resolved production client build; server modules retain their existing delivery.',
 	"packages/bundler/src/link-driver.ts :: clientEnvironment: environment === 'client',":
 		'The link driver reports the already resolved build environment to the module-link pass.',
+	"packages/bundler/src/link-driver.ts :: return environment === 'client' && options.dev !== true ? symbolRouteSource(source) : source;":
+		'A client build forces an uncompiled child through the symbols module its claim plan loads anyway; the plain module the server imports would join the client graph only when compile timing left no variant started.',
 	"packages/bundler/src/hooks/transform-link.ts :: clientEnvironment: currentEnvironment === 'client',":
 		'The transform hook reports the already resolved build environment to the delegate-children pass.',
 	"packages/bundler/src/hooks/transform-hook.ts :: currentEnvironment === 'client' &&":

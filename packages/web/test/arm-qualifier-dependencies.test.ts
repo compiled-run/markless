@@ -45,6 +45,6 @@ test.each([false, true])(
 		const { composedArmRecordQualifier } = await import('../src/resume-arm-records.ts');
 		expect(composedArmRecordQualifier()).toBeTypeOf('function');
 		const set = { locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [] };
-		expect(composedArmRecordQualifier()!('boundary', set)).toEqual(set);
+		expect(composedArmRecordQualifier()!({ id: 'boundary' }, set)).toEqual(set);
 	},
 );

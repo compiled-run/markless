@@ -152,8 +152,9 @@ export function createBehaviorRuntime(input: {
 			const removed = new Set<ResumeDomElement>();
 			for (const record of records)
 				for (const node of record.removedNodes) collectRemovedElements(node, removed);
-			for (const id of hostIdsInsideRemovedElements(input.elementsByHostId, removed))
-				input.disposeHost(id);
+			for (const [id, element] of input.elementsByHostId)
+				// A script that moves markup within the page reports it removed, yet it is still here.
+				if (removed.has(element) && !input.root.contains?.(element)) input.disposeHost(id);
 		});
 		removalObserver.observe(input.root, { childList: true, subtree: true });
 	}
@@ -307,17 +308,4 @@ function collectRemovedElements(node: ResumeDomNode, removed: Set<ResumeDomEleme
 	const element = node as ResumeDomElement;
 	removed.add(element);
 	for (const child of element.childNodes ?? []) collectRemovedElements(child, removed);
-}
-function hostIdsInsideRemovedElements(
-	elementsByHostId: Map<string, ResumeDomElement>,
-	removed: Set<ResumeDomElement>,
-): string[] {
-	const ids: string[] = [];
-	for (const [id, element] of elementsByHostId)
-		for (const removedElement of removed)
-			if (containsElement(removedElement, element)) {
-				ids.push(id);
-				break;
-			}
-	return ids;
 }

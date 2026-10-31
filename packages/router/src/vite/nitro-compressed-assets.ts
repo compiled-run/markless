@@ -9,7 +9,11 @@ import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 type EdgeRoute = {
 	readonly src: string;
 	readonly dest: string;
-	readonly has: ReadonlyArray<{ readonly type: 'header'; readonly key: string; readonly value: string }>;
+	readonly has: ReadonlyArray<{
+		readonly type: 'header';
+		readonly key: string;
+		readonly value: string;
+	}>;
 	readonly headers: Readonly<Record<string, string>>;
 };
 
@@ -17,14 +21,16 @@ type CompressedAssetsNitro = {
 	options: {
 		preset?: string;
 		dev?: boolean;
+		entry?: string;
 		buildDir?: string;
 		handlers?: Array<{ route: string; middleware: boolean; handler: string }>;
 		baseURL?: string;
 		serveStatic?: boolean | string;
-		output: { publicDir: string };
+		output: { publicDir: string; serverDir?: string };
 		compressPublicAssets?: boolean | { gzip?: boolean; brotli?: boolean; zstd?: boolean };
 		vercel?: { config?: { routes?: EdgeRoute[] } };
 	};
+	hooks?: { hook(name: 'compiled', handler: () => Promise<void>): unknown };
 };
 
 // A rendered page is compressed per request while it streams, so brotli runs at a quality cheap enough to keep up.
@@ -87,7 +93,7 @@ export default async function compressRendered(event, next) {
 // Nitro's brotli runs at quality 11: about 30 to 37 ms a file against 0.4 to 0.5 ms at 9, for 4 to 15% fewer bytes.
 export const PUBLIC_BROTLI_QUALITY = 9;
 
-// Vercel's edge compresses near quality 4, 15 to 20% larger than 11; a client chunk is built once and fetched on every landing.
+// Vercel's and Cloudflare's edges compress 15 to 20% larger than quality 11; a client chunk is built once and fetched on every landing.
 export const EDGE_BROTLI_QUALITY = 11;
 
 const EDGE_CONTENT_TYPES = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8' };
@@ -102,6 +108,46 @@ export function compressedAssetsState(): CompressedAssetsState {
 	return { brotliDir: undefined };
 }
 
+// Cloudflare compresses every response again unless the Worker sends it with encodeBody 'manual'.
+const cloudflareEntrySource = (
+	entry: string,
+	prefix: string,
+) => `import worker from ${JSON.stringify(entry)};
+export * from ${JSON.stringify(entry)};
+const prefix = ${JSON.stringify(prefix)};
+const types = ${JSON.stringify(EDGE_CONTENT_TYPES)};
+const acceptsBrotli = (header) =>
+	header.split(',').some((part) => {
+		const [coding, ...params] = part.trim().toLowerCase().split(';');
+		const q = params.map((param) => param.trim()).find((param) => param.startsWith('q='));
+		return coding === 'br' && (!q || Number(q.slice(2)) > 0);
+	});
+export default {
+	...worker,
+	async fetch(request, env, context) {
+		const url = new URL(request.url);
+		const type = url.pathname.startsWith(prefix) && types[url.pathname.slice(url.pathname.lastIndexOf('.') + 1)];
+		if (type && env.ASSETS && !request.headers.has('range') && acceptsBrotli(request.headers.get('accept-encoding') ?? '')) {
+			const copy = await env.ASSETS.fetch(new Request(new URL(url.pathname + '.br', url), request));
+			if (copy.status === 200 || copy.status === 304) {
+				const headers = new Headers(copy.headers);
+				headers.set('content-type', type);
+				headers.set('cache-control', 'public, max-age=31536000, immutable');
+				headers.set('vary', 'Accept-Encoding');
+				if (copy.status === 200) headers.set('content-encoding', 'br');
+				return new Response(copy.body, { status: copy.status, headers, encodeBody: 'manual' });
+			}
+		}
+		return worker.fetch(request, env, context);
+	},
+};
+`;
+
+/** Whether a Nitro preset deploys to Cloudflare Workers or Pages. */
+export function isCloudflarePreset(preset: string | undefined): boolean {
+	return preset !== undefined && preset.startsWith('cloudflare') && preset !== 'cloudflare-dev';
+}
+
 // A server that serves its own files (node, bun, deno) gets gzip and brotli copies; a host with a CDN (vercel, netlify) compresses at its edge.
 export function compressedAssetsModule(
 	configured: boolean,
@@ -113,6 +159,42 @@ export function compressedAssetsModule(
 			const { preset, serveStatic } = nitro.options;
 			// The prerenderer is a second Nitro with its own preset and output; the files served are the build's own.
 			if (preset === 'nitro-prerender') return;
+			if (isCloudflarePreset(preset) && !nitro.options.dev) {
+				// Cloudflare never serves Nitro's .gz or .br copies, which would only count against its file limit.
+				const off = nitro.options.compressPublicAssets === false;
+				nitro.options.compressPublicAssets = false;
+				if (
+					(configured && off) ||
+					preset === 'cloudflare-pages' ||
+					!nitro.options.entry ||
+					!nitro.options.buildDir
+				)
+					return;
+				const base = nitro.options.baseURL ?? '/';
+				const dir = join(nitro.options.buildDir, 'markless-router');
+				const entry = join(dir, 'cloudflare-entry.mjs');
+				await mkdir(dir, { recursive: true });
+				await writeFile(
+					entry,
+					cloudflareEntrySource(nitro.options.entry, `${base}${MARKLESS_BUILD_PREFIX}`),
+				);
+				nitro.options.entry = entry;
+				nitro.hooks?.hook('compiled', async () => {
+					const file = join(nitro.options.output.serverDir ?? '', 'wrangler.json');
+					const config = JSON.parse(await readFile(file, 'utf8').catch(() => 'null')) as {
+						assets?: { run_worker_first?: boolean | string[] };
+					} | null;
+					if (!config?.assets) return;
+					const own = config.assets.run_worker_first;
+					if (own === true) return;
+					config.assets.run_worker_first = [
+						...new Set([...(own || []), `${base}${MARKLESS_BUILD_PREFIX}*`]),
+					];
+					await writeFile(file, `${JSON.stringify(config, null, 2)}\n`);
+				});
+				state.edgeBrotliDir = join(nitro.options.output.publicDir, MARKLESS_BUILD_PREFIX);
+				return;
+			}
 			if (preset?.startsWith('vercel')) {
 				if (configured) return;
 				const base = nitro.options.baseURL ?? '/';
@@ -121,7 +203,13 @@ export function compressedAssetsModule(
 				nitro.options.vercel.config.routes = [
 					...Object.entries(EDGE_CONTENT_TYPES).map(([extension, type]) => ({
 						src: `^${escapeRegExp(`${base}${MARKLESS_BUILD_PREFIX}`)}(.+\\.${extension})$`,
-						has: [{ type: 'header' as const, key: 'accept-encoding', value: '.*\\bbr\\b.*' }],
+						has: [
+							{
+								type: 'header' as const,
+								key: 'accept-encoding',
+								value: '.*\\bbr\\b.*',
+							},
+						],
 						dest: `${base}${MARKLESS_BUILD_PREFIX}$1.br`,
 						headers: {
 							'content-encoding': 'br',
@@ -178,7 +266,9 @@ export function brotliCopiesPlugin(state: CompressedAssetsState): Plugin {
 				const extensions = Object.keys(EDGE_CONTENT_TYPES);
 				await writeBrotliCopies(
 					(await readdir(dir, { recursive: true }).catch(() => []))
-						.filter((file) => extensions.includes(file.slice(file.lastIndexOf('.') + 1)))
+						.filter((file) =>
+							extensions.includes(file.slice(file.lastIndexOf('.') + 1)),
+						)
 						.map((file) => join(dir, file)),
 					EDGE_BROTLI_QUALITY,
 				);

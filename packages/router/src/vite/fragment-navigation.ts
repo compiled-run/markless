@@ -15,7 +15,8 @@ export type { FragmentNavigationConfig } from './entries/fragment-entry.ts';
 export function startFragmentNavigation(
 	d: Document,
 	linkAttributeOf: () => string,
-	routes: FragmentRouteCode,
+	// The attribute marking the page's route table, inert JSON `[preloads, destinations]` parsed on first lookup.
+	tableAttribute: string,
 	importModule: (href: string) => Promise<unknown>,
 	loadRun: () => Promise<FragmentNavigationRun>,
 	// What a press may start before the run half arrives; null when the app fetches nothing ahead of a click. A thunk, like the config.
@@ -24,13 +25,36 @@ export function startFragmentNavigation(
 	const w = d.defaultView as (Window & typeof globalThis) | null;
 	if (!w) return;
 	const host = d as Document & {
-		__marklessFragmentNav?: FragmentNavigationState;
-		__marklessFragmentWake?: FragmentRouteCode;
+		__marklessFragmentTables?: () => void;
 		__marklessFragmentIdle?: Promise<boolean>;
 	};
-	const known = host.__marklessFragmentNav?.routes ?? host.__marklessFragmentWake;
-	if (known) return void Object.assign(known, routes);
-	host.__marklessFragmentWake = routes;
+	// A later page's bridge adds its table to the one the first page started.
+	if (host.__marklessFragmentTables) return host.__marklessFragmentTables();
+	const read = new WeakSet<Element>();
+	const table: Record<string, readonly FragmentPreload[]> = {};
+	let unread = true;
+	host.__marklessFragmentTables = () => void (unread = true);
+	const fill = () => {
+		if (!unread) return table;
+		unread = false;
+		for (const script of d.querySelectorAll(`script[${tableAttribute}]`)) {
+			if (read.has(script)) continue;
+			read.add(script);
+			const [preloads, destinations] = JSON.parse(script.textContent!) as [
+				FragmentPreload[],
+				Record<string, number[]>,
+			];
+			for (const path in destinations)
+				table[path] = destinations[path]!.map((at) => preloads[at]!);
+		}
+		return table;
+	};
+	const routes: FragmentRouteCode = new Proxy(table, {
+		get: (_, key) => fill()[key as string],
+		has: (_, key) => key in fill(),
+		ownKeys: () => Reflect.ownKeys(fill()),
+		getOwnPropertyDescriptor: (_, key) => Reflect.getOwnPropertyDescriptor(fill(), key),
+	});
 	// Nothing idle may compete with the page's own first-click code: wait for the load event and every modulepreload it landed with.
 	const landed = new Promise<void>((done) => {
 		const start = () => {
@@ -138,7 +162,6 @@ export function startFragmentNavigation(
 	};
 	const wake = (event?: Event) => {
 		starting ??= loadRun().then((run) => {
-			delete host.__marklessFragmentWake;
 			return (running = run(d, routes, importModule, scrolled, arriving, pressed));
 		});
 		starting.then(
@@ -203,7 +226,7 @@ export function startFragmentNavigation(
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
-	if (Object.keys(routes).length)
+	if (d.querySelector(`script[${tableAttribute}]`))
 		void landed.then(() =>
 			w.requestIdleCallback
 				? w.requestIdleCallback(() => wake(), { timeout: 3000 })
@@ -287,27 +310,46 @@ export function runFragmentNavigation(
 	// A same-origin anchor, router Link or plain, counts only when its path names one of the app's pages.
 	const underEndpoints = (pathname: string) =>
 		config.endpointPrefixes.some((prefix) => (pathname + '/').startsWith(prefix + '/'));
-	const pages = config.pages.map(
-		(page) => [underEndpoints(page), page.split('/').filter(Boolean)] as const,
-	);
+	const decoded = (part: string) => {
+		try {
+			return decodeURIComponent(part);
+		} catch {
+			return part;
+		}
+	};
+	// Every link on a large site is checked after each swap: a page with no parameter is one lookup, not one comparison per page.
+	const staticPages = new Map<string, boolean[]>();
+	const patterns: (readonly [boolean, string[]])[] = [];
+	for (const page of config.pages) {
+		const segments = page.split('/').filter(Boolean);
+		const under = underEndpoints(page);
+		if (segments.some((segment) => segment === '**' || segment === ':'))
+			patterns.push([under, segments]);
+		else {
+			const key = JSON.stringify(segments);
+			staticPages.set(key, [...(staticPages.get(key) ?? []), under]);
+		}
+	}
+	const known = new Map<string, boolean>();
 	// Server endpoints are never fetched ahead of a click or as a fragment: a GET there may have side effects.
 	// Only a page file under the endpoint prefix itself (pages/api/) answers a path there.
 	const isPage = (pathname: string) => {
+		const cached = known.get(pathname);
+		if (cached !== undefined) return cached;
 		const endpoint = underEndpoints(pathname);
-		const parts = pathname.split('/').filter(Boolean);
-		return pages.some(([under, page]) => {
-			if (endpoint && !under) return false;
-			const rest = page.indexOf('**');
-			if (rest === -1 ? page.length !== parts.length : parts.length <= rest) return false;
-			return page.every((segment, index) => {
-				if (segment === '**' || segment === ':') return true;
-				try {
-					return segment === decodeURIComponent(parts[index]!);
-				} catch {
-					return segment === parts[index];
-				}
+		const parts = pathname.split('/').filter(Boolean).map(decoded);
+		const answer =
+			!!staticPages.get(JSON.stringify(parts))?.some((under) => !endpoint || under) ||
+			patterns.some(([under, page]) => {
+				if (endpoint && !under) return false;
+				const rest = page.indexOf('**');
+				if (rest === -1 ? page.length !== parts.length : parts.length <= rest) return false;
+				return page.every(
+					(segment, index) => segment === '**' || segment === ':' || segment === parts[index],
+				);
 			});
-		});
+		known.set(pathname, answer);
+		return answer;
 	};
 	const eligible = (anchor: Element | null | undefined, forClick = false): URL | undefined => {
 		if (!anchor || anchor.localName !== 'a') return;

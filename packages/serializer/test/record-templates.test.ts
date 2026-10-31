@@ -149,6 +149,7 @@ test('field names the key table spells travel as indexes, and unknown ones as th
 	expect(decoded).toEqual(records);
 });
 
+// Generating the tables builds a TypeScript program over the protocol types: real work that passes 5 s on a loaded machine.
 test('the key tables are the ones the protocol types generate', async () => {
 	const { generateRecordKeysSource, RECORD_KEYS_FILE } = await import(
 		'../scripts/generate-record-keys.ts'
@@ -158,7 +159,7 @@ test('the key tables are the ones the protocol types generate', async () => {
 		readFileSync(RECORD_KEYS_FILE, 'utf8'),
 		'run node packages/serializer/scripts/generate-record-keys.ts',
 	).toBe(generateRecordKeysSource());
-});
+}, 60_000);
 
 test('a payload already served as plain arrays decodes unchanged', () => {
 	const view = { version: 1, domUpdates: rowUpdates(2) };

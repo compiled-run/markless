@@ -10,6 +10,17 @@ const block = (code: string) => ({ files: [{ name: 'app.tsrx', code }], panes: [
 
 const all = (html: string, pattern: RegExp): string[] => [...(html.match(pattern) ?? [])];
 
+/** The name a screen reader gives an element: the text of what its aria-labelledby points at, else its aria-label. */
+function accessibleName(html: string, tag: string): string | undefined {
+	const ids = tag.match(/\baria-labelledby="([^"]+)"/)?.[1];
+	if (!ids) return tag.match(/\baria-label="([^"]+)"/)?.[1];
+	return ids
+		.split(/\s+/)
+		.map((id) => html.match(new RegExp(`<(\\w+)[^>]*\\bid="${id}"[^>]*>([^<]*)</\\1>`))?.[2] ?? '')
+		.join(' ')
+		.trim();
+}
+
 describe('the playground split', () => {
 	it('lays the code and the result side by side in one resizable group with a labelled divider', async () => {
 		const html = await render(block('export default function App() @{ <p>Hi</p> }'));
@@ -27,7 +38,7 @@ describe('the playground split', () => {
 		expect(divider).toHaveLength(1);
 		const codeId = (panels[0] ?? '').match(/\bid="([^"]+)"/)?.[1];
 		expect(codeId).toBeTruthy();
-		expect(divider[0] ?? '').toContain('aria-label="Resize code and preview"');
+		expect(accessibleName(html, divider[0] ?? '')).toBe('Resize code and preview');
 		expect(divider[0] ?? '').toContain(`aria-controls="${codeId}"`);
 		expect(divider[0] ?? '').toContain('aria-valuenow="64"');
 		expect(divider[0] ?? '').toContain('aria-valuemin="25"');

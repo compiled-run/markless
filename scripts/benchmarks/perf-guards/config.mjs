@@ -23,7 +23,12 @@ export const COST_MODEL = {
 
 // App size is never gated. Framework overhead is: per runtime module (rendered bytes before
 // minification, independent of what shares its chunk) and per compiled construct.
+// Loads per route for G16; the lowest of them is the page's weight.
+export const LOAD_WEIGHT_RUNS = 3;
+
 export const BUDGETS = {
+	// The lowest of three loads moved by at most 107 chars across three measurements of one build (bench /settings); 2.4x that.
+	loadExecutionSwingChars: 256,
 	runtimeModuleGrowthBytes: 128,
 	constructGlueGrowthBytes: 24,
 	resumeRowGrowthBytes: 16,
@@ -31,6 +36,10 @@ export const BUDGETS = {
 	hiddenContentLoadChars: 512,
 	// Below this the long panel no longer ships more code, and G14 would compare two equal pages.
 	hiddenContentMinShippedGrowth: 8 * 1024,
+	// The two pages run the same code at load; only the route table they ship differs.
+	routeTableLoadChars: 512,
+	// Below this the many-link page no longer ships a bigger route table, and G15 would compare two equal pages.
+	routeTableMinHtmlGrowth: 4 * 1024,
 	executionGrowth: 0.25,
 	executionMinChars: 2048,
 	initializerMinExtra: 2,

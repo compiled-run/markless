@@ -78,21 +78,10 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 				);
 				continue;
 			}
-			const staticExpressionReadSource = templateExpressionGraphReadSource(
-				read.source,
-				lookup,
-			);
-			if (staticExpressionReadSource) {
-				diagnostics.push(
-					templateExpressionStaticDiagnostic({
-						source: read.source,
-						readSource: staticExpressionReadSource,
-						sourceSpan: read.sourceSpan,
-						filename: input.semanticGraph.filename,
-					}),
-				);
-				continue;
-			}
+			// A keyed row's slot is live when the row mints; the row-mint check reports the rows that do not.
+			if (read.keyedRepeatId) continue;
+			const diagnostic = staticTemplateReadDiagnostic(input.semanticGraph, read);
+			if (diagnostic) diagnostics.push(diagnostic);
 			continue;
 		}
 
@@ -742,6 +731,57 @@ function resolveStateGraphPath(
 	if (sharedDefinitionId) return null;
 
 	return resolveSharedInstanceGraphPath(source, input.semanticGraph, componentName);
+}
+
+export function staticTemplateReadDiagnostic(
+	semanticGraph: StateLoweringInput['semanticGraph'],
+	read: StateLoweringInput['semanticGraph']['templateReads'][number],
+): StateLoweringDiagnostic | null {
+	if (read.computedGraphNodeId) return null;
+	const lookup = {
+		bindings: graphBindingMap(semanticGraph, null, read.componentName),
+		aliases: semanticAliasMap(semanticGraph, null, read.componentName),
+	};
+	if (resolveGraphPath(optionalMemberReadSource(read.source), lookup.bindings, lookup.aliases))
+		return null;
+	const readSource = templateExpressionGraphReadSource(read.source, lookup);
+	if (!readSource) return null;
+	const diagnostic = templateExpressionStaticDiagnostic({
+		source: read.source,
+		readSource,
+		sourceSpan: read.sourceSpan,
+		filename: semanticGraph.filename,
+	});
+	const props = read.componentName ? propsOnlyReads(read.source, lookup, semanticGraph.moduleImports) : null;
+	return props ? { ...diagnostic, decidedByProps: { componentName: read.componentName!, props } } : diagnostic;
+}
+
+// Every name the expression reads is a prop or an import: anything else, a body local included, keeps the warning unsettled.
+function propsOnlyReads(
+	source: string,
+	lookup: GraphLookup,
+	imports: StateLoweringInput['semanticGraph']['moduleImports'],
+): ReadonlyArray<string> | null {
+	const code = blankLiteralText(source);
+	const props = new Set<string>();
+	for (const match of code.matchAll(/(?<![$\w.])([A-Za-z_$][\w$]*)(?![$\w])/g)) {
+		const name = match[1]!;
+		const after = code.slice(match.index + name.length);
+		const before = code.slice(0, match.index);
+		if (/^\s*:/.test(after) && /[{,]\s*$/.test(before)) continue;
+		if (/^(?:true|false|null|undefined|typeof|void|in|instanceof|new)$/.test(name)) continue;
+		const resolved = resolveGraphPath(name, lookup.bindings, lookup.aliases);
+		if (!resolved && imports.some((imported) => imported.localName === name && !imported.typeOnly))
+			continue;
+		if (resolved?.binding.kind !== 'prop') return null;
+		const prop =
+			resolved.binding.id === PROTOCOL_PROPS_GRAPH_NODE_ID
+				? resolved.path[0]
+				: resolved.binding.id.slice(PROTOCOL_PROP_GRAPH_NODE_PREFIX.length);
+		if (prop === undefined) return null;
+		props.add(prop);
+	}
+	return props.size > 0 ? [...props] : null;
 }
 
 function templateExpressionStaticDiagnostic({

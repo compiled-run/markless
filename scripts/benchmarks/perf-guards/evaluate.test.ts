@@ -477,3 +477,51 @@ describe('measured routes', () => {
 		}
 	});
 });
+
+describe('G16 load weight', () => {
+	const withLoad = (load: Json) => {
+		const m = measurement();
+		m.sites.bench.routes['/records'].load = { files: ['/build/a.js'], ...load };
+		return m;
+	};
+	const platform = `${process.platform}-${process.arch}`;
+	const anchors = (extra: Json = {}) => ({
+		loadWeight: {
+			[platform]: { 'bench /records': { executedChars: 10_000, jsGzipBytes: 80_000 } },
+		},
+		...extra,
+	});
+	const g16 = (m: Json, a: Json) =>
+		evaluate(m, a as never).failures.filter((f: Json) => f.guard === 'G16');
+
+	test('a page that runs no more than the measured swing and downloads no more passes', () => {
+		expect(g16(withLoad({ executedChars: 10_200, jsGzipBytes: 80_000 }), anchors())).toEqual(
+			[],
+		);
+		expect(g16(withLoad({ executedChars: 9_000, jsGzipBytes: 70_000 }), anchors())).toEqual([]);
+	});
+
+	test('running more than the swing at load, or downloading one byte more, fails', () => {
+		expect(
+			g16(withLoad({ executedChars: 10_400, jsGzipBytes: 80_000 }), anchors()),
+		).toHaveLength(1);
+		expect(
+			g16(withLoad({ executedChars: 10_000, jsGzipBytes: 80_001 }), anchors()),
+		).toHaveLength(1);
+	});
+
+	test('a page without an anchor fails until one is accepted, and accept records both values', () => {
+		expect(g16(withLoad({ executedChars: 1, jsGzipBytes: 1 }), {})).toHaveLength(1);
+		const next = accept(
+			{},
+			withLoad({ executedChars: 1_234, jsGzipBytes: 5_678 }),
+			'load',
+			'bench /records',
+			'test',
+			'2026-10-28',
+		);
+		expect(next.loadWeight).toEqual({
+			[platform]: { 'bench /records': { executedChars: 1_234, jsGzipBytes: 5_678 } },
+		});
+	});
+});

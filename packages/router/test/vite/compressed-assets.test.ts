@@ -1,5 +1,6 @@
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
-import { request } from 'node:http';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { createServer, request, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import {
 	brotliCompressSync,
@@ -29,9 +30,46 @@ let root = '';
 let origin = '';
 let close: (() => void) | undefined;
 
+// The held page's data waits on this server, which answers at once unless a test holds it, so a build never waits on it.
+const heldAnswers: ServerResponse[] = [];
+let holding = false;
+const gate = createServer((_request, response) => {
+	if (holding) heldAnswers.push(response);
+	else response.end();
+});
+const releaseGate = () => {
+	holding = false;
+	for (const response of heldAnswers.splice(0)) response.end();
+};
+
 beforeAll(async () => {
 	root = await mkdtemp(join(tmpdir(), 'markless-compressed-assets-'));
 	await cp(resolve(import.meta.dirname, '../fixtures/fragment-app'), root, { recursive: true });
+	await new Promise<void>((listening) => gate.listen(0, '127.0.0.1', listening));
+	const gateUrl = `http://127.0.0.1:${(gate.address() as AddressInfo).port}/`;
+	await writeFile(
+		join(root, 'pages/held.tsrx'),
+		[
+			"import { computed } from '@markless/core';",
+			'',
+			'export default function Held() @{',
+			'\tconst report = computed(async () => {',
+			`\t\tawait fetch(${JSON.stringify(gateUrl)});`,
+			"\t\treturn { text: 'report ready' };",
+			'\t});',
+			'',
+			'\t<main data-page="held">',
+			'\t\t@try {',
+			'\t\t\t<p data-settled>{report.text}</p>',
+			'\t\t} @pending {',
+			'\t\t\t<p data-pending>loading report</p>',
+			'\t\t} @catch {',
+			'\t\t\t<p data-failed>report failed</p>',
+			'\t\t}',
+			'\t</main>',
+			'}',
+		].join('\n'),
+	);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
@@ -63,6 +101,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	close?.();
+	releaseGate();
+	gate.close();
 	if (root) await rm(root, { recursive: true, force: true });
 });
 
@@ -145,32 +185,25 @@ test('the node server compresses a rendered page for a client that accepts it, a
 
 for (const encoding of ['br', 'gzip'] as const)
 	test(`a compressed (${encoding}) streaming page still shows its @pending arm before its data is ready`, async () => {
-		const seen = await new Promise<{
-			firstAt: number;
-			firstText: string;
-			endAt: number;
-			all: string;
-		}>((done, fail) => {
-			const started = performance.now();
+		// The data stays unready until this client has decoded the @pending arm: a compressor that held the arm back would never let it arrive.
+		holding = true;
+		const seen = await new Promise<{ firstText: string; all: string }>((done, fail) => {
 			const req = request(
-				origin + '/slow',
+				origin + '/held',
 				{ headers: { 'accept-encoding': encoding } },
 				(res) => {
 					expect(res.headers['content-encoding']).toBe(encoding);
 					const decoder = encoding === 'br' ? createBrotliDecompress() : createGunzip();
 					let all = '';
-					let firstAt = 0;
 					let firstText = '';
 					decoder.on('data', (chunk: Buffer) => {
 						all += chunk.toString();
-						if (!firstAt && all.includes('loading report')) {
-							firstAt = performance.now() - started;
+						if (!firstText && all.includes('loading report')) {
 							firstText = all;
+							releaseGate();
 						}
 					});
-					decoder.on('end', () =>
-						done({ firstAt, firstText, endAt: performance.now() - started, all }),
-					);
+					decoder.on('end', () => done({ firstText, all }));
 					decoder.on('error', fail);
 					res.pipe(decoder);
 				},
@@ -180,7 +213,6 @@ for (const encoding of ['br', 'gzip'] as const)
 		});
 		expect(seen.firstText).not.toContain('report ready');
 		expect(seen.all).toContain('report ready');
-		expect(seen.endAt - seen.firstAt).toBeGreaterThan(200);
 	});
 
 test('every file with a gzip copy has a brotli copy written at the public brotli quality', async () => {

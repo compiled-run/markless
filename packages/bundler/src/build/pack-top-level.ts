@@ -92,35 +92,50 @@ export function lazyNamespaceObjects(fileName: string, code: string): Edit[] {
 		}
 	});
 
-	const edits: Edit[] = [];
-	for (const [name, declaration] of candidates) {
+	const getters = new Map<string, string>();
+	for (const name of candidates.keys()) {
 		// A second binding of the name anywhere would make a reference ambiguous without scope analysis.
 		if (bindings.get(name) !== 1 || written.has(name)) continue;
 		let getter = `${name}$namespace`;
 		for (let attempt = 1; names.has(getter); attempt++) getter = `${name}$namespace${attempt}`;
 		names.add(getter);
-		const declarator = (declaration.declarations as Syntax[])[0]!;
-		const init = declarator.init as Syntax;
+		getters.set(name, getter);
+	}
+	const referenceEdits: Edit[] = [...getters].flatMap(([name, getter]) =>
+		(references.get(name) ?? []).map((reference) =>
+			reference.shorthand
+				? {
+						start: reference.shorthand.start,
+						end: reference.shorthand.end,
+						source: `${name}:${getter}()`,
+					}
+				: { start: reference.node.start, end: reference.node.end, source: `${getter}()` },
+		),
+	);
+	const edits: Edit[] = [];
+	const folded = new Set<Edit>();
+	for (const [name, getter] of getters) {
+		const declaration = candidates.get(name)!;
+		const init = (declaration.declarations as Syntax[])[0]!.init as Syntax;
+		// A namespace that re-exports another reads it inside this init, so its getter call is written here.
+		const inner = referenceEdits
+			.filter((edit) => edit.start >= init.start && edit.end <= init.end)
+			.sort((a, b) => b.start - a.start);
+		let value = code.slice(init.start, init.end);
+		for (const edit of inner) {
+			value =
+				value.slice(0, edit.start - init.start) +
+				edit.source +
+				value.slice(edit.end - init.start);
+			folded.add(edit);
+		}
 		edits.push({
 			start: declaration.start,
 			end: declaration.end,
-			source: `function ${getter}(){return ${getter}.value||(${getter}.value=${code.slice(init.start, init.end)})}`,
+			source: `function ${getter}(){return ${getter}.value||(${getter}.value=${value})}`,
 		});
-		for (const reference of references.get(name) ?? [])
-			edits.push(
-				reference.shorthand
-					? {
-							start: reference.shorthand.start,
-							end: reference.shorthand.end,
-							source: `${name}:${getter}()`,
-						}
-					: {
-							start: reference.node.start,
-							end: reference.node.end,
-							source: `${getter}()`,
-						},
-			);
 	}
+	for (const edit of referenceEdits) if (!folded.has(edit)) edits.push(edit);
 	return edits;
 }
 

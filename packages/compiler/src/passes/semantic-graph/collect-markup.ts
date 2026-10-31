@@ -1128,7 +1128,7 @@ function sourceResidue(
 	}
 	const computedRead = context.graph.templateReads.find(
 		(read) =>
-			read.source === source &&
+			(read.source === source || read.authoredSource === source) &&
 			read.sourceSpan?.start === span?.start &&
 			read.computedGraphNodeId,
 	);

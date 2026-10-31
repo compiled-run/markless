@@ -779,6 +779,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED'
 		| 'MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE'
 		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
@@ -944,6 +945,10 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// The expression as written, when `source` carries a body function spliced into its call.
+	readonly authoredSource?: string;
+	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
+	readonly keyedRepeatId?: string;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).
@@ -2365,11 +2370,6 @@ export type SymbolResolverModuleInput = {
 		// callback slot alone and leaves the child's own captures to the child.
 		readonly claimKind?: 'prop-bound' | 'widget-callback';
 		readonly captureSymbol?: ExtractedCaptureSymbol;
-		/**
-		 * The module a literal `import()` of this symbol names when something else
-		 * imports `chunk` statically: an `export *` entry, so no module is imported both ways.
-		 */
-		readonly lazyChunk?: string;
 	}>;
 	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;
 };
@@ -2811,6 +2811,8 @@ export type CompilerPassGraph = {
 
 export type CompileTsrxModuleResult = {
 	readonly passGraph: CompilerPassGraph;
+	/** The authored source, read once more for `markless-allow` comments that name any pass's warning. */
+	readonly allowScan?: { readonly filename: string; readonly source: string };
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly stateLowering: StateLoweringArtifact;

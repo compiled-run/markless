@@ -8,6 +8,7 @@ import type {
 	ViteDevServer,
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'pathe';
 import {
 	DEBUGGING_PLAYBOOK_HINT,
@@ -83,6 +84,7 @@ import { createViteHmr } from './hmr.ts';
 import { installDevRuntimeImportResolution } from './dev-runtime-imports.ts';
 import { browserNodeGuard } from './browser-node-guard.ts';
 import { constantSlicesPlugin } from '../constant-slices.ts';
+import { buildClientInChildProcess, clientBuildRequest } from './separate-client-build.ts';
 
 export type {
 	BundleGraphAdder,
@@ -193,6 +195,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			declarePackOwnership: MarklessRolldownPluginApi['declarePackOwnership'];
 			invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules;
 			runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
+			clientBuildHandoff: MarklessRolldownPluginApi['clientBuildHandoff'];
+			adoptClientBuildHandoff: MarklessRolldownPluginApi['adoptClientBuildHandoff'];
 			runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 			directCsrOnly: MarklessRolldownPluginApi['directCsrOnly'];
 		};
@@ -209,6 +213,20 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const packOwnership = packingPlugins?.[0]?.api;
 	if (packOwnership) basePlugin.api.declarePackOwnership(packOwnership);
 	const hmr = createViteHmr(hmrOptions);
+	const prepareClientBuild = async () => {
+		if (!(prerender || stagePrerenderWake) || !prerenderEntry) return;
+		const source = resolve(resolvedRoot, prerenderEntry);
+		prerenderRecordsBySource.set(
+			source,
+			await deriveBuiltPrerenderRecords({
+				entry: source,
+				serverPlugin: createMarklessRolldownPlugin({
+					environment: 'server',
+					options: { ...rolldownOptions, rootDir: resolvedRoot, dev: false },
+				}),
+			}),
+		);
+	};
 
 	const marklessPlugin = {
 		...basePlugin,
@@ -228,6 +246,14 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			registerDevInjection: (injection: GlobalInjections) => devTags.register(injection),
 			registerPreloadGraphEntries: (adder: PreloadGraphEntriesAdder) =>
 				bundleGraphAdders.add(createPreloadGraphAdder(adder)),
+			buildClientOnly: async (builder: ViteBuilder, handoffFile: string) => {
+				await prepareClientBuild();
+				const client = builder.environments[viteEnvironmentName('client', options)];
+				if (!client) throw new Error('The reloaded config has no client environment.');
+				await builder.build(client);
+				await flushCompileCache();
+				writeFileSync(handoffFile, JSON.stringify(basePlugin.api.clientBuildHandoff()));
+			},
 		},
 		config(config, env) {
 			command = env.command;
@@ -356,19 +382,17 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		buildApp: {
 			order: 'pre',
 			async handler(builder) {
-				if ((prerender || stagePrerenderWake) && prerenderEntry) {
-					const source = resolve(resolvedRoot, prerenderEntry);
-					prerenderRecordsBySource.set(
-						source,
-						await deriveBuiltPrerenderRecords({
-							entry: source,
-							serverPlugin: createMarklessRolldownPlugin({
-								environment: 'server',
-								options: { ...rolldownOptions, rootDir: resolvedRoot, dev: false },
-							}),
-						}),
+				const clientEnvironment = viteEnvironmentName('client', options);
+				const childRequest = clientBuildRequest(builder, clientEnvironment);
+				const handoff = childRequest && (await buildClientInChildProcess(childRequest));
+				if (childRequest && !handoff)
+					builder.config.logger.warn(
+						'markless: the client builds in this process, because a child process resolved this config differently.',
 					);
-				}
+				if (handoff) {
+					basePlugin.api.adoptClientBuildHandoff(handoff);
+					builder.environments[clientEnvironment]!.isBuilt = true;
+				} else await prepareClientBuild();
 				await buildMarklessEnvironments(builder, options);
 				await flushCompileCache();
 				if (prerender && prerenderEntry) {
@@ -626,7 +650,10 @@ function configDefaults(
 		: dynamicImportVars.exclude
 			? [dynamicImportVars.exclude]
 			: [];
-	dynamicImportVars.exclude = [...exclude, /\.tsrx(?:[?#]|$)/];
+	const tsrxFiles = /\.tsrx(?:[?#]|$)/;
+	// A client build in its own process resolves this config again from the inline config this hook already wrote to.
+	if (!exclude.some((item) => item instanceof RegExp && item.source === tsrxFiles.source))
+		dynamicImportVars.exclude = [...exclude, tsrxFiles];
 
 	if (config.build?.lib || config.build?.ssr) {
 		return;
@@ -783,6 +810,8 @@ type MarklessVitePluginApi = {
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
 	registerDevInjection?: (injection: GlobalInjections) => void;
 	registerPreloadGraphEntries?: (adder: PreloadGraphEntriesAdder) => void;
+	/** Builds the client environment alone and writes what the later environments read; a build's child process calls it. */
+	buildClientOnly?: (builder: ViteBuilder, handoffFile: string) => Promise<void>;
 };
 
 function getBuildEnvironment(context: unknown): MarklessEnvironment {

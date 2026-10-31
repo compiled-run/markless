@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { Rows } from './rows.tsrx';
 import { Search } from './search.tsrx';
+import { holdSearches } from './search-fruit.ts';
 
 // A style object value may be any expression: a conditional over state, an arm const, a row item, or the @catch error.
 afterEach(() => cleanup());
@@ -36,8 +37,10 @@ async function exerciseSearch(container: HTMLElement) {
 	(container.querySelectorAll('li')[1] as HTMLElement).click();
 	await expect.poll(weights).toEqual(['400', '700', '400', '400', '400', '400', '400']);
 
+	const release = holdSearches();
 	await type(container.querySelector('input')!, 'ap');
-	await expect.poll(() => list()?.style.opacity, { timeout: 700, interval: 10 }).toBe('0.5');
+	await expect.poll(() => list()?.style.opacity, { timeout: 5_000 }).toBe('0.5');
+	release();
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
 	await expect.poll(() => [list()?.style.opacity, ...weights()]).toEqual(['1', '400', '700', '400']);
 

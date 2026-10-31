@@ -1,0 +1,241 @@
+import { spawn, type ChildProcess } from 'node:child_process';
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { createServer, request, type IncomingHttpHeaders, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { brotliCompressSync, constants } from 'node:zlib';
+import { join, resolve } from 'pathe';
+import { createBuilder } from 'vite';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
+import { markless } from '@markless/bundler/vite';
+import { router } from '../../src/vite/index.ts';
+import { FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
+
+// A Nitro `cloudflare-module` build served by wrangler's local workerd, which applies Workers static
+// assets routing: a request that names an asset file never runs the Worker, so it is free.
+
+vi.setConfig({ testTimeout: 30_000 });
+
+const packagesRoot = resolve(import.meta.dirname, '../../..');
+const wrangler = resolve(import.meta.dirname, '../../node_modules/.bin/wrangler');
+const SERVED_FROM_ASSETS = '<!--served from the uploaded file-->';
+let root = '';
+let origin = '';
+let worker: ChildProcess | undefined;
+
+const heldAnswers: ServerResponse[] = [];
+let holding = false;
+const gate = createServer((_request, response) => {
+	if (holding) heldAnswers.push(response);
+	else response.end();
+});
+const releaseGate = () => {
+	holding = false;
+	for (const response of heldAnswers.splice(0)) response.end();
+};
+
+beforeAll(async () => {
+	root = await mkdtemp(join(tmpdir(), 'markless-cloudflare-'));
+	await cp(resolve(import.meta.dirname, '../fixtures/prerender-app'), root, { recursive: true });
+	await new Promise<void>((listening) => gate.listen(0, '127.0.0.1', listening));
+	const gateUrl = `http://127.0.0.1:${(gate.address() as AddressInfo).port}/`;
+	await mkdir(join(root, 'pages/docs'), { recursive: true });
+	await writeFile(
+		join(root, 'pages/docs/intro.tsrx'),
+		'export default function Intro() @{\n\t<main data-page="intro">Prerendered intro</main>\n}\n',
+	);
+	await writeFile(
+		join(root, 'pages/held.tsrx'),
+		[
+			"import { computed } from '@markless/core';",
+			'',
+			'export default function Held() @{',
+			'\tconst report = computed(async () => {',
+			`\t\tawait fetch(${JSON.stringify(gateUrl)});`,
+			"\t\treturn { text: 'report ready' };",
+			'\t});',
+			'',
+			'\t<main data-page="held">',
+			'\t\t@try {',
+			'\t\t\t<p data-settled>{report.text}</p>',
+			'\t\t} @pending {',
+			'\t\t\t<p data-pending>loading report</p>',
+			'\t\t} @catch {',
+			'\t\t\t<p data-failed>report failed</p>',
+			'\t\t}',
+			'\t</main>',
+			'}',
+		].join('\n'),
+	);
+	await writeFile(
+		join(root, 'package.json'),
+		'{ "name": "markless-cloudflare-test", "private": true }\n',
+	);
+	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
+	for (const pkg of ['core', 'router'])
+		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
+	const prerendered = ['/', '/guide', '/docs/intro'];
+	const builder = await createBuilder({
+		root,
+		configFile: false,
+		logLevel: 'silent',
+		nitro: {
+			preset: 'cloudflare-module',
+			compressPublicAssets: { gzip: true, brotli: true },
+			routeRules: Object.fromEntries(
+				prerendered.flatMap((path) => [
+					[path, { prerender: true }],
+					[`${FRAGMENT_PATH_PREFIX}${path}`, { prerender: true }],
+				]),
+			),
+		},
+		plugins: [markless(), router()],
+	} as Parameters<typeof createBuilder>[0]);
+	await builder.buildApp();
+	// A response carrying this comment came from the uploaded file, not from the Worker rendering the page again.
+	for (const file of await htmlFiles())
+		await writeFile(file, (await readFile(file, 'utf8')) + SERVED_FROM_ASSETS);
+	origin = await startWrangler(join(root, '.output/server/wrangler.json'));
+}, 240_000);
+
+afterAll(async () => {
+	worker?.kill();
+	releaseGate();
+	gate.close();
+	if (root) await rm(root, { recursive: true, force: true });
+});
+
+async function htmlFiles(): Promise<string[]> {
+	const publicDir = join(root, '.output/public');
+	return (await readdir(publicDir, { recursive: true }))
+		.filter((file) => file.endsWith('.html'))
+		.map((file) => join(publicDir, file));
+}
+
+function startWrangler(config: string): Promise<string> {
+	const child = spawn(
+		wrangler,
+		[
+			'dev',
+			'--config',
+			config,
+			'--ip',
+			'127.0.0.1',
+			'--port',
+			'0',
+			'--show-interactive-dev-session=false',
+		],
+		{
+			cwd: root,
+			env: { ...process.env, WRANGLER_SEND_METRICS: 'false', CI: '1' },
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
+	worker = child;
+	let output = '';
+	return new Promise((ready, fail) => {
+		const read = (chunk: Buffer) => {
+			output += chunk.toString();
+			const listening = /Ready on (http:\/\/\S+)/.exec(output);
+			if (listening) ready(listening[1]!);
+		};
+		child.stdout!.on('data', read);
+		child.stderr!.on('data', read);
+		child.once('exit', (code) => fail(new Error(`wrangler dev exited (${code}):\n${output}`)));
+	});
+}
+
+// Local workerd holds a compressed stream until it ends; Cloudflare's edge flushes it (measured on workers.dev).
+const get = (path: string) =>
+	fetch(origin + path, { redirect: 'manual', headers: { 'accept-encoding': 'identity' } });
+
+test('a prerendered page and its fragment URL are answered from the uploaded files at their own paths, without a redirect', async () => {
+	for (const path of ['/', '/guide', '/docs/intro']) {
+		for (const url of [path, `${FRAGMENT_PATH_PREFIX}${path}`]) {
+			const response = await get(url);
+			expect(response.status, url).toBe(200);
+			expect(response.headers.get('content-type'), url).toMatch(/^text\/html/);
+			expect(await response.text(), url).toContain(SERVED_FROM_ASSETS);
+		}
+	}
+});
+
+test('a page that is not prerendered streams from the Worker, its @pending arm arriving before its data', async () => {
+	holding = true;
+	const response = await get('/held');
+	expect(response.status).toBe(200);
+	const reader = response.body!.getReader();
+	const decoder = new TextDecoder();
+	let firstText = '';
+	let all = '';
+	for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+		all += decoder.decode(chunk.value, { stream: true });
+		if (!firstText && all.includes('loading report')) {
+			firstText = all;
+			releaseGate();
+		}
+	}
+	expect(firstText).not.toContain('report ready');
+	expect(all).toContain('report ready');
+	expect(all).not.toContain(SERVED_FROM_ASSETS);
+});
+
+function getRaw(path: string, acceptEncoding: string) {
+	return new Promise<{ status: number; headers: IncomingHttpHeaders; body: Buffer }>(
+		(done, fail) => {
+			const req = request(
+				origin + path,
+				{ headers: { 'accept-encoding': acceptEncoding } },
+				(res) => {
+					const chunks: Buffer[] = [];
+					res.on('data', (chunk: Buffer) => chunks.push(chunk));
+					res.on('end', () =>
+						done({
+							status: res.statusCode!,
+							headers: res.headers,
+							body: Buffer.concat(chunks),
+						}),
+					);
+				},
+			);
+			req.on('error', fail);
+			req.end();
+		},
+	);
+}
+
+test('a client chunk is sent as its brotli copy written at quality 11, kept by browsers for a year', async () => {
+	const dir = join(root, '.output/public', MARKLESS_BUILD_PREFIX);
+	const scripts = (await readdir(dir)).filter((file) => /\.(?:js|css)$/.test(file));
+	const sized = await Promise.all(
+		scripts.map(async (file) => ({ file, source: await readFile(join(dir, file)) })),
+	);
+	const { file, source } = sized.sort((a, b) => b.source.length - a.source.length)[0]!;
+	const br = await getRaw(`/${MARKLESS_BUILD_PREFIX}${file}`, 'br');
+	expect(br.status).toBe(200);
+	expect(br.headers['content-encoding']).toBe('br');
+	expect(br.headers['content-type']).toMatch(/javascript|css/);
+	expect(br.headers['cache-control']).toContain('immutable');
+	expect(String(br.headers.vary)).toMatch(/accept-encoding/i);
+	expect(
+		br.body.equals(
+			brotliCompressSync(source, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }),
+		),
+	).toBe(true);
+	const plain = await getRaw(`/${MARKLESS_BUILD_PREFIX}${file}`, 'identity');
+	expect(plain.status).toBe(200);
+	expect(plain.headers['content-encoding']).toBeUndefined();
+	expect(plain.headers['cache-control']).toContain('immutable');
+	expect(plain.body.equals(source)).toBe(true);
+});
+
+test('the only compressed copies uploaded are the client chunks the Worker sends', async () => {
+	const publicDir = join(root, '.output/public');
+	const copies = (await readdir(publicDir, { recursive: true })).filter((file) =>
+		/\.(?:br|gz|zst)$/.test(file),
+	);
+	expect(copies.length).toBeGreaterThan(0);
+	for (const copy of copies)
+		expect(copy).toMatch(new RegExp(`^${MARKLESS_BUILD_PREFIX}.+\\.(?:js|css)\\.br$`));
+});

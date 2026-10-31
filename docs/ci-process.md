@@ -42,7 +42,7 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 | Mode      | Jobs                                                                                                                                               | Time                                                                                                                                                                          |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--fast`  | `agent-files` (2 s), `typecheck` (workflow check, `pnpm typecheck`, `vp check --no-fmt`: 9 s), `typecheck-ts7` (`pnpm typecheck:ts7`, TypeScript 7.1 over the root and `website/`: about 3 s, added later), `unit` (`vp test --project node`: 52 s)             | **64 s**                                                                                                                                                                      |
-| `--full`  | fast, plus `browser` (browser + `ui` projects, `api:check`), `completion-matrix` (measured alone: 6 s), the four box jobs, `receipts`, `website-boxes`, `perf-guards`, `demo-boxes`, `package-manager-matrix` | not timed end to end in this task: the box jobs bind fixed ports that another worker on this machine was using; expect roughly the sum of the CI lane times, 20 to 40 minutes |
+| `--full`  | fast, plus `browser` (browser + `ui` projects, `api:check`), `completion-matrix` (measured alone: 6 s), the four box jobs, `test` (the analyzer receipt set), `website-boxes`, `perf-guards`, `demo-boxes`, `package-manager-matrix` | not timed end to end in this task: the box jobs bind fixed ports that another worker on this machine was using; expect roughly the sum of the CI lane times, 20 to 40 minutes |
 | `--clean` | any mode, in a fresh worktree of `HEAD`                                                                                                            | adds about 5 s (worktree + offline `pnpm install`)                                                                                                                            |
 
 `--fast` on `1f6d2cd3` passed locally, while the same commit's `unit` job failed on CI with 110 failures. The failures were `browserType.launch: Executable doesn't exist`: node-project tests launch Chromium and WebKit, and the `unit` job installs no browsers. The Mac has both browsers cached, so a plain local run cannot see this. `--linux` can, because each job gets its own container with only the setup steps that job declares.
@@ -52,7 +52,7 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 | Job                                                                   | Why                                                                                                                                                         | What to do instead                                                                                                                                    |
 | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `benchmark`, `benchmark-guard`                                        | Clones `js-framework-benchmark`, builds a baseline worktree, and runs 30 minutes of interleaved Chrome pairs; the guard only compares that job's artifacts. | When a diff can reach the benchmark bundles, open a PR and let CI run it. Rerun a timing-only red once before treating it as real (see flake policy). |
-| `lanes`, `prepare-playwright`, `save-lane-markers`, `test`, `changes` | Content-hash lane skipping and the gate. No checks of their own.                                                                                            | Nothing: locally every lane runs.                                                                                                                     |
+| `lanes`, `prepare-playwright`, `save-lane-markers`, `changes`         | Content-hash lane skipping and cache bookkeeping. No checks of their own.                                                                                   | Nothing: locally every lane runs.                                                                                                                     |
 | screen-reader `nvda`                                                  | Needs Windows with NVDA.                                                                                                                                    | CI only.                                                                                                                                              |
 | screen-reader `voiceover`                                             | Needs a macOS runner with VoiceOver automation granted.                                                                                                     | `pnpm test:sr-real` by hand on a prepared Mac.                                                                                                        |
 
@@ -111,6 +111,28 @@ Multi-commit series (for example a migration done unit by unit) go on a branch w
 
 A release commit runs `pnpm release:check` and `--fast`; a new package additionally needs its npm trusted-publisher entry before the first publish (two release runs failed with `E404` on a package's first publish).
 
+### Lanes: what each proves and when it runs
+
+Every job in `ci.yml` runs on pull requests, in the merge queue and on pushes to `main`. A content-hashed lane is skipped when its inputs already went green (the `lanes` job decides; section 1), and a push the merge queue already tested runs only the always-on jobs. The required checks are `test`, `typecheck` and `agent-files`.
+
+| Lane | What it proves | Pull request | Merge queue | `main` |
+| --- | --- | --- | --- | --- |
+| `agent-files` | agent files match `.ruler/` | always | always | always |
+| `typecheck` | `ci.yml` structure, `pnpm typecheck`, lint | always | always | always |
+| `typecheck-ts7` | the same type gate on TypeScript 7.1 | always | always | always |
+| `unit` (3 shards) | the node test project, including Chromium and WebKit fixture tests | when its inputs changed | same | skipped if the queue tested the commit |
+| `browser` (3 shards) | the real-Chromium `browser` and `ui` projects, the `@markless/ui` API manifest | when its inputs changed | same | same |
+| `completion-matrix` | the packaged editor plugin's completions | when its inputs changed | same | same |
+| `boxes-*`, `receipts` | witness boxes for the bundler, router and music players, and the analyzer receipt set they write | when their inputs changed | same | same |
+| `website-boxes`, `demo-boxes` | the docs site and the demos build and behave | when their inputs changed | same | same |
+| `perf-guards` | page-weight and interaction budgets | when their inputs changed | same | same |
+| `build-scale`, `build-warnings` | build memory and output at 100 and 300 pages; no new build warnings | when their inputs changed | same | same |
+| `package-manager-matrix` | CLI workspace detection under npm, pnpm, yarn and bun (not required) | always | always | always |
+| `benchmark`, `benchmark-guard` | js-framework-benchmark against the base (not required) | when the change can reach the benchmark app | same | same |
+| `screen-reader.yml` `virtual` | each `@markless/ui` family's transcript with a JavaScript screen reader | when headless, runtime, web or the markup passes changed | no | nightly |
+| `screen-reader.yml` `nvda`, `voiceover` | the same transcripts with real NVDA (Windows) and VoiceOver (macOS, advisory) | dispatch only | no | nightly; the release cut refuses unless the newest nightly it contains passed |
+| `ecosystem-ci.yml` | the migrated sites build and check against Markless (never blocks) | `/ecosystem-ci run` comment | no | every 3 hours when `main` moved; the release commit; every route nightly in the ecosystem repository |
+
 ## 4. Flake policy
 
 A flake is a test that fails and passes on the same code. Rules:
@@ -127,6 +149,26 @@ A flake is a test that fails and passes on the same code. Rules:
     - A whole Vite build, dev server start or child `npm` process under the 5 s default (`rolldown`, `ssr-browser-hmr`, `create`): measured at 2 to 7 s at load average 80 to 110 on the 18-core Mac, so these tests carry a stated 30 s timeout. The same holds for tests that spawn `markless-tsc`, TypeScript 7.1 or tsserver, or compile or type-check a large input (`markless-tsc`, `language`, `template-dynamic-import`, `doctrine-guard`, `node-in-browser-fixture`, `static-arm-literal-text`, `storage-types`): 2.3 to 4.2 s alone at load average 54, so they carry 30 s. `router/test/package-build` packs and type-checks the router in 22.8 s alone at that load and carries 120 s.
     - Fixed ports: bundler tests on 4218 and 4346 to 4348, router boxes on 3000, music-player boxes on 4173, perf guards on 4221 to 4224. Listen on port `0` and read the assigned port back, as the other tests already do. Where a fixed port is unavoidable, make it overridable (as `MARKLESS_PERF_GUARD_PORTS` does) and fail fast with "port in use" rather than timing out.
 - **Timing benchmarks are not correctness checks.** `benchmark-guard` timing rows are known to be two-speed on runners (`07_create10k`). A timing-only red on a diff that cannot reach the benchmark bundles gets one rerun, recorded; size rows are deterministic and are never rerun away. Each benchmark shard now builds the benchmark app from the baseline checkout and from the current one before timing anything (`scripts/benchmarks/jsfb-bundle-digest.mjs`). When every file in both `dist` folders is byte-identical, after the checkout's own path is written out of them, nothing a benchmark loads changed: the shard skips the timing and the guard passes. If the shards disagree, the build is not deterministic and the guard fails. From 2026-10-21 21:49 to 2026-10-22 07:53, 8 of 69 guard runs went red, and in every one the two builds emitted the same content-hashed chunks (read from the shard logs), so those 8 were noise (11.6% of runs). The one run in that window whose builds differed was timed and passed. With the identity check, all 8 would have passed without timing. Timing still runs, with the same noise, whenever the built app differs.
+
+### Quarantined tests
+
+| Test | Expires | Owner | Why |
+| --- | --- | --- | --- |
+| `packages/vitest-browser/browser/child-async-prop/child-async-prop.test.ts`, both tests | 2026-11-10 | author of #322 (`test/hold-search-in-stale-checks`) | Failed 8 CI runs on 2026-10-27 (merge groups for #265, #294, #303, #304 and #310; pull request runs of `fix/rl-state-escapes`, `fix/rl-state-snapshots` and `fix/maieul-row-prop`), each `expected [ null, '1' ] to deeply equal [ 'true', '0.5' ]`: after the second keystroke the dimmed list never showed. On this Mac at load average 44 the SSR test failed the same way 7 of 10 runs. With the fixture search held until the test releases it (#322's test change), the list is missing instead (`[ null, undefined ]`, 2 of 5 runs): the settle drew the `@pending` arm for an answer a newer search had superseded. That is a runtime race in `settleAsyncBoundaryRange` (`packages/web/src/resume-async-wiring.ts`), which #322 fixes. On the expiry date both tests run again and a guard test in the same file fails. |
+
+### Quarantine list
+
+A test listed here failed and then passed on a rerun of the same commit at least twice in the last two weeks. It keeps running: a red run of a listed test may be rerun once, with a note on the PR naming the entry, and a second red is a real failure. On the expiry date each entry is fixed or renewed with what was learned.
+
+| Test | What fails | Evidence (first attempts that passed on rerun) | Owner | Expires |
+| --- | --- | --- | --- | --- |
+| `packages/router/test/vite/page-region.test.ts` (webkit) | "the landing serves the page as body children and resumes", "a fragment swap to a streamed @pending page keeps the document content": 30 s test timeout | CI runs 40374168601, 39223212007 | thejackshelton | 2026-11-09 |
+| `packages/router/test/vite/fragment-cache.test.ts` (chromium) | "the move that woke the navigation code over a link still counts as resting on it" (30 s timeout), "a page that answers Cache-Control: no-store is fetched again at the click" | CI runs 40193557743, 40075780850 | thejackshelton | 2026-11-09 |
+| `packages/bundler/test/ssr-browser-hmr.test.ts` | "reports an invalid real edit without reload and clears it before the corrected reload", "a new .tsrx file nothing loaded imports sends no reload and no error" (watcher events, see the mechanisms above) | CI runs 39978464580, 39404383274 | thejackshelton | 2026-11-09 |
+| `benchmark-guard` | "The benchmark shards disagree on whether the app changed": two shards built different apps from one commit | CI runs 40195481656, 40017342977 | thejackshelton | 2026-11-09 |
+| `packages/cli/test/workspace-matrix.test.ts` (`package-manager-matrix`) | npm installs time out at 90 s ("a non-member app installs on its own", "an app that already matches a member declaration") | CI run 39741280055; the 0.9.0 release pull request run | thejackshelton | 2026-11-09 |
+
+Seen once in the same window and watched, not listed: `navigation-release.test.ts` (40401426019), `fragment-navigation.test.ts` (40070980873), `music-player-ssr-budget.test.ts` (40100142200), `node-in-browser-fixture.test.ts` (39908441660), `item-collections.test.ts` (39903780595), `resizable.browser.ts` (39936516624), `toaster.browser.ts` (39117438419), `component-row-refresh.test.ts` (39110964263), `completion-matrix.test.ts` M10 (39404383274). Locally under heavy load (load average 50 to 70) the pre-commit run of `--fast` also timed out in `fixed-route-rows.test.ts` (its `afterAll` past the 10 s hook timeout), `markless-tsc.test.ts`, `language.test.ts` and several bundler tests; each passed alone in seconds.
 
 ## 5. Keeping `main` green
 
@@ -163,6 +205,12 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
 
+### Merge queue timeout
+
+The queue drops a group whose required checks have not reported within `check_response_timeout_minutes` (set in the `main` ruleset, not in this repository). It was 90. On 2026-10-28, with the org's 60 runners shared with markless-migrate's pull request CI, merge groups took about 145 minutes, roughly 10 of them running jobs and the rest waiting for runners. So the queue dropped groups that went on to pass: #328 was removed at 09:47Z with `checks_timed_out` while its group run 40655720022 finished green at 10:32Z, and #336 and #310 were dropped the same way. Every drop rebuilt the groups behind it, so nothing merged. The timeout is now 240 minutes. Lower it once the shorter merge gate (#337) and lane reuse (#350) have landed and a week of group times is measured, to about twice the slowest of those groups.
+
+Jumping the queue (`jump: true`) is ignored even for an admin token unless that actor is a ruleset bypass actor; that setting is unchanged.
+
 ### The Actions cache is a budget
 
 Restoring a cache counts against the repository's cache egress limit. On 2026-10-23 it ran out: restores failed with `Egress is over the account limit`, and pnpm restores in unrelated jobs stalled until the job was cancelled. Most of the traffic was restores, not saves:
@@ -179,12 +227,21 @@ What changed, and the rule going forward:
 - The screen-reader family jobs install from the npm registry with no pnpm store cache. Their virtual lane reads with the runner's Chrome and downloads no browser.
 - Box lanes whose boxes only use witness's browser (router, both music players) restore no Playwright browser or system packages: witness drives the runner image's Google Chrome. `boxes-bundler` (its analyzer measurement), `website-boxes` (the mug studio box), `demo-boxes`, `perf-guards`, `unit` and `browser` launch Playwright's Chromium and keep the restore.
 - `prepare-playwright` looks the browser cache up instead of restoring it, and skips the pnpm store cache.
+- No lane needs `prepare-playwright`: it fills the caches beside the lanes, and on a miss (a Playwright bump) each lane installs its own copy and restores the newest older system-package entry. Waiting on it cost a merge group a second runner queue, 12 minutes on 2026-10-27.
 - `cache-cleanup.yml` deletes a pull request's caches when it closes, and a daily sweep deletes caches of closed pull requests and deleted branches and every main tool cache but the newest per key. Dry run against 2026-10-23: 232 of 722 entries, 6.6 of 10.6 GB.
 - A new cache step needs a reason it pays for itself: what one restore costs, how many jobs restore it per run, and what it saves over downloading. A cache restored by a large matrix is the first suspect.
 
+### Runner queues and `needs:` layers
+
+The org runs 60 jobs at once across every repository, so every `needs:` hop waits in the runner queue again. Merge group run 40594026312 (2026-10-27) took 68 minutes, about 20 of them running jobs: `lanes` waited 23 minutes, `prepare-playwright` 12, `browser` 14, `receipts` 9 and `test` 8. The gate's path is now `typecheck` and `lanes`, then the lanes, then `test`, which checks the analyzer receipt set itself after its result step finds every lane green.
+
+### Merge queue settings
+
+The `main` ruleset's merge queue builds at most 2 groups at once (`max_entries_to_build`), merges up to 10 pull requests per group (`max_entries_to_merge`), and waits 1 minute for a group to fill (`min_entries_to_merge_wait_minutes`). Until 2026-10-28 it was 4, 5 and 5 minutes. With 25 pull requests queued that day, four groups each ran about 24 jobs and competed for the same 60 runners with pull request runs and Ecosystem CI on `main`: the oldest entry had waited 15 hours, and finished groups sat 20 minutes or more waiting for a runner for their last two jobs. Fewer groups in flight get their runners sooner, and larger groups merge more pull requests per tested run. The cost is that a red group holds back more pull requests while the queue splits it to find the culprit. Change these numbers only with a measured queue time before and after, recorded here.
+
 ### Screen readers
 
-`screen-reader.yml` has three lanes. Pull requests that can change what is heard run only the virtual reader (`virtual`, Linux, about a minute a family). NVDA (Windows) and VoiceOver (macOS) read `main` every night and on dispatch, and the release cut refuses unless the newest nightly run it contains passed (section 8, step 1). On 2026-10-26 the two real readers ran 2,644 jobs on pull requests in one day, about 37,000 Windows and macOS runner-minutes, over 40% of everything the org ran, and every other workflow's jobs queued behind them. To hear a branch with the real readers before it merges, run `gh workflow run screen-reader.yml --ref <branch>`.
+`screen-reader.yml` has three lanes. Pull requests that can change what is heard run only the virtual reader (`virtual`, Linux, every family split across three jobs; it was one job per family until 2026-10-28, 44 jobs a pull request that spent 33 s of each 55 s on install and type-check). NVDA (Windows) and VoiceOver (macOS) read `main` every night and on dispatch, and the release cut refuses unless the newest nightly run it contains passed (section 8, step 1). On 2026-10-26 the two real readers ran 2,644 jobs on pull requests in one day, about 37,000 Windows and macOS runner-minutes, over 40% of everything the org ran, and every other workflow's jobs queued behind them. To hear a branch with the real readers before it merges, run `gh workflow run screen-reader.yml --ref <branch>`.
 
 ### The VoiceOver lane (parked)
 
@@ -270,7 +327,7 @@ Markless's own suite passing does not show that real apps still work. The chunke
 2. It opens one issue labelled `ecosystem-ci` that mentions @thejackshelton, or adds a comment to the one already open.
 3. It closes that issue, with a comment, on the next clean run on `main`.
 
-- **Every push to `main`:** the per-PR sample runs on the pushed commit; a newer push cancels the run of an older one.
+- **`main`, every three hours:** the per-PR sample runs on `main`'s head when it moved since the last scheduled run. It ran on every push until 2026-10-27: 19 runs and about 7,600 runner-minutes on 2026-10-26, while pull request jobs queued for runners. A regression still comments on every pull request merged since main's baseline, so batching the commits changes when it reports, not who it names.
 - **On a pull request:** a maintainer comments `/ecosystem-ci run`, or `/ecosystem-ci run shadcn-admin realworld` for some suites. `.github/workflows/ecosystem-ci.yml` builds the pull request's commit, runs each suite in its own job, posts the results table on the pull request and sets an `ecosystem-ci` commit status, which no ruleset requires. Run it on any change that can reach what a site ships: the bundler, the router, the runtime, `web` or the compiler.
 - **Dispatch:** `gh workflow run ecosystem-ci.yml -f ref=<commit> [-f pr=<number>] [-f suites='a b'] [-f lane=full]`.
 - **Release:** the release cut dispatches it on the release commit right after pushing the release branch and goes on without waiting. The GitHub Release notes link the run and say what it found (or that it was still running); a regression notifies as above.

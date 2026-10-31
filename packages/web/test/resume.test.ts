@@ -1997,6 +1997,89 @@ test('resume runtime cleans behavior and visible cleanups when an observed host 
 	expect(loadedSymbols).toEqual(['symbol:chart', 'symbol:visible']);
 });
 
+test('resume runtime disposes hosts inside a removed subtree with one pass over the removed elements', async () => {
+	const rows = Array.from({ length: 60 }, () => element('LI', [element('SPAN')]));
+	const panel = element('UL', rows);
+	const buttons = Array.from({ length: 60 }, () => element('BUTTON'));
+	const root = element('SECTION', [panel, ...buttons]);
+	const removedElements = [panel, ...rows.flatMap((row) => [row, row.childNodes[0] as FakeElement])];
+	let childReads = 0;
+	for (const node of removedElements) {
+		const children = node.childNodes;
+		Object.defineProperty(node, 'childNodes', {
+			configurable: true,
+			get: () => (childReads++, children),
+		});
+	}
+	const locators = [
+		...rows.map((_, index) => ({
+			hostNodeId: `row${index}`,
+			strategy: 'dom-order' as const,
+			index: 2 + index * 2,
+			tagName: 'li',
+		})),
+		...buttons.map((_, index) => ({
+			hostNodeId: `button${index}`,
+			strategy: 'dom-order' as const,
+			index: 2 + rows.length * 2 + index,
+			tagName: 'button',
+		})),
+	];
+	const cleanups: string[] = [];
+	let removalCallback:
+		| ((records: ReadonlyArray<{ readonly removedNodes: ReadonlyArray<FakeNode> }>) => void)
+		| undefined;
+	const resume = createResumeRuntime({
+		root,
+		graph: createRuntimeGraph({ cells: [] }),
+		view: {
+			locators,
+			events: [{ hostNodeId: 'button0', eventName: 'visible', symbolIds: ['symbol:visible'] }],
+			domUpdates: [],
+			behaviors: ['row7', 'button7'].map((hostNodeId) => ({
+				hostNodeId,
+				source: 'track(row)',
+				functionSource: 'track',
+				inputSources: ['row'],
+				inputValues: [hostNodeId],
+				symbolId: 'symbol:track',
+			})),
+			elementHandles: [],
+			asyncBoundaries: [],
+		},
+		createVisibilityObserver() {
+			return { observe() {}, unobserve() {} };
+		},
+		createRemovalObserver(callback) {
+			removalCallback = callback;
+			return { observe() {} };
+		},
+		loadSymbol() {
+			return ({ behaviorInputs }: { readonly behaviorInputs: readonly unknown[] }) =>
+				() =>
+					cleanups.push(String(behaviorInputs[0]));
+		},
+	});
+
+	await resume.start();
+	expect(locators.map(({ hostNodeId }) => resume.getElement(hostNodeId))).toEqual([
+		...rows,
+		...buttons,
+	]);
+	await resume.activateBehaviors('row7');
+	await resume.activateBehaviors('button7');
+	expect(removalCallback).toBeTypeOf('function');
+
+	root.childNodes.splice(root.childNodes.indexOf(panel), 1);
+	panel.parentElement = null;
+	childReads = 0;
+	removalCallback?.([{ removedNodes: [panel] }]);
+
+	expect(cleanups).toEqual(['row7']);
+	expect(resume.getElement('button59')).toBe(buttons[59]);
+	expect(childReads).toBeLessThanOrEqual(removedElements.length);
+});
+
 test('resume runtime uses a global IntersectionObserver for visible events when no observer factory is injected', async () => {
 	const image = element('IMG');
 	const root = element('SECTION', [image]);

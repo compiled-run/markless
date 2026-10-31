@@ -450,6 +450,7 @@ function applyKeyedRepeatRowOrder(
 		}
 	const anchor =
 		rangeEnd ??
+		rowsAnchor(parent, repeat, currentRows.findLast((row) => staying.has(row))) ??
 		elementChildren(parent)
 			.slice(rowsFrom(parent, repeat))
 			.find((child) => !knownRows.has(child)) ??
@@ -469,11 +470,21 @@ function applyKeyedRepeatRowOrder(
 		spliceDomOrderCensus(census, currentRows, nextRows);
 	if (nextRows.length > 0 || arm.mounted || !repeat.emptyArm || !mint) return;
 	const nodes = mint.renderEmptyArm(parent, repeat);
-	const armAnchor = rangeEnd ?? elementChildren(parent).slice(rowsFrom(parent, repeat))[0];
+	const armAnchor =
+		rangeEnd ?? rowsAnchor(parent, repeat) ?? elementChildren(parent).slice(rowsFrom(parent, repeat))[0];
 	for (const node of nodes) insertRepeatNode(mutableParent, node, armAnchor);
 	arm.mounted = true;
 	arm.nodes = nodes;
 	if (census) spliceDomOrderCensus(census, [], nodes);
+}
+// Rows counted from the start go right after the last row or the elements before them, ahead of an @if after them.
+function rowsAnchor(parent: ResumeDomElement, repeat: ResumeKeyedRepeatRecord, last?: ResumeDomNode) {
+	if (repeat.rowEndOffset !== undefined) return;
+	const offset = rowsFrom(parent, repeat);
+	let node = (last ?? elementChildren(parent)[offset - 1]) as Sibling | null | undefined;
+	node = node ? node.nextSibling : (pageNodes(parent)[0] as Sibling | undefined);
+	while (!last && node?.nodeType === 3) node = node.nextSibling;
+	return node ?? undefined;
 }
 type MountedEmptyArm = { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> };
 type MutableRepeatParent = ResumeDomElement & {

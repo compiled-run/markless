@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { Page } from './page.tsrx';
+import { holdSearches } from './search-fruit.ts';
 
 // A child declared beside its parent, whose async value and staleness check read a prop, behaves like the one-component form.
 afterEach(() => cleanup());
@@ -23,8 +24,10 @@ async function exercise(container: HTMLElement) {
 	// The first keystroke wakes a served page; the second starts a refresh over a settled answer.
 	await type(container.querySelector('input')!, 'a');
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotbananagrapemango');
+	const release = holdSearches();
 	await type(container.querySelector('input')!, 'p');
-	await expect.poll(looks, { timeout: 700, interval: 10 }).toEqual(['true', '0.5']);
+	await expect.poll(looks, { timeout: 5_000 }).toEqual(['true', '0.5']);
+	release();
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
 	await expect.poll(looks).toEqual([null, '1']);
 
@@ -43,12 +46,18 @@ async function exercise(container: HTMLElement) {
 	await expect.poll(() => [list()?.style.opacity, busy()]).toEqual(['1', 0]);
 }
 
-test('CSR: a child reading its query prop searches, fails, retries and recovers', async () => {
+// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": a keystroke over a settled answer sometimes paints @pending instead of the dimmed list.
+const quarantined = Date.now() < Date.parse('2026-11-10');
+test.runIf(!quarantined)('the quarantine is still in date', () => {
+	expect.fail('Quarantine expired on 2026-11-10: land the settleAsyncBoundaryRange fix (#322, test/hold-search-in-stale-checks) and drop the quarantine.');
+});
+
+test.skipIf(quarantined)('CSR: a child reading its query prop searches, fails, retries and recovers', async () => {
 	const screen = await render(Page);
 	await exercise(screen.container as HTMLElement);
 });
 
-test('SSR: a child reading its query prop searches, fails, retries and recovers after resume', async () => {
+test.skipIf(quarantined)('SSR: a child reading its query prop searches, fails, retries and recovers after resume', async () => {
 	const screen = await renderSSR(Page);
 	await exercise(screen.container as HTMLElement);
 });

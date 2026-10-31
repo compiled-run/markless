@@ -1713,6 +1713,44 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_CLIENT_BUILD_FAILED',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_CLIENT_BUILD_FAILED: the client build failed in its own process (<exit>); its error is printed above. Set MARKLESS_CLIENT_BUILD_PROCESS=0 to build every environment in one process.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/separate-client-build.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/separate-client-build.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_CLIENT_BUILD_PROCESS',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_CLIENT_BUILD_PROCESS: the client build failed in its own process (<exit>); its error is printed above. Set MARKLESS_CLIENT_BUILD_PROCESS=0 to build every environment in one process.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/separate-client-build.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/separate-client-build.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_COMPILE_BLOCKED',
 		packageName: '@markless/bundler',
 		stage: 'build',
@@ -4850,11 +4888,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must render an element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY: Each row of this @for over <itemName> is one <branchLabel> (<testSource>) with no <value>, so a row whose test fails renders nothing. After the page loads, the browser finds a list’s rows as one element each, so this list would show the rows the server sent and never update.',
+			'The browser adds, moves and removes a list’s rows by counting the parent’s child elements, one element per row. A row that renders nothing has no element to count, so the browser cannot tell which rows are which.',
+			'Filter the list before the @for instead: `<filter>` and `@for (const <itemName> of shown; ...)`. Or give the @if an @else that renders one element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
-		description: 'This list can never grow in the browser: a Markless build warning.',
+		severity: 'error-or-warning',
+		description: 'This list can never grow in the browser: a Markless build error.',
 		printed: [
 			'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: <message> The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.',
 			'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text and attributes read off the row item or off a state cell the page holds, and nothing else, so a row needing anything more ships no template at all.',
@@ -4873,6 +4933,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 				],
 			},
 		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must be one element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: Each row of this @for over <itemName> renders <rowShape>. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.',
+			'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+			'Wrap each row in one element, such as `<span>...</span>`, so every row of <itemName> is a single element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		],
+		structured: true,
 		sources: [
 			{
 				id: 'f0',
@@ -7289,9 +7376,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error-or-warning',
 		description:
-			'This <branchLabel> in a @for row never changes in the browser: a Markless build warning.',
+			'This <branchLabel> in a @for row never changes in the browser: a Markless build error.',
 		printed: [
 			'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: <message> So each row keeps the arm the server rendered for <branchLabel> (<testSource>): when <testSource> changes after the page loads, the row does not show the other arm.',
 			"A row flips its own <branchLabel> from the row markup the payload carries: the test read per row, and each arm's elements, text and attributes. A row needing anything more ships no markup at all, so nothing can rebuild an arm in it.",
@@ -7315,6 +7402,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
 			},
 		],
 		moreSources: 0,
@@ -9204,6 +9296,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A function cannot be stored in state: a Markless build error.',
+		printed: [
+			'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE: state "<stateName>" holds a function, `<source>`, in its initial value. A function cannot be written into the page, so the browser would read a value that is not callable.',
+			'state() values are serialized into the page and the browser resumes from them without running the component body, so only data (strings, numbers, booleans, null, arrays and plain objects) survives the trip.',
+			'Keep the function outside state(): declare it in the component body or at module scope, and store only the data it needs, for example a name to pick it by.',
+			'https://markless.dev/errors/MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -10431,7 +10545,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error-or-warning',
 		description: 'A markup expression assigns a value, so its text never updates.',
 		printed: [
 			'MARKLESS_TEMPLATE_EXPRESSION_STATIC: This text reads `<readSource>`, but only plain reads like `{<readSource>}` update the page today. The expression renders its initial value and never changes when `<readSource>` changes.',
@@ -10622,6 +10736,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				file: 'packages/compiler/src/passes/state-lowering.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
 			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
+			},
 		],
 		moreSources: 0,
 	},
@@ -10635,7 +10754,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		printed: [
 			'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED: <target> is written as `<source>`, which reads state but is not an expression this compiler can keep current.',
 			'An expression with no graph node behind it renders once, from whatever the value was at render, and a later write never reaches it - so the page would show a stale value and nothing would say so.',
-			'Write a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads. If the value needs a function of your own, put that function inside a `computed()` and read the computed here.',
+			'Write a plain read (`group.value`), an expression built from reads, operators and method calls, or a call to a function declared with `function` or `const` that does not change state. A function held in a `let`, or one that writes state, cannot be followed: move the write into an event handler.',
 			'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 		],
 		structured: true,

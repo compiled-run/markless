@@ -27,6 +27,13 @@ export function collectDestructuredAliases(
 		semanticAliasMap(state.graph, currentGraphScope(state)),
 	);
 	if (!resolved) return;
+	// Inside a handler, `let { b } = obj; b++` changes that handler's copy, never obj.b.
+	if (
+		declarationKind !== 'const' &&
+		state.currentFunctionSite &&
+		patternNameIsReassigned(id, state)
+	)
+		return;
 
 	const targetBase = graphPathSource(resolved.binding, resolved.path);
 	if (id.type === 'ObjectPattern') {
@@ -35,6 +42,35 @@ export function collectDestructuredAliases(
 	}
 
 	collectArrayPatternAliases(id, targetBase, declarationKind, state);
+}
+
+export function patternIdentifiers(pattern: AnyNode): ReadonlyArray<AnyNode> {
+	const names: AnyNode[] = [];
+	const visit = (node: AnyNode | undefined) => {
+		if (!node) return;
+		if (node.type === 'Identifier') names.push(node);
+		else if (node.type === 'ObjectPattern')
+			for (const property of asNodes(node.properties))
+				visit((property.type === 'RestElement' ? property.argument : property.value) as AnyNode);
+		else if (node.type === 'ArrayPattern') for (const element of asNodes(node.elements)) visit(element);
+		else if (node.type === 'RestElement') visit(node.argument as AnyNode);
+		else if (node.type === 'AssignmentPattern') visit(node.left as AnyNode);
+	};
+	visit(pattern);
+	return names;
+}
+
+function patternNameIsReassigned(pattern: AnyNode, state: WalkState): boolean {
+	const starts = new Set(patternIdentifiers(pattern).map((name) => name.start));
+	const semantic = state.semantic();
+	return semantic.references.some(
+		(reference) =>
+			reference.isWrite &&
+			reference.binding !== null &&
+			reference.binding !== undefined &&
+			starts.has(semantic.bindings[reference.binding.id]!.declarations[0]?.start ?? -1) &&
+			reference.node.start !== semantic.bindings[reference.binding.id]!.declarations[0]?.start,
+	);
 }
 
 export function collectWholeBindingAlias(

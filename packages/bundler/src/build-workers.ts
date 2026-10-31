@@ -48,7 +48,7 @@ type PooledWorker = {
 
 export type CompileWorkerPool = {
 	readonly run: CompileRunner;
-	/** Waits for every result a worker is still writing to this build's store. */
+	/** Waits for every compile this pool handed a worker, and every result a worker is still writing to this build's store. */
 	close(): Promise<void>;
 };
 
@@ -229,6 +229,7 @@ export function createCompileWorkerPool(options: {
 		fingerprint: options.store.fingerprint,
 	};
 	const writes = new Set<Promise<void>>();
+	const runs = new Set<Promise<unknown>>();
 	let closed = false;
 	return {
 		run(input, key) {
@@ -240,7 +241,7 @@ export function createCompileWorkerPool(options: {
 				addWorker();
 			// Until a worker is online the calling thread compiles, so booting never idles the build.
 			if (!workers.some((entry) => entry.online)) return undefined;
-			return new Promise((resolve) => {
+			const run = new Promise<CompileTsrxModuleResult | undefined>((resolve) => {
 				queue.push({
 					kind: 'compile',
 					id: nextId++,
@@ -256,10 +257,13 @@ export function createCompileWorkerPool(options: {
 				});
 				dispatch();
 			});
+			runs.add(run);
+			void run.finally(() => runs.delete(run));
+			return run;
 		},
 		async close() {
 			closed = true;
-			while (writes.size) await Promise.all(writes);
+			while (runs.size || writes.size) await Promise.all([...runs, ...writes]);
 		},
 	};
 }

@@ -51,8 +51,6 @@ export type MarklessVirtualModuleType =
 	| 'resume'
 	| 'settle'
 	| 'symbol'
-	// `export *` of a symbol module that render data imports statically: loaders `import()` this instead.
-	| 'symbol-entry'
 	| 'symbol-bundle'
 	| 'trigger-group'
 	| 'style';
@@ -70,6 +68,8 @@ export interface MarklessVirtualModule {
 	exportName?: string;
 	canonicalRenderData?: boolean;
 	symbolClaims?: ReadonlyArray<string>;
+	/** A grouped symbol module: the symbols whose code it holds. */
+	groupedSymbolIds?: ReadonlyArray<string>;
 	/** `symbol-bundle` only: the symbol module ids this bundle ships as one chunk. */
 	bundledSymbolModuleIds?: ReadonlyArray<string>;
 	/** Symbols and resolvers may resolve during linking, but never serve first-pass code. */
@@ -178,6 +178,8 @@ export interface MarklessTransformManifest {
 	resolver: MarklessBuildModuleReference;
 	symbols: MarklessSymbolManifestEntry[];
 	runtimeDemandMap?: RuntimeDemandMapManifest;
+	/** Symbols this module ships inside a grouped module, by the group's symbol id. */
+	symbolGroups?: Readonly<Record<string, string>>;
 	/** This client module mounts through the direct-DOM renderer, which never reaches render()'s other paths. */
 	directCsr?: boolean;
 }
@@ -269,7 +271,20 @@ export type MarklessRolldownPluginApi = {
 	runtimeDemandSources: () => Iterable<{
 		readonly source: string;
 		readonly map: RuntimeDemandMapManifest | undefined;
+		readonly symbolGroups?: ReadonlyMap<string, string>;
 	}>;
 	/** Whether every compiled module of this build mounts through the direct-DOM renderer. */
 	directCsrOnly: () => boolean;
+	/** What the client build leaves for the environments built after it, so they can build in another process. */
+	clientBuildHandoff: () => ClientBuildHandoff;
+	/** Starts the later environments from a client build that ran in another process. */
+	adoptClientBuildHandoff: (handoff: ClientBuildHandoff) => void;
+};
+
+export type ClientBuildHandoff = {
+	readonly resumeModuleUrls: ReadonlyArray<readonly [string, string]>;
+	readonly prerenderWakeModuleUrls: ReadonlyArray<readonly [string, string]>;
+	readonly settleModuleUrls: ReadonlyArray<readonly [string, string]>;
+	readonly prerenderWakeCapabilities: ReadonlyArray<readonly [string, boolean]>;
+	readonly styleClosures: ReadonlyArray<readonly [string, ReadonlyArray<string>]>;
 };

@@ -86,10 +86,13 @@ export type ShowcaseApp = {
 	/** `null` when the check measured no JavaScript on the home page. */
 	readonly headline: { readonly route: string; readonly before: number; readonly after: number } | null;
 	readonly links: {
-		readonly frontDoor: string;
-		readonly old: string;
+		/** `null` once the front door is no longer hosted. */
+		readonly frontDoor: string | null;
+		/** `null` once the old app is no longer hosted. */
+		readonly old: string | null;
 		readonly markless: string;
-		readonly report: string;
+		/** `null` with the front door that served it. */
+		readonly report: string | null;
 		readonly port: string;
 		readonly originalRepo: string | null;
 		readonly originalSite: string | null;

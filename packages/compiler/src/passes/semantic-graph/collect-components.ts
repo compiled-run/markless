@@ -363,16 +363,14 @@ function componentPropBindings(
 
 		// A recombined expression at the edge - `list.value.includes(item.value)` -
 		// resolves to no single node, so without a computed of its own the child is
-		// seeded once and never hears about the group again. A props-only expression
-		// (`depth - 1`) is settled by the render that read it, so it owes no computed.
-		// `!board.wide` is the same recombination behind one operator, and leaving it
+		// seeded once and never hears about the group again; a props-only one (`depth - 1`)
+		// moves when the parent's value does. `!board.wide` is the same recombination behind one operator, and leaving it
 		// out sent it to the refusal below instead of the route it already had.
 		const composite = expression
 			? collectCompositeTemplateExpression(expression, state, {
 					scope,
 					methodCalls: true,
 					unaryOperators: true,
-					requireWritableRead: true,
 				})
 			: null;
 		if (composite) {
@@ -478,7 +476,6 @@ function scopedCallSiteClass(
 		`() => ${scopedClassSource(source, styleScopeClass)}`,
 		readSources,
 		state,
-		false,
 		scope,
 	);
 	if (!composed) return null;

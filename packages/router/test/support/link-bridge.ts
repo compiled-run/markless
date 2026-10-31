@@ -31,3 +31,19 @@ export function laterLinkBridge(entry: {
 		.map((module) => module.source)
 		.join('\n');
 }
+
+// The page's route table, decoded: each destination's preloads, in order.
+export function servedRouteTable(html: string): Record<string, unknown[]> | undefined {
+	const json =
+		/<script type="application\/json" data-markless-router-links>([\s\S]*?)<\/script>/.exec(
+			html,
+		)?.[1];
+	if (json === undefined) return undefined;
+	const [preloads, destinations] = JSON.parse(json) as [unknown[], Record<string, number[]>];
+	return Object.fromEntries(
+		Object.entries(destinations).map(([path, indexes]) => [
+			path,
+			indexes.map((at) => preloads[at]),
+		]),
+	);
+}

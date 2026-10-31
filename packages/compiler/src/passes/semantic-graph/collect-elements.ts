@@ -121,8 +121,7 @@ import type {
  * spelled with a call rendered once and never moved, because no computed was
  * minted, so no update record was emitted and nothing subscribed the write.
  * A newly reactive call costs about 1.4 kB raw and 100 B gzip, pinned in
- * test/emit-byte-equality/template-method-call-bytes.test.ts; the bound is
- * `requireWritableRead` below, which keeps a props-only call minting nothing.
+ * test/emit-byte-equality/template-method-call-bytes.test.ts.
  */
 const TEMPLATE_READ_OPTIONS: CompositeReadOptions = { methodCalls: true, unaryOperators: true };
 
@@ -201,20 +200,19 @@ function armRebuildsFromGraph(state: WalkState): boolean {
 	return !!state.currentArmScope && state.currentKeyedRepeatScopeIds.length === 0;
 }
 
+function rowScope(state: WalkState): { readonly keyedRepeatId?: string } {
+	const id = state.currentKeyedRepeatScopeIds.at(-1);
+	return id ? { keyedRepeatId: id } : {};
+}
+
 export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
 	if (readsShadowingRowItem(expression, state)) return;
-	// Same bound the attribute branch already takes: no write can move a prop after
-	// the render that read it, so a props-only text read owes no record - and with
-	// method calls lifted, minting one would demand a capture slot for the receiver.
 	const joined = joinedTextExpressions.get(expression);
 	if (joined === null) return;
 	const composite =
 		joined ??
-		collectCompositeTemplateExpression(expression, state, {
-			...TEMPLATE_READ_OPTIONS,
-			requireWritableRead: !armRebuildsFromGraph(state),
-		}) ??
+		collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS) ??
 		liftArmModuleValue(expression, state) ??
 		liftArmShownValue(expression, state) ??
 		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS);
@@ -229,8 +227,9 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		state.currentProjectionScope.hostNodeId === state.currentHostNodeId;
 
 	state.graph.templateReads.push({
+		...rowScope(state),
 		hostNodeId: state.currentHostNodeId,
-		source: joined?.source ?? expressionSource(expression, state.source),
+		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -241,6 +240,17 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		computedGraphNodeId: composite?.graphNodeId,
 		componentName: state.currentComponentName ?? undefined,
 	});
+}
+
+function templateReadSource(
+	composite: { readonly graphNodeId: string; readonly splicedSource?: string } | null,
+	expression: AnyNode,
+	state: WalkState,
+): { readonly source: string; readonly authoredSource?: string } {
+	const authored = expressionSource(expression, state.source);
+	return composite?.splicedSource
+		? { source: composite.splicedSource, authoredSource: authored }
+		: { source: authored };
 }
 
 // The first interpolation carries the joined text's computed; the rest carry null and ship nothing.
@@ -370,7 +380,7 @@ function joinTextParts(
 			: textPartValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
 	);
 	const source = `\`${parts.join('')}\``;
-	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state, true);
+	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state);
 	if (!composite) return null;
 	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
@@ -605,6 +615,7 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 	};
 	for (const hostNodeId of [consequent.hostNodeId, alternate.hostNodeId]) {
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
 			source,
 			sourceSpan: sourceSpanValue,
@@ -1169,6 +1180,7 @@ function collectAttribute(
 			TEMPLATE_READ_OPTIONS,
 		);
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
 			source: expressionSource(conditionalClass.test, state.source),
 			sourceSpan: sourceSpan(conditionalClass.test, state.filename),
@@ -1229,10 +1241,7 @@ function collectAttribute(
 		}
 		// A recombined value resolves to no graph node, so without this nothing subscribes it.
 		const composite =
-			collectCompositeTemplateExpression(expressionValue, state, {
-				...TEMPLATE_READ_OPTIONS,
-				requireWritableRead: !armRebuildsFromGraph(state),
-			}) ??
+			collectCompositeTemplateExpression(expressionValue, state, TEMPLATE_READ_OPTIONS) ??
 			liftArmModuleValue(expressionValue, state) ??
 			liftArmShownValue(expressionValue, state) ??
 			liftRenderLocalComposite(expressionValue, state, TEMPLATE_READ_OPTIONS);
@@ -1244,8 +1253,9 @@ function collectAttribute(
 			return;
 		}
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
-			source: expressionSource(expressionValue, state.source),
+			...templateReadSource(composite, expressionValue, state),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -1301,6 +1311,7 @@ function collectStyleObjectAttribute(
 		(composite || lowering.valueExpressions.every((value) => rendersStyleValue(value, state)))
 	) {
 		state.graph.templateReads.push({
+			...rowScope(state),
 			hostNodeId,
 			source: expressionSource(usageNode, state.source),
 			sourceSpan: sourceSpan(usageNode, state.filename),

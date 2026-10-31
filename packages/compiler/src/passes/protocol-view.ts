@@ -876,7 +876,7 @@ function nestedRepeatMints(
 		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === enclosing.repeatId,
 	);
 	const render = renderDataOf(input).repeats.find((candidate) => candidate.repeatId === repeatId);
-	if (!nested || !render || render.rowStartOffset === 'unknown' || render.rowElementCount < 1)
+	if (!nested || !render || render.rowStartOffset === 'unknown' || !rowRootsOneElement(input, render))
 		return false;
 	if (
 		input.semanticGraph?.keyedRepeats.some(
@@ -1119,8 +1119,8 @@ function rowRootsOneElement(
 	input: ProtocolViewPayloadInput,
 	render: { readonly rowElementCount: number; readonly rowChunkId: string },
 ): boolean {
-	if (render.rowElementCount > 0) return true;
 	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === render.rowChunkId);
+	if (render.rowElementCount > 0) return chunk !== undefined && armRootsOneElement(chunk);
 	if ((chunk?.slots ?? []).some((slot) => slot.kind === 'child-component')) return true;
 	// A row that is one @if or @switch is the one element its shown arm renders.
 	const slot = chunk?.slots[0];

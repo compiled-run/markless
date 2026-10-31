@@ -66,3 +66,46 @@ test('a write a commit makes is flushed by the same flush', async () => {
 
 	expect(texts).toEqual(['minted']);
 });
+
+test('a write observer leaves its DOM to the pass while a subscription in that pass still loads code', async () => {
+	const landed: string[] = [];
+	let loaded = false;
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:requests', value: 0 },
+			{ graphNodeId: 'state:rows', value: 'served' },
+		],
+	});
+	graph.subscribe({
+		id: 'dom-update:requests',
+		graphNodeId: 'state:requests',
+		ready: () => loaded,
+		run: async (value) => {
+			await macrotask();
+			loaded = true;
+			return { type: 'setText', locator: 'text:requests', value };
+		},
+	});
+	graph.subscribe({
+		id: 'repeat:rows',
+		graphNodeId: 'state:rows',
+		run: () => () => void landed.push('rows by the pass'),
+	});
+	graph.subscribeWrite({
+		graphNodeId: 'state:rows',
+		run: () => void landed.push('rows at the write'),
+	});
+	graph.subscribeJournal((entries) => {
+		landed.push(...entries.map((entry) => `text:${(entry as { value: unknown }).value}`));
+	});
+
+	graph.write({ graphNodeId: 'state:requests', value: 1 });
+	graph.write({ graphNodeId: 'state:rows', value: 'editing' });
+	expect(landed).toEqual([]);
+	await graph.flush();
+	expect(landed).toEqual(['rows by the pass', 'text:1']);
+
+	graph.write({ graphNodeId: 'state:requests', value: 2 });
+	graph.write({ graphNodeId: 'state:rows', value: 'saved' });
+	expect(landed.at(-1)).toBe('rows at the write');
+});

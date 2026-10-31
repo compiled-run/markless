@@ -111,6 +111,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 	};
 	return {
 		passGraph: pipeline.passGraph,
+		allowScan: { filename: input.filename, source: input.source },
 		semanticGraph: artifacts.semanticGraph,
 		moduleGraphInterface: withFirstUseReach(
 			withClosureActionOwners(

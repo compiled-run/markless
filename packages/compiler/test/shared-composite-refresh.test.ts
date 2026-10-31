@@ -143,7 +143,7 @@ export function App() @{
 	expect(node?.dependencies).toEqual([{ graphNodeId: 'state:flags', path: ['open'] }]);
 });
 
-test('an attribute expression over props alone stays out of the payload', async () => {
+test('an attribute expression over props alone gets an update a parent passing state can wake', async () => {
 	const compiled = await compile(
 		`
 export function Badge({ marker }) @{
@@ -153,14 +153,16 @@ export function Badge({ marker }) @{
 		'src/badge.tsrx',
 	);
 
-	// Nothing can write a prop after the render that read it, so a record here
-	// would be payload no interaction can ever wake.
-	expect(
-		compiled.protocolView.domUpdates.filter(
-			(candidate) => candidate.target.kind === 'attribute',
-		),
-	).toEqual([]);
-	expect(compiled.protocolState.computed).toEqual([]);
+	const attributeUpdates = compiled.protocolView.domUpdates.filter(
+		(candidate) => candidate.target.kind === 'attribute',
+	);
+	expect(attributeUpdates.map((update) => update.target)).toEqual([
+		{ kind: 'attribute', name: 'data-graph' },
+		{ kind: 'attribute', name: 'data-literal' },
+	]);
+	expect(compiled.protocolState.computed.map((computed) => computed.graphNodeId)).toEqual(
+		attributeUpdates.map((update) => update.graphNodeId),
+	);
 });
 
 test('a component-body computed over a shared read binds the instance in the SSR body', async () => {

@@ -151,6 +151,64 @@ export function Editor() @{
 	]);
 });
 
+test('a body function called over state follows the state it and its body read', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Editor() @{
+	let draft = state('x');
+	let suffix = state('!');
+	function label(value: string) { return value + suffix; }
+	const shout = (value: string) => label(value).toUpperCase();
+	<form onInput={(event) => (draft = event.target.value)}>
+		<output title={shout(draft)}>{label(draft)}</output>
+	</form>
+}
+`);
+	expect(result.semanticGraph.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+	expect(result.protocolView.domUpdates).toHaveLength(2);
+	for (const update of result.protocolView.domUpdates)
+		expect(
+			result.protocolState.computed?.find((record) => record.graphNodeId === update.graphNodeId)
+				?.dependencies,
+		).toEqual([
+			{ graphNodeId: 'state:draft', path: [] },
+			{ graphNodeId: 'state:suffix', path: [] },
+		]);
+});
+
+test('a computed() recipe calling a body function derives from the state that function reads', async () => {
+	const result = await compile(`import { computed, state } from '@markless/core';
+export function Editor() @{
+	let draft = state('x');
+	let suffix = state('!');
+	function label(value: string) { return value + suffix; }
+	const shown = computed(() => label(draft));
+	<output onClick={() => (draft = 'y')}>{shown}</output>
+}
+`);
+	expect(result.semanticGraph.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+	expect(
+		result.protocolState.computed?.find((record) => record.graphNodeId === 'computed:shown')
+			?.dependencies,
+	).toEqual([
+		{ graphNodeId: 'state:draft', path: [] },
+		{ graphNodeId: 'state:suffix', path: [] },
+	]);
+});
+
+test('a body function that writes state is refused in markup, not run from a render', async () => {
+	const found = await refusals(`import { state } from '@markless/core';
+export function Editor() @{
+	let draft = state('x');
+	let calls = state(0);
+	function label(value: string) { calls++; return value; }
+	<output>{label(draft)}</output>
+}
+`);
+	expect(found.map((diagnostic) => diagnostic.message)).toEqual([
+		expect.stringContaining('`label(draft)`'),
+	]);
+});
+
 test('a reassignable component local beside state is refused; a const local and a module lookup keyed by state are routed', async () => {
 	const found = await refusals(`import { state } from '@markless/core';
 const LABELS: Record<string, string> = { on: 'On', off: 'Off' };

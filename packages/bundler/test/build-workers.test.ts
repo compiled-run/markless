@@ -1,6 +1,6 @@
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'pathe';
+import { join, relative } from 'pathe';
 import { afterAll, afterEach, expect, test } from 'vitest';
 import {
 	clearCompileCache,
@@ -8,7 +8,11 @@ import {
 	useCompileRunner,
 	usePersistentCompileStore,
 } from '@markless/compiler';
-import { compilerFingerprint, createPersistentCompileCache } from '../src/compile-store.ts';
+import {
+	compileStoreEntry,
+	compilerFingerprint,
+	createPersistentCompileCache,
+} from '../src/compile-store.ts';
 import { createCompileWorkerPool } from '../src/build-workers.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'markless-build-workers-'));
@@ -84,6 +88,24 @@ test('a worker writes the result to the store, and a later build reads it back',
 	const later = createPersistentCompileCache({ directory, fingerprint });
 	usePersistentCompileStore(later);
 	expect(await compileTsrxModule(input('Stored'))).toEqual(compiled);
+});
+
+test('closing a pool waits for compiles it handed a worker but nobody awaited', async () => {
+	const directory = join(scratch, 'unawaited');
+	const fingerprint = compilerFingerprint();
+	const cache = createPersistentCompileCache({ directory, fingerprint });
+	await (await onlinePool({ size: 1 })).close();
+	const pool = createCompileWorkerPool({ size: 1, store: { cache, directory, fingerprint } });
+	const names = ['Left', 'Right', 'Up', 'Down'];
+	for (const name of names) void pool.run(input(name), name);
+	await pool.close();
+	const written = readdirSync(directory, { recursive: true }).filter((name) =>
+		String(name).endsWith('.bin'),
+	);
+	for (const name of names)
+		expect(written).toContain(
+			relative(directory, compileStoreEntry(directory, fingerprint, input(name).source, name).path),
+		);
 });
 
 test('a compile a runner hands back is compiled here, once', async () => {

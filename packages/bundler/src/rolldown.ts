@@ -1,10 +1,15 @@
 import type { InputOptions, Plugin } from 'rolldown';
 import {
 	DEBUGGING_PLAYBOOK_HINT,
+	clearCompileCache,
 	computeExecutionAttribution,
+	resetParseCache,
 	type LinkedModuleChildResolution,
 } from '@markless/compiler';
 import { clearParsedChunkCode } from './build/chunk-ast.ts';
+import { clearModuleSpecifiers } from './hooks/transform-emit.ts';
+import { clearFactoredRenderDataLiterals } from './render-data-literals.ts';
+import { clearStrippedCode } from './transform.ts';
 import {
 	moveBuildMetadataOutOfClientOutput,
 	moveImportMapOutOfClientOutput,
@@ -43,6 +48,7 @@ import { encodedSymbolSource } from './source-module.ts';
 import { moduleIdFor } from './module-id.ts';
 import { importedRouteModules } from './composed-route-modules.ts';
 import type {
+	ClientBuildHandoff,
 	MarklessEnvironment,
 	MarklessRolldownOptions,
 	MarklessRolldownPluginApi,
@@ -53,6 +59,7 @@ import type { BuiltPrerenderRecords } from './build/prerender.ts';
 
 export type {
 	BundleGraphAdder,
+	ClientBuildHandoff,
 	GlobalInjections,
 	PreloadGraphContext,
 	PreloadGraphEntries,
@@ -138,7 +145,13 @@ export function createMarklessRolldownPlugin(input: {
 
 	function* runtimeDemandSources() {
 		for (const manifest of state.moduleMetadata.symbolClaimManifests())
-			yield { source: manifest.source, map: manifest.runtimeDemandMap };
+			yield {
+				source: manifest.source,
+				map: manifest.runtimeDemandMap,
+				...(manifest.symbolGroups
+					? { symbolGroups: new Map(Object.entries(manifest.symbolGroups)) }
+					: {}),
+			};
 	}
 
 	// `resolveSpecifier`/`encodeSource` are the bundler's; the compiler pass owns
@@ -200,6 +213,41 @@ export function createMarklessRolldownPlugin(input: {
 			declarePackOwnership: (packs: PackOwnership) => {
 				declaredPacks = packs;
 			},
+			clientBuildHandoff: () => ({
+				resumeModuleUrls: [...(internalOptions.productionResumeModuleUrls ?? [])],
+				prerenderWakeModuleUrls: [
+					...(internalOptions.productionPrerenderWakeModuleUrls ?? []),
+				],
+				settleModuleUrls: [...(internalOptions.productionSettleModuleUrls ?? [])],
+				prerenderWakeCapabilities: [...state.prerenderWakeCapabilities],
+				styleClosures: [...state.styleClosures].map(([source, ids]) => [source, [...ids]]),
+			}),
+			adoptClientBuildHandoff: (handoff: ClientBuildHandoff) => {
+				const fill = (
+					target: Map<string, string> | undefined,
+					rows: ClientBuildHandoff['resumeModuleUrls'],
+				) => {
+					const map = target ?? new Map<string, string>();
+					for (const [source, url] of rows) map.set(source, url);
+					return map;
+				};
+				internalOptions.productionResumeModuleUrls = fill(
+					internalOptions.productionResumeModuleUrls,
+					handoff.resumeModuleUrls,
+				);
+				internalOptions.productionPrerenderWakeModuleUrls = fill(
+					internalOptions.productionPrerenderWakeModuleUrls,
+					handoff.prerenderWakeModuleUrls,
+				);
+				internalOptions.productionSettleModuleUrls = fill(
+					internalOptions.productionSettleModuleUrls,
+					handoff.settleModuleUrls,
+				);
+				for (const [source, capable] of handoff.prerenderWakeCapabilities)
+					state.prerenderWakeCapabilities.set(source, capable);
+				for (const [source, ids] of handoff.styleClosures)
+					state.styleClosures.set(source, new Set(ids));
+			},
 		},
 		name,
 		options(input: InputOptions) {
@@ -255,7 +303,10 @@ export function createMarklessRolldownPlugin(input: {
 			const hook = packing?.buildEnd;
 			await (typeof hook === 'function' ? hook : hook?.handler)?.call(this, error);
 			// Kept only to reuse a compile within the module graph; render and later environments never read it.
-			if (internalOptions.dev !== true) state.linkedTransformCache.clear();
+			if (internalOptions.dev !== true) {
+				state.linkedTransformCache.clear();
+				releaseTransformMemos();
+			}
 		},
 		renderStart: facades?.renderStart,
 		renderChunk: facades?.renderChunk,
@@ -310,7 +361,10 @@ export function createMarklessRolldownPlugin(input: {
 					`Markless emitted chunks that import specifiers its import map does not resolve to an emitted chunk: ${unmapped.join(', ')}. A plugin changed chunk code or file names after the Markless finalize pass. ${DEBUGGING_PLAYBOOK_HINT}`,
 				);
 			if (output.dir) {
-				await moveImportMapOutOfClientOutput(output.dir, MARKLESS_IMPORT_MAP_ASSET in bundle);
+				await moveImportMapOutOfClientOutput(
+					output.dir,
+					MARKLESS_IMPORT_MAP_ASSET in bundle,
+				);
 				await moveBuildMetadataOutOfClientOutput(output.dir, new Set(Object.keys(bundle)), {
 					executionLogActive:
 						executionLogActivationInjection(internalOptions.executionLog) !== null,
@@ -320,6 +374,16 @@ export function createMarklessRolldownPlugin(input: {
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
 	return plugin;
+}
+
+// Memos that spare repeat work while a module graph is built; rendering chunks reads none of them, and a later
+// environment's compiles come back from the persistent compile store.
+function releaseTransformMemos(): void {
+	clearCompileCache();
+	resetParseCache();
+	clearStrippedCode();
+	clearModuleSpecifiers();
+	clearFactoredRenderDataLiterals();
 }
 
 function pluginName(environment: Environment) {

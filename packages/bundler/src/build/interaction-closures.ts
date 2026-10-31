@@ -81,6 +81,8 @@ export type InteractionDemandSource = {
 	// The emitted module's source request; the file is everything before `?`.
 	readonly source: string;
 	readonly map: RuntimeDemandMapManifest | undefined;
+	// Symbols that ship inside a grouped module, by the group's own symbol id.
+	readonly symbolGroups?: ReadonlyMap<string, string>;
 };
 
 export type InteractionConsumerKind = 'boot' | 'render' | 'action';
@@ -168,6 +170,26 @@ export function computeInteractionClosures(input: {
 	const runtimeIdOf = memoById((id: string) => runtimeModuleIdFromOrigin(id.split('?')[0]!));
 	const sources = [...input.demand];
 	const demand = mergeDemand(sources, input.landingArmsServed === true);
+	// Each compile of a file names its groups by their members, so a symbol may sit in more than one group.
+	const groupOf = new Map<string, Map<string, Set<string>>>();
+	for (const { source, symbolGroups } of sources) {
+		if (!symbolGroups?.size) continue;
+		const file = source.split('?')[0]!;
+		const groups = groupOf.get(file) ?? groupOf.set(file, new Map()).get(file)!;
+		for (const [symbolId, group] of symbolGroups)
+			(groups.get(symbolId) ?? groups.set(symbolId, new Set()).get(symbolId)!).add(group);
+	}
+	// A symbol shipped in a group seeds the whole group: a page that needs one member loads all of it with the page.
+	const seedSymbol = (seeds: Set<string>, file: string, symbolId: string): boolean => {
+		let found = false;
+		for (const id of [symbolId, ...(groupOf.get(file)?.get(symbolId) ?? [])]) {
+			const module = byVirtualId.get(symbolVirtualModuleId(file, id));
+			if (!module) continue;
+			seeds.add(module);
+			found = true;
+		}
+		return found;
+	};
 	const byRuntimeId = new Map<string, string[]>();
 	const byVirtualId = new Map<string, string>();
 	const symbolsByFile = new Map<string, string[]>();
@@ -351,16 +373,14 @@ export function computeInteractionClosures(input: {
 		const bootSeeds = new Set(bootRoots);
 		let bootBounded =
 			resume !== 'unknown' && [...files].every((file) => !demand.get(file)!.replaced);
-		const seedSymbol = (file: string, symbolId: string) => {
-			const id = byVirtualId.get(symbolVirtualModuleId(file, symbolId));
-			if (id) bootSeeds.add(id);
-			else bootBounded = false;
+		const seedBoot = (file: string, symbolId: string) => {
+			if (!seedSymbol(bootSeeds, file, symbolId)) bootBounded = false;
 		};
 		for (const file of files)
-			for (const symbolId of demand.get(file)!.landingSymbols) seedSymbol(file, symbolId);
+			for (const symbolId of demand.get(file)!.landingSymbols) seedBoot(file, symbolId);
 		if (resume !== 'unknown')
 			for (const [owner, symbolIds] of resume.symbols)
-				for (const symbolId of symbolIds) seedSymbol(owner, symbolId);
+				for (const symbolId of symbolIds) seedBoot(owner, symbolId);
 		// A first input on a full-dispatch control resumes the whole page; a lean one runs only its own path,
 		// so runtime the resume module imports for escalation is first-use code only where something names it.
 		const leanOnly =
@@ -430,9 +450,8 @@ export function computeInteractionClosures(input: {
 				};
 				for (const [owner, symbolIds] of joined?.symbols ?? []) {
 					for (const symbolId of symbolIds) {
-						const id = byVirtualId.get(symbolVirtualModuleId(owner, symbolId));
-						if (id) seeds.add(id);
-						else if (owner === file) widen('unresolved-symbol');
+						if (seedSymbol(seeds, owner, symbolId)) continue;
+						if (owner === file) widen('unresolved-symbol');
 						else {
 							conservative ??= 'unresolved-symbol';
 							for (const known of symbolsByFile.get(owner) ?? []) seeds.add(known);
@@ -445,11 +464,8 @@ export function computeInteractionClosures(input: {
 						widen('unlisted-record');
 						continue;
 					}
-					for (const symbolId of symbolIds) {
-						const id = byVirtualId.get(symbolVirtualModuleId(file, symbolId));
-						if (id) seeds.add(id);
-						else widen('unresolved-symbol');
-					}
+					for (const symbolId of symbolIds)
+						if (!seedSymbol(seeds, file, symbolId)) widen('unresolved-symbol');
 				}
 				// A lean action also demands the full runtime it escalates to; its first use names only what it runs.
 				const runtimeIds = new Set([
@@ -492,6 +508,8 @@ export function interactionClosuresAsset(input: {
 	readonly partition: 'tiers' | 'unsplit:entry-roots';
 	// Output files an import of each module fetches, when the asset is written after rendering.
 	readonly chunkOf?: ReadonlyMap<string, readonly string[]>;
+	// A hash of each module's own code, so a route's runnable code is compared without the packs it lands in.
+	readonly moduleHashes?: ReadonlyMap<string, string>;
 }): string {
 	const filesFor = (route: RouteInteractionClosures, render: boolean) => {
 		const files = new Set<string>();
@@ -510,6 +528,12 @@ export function interactionClosuresAsset(input: {
 			for (const id of consumer.modules)
 				if (!displayed.has(id)) displayed.set(id, display(id, input.root));
 	const modules = [...new Set(displayed.values())].sort();
+	const rawOf = new Map<string, string[]>();
+	for (const [id, shown] of displayed) push(rawOf, shown, id);
+	const displayedHash = (shown: string) => {
+		const hashes = rawOf.get(shown)!.map((id) => input.moduleHashes!.get(id) ?? '');
+		return hashes.includes('') ? '' : hashes.sort().join('+');
+	};
 	const moduleIndex = new Map(modules.map((id, index) => [id, index]));
 	const closureSets: number[][] = [];
 	const closureIndex = new Map<readonly string[], number>();
@@ -535,6 +559,7 @@ export function interactionClosuresAsset(input: {
 		partition: input.partition,
 		modules,
 		closures: closureSets,
+		...(input.moduleHashes ? { moduleHashes: modules.map((id) => displayedHash(id)) } : {}),
 		routes: input.closures.map((route) => ({
 			route: route.route,
 			...(route.fallback ? { fallback: route.fallback } : {}),
@@ -824,6 +849,8 @@ export type InteractionClosuresAssetView = {
 	}>;
 	readonly packs: Readonly<Record<string, readonly string[]>>;
 	readonly packFiles?: Readonly<Record<string, readonly string[]>>;
+	/** Each listed module's code hash, by the module id the consumers name. */
+	readonly moduleHashes?: Readonly<Record<string, string>>;
 };
 
 /** The asset with every consumer's closure spelled out as module ids again. */
@@ -839,9 +866,18 @@ export function readInteractionClosuresAsset(source: string): InteractionClosure
 			}
 		>;
 	};
-	const { modules, closures, ...rest } = parsed;
+	const { modules, closures, moduleHashes, ...rest } = parsed as typeof parsed & {
+		readonly moduleHashes?: readonly string[];
+	};
 	return {
 		...rest,
+		...(moduleHashes
+			? {
+					moduleHashes: Object.fromEntries(
+						modules.map((id, index) => [id, moduleHashes[index]!]),
+					),
+				}
+			: {}),
 		routes: parsed.routes.map((route) => ({
 			...route,
 			consumers: route.consumers.map(({ closure, ...consumer }) => ({

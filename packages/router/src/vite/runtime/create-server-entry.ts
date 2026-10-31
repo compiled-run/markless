@@ -47,7 +47,11 @@ import {
 } from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
-import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
+import {
+	LINK_BRIDGE_SCRIPT_ATTRIBUTE,
+	LINK_TABLE_SCRIPT_ATTRIBUTE,
+	linkBridgeModulePath,
+} from './link-bridge-module.ts';
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
 import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../navigation-timing.ts';
@@ -677,15 +681,15 @@ function landingModulePreloads(
 ): readonly ModulePreloadInput[] | undefined {
 	const preloads: ModulePreloadInput[] = [];
 	addModulePreloads(preloads, new Set(), routePreloads);
-	// The first click waits on the landing plan: below high, a font the stylesheet asks for late is sent ahead of it.
-	const landing = preloads.map(highFetchPriority);
+	// Low: Chromium sends a high-priority script ahead of first paint, and Lighthouse counts every one finished before it as render-blocking.
+	const landing = preloads.map(lowFetchPriority);
 	if (linkBridgePath) landing.push({ href: linkBridgePath, fetchPriority: 'low' });
 	return landing.length > 0 ? landing : undefined;
 }
 
-function highFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
-	if (typeof preload === 'string') return { href: preload, fetchPriority: 'high' };
-	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'high' };
+function lowFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
+	if (typeof preload === 'string') return { href: preload, fetchPriority: 'low' };
+	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'low' };
 }
 
 function routerLinkHrefs(html: string): string[] {
@@ -816,10 +820,11 @@ async function renderDocumentShell(
 	);
 	const attributes = htmlAttributes(documentModule, pageProps, written);
 	if (documentHtml !== undefined) {
+		const { html, preloads } = takeHeadModulePreloads(insertHeadHtml(documentHtml, headHtml));
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertImportMap(insertHeadHtml(documentHtml, headHtml), importMap),
+			insertImportMap(html, importMap + preloads),
 			'</html>',
 		].join('');
 	}
@@ -910,6 +915,27 @@ function documentStorageRecords(state: unknown): ReadonlyArray<{ readonly key: s
 	return Array.isArray(storage) ? (storage as ReadonlyArray<{ readonly key: string }>) : [];
 }
 
+// A modulepreload tag, or text a preload scan must step over whole: a comment or the content of a raw-text element.
+const HEAD_SCAN =
+	/<!--[\s\S]*?-->|<(script|style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\1\s*>|(<link\b[^>]*\brel=["']?modulepreload\b[^>]*>)/gi;
+
+// Firefox and Safari fetch a modulepreload only once the parser reaches it, and a head script waits for every stylesheet above it:
+// the head's modulepreloads, the document's own included, move up beside the import map.
+function takeHeadModulePreloads(html: string): {
+	readonly html: string;
+	readonly preloads: string;
+} {
+	const headEnd = html.search(/<\/head>/i);
+	if (headEnd === -1) return { html, preloads: '' };
+	let preloads = '';
+	const head = html.slice(0, headEnd).replace(HEAD_SCAN, (match, _raw, preload) => {
+		if (!preload) return match;
+		preloads += preload;
+		return '';
+	});
+	return { html: head + html.slice(headEnd), preloads };
+}
+
 function insertHeadHtml(documentHtml: string, headHtml: string): string {
 	if (!headHtml) return documentHtml;
 	const headEnd = documentHtml.indexOf('</head>');
@@ -947,7 +973,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}));`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}));`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1112,15 +1138,21 @@ function renderLinkBridgeScript(
 	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
 })();`)}</script>`
 			: '';
+	// Inert JSON, each preload once: parsed at idle or on the first link intent, never evaluated at load.
+	const table =
+		fragment && intentPreloads && Object.keys(intentPreloads).length
+			? (({ preloads, destinations }) =>
+					`<script type="application/json" ${LINK_TABLE_SCRIPT_ATTRIBUTE}>${escapeScriptJson([preloads, destinations])}</script>`)(
+					indexedPreloads(intentPreloads),
+				)
+			: '';
 	const modulePath = modulePaths?.[hashLinks ? 1 : 0];
 	if (modulePath) {
 		const indexed = !fragment && intentPreloads ? indexedPreloads(intentPreloads) : undefined;
-		const args = fragment
-			? [escapeScriptJson(intentPreloads ?? {})]
-			: indexed
-				? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
-				: [];
-		return `${debugBootstrap}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
+		const args = indexed
+			? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
+			: [];
+		return `${debugBootstrap}${table}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
 	}
 	const body = linkBridgeBody(
 		resumeEntryPath,
@@ -1132,7 +1164,7 @@ function renderLinkBridgeScript(
 			hashLinks,
 		},
 	);
-	return `${debugBootstrap}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
+	return `${debugBootstrap}${table}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
 })();`)}</script>`;
 }
 

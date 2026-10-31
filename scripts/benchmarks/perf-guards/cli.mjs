@@ -3,11 +3,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ANCHORS_PATH } from './config.mjs';
-import { evaluate, formatReport, isLean, routeKey } from './evaluate.mjs';
+import { evaluate, formatReport, isLean, LOAD_PLATFORM, routeKey } from './evaluate.mjs';
 import { measure } from './measure.mjs';
 
 export const LAST_MEASUREMENT = join(tmpdir(), 'markless-perf-guards', 'last-measurement.json');
-const GUARDS = ['runtime', 'construct', 'execution', 'lean', 'resume', 'all'];
+const GUARDS = ['runtime', 'construct', 'execution', 'lean', 'resume', 'load', 'all'];
 const USAGE = `usage:
   node scripts/benchmarks/perf-guards/cli.mjs check [--no-build] [--sites bench,docs] [--from <measurement.json>]
   node scripts/benchmarks/perf-guards/cli.mjs measure [--no-build] [--out <file>]
@@ -89,6 +89,21 @@ export function accept(
 				matched++;
 			}
 	}
+	if (guard === 'load' || guard === 'all')
+		for (const [site, siteResult] of Object.entries(measurement.sites))
+			for (const [route, result] of Object.entries(siteResult.routes)) {
+				const key = routeKey(site, route);
+				if (!result.load || !pick(key)) continue;
+				next.loadWeight ??= {};
+				const anchors = (next.loadWeight[LOAD_PLATFORM] ??= {});
+				const value = {
+					executedChars: result.load.executedChars,
+					jsGzipBytes: result.load.jsGzipBytes,
+				};
+				log('load', `${key} (${LOAD_PLATFORM})`, anchors[key], value);
+				anchors[key] = value;
+				matched++;
+			}
 	for (const [, siteResult] of Object.entries(measurement.sites)) {
 		if ((guard === 'runtime' || guard === 'all') && siteResult.runtimeModules) {
 			next.runtimeModules ??= {};
