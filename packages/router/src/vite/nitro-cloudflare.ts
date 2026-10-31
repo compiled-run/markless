@@ -256,3 +256,37 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 		},
 	};
 }
+
+const PUBLIC_ASSETS_DATA = '#nitro/virtual/public-assets-data';
+const EMPTY_PUBLIC_ASSETS = '\0markless-router:cloudflare-public-assets';
+
+/**
+ * Nitro lists every public file, with its etag and size, in the server bundle so a request for one can be forwarded to
+ * the assets. Cloudflare serves those files before the Worker runs, so the Worker drops the list (2.7 MB to parse on
+ * every cold isolate for 11,664 files), unless an app's run_worker_first sends asset URLs to the Worker.
+ */
+export function cloudflareWorkerTrimPlugin(): Plugin {
+	let keepTable = false;
+	return {
+		name: 'markless-router:cloudflare-worker-trim',
+		apply: 'build',
+		async configResolved(config) {
+			for (const name of ['wrangler.json', 'wrangler.jsonc', 'wrangler.toml']) {
+				const text = await readFile(join(config.root, name), 'utf8').catch(() => '');
+				if (/run_worker_first/.test(text)) keepTable = true;
+			}
+		},
+		applyToEnvironment: (environment) =>
+			environment.name === 'nitro' &&
+			environment.config.resolve.conditions.includes('workerd'),
+		resolveId: {
+			order: 'pre',
+			handler(source) {
+				if (source === PUBLIC_ASSETS_DATA && !keepTable) return EMPTY_PUBLIC_ASSETS;
+			},
+		},
+		load(id) {
+			if (id === EMPTY_PUBLIC_ASSETS) return 'export default {};';
+		},
+	};
+}

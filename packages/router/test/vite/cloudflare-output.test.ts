@@ -394,3 +394,15 @@ test('CommonJS code that reads __filename as it loads runs in the Worker', async
 	expect(response.status).toBe(200);
 	expect(await response.json()).toEqual({ where: 'string:string' });
 });
+
+test('the Worker carries no list of the uploaded files, which Cloudflare serves before it runs', async () => {
+	const serverDir = join(root, '.output/server');
+	const code = await Promise.all(
+		(await readdir(serverDir, { recursive: true }))
+			.filter((file) => file.endsWith('.mjs'))
+			.map((file) => readFile(join(serverDir, file), 'utf8')),
+	);
+	expect(code.some((source) => source.includes('../public/guide.html'))).toBe(false);
+	expect((await get('/guide')).status).toBe(200);
+	expect((await get('/no-such-page')).status).toBe(404);
+});
