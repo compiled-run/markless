@@ -20,6 +20,9 @@ export { isEventAttribute, normalizeEventName } from './ast/events.ts';
 export {
 	callsImportedOrFreeName,
 	importedOrFreeNameCalls,
+	moduleCallFacts,
+	type AnalyzedNode,
+	type ModuleCallFacts,
 	type ImportedOrFreeNameCall,
 } from './module-free-calls.ts';
 export { LEAN_DISPATCH_MARKER_MODULES } from './lean-dispatch-modules.ts';
