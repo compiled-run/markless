@@ -1210,10 +1210,12 @@ function announcePage(d: Document, leftName: string): void {
 	const body = d.body;
 	const w = d.defaultView;
 	if (!body || !w) return;
-	const name = pageName(d);
-	if (!name || name === leftName) return;
 	const slot = d as unknown as Record<string, Announcer | undefined>;
 	let announcer = slot[ANNOUNCER];
+	// A pending announcement names the page being left.
+	if (announcer) w.clearTimeout(announcer.timer);
+	const name = pageName(d);
+	if (!name || name === leftName) return;
 	if (!announcer) {
 		const host = d.createElement('markless-route-announcer');
 		host.style.cssText = 'position:absolute';
@@ -1227,7 +1229,6 @@ function announcePage(d: Document, leftName: string): void {
 	}
 	const { region } = announcer;
 	const host = (region.getRootNode() as ShadowRoot).host;
-	w.clearTimeout(announcer.timer);
 	if (host.isConnected) {
 		region.textContent = name;
 		return;
