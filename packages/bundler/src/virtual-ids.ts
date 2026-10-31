@@ -65,6 +65,14 @@ export function devBrowserSourceModuleUrl(
 	return publicPath ? publicPath(path) : joinURL('/', path);
 }
 
+export function devBrowserFileUrl(
+	file: string,
+	publicPath: ((fileName: string) => string) | undefined,
+) {
+	const path = joinURL('@fs', withoutLeadingSlash(pathname(file)));
+	return publicPath ? publicPath(path) : joinURL('/', path);
+}
+
 export function devBrowserVirtualModuleUrl(
 	virtualId: string,
 	publicPath: ((fileName: string) => string) | undefined,
@@ -311,6 +319,10 @@ export function resolveVirtualId(id: string) {
 	}
 
 	return `\0${id}`;
+}
+
+export function isMarklessVirtualId(id: string): boolean {
+	return id.replace(/^\0/, '').startsWith(MARKLESS_VIRTUAL_PREFIX);
 }
 
 export function pathname(id: string) {

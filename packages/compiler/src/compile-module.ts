@@ -677,6 +677,7 @@ function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
 		styleScopes: [],
+		stylesheetImports: [],
 		diagnostics: [],
 	};
 }

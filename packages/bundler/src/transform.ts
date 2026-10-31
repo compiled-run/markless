@@ -797,7 +797,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		),
 	];
 
-	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
+	const stylesheetImports = await resolvedStylesheetImports(
+		compiled.publicRenderPlan.stylesheetImports,
+		input.resolveStylesheetImport,
+	);
+	const styleImport = [...stylesheetImports, ...(styleId ? [styleId] : [])]
+		.map((id) => `import ${JSON.stringify(id)};\n`)
+		.join('');
 	const inlineResumerSources =
 		(input.environment ?? 'lib') === 'client'
 			? undefined
@@ -807,7 +813,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				});
 	// Dev links the children's scoped styles too, so the SSR HTML is styled before any island's JS.
 	const styleModuleIds = [
-		...new Set([...(styleId ? [styleId] : []), ...(input.linkedStyleModuleIds ?? [])]),
+		...new Set([
+			...stylesheetImports,
+			...(styleId ? [styleId] : []),
+			...(input.linkedStyleModuleIds ?? []),
+		]),
 	];
 	const styleModuleUrl = input.styleModuleUrl;
 	const headInjections = [
@@ -915,6 +925,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
+		stylesheetImports,
 		artifactChildren: artifactChildCandidates(compiled),
 		propFlow: modulePropFlow(compiled, moduleDiagnostics(compiled)),
 		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
@@ -1673,4 +1684,12 @@ function authorsPendingArm(markup: {
 				(slot.armTemplateIds as { readonly pending?: string }).pending !== undefined,
 		),
 	);
+}
+
+async function resolvedStylesheetImports(
+	requests: ReadonlyArray<string>,
+	resolve: TransformTsrxModuleInput['resolveStylesheetImport'],
+): Promise<ReadonlyArray<string>> {
+	const ids = await Promise.all(requests.map(async (request) => (await resolve?.(request)) ?? request));
+	return [...new Set(ids)];
 }

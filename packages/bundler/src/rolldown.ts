@@ -203,6 +203,9 @@ export function createMarklessRolldownPlugin(input: {
 			enableChunkImportMap: () => {
 				internalOptions.chunkImportMap = true;
 			},
+			deliverStylesheetsInDocuments: () => {
+				internalOptions.documentStylesheets = true;
+			},
 			declareServerOnlyProps: (
 				resolve: InternalMarklessRolldownOptions['serverOnlyProps'],
 			) => {

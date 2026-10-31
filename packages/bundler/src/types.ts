@@ -103,6 +103,8 @@ export interface TransformTsrxModuleInput {
 	settleModuleUrl?: string;
 	headInjections?: GlobalInjections[];
 	styleModuleUrl?: (virtualModuleId: string) => string;
+	/** Resolves a stylesheet the module imports for its effect to the id it builds from. */
+	resolveStylesheetImport?: (request: string) => Promise<string | undefined>;
 	/** Scoped-style modules of the linked children, so a dev page links its whole tree. */
 	linkedStyleModuleIds?: readonly string[];
 	executionLog?: MarklessExecutionLogMode;
@@ -130,6 +132,8 @@ export interface TransformTsrxModuleResult {
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
+	/** The resolved ids of the stylesheets the module imports for their effect, in source order. */
+	stylesheetImports: ReadonlyArray<string>;
 	artifactChildren: ReadonlyArray<ArtifactChildCandidate>;
 	propFlow?: import('./prop-flow.ts').ModulePropFlow;
 	/** Imported constants a prop reads that this compile was not given. */
@@ -259,6 +263,8 @@ export type MarklessRolldownPluginApi = {
 	chunkImportMap: () => boolean;
 	/** A plugin that writes every document the app serves turns chunk import maps on. */
 	enableChunkImportMap: () => void;
+	/** A plugin whose documents carry every stylesheet their pages' code can load: a dynamic import then waits for none. */
+	deliverStylesheetsInDocuments: () => void;
 	/** A host plugin names, per root-relative module id, the props browser code must never read. */
 	declareServerOnlyProps: (
 		resolve: (moduleId: string) => SemanticGraphInput['serverOnlyProps'],

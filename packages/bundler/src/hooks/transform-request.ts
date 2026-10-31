@@ -11,9 +11,11 @@ import { transformCompileInput } from '../transform.ts';
 import type { MarklessEnvironment, TransformTsrxModuleInput } from '../types.ts';
 import {
 	MARKLESS_ROUTE_SOURCE_QUERY_RE,
+	devBrowserFileUrl,
 	devBrowserSourceModuleUrl,
 	devBrowserVirtualModuleUrl,
 	isClientPrimarySourceRequest,
+	isMarklessVirtualId,
 	isPrerenderWakeSourceRequest,
 	isRenderDataSourceRequest,
 	isResumeSourceRequest,
@@ -169,14 +171,18 @@ export function planTransformHookRequest(
 				: undefined,
 		styleModuleUrl:
 			internalOptions.dev === true && currentEnvironment === 'server'
-				? (virtualId) =>
+				? (styleModuleId) =>
 						withQuery(
-							devBrowserVirtualModuleUrl(virtualId, internalOptions.publicPath),
+							isMarklessVirtualId(styleModuleId)
+								? devBrowserVirtualModuleUrl(styleModuleId, internalOptions.publicPath)
+								: devBrowserFileUrl(styleModuleId, internalOptions.publicPath),
 							{
 								direct: null,
 							},
 						)
 				: undefined,
+		resolveStylesheetImport: async (request) =>
+			(await pluginContext.resolve(request, source))?.id,
 		headInjections:
 			internalOptions.dev === true && currentEnvironment === 'server'
 				? internalOptions.devInjections
