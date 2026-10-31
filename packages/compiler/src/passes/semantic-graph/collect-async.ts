@@ -438,8 +438,6 @@ function postAwaitGraphReads(
 							? { awaitedSegment: expressionSource(property, state.source) }
 							: {}),
 					});
-					visit(property);
-					return;
 				}
 				visit(property);
 			}
@@ -460,7 +458,7 @@ function postAwaitGraphReads(
 
 	visit(node);
 
-	return uniqueBy(reads, (read) => read.read.source);
+	return uniqueBy(reads, (read) => `${read.read.sourceSpan?.start}:${read.read.source}`);
 }
 
 /** The graph read a computed member hangs off: `items` in `items[k]`, `a.b` in `a.b[k].c`. */

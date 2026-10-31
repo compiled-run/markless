@@ -1054,6 +1054,39 @@ export function App() @{
 	);
 });
 
+test('buildSemanticGraph reports an awaited key inside a longer member chain and a shadowed repeat', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let shelf = state({ a1: { label: 'apple' } } as Record<string, { label: string }>);
+	const label = computed(async () => {
+		const key = 'a1';
+		const res = await fetch('/pick');
+		const first = shelf[key];
+		const late = (() => {
+			const key = res.id;
+			return shelf[key];
+		})();
+		return first.label + late.label + shelf[res.id]['label'];
+	});
+
+	@try {
+		<p>{label}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Shelf.tsrx', source });
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.primarySpan?.start).sort()).toEqual(
+		[source.lastIndexOf('shelf[key]'), source.indexOf('shelf[res.id]')].sort(),
+	);
+});
+
 test('buildSemanticGraph allows a post-await computed key settled before the await', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/SettledKey.tsrx',
