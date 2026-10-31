@@ -14,6 +14,9 @@ let maxEntries = DEFAULT_MAX_ENTRIES;
 // Outer key is the source text itself: stringifying it into every key cost more than the compiles the memo saved.
 const compiles = new Map<string, Map<string, Promise<CompileTsrxModuleResult>>>();
 let entries = 0;
+// Experiment branch only: bounds the memo by source characters.
+const maxSourceChars = Number(process.env.L4_MEMO_CHARS ?? Number.POSITIVE_INFINITY);
+let sourceChars = 0;
 
 // Sorted, because the two requests for one module build their interface records
 // in whatever order they resolved imports; the values are compiler artifacts,
@@ -125,6 +128,7 @@ export function memoizedCompile(
 	if (!bySource) compiles.set(input.source, (bySource = new Map()));
 	bySource.set(key, pending);
 	entries++;
+	sourceChars += input.source?.length ?? 0;
 	// A throwing compile is not remembered: the transform hook answers one by
 	// recompiling against a wider link input, and a stored rejection nobody
 	// awaits again would also surface as an unhandled rejection.
@@ -133,14 +137,16 @@ export function memoizedCompile(
 		if (owner.get(key) === pending) {
 			owner.delete(key);
 			entries--;
+			sourceChars -= input.source?.length ?? 0;
 			if (owner.size === 0 && compiles.get(input.source) === owner)
 				compiles.delete(input.source);
 		}
 	});
 	for (const [source, oldest] of compiles) {
-		if (entries <= maxEntries || oldest === owner) break;
+		if ((entries <= maxEntries && sourceChars <= maxSourceChars) || oldest === owner) break;
 		compiles.delete(source);
 		entries -= oldest.size;
+		sourceChars -= (source?.length ?? 0) * oldest.size;
 	}
 	return pending;
 }
@@ -148,6 +154,7 @@ export function memoizedCompile(
 export function clearCompileCache(): void {
 	compiles.clear();
 	entries = 0;
+	sourceChars = 0;
 }
 
 /** Bounds the memo to `limit` entries (the default when undefined) and returns the bound it replaced. */
