@@ -1152,7 +1152,8 @@ function renderLinkBridgeScript(
 		const args = indexed
 			? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
 			: [];
-		return `${debugBootstrap}${table}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
+		// Async: a module script waits for every one before it, so the document's own scripts would wait on this low-priority download.
+		return `${debugBootstrap}${table}<script type="module" async ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
 	}
 	const body = linkBridgeBody(
 		resumeEntryPath,
