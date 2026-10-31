@@ -62,7 +62,9 @@ export * from ${JSON.stringify(entry)};
 const shared = (request) => request.method === 'GET' && !request.headers.has('cookie') && !request.headers.has('authorization');
 const kept = (response) => {
 	const control = response.headers.get('cache-control') ?? '';
-	return response.status === 200 && !response.headers.has('set-cookie') && /(?:^|,)\\s*s-maxage=[1-9]/i.test(control) && !/\\b(?:private|no-store)\\b/i.test(control);
+	// Cloudflare's cache keys on the URL alone: an answer that varies on anything but its encoding is never shared.
+	const vary = (response.headers.get('vary') ?? '').split(',').map((name) => name.trim().toLowerCase()).filter(Boolean);
+	return response.status === 200 && !response.headers.has('set-cookie') && /(?:^|,)\\s*s-maxage=[1-9]/i.test(control) && !/\\b(?:private|no-store)\\b/i.test(control) && vary.every((name) => name === 'accept-encoding');
 };
 export default {
 	...worker,

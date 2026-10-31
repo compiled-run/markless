@@ -117,6 +117,7 @@ beforeAll(async () => {
 			'\tanswers++;',
 			"\tconst headers = { 'cache-control': 'public, max-age=0, s-maxage=600' };",
 			"\tif (event.url.searchParams.has('session')) headers['set-cookie'] = 'sid=1';",
+			"\tif (event.url.searchParams.has('lang')) headers.vary = 'Accept-Language';",
 			'\treturn Response.json({ answers }, { headers });',
 			'};',
 		].join('\n'),
@@ -421,6 +422,8 @@ test('a Worker answer marked for shared caches is answered from the edge cache f
 	expect(await answers('/api/counted?a=2')).toBeGreaterThan(first);
 	const fresh = await answers('/api/counted?a=1', { headers: { cookie: 'sid=2' } });
 	expect(fresh).toBeGreaterThan(first);
+	const varied = await answers('/api/counted?lang=1');
+	expect(await answers('/api/counted?lang=1')).toBeGreaterThan(varied);
 	const cookie = await answers('/api/counted?session=1');
 	expect(await answers('/api/counted?session=1')).toBeGreaterThan(cookie);
 });
