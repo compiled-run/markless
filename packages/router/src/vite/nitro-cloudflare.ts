@@ -217,7 +217,7 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 			environment.config.resolve.conditions.includes('workerd'),
 		resolveId: {
 			order: 'pre',
-			async handler(source, importer) {
+			async handler(source, importer, options) {
 				if (!importer || !/^(?:@[\w.-]+\/)?[\w.-]+(?:\/|$)/.test(source)) return;
 				const parts = source.split('/');
 				const name = source.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!;
@@ -233,7 +233,14 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 				if (!entry || typeof entry !== 'object' || !('node' in entry)) return;
 				if (Object.keys(entry).some((condition) => WORKER_CONDITIONS.includes(condition)))
 					return;
-				const node = conditionTarget(entry.node, ['node', 'import', 'module', 'default']);
+				const required =
+					(options as { kind?: string } | undefined)?.kind === 'require-call';
+				const node = conditionTarget(
+					entry.node,
+					required
+						? ['node', 'require', 'default']
+						: ['node', 'import', 'module', 'default'],
+				);
 				return node ? resolve(found.root, node) : undefined;
 			},
 		},

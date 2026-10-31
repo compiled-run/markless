@@ -1,5 +1,15 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+	cp,
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	realpath,
+	rm,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -9,7 +19,11 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
-import { pruneRenderedPages, workerFirstPatterns } from '../../src/vite/nitro-cloudflare.ts';
+import {
+	cloudflareNodeBuildsPlugin,
+	pruneRenderedPages,
+	workerFirstPatterns,
+} from '../../src/vite/nitro-cloudflare.ts';
 import { FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
 
 // A Nitro `cloudflare-module` build served by wrangler's local workerd, which applies Workers static
@@ -315,3 +329,37 @@ test('a dependency with only a Node build and a default one runs its Node build 
 	expect(await response.json()).toEqual({ path: '/a/b' });
 });
 
+test('a require of such a package gets its Node require build, an import its Node import build', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'markless-cloudflare-node-'));
+	try {
+		const pkg = join(dir, 'node_modules/dual');
+		await mkdir(pkg, { recursive: true });
+		await writeFile(
+			join(pkg, 'package.json'),
+			JSON.stringify({
+				name: 'dual',
+				exports: {
+					node: { import: './node.mjs', require: './node.cjs' },
+					default: './default.js',
+				},
+			}),
+		);
+		const hook = cloudflareNodeBuildsPlugin().resolveId as {
+			handler: (
+				source: string,
+				importer: string,
+				options: { kind: string },
+			) => Promise<string | undefined>;
+		};
+		const importer = join(dir, 'api.ts');
+		const real = await realpath(pkg);
+		expect(await hook.handler('dual', importer, { kind: 'import-statement' })).toBe(
+			join(real, 'node.mjs'),
+		);
+		expect(await hook.handler('dual', importer, { kind: 'require-call' })).toBe(
+			join(real, 'node.cjs'),
+		);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
