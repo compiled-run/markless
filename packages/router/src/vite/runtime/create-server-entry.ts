@@ -937,15 +937,15 @@ function takeHeadModulePreloads(html: string): {
 
 // Steps over comments and raw-text elements whole; captures a script's attributes and a link tag.
 const HEAD_ORDER_SCAN =
-	/<!--[\s\S]*?-->|<script\b([^>]*)>[\s\S]*?<\/script\s*>|<(style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\2\s*>|(<link\b[^>]*>)/gi;
+	/<!--[\s\S]*?-->|<script\b((?:[^"'>]|"[^"]*"|'[^']*')*)>[\s\S]*?<\/script\s*>|<(style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\2\s*>|(<link\b(?:[^"'>]|"[^"]*"|'[^']*')*>)/gi;
 
 // WebKit holds first paint for modulepreloads above a stylesheet, yet a classic head script waits for every stylesheet above it:
 // the preloads go after the stylesheets that come before the first such script.
 function insertHeadModulePreloads(html: string, importMap: string, preloads: string): string {
 	if (!preloads) return html;
 	const start = importMap ? html.indexOf(importMap) + importMap.length : headContentStart(html);
-	const headEnd = html.indexOf('</head>', start);
-	const head = html.slice(start, headEnd === -1 ? html.length : headEnd);
+	const headEnd = html.slice(start).search(/<\/head\s*>/i);
+	const head = headEnd === -1 ? html.slice(start) : html.slice(start, start + headEnd);
 	let at = 0;
 	for (const match of head.matchAll(HEAD_ORDER_SCAN)) {
 		if (match[1] !== undefined && isParserBlockingScript(match[1])) break;

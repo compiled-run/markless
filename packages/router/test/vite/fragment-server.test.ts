@@ -204,6 +204,22 @@ test('a classic head script keeps every modulepreload ahead of it, even with a s
 	}
 });
 
+test('a ">" inside a quoted stylesheet attribute does not split the tag, and an uppercase head end keeps the preloads in the head', async () => {
+	const stylesheet = '<link rel="stylesheet" href="/a.css" title="wide > narrow">';
+	const served = entry({
+		importMap: '<script type="importmap">{"imports":{}}</script>',
+		shell: `<html><head><meta charset="utf-8">${stylesheet}<title>Shell</title></HEAD><body><link rel="stylesheet" href="/body.css">__children__</body></html>`,
+	});
+	const html = await (await served.fetch(new Request('https://app.test/'))).text();
+	expect(html).toContain(stylesheet);
+	const preloads = [...html.matchAll(/<link rel="modulepreload"[^>]*>/g)];
+	expect(preloads.length).toBeGreaterThan(0);
+	for (const preload of preloads) {
+		expect(preload.index).toBeGreaterThan(html.indexOf(stylesheet));
+		expect(preload.index).toBeLessThan(html.indexOf('<body'));
+	}
+});
+
 test('a modulepreload written as text inside a head script, style or comment stays where it is', async () => {
 	const script = `<script>document.head.insertAdjacentHTML('beforeend', '<link rel="modulepreload" href="/widget.js">')</script>`;
 	const style = '<style>/* <link rel="modulepreload" href="/in-style.js"> */</style>';
