@@ -90,7 +90,7 @@ export function codeTextEdits(root: string): Map<string, Record<string, number>>
 					)
 						next = nameOf(node.key as Node) ?? owner;
 				}
-				if (next !== owner) flags = { search: false, splice: false };
+				if (fn || next !== owner) flags = { search: false, splice: false };
 				if (node.type === 'CallExpression') {
 					const member = memberName(node.callee as Node);
 					if (member === 'replace' || member === 'replaceAll') add(next, member);
@@ -100,7 +100,8 @@ export function codeTextEdits(root: string): Map<string, Record<string, number>>
 				if (node.type === 'NewExpression' && nameOf(node.callee as Node) === 'RegExp')
 					add(next, 'RegExp');
 				for (const child of children(node)) visit(child, next, flags);
-				if (next !== owner && flags.search && flags.splice) add(next, 'search-splice');
+				if ((fn || next !== owner) && flags.search && flags.splice)
+					add(next, 'search-splice');
 			};
 			const top = { search: false, splice: false };
 			visit(program as unknown as Node, '<module>', top);

@@ -51,6 +51,7 @@ test('the scan sees a regex replace, a RegExp and a searched splice', async () =
 			'export function strip(code: string) { return code.replace(/,l\\(\\),/g, ","); }',
 			'export const find = (name: string) => new RegExp(name);',
 			'export function cut(code: string) { const at = code.indexOf("x"); return code.slice(0, at); }',
+			'export const parts = [(code: string) => code.indexOf("x"), (code: string) => code.slice(1)];',
 		].join('\n'),
 	);
 	expect(Object.fromEntries(codeTextEdits(scratch))).toEqual({

@@ -361,10 +361,6 @@
 		"search-splice": 1,
 		"kind": "unreviewed"
 	},
-	"packages/bundler/src/render-data-literals.ts#factorUncached": {
-		"search-splice": 1,
-		"kind": "unreviewed"
-	},
 	"packages/bundler/src/source-module.ts#emitLoadSymbol": {
 		"replace": 1,
 		"kind": "unreviewed"
@@ -807,7 +803,6 @@
 	},
 	"packages/router/src/vite/nitro-cloudflare.ts#pruneRenderedPages": {
 		"replace": 1,
-		"search-splice": 1,
 		"kind": "edits-emitted-chunks"
 	},
 	"packages/router/src/vite/nitro-cloudflare.ts#servedAsFile": {
