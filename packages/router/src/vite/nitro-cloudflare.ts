@@ -177,6 +177,13 @@ const WORKER_CONDITIONS = ['workerd', 'worker', 'browser'];
 
 type ExportsEntry = string | { readonly [condition: string]: ExportsEntry } | null | undefined;
 
+function hasWorkerBuild(entry: ExportsEntry): boolean {
+	if (!entry || typeof entry !== 'object') return false;
+	return Object.entries(entry).some(
+		([condition, value]) => WORKER_CONDITIONS.includes(condition) || hasWorkerBuild(value),
+	);
+}
+
 function conditionTarget(entry: ExportsEntry, conditions: readonly string[]): string | undefined {
 	if (typeof entry === 'string') return entry;
 	if (!entry || typeof entry !== 'object') return undefined;
@@ -241,8 +248,7 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 						? exportsMap
 						: undefined;
 				if (!entry || typeof entry !== 'object' || !('node' in entry)) return;
-				if (Object.keys(entry).some((condition) => WORKER_CONDITIONS.includes(condition)))
-					return;
+				if (hasWorkerBuild(entry)) return;
 				const required =
 					(options as { kind?: string } | undefined)?.kind === 'require-call';
 				const node = conditionTarget(

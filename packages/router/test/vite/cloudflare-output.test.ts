@@ -379,6 +379,21 @@ test('a require of such a package gets its Node require build, an import its Nod
 			join(dir, 'package.json'),
 			JSON.stringify({ name: 'app', exports: { node: './x.js' } }),
 		);
+		const nested = join(dir, 'node_modules/nested');
+		await mkdir(nested, { recursive: true });
+		await writeFile(
+			join(nested, 'package.json'),
+			JSON.stringify({
+				name: 'nested',
+				exports: {
+					node: './node.js',
+					import: { workerd: './worker.js', default: './default.js' },
+				},
+			}),
+		);
+		expect(
+			await hook.handler('nested', importer, { kind: 'import-statement' }),
+		).toBeUndefined();
 		for (const relative of ['./dual', '../dual', '..', '.'])
 			expect(
 				await hook.handler(relative, join(dir, 'src/api.ts'), { kind: 'import-statement' }),
