@@ -4,6 +4,12 @@ import {
 	stripEmptyVitePreloadWrappers,
 } from '../src/build/preload-cleanup.ts';
 
+// The bundle pass names the helper its own chunk defines from the chunk that renders Vite's helper module.
+const definesHelper = (local: string) => ({
+	fileName: 'build/chunk-a.js',
+	helpers: [{ fileName: 'build/chunk-a.js', locals: [local], exports: [] }],
+});
+
 describe('Vite preload cleanup', () => {
 	test('removes empty dynamic import preload wrappers without touching the import', () => {
 		const code =
@@ -57,7 +63,7 @@ describe('Vite preload cleanup', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";var A=e((()=>{})),O,k,S,p,M=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}));async function load(id){return p(()=>import("./chunk.js").then(e=>e.symbol),[],import.meta.url)}var F=e((()=>{M()})),I=e((()=>{F()}));e((()=>{A(),I()}))();';
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";var A=e((()=>{}));async function load(id){return import("./chunk.js").then(e=>e.symbol)}e((()=>{A()}))();',
 		);
 	});
@@ -155,7 +161,7 @@ describe('Vite preload cleanup', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";var O,k,S,p,M=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}));async function load(){let{createRuntimeGraph:e}=await p(async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}},[]);return e({cells:[]})}var F=e((()=>{M()})),I=e((()=>{F()}));e((()=>{I()}))();';
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";async function load(){let{createRuntimeGraph:e}=await (async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}})();return e({cells:[]})}e((()=>{}))();',
 		);
 	});
@@ -164,7 +170,7 @@ describe('Vite preload cleanup', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";var T=e((()=>{})),O,k,S,p,A=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}));async function load(){let{createRuntimeGraph:e}=await p(async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}},[]);return e({cells:[]})}var z=e((()=>{T(),A()})),B=e((()=>{z()})),H=e((()=>{})),G=e((()=>{A()})),K=e((()=>{H(),G()}));e((()=>{B(),K()}))();';
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";var T=e((()=>{}));async function load(){let{createRuntimeGraph:e}=await (async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}})();return e({cells:[]})}var z=e((()=>{T()})),B=e((()=>{z()})),H=e((()=>{})),G=e((()=>{})),K=e((()=>{H(),G()}));e((()=>{B(),K()}))();',
 		);
 	});
@@ -195,7 +201,7 @@ describe('Vite preload cleanup', () => {
 			'A=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}))';
 		const code = `import{__esmMin as e}from"./shared.js";var T=e((()=>{})),O,k,S,p,${helper};async function load(){let{run:e}=await p(async()=>{let{run:e}=await import("./graph.js");return{run:e}},[]);return e()}function close(d){let A=d.undo;d.cleanup=()=>{d.x(),A(),d.y()}}var z=e((()=>{T(),A()}));e((()=>{z()}))();`;
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";var T=e((()=>{}));async function load(){let{run:e}=await (async()=>{let{run:e}=await import("./graph.js");return{run:e}})();return e()}function close(d){let A=d.undo;d.cleanup=()=>{d.x(),A(),d.y()}}var z=e((()=>{T()}));e((()=>{z()}))();',
 		);
 	});
@@ -282,10 +288,24 @@ describe('Vite preload cleanup', () => {
 		expect(
 			stripEmptyVitePreloadWrappers(code, {
 				fileName: 'build/chunk-u.js',
-				helpers: [{ fileName: 'build/chunk-h.js', exports: ['E'] }],
+				helpers: [{ fileName: 'build/chunk-h.js', locals: ['s'], exports: ['E'] }],
 			}),
 		).toBe(
 			'import{D as r,E as i}from"./chunk-h.js";const a=()=>import(`./a.js`);const b=()=>r(()=>import(`./b.js`),[]);',
 		);
+	});
+
+	test('keeps a wrapper whose deps argument runs code', () => {
+		const code =
+			'import{__vitePreload as p}from"./preload.js";const a=()=>p(()=>import("./a.js"),void recordLoad());';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
+	test('leaves a function that only resembles the helper alone without the chunk rendering Vite’s helper module', () => {
+		const code =
+			'function recover(e,t){window.dispatchEvent(new Event(`vite:preloadError`));return e()}const a=()=>recover(()=>import("./a.js"),[]);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
 	});
 });

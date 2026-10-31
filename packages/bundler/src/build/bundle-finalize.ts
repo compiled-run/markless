@@ -317,14 +317,19 @@ function preloadHelperChunks(
 	chunks: ReadonlyArray<{ readonly fileName: string; readonly code: string }>,
 ): PreloadHelperExports[] {
 	return chunks.flatMap((chunk) => {
-		const defined = definedPreloadHelpers(chunk.code);
-		if (defined.length === 0) return [];
-		const exported = [...(chunkLocalExportSpecifiers(chunk.fileName, chunk.code) ?? [])]
-			.filter(([, local]) => defined.includes(local))
+		const moduleIds = (chunk as { readonly moduleIds?: readonly string[] }).moduleIds ?? [];
+		if (!moduleIds.includes(VITE_PRELOAD_HELPER_ID)) return [];
+		const locals = definedPreloadHelpers(chunk.code);
+		if (locals.length === 0) return [];
+		const exports = [...(chunkLocalExportSpecifiers(chunk.fileName, chunk.code) ?? [])]
+			.filter(([, local]) => locals.includes(local))
 			.map(([name]) => name);
-		return exported.length ? [{ fileName: chunk.fileName, exports: exported }] : [];
+		return [{ fileName: chunk.fileName, locals, exports }];
 	});
 }
+
+// The module Vite's import analysis injects; the chunk that renders it defines the helper.
+const VITE_PRELOAD_HELPER_ID = '\0vite/preload-helper.js';
 
 function prefetchDynamicImportParses(bundle: Record<string, unknown>): Promise<void> {
 	return prefetchChunkDynamicImports(

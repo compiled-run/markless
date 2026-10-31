@@ -14,6 +14,9 @@ import { applyCodeEdits, type CodeEdit } from './code-edits.ts';
 /** Where a bundle defines Vite's preload helper, and the names that chunk exports it under. */
 export type PreloadHelperExports = {
 	readonly fileName: string;
+	/** The module-scope names the helper has in that chunk. */
+	readonly locals: readonly string[];
+	/** The names that chunk exports it under. */
 	readonly exports: readonly string[];
 };
 
@@ -124,10 +127,8 @@ function unwrapEmptyPreloadCalls(code: string, context?: PreloadWrapperContext):
 		return code;
 	const facts = moduleCallFacts(code);
 	if (!facts) return code;
-	const helpers = new Set([
-		...importedPreloadHelpers(facts, context),
-		...definedPreloadHelpers(code, facts),
-	]);
+	const own = context?.helpers.find((helper) => helper.fileName === context.fileName);
+	const helpers = new Set([...importedPreloadHelpers(facts, context), ...(own?.locals ?? [])]);
 	const edits: CodeEdit[] = [];
 	for (const helper of helpers)
 		for (const { call } of facts.callsTo(helper)) {
@@ -141,7 +142,9 @@ function emptyPreloadUnwrap(code: string, call: AnalyzedNode): CodeEdit | undefi
 	const [loader, deps, base, ...rest] = call.arguments as readonly AnalyzedNode[];
 	if (!loader || !deps || rest.length > 0) return undefined;
 	const noDeps =
-		(deps.type === 'UnaryExpression' && deps.operator === 'void') ||
+		(deps.type === 'UnaryExpression' &&
+			deps.operator === 'void' &&
+			(deps.argument as AnalyzedNode).type === 'Literal') ||
 		(deps.type === 'ArrayExpression' && (deps.elements as readonly unknown[]).length === 0);
 	if (!noDeps || (base && code.slice(base.start, base.end) !== 'import.meta.url'))
 		return undefined;
