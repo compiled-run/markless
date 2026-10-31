@@ -119,7 +119,9 @@ describe('TSRX Rolldown plugin structure', () => {
 		).toMatchObject({
 			preserveEntrySignatures: 'strict',
 		});
-		expect(callOptions(marklessServer(), {})).toEqual({});
+		expect(callOptions(marklessServer(), {})).toEqual({
+			experimental: { attachDebugInfo: 'none' },
+		});
 		expect(callOptions(marklessLib(), {})).toEqual({});
 	});
 

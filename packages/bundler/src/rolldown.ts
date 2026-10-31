@@ -253,12 +253,24 @@ export function createMarklessRolldownPlugin(input: {
 		name,
 		options(input: InputOptions) {
 			const currentEnvironment = getEnvironment(this);
+			if (currentEnvironment === 'lib') return input;
+			// Debug region comments name each module by its id, and Markless's virtual ids carry source paths.
+			const withoutRegions: InputOptions =
+				internalOptions.dev === true
+					? input
+					: {
+							...input,
+							experimental: {
+								...input.experimental,
+								attachDebugInfo: input.experimental?.attachDebugInfo ?? 'none',
+							},
+						};
 			if (currentEnvironment !== 'client') {
-				return input;
+				return withoutRegions;
 			}
 
 			return {
-				...input,
+				...withoutRegions,
 				preserveEntrySignatures: packing
 					? 'allow-extension'
 					: (input.preserveEntrySignatures ?? 'allow-extension'),

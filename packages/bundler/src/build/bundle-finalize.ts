@@ -38,7 +38,6 @@ import {
 import type { ModuleMetadataRegistry } from '../module-metadata-registry.ts';
 import { chunkImportMapEnabled, nativePackingEnabled } from '../packing-option.ts';
 import { rootRelativeId } from '../module-id.ts';
-import { rootRelativeRegionComments } from './machine-paths.ts';
 import { resortInteractionClosuresFiles } from './interaction-closures.ts';
 import { withoutFirstUse } from '../source-module.ts';
 import type { MarklessRolldownOptions, MarklessTransformManifest } from '../types.ts';
@@ -94,7 +93,6 @@ export async function finalizeBundle(
 	const { options, moduleMetadata } = input;
 
 const renderedModules = collectRenderedModules(bundle, input.root);
-rootRelativeRegionComments(bundle, input.root);
 await stripEmptyPreloadWrappersFromChunks(bundle);
 const removedSymbolFacades = new Set(rewriteGeneratedSymbolFacadeImports(bundle));
 await prefetchDynamicImportParses(bundle);

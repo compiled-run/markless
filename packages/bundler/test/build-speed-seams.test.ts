@@ -190,3 +190,30 @@ export function Counter() @{
 		},
 	);
 });
+
+// Region comments name each module by its id; Markless's virtual ids carry the source path they compile.
+test('a production build carries no debug region comments', async () => {
+	const directory = await realpath(await mkdtemp(join(tmpdir(), 'markless-regions-')));
+	try {
+		await writeFile(
+			join(directory, 'Page.tsrx'),
+			'export default function Page() @{\n\t<main>hello</main>\n}\n',
+		);
+		await writeFile(join(directory, 'entry.js'), "export { default } from './Page.tsrx';\n");
+		const build = await rolldown({
+			input: join(directory, 'entry.js'),
+			external: [/^@markless\//],
+			plugins: [marklessServer({ rootDir: directory })],
+		});
+		try {
+			const { output } = await build.generate({ format: 'es' });
+			const code = output.map((item) => (item.type === 'chunk' ? item.code : '')).join('\n');
+			expect(code).toContain('hello');
+			expect(code).not.toContain('//#region');
+		} finally {
+			await build.close();
+		}
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
+});
