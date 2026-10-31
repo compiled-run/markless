@@ -16,7 +16,13 @@ interface CloudflareNitro {
 		hook(name: 'compiled', handler: () => Promise<void>): unknown;
 		hook(
 			name: 'rollup:before',
-			handler: (nitro: unknown, config: { output?: { codeSplitting?: unknown } }) => void,
+			handler: (
+				nitro: unknown,
+				config: {
+					output?: { codeSplitting?: unknown };
+					experimental?: Record<string, unknown>;
+				},
+			) => void,
 		): unknown;
 		hook(
 			name: 'prerender:done',
@@ -51,6 +57,9 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 					splitting.groups = splitting.groups.filter(
 						(group) => group.debugName !== 'nitro-libs',
 					);
+				// Merging shared chunks into the chunks that use them puts a route's unused modules in its way again.
+				const own = config as { experimental?: Record<string, unknown> };
+				own.experimental = { ...own.experimental, chunkOptimization: false };
 			});
 			// Nitro prerenders before it writes the Worker, so the pages are left out once it is written.
 			let prerendered = new Set<string>();
