@@ -120,6 +120,15 @@ export function crossChunkNamespaceLoad(
 	};
 }
 
+/** The text of every namespace load in `code`: the `.then(...)` after an `import()`, or a same-pack load whole. */
+export function namespaceLoadTexts(code: string): string[] {
+	if (!code.includes('.then((')) return [];
+	return [
+		...[...code.matchAll(new RegExp(CROSS_CHUNK_LOAD.source, 'g'))].map((match) => match[0]),
+		...[...code.matchAll(SAME_CHUNK_LOAD)].map((match) => match[0]),
+	];
+}
+
 /** Loads of a module from inside its own pack, which Rolldown writes without an `import()`. */
 export function sameChunkNamespaceLoads(
 	code: string,

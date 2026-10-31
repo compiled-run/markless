@@ -79,8 +79,8 @@ export function nativePackingPlugins(
 		(id) => groups.get(id),
 		(pack) => routeSets.get(pack),
 		(pack) => eagerLazyRoutes.get(pack),
-		// Builds loading one route per page collapsed every lazy load when its artifact awaited, which made facade chunks.
-		() => partitioned,
+		// A page module keeps Rolldown's namespace read: its facade chunk never collapsed, and a loader would run at landing.
+		() => (partitioned ? (id) => !MARKLESS_ROUTE_SOURCE_QUERY_RE.test(id) : undefined),
 	);
 	return [
 		{

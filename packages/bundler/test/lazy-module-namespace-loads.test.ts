@@ -1,6 +1,10 @@
 import { rolldown, type OutputChunk, type Plugin } from 'rolldown';
 import { expect, test } from 'vitest';
-import { lazyModuleFacadesPlugin } from '../src/build/lazy-module-facades.ts';
+import { collectRenderedModules } from '../src/build/byte-attribution.ts';
+import {
+	collapseLazyModuleFacades,
+	lazyModuleFacadesPlugin,
+} from '../src/build/lazy-module-facades.ts';
 import { packTopLevelPlugin } from '../src/build/pack-top-level.ts';
 import { shortExportNamesPlugin } from '../src/build/short-export-names.ts';
 import { clientRouteArtifactReference } from '../src/virtual-ids.ts';
@@ -45,7 +49,7 @@ async function build(
 			strictExecutionOrder: true,
 			minifyInternalExports: false,
 			minify: options.minify ?? false,
-			chunkFileNames: '[name].js',
+			chunkFileNames: 'chunk-[hash].js',
 			codeSplitting: {
 				groups: [
 					{
@@ -133,6 +137,19 @@ test('a lazy load Rolldown writes as a namespace read gets the same loader a fac
 	expect(loads(namespaces.chunks)).toEqual(loads(facades.chunks));
 });
 
+test('a module is measured without the namespace object its collapsed lazy loads dropped', async () => {
+	const measured = async (sources: Record<string, string>) => {
+		const { chunks } = await build(sources, lazyPack);
+		const lengths = new Map<string, number>();
+		for (const modules of collectRenderedModules(
+			Object.fromEntries(chunks.map((chunk) => [chunk.fileName, chunk])) as never,
+		).values())
+			for (const [id, length] of modules) lengths.set(id, length);
+		return ['first', 'second', 'registry'].map((id) => lengths.get(id));
+	};
+	expect(await measured(lazySources)).toEqual(await measured(withTopLevelAwait(lazySources)));
+});
+
 test('a namespace a module imports as a whole stays beside the loader built for a lazy load of it', async () => {
 	const sources: Record<string, string> = {
 		entry: 'export const load = () => import("first"); export const whole = () => import("reader");',
@@ -194,4 +211,83 @@ test('lazy namespace loads run each module once and in the order a facade load r
 	const namespaces = await run(lazySources);
 	expect(namespaces).toEqual(facades);
 	expect(namespaces.trace).toEqual(['shared', 'first', 'registry', 'second']);
+});
+
+function namespaceBundle(packCode: string, entryCode: string) {
+	return {
+		'entry.js': {
+			type: 'chunk' as const,
+			fileName: 'entry.js',
+			isEntry: true,
+			code: entryCode,
+			imports: ['rt.js'],
+			dynamicImports: ['pack.js'],
+			moduleIds: ['entry'],
+			exports: ['load'],
+		},
+		'pack.js': {
+			type: 'chunk' as const,
+			fileName: 'pack.js',
+			code: packCode,
+			imports: ['rt.js'],
+			dynamicImports: [],
+			moduleIds: ['a', 'b'],
+			exports: ['a_exports', 'bar', 'init_a', 'b_exports', 'init_b'],
+			namespaceModules: { a_exports: 'a', b_exports: 'b' },
+		},
+		'rt.js': {
+			type: 'chunk' as const,
+			fileName: 'rt.js',
+			code: 'var __exportAll = (all) => all;\nvar __esmMin = (fn) => fn;\nexport { __esmMin, __exportAll };',
+			imports: [],
+			dynamicImports: [],
+			moduleIds: ['rt'],
+			exports: ['__esmMin', '__exportAll'],
+		},
+	};
+}
+
+test('a loader reads each export from its own binding when one local is exported under another local name', () => {
+	const bundle = namespaceBundle(
+		[
+			'import { __esmMin, __exportAll } from "./rt.js";',
+			'var a_exports = /* @__PURE__ */ __exportAll({',
+			'\tx: () => foo,',
+			'\ty: () => bar',
+			'});',
+			'var foo = 1, bar = 2;',
+			'function init_a() {}',
+			'var b_exports = /* @__PURE__ */ __exportAll({ z: () => foo });',
+			'function init_b() {}',
+			'export { a_exports, b_exports, foo as bar, init_a, init_b };',
+		].join('\n'),
+		'export const load = () => import("./pack.js").then((n) => (n.init_a(), n.a_exports));',
+	);
+	collapseLazyModuleFacades(bundle, undefined, { namespaceLoads: () => true });
+	expect(bundle['pack.js'].code).toContain('get "x"(){return foo}');
+	expect(bundle['pack.js'].code).toContain('get "y"(){return bar}');
+});
+
+test('text that only reads like a same-pack namespace load stays as written', () => {
+	const bundle = namespaceBundle(
+		[
+			'import { __esmMin, __exportAll } from "./rt.js";',
+			'var a_exports = /* @__PURE__ */ __exportAll({ x: () => foo });',
+			'var foo = 1, bar = 2;',
+			'function init_a() {}',
+			'var b_exports = /* @__PURE__ */ __exportAll({ z: () => foo });',
+			'function init_b() {}',
+			'const text = "Promise.resolve().then(() => (init_a(), a_exports))";',
+			'export const later = () => Promise.resolve().then(() => (init_b(), b_exports));',
+			'export { a_exports, b_exports, foo as bar, init_a, init_b };',
+		].join('\n'),
+		'export const load = () => import("./pack.js").then((n) => (n.init_a(), n.a_exports));',
+	);
+	collapseLazyModuleFacades(bundle, undefined, { namespaceLoads: () => true });
+	expect(bundle['pack.js'].code).toContain(
+		'const text = "Promise.resolve().then(() => (init_a(), a_exports))";',
+	);
+	expect(bundle['pack.js'].code).not.toContain(
+		'Promise.resolve().then(() => (init_b(), b_exports))',
+	);
 });
