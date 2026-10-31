@@ -83,6 +83,12 @@ every page whose page and fragment URLs were both prerendered: those requests ne
 Browser code under `/build/` is static too, kept by browsers for a year. Cloudflare compresses it at
 its edge, so the router writes no `.gz` or `.br` copies for this preset.
 
+Some packages ship a Node build and a default build, and no build for Workers or browsers. Their
+default build is for runtimes without Node's APIs and can miss functions the Node build has. A Worker
+with `nodejs_compat` (Nitro's default) has those APIs, so the router bundles the Node build of such a
+package into the Worker, the code a Node server would run. A package with its own Worker or browser
+build keeps that one.
+
 Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`; Nitro merges that file
 into the one it writes.
 

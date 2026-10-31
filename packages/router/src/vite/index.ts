@@ -85,7 +85,7 @@ import {
 	serverBuildState,
 	type ServerBuildState,
 } from './nitro-prerender.ts';
-import { cloudflareModule } from './nitro-cloudflare.ts';
+import { cloudflareModule, cloudflareNodeBuildsPlugin } from './nitro-cloudflare.ts';
 import {
 	buildRouteManifestFromFileIds,
 	isPageModuleFile,
@@ -227,6 +227,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		linkBridgeFilesPlugin(navigationEntry, fragmentEntry, options),
 		devNitroClosePlugin(devNitro),
 		brotliCopiesPlugin(compressedAssets),
+		cloudflareNodeBuildsPlugin(),
 		nitroPlugins,
 	];
 }

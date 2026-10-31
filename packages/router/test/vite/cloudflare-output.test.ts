@@ -72,9 +72,35 @@ beforeAll(async () => {
 		join(root, 'package.json'),
 		'{ "name": "markless-cloudflare-test", "private": true }\n',
 	);
+	// Like unicorn-magic: its default build, for runtimes without Node's APIs, lacks what its Node build exports.
+	const nodeOnly = join(root, 'node_modules/node-build-only');
+	await mkdir(nodeOnly, { recursive: true });
+	await writeFile(
+		join(nodeOnly, 'package.json'),
+		JSON.stringify({
+			name: 'node-build-only',
+			type: 'module',
+			exports: { node: { import: './node.js' }, default: { import: './default.js' } },
+		}),
+	);
+	await writeFile(
+		join(nodeOnly, 'node.js'),
+		"import { fileURLToPath } from 'node:url';\nexport const toPath = (url) => fileURLToPath(url);\n",
+	);
+	await writeFile(join(nodeOnly, 'default.js'), 'export const other = 1;\n');
+	await mkdir(join(root, 'api'), { recursive: true });
+	await writeFile(
+		join(root, 'api/path.ts'),
+		"import { toPath } from 'node-build-only';\nexport default () => Response.json({ path: toPath('file:///a/b') });\n",
+	);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
+	await symlink(
+		resolve(packagesRoot, 'router/node_modules/nitro'),
+		join(root, 'node_modules/nitro'),
+		'dir',
+	);
 	const prerendered = ['/', '/guide', '/docs/intro'];
 	const builder = await createBuilder({
 		root,
@@ -282,3 +308,10 @@ test('pages are left out only when every environment serves prerendered URLs fro
 		workerFirstPatterns({ main: 'index.mjs', pages_build_output_dir: '..' }),
 	).toBeUndefined();
 });
+
+test('a dependency with only a Node build and a default one runs its Node build in the Worker', async () => {
+	const response = await get('/api/path');
+	expect(response.status).toBe(200);
+	expect(await response.json()).toEqual({ path: '/a/b' });
+});
+
