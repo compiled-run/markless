@@ -24,11 +24,11 @@ function memory(sources: Record<string, string>): Plugin {
 async function build(
 	sources: Record<string, string>,
 	packed: (id: string) => string | null,
-	options: { minify?: boolean } = {},
+	options: { minify?: boolean; root?: string } = {},
 ) {
 	let rendered = 0;
 	const inputs: string[] = [];
-	const facades = lazyModuleFacadesPlugin();
+	const facades = lazyModuleFacadesPlugin(() => options.root ?? '');
 	const bundle = await rolldown({
 		input: 'entry',
 		preserveEntrySignatures: 'allow-extension',
@@ -142,18 +142,34 @@ test('a lazy load Rolldown writes as a namespace read gets the same loader a fac
 	expect(loads(namespaces.chunks)).toEqual(loads(facades.chunks));
 });
 
-test('a module is measured without the namespace object its collapsed lazy loads dropped', async () => {
-	const measured = async (sources: Record<string, string>) => {
-		const { chunks } = await build(sources, lazyPack);
-		const lengths = new Map<string, number>();
-		for (const modules of collectRenderedModules(
-			Object.fromEntries(chunks.map((chunk) => [chunk.fileName, chunk])) as never,
-		).values())
-			for (const [id, length] of modules) lengths.set(id, length);
-		return ['first', 'second', 'registry'].map((id) => lengths.get(id));
-	};
-	expect(await measured(lazySources)).toEqual(await measured(withTopLevelAwait(lazySources)));
-});
+test.each([undefined, '/workspace/app'])(
+	'a module is measured without the namespace object its collapsed lazy loads dropped (root %s)',
+	async (root) => {
+		// A virtual module's bundler-minted names spell the root they were built under.
+		const virtual =
+			root && `\0virtual:markless:symbol:${encodeURIComponent(`${root}/page.tsrx`)}`;
+		const rename = (sources: Record<string, string>) =>
+			virtual
+				? Object.fromEntries(
+						Object.entries(sources).map(([id, code]) => [
+							id === 'first' ? virtual : id,
+							code.replaceAll('"first"', JSON.stringify(virtual)),
+						]),
+					)
+				: sources;
+		const measured = async (sources: Record<string, string>) => {
+			const { chunks } = await build(rename(sources), lazyPack, { root });
+			const lengths = new Map<string, number>();
+			for (const modules of collectRenderedModules(
+				Object.fromEntries(chunks.map((chunk) => [chunk.fileName, chunk])) as never,
+				root,
+			).values())
+				for (const [id, length] of modules) lengths.set(id, length);
+			return [virtual ?? 'first', 'second', 'registry'].map((id) => lengths.get(id));
+		};
+		expect(await measured(lazySources)).toEqual(await measured(withTopLevelAwait(lazySources)));
+	},
+);
 
 test('a namespace a module imports as a whole stays beside the loader built for a lazy load of it', async () => {
 	const sources: Record<string, string> = {

@@ -1245,11 +1245,12 @@ function collectNamespaceLoads(
 			nodes.push({ start: load.start, end: load.end, specifier: key, plain: true });
 			// A facade chunk's load was `import("./facade.js")`: what the namespace read writes beyond it.
 			const text = chunk.code.slice(read ?? load.start, load.end);
+			const measured = withoutMachinePaths(text, root).length;
 			collapsedLoadChars.set(
 				text,
 				read === undefined
-					? text.length - `import("./${basename(target.fileName)}")`.length
-					: text.length,
+					? measured - `import("./${basename(target.fileName)}")`.length
+					: measured,
 			);
 		}
 		imports.set(chunk.fileName, nodes);
