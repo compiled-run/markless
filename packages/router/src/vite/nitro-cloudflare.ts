@@ -228,7 +228,7 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 		resolveId: {
 			order: 'pre',
 			async handler(source, importer, options) {
-				if (!importer || !/^(?:@[\w.-]+\/)?[\w.-]+(?:\/|$)/.test(source)) return;
+				if (!importer || !/^(?:@[\w-][\w.-]*\/)?[\w-][\w.-]*(?:\/|$)/.test(source)) return;
 				const parts = source.split('/');
 				const name = source.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!;
 				const found = await installedPackage(name, importer.split('?')[0]!);

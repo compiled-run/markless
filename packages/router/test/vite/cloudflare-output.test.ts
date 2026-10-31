@@ -375,6 +375,15 @@ test('a require of such a package gets its Node require build, an import its Nod
 		expect(await hook.handler('dual', importer, { kind: 'require-call' })).toBe(
 			join(real, 'node.cjs'),
 		);
+		await writeFile(
+			join(dir, 'package.json'),
+			JSON.stringify({ name: 'app', exports: { node: './x.js' } }),
+		);
+		for (const relative of ['./dual', '../dual', '..', '.'])
+			expect(
+				await hook.handler(relative, join(dir, 'src/api.ts'), { kind: 'import-statement' }),
+				relative,
+			).toBeUndefined();
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
