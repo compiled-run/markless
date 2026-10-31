@@ -409,7 +409,7 @@ test('the Worker carries no list of the uploaded files, which Cloudflare serves 
 	expect((await get('/no-such-page')).status).toBe(404);
 });
 
-test('a Pages build keeps the list, since its _routes.json can send public files to the Function', async () => {
+test('a Pages build, or one whose run_worker_first sends files to the Worker, keeps the list', async () => {
 	const plugin = cloudflareWorkerTrimPlugin();
 	const resolve = (plugin.resolveId as { handler: (source: string) => string | undefined })
 		.handler;
@@ -421,4 +421,26 @@ test('a Pages build keeps the list, since its _routes.json can send public files
 	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
 	await setup('cloudflare-module');
 	expect(resolve('#nitro/virtual/public-assets-data')).toBeDefined();
+	await cloudflareModule({ autoSubfolderIndex: false }).setup({
+		options: {
+			preset: 'cloudflare-module',
+			prerender: {},
+			output: { serverDir: '/tmp/none' },
+			cloudflare: { wrangler: { assets: { run_worker_first: ['/*'] } } },
+		},
+	} as never);
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	const above = await mkdtemp(join(tmpdir(), 'markless-wrangler-above-'));
+	await writeFile(join(above, 'wrangler.jsonc'), '{ "assets": { "run_worker_first": true } }');
+	await mkdir(join(above, 'app'));
+	await cloudflareModule({ autoSubfolderIndex: false }).setup({
+		options: {
+			preset: 'cloudflare-module',
+			rootDir: join(above, 'app'),
+			prerender: {},
+			output: { serverDir: '/tmp/none' },
+		},
+	} as never);
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	await rm(above, { recursive: true, force: true });
 });
