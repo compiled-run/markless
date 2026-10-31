@@ -1,10 +1,6 @@
 import { serialize } from 'node:v8';
 import { parentPort } from 'node:worker_threads';
-import {
-	clearCompileCache,
-	compileTsrxModule,
-	type CompileTsrxModuleInput,
-} from '@markless/compiler';
+import type { CompileTsrxModuleInput } from '@markless/compiler';
 import { compileStoreEntry, writeCompileStoreEntry } from './compile-store.ts';
 import type { ChunkTaskName } from './build/chunk-tasks.ts';
 
@@ -25,14 +21,29 @@ type ChunkJob = {
 	readonly context?: unknown;
 };
 
-// Compiles run while modules transform and chunk reads while chunks render, so a worker loads the chunk passes only once asked.
+// Compiles run in child processes and chunk reads on threads, so each loads only the code its jobs need.
 let chunkTasks: Promise<typeof import('./build/chunk-tasks.ts')> | undefined;
 let chunkAst: Promise<typeof import('./build/chunk-ast.ts')> | undefined;
+let compiler: Promise<typeof import('@markless/compiler')> | undefined;
 
-parentPort!.on('message', async (job: CompileJob | ChunkJob) => {
-	if (job.kind === 'chunk') await runChunkJob(job);
+// A parent that finished its build may exit before this process boots or answers; nothing is left to tell.
+const post = (message: unknown, transfer?: ArrayBuffer[]): void => {
+	if (parentPort) parentPort.postMessage(message, transfer);
+	else if (process.connected) process.send!(message, undefined, undefined, () => {});
+};
+const writes = new Set<Promise<void>>();
+
+(parentPort ?? process).on('message', async (job: CompileJob | ChunkJob | { kind: 'exit' }) => {
+	if (job.kind === 'exit') {
+		await Promise.all(writes);
+		process.exit(0);
+	} else if (job.kind === 'chunk') await runChunkJob(job);
 	else await runCompileJob(job);
 });
+if (!parentPort) {
+	process.once('disconnect', () => void Promise.all(writes).then(() => process.exit(0)));
+	post({ ready: true });
+}
 
 async function runChunkJob({ id, task, fileName, code, context }: ChunkJob): Promise<void> {
 	chunkTasks ??= import('./build/chunk-tasks.ts');
@@ -42,12 +53,12 @@ async function runChunkJob({ id, task, fileName, code, context }: ChunkJob): Pro
 		chunkAst,
 	]);
 	try {
-		parentPort!.postMessage({
+		post({
 			id,
 			result: runChunkTaskInline(task, fileName, code, context as never),
 		});
 	} catch (error) {
-		parentPort!.postMessage({
+		post({
 			id,
 			error: error instanceof Error ? (error.stack ?? error.message) : String(error),
 		});
@@ -58,11 +69,13 @@ async function runChunkJob({ id, task, fileName, code, context }: ChunkJob): Pro
 }
 
 async function runCompileJob({ id, input, key, store }: CompileJob): Promise<void> {
+	compiler ??= import('@markless/compiler');
+	const { clearCompileCache, compileTsrxModule } = await compiler;
 	let bytes: Buffer;
 	try {
 		bytes = serialize(await compileTsrxModule(input));
 	} catch {
-		parentPort!.postMessage({ id, failed: true });
+		post({ id, failed: true });
 		return;
 	} finally {
 		// The main thread memoizes; a worker holding every result it produced would only grow.
@@ -72,12 +85,12 @@ async function runCompileJob({ id, input, key, store }: CompileJob): Promise<voi
 		? compileStoreEntry(store.directory, store.fingerprint, input.source, key).path
 		: undefined;
 	const copy = storePath === undefined ? undefined : new Uint8Array(bytes);
-	parentPort!.postMessage(
-		{ id, buffer: bytes.buffer, offset: bytes.byteOffset, length: bytes.byteLength },
-		[bytes.buffer as ArrayBuffer],
-	);
+	post({ id, bytes }, parentPort ? [bytes.buffer as ArrayBuffer] : undefined);
 	if (copy && storePath) {
-		await writeCompileStoreEntry(storePath, copy);
-		parentPort!.postMessage({ id, written: true });
+		const write = writeCompileStoreEntry(storePath, copy).then(() =>
+			post({ id, written: true }),
+		);
+		writes.add(write);
+		await write.finally(() => writes.delete(write));
 	}
 }
