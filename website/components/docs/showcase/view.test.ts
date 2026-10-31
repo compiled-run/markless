@@ -31,6 +31,16 @@ describe('the showcase cards', () => {
 		expect(grid).toContain('@if (card.before && card.after)');
 	});
 
+	it('points at the Markless port when the front door and the original are no longer hosted', () => {
+		const retired = appView({ ...sample, links: { ...sample.links, frontDoor: null, old: null, report: null } });
+		const ids = retired.links.map((link) => link.id);
+		expect(ids).not.toContain('front');
+		expect(ids).not.toContain('old');
+		expect(ids).not.toContain('report');
+		expect(retired.links.find((link) => link.main)?.href).toBe(sample.links.markless);
+		expect(retired.hostName).toBe(new URL(sample.links.markless).host);
+	});
+
 	it('keeps the progress as real text and loads the drawing as a file, with no drawing code in the component', () => {
 		expect(grid).toContain('<span class="progress">{card.progress}</span>');
 		expect(grid).toContain('aria-label={card.alt}');
