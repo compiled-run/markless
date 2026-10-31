@@ -84,7 +84,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 				]
 			: []),
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, input.literalImports)),
 		';',
 		'',
 		input.literalImports
@@ -358,7 +358,7 @@ function emitTableSymbolResolverModule(
 ): string {
 	return [
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, literalImports)),
 		';',
 		'',
 		literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
@@ -415,6 +415,16 @@ function emitLoadSymbolFunction(literalImports: boolean, bound: boolean): string
 		'\t});',
 		'}',
 	];
+}
+
+// Literal loads name each module in its own import(), so the table's URL list would only be dead text.
+function shippedManifest(
+	manifest: SymbolResolverModuleManifest,
+	literalImports: boolean | undefined,
+): SymbolResolverModuleManifest {
+	if (!literalImports) return manifest;
+	const [protocolVersion, buildId, resolverId, , exportNames, symbols] = manifest;
+	return [protocolVersion, buildId, resolverId, [], exportNames, symbols];
 }
 
 function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {
