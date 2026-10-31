@@ -36,7 +36,7 @@ export function stripEmptyVitePreloadWrapperCalls(
 	code: string,
 	context?: PreloadWrapperContext,
 ): string {
-	return stripUnusedVitePreloadHelper(unwrapEmptyPreloadCalls(code, context));
+	return unwrapEmptyPreloadCalls(code, context);
 }
 
 /**
@@ -277,131 +277,6 @@ function findImportedVitePreloadHelper(code: string): ImportedVitePreloadHelper 
 	}
 
 	return undefined;
-}
-
-function stripUnusedVitePreloadHelper(code: string): string {
-	const marker = code.indexOf('vite:preloadError');
-	if (marker < 0) return code;
-
-	const helper = findVitePreloadHelperModule(code, marker);
-	if (!helper) return code;
-
-	const statementEnd =
-		code[helper.removeStart] === ',' && code[helper.removeEnd - 1] === ';' ? ';' : '';
-	const outsideHelper =
-		code.slice(0, helper.removeStart) + statementEnd + code.slice(helper.removeEnd);
-	if (hasCallableReference(outsideHelper, helper.preloadFunction)) {
-		return code;
-	}
-
-	let withoutHelper: string | undefined = outsideHelper;
-	const chain = findVitePreloadHelperInitChain(withoutHelper, helper.moduleVariable);
-	if (chain) {
-		withoutHelper = removeInitCalls(
-			withoutHelper.slice(0, chain.removeStart) + withoutHelper.slice(chain.removeEnd),
-			chain.entryVariable,
-		);
-	}
-
-	return (withoutHelper && removeInitCalls(withoutHelper, helper.moduleVariable)) ?? code;
-}
-
-function findVitePreloadHelperModule(
-	code: string,
-	marker: number,
-):
-	| {
-			readonly moduleVariable: string;
-			readonly preloadFunction: string;
-			readonly removeStart: number;
-			readonly removeEnd: number;
-	  }
-	| undefined {
-	const initStart = code.lastIndexOf('=e((()=>{', marker);
-	if (initStart < 0) return undefined;
-
-	const moduleVariable = readIdentifierBefore(code, initStart);
-	if (!moduleVariable) return undefined;
-
-	const bodyStart = initStart + '=e((()=>{'.length;
-	const bodyEnd = findModuleInitEnd(code, initStart);
-	if (bodyEnd < 0) return undefined;
-
-	const helperBody = code.slice(bodyStart, bodyEnd);
-	const preloadFunction = helperBody.match(
-		/,([$A-Z_a-z][$\w]*)=function\([^)]*\)\{let\s+[$A-Z_a-z][$\w]*=Promise\.resolve\(\)/,
-	)?.[1];
-	if (!preloadFunction) return undefined;
-
-	const firstHelperVariable = helperBody.match(/^([$A-Z_a-z][$\w]*)=/)?.[1];
-	if (!firstHelperVariable) return undefined;
-
-	const removeStart = findHelperDeclarationStart(code, initStart, firstHelperVariable);
-	if (removeStart < 0) return undefined;
-
-	return {
-		moduleVariable,
-		preloadFunction,
-		removeStart,
-		removeEnd: bodyEnd + '}));'.length,
-	};
-}
-
-function findVitePreloadHelperInitChain(
-	code: string,
-	moduleVariable: string,
-):
-	| {
-			readonly entryVariable: string;
-			readonly removeStart: number;
-			readonly removeEnd: number;
-	  }
-	| undefined {
-	const chainRE = new RegExp(
-		`var\\s+([$A-Z_a-z][$\\w]*)=e\\(\\(\\(\\)=>\\{${escapeRegExp(
-			moduleVariable,
-		)}\\(\\)\\}\\)\\),([$A-Z_a-z][$\\w]*)=e\\(\\(\\(\\)=>\\{\\1\\(\\)\\}\\)\\);`,
-	);
-	const match = chainRE.exec(code);
-	if (!match) return undefined;
-
-	return {
-		entryVariable: match[2]!,
-		removeStart: match.index,
-		removeEnd: match.index + match[0].length,
-	};
-}
-
-function readIdentifierBefore(code: string, index: number): string | undefined {
-	let end = index;
-	while (/\s/.test(code[end - 1] ?? '')) end--;
-	let start = end;
-	while (/[$\w]/.test(code[start - 1] ?? '')) start--;
-	const value = code.slice(start, end);
-	return /^[$A-Z_a-z][$\w]*$/.test(value) ? value : undefined;
-}
-
-function findModuleInitEnd(code: string, initStart: number): number {
-	const end = code.indexOf('}));', initStart);
-	return end;
-}
-
-function findHelperDeclarationStart(
-	code: string,
-	initStart: number,
-	firstHelperVariable: string,
-): number {
-	const commaStart = code.lastIndexOf(`,${firstHelperVariable},`, initStart);
-	if (commaStart >= 0) return commaStart;
-
-	const varStart = code.lastIndexOf(`var ${firstHelperVariable},`, initStart);
-	if (varStart >= 0) return varStart;
-
-	return -1;
-}
-
-function escapeRegExp(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // hasCallableReference(withoutImport), read off the chunk's own tree when the import is a whole top-level statement.
