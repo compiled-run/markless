@@ -103,6 +103,22 @@ beforeAll(async () => {
 	);
 	await writeFile(join(nodeOnly, 'default.js'), 'export const other = 1;\n');
 	await mkdir(join(root, 'api'), { recursive: true });
+	// Like typescript.js inside ts-morph: CommonJS that reads __filename as it loads.
+	const commonjs = join(root, 'node_modules/reads-filename');
+	await mkdir(commonjs, { recursive: true });
+	await writeFile(
+		join(commonjs, 'package.json'),
+		JSON.stringify({ name: 'reads-filename', main: 'index.js' }),
+	);
+	await writeFile(
+		join(commonjs, 'index.js'),
+		'exports.where = typeof __filename + ":" + typeof __dirname;\n',
+	);
+	await writeFile(
+		join(root, 'api/where.ts'),
+		"import { where } from 'reads-filename';\nexport default () => Response.json({ where });\n",
+	);
+	await mkdir(join(root, 'api'), { recursive: true });
 	await writeFile(
 		join(root, 'api/path.ts'),
 		"import { toPath } from 'node-build-only';\nexport default () => Response.json({ path: toPath('file:///a/b') });\n",
@@ -362,4 +378,10 @@ test('a require of such a package gets its Node require build, an import its Nod
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
+});
+
+test('CommonJS code that reads __filename as it loads runs in the Worker', async () => {
+	const response = await get('/api/where');
+	expect(response.status).toBe(200);
+	expect(await response.json()).toEqual({ where: 'string:string' });
 });

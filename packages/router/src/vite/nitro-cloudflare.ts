@@ -215,6 +215,16 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 		applyToEnvironment: (environment) =>
 			environment.name === 'nitro' &&
 			environment.config.resolve.conditions.includes('workerd'),
+		// CommonJS code bundled into the Worker's ESM still reads __filename and __dirname, which a Worker never defines.
+		configEnvironment(name, config) {
+			if (name !== 'nitro' || !config.resolve?.conditions?.includes('workerd')) return;
+			return {
+				define: {
+					__filename: JSON.stringify('/index.mjs'),
+					__dirname: JSON.stringify('/'),
+				},
+			};
+		},
 		resolveId: {
 			order: 'pre',
 			async handler(source, importer, options) {

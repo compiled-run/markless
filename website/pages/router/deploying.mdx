@@ -88,6 +88,8 @@ default build is for runtimes without Node's APIs and can miss functions the Nod
 with `nodejs_compat` (Nitro's default) has those APIs, so the router bundles the Node build of such a
 package into the Worker, the code a Node server would run. A package with its own Worker or browser
 build keeps that one.
+CommonJS code bundled into the Worker can still read `__filename` and `__dirname`, which a Worker never
+defines, so a Worker build defines them as `/index.mjs` and `/`.
 
 Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`; Nitro merges that file
 into the one it writes.
