@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'pathe';
 import { rolldown } from 'rolldown';
-import { afterAll, afterEach, expect, test } from 'vitest';
+import { afterAll, afterEach, expect, test, vi } from 'vitest';
 import {
 	clearCompileCache,
 	compileTsrxModule,
@@ -20,6 +21,9 @@ import {
 	retireCompileWorkers,
 } from '../src/build-workers.ts';
 import { marklessClient } from '../src/rolldown.ts';
+
+// A compile process boots by loading the compiler, which took over 5 s on a loaded machine.
+vi.setConfig({ testTimeout: 30_000 });
 
 const scratch = mkdtempSync(join(tmpdir(), 'markless-build-workers-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -48,7 +52,7 @@ async function onlinePool(options: Parameters<typeof createCompileWorkerPool>[0]
 	const pool = createCompileWorkerPool(options);
 	// The first request boots a worker and compiles on this thread until one is online.
 	pool.run(input('Boot'), 'boot');
-	for (let turn = 0; turn < 500; turn++) {
+	for (let turn = 0; turn < 2_500; turn++) {
 		const probe = pool.run(input('Probe'), `probe-${turn}`);
 		if (probe) {
 			await probe;
@@ -199,4 +203,15 @@ test('a compile process retired while it boots exits, and starts no other', asyn
 	expect(await exited(pids)).toEqual([]);
 	expect(compileWorkerPids()).toEqual([]);
 	await pool.close();
+});
+
+// The build's NODE_OPTIONS heap limit is sized for the whole build; a compile process collects long before it.
+test('a compile process runs with a heap limit of its own', async () => {
+	const pool = await onlinePool({ size: 1 });
+	const [pid] = compileWorkerPids();
+	expect(execFileSync('ps', ['-o', 'args=', '-p', String(pid)], { encoding: 'utf8' })).toMatch(
+		/--max-old-space-size=\d+/,
+	);
+	await pool.close();
+	await retireCompileWorkers();
 });

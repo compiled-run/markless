@@ -70,7 +70,7 @@ async function runChunkJob({ id, task, fileName, code, context }: ChunkJob): Pro
 
 async function runCompileJob({ id, input, key, store }: CompileJob): Promise<void> {
 	compiler ??= import('@markless/compiler');
-	const { clearCompileCache, compileTsrxModule } = await compiler;
+	const { clearCompileCache, compileTsrxModule, resetParseCache } = await compiler;
 	let bytes: Buffer;
 	try {
 		bytes = serialize(await compileTsrxModule(input));
@@ -78,8 +78,9 @@ async function runCompileJob({ id, input, key, store }: CompileJob): Promise<voi
 		post({ id, failed: true });
 		return;
 	} finally {
-		// The main thread memoizes; a worker holding every result it produced would only grow.
+		// The main thread memoizes; a worker holding every result or tree it produced would only grow.
 		clearCompileCache();
+		resetParseCache();
 	}
 	const storePath = store
 		? compileStoreEntry(store.directory, store.fingerprint, input.source, key).path

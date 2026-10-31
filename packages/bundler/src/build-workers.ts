@@ -84,6 +84,9 @@ export type CompileWorkerPool = {
 
 let nextId = 0;
 
+// One compile at a time needs far less than a build; a larger limit only lets garbage pile up before a collection.
+const COMPILE_PROCESS_HEAP_MB = 2048;
+
 function workerUrl(name: 'build-worker'): URL {
 	// Source runs as .ts; the packed bundle sits beside its own build-worker.js.
 	return new URL(
@@ -101,6 +104,8 @@ const compiles: Lane = {
 	unavailable: false,
 	start() {
 		const child = fork(workerUrl('build-worker'), [], {
+			// A flag here overrides the build's NODE_OPTIONS, whose heap limit is sized for the whole build.
+			execArgv: [...process.execArgv, `--max-old-space-size=${COMPILE_PROCESS_HEAP_MB}`],
 			serialization: 'advanced',
 			stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
 		});
