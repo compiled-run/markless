@@ -6,7 +6,8 @@ import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_DEMAND } from './chunking.ts'
 import { createExecutionSizesAsset } from './execution-sizes.ts';
 import { executionDemandAsset } from './execution-demand.ts';
 import { collectRenderedModules, createByteAttributionAsset } from './byte-attribution.ts';
-import { clearParsedChunkCode } from './chunk-ast.ts';
+import { chunkLocalExportSpecifiers, clearParsedChunkCode } from './chunk-ast.ts';
+import { definedPreloadHelpers, type PreloadHelperExports } from './preload-cleanup.ts';
 import { prefetchChunkDynamicImports, runChunkTask } from './chunk-workers.ts';
 import { unwrapAsyncImportWrappers } from './async-import-wrappers.ts';
 import { collapseInitFacadeImports } from './init-facade-imports.ts';
@@ -288,8 +289,14 @@ function bundleWithoutRemovedChunks(
 
 async function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
 	const chunks = Object.values(bundle).filter(isChunkWithCode);
+	const helpers = preloadHelperChunks(chunks);
 	const stripped = await Promise.all(
-		chunks.map((chunk) => runChunkTask('strippedPreloadHelper', 'chunk.js', chunk.code)),
+		chunks.map((chunk) =>
+			runChunkTask('strippedPreloadHelper', chunk.fileName, chunk.code, {
+				fileName: chunk.fileName,
+				helpers,
+			}),
+		),
 	);
 	for (const [index, output] of chunks.entries()) {
 		const nextCode = stripped[index]!;
@@ -302,6 +309,21 @@ async function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknow
 			(output): output is PreloadHelperChunk => isChunkWithCode(output) && isChunkFile(output),
 		),
 	);
+}
+
+// The chunks that define Vite's preload helper and the names each exports it under: a chunk that imports it by a
+// minified export name is still known to call it.
+function preloadHelperChunks(
+	chunks: ReadonlyArray<{ readonly fileName: string; readonly code: string }>,
+): PreloadHelperExports[] {
+	return chunks.flatMap((chunk) => {
+		const defined = definedPreloadHelpers(chunk.code);
+		if (defined.length === 0) return [];
+		const exported = [...(chunkLocalExportSpecifiers(chunk.fileName, chunk.code) ?? [])]
+			.filter(([, local]) => defined.includes(local))
+			.map(([name]) => name);
+		return exported.length ? [{ fileName: chunk.fileName, exports: exported }] : [];
+	});
 }
 
 function prefetchDynamicImportParses(bundle: Record<string, unknown>): Promise<void> {
@@ -327,6 +349,7 @@ function isChunkFile(output: unknown): output is {
 
 function isChunkWithCode(output: unknown): output is {
 	readonly type: 'chunk';
+	readonly fileName: string;
 	code: string;
 } {
 	if (!output || typeof output !== 'object') return false;

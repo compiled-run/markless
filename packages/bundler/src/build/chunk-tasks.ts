@@ -3,7 +3,7 @@ import { readChunkDynamicImports } from './chunk-ast.ts';
 import { facadeChunkFacts } from './lazy-module-facades.ts';
 import { packTopLevelEdits } from './pack-top-level.ts';
 import { helperImporterRewrite } from './preload-helper-removal.ts';
-import { stripEmptyVitePreloadWrappers } from './preload-cleanup.ts';
+import { stripEmptyVitePreloadWrappers, type PreloadWrapperContext } from './preload-cleanup.ts';
 import { shortNameChunkFacts } from './short-export-names.ts';
 
 // Pure analyses of one chunk's code: the same answer on the main thread or in a chunk worker.
@@ -12,8 +12,10 @@ const CHUNK_TASKS = {
 	shortNameChunkFacts,
 	chunkDynamicImports: readChunkDynamicImports,
 	facadeChunkFacts,
-	strippedPreloadHelper: (_fileName: string, code: string) => stripEmptyVitePreloadWrappers(code),
-	unwrappedAsyncImports: (_fileName: string, code: string) => unwrapAsyncImportWrappersInCode(code),
+	strippedPreloadHelper: (_fileName: string, code: string, context?: PreloadWrapperContext) =>
+		stripEmptyVitePreloadWrappers(code, context),
+	unwrappedAsyncImports: (_fileName: string, code: string) =>
+		unwrapAsyncImportWrappersInCode(code),
 	helperImporterRewrite,
 } as const;
 
