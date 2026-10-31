@@ -1,5 +1,3 @@
-import { parseSync } from 'rolldown/experimental';
-
 // With facade chunks optimized away, Rolldown loads a grouped module by reading its namespace object from
 // the pack: `import("./pack.js").then((n) => (n.init_a(), n.a_exports))`. These read that unminified shape.
 
@@ -20,8 +18,6 @@ export type NamespaceLoad = {
 	readonly init: string | undefined;
 	readonly namespace: string;
 };
-
-type Syntax = { type?: string; start: number; end: number; [key: string]: unknown };
 
 const DECLARATION = /^var ([A-Za-z_$][\w$]*) = \/\* @__PURE__ \*\/ __exportAll\(\{/gm;
 const IDENTIFIER = '[A-Za-z_$][\\w$]*';
@@ -44,7 +40,7 @@ export function namespaceObjects(code: string): Map<string, NamespaceObject> {
 		const close =
 			code[open] === '\n' ? code.indexOf('\n});', open) + 4 : code.indexOf(' });', open) + 4;
 		if (close < 4 || (code[open] !== '\n' && code.slice(open, close).includes('\n'))) continue;
-		const entries = namespaceEntries(code.slice(start, close));
+		const entries = namespaceEntries(code.slice(open, close - 3));
 		if (!entries) continue;
 		found.set(match[1]!, {
 			local: match[1]!,
@@ -56,51 +52,23 @@ export function namespaceObjects(code: string): Map<string, NamespaceObject> {
 	return found;
 }
 
-function namespaceEntries(declaration: string): [string, string][] | undefined {
-	const parsed = parseSync('namespace.js', declaration);
-	const [statement] = parsed.program.body as unknown as Syntax[];
-	if (parsed.errors.length || parsed.program.body.length !== 1) return undefined;
-	const [declarator] = (statement?.declarations as Syntax[] | undefined) ?? [];
-	const call = declarator?.init as Syntax | undefined;
-	const [object, ...rest] = (call?.arguments as Syntax[] | undefined) ?? [];
-	if (call?.type !== 'CallExpression' || rest.length || object?.type !== 'ObjectExpression')
-		return undefined;
+// One `name: () => value` getter, the value a binding or a constant Rolldown inlined in its place.
+const ENTRY = new RegExp(
+	String.raw`(?:(${IDENTIFIER})|("(?:[^"\\\n]|\\.)*")): \(\) => (${IDENTIFIER}|-?\d[\w.+-]*|"(?:[^"\\\n]|\\.)*"|true|false|null|void 0)(,\s*|\s*$)`,
+	'y',
+);
+
+function namespaceEntries(body: string): [string, string][] | undefined {
 	const entries: [string, string][] = [];
-	for (const property of object.properties as Syntax[]) {
-		const key = property.key as Syntax;
-		const getter = property.value as Syntax;
-		const body = getter?.body as Syntax | undefined;
-		const name =
-			key?.type === 'Identifier'
-				? (key.name as string)
-				: key?.type === 'Literal' && typeof key.value === 'string'
-					? key.value
-					: undefined;
-		if (
-			property.type !== 'Property' ||
-			property.computed ||
-			name === undefined ||
-			getter.type !== 'ArrowFunctionExpression' ||
-			(getter.params as unknown[]).length ||
-			!body ||
-			!(body.type === 'Identifier' || readsNoBinding(body))
-		)
-			return undefined;
-		entries.push([name, declaration.slice(body.start, body.end)]);
+	ENTRY.lastIndex = 0;
+	const text = body.trim();
+	while (ENTRY.lastIndex < text.length) {
+		const at = ENTRY.lastIndex;
+		const match = ENTRY.exec(text);
+		if (!match || match.index !== at) return undefined;
+		entries.push([match[1] ?? (JSON.parse(match[2]!) as string), match[3]!]);
 	}
 	return entries;
-}
-
-// A constant Rolldown inlined in place of the binding it exported.
-function readsNoBinding(node: Syntax): boolean {
-	if (node.type === 'Literal') return true;
-	if (node.type === 'TemplateLiteral') return !(node.expressions as unknown[]).length;
-	if (node.type === 'UnaryExpression')
-		return (
-			['-', '+', '!', 'void'].includes(node.operator as string) &&
-			readsNoBinding(node.argument as Syntax)
-		);
-	return false;
 }
 
 /** The namespace load an `import()` expression ending at `end` opens, if it has the shape Rolldown writes. */
@@ -127,6 +95,15 @@ export function namespaceLoadTexts(code: string): string[] {
 		...[...code.matchAll(new RegExp(CROSS_CHUNK_LOAD.source, 'g'))].map((match) => match[0]),
 		...[...code.matchAll(SAME_CHUNK_LOAD)].map((match) => match[0]),
 	];
+}
+
+/** Every span reading like a same-pack load, whatever namespace it names. */
+export function sameChunkLoadCandidates(code: string): { start: number; end: number }[] {
+	if (!code.includes('Promise.resolve().then(() => ')) return [];
+	return [...code.matchAll(SAME_CHUNK_LOAD)].map((match) => ({
+		start: match.index,
+		end: match.index + match[0].length,
+	}));
 }
 
 /** Loads of a module from inside its own pack, which Rolldown writes without an `import()`. */

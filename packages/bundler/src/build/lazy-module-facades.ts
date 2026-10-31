@@ -30,6 +30,7 @@ import {
 	namespaceLoadTexts,
 	namespaceObjects,
 	namespaceOwners,
+	sameChunkLoadCandidates,
 	sameChunkNamespaceLoads,
 } from './namespace-lazy-loads.ts';
 
@@ -780,7 +781,31 @@ export function facadeChunkFacts(fileName: string, code: string) {
 		localExportSpecifiers: readChunkLocalExportSpecifiers(fileName, code),
 		inertness: readChunkInertness(fileName, code),
 		topLevelAwait: readChunkTopLevelAwait(fileName, code),
+		sameChunkLoadStarts: readSameChunkLoadStarts(fileName, code),
 	};
+}
+
+const sameChunkLoadStartsByCode = new Map<string, readonly number[]>();
+
+function sameChunkLoadStarts(fileName: string, code: string): readonly number[] {
+	return sameChunkLoadStartsByCode.get(code) ?? readSameChunkLoadStarts(fileName, code);
+}
+
+// A same-pack load is matched as text, so only the matches that are calls in the tree count.
+export function readSameChunkLoadStarts(fileName: string, code: string): number[] {
+	const candidates = sameChunkLoadCandidates(code);
+	if (!candidates.length) return [];
+	const spans = new Set(candidates.map(({ start, end }) => `${start}:${end}`));
+	const starts: number[] = [];
+	walk(
+		parseChunkCode(fileName, code).program,
+		candidates.map(({ start }) => start),
+		(node) => {
+			if (node.type === 'CallExpression' && spans.has(`${node.start}:${node.end}`))
+				starts.push(node.start!);
+		},
+	);
+	return starts;
 }
 
 /** Reads every large chunk's facade facts on the chunk workers, so the collapse finds them cached. */
@@ -809,6 +834,7 @@ export async function prefetchFacadeChunkFacts(
 						);
 						inertnessByCode.set(chunk.code, facts.inertness);
 						topLevelAwaitByCode.set(chunk.code, facts.topLevelAwait);
+						sameChunkLoadStartsByCode.set(chunk.code, facts.sameChunkLoadStarts);
 					},
 					// A read that throws is left to the synchronous path, which reports it where it did.
 					() => {},
@@ -820,6 +846,7 @@ export async function prefetchFacadeChunkFacts(
 export function clearFacadeChunkFacts(): void {
 	inertnessByCode.clear();
 	topLevelAwaitByCode.clear();
+	sameChunkLoadStartsByCode.clear();
 }
 
 function topLevelScope(body: Syntax[], leafSources: Set<string>): TopLevelScope {
@@ -1080,16 +1107,6 @@ function mayHold(offsets: readonly number[], value: unknown): boolean {
 
 const NAMESPACE_LOAD_KEY = '\0markless-namespace-load:';
 
-// A same-pack load is matched as text, so it is checked against the tree before it is replaced.
-function isCallExpressionAt(chunk: Chunk, start: number, end: number): boolean {
-	let found = false;
-	walk(parseChunkCode(chunk.fileName, chunk.code).program, [start], (node) => {
-		if (node.type === 'CallExpression' && node.start === start && node.end === end)
-			found = true;
-	});
-	return found;
-}
-
 // Per module, the chars of namespace objects the last render dropped; Rolldown's per-module code still holds them.
 const droppedNamespaceChars = new Map<string, number>();
 
@@ -1157,9 +1174,10 @@ function collectNamespaceLoads(
 			const load = crossChunkNamespaceLoad(chunk.code, expression.start, expression.end);
 			if (load) loads.push({ load, target, read: expression.end });
 		}
-		for (const load of sameChunkNamespaceLoads(chunk.code, namespacesOf(chunk)))
-			if (isCallExpressionAt(chunk, load.start, load.end))
-				loads.push({ load, target: chunk });
+		const sameChunk = sameChunkNamespaceLoads(chunk.code, namespacesOf(chunk));
+		const calls = sameChunk.length ? sameChunkLoadStarts(chunk.fileName, chunk.code) : [];
+		for (const load of sameChunk)
+			if (calls.includes(load.start)) loads.push({ load, target: chunk });
 		if (!loads.length) continue;
 		const nodes = [...(imports.get(chunk.fileName) ?? [])];
 		for (const { load, target, read } of loads) {
@@ -1236,6 +1254,21 @@ function collectNamespaceLoads(
 		}
 		imports.set(chunk.fileName, nodes);
 	}
+	// Where each chunk's import() expressions start, by the chunk they load.
+	const startsByTarget = new Map<string, Map<string, number[]>>();
+	const importStarts = (reader: Chunk) => {
+		let found = startsByTarget.get(reader.fileName);
+		if (!found) {
+			found = new Map();
+			for (const expression of imports.get(reader.fileName) ?? []) {
+				if (expression.specifier === undefined) continue;
+				const target = resolve(reader.fileName, expression.specifier);
+				found.set(target, [...(found.get(target) ?? []), expression.start]);
+			}
+			startsByTarget.set(reader.fileName, found);
+		}
+		return found;
+	};
 	return namespaceObjectEdits(
 		chunks,
 		reads,
@@ -1245,11 +1278,8 @@ function collectNamespaceLoads(
 		siteNames,
 		(reader, target) => {
 			const starts = collapsed.get(reader.fileName);
-			return (imports.get(reader.fileName) ?? []).every(
-				(expression) =>
-					expression.specifier === undefined ||
-					resolve(reader.fileName, expression.specifier) !== target.fileName ||
-					!!starts?.has(expression.start),
+			return (importStarts(reader).get(target.fileName) ?? []).every(
+				(start) => !!starts?.has(start),
 			);
 		},
 		root,
