@@ -76,6 +76,11 @@ requests are free. So everything you prerender costs nothing to serve: give a pa
 links to it are served from files too. The router writes `/guide` as `guide.html` and `/guide/` as
 `guide/index.html`, the names Cloudflare serves at exactly those URLs without a redirect.
 
+A page or endpoint that renders in the Worker and answers with `s-maxage` in its `Cache-Control` is
+kept in Cloudflare's edge cache for that long, keyed by its full URL and the deployed version: the
+same as an ISR rule on Vercel. A request with a cookie or an `Authorization` header, and an answer
+that sets a cookie, are never cached.
+
 Pages that are not prerendered render in the Worker and stream, so a `@pending` arm still shows
 before its data is ready. A Worker can be at most 64 MiB, so the router leaves out of it the code of
 every page whose page and fragment URLs were both prerendered: those requests never reach it.

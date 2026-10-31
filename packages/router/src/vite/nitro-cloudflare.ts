@@ -1,4 +1,4 @@
-import { readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'pathe';
 import type { Plugin } from 'vite';
 import { buildRouteManifestFromFileIds, normalizeRouteFileId } from '../route-manifest.ts';
@@ -9,6 +9,12 @@ interface CloudflareNitro {
 	readonly options: {
 		readonly preset?: string;
 		readonly dev?: boolean;
+		entry?: string;
+		readonly buildDir?: string;
+		readonly rootDir?: string;
+		readonly cloudflare?: {
+			readonly wrangler?: { readonly version_metadata?: { readonly binding?: string } };
+		};
 		prerender: { autoSubfolderIndex?: boolean };
 		readonly output: { readonly serverDir: string };
 	};
@@ -27,14 +33,77 @@ interface CloudflareNitro {
 	readonly logger?: { info(message: string): void };
 }
 
+/** The binding the Worker reads its deployed version from, so a cached answer never outlives its deploy. */
+export const CLOUDFLARE_VERSION_BINDING = 'MARKLESS_VERSION';
+
+// An app's own version_metadata binding, from Nitro's cloudflare.wrangler option or a wrangler config beside the app, is the one read.
+async function versionBinding(nitro: CloudflareNitro): Promise<string> {
+	const own = nitro.options.cloudflare?.wrangler?.version_metadata?.binding;
+	if (own) return own;
+	for (const name of ['wrangler.json', 'wrangler.jsonc', 'wrangler.toml']) {
+		const text = await readFile(join(nitro.options.rootDir ?? '.', name), 'utf8').catch(
+			() => '',
+		);
+		const binding =
+			/"?version_metadata"?\s*[:=]\s*\{[^}]*?"?binding"?\s*[:=]\s*"([^"]+)"/.exec(
+				text,
+			)?.[1] ?? /\[version_metadata\][^[]*?binding\s*=\s*"([^"]+)"/.exec(text)?.[1];
+		if (binding) return binding;
+	}
+	return CLOUDFLARE_VERSION_BINDING;
+}
+
+// ISR on Vercel keeps a rendered page for its s-maxage; on Cloudflare the Cache API does, keyed by the URL and the deployed version.
+const edgeCacheEntrySource = (
+	entry: string,
+	binding: string,
+) => `import worker from ${JSON.stringify(entry)};
+export * from ${JSON.stringify(entry)};
+const shared = (request) => request.method === 'GET' && !request.headers.has('cookie') && !request.headers.has('authorization');
+const kept = (response) => {
+	const control = response.headers.get('cache-control') ?? '';
+	// Cloudflare's cache keys on the URL alone: an answer that varies on anything but its encoding is never shared.
+	const vary = (response.headers.get('vary') ?? '').split(',').map((name) => name.trim().toLowerCase()).filter(Boolean);
+	return response.status === 200 && !response.headers.has('set-cookie') && /(?:^|,)\\s*s-maxage=[1-9]/i.test(control) && !/\\b(?:private|no-store)\\b/i.test(control) && vary.every((name) => name === 'accept-encoding');
+};
+export default {
+	...worker,
+	async fetch(request, env, context) {
+		const version = env?.[${JSON.stringify(binding)}]?.id;
+		if (!version || typeof caches === 'undefined' || !shared(request)) return worker.fetch(request, env, context);
+		const key = new URL(request.url);
+		key.searchParams.set('__markless_version', version);
+		const hit = await caches.default.match(key.href);
+		if (hit) return hit;
+		const response = await worker.fetch(request, env, context);
+		if (kept(response)) context.waitUntil(caches.default.put(key.href, response.clone()));
+		return response;
+	},
+};
+`;
+
 // Cloudflare serves an asset only at the URL its file name implies and redirects the other spelling,
 // so a prerendered page is written as `guide.html` for `/guide` and `guide/index.html` for `/guide/`.
 export function cloudflareModule(configured: { readonly autoSubfolderIndex: boolean }) {
 	return {
 		name: 'markless-router:cloudflare',
-		setup(nitro: CloudflareNitro) {
+		async setup(nitro: CloudflareNitro) {
 			if (nitro.options.dev || !isCloudflarePreset(nitro.options.preset)) return;
 			if (!configured.autoSubfolderIndex) nitro.options.prerender.autoSubfolderIndex = false;
+			if (
+				nitro.options.entry &&
+				nitro.options.buildDir &&
+				nitro.options.preset !== 'cloudflare-pages'
+			) {
+				const dir = join(nitro.options.buildDir, 'markless-router');
+				const entry = join(dir, 'cloudflare-entry.mjs');
+				await mkdir(dir, { recursive: true });
+				await writeFile(
+					entry,
+					edgeCacheEntrySource(nitro.options.entry, await versionBinding(nitro)),
+				);
+				nitro.options.entry = entry;
+			}
 			// Nitro prerenders before it writes the Worker, so the pages are left out once it is written.
 			let prerendered = new Set<string>();
 			nitro.hooks?.hook('prerender:done', async ({ prerenderedRoutes = [] }) => {
@@ -47,6 +116,16 @@ export function cloudflareModule(configured: { readonly autoSubfolderIndex: bool
 				const config = JSON.parse(
 					await readFile(join(serverDir, 'wrangler.json'), 'utf8').catch(() => '{}'),
 				) as WranglerConfig;
+				if (config.main && !config.pages_build_output_dir) {
+					const own = config as WranglerConfig & {
+						version_metadata?: { binding?: string };
+					};
+					own.version_metadata ??= { binding: CLOUDFLARE_VERSION_BINDING };
+					await writeFile(
+						join(serverDir, 'wrangler.json'),
+						`${JSON.stringify(own, null, 2)}\n`,
+					);
+				}
 				const workerFirst = workerFirstPatterns(config);
 				if (workerFirst === undefined || !config.main) return;
 				const { pages, bytes } = await pruneRenderedPages(
