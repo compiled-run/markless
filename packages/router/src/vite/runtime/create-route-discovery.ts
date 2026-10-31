@@ -11,7 +11,12 @@ export function createRouteDiscovery(
 	const pageModuleLoaders = Object.fromEntries(
 		Object.entries(discoveredPageModuleLoaders).map(([file, loader]) => [
 			normalizeRouteFileId(file),
-			loader,
+			// A client page module exports its artifact as a promise.
+			() =>
+				loader().then(async (page) => ({
+					...(page as object),
+					default: await (page as { default?: unknown }).default,
+				})),
 		]),
 	);
 

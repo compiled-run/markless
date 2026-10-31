@@ -185,12 +185,12 @@ export function clientRouteArtifactReference(source: string): string {
 	const renderDataSource = source.includes('?')
 		? `${source}&markless-render-data`
 		: `${source}?markless-render-data`;
+	// No top-level await: one awaiting module stops Rolldown merging every lazily loaded module into its pack.
 	return [
-		`const [symbolModule, renderDataModule] = await Promise.all([import(${JSON.stringify(symbolSource)}), import(${JSON.stringify(renderDataSource)})]);`,
-		'const marklessRouteArtifact = {',
+		`const marklessRouteArtifact = Promise.all([import(${JSON.stringify(symbolSource)}), import(${JSON.stringify(renderDataSource)})]).then(([symbolModule, renderDataModule]) => ({`,
 		'\trenderData: renderDataModule.marklessPrerenderData,',
 		'\tloadSymbol: symbolModule.loadSymbol,',
-		'};',
+		'}));',
 		'export default marklessRouteArtifact;',
 	].join('\n');
 }
