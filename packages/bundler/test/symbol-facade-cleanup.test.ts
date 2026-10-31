@@ -260,6 +260,38 @@ describe('generated symbol facade cleanup', () => {
 		);
 	});
 
+	// The rename reads the parse: only the identifiers and the string literals that are the whole name change.
+	test('leaves a comment or a string that only mentions an init export name as it was', () => {
+		const lookalike = 'init_anatomy_2b383bb946b90e01$1';
+		const bundle = {
+			'build/shared.js': {
+				type: 'chunk',
+				fileName: 'build/shared.js',
+				code: `function l(){}export{l as ${lookalike}};`,
+				exports: [lookalike],
+				imports: [],
+				dynamicImports: [],
+				moduleIds: ['\0virtual:markless:symbol:%2Fworkspace%2Fsrc%2Froot.tsrx:symbol%3A0'],
+			},
+			'build/runtime.js': {
+				type: 'chunk',
+				fileName: 'build/runtime.js',
+				code: `import{${lookalike} as a}from"./shared.js";/* calls ${lookalike} */const t=["run ${lookalike} first",\`${lookalike}\`];`,
+				exports: [],
+				imports: ['build/shared.js'],
+				dynamicImports: [],
+				moduleIds: ['\0virtual:markless:resolver:%2Fworkspace%2Fsrc%2Froot.tsrx'],
+			},
+		};
+
+		rewriteGeneratedSymbolInitExports(bundle);
+
+		const renamed = 'init__virtual_markless_symbol$1';
+		expect(bundle['build/runtime.js'].code).toBe(
+			`import{${renamed} as a}from"./shared.js";/* calls ${lookalike} */const t=["run ${lookalike} first",\`${renamed}\`];`,
+		);
+	});
+
 	test('keeps init export names when chunks sharing a generated name would shorten it differently', () => {
 		const first = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Ffirst_2Etsrx$1';
 		const second = 'init__virtual_markless_symbol__2Fworkspace_2Fsrc_2Fsecond_2Etsrx$1';

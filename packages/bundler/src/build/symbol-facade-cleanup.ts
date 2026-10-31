@@ -1,5 +1,7 @@
+import { applyCodeEdits, type CodeEdit } from './code-edits.ts';
 import { dirname, join, normalize, relative } from 'pathe';
 import { MARKLESS_VIRTUAL_PREFIX } from '../source-module.ts';
+import { parseChunkCode } from './chunk-ast.ts';
 
 type GeneratedChunk = {
 	readonly type: 'chunk';
@@ -93,21 +95,24 @@ export function rewriteGeneratedSymbolInitExports(bundle: Record<string, unknown
 	if (rewrites.length === 0) return { renamed: 0 };
 
 	const replacements = new Map<string, string>();
-	for (const rewrite of rewrites) {
+	for (const rewrite of rewrites)
+		for (const [from, to] of rewrite.names) replacements.set(from, to);
+	const resolved = resolvedRenames(replacements);
+	const renamedCode = new Map<GeneratedChunk, string>();
+	for (const chunk of chunks.values()) {
+		if (!isGeneratedAsyncChunk(chunk)) continue;
+		const rewrite = rewrites.find((item) => item.chunk === chunk);
+		const code = rewrite?.collapsed ? rewrite.collapsed.code : chunk.code;
+		const next = renameInitNames(chunk.fileName, code, resolved);
+		// A chunk that does not parse keeps every name, so no import is left naming an export that moved.
+		if (next === undefined) return { renamed: 0 };
+		renamedCode.set(chunk, next);
+	}
+	for (const rewrite of rewrites)
 		rewrite.chunk.exports = rewrite.collapsed
 			? [...rewrite.collapsed.exports]
 			: rewrite.chunk.exports.map((name) => rewrite.names.get(name) ?? name);
-		if (rewrite.collapsed) rewrite.chunk.code = rewrite.collapsed.code;
-		for (const [from, to] of rewrite.names) {
-			replacements.set(from, to);
-		}
-	}
-
-	const rename = identifierRenamer(replacements);
-	for (const chunk of chunks.values()) {
-		if (!isGeneratedAsyncChunk(chunk)) continue;
-		chunk.code = rename(chunk.code);
-	}
+	for (const [chunk, code] of renamedCode) chunk.code = code;
 
 	return { renamed: replacements.size };
 }
@@ -607,50 +612,72 @@ function unique(values: readonly string[]): string[] {
 	return [...new Set(values)];
 }
 
-// Resolved once per bundle: sorting and chaining every rename again for each chunk was 23 s of a 498-page build.
-function identifierRenamer(replacements: ReadonlyMap<string, string>): (code: string) => string {
-	const names = [...replacements.keys()].sort((a, b) => b.length - a.length);
+function resolvedRenames(replacements: ReadonlyMap<string, string>): ReadonlyMap<string, string> {
+	const names = [...replacements.keys()].sort((a, b) => a.length - b.length);
 	const resolved = new Map<string, string>();
-	for (const name of names.reverse()) {
+	for (const name of names) {
 		const replacement = replacements.get(name)!;
 		resolved.set(name, resolved.get(replacement) ?? replacement);
 	}
-	// A generated init export holds the prefix or ends in `$<digits>`, so only tokens around one can change.
-	if (names.some((name) => !name.includes(SYMBOL_INIT_EXPORT_PREFIX) && !/\$\d/.test(name)))
-		return (code) =>
-			code.replace(/(?<![$\w])[$A-Z_a-z][$\w]*/g, (name) => resolved.get(name) ?? name);
-	return (code) => {
-		const anchors = new RegExp(`${escapeRegExp(SYMBOL_INIT_EXPORT_PREFIX)}|\\$\\d`, 'g');
-		let next = '';
-		let cursor = 0;
-		for (let match = anchors.exec(code); match; match = anchors.exec(code)) {
-			let start = match.index;
-			while (start > 0 && isIdentifierPart(code.charCodeAt(start - 1))) start--;
-			let end = match.index + match[0].length;
-			while (end < code.length && isIdentifierPart(code.charCodeAt(end))) end++;
-			anchors.lastIndex = end;
-			if (start < cursor || isDigit(code.charCodeAt(start))) continue;
-			const replacement = resolved.get(code.slice(start, end));
-			if (replacement === undefined) continue;
-			next += code.slice(cursor, start) + replacement;
-			cursor = end;
+	return resolved;
+}
+
+// Renames the parsed identifiers and the whole string literals that name an init export: the loaders read
+// exports by name from string tables too. Undefined when the chunk does not parse.
+function renameInitNames(
+	fileName: string,
+	code: string,
+	resolved: ReadonlyMap<string, string>,
+): string | undefined {
+	if (![...resolved.keys()].some((name) => code.includes(name))) return code;
+	const parsed = parseChunkCode(fileName, code);
+	if (parsed.errors.length > 0) return undefined;
+	const edits: CodeEdit[] = [];
+	const visit = (node: unknown): void => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item);
+			return;
 		}
-		return cursor === 0 ? code : next + code.slice(cursor);
+		const value = node as {
+			type?: string;
+			name?: string;
+			value?: unknown;
+			start: number;
+			end: number;
+		};
+		if (value.type === 'Identifier' && value.name && resolved.has(value.name))
+			edits.push({ start: value.start, end: value.end, text: resolved.get(value.name)! });
+		else if (value.type === 'TemplateLiteral') {
+			const template = value as unknown as {
+				expressions: unknown[];
+				quasis: Array<{ value: { cooked: string | null } }>;
+			};
+			const text = template.quasis[0]?.value.cooked;
+			if (template.expressions.length === 0 && text && resolved.has(text))
+				edits.push({
+					start: value.start,
+					end: value.end,
+					text: `\`${resolved.get(text)}\``,
+				});
+		} else if (
+			value.type === 'Literal' &&
+			typeof value.value === 'string' &&
+			resolved.has(value.value)
+		) {
+			const quote = code[value.start]!;
+			edits.push({
+				start: value.start,
+				end: value.end,
+				text: `${quote}${resolved.get(value.value)}${quote}`,
+			});
+		}
+		for (const key in value)
+			if (key !== 'type' && key !== 'start' && key !== 'end')
+				visit((value as Record<string, unknown>)[key]);
 	};
-}
-
-function isIdentifierPart(char: number): boolean {
-	return (
-		(char >= 48 && char <= 57) ||
-		(char >= 65 && char <= 90) ||
-		(char >= 97 && char <= 122) ||
-		char === 36 ||
-		char === 95
-	);
-}
-
-function isDigit(char: number): boolean {
-	return char >= 48 && char <= 57;
+	visit(parsed.program);
+	return applyCodeEdits(code, edits);
 }
 
 function identifierNameRE(name: string): RegExp {
