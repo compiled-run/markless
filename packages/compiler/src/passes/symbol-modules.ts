@@ -1426,12 +1426,15 @@ function renderBranchArms(
 		};
 		const arms = branch.armChunkIds.map((chunkId) => renderChunkParts(context, chunkId));
 		if (arms.some((arm) => arm === null)) {
-			// A branch nobody asks to flip ships no symbol, so it needs no diagnostic.
-			const symbol = input.symbolResolver.symbols.find(
-				(candidate) =>
-					candidate.kind === 'branch-update' &&
-					candidate.branchSiteId === branch.branchSiteId,
-			);
+			// A branch nobody asks to flip ships no symbol, and one whose test reads nothing never flips.
+			const symbol =
+				branch.testReads.length > 0
+					? input.symbolResolver.symbols.find(
+							(candidate) =>
+								candidate.kind === 'branch-update' &&
+								candidate.branchSiteId === branch.branchSiteId,
+						)
+					: undefined;
 			if (symbol) {
 				const refused = branchArmUnsupportedDiagnostic(
 					branch,
