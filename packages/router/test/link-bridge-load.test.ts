@@ -81,7 +81,7 @@ describe('router link bridge', () => {
 		const entry = bridgeEntry();
 		const html = await (await entry.fetch(new Request('http://router.test/'))).text();
 		const stub =
-			/<script type="module" data-markless-router-link-resumer>import b from"([^"]+)";b\(/.exec(
+			/<script type="module" async data-markless-router-link-resumer>import b from"([^"]+)";b\(/.exec(
 				html,
 			);
 		expect(stub?.[1]).toMatch(/^\/_markless\/links\/[0-9a-z]+\.js$/);
@@ -105,6 +105,13 @@ describe('router link bridge', () => {
 		const devHtml = await (await dev.fetch(new Request('http://router.test/'))).text();
 		expect(devHtml).toContain('<script data-markless-router-link-resumer>');
 		expect(devHtml).not.toContain('/_markless/links/');
+	});
+
+	test('a built page runs its bridge as soon as it arrives, so the page’s own module scripts never wait for its download', async () => {
+		const html = await (await bridgeEntry().fetch(new Request('http://router.test/'))).text();
+		const stub = /<script\b([^>]*)\bdata-markless-router-link-resumer>import b from/.exec(html);
+		expect(stub?.[1]).toMatch(/\btype="module"/);
+		expect(stub?.[1]).toMatch(/\basync\b/);
 	});
 
 	test('declares only what the page uses at load', async () => {

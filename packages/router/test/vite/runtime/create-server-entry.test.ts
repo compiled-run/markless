@@ -372,7 +372,7 @@ describe('server entry rendering', () => {
 		);
 		// The one module script is the shared link bridge; nothing else wakes at load.
 		expect(
-			html.match(/<script type="module"(?! data-markless-router-link-resumer>)/),
+			html.match(/<script type="module"(?! async data-markless-router-link-resumer>)/),
 		).toBeNull();
 		expect(html).not.toContain('virtual:markless-router/client-entry');
 		expect(html).not.toContain('__marklessRouterStartSpaNavigation');
