@@ -10,6 +10,7 @@ When your PR merges or your task ends, remove your git worktree (`git worktree r
 ## One analysis, used everywhere
 
 The yuku analyzer analyzes the whole project once: modules, imports and exports, scopes, bindings, references and the semantic graph. That analysis is the single source of truth. Every later stage (compiler, bundler, router, migrator, editor tooling) consumes those facts and never re-derives them by scanning text, matching regexes or re-parsing its own output. Emit correct output from the facts rather than editing output afterwards. If a stage needs a fact the analysis lacks, add it to the analyzer once so every stage gets it.
+Agents: before writing any check, scan, probe or rewrite over code or build output, name the analyzer or build fact that answers it and use that. A regex, string search or ad hoc parse over code is an architecture violation, not a shortcut; if the fact is missing, add it to the analyzer or return blocked.
 
 ## CI discipline
 
