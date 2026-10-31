@@ -1,6 +1,6 @@
 // Tells screen readers which page an in-place navigation landed on, as Next.js's route announcer does.
+// vite/entries/fragment-entry.ts carries a copy: one shared module would add a file to every navigation's fetches.
 type Announcer = { readonly region: HTMLElement; timer?: number };
-// Kept on the document: the fragment swap and the client renderer can each carry a copy of this module.
 const ANNOUNCER = '__marklessRouteAnnouncer';
 
 export function pageName(d: Document): string {
@@ -9,16 +9,10 @@ export function pageName(d: Document): string {
 	return heading?.innerText || heading?.textContent || '';
 }
 
-// Path, query and a '#/' route hash: an in-page anchor or the same URL again is not a new page.
-export function pageAddress(href: string): string {
-	const url = new URL(href);
-	return url.pathname + url.search + (url.hash.startsWith('#/') ? url.hash : '');
-}
-
-export function announcePage(d: Document, leftAddress: string, leftName: string): void {
+export function announcePage(d: Document, leftName: string): void {
 	const body = d.body;
 	const w = d.defaultView;
-	if (!body || !w || pageAddress(w.location.href) === leftAddress) return;
+	if (!body || !w) return;
 	const name = pageName(d);
 	if (!name || name === leftName) return;
 	const slot = d as unknown as Record<string, Announcer | undefined>;

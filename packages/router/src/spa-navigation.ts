@@ -12,7 +12,7 @@ import {
 	type RouteUpdate,
 } from './route-state.ts';
 import { LINK_ATTRIBUTE, REPLACE_ATTRIBUTE, SCROLL_ATTRIBUTE } from './link-attributes.ts';
-import { announcePage, pageAddress, pageName } from './vite/entries/route-announcer.ts';
+import { announcePage, pageName } from './route-announcer.ts';
 
 const STARTED = '__marklessRouterSpaNavigationStarted';
 const LINK_INFO = '__marklessRouterLink';
@@ -67,6 +67,12 @@ function hashRoutePath(url: URL): string | undefined {
 // deepest-specified route intent); otherwise the pathname routes.
 function routePathname(url: URL, _context?: NavigationContext): string {
 	return hashRoutePath(url) ?? url.pathname;
+}
+
+// An in-page anchor or the same URL again is not a new page to announce.
+function pageAddress(href: string): string {
+	const url = new URL(href);
+	return url.pathname + url.search + (hashRoutePath(url) ?? '');
 }
 
 export async function __marklessRouterStartSpaNavigation(options: StartSpaNavigationOptions) {
@@ -219,8 +225,12 @@ async function renderRoute(
 	await new Promise<void>((resolve) => {
 		dispatchRouteUpdate(context.window.document, { ...update, onRendered: resolve });
 	});
-	if (leaving && !signal?.aborted)
-		announcePage(context.window.document, leaving.address, leaving.name);
+	if (
+		leaving &&
+		!signal?.aborted &&
+		pageAddress(context.window.location.href) !== leaving.address
+	)
+		announcePage(context.window.document, leaving.name);
 }
 
 // A '#/...' URL cannot fall back to a server document load (assigning a hash

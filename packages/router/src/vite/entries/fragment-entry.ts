@@ -1,6 +1,5 @@
 // The swap half of fragment navigation; the inline link bridge (vite/fragment-navigation.ts) fetches, this module commits.
 import type { ModulePreloadInput } from '@markless/web/render-to-string';
-import { announcePage, pageName } from '@markless/router/vite/route-announcer';
 
 export interface FragmentNavigationConfig {
 	readonly entry: string;
@@ -285,8 +284,7 @@ function captureLoadListeners(d: Document, w: Window, into: LoadListener[]): () 
 		) {
 			// A bare call has no receiver; one for the event that already fired is kept off the target, which would hold it and its page for good.
 			const self = this ?? w;
-			if (kind === type && listener && self === target)
-				return void into.push({ target, type, listener });
+			if (kind === type && listener && self === target) return void into.push({ target, type, listener });
 			return add.call(self, kind, listener, options);
 		};
 		return () => {
@@ -753,8 +751,7 @@ function withoutTransitions(d: Document): () => void {
 			const observer = new w.ResizeObserver(() => {
 				observer.disconnect();
 				for (const animation of d.getAnimations())
-					if (!running.has(animation) && animation instanceof w.CSSTransition)
-						animation.cancel();
+					if (!running.has(animation) && animation instanceof w.CSSTransition) animation.cancel();
 				if (frames > 1) w.requestAnimationFrame(() => beforePaint(frames - 1));
 			});
 			observer.observe(d.documentElement);
@@ -1006,7 +1003,7 @@ export async function navigate(
 			),
 		);
 	const ranFiles = filesRan(d);
-	const leaving = { address: state.shown, name: pageName(d) };
+	const leaving = { key: state.shown, name: pageName(d) };
 	const head = await mergeHead(d, next);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (stale()) return abandon();
@@ -1166,7 +1163,7 @@ export async function navigate(
 		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
-	announcePage(d, leaving.address, leaving.name);
+	if (state.shown !== leaving.key) announcePage(d, leaving.name);
 	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
 	state.rescan();
 	const key = state.shown;
@@ -1196,4 +1193,47 @@ export async function navigate(
 		},
 	);
 	await ran;
+}
+
+// Tells screen readers which page a swap landed on, as Next.js's route announcer does.
+// src/route-announcer.ts carries a copy: one shared module would add a file to every navigation's fetches.
+type Announcer = { readonly region: HTMLElement; timer?: number };
+const ANNOUNCER = '__marklessRouteAnnouncer';
+
+function pageName(d: Document): string {
+	if (d.title) return d.title;
+	const heading = d.querySelector?.('h1') as HTMLElement | null | undefined;
+	return heading?.innerText || heading?.textContent || '';
+}
+
+function announcePage(d: Document, leftName: string): void {
+	const body = d.body;
+	const w = d.defaultView;
+	if (!body || !w) return;
+	const name = pageName(d);
+	if (!name || name === leftName) return;
+	const slot = d as unknown as Record<string, Announcer | undefined>;
+	let announcer = slot[ANNOUNCER];
+	if (!announcer) {
+		const host = d.createElement('markless-route-announcer');
+		host.style.cssText = 'position:absolute';
+		const region = d.createElement('div');
+		region.setAttribute('aria-live', 'assertive');
+		region.setAttribute('role', 'alert');
+		region.style.cssText =
+			'position:absolute;border:0;height:1px;margin:-1px;padding:0;width:1px;clip:rect(0 0 0 0);overflow:hidden;white-space:nowrap;word-wrap:normal';
+		host.attachShadow({ mode: 'open' }).append(region);
+		slot[ANNOUNCER] = announcer = { region };
+	}
+	const { region } = announcer;
+	const host = (region.getRootNode() as ShadowRoot).host;
+	w.clearTimeout(announcer.timer);
+	if (host.isConnected) {
+		region.textContent = name;
+		return;
+	}
+	// Screen readers may skip text a live region is inserted with, so the text lands once the region is in place.
+	region.textContent = '';
+	body.append(host);
+	announcer.timer = w.setTimeout(() => (region.textContent = name), 100);
 }

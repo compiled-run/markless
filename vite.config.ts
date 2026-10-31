@@ -170,7 +170,6 @@ const buildOrder: PackUserConfig[] = [
 			'vite/runtime/mdx-route': './src/vite/runtime/mdx-route.ts',
 			'vite/runtime/create-server-entry': './src/vite/runtime/create-server-entry.ts',
 			'vite/route-href': './src/vite/entries/route-href.ts',
-			'vite/route-announcer': './src/vite/entries/route-announcer.ts',
 			'typescript-plugin': './src/typescript-plugin/index.ts',
 		},
 	}),
