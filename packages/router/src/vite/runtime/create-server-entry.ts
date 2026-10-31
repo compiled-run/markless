@@ -246,7 +246,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		}
 		return head.then((hrefs) => [...new Set([...own, ...hrefs])]);
 	}
-	// A destination's own stylesheets arrive inside its fragment, so a press preloads only those it would request.
+	// A destination's own stylesheets arrive inside its fragment, so a press preloads only those it may request.
 	function requestedStylesheetsAt(
 		url: URL,
 		match: NonNullable<ReturnType<typeof matchRouteManifest>>,
@@ -254,7 +254,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		request: Request,
 	): Promise<readonly string[]> {
 		return pageStylesheetsAt(url, match, documentModule, request).then((hrefs) =>
-			hrefs.filter((href) => !inlineStylesheets.inlines(href)),
+			hrefs.filter((href) => !inlineStylesheets.carries(href)),
 		);
 	}
 
@@ -601,22 +601,23 @@ function dedupeHeadLinks(
 	});
 }
 
-// A stylesheet the build holds the text of rides inside the page. A fragment names the ones every page
-// carries without their text; the link stands in only for a document that somehow lacks one.
+// A stylesheet the build holds the text of rides inside the page. A fragment carries the text only of those its own route
+// alone uses; the rest it names, so a document keeps the one it has and fetches, as a file, one it lacks.
 function inlineStylesheetPlan(options: ServerEntryOptions) {
 	const sources = options.stylesheetSources ?? {};
-	const routes = Object.values(options.routeStylesheets ?? {});
-	const everyPage = new Set([
-		...(options.documentStylesheets ?? []),
-		...(routes[0] ?? []).filter((href) => routes.every((hrefs) => hrefs.includes(href))),
-	]);
+	const routes = new Map<string, number>();
+	for (const hrefs of Object.values(options.routeStylesheets ?? {}))
+		for (const href of new Set(hrefs)) routes.set(href, (routes.get(href) ?? 0) + 1);
+	const documentHrefs = new Set(options.documentStylesheets ?? []);
 	const inlines = (href: string) => Object.hasOwn(sources, href);
+	const routeOwn = (href: string) => routes.get(href) === 1 && !documentHrefs.has(href);
 	return {
-		inlines,
+		// What a destination's fragment carries as text, so a press need not fetch it.
+		carries: (href: string) => inlines(href) && routeOwn(href),
 		injection(href: string, fragment: boolean): RenderHeadInjection {
 			if (!inlines(href))
 				return { tag: 'link', location: 'head', attributes: { rel: 'stylesheet', href } };
-			if (fragment && everyPage.has(href))
+			if (fragment && !routeOwn(href))
 				return {
 					tag: 'link',
 					location: 'head',

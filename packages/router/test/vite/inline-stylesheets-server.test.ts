@@ -14,17 +14,27 @@ const sources = {
 	'/assets/shared.css': '.nav{--shared:1}',
 	'/assets/index.css': '.home{--index:1}',
 	'/assets/next.css': '.next{--next:1}',
+	'/assets/pair.css': '.pair{--pair:1}',
 };
 
 function entry(options: Partial<ServerEntryOptions> = {}) {
 	return createServerEntry({
 		navigationEntryPath: '/navigation.js',
 		fragmentEntryPath: '/fragment.js',
-		routeSsrModulePreloads: { 'pages/index.tsrx': ['/i.js'], 'pages/next.tsrx': ['/n.js'] },
-		routeModulePreloads: { 'pages/index.tsrx': ['/i.js'], 'pages/next.tsrx': ['/n.js'] },
+		routeSsrModulePreloads: {
+			'pages/index.tsrx': ['/i.js'],
+			'pages/next.tsrx': ['/n.js'],
+			'pages/last.tsrx': ['/l.js'],
+		},
+		routeModulePreloads: {
+			'pages/index.tsrx': ['/i.js'],
+			'pages/next.tsrx': ['/n.js'],
+			'pages/last.tsrx': ['/l.js'],
+		},
 		routeStylesheets: {
 			'pages/index.tsrx': ['/assets/shared.css', '/assets/index.css'],
-			'pages/next.tsrx': ['/assets/shared.css', '/assets/next.css'],
+			'pages/next.tsrx': ['/assets/shared.css', '/assets/pair.css', '/assets/next.css'],
+			'pages/last.tsrx': ['/assets/shared.css', '/assets/pair.css'],
 		},
 		documentStylesheets: ['/assets/doc.css'],
 		stylesheetSources: sources,
@@ -40,8 +50,9 @@ function entry(options: Partial<ServerEntryOptions> = {}) {
 				'<div data-async-container><a href="/next" data-markless-router-link>Next</a></div>',
 			),
 			'pages/next.tsrx': page('<div data-async-container><h1>Next</h1></div>'),
+			'pages/last.tsrx': page('<div data-async-container><h1>Last</h1></div>'),
 		},
-		routeFileIds: ['/pages/index.tsrx', '/pages/next.tsrx'],
+		routeFileIds: ['/pages/index.tsrx', '/pages/next.tsrx', '/pages/last.tsrx'],
 		...options,
 	});
 }
@@ -61,7 +72,7 @@ test('a document carries each stylesheet it links as inline text, in the order i
 	expect(order).toEqual([...order].sort((left, right) => left - right));
 });
 
-test('a fragment names the stylesheets every page has and carries the text of its own', async () => {
+test('a fragment carries the text only of the stylesheets its route alone uses, and names the rest', async () => {
 	const app = entry();
 	const fragment = await (
 		await app.fetch(new Request(fragmentRequestUrl('https://app.test/next')))
@@ -73,15 +84,18 @@ test('a fragment names the stylesheets every page has and carries the text of it
 		'<link rel="stylesheet" href="/assets/shared.css" data-markless-css="/assets/shared.css">',
 	);
 	expect(fragment).toContain(
+		'<link rel="stylesheet" href="/assets/pair.css" data-markless-css="/assets/pair.css">',
+	);
+	expect(fragment).toContain(
 		'<style data-markless-css="/assets/next.css">.next{--next:1}</style>',
 	);
-	expect(fragment).not.toContain('--doc');
-	expect(fragment).not.toContain('--shared');
+	for (const shared of ['--doc', '--shared', '--pair']) expect(fragment).not.toContain(shared);
 });
 
-test('a press preloads no stylesheet the destination carries inline', async () => {
+test('a press preloads the stylesheets a destination only names, and none it carries', async () => {
 	const html = await (await entry().fetch(new Request('https://app.test/'))).text();
 	expect(html).not.toContain('/assets/next.css');
+	expect(html).toContain('/assets/pair.css');
 });
 
 test('a stylesheet the build holds no text for stays a link', async () => {
