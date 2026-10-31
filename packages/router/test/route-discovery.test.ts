@@ -10,8 +10,12 @@ test('a page module whose default export is a promise loads as its settled artif
 	expect(page.default).toBe(artifact);
 });
 
-test('a page module with a plain default export loads as the module itself', async () => {
-	const module = { default: { renderData: {} } };
-	const { pageModuleLoaders } = createRouteDiscovery({ '/pages/about.mdx': async () => module });
-	expect(await pageModuleLoaders['pages/about.mdx']!()).toBe(module);
+test('a page module with a plain default export loads with that export', async () => {
+	const page = { renderData: {} };
+	const { pageModuleLoaders } = createRouteDiscovery({
+		'/pages/about.mdx': async () => ({ default: page }),
+	});
+	expect(((await pageModuleLoaders['pages/about.mdx']!()) as { default: unknown }).default).toBe(
+		page,
+	);
 });

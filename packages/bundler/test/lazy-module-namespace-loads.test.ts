@@ -1,10 +1,12 @@
 import { rolldown, type OutputChunk, type Plugin } from 'rolldown';
+import { parseSync } from 'rolldown/experimental';
 import { expect, test } from 'vitest';
 import { collectRenderedModules } from '../src/build/byte-attribution.ts';
 import {
 	collapseLazyModuleFacades,
 	lazyModuleFacadesPlugin,
 } from '../src/build/lazy-module-facades.ts';
+import { namespaceLoadTexts } from '../src/build/namespace-lazy-loads.ts';
 import { packTopLevelPlugin } from '../src/build/pack-top-level.ts';
 import { shortExportNamesPlugin } from '../src/build/short-export-names.ts';
 import { clientRouteArtifactReference } from '../src/virtual-ids.ts';
@@ -25,6 +27,7 @@ async function build(
 	options: { minify?: boolean } = {},
 ) {
 	let rendered = 0;
+	const inputs: string[] = [];
 	const facades = lazyModuleFacadesPlugin();
 	const bundle = await rolldown({
 		input: 'entry',
@@ -34,8 +37,9 @@ async function build(
 			memory(sources),
 			{
 				name: 'render-count',
-				renderChunk() {
+				renderChunk(code) {
 					rendered++;
+					inputs.push(code);
 				},
 			},
 			facades,
@@ -63,6 +67,7 @@ async function build(
 		});
 		return {
 			rendered,
+			inputs,
 			chunks: output.filter((item): item is OutputChunk => item.type === 'chunk'),
 		};
 	} finally {
@@ -291,3 +296,52 @@ test('text that only reads like a same-pack namespace load stays as written', ()
 		'Promise.resolve().then(() => (init_b(), b_exports))',
 	);
 });
+
+// How often code calls each named function, outside the lazy loads the facade pass replaces on purpose.
+function namedCalls(code: string): Map<string, number> {
+	const replaced = namespaceLoadTexts(code).flatMap((text) => {
+		const spans: [number, number][] = [];
+		for (let at = code.indexOf(text); at !== -1; at = code.indexOf(text, at + 1))
+			spans.push([at, at + text.length]);
+		return spans;
+	});
+	const calls = new Map<string, number>();
+	const visit = (node: unknown): void => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) return node.forEach(visit);
+		const syntax = node as {
+			type?: string;
+			start: number;
+			end: number;
+			callee?: { type?: string; name?: string };
+		};
+		if (
+			syntax.type === 'CallExpression' &&
+			syntax.callee?.type === 'Identifier' &&
+			syntax.callee.name !== '__exportAll' &&
+			!replaced.some(([start, end]) => start <= syntax.start && syntax.end <= end)
+		)
+			calls.set(syntax.callee.name!, (calls.get(syntax.callee.name!) ?? 0) + 1);
+		for (const value of Object.values(node))
+			if (value && typeof value === 'object') visit(value);
+	};
+	visit(parseSync('chunk.js', code).program);
+	return calls;
+}
+
+test.each([
+	['facade chunks', withTopLevelAwait(lazySources)],
+	['namespace reads', lazySources],
+])(
+	'every call Rolldown rendered survives the facade, pack and export-name passes (%s)',
+	async (_, sources) => {
+		const { inputs, chunks } = await build(sources, lazyPack);
+		const before = new Map<string, number>();
+		for (const input of inputs)
+			for (const [name, count] of namedCalls(input))
+				before.set(name, (before.get(name) ?? 0) + count);
+		const after = namedCalls(chunks.map((chunk) => chunk.code).join('\n;\n'));
+		const dropped = [...before].filter(([name, count]) => (after.get(name) ?? 0) < count);
+		expect(dropped).toEqual([]);
+	},
+);
