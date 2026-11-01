@@ -169,7 +169,8 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 		if (write.passedTo) {
 			const passed = lowerPassedStateWrite(write, write.passedTo, input, lookup);
-			if (passed) writes.push(passed);
+			if (passed?.kind === 'write') writes.push(passed.write);
+			else if (passed) diagnostics.push(passed.diagnostic);
 			continue;
 		}
 
@@ -337,26 +338,35 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 	};
 }
 
-// A call changed state in place; a path that is not writable state is the call's own business.
+// A call changed state in place; an assumed change to a value nothing may write is the call's own business.
 function lowerPassedStateWrite(
 	write: SemanticStateWrite,
 	passedTo: PassedStateWrite,
 	input: StateLoweringInput,
 	lookup: GraphLookup,
-): LoweredStateWrite | null {
+): RowItemWriteLowering | null {
 	if (write.rowRepeatId) {
 		const row = lowerRowItemWrite(write, input);
-		return row?.kind === 'write' ? { ...row.write, source: passedTo.argument, passedTo } : null;
+		if (row?.kind === 'write')
+			return { kind: 'write', write: { ...row.write, source: passedTo.argument, passedTo } };
+		return row && !passedTo.assumed ? row : null;
 	}
 	const resolved = resolveStateGraphPath(input, write.target, lookup, null, write.componentName);
-	if (!resolved || resolved.binding.kind !== 'state' || !resolved.binding.writable) return null;
+	if (!resolved) return null;
+	if (resolved.binding.kind !== 'state' || !resolved.binding.writable)
+		return passedTo.assumed
+			? null
+			: { kind: 'diagnostic', diagnostic: readOnlyWriteDiagnostic(write, resolved.binding) };
 	return {
-		source: passedTo.argument,
-		sourceSpan: write.targetSpan,
-		graphNodeId: resolved.binding.id,
-		path: resolved.path,
-		operation: 'call',
-		passedTo,
+		kind: 'write',
+		write: {
+			source: passedTo.argument,
+			sourceSpan: write.targetSpan,
+			graphNodeId: resolved.binding.id,
+			path: resolved.path,
+			operation: 'call',
+			passedTo,
+		},
 	};
 }
 

@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { markDone, retitle, titleOf } from './mutators.ts';
+import { archive, markDone, retitle, titleOf } from './mutators.ts';
 
 export default function RowsPage() @{
 	let board = state({ meta: { title: 'week' }, tasks: [{ id: 't1', title: 'mail', done: false }, { id: 't2', title: 'shop', done: false }] });
@@ -14,6 +14,7 @@ export default function RowsPage() @{
 				<li data-task={task.id}>
 					<span>{task.done ? 'done' : 'open'}</span>
 					<button onClick={() => markDone(task)}>toggle</button>
+					<button data-archive onClick={() => archive(board.tasks, task)}>archive</button>
 				</li>
 			}
 		</ul>

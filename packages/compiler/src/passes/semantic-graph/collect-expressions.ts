@@ -101,12 +101,22 @@ export function collectPassedStateWrites(node: AnyNode, state: WalkState): void 
 	const callee = calleeWrites(node, state);
 	if (callee.kind === 'skip') return;
 	const callSource = expressionSource(node, state.source);
+	const calleeSource = expressionSource(node.callee as AnyNode, state.source);
+	// A spread before an argument moves it to a parameter position no fact names.
+	let shifted = false;
 	asNodes(node.arguments).forEach((argument, argumentIndex) => {
-		if (argument.type === 'SpreadElement') return;
+		if (argument.type === 'SpreadElement') {
+			shifted = true;
+			return;
+		}
 		const value = unwrapValueWrappers(argument);
 		if (value?.type !== 'Identifier' && value?.type !== 'MemberExpression') return;
-		if (!passesComponentState(value, state)) return;
-		const writes = callee.facts ? argumentWrites(callee.facts, argumentIndex) : WHOLE_VALUE;
+		const passed = passedState(value, state);
+		if (!passed) return;
+		const facts = shifted ? null : callee.facts;
+		const known = facts ? argumentWrites(facts, argumentIndex) : WHOLE_VALUE;
+		// Lowering refuses a known write to a value nothing may write, as it refuses the same write in the handler.
+		const writes = passed === 'writable' ? known : known.filter((write) => !write.assumed);
 		if (writes.length === 0) return;
 		const source = expressionSource(value, state.source);
 		for (const write of writes)
@@ -119,10 +129,11 @@ export function collectPassedStateWrites(node: AnyNode, state: WalkState): void 
 				passedTo: {
 					argument: source,
 					argumentIndex,
+					callee: calleeSource,
 					...(write.assumed ? { assumed: true as const } : {}),
 				},
 			});
-		if (!callee.quiet && writes.some((write) => write.assumed))
+		if ((shifted || !callee.quiet) && writes.some((write) => write.assumed))
 			state.graph.diagnostics.push(
 				callWritesAssumedDiagnostic({
 					call: callSource,
@@ -253,19 +264,20 @@ function moduleFunctionWrites(state: WalkState): FunctionWritesAnalysis {
 }
 
 // The argument names component state directly, not a handler local of the same name.
-function passesComponentState(value: AnyNode, state: WalkState): boolean {
-	if (writeThroughLocal(value, state, 'call')) return false;
+function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only' | null {
+	if (writeThroughLocal(value, state, 'call')) return null;
 	const source = expressionSource(value, state.source);
 	if (repeatRowBindsName(source, state))
-		return rowWriteScope(value, state).rowRepeatId !== undefined;
+		return rowWriteScope(value, state).rowRepeatId !== undefined ? 'writable' : null;
 	const resolved = resolveGraphPath(
 		source,
 		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 	);
-	if (!resolved || resolved.binding.kind !== 'state' || !resolved.binding.writable) return false;
-	if (resolved.binding.sharedDefinitionId !== undefined) return false;
-	return resolved.path.length > 0 || resolved.binding.valueKind !== 'scalar';
+	if (!resolved || resolved.binding.sharedDefinitionId !== undefined) return null;
+	if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
+	if (resolved.path.length === 0 && resolved.binding.valueKind === 'scalar') return null;
+	return resolved.binding.kind === 'state' && resolved.binding.writable ? 'writable' : 'read-only';
 }
 
 export function collectCollectionCall(node: AnyNode, state: WalkState): void {

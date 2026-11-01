@@ -93,6 +93,9 @@ async function rowsAndNestedPaths() {
 	await expect.poll(() => text('[data-title]')).toBe('month');
 	press('[data-show]');
 	await expect.poll(() => text('[data-shown]')).toBe('MONTH');
+	document.querySelector<HTMLElement>('[data-task="t1"] [data-archive]')!.click();
+	await expect.poll(() => document.querySelectorAll('[data-task]').length).toBe(1);
+	expect(taskState('t2')).toBe('done');
 }
 
 test('CSR: a helper handed a row item or a nested path updates that row and that path', async () => {

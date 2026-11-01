@@ -156,12 +156,12 @@ test('a call to an imported helper marks exactly the paths the helper writes', a
 		expect.objectContaining({
 			graphNodeId: 'state:card',
 			path: ['label'],
-			passedTo: { argument: 'card', argumentIndex: 0 },
+			passedTo: { argument: 'card', argumentIndex: 0, callee: 'setLabel' },
 		}),
 		expect.objectContaining({
 			graphNodeId: 'state:tags',
 			path: [],
-			passedTo: { argument: 'tags', argumentIndex: 0 },
+			passedTo: { argument: 'tags', argumentIndex: 0, callee: 'append' },
 		}),
 	]);
 	const source = handler(result);
@@ -193,7 +193,7 @@ test('without the helper module facts the compile asks for them and assumes the 
 		expect.objectContaining({
 			graphNodeId: 'state:card',
 			path: [],
-			passedTo: { argument: 'card', argumentIndex: 0, assumed: true },
+			passedTo: { argument: 'card', argumentIndex: 0, callee: 'setLabel', assumed: true },
 		}),
 	]);
 	// The host supplies the facts and compiles again, so nothing is reported yet.
@@ -228,7 +228,9 @@ test('a function looked up at run time is assumed to change all of what it is ha
 			passedTo: expect.objectContaining({ assumed: true }),
 		}),
 	]);
-	expect(handler(result)).toMatch(/marklessChanged\(\s*registry\.get\(["']inc["']\)\?\.\(/);
+	expect(handler(result)).toMatch(
+		/marklessChanged\(\s*context\.graph,\s*\[\s*\[\s*"state:card",\s*\[\s*\]\s*\]\s*\],\s*registry\.get\(["']inc["']\)\?\.\(/,
+	);
 	expect(diagnostics(result, 'MARKLESS_CALL_WRITES_ASSUMED')).toHaveLength(1);
 });
 
@@ -244,7 +246,7 @@ test('a function declared in the same file is read for the paths it writes', asy
 		expect.objectContaining({
 			graphNodeId: 'state:card',
 			path: ['label'],
-			passedTo: { argument: 'card', argumentIndex: 0 },
+			passedTo: { argument: 'card', argumentIndex: 0, callee: 'rename' },
 		}),
 	]);
 	expect(result.semanticGraph.importedFunctionWriteRequests).toBeUndefined();
@@ -258,4 +260,92 @@ test('a handler local, a scalar and a reading platform call are left alone', asy
 
 	expect(result.stateLowering.writes.filter((write) => write.passedTo)).toEqual([]);
 	expect(diagnostics(result, 'MARKLESS_CALL_WRITES_ASSUMED')).toEqual([]);
+});
+
+test('a callback handed by name, the array a callback is handed, and an alias of two paths are all followed', () => {
+	const facts = analyzeModuleFunctionWrites({
+		filename: 'src/walk.ts',
+		source: `function stamp(entry: { seen: boolean }) {
+	entry.seen = true;
+}
+export function stampAll(entries: { seen: boolean }[]) {
+	entries.forEach(stamp);
+}
+export function stampByIndex(entries: { seen: boolean }[]) {
+	entries.map((_entry, at, all) => (all[at]!.seen = true));
+}
+export function pickSide(pair: { left: { tag: string }; right: { tag: string } }, left: boolean) {
+	const side = left ? pair.left : pair.right;
+	side.tag = 'x';
+}
+function inner(holder: { core: { tag: string } }) {
+	return holder.core;
+}
+export function viaResult(holder: { core: { tag: string } }) {
+	inner(holder).tag = 'y';
+}
+`,
+	});
+	expect(facts).toEqual({
+		stampAll: { parameters: [[{ path: [] }]] },
+		stampByIndex: { parameters: [[{ path: [] }]] },
+		pickSide: { parameters: [[{ path: ['left', 'tag'] }, { path: ['right', 'tag'] }], []] },
+		viaResult: { parameters: [[{ path: [] }]] },
+	});
+});
+
+test('an argument after a spread is assumed written whole, since no fact names its position', async () => {
+	const result = await compile(page(`() => setLabel(...[], card)`), facts);
+
+	expect(result.stateLowering.writes).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'state:card',
+			path: [],
+			passedTo: expect.objectContaining({ argumentIndex: 1, assumed: true }),
+		}),
+	]);
+});
+
+test('two calls handing the same state to different helpers each mark their own paths', async () => {
+	const helpersWith = {
+		'./helpers.ts': {
+			...facts['./helpers.ts'],
+			setSize: { parameters: [[{ path: ['size'] }]] },
+		},
+	};
+	const result = await compile(
+		page(
+			`(event) => { if (event.shiftKey) setLabel(card, 'b'); else setSize(card); }`,
+			`import { setLabel, setSize } from './helpers.ts';`,
+		),
+		helpersWith,
+	);
+
+	const source = handler(result);
+	expect(source).toMatch(/\[\s*"state:card",\s*\[\s*"label"\s*\]\s*\]\s*\],\s*setLabel\(/);
+	expect(source).toMatch(/\[\s*"state:card",\s*\[\s*"size"\s*\]\s*\]\s*\],\s*setSize\(/);
+});
+
+test('a known write into a computed value is refused like the same write in the handler', async () => {
+	const result = await compile(
+		`
+import { computed, state } from '@markless/core';
+import { setLabel } from './helpers.ts';
+
+export function Board() @{
+	let card = state({ label: 'a' });
+	const view = computed(() => ({ label: card.label }));
+	<div>
+		<output>{view.label}</output>
+		<button onClick={() => setLabel(view, 'b')}>go</button>
+	</div>
+}
+`,
+		facts,
+	);
+
+	expect(result.stateLowering.diagnostics.map((diagnostic) => diagnostic.severity)).toContain(
+		'error',
+	);
+	expect(result.stateLowering.writes.filter((write) => write.passedTo)).toEqual([]);
 });

@@ -6867,6 +6867,8 @@ function passedStateCallNode(node: AnyNode, rewrite: EventHandlerRewrite): Emiss
 		const argument = args[passedTo.argumentIndex];
 		if (!argument || valueNodeText(argument, rewrite.source) !== passedTo.argument)
 			return false;
+		if (!isNode(call.callee) || valueNodeText(call.callee, rewrite.source) !== passedTo.callee)
+			return false;
 		const key = `${passedTo.argumentIndex}:${write.graphNodeId}:${JSON.stringify(write.path)}:${JSON.stringify(write.row?.itemPath ?? null)}`;
 		if (claimed.has(key)) return false;
 		claimed.add(key);
@@ -6878,8 +6880,8 @@ function passedStateCallNode(node: AnyNode, rewrite: EventHandlerRewrite): Emiss
 	const rewritten = rewriteEventHandlerChildren(call, (child) =>
 		rewriteEventHandlerNode(child, call, rewrite),
 	);
+	// The paths are found before the call runs: a row the call removes has no path after it.
 	return callNode(identifierNode(CHANGED_FN), [
-		chain ? chainExpressionNode(chain, rewritten) : rewritten,
 		memberChainNode('context.graph'),
 		arrayNode(
 			writes.map((write) =>
@@ -6889,6 +6891,7 @@ function passedStateCallNode(node: AnyNode, rewrite: EventHandlerRewrite): Emiss
 				]),
 			),
 		),
+		chain ? chainExpressionNode(chain, rewritten) : rewritten,
 	]);
 }
 

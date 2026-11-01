@@ -863,9 +863,10 @@ export type ModuleFunctionWrites = Readonly<Record<string, FunctionParameterWrit
 
 /** State handed to a function call that changes it in place before the call returns. */
 export type PassedStateWrite = {
-	/** The argument as authored, which the lowering finds the call by. */
+	/** The argument and callee as authored, which the lowering finds the call by. */
 	readonly argument: string;
 	readonly argumentIndex: number;
+	readonly callee: string;
 	readonly assumed?: true;
 };
 

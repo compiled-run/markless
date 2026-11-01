@@ -1,11 +1,11 @@
 /** A call that changed state in place: once it returns, each path it wrote is marked changed. */
 export function marklessChanged<T>(
-	result: T,
 	graph: {
 		read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
 		changed(change: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }): void;
 	},
 	changes: ReadonlyArray<readonly [graphNodeId: string, path: ReadonlyArray<string>]>,
+	result: T,
 ): T {
 	for (const [graphNodeId, path] of changes) {
 		const parent = path.slice(0, -1);

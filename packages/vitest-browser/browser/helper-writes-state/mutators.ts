@@ -16,3 +16,7 @@ function setTitle(meta: { title: string }, title: string): void {
 export function titleOf(board: { meta: { title: string } }): string {
 	return board.meta.title.toUpperCase();
 }
+export function archive(tasks: { done: boolean }[], task: { done: boolean }): void {
+	task.done = true;
+	tasks.splice(tasks.indexOf(task), 1);
+}

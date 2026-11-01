@@ -194,9 +194,10 @@ export class FunctionWritesAnalysis {
 		return rest ? { parameters, rest } : { parameters };
 	}
 
-	#track(binding: Binding, base: Path, exact: boolean, out: WriteSet, seen: Set<Binding>): void {
-		if (seen.has(binding)) return;
-		seen.add(binding);
+	#track(binding: Binding, base: Path, exact: boolean, out: WriteSet, seen: Set<string>): void {
+		const key = `${binding.id}:${exact}:${JSON.stringify(base)}`;
+		if (seen.has(key)) return;
+		seen.add(key);
 		for (const reference of binding.references) {
 			if (reference.inTypePosition || reference.isWrite) continue;
 			this.#use(reference.node as unknown as AnyNode, base, exact, out, seen);
@@ -204,7 +205,7 @@ export class FunctionWritesAnalysis {
 	}
 
 	// Follows one use of a tracked value up to the expression that decides what happens to it.
-	#use(node: AnyNode, base: Path, exactBase: boolean, out: WriteSet, seen: Set<Binding>): void {
+	#use(node: AnyNode, base: Path, exactBase: boolean, out: WriteSet, seen: Set<string>): void {
 		const module = this.#module;
 		const path = [...base];
 		let exact = exactBase;
@@ -271,7 +272,7 @@ export class FunctionWritesAnalysis {
 			readonly member: boolean;
 		},
 		out: WriteSet,
-		seen: Set<Binding>,
+		seen: Set<string>,
 	): void {
 		const { path, exact, receiver, method, member } = use;
 		switch (parent.type) {
@@ -343,7 +344,7 @@ export class FunctionWritesAnalysis {
 		receiver: Path,
 		method: string | null,
 		out: WriteSet,
-		seen: Set<Binding>,
+		seen: Set<string>,
 	): void {
 		if (method === null) {
 			out.add(receiver, true);
@@ -357,15 +358,33 @@ export class FunctionWritesAnalysis {
 			out.add(receiver, true);
 			return;
 		}
-		if (ELEMENT_CALLBACK_METHODS.has(method)) {
-			const callback = (call.arguments as AnyNode[] | undefined)?.[0];
-			const param = isFunctionNode(callback) ? (callback.params as AnyNode[])[0] : undefined;
-			if (param)
-				for (const element of patternBindings(param, this.#module))
-					this.#track(element, receiver, false, out, seen);
-		}
+		if (ELEMENT_CALLBACK_METHODS.has(method) || method.startsWith('reduce'))
+			this.#callback(call, receiver, method.startsWith('reduce') ? 1 : 0, out, seen);
 		if (ELEMENT_RETURNING_METHODS.has(method) || COPYING_METHODS.has(method))
 			this.#use(call, receiver, false, out, seen);
+	}
+
+	// An array callback is handed each element and then the array itself.
+	#callback(call: AnyNode, receiver: Path, element: number, out: WriteSet, seen: Set<string>): void {
+		const callback = unwrap(((call.arguments as AnyNode[] | undefined)?.[0] ?? call) as AnyNode);
+		if (isFunctionNode(callback)) {
+			const params = (callback.params as AnyNode[]) ?? [];
+			for (const index of [element, element + 2])
+				for (const alias of patternBindings(params[index], this.#module))
+					this.#track(alias, receiver, false, out, seen);
+			return;
+		}
+		const binding =
+			callback.type === 'Identifier'
+				? (this.#module.referenceOf(callback as never)?.binding ?? null)
+				: null;
+		const facts = binding ? this.ofBinding(binding) : null;
+		if (!facts) {
+			out.add(receiver, true);
+			return;
+		}
+		for (const index of [element, element + 2])
+			for (const write of argumentWrites(facts, index)) out.add(receiver, write.assumed);
 	}
 
 	#argument(call: AnyNode, index: number, path: Path, exact: boolean, out: WriteSet): void {
@@ -533,7 +552,7 @@ function unwrap(node: AnyNode): AnyNode {
 	return current;
 }
 
-function isFunctionNode(node: AnyNode | undefined): node is AnyNode {
+function isFunctionNode(node: AnyNode | undefined): boolean {
 	return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 }
 
