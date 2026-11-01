@@ -476,10 +476,11 @@ export function main(argv) {
 		run('node', ['scripts/release/sync-version.mjs', '--check'], { cwd: workdir });
 
 		const sectionFile = path.join(scratch, 'changelog-section.md');
+		// This checkout's release-notes.mjs: an older base's copy may not take every argument below.
 		run(
 			'node',
 			[
-				'scripts/release/release-notes.mjs',
+				path.join(scriptDirectory, 'release-notes.mjs'),
 				'--changelog',
 				'--version',
 				version,
@@ -492,7 +493,7 @@ export function main(argv) {
 				'--out',
 				sectionFile,
 			],
-			{ cwd: workdir },
+			{ cwd: workdir, env: { MARKLESS_REPO_ROOT: workdir } },
 		);
 		const section = readFileSync(sectionFile, 'utf8');
 		const changelogPath = path.join(workdir, 'CHANGELOG.md');
