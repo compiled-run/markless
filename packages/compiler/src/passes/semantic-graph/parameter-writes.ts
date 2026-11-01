@@ -240,6 +240,21 @@ export class FunctionWritesAnalysis {
 				top = parent;
 				continue;
 			}
+			// A new object or array holding the value is followed in its place, at no finer path.
+			const holder = parentOf(module, parent);
+			if (
+				(parent.type === 'Property' && parent.value === top && holder?.type === 'ObjectExpression') ||
+				parent.type === 'ArrayExpression' ||
+				(parent.type === 'SpreadElement' &&
+					(holder?.type === 'ObjectExpression' || holder?.type === 'ArrayExpression'))
+			) {
+				top = parent.type === 'ArrayExpression' ? parent : holder!;
+				exact = false;
+				member = false;
+				method = null;
+				receiver = path.slice();
+				continue;
+			}
 			this.#decide(parent, top, { path, exact, receiver, method, member }, out, seen);
 			return;
 		}
@@ -284,6 +299,11 @@ export class FunctionWritesAnalysis {
 						seen,
 					);
 				return;
+			case 'AssignmentPattern':
+				if (parent.right !== top) return;
+				for (const alias of patternBindings(parent.left as AnyNode, this.#module))
+					this.#track(alias, path, exact && (parent.left as AnyNode).type === 'Identifier', out, seen);
+				return;
 			case 'ForOfStatement':
 				if (parent.right !== top) return;
 				for (const alias of declaredBindings(parent.left as AnyNode, this.#module))
@@ -294,7 +314,7 @@ export class FunctionWritesAnalysis {
 					if (member) this.#methodCall(parent, receiver, method, out, seen);
 					return;
 				}
-				if ((parent.arguments as AnyNode[]).includes(top))
+				if ((parent.arguments as AnyNode[]).includes(top)) {
 					this.#argument(
 						parent,
 						(parent.arguments as AnyNode[]).indexOf(top),
@@ -302,6 +322,9 @@ export class FunctionWritesAnalysis {
 						exact,
 						out,
 					);
+					// What the call returns may be the value it was handed.
+					this.#use(parent, path, false, out, seen);
+				}
 				return;
 			case 'MemberExpression':
 			case 'Property':
@@ -356,6 +379,8 @@ export class FunctionWritesAnalysis {
 					out.add(exact ? [...path, ...write.path] : path, write.assumed);
 				return;
 			}
+		} else if (callee.type === 'MemberExpression' && readsItsArguments(staticKey(callee))) {
+			return;
 		} else if (
 			callee.type === 'MemberExpression' &&
 			isGlobalReadingCall(callee, this.#module)
@@ -484,6 +509,11 @@ function isGlobalReadingCall(callee: AnyNode, module: ModuleSemantics): boolean 
 	if (object.type !== 'Identifier' || property === null) return false;
 	if (module.referenceOf(object as never)?.binding) return false;
 	return READING_GLOBAL_CALLS.has(`${String(object.name)}.${property}`);
+}
+
+// A reduce hands its seed to the callback, which may change it.
+function readsItsArguments(method: string | null): boolean {
+	return method !== null && READING_METHODS.has(method) && !method.startsWith('reduce');
 }
 
 function staticKey(member: AnyNode): string | null {

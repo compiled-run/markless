@@ -46,6 +46,50 @@ test('a module function is read for the paths it writes below each argument', ()
 	});
 });
 
+test('a copy into a new object or array, or a value handed back, is followed rather than counted as a write', () => {
+	const facts = analyzeModuleFunctionWrites({
+		filename: 'src/lists.ts',
+		source: `export function asList(input: string | readonly string[]) {
+	if (typeof input !== 'string') return input;
+	return [input];
+}
+export function flipIn(held: readonly string[], one: string) {
+	const current = asList(held);
+	return current.includes(one) ? current.filter((entry) => entry !== one) : [...current, one];
+}
+export const moveTo = (spot: { at: number; name: string }, at: number) => ({ ...spot, at });
+export function grow(held: string[]) {
+	const same = asList(held) as string[];
+	same.push('x');
+}
+export function wrapAndBump(counter: { hits: number }) {
+	const box = { inner: counter };
+	box.inner.hits++;
+}
+export const nextOf = (walk: { at: number }, at = walk.at) => at + 1;
+export function window(view: { size: number }, lines: string[]) {
+	return lines.slice(0, view.size);
+}
+export function tally(seed: Record<string, number>, keys: string[]) {
+	return keys.reduce((counts, key) => {
+		counts[key] = 1;
+		return counts;
+	}, seed);
+}
+`,
+	});
+	expect(facts).toEqual({
+		asList: { parameters: [[]] },
+		flipIn: { parameters: [[], []] },
+		moveTo: { parameters: [[], []] },
+		grow: { parameters: [[{ path: [] }]] },
+		wrapAndBump: { parameters: [[{ path: [] }]] },
+		nextOf: { parameters: [[], []] },
+		window: { parameters: [[], []] },
+		tally: { parameters: [[{ path: [], assumed: true }], []] },
+	});
+});
+
 test('a value stored somewhere the analysis cannot follow is assumed written whole', () => {
 	const facts = analyzeModuleFunctionWrites({
 		filename: 'src/keep.ts',
