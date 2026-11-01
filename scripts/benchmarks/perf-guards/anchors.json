@@ -33,7 +33,9 @@
 		}
 	},
 	"lean": {
-		"/": ["click@counter-increment"],
+		"/": [
+			"click@counter-increment"
+		],
 		"/records": [],
 		"/settings": []
 	},
@@ -165,7 +167,9 @@
 			"guard": "lean",
 			"subject": "/",
 			"from": null,
-			"to": ["click@counter-increment"],
+			"to": [
+				"click@counter-increment"
+			],
 			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
 		},
 		{
@@ -2324,6 +2328,114 @@
 				"jsGzipBytes": 1678763
 			},
 			"reason": "the docs pages' in-browser compiler gains the post-await read classifier; measured on CI run 41244233368 (PR #397 on main 64dc4b798): docs / +420 B gzip, /concepts/state +513 B gzip, executed chars -1; the 93 B gap between the two pages is not attributed"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "runtime/graph",
+			"from": 10407,
+			"to": 10665,
+			"reason": "a sync computed that only markup reads re-derives when read (spec 03): resume marks it stale on a dependency write and derives it at its next read; graph pullBeforeRead and subscriptionCount, stale tracking in resume-sync-computed (loaded on the first computed write, not run at load)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "web/resume-sync-computed",
+			"from": 2751,
+			"to": 7870,
+			"reason": "a sync computed that only markup reads re-derives when read (spec 03): resume marks it stale on a dependency write and derives it at its next read; graph pullBeforeRead and subscriptionCount, stale tracking in resume-sync-computed (loaded on the first computed write, not run at load)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "web/resume-sync-demand",
+			"from": 1099,
+			"to": 1530,
+			"reason": "a sync computed that only markup reads re-derives when read (spec 03): resume marks it stale on a dependency write and derives it at its next read; graph pullBeforeRead and subscriptionCount, stale tracking in resume-sync-computed (loaded on the first computed write, not run at load)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87961
+			},
+			"reason": "read-time computed derivation ships its resume module in the page's preload (download only; executed at load +140 chars on docs, 0 on bench, measured against main 8a3787394 on this Mac); the docs pages' in-browser compiler gains the deriveOnRead marking and imported-arm escalation"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87961
+			},
+			"reason": "read-time computed derivation ships its resume module in the page's preload (download only; executed at load +140 chars on docs, 0 on bench, measured against main 8a3787394 on this Mac); the docs pages' in-browser compiler gains the deriveOnRead marking and imported-arm escalation"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10848,
+				"jsGzipBytes": 87961
+			},
+			"reason": "read-time computed derivation ships its resume module in the page's preload (download only; executed at load +140 chars on docs, 0 on bench, measured against main 8a3787394 on this Mac); the docs pages' in-browser compiler gains the deriveOnRead marking and imported-arm escalation"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 110612,
+				"jsGzipBytes": 1566081
+			},
+			"to": {
+				"executedChars": 110693,
+				"jsGzipBytes": 1566183
+			},
+			"reason": "read-time computed derivation ships its resume module in the page's preload (download only; executed at load +140 chars on docs, 0 on bench, measured against main 8a3787394 on this Mac); the docs pages' in-browser compiler gains the deriveOnRead marking and imported-arm escalation"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 121354,
+				"jsGzipBytes": 1678656
+			},
+			"to": {
+				"executedChars": 121743,
+				"jsGzipBytes": 1679413
+			},
+			"reason": "read-time computed derivation ships its resume module in the page's preload (download only; executed at load +140 chars on docs, 0 on bench, measured against main 8a3787394 on this Mac); the docs pages' in-browser compiler gains the deriveOnRead marking and imported-arm escalation"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 22480,
+				"jsGzipBytes": 406068
+			},
+			"to": {
+				"executedChars": 22479,
+				"jsGzipBytes": 407103
+			},
+			"reason": "read-time computed derivation ships its resume module in the page's preload (download only; executed at load +140 chars on docs, 0 on bench, measured against main 8a3787394 on this Mac); the docs pages' in-browser compiler gains the deriveOnRead marking and imported-arm escalation"
 		}
 	],
 	"runtimeModules": {
@@ -2340,7 +2452,7 @@
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
-		"runtime/graph": 10407,
+		"runtime/graph": 10665,
 		"runtime/graph-async": 4122,
 		"runtime/graph-collections": 4282,
 		"runtime/graph-computed": 2313,
@@ -2440,8 +2552,8 @@
 		"web/resume-runtime-start": 9385,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2414,
-		"web/resume-sync-computed": 2751,
-		"web/resume-sync-demand": 1099,
+		"web/resume-sync-computed": 7870,
+		"web/resume-sync-demand": 1530,
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
@@ -2489,27 +2601,27 @@
 		"darwin-arm64": {
 			"bench /": {
 				"executedChars": 10775,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87961
 			},
 			"bench /records": {
 				"executedChars": 10791,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87961
 			},
 			"bench /settings": {
-				"executedChars": 10741,
-				"jsGzipBytes": 87007
+				"executedChars": 10848,
+				"jsGzipBytes": 87961
 			},
 			"docs /": {
-				"executedChars": 110612,
-				"jsGzipBytes": 1566081
+				"executedChars": 110693,
+				"jsGzipBytes": 1566183
 			},
 			"docs /concepts/state": {
-				"executedChars": 121354,
-				"jsGzipBytes": 1678656
+				"executedChars": 121743,
+				"jsGzipBytes": 1679413
 			},
 			"docs /ui/accordion": {
-				"executedChars": 22480,
-				"jsGzipBytes": 406068
+				"executedChars": 22479,
+				"jsGzipBytes": 407103
 			}
 		},
 		"linux-x64": {

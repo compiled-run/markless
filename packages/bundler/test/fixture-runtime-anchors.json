@@ -1,6 +1,6 @@
 {
 	"@fixtures/vite-csr": {
-		"runtime/graph": 10746,
+		"runtime/graph": 10653,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
 		"runtime/graph-computed": 2224,
@@ -79,8 +79,8 @@
 		"web/resume-runtime-shared": 2077,
 		"web/resume-runtime-start": 9407,
 		"web/resume-shared-patch": 1188,
-		"web/resume-sync-computed": 3636,
-		"web/resume-sync-demand": 5281,
+		"web/resume-sync-computed": 7858,
+		"web/resume-sync-demand": 1518,
 		"web/runtime-error-reporting": 1864,
 		"web/ssr-data/awaitable": 844,
 		"web/ssr-data/branch-arm-idrefs": 1847,
@@ -88,7 +88,7 @@
 		"web/storage-plane": 1920
 	},
 	"@fixtures/vite-plus": {
-		"runtime/graph": 10746,
+		"runtime/graph": 10653,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
 		"runtime/graph-computed": 2224,
@@ -166,8 +166,8 @@
 		"web/resume-runtime-shared": 2077,
 		"web/resume-runtime-start": 9407,
 		"web/resume-shared-patch": 1188,
-		"web/resume-sync-computed": 3636,
-		"web/resume-sync-demand": 5281,
+		"web/resume-sync-computed": 7858,
+		"web/resume-sync-demand": 1518,
 		"web/runtime-error-reporting": 1864,
 		"web/ssr-data/awaitable": 844,
 		"web/ssr-data/branch-arm-idrefs": 1847,

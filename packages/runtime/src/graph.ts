@@ -312,7 +312,6 @@ type RuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitio
 export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
 	const readInitializers = new Map<string, () => unknown>();
-	const readPulls = new Map<string, () => void>();
 	const computedNodes = createRuntimeComputedNodes(input.computed);
 	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
 	let dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
@@ -346,12 +345,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return readAsyncComputedNode(asyncComputed, path, () =>
 				demandAsyncComputed(asyncComputed),
 			);
-		}
-
-		const pull = readPulls.size > 0 ? readPulls.get(graphNodeId) : undefined;
-		if (pull) {
-			readPulls.delete(graphNodeId);
-			pull();
 		}
 
 		const initialize = readInitializers.get(graphNodeId);
@@ -620,7 +613,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const seeded = cells.has(write.graphNodeId);
 			if (
 				!seeded ||
-				!(plane?.commitDerived(write, path) || Object.is(readPath(current, path), write.value))
+				!(
+					plane?.commitDerived(write, path) ||
+					Object.is(readPath(current, path), write.value)
+				)
 			)
 				commitCell(write.graphNodeId, path, write.value);
 			return write.value;
@@ -675,7 +671,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,
 		pullBeforeRead(graphNodeId, pull) {
-			readPulls.set(graphNodeId, pull);
+			// The pull writes the node itself, so the initializer answers what it held before.
+			readInitializers.set(graphNodeId, () => {
+				const before = cells.get(graphNodeId);
+				pull();
+				return before;
+			});
 		},
 		subscribeWrite(observer) {
 			writeObservers.push(observer);

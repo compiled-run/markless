@@ -115,6 +115,7 @@ export async function refreshSyncComputed(
 			Omit<ResumeSyncComputedRecord, 'deriveSymbolId'> & {
 				readonly async?: boolean;
 				readonly deriveSymbolId?: string;
+				readonly deriveOnRead?: true;
 			}
 		>;
 	},
@@ -171,7 +172,8 @@ function awaitsAsyncAncestor(
 
 // A re-run keeps its prior settled value readable (spec D8), so only a first run or a rejection has nothing to read.
 function hasReadableValue(snapshot: unknown): boolean {
-	const { status, value } = (snapshot as { readonly status?: unknown; readonly value?: unknown } | null) ?? {};
+	const { status, value } =
+		(snapshot as { readonly status?: unknown; readonly value?: unknown } | null) ?? {};
 	return status === 'fulfilled' || (status === 'pending' && value !== undefined);
 }
 
@@ -191,4 +193,177 @@ function seedSourceGraph(graph: RuntimeGraph, record: ResumeSyncComputedRecord):
 		return route ? graph.read(route.graphNodeId, route.path) : graph.read(graphNodeId, path);
 	};
 	return { ...graph, read };
+}
+
+type OnReadRecord = ResumeSyncComputedRecord & {
+	readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
+};
+
+type OnReadNode = {
+	readonly record: OnReadRecord;
+	stale: boolean;
+	version: number;
+	derive?: ResumeSymbol;
+	loading?: Promise<void>;
+	pending?: Promise<void>;
+};
+
+type OnReadGraph = {
+	readonly nodes: Map<string, OnReadNode>;
+	readonly readers: Map<string, Set<string>>;
+	// The demand subscriptions on each node, which read nothing themselves.
+	readonly own: Map<string, number>;
+	// Read by an async computed, which the graph re-runs from the value itself.
+	readonly asyncRead: Set<string>;
+	scanned: number;
+};
+
+const onReadGraphs = new WeakMap<RuntimeGraph, OnReadGraph>();
+
+/**
+ * Spec 03 for a computed only markup reads: a dependency write marks it stale,
+ * and it re-derives in that pass only while something shown subscribes to it,
+ * otherwise at its next read.
+ */
+export async function refreshWhenShown(
+	input: RefreshInput,
+	batches: ReadonlyArray<NonNullable<RefreshInput['records']>>,
+): Promise<void> {
+	const { graph } = input;
+	let state = onReadGraphs.get(graph);
+	if (!state) {
+		onReadGraphs.set(
+			graph,
+			(state = {
+				nodes: new Map(),
+				readers: new Map(),
+				own: new Map(),
+				asyncRead: new Set(),
+				scanned: 0,
+			}),
+		);
+		// A gesture, and a flip, wait for the derives already loading or settling.
+		graph.subscribeWrite?.({
+			graphNodeId: input.computed.graphNodeId,
+			settle() {
+				const waits = [...state!.nodes.values()].flatMap((node) =>
+					node.loading || node.pending ? [node.loading ?? node.pending] : [],
+				);
+				return waits.length ? Promise.all(waits).then(() => undefined) : undefined;
+			},
+			run() {},
+		});
+	}
+	const { nodes, readers, own, asyncRead } = state;
+	const base = { ...input, records: batches.flat() };
+	const at = (record: OnReadRecord, derive?: ResumeSymbol) => ({
+		...base,
+		computed: record,
+		derive,
+	});
+	const track = (node: OnReadNode, loading: Promise<unknown>) =>
+		(node.loading = loading.then(
+			() => void (node.loading = undefined),
+			() => void (node.loading = undefined),
+		));
+	// Loads the derive symbol without running it.
+	const prepare = (node: OnReadNode): Promise<void> | undefined => {
+		if (node.loading) return node.loading;
+		if (!node.derive) {
+			const symbol = input.loadSymbol(node.record.deriveSymbolId);
+			if (typeof symbol !== 'function')
+				return track(
+					node,
+					symbol.then((derive) => ((node.derive = derive), pendingRosterResume())),
+				);
+			node.derive = symbol;
+		}
+		const roster = pendingRosterResume();
+		return roster && track(node, roster);
+	};
+	const shown = (graphNodeId: string, seen = new Set<string>()): boolean => {
+		if (seen.has(graphNodeId)) return false;
+		seen.add(graphNodeId);
+		if (graph.subscriptionCount!(graphNodeId) > (own.get(graphNodeId) ?? 0)) return true;
+		if (asyncRead.has(graphNodeId)) return true;
+		for (const reader of readers.get(graphNodeId) ?? []) if (shown(reader, seen)) return true;
+		return false;
+	};
+	const refresh = async (node: OnReadNode) => {
+		const version = node.version;
+		await prepare(node);
+		await refreshSyncComputed(at(node.record, node.derive));
+		if (node.version === version) node.stale = false;
+	};
+	const pull = (node: OnReadNode) => {
+		if (!node.stale || node.pending) return;
+		const id = node.record.graphNodeId;
+		const derived = node.derive && deriveSyncComputedNow(at(node.record), node.derive);
+		if (derived === true) node.stale = false;
+		else if (derived) {
+			const version = node.version;
+			// A rejected derive wrote nothing, so the node stays stale for its next read.
+			const settled = (fulfilled: boolean) => {
+				node.pending = undefined;
+				if (fulfilled && node.version === version) node.stale = false;
+				else graph.pullBeforeRead!(id, () => pull(node));
+			};
+			node.pending = derived.then(
+				() => settled(true),
+				() => settled(false),
+			);
+		} else {
+			// Read before its symbol arrived: a flip reads again once it has, and a shown reader refreshes.
+			graph.pullBeforeRead!(id, () => pull(node));
+			const loaded = () => {
+				if (node.stale && shown(id)) void refresh(node);
+			};
+			const loading = prepare(node);
+			if (loading) void loading.then(loaded);
+			else loaded();
+		}
+	};
+	const markStale = (graphNodeId: string, seen = new Set<string>()) => {
+		if (seen.has(graphNodeId)) return;
+		seen.add(graphNodeId);
+		const node = nodes.get(graphNodeId);
+		if (node) {
+			node.version++;
+			graph.pullBeforeRead!(graphNodeId, () => pull(node));
+			node.stale = true;
+		}
+		for (const reader of readers.get(graphNodeId) ?? []) markStale(reader, seen);
+	};
+	const fresh: OnReadRecord[] = [];
+	for (const batch of batches.slice(state.scanned))
+		for (const record of batch) {
+			if (record.async === true)
+				for (const { graphNodeId } of record.dependencies ?? []) asyncRead.add(graphNodeId);
+			else if (
+				record.deriveOnRead &&
+				record.deriveSymbolId &&
+				!nodes.has(record.graphNodeId)
+			) {
+				const onRead = record as OnReadRecord;
+				fresh.push(onRead);
+				nodes.set(record.graphNodeId, { record: onRead, stale: false, version: 0 });
+				for (const { graphNodeId } of record.dependencies ?? []) {
+					readers.set(
+						graphNodeId,
+						(readers.get(graphNodeId) ?? new Set()).add(record.graphNodeId),
+					);
+					own.set(graphNodeId, (own.get(graphNodeId) ?? 0) + 1);
+				}
+			}
+		}
+	state.scanned = batches.length;
+	// No value is served for a computed only other computeds read: it derives at its first read.
+	for (const record of fresh.filter(
+		(candidate) =>
+			candidate.graphNodeId !== input.computed.graphNodeId &&
+			graph.read(candidate.graphNodeId, []) === undefined,
+	))
+		markStale(record.graphNodeId);
+	markStale(input.computed.graphNodeId);
+	if (shown(input.computed.graphNodeId)) await refresh(nodes.get(input.computed.graphNodeId)!);
 }
