@@ -1382,6 +1382,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_CALL_WRITES_ASSUMED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'This call is assumed to change the state it is passed: a Markless build error.',
+		printed: [
+			'MARKLESS_CALL_WRITES_ASSUMED: `<call>` is handed `<argument>`, and Markless cannot see which parts of it the call changes, so all of `<argument>` is treated as changed once the call returns.',
+			'The called function is looked up at run time, comes from a package, or passes the value on to code the compiler cannot read. Changes it makes before returning still reach the page; everything that reads the value updates, not only what changed.',
+			'Call a function from a .ts or .tsrx file in this project so Markless can read which paths it writes, or write the state in the handler itself.',
+			'https://markless.dev/errors/MARKLESS_CALL_WRITES_ASSUMED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',

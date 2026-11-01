@@ -922,6 +922,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],
 			),
 		),
+		...(compiled.semanticGraph.importedFunctionWriteRequests?.length
+			? {
+					importedFunctionWriteRequests:
+						compiled.semanticGraph.importedFunctionWriteRequests,
+				}
+			: {}),
 		...(linkPendingDiagnostics.length > 0 ? { linkPendingDiagnostics } : {}),
 	};
 }
@@ -1299,6 +1305,7 @@ type CompiledTransformInput = Pick<
 	| 'symbols'
 	| 'importedModuleInterfaces'
 	| 'importedModuleConstants'
+	| 'importedFunctionWrites'
 	| 'artifactChildMaterializations'
 	| 'executionLog'
 	| 'serverOnlyProps'
@@ -1318,6 +1325,7 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionWrites: input.importedFunctionWrites,
 		artifactChildMaterializations: input.artifactChildMaterializations,
 		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
 		// default 'auto' keeps the authored-source strings for dev tooling.

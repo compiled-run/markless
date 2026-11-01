@@ -29,6 +29,7 @@ import type {
 	SemanticBranchSite,
 	SemanticStateRead,
 	SemanticStateWrite,
+	ModuleFunctionWrites,
 	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
 } from '../../artifacts.ts';
@@ -76,6 +77,7 @@ export type MutableSemanticGraphArtifact = {
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
 	stateWrites: SemanticStateWrite[];
+	importedFunctionWriteRequests?: string[];
 	asyncBoundaries: Array<{
 		readonly id: string;
 		readonly anchorOrder: number;
@@ -121,6 +123,7 @@ export type WalkState = {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
 	/** Props the host provides only while rendering on the server, by component export. */
 	readonly serverOnlyProps: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
 	readonly hostIds: WeakMap<object, string>;
@@ -260,6 +263,7 @@ export function createWalkState(input: {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly importedFunctionWrites?: Readonly<Record<string, ModuleFunctionWrites>>;
 	readonly serverOnlyProps?: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
@@ -275,6 +279,7 @@ export function createWalkState(input: {
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		importedModuleConstants: input.importedModuleConstants ?? {},
+		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		hostIds: new WeakMap<object, string>(),
 		handledTemplateValues: new WeakSet<object>(),

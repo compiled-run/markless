@@ -3,6 +3,7 @@
 import { compileTsrxModuleLinkArtifact, overlayBarrelInterfaces } from '@markless/compiler';
 import type { TransformPluginContext } from 'rolldown';
 import { importedModuleConstants, missingConstantSources } from './module-constants.ts';
+import { importedFunctionWrites, missingFunctionWriteSources } from './function-writes.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	injectExecutionLogModuleHook,
@@ -239,6 +240,7 @@ async function runFirstPassTransform(
 			cached.importedInterfaceHashes === cachedLink.signature &&
 			cached.importedSymbolClaims === cachedLink.claimSignature &&
 			(await importedConstantsUnchanged(pluginContext, manifestSource, cached.input)) &&
+			(await importedFunctionWritesUnchanged(pluginContext, manifestSource, cached.input)) &&
 			childStyleModuleIds.join('\n') ===
 				[...cached.linkedStyleModuleIds].toSorted().join('\n')
 		) {
@@ -338,6 +340,20 @@ async function runFirstPassTransform(
 			};
 			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
 		}
+		const missingWrites = missingFunctionWriteSources(
+			linkedTransformResult.importedFunctionWriteRequests,
+			linkedTransformInput.importedFunctionWrites,
+		);
+		if (missingWrites.length > 0) {
+			linkedTransformInput = {
+				...linkedTransformInput,
+				importedFunctionWrites: {
+					...linkedTransformInput.importedFunctionWrites,
+					...(await importedFunctionWrites(pluginContext, manifestSource, missingWrites)),
+				},
+			};
+			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
+		}
 	}
 	return {
 		result: linkedTransformResult,
@@ -355,5 +371,17 @@ async function importedConstantsUnchanged(
 	const known = input.importedModuleConstants;
 	if (!known || Object.keys(known).length === 0) return true;
 	const current = await importedModuleConstants(pluginContext, importer, Object.keys(known));
+	return JSON.stringify(current) === JSON.stringify(known);
+}
+
+// A helper module edited under an unchanged importer changes which paths its calls mark changed.
+async function importedFunctionWritesUnchanged(
+	pluginContext: TransformPluginContext,
+	importer: string,
+	input: TransformTsrxModuleInput,
+): Promise<boolean> {
+	const known = input.importedFunctionWrites;
+	if (!known || Object.keys(known).length === 0) return true;
+	const current = await importedFunctionWrites(pluginContext, importer, Object.keys(known));
 	return JSON.stringify(current) === JSON.stringify(known);
 }

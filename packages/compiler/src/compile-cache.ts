@@ -53,7 +53,9 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 			input.symbols,
 		])}${sortedRecordJson(input.importedModuleInterfaces)}${sortedRecordJson(
 			input.importedModuleConstants,
-		)}${sortedRecordJson(input.artifactChildMaterializations)}`;
+		)}${sortedRecordJson(input.importedFunctionWrites)}${sortedRecordJson(
+			input.artifactChildMaterializations,
+		)}`;
 	} catch {
 		return null;
 	}
