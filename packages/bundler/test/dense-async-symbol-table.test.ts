@@ -31,10 +31,11 @@ describe('dense async generated symbol tables', () => {
 				result.manifestSymbolIds.map((id) => symbolFiles.get(id)),
 				result.bundleShape,
 			).toEqual(result.manifestSymbolIds.map(() => expect.stringMatching(/\.js$/)));
-			expect(result.tableRewrite.unresolved, result.bundleShape).toEqual([]);
-			expect(result.tableRewrite.rewritten, result.bundleShape).toBe(
-				result.manifestSymbolIds.length,
-			);
+			// A packed resolver ships no module URL list, so nothing is left to rewrite after rendering.
+			expect(result.tableRewrite, result.bundleShape).toEqual({
+				rewritten: 0,
+				unresolved: [],
+			});
 			expect(
 				verifyGeneratedSymbolTableRoutes(result.bundle, [result.manifest]),
 				result.bundleShape,
@@ -46,9 +47,10 @@ describe('dense async generated symbol tables', () => {
 		const result = await buildDenseAsyncShape({ computeds: 10, boundaries: 10 });
 
 		expect(result.manifest.symbols).toHaveLength(31);
-		expect(result.tableRewrite).toEqual({
-			rewritten: result.manifestSymbolIds.length,
-			unresolved: [],
+		expect(result.tableRewrite).toEqual({ rewritten: 0, unresolved: [] });
+		expect(verifyGeneratedSymbolTableRoutes(result.bundle, [result.manifest])).toEqual({
+			verified: 31,
+			errors: [],
 		});
 		expect(result.resolverCode).not.toContain(symbolPrefix);
 	});
@@ -64,9 +66,17 @@ describe('dense async generated symbol tables', () => {
 		delete bundle[solitaryFile];
 
 		rewriteGeneratedSymbolFacadeImports(bundle);
-		expect(rewriteGeneratedSymbolTableUrls(bundle)).toEqual({
-			rewritten: result.manifestSymbolIds.length - 1,
-			unresolved: [missingId],
+		const missing = result.manifest.symbols.filter(
+			(symbol) => normalizeVirtualId(symbol.virtualModuleId) === missingId,
+		);
+		expect(missing.length).toBeGreaterThan(0);
+		expect(verifyGeneratedSymbolTableRoutes(bundle, [result.manifest])).toEqual({
+			verified: result.manifest.symbols.length - missing.length,
+			errors: missing.map((symbol) => ({
+				symbolId: symbol.symbolId,
+				claimedChunk: solitaryFile,
+				reason: expect.stringContaining('claimed chunk was not emitted'),
+			})),
 		});
 	});
 

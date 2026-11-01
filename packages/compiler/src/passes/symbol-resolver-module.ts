@@ -75,7 +75,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 				]
 			: []),
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, input.literalImports)),
 		';',
 		'',
 		input.literalImports
@@ -338,7 +338,7 @@ function emitTableSymbolResolverModule(
 ): string {
 	return [
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, literalImports)),
 		';',
 		'',
 		literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
@@ -375,6 +375,19 @@ function emitTableSymbolResolverModule(
 		'}',
 		'',
 	].join('\n');
+}
+
+// Literal loads name each module in its own import(), so the URL list and each row's index into it are dead.
+function shippedManifest(
+	manifest: SymbolResolverModuleManifest,
+	literalImports: boolean | undefined,
+): SymbolResolverModuleManifest {
+	if (!literalImports) return manifest;
+	const [protocolVersion, buildId, resolverId, , exportNames, symbols] = manifest;
+	const rows = Object.fromEntries(
+		Object.entries(symbols).map(([id, [, exportIndex]]) => [id, [0, exportIndex] as const]),
+	);
+	return [protocolVersion, buildId, resolverId, [], exportNames, rows];
 }
 
 function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {
