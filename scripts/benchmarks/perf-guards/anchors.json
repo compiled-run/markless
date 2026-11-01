@@ -2690,6 +2690,48 @@
 				"jsGzipBytes": 87105
 			},
 			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -2881,15 +2923,15 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11235,
-				"jsGzipBytes": 87105
+				"jsGzipBytes": 87128
 			},
 			"bench /records": {
 				"executedChars": 11251,
-				"jsGzipBytes": 87105
+				"jsGzipBytes": 87128
 			},
 			"bench /settings": {
 				"executedChars": 11308,
-				"jsGzipBytes": 87105
+				"jsGzipBytes": 87128
 			},
 			"docs /": {
 				"executedChars": 110777,
