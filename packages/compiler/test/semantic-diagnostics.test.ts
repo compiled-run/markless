@@ -1087,6 +1087,34 @@ export function App() @{
 	);
 });
 
+test('buildSemanticGraph reports a key assigned from the first await', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let rack = state({ b2: 'banana' } as Record<string, string>);
+	const shown = computed(async () => {
+		let slot = '';
+		slot = await fetch('/slot');
+		return rack[slot];
+	});
+
+	@try {
+		<p>{shown}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Rack.tsrx', source });
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.primarySpan?.start)).toEqual([
+		source.indexOf('rack[slot]'),
+	]);
+});
+
 test('buildSemanticGraph allows a post-await computed key settled before the await', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/SettledKey.tsrx',

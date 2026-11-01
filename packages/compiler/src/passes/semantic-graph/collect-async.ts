@@ -490,16 +490,30 @@ function bodyLocals(
 	if (!bodyRegion) return { all, settled };
 	const semantic = state.semantic();
 	const declaratorEndById = new Map<number, number>();
+	// A write lands when its whole assignment finishes, so `key = await x` writes after the await.
+	const writeEndByTarget = new Map<number, number>();
 	walkNode(body, (candidate) => {
-		if (candidate.type !== 'VariableDeclarator') return;
-		walkNode(candidate.id as AnyNode, (pattern) => {
-			if (pattern.type === 'Identifier' && typeof pattern.start === 'number')
+		const target =
+			candidate.type === 'VariableDeclarator'
+				? candidate.id
+				: candidate.type === 'AssignmentExpression'
+					? candidate.left
+					: candidate.type === 'UpdateExpression'
+						? candidate.argument
+						: null;
+		if (!target) return;
+		walkNode(target as AnyNode, (pattern) => {
+			if (pattern.type !== 'Identifier' || typeof pattern.start !== 'number') return;
+			writeEndByTarget.set(pattern.start, candidate.end as number);
+			if (candidate.type === 'VariableDeclarator')
 				declaratorEndById.set(pattern.start, candidate.end as number);
 		});
 	});
 	const writtenAfterAwait = new Set<number>();
 	for (const reference of semantic.references) {
-		if (!reference.isWrite || reference.node.start <= firstAwait.start) continue;
+		const start = reference.node.start;
+		if (!reference.isWrite || (writeEndByTarget.get(start) ?? start) <= firstAwait.start)
+			continue;
 		const id = reference.binding?.id;
 		if (typeof id === 'number') writtenAfterAwait.add(id);
 	}
