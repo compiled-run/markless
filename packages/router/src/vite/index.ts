@@ -1345,9 +1345,10 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		: [
 				`export const routeStylesheets = ${state.persisted ? 'routePreloadData.styles ?? {}' : 'undefined'};`,
 				`const documentStylesheetsJson = globalThis.__marklessRouterDocumentStylesheetsJson ?? ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)};`,
-				`export const documentStylesheets = documentStylesheetsJson === ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)} ? [] : JSON.parse(documentStylesheetsJson);`,
+				// The placeholder is spelled once: a second server bundle pass (Nitro's) must find nothing left to patch.
+				`export const documentStylesheets = documentStylesheetsJson.startsWith('[') ? JSON.parse(documentStylesheetsJson) : [];`,
 				`const stylesheetSourcesJson = globalThis.__marklessRouterStylesheetSourcesJson ?? ${JSON.stringify(STYLESHEET_SOURCES_PLACEHOLDER)};`,
-				`export const stylesheetSources = stylesheetSourcesJson === ${JSON.stringify(STYLESHEET_SOURCES_PLACEHOLDER)} ? {} : JSON.parse(stylesheetSourcesJson);`,
+				`export const stylesheetSources = stylesheetSourcesJson.startsWith('{') ? JSON.parse(stylesheetSourcesJson) : {};`,
 				`export const documentImportMap = ${JSON.stringify(state.persisted && state.importMap ? importMapScript(state.importMap) : '')};`,
 				`export const routeResumeModules = ${JSON.stringify(state.persisted ? state.resumeModules : {})};`,
 			];

@@ -397,10 +397,8 @@ function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> 
 
 // Existing head nodes stay where they are (moving a stylesheet re-applies it); new ones go in the destination's order.
 async function mergeHead(d: Document, next: Document, stylesheetKey: string) {
-	const key = (element: Element) => {
-		const stylesheet = element.getAttribute(stylesheetKey);
-		return stylesheet === null ? element.outerHTML : `${stylesheetKey}:${stylesheet}`;
-	};
+	// A stylesheet's name is a URL and outerHTML starts with "<", so the two never collide.
+	const key = (element: Element) => element.getAttribute(stylesheetKey) ?? element.outerHTML;
 	const current = new Map<string, Element[]>();
 	for (const element of d.head.children) {
 		const list = current.get(key(element));

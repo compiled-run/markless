@@ -150,11 +150,14 @@ async function stylesheetsBeforePage(
 	const own = await page.evaluate(async (destination) => {
 		const text = await (await fetch(`/_markless/fragment${destination}`)).text();
 		const doc = new DOMParser().parseFromString(text, 'text/html');
-		const have = new Set(
-			[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
+		const have = new Set([
+			...[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
 				(l) => l.href,
 			),
-		);
+			...[...document.querySelectorAll('[data-markless-css]')].map(
+				(node) => new URL(node.getAttribute('data-markless-css')!, location.href).href,
+			),
+		]);
 		return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
 			.map((l) => new URL(l.getAttribute('href')!, location.href))
 			.filter((url) => !have.has(url.href))
@@ -428,39 +431,37 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('a prefetched page loads its own stylesheets before the click, so the swap never waits on them', async () => {
+		// A destination's own route CSS rides inside its fragment, so neither the prefetch nor the swap waits on a stylesheet file.
+		test('a prefetched page brings its route CSS inside its fragment, so the swap fetches no stylesheet', async () => {
 			const { page, errors } = await open(browser);
 			const styles: string[] = [];
 			page.on('request', (request) => {
 				if (request.resourceType() === 'stylesheet')
 					styles.push(new URL(request.url()).pathname);
 			});
-			const own = await page.evaluate(async () => {
+			const carried = await page.evaluate(async () => {
 				const text = await (await fetch('/_markless/fragment/other')).text();
 				const doc = new DOMParser().parseFromString(text, 'text/html');
-				const have = new Set(
-					[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
-						(l) => l.href,
-					),
-				);
-				return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
-					.map((l) => new URL(l.getAttribute('href')!, location.href))
-					.filter((url) => !have.has(url.href))
-					.map((url) => url.pathname);
+				return doc.querySelectorAll('style[data-markless-css]').length;
 			});
-			expect(own.length).toBeGreaterThan(0);
+			expect(carried).toBeGreaterThan(0);
 			await page.locator('[data-nav="other"]').hover();
-			await expect.poll(() => own.every((path) => styles.includes(path))).toBe(true);
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
+			expect(
+				await page
+					.locator('[data-mark]')
+					.evaluate((element) => getComputedStyle(element).color),
+			).toBe('rgb(200, 100, 50)');
+			expect(styles).toEqual([]);
 			expect(errors).toEqual([]);
 			await page.close();
 		});
 
-		test('a press with no hover before it requests the destination stylesheets with its page, not after it', async () => {
+		test('a press with no hover before it has no destination stylesheet left to request, its route CSS rides the page', async () => {
 			expect(
 				await stylesheetsBeforePage(browser, origin, '/', '[data-nav="other"]', '/other'),
-			).toEqual([true]);
+			).toEqual([]);
 		});
 
 		test('a press requests the stylesheets the document adds for the destination URL with its page', async () => {

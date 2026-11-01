@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import type { Plugin } from 'vite';
@@ -210,4 +211,49 @@ test('the server build patches the document chunk’s stylesheet closure, depend
 	expect(bundle['index.mjs'].code).toBe(
 		`const documentStylesheetsJson = "[\\"/app/assets/site-header.css\\",\\"/app/assets/document.css\\"]";`,
 	);
+});
+
+// A host that bundles the server build's output again (Nitro) runs the server generateBundle over the same code twice.
+test('the document stylesheets and their text survive a second server bundle pass over the same code', async () => {
+	const root = '/repo/app';
+	const resolvedConfig = {
+		base: '/app/',
+		command: 'build',
+		environments: {
+			browser: { consumer: 'client', build: { outDir: 'dist/client' } },
+			ssr: { consumer: 'server', build: { outDir: join(root, 'dist/server') } },
+		},
+		root,
+	};
+	const plugins = flattenPlugins([router()]);
+	const configPlugin = plugins.find((plugin) => plugin.name === 'markless-router:vite');
+	const routesPlugin = plugins.find((plugin) => plugin.name === 'markless-router:routes');
+	const serverContext = { environment: { config: resolvedConfig.environments.ssr } };
+	configPlugin?.configResolved?.(resolvedConfig as never);
+	routesPlugin?.configResolved?.(resolvedConfig as never);
+	const source = (await hookHandler(routesPlugin?.load)?.call(
+		serverContext,
+		'\0virtual:markless-router/route-preloads',
+	)) as string;
+	const bundle = {
+		'index.mjs': chunk({ code: source, fileName: 'index.mjs', imports: ['_ssr/document.mjs'] }),
+		'_ssr/document.mjs': chunk({
+			fileName: '_ssr/document.mjs',
+			moduleIds: [join(root, 'document.tsrx')],
+			viteMetadata: { importedCss: ['assets/document.css'] },
+		}),
+		'assets/document.css': {
+			type: 'asset',
+			fileName: 'assets/document.css',
+			source: 'body{margin:0}',
+		},
+	};
+	for (let pass = 0; pass < 2; pass++)
+		await hookHandler(configPlugin?.generateBundle)?.call(serverContext, {}, bundle);
+	const evaluated = runInNewContext(
+		`${bundle['index.mjs'].code!.replace(/export (const|function) /g, '$1 ')};({documentStylesheets,stylesheetSources})`,
+		{},
+	);
+	expect(evaluated.documentStylesheets).toEqual(['/app/assets/document.css']);
+	expect(evaluated.stylesheetSources).toEqual({ '/app/assets/document.css': 'body{margin:0}' });
 });
