@@ -119,8 +119,25 @@ describe('TSRX Rolldown plugin structure', () => {
 		).toMatchObject({
 			preserveEntrySignatures: 'strict',
 		});
-		expect(callOptions(marklessServer(), {})).toEqual({});
+		expect(callOptions(marklessServer(), {})).toEqual({
+			experimental: { attachDebugInfo: 'none' },
+		});
 		expect(callOptions(marklessLib(), {})).toEqual({});
+		const warn = vi.fn();
+		expect(
+			callOptions(marklessServer(), { experimental: { attachDebugInfo: 'simple' } }, { warn }),
+		).toEqual({ experimental: { attachDebugInfo: 'none' } });
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('attachDebugInfo'));
+		const routeBuild = marklessClient();
+		(routeBuild as { api: { declareRouteModules(isRoute: () => boolean): void } }).api.declareRouteModules(
+			() => true,
+		);
+		expect(callOptions(routeBuild, {})).toMatchObject({
+			experimental: {
+				attachDebugInfo: 'none',
+				chunkOptimization: { mergeCommonChunks: true, avoidRedundantChunkLoads: false },
+			},
+		});
 	});
 
 	test('transformTsrxModule produces virtual payload, resolver, and symbol modules', async () => {

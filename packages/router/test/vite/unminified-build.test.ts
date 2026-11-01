@@ -83,7 +83,7 @@ test('the client output is unminified', async () => {
 	const build = join(root, '.output/public/build');
 	const chunks = (await readdir(build)).filter((file) => file.endsWith('.js'));
 	const sources = await Promise.all(chunks.map((file) => readFile(join(build, file), 'utf8')));
-	expect(sources.some((source) => source.includes('//#region'))).toBe(true);
+	expect(sources.some((source) => /\n[\t ]+\S/.test(source))).toBe(true);
 });
 
 test('an unminified build resumes, navigates and settles a streamed @pending page', async () => {

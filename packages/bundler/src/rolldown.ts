@@ -253,12 +253,22 @@ export function createMarklessRolldownPlugin(input: {
 		name,
 		options(input: InputOptions) {
 			const currentEnvironment = getEnvironment(this);
+			if (currentEnvironment === 'lib') return input;
+			const asked = input.experimental?.attachDebugInfo;
+			if (internalOptions.dev !== true && asked !== undefined && asked !== 'none')
+				this.warn?.(
+					`experimental.attachDebugInfo: '${asked}' is ignored in production builds: its region comments name modules by id, and Markless's generated module ids carry this checkout's source paths.`,
+				);
+			const withoutRegions: InputOptions =
+				internalOptions.dev === true
+					? input
+					: { ...input, experimental: { ...input.experimental, attachDebugInfo: 'none' } };
 			if (currentEnvironment !== 'client') {
-				return input;
+				return withoutRegions;
 			}
 
 			return {
-				...input,
+				...withoutRegions,
 				preserveEntrySignatures: packing
 					? 'allow-extension'
 					: (input.preserveEntrySignatures ?? 'allow-extension'),
@@ -266,7 +276,7 @@ export function createMarklessRolldownPlugin(input: {
 				...(packing && internalOptions.routeModules
 					? {
 							experimental: {
-								...input.experimental,
+								...withoutRegions.experimental,
 								chunkOptimization: {
 									mergeCommonChunks: true,
 									avoidRedundantChunkLoads: false,
