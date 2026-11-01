@@ -2,6 +2,7 @@ import type {
 	LoweredRowItem,
 	LoweredStateRead,
 	LoweredStateWrite,
+	PassedStateWrite,
 	SemanticGraphAlias,
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
@@ -166,6 +167,12 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		if (write.passedTo) {
+			const passed = lowerPassedStateWrite(write, write.passedTo, input, lookup);
+			if (passed) writes.push(passed);
+			continue;
+		}
+
 		if (write.through) {
 			const through = lowerWriteThrough(
 				write,
@@ -327,6 +334,29 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		),
 		writes,
 		diagnostics,
+	};
+}
+
+// A call changed state in place; a path that is not writable state is the call's own business.
+function lowerPassedStateWrite(
+	write: SemanticStateWrite,
+	passedTo: PassedStateWrite,
+	input: StateLoweringInput,
+	lookup: GraphLookup,
+): LoweredStateWrite | null {
+	if (write.rowRepeatId) {
+		const row = lowerRowItemWrite(write, input);
+		return row?.kind === 'write' ? { ...row.write, source: passedTo.argument, passedTo } : null;
+	}
+	const resolved = resolveStateGraphPath(input, write.target, lookup, null, write.componentName);
+	if (!resolved || resolved.binding.kind !== 'state' || !resolved.binding.writable) return null;
+	return {
+		source: passedTo.argument,
+		sourceSpan: write.targetSpan,
+		graphNodeId: resolved.binding.id,
+		path: resolved.path,
+		operation: 'call',
+		passedTo,
 	};
 }
 

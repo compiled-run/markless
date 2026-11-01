@@ -86,6 +86,7 @@ export interface TransformTsrxModuleInput {
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
+	importedFunctionWrites?: SemanticGraphInput['importedFunctionWrites'];
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
 	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
@@ -137,6 +138,8 @@ export interface TransformTsrxModuleResult {
 		readonly source: string;
 		readonly exportName: string;
 	}>;
+	/** Imported modules whose function write facts a handler needs and this compile was not given. */
+	importedFunctionWriteRequests?: ReadonlyArray<string>;
 	/** Refusals a `linkPending` compile held; a compile with every component interface decides them. */
 	linkPendingDiagnostics?: ReadonlyArray<CompilerDiagnostic>;
 }

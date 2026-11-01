@@ -1,0 +1,217 @@
+import { expect, test } from 'vitest';
+import { analyzeModuleFunctionWrites, compileTsrxModule } from '../src/index.ts';
+import type { ModuleFunctionWrites } from '../src/artifacts.ts';
+
+// A handler that hands state to a function which changes it in place marks the
+// paths that function writes changed once it returns. A function in a project
+// module is read for exactly those paths; one the compiler cannot see is
+// assumed to change all of what it was handed.
+
+const helpers = `
+export function setLabel(target: { label: string }, next: string): void {
+	target.label = next;
+}
+export function append(entries: string[], entry: string): void {
+	entries.push(entry);
+}
+export function describe(target: { label: string; size: number }): string {
+	return \`\${target.label.trim()}:\${target.size}\`;
+}
+export function tidy(record: { mail: string }): void {
+	record.mail = record.mail.trim().toLowerCase();
+}
+export function bump(rows: { id: number; hits: number }[], id: number): void {
+	const row = rows.find((candidate) => candidate.id === id);
+	if (row) row.hits++;
+}
+export const relabel = (outer: { inner: { label: string } }) => setDeep(outer.inner);
+function setDeep(inner: { label: string }) {
+	inner.label = 'deep';
+}
+import { mystery } from 'some-package';
+export function handOff(holder: { part: object; other: number }) {
+	mystery(holder.part);
+}
+`;
+
+test('a module function is read for the paths it writes below each argument', () => {
+	expect(analyzeModuleFunctionWrites({ filename: 'src/helpers.ts', source: helpers })).toEqual({
+		setLabel: { parameters: [[{ path: ['label'] }], []] },
+		append: { parameters: [[{ path: [] }], []] },
+		describe: { parameters: [[]] },
+		tidy: { parameters: [[{ path: ['mail'] }]] },
+		bump: { parameters: [[{ path: [] }], []] },
+		relabel: { parameters: [[{ path: ['inner', 'label'] }]] },
+		handOff: { parameters: [[{ path: ['part'], assumed: true }]] },
+	});
+});
+
+test('a value stored somewhere the analysis cannot follow is assumed written whole', () => {
+	const facts = analyzeModuleFunctionWrites({
+		filename: 'src/keep.ts',
+		source: `const kept: object[] = [];
+export function keep(value: object) { kept.push(value); }
+export function spread(...values: object[]) { for (const value of values) Object.freeze(value); }
+`,
+	});
+	expect(facts).toEqual({
+		keep: { parameters: [[{ path: [], assumed: true }]] },
+		spread: { parameters: [], rest: [{ path: [], assumed: true }] },
+	});
+});
+
+const page = (handler: string, imports = `import { append, setLabel } from './helpers.ts';`) => `
+import { state } from '@markless/core';
+${imports}
+
+export function Board() @{
+	let card = state({ label: 'a', size: 1 });
+	let tags = state(['x']);
+	let count = state(0);
+	<div>
+		<output>{card.label}</output>
+		<output>{tags.length}</output>
+		<output>{count}</output>
+		<button onClick={${handler}}>go</button>
+	</div>
+}
+`;
+
+async function compile(
+	source: string,
+	importedFunctionWrites?: Record<string, ModuleFunctionWrites>,
+) {
+	return compileTsrxModule({
+		filename: 'src/Board.tsrx',
+		source,
+		symbols: [],
+		...(importedFunctionWrites ? { importedFunctionWrites } : {}),
+	});
+}
+
+type Compiled = Awaited<ReturnType<typeof compile>>;
+
+function handler(result: Compiled): string {
+	return result.symbolModules.modules.find((module) => module.kind === 'event-handler')!.source;
+}
+
+function diagnostics(result: Compiled, code: string) {
+	return [...result.semanticGraph.diagnostics, ...result.stateLowering.diagnostics].filter(
+		(diagnostic) => diagnostic.code === code,
+	);
+}
+
+const facts = {
+	'./helpers.ts': analyzeModuleFunctionWrites({ filename: 'src/helpers.ts', source: helpers }),
+};
+
+test('a call to an imported helper marks exactly the paths the helper writes', async () => {
+	const result = await compile(page(`() => { setLabel(card, 'b'); append(tags, 'y'); }`), facts);
+
+	expect(result.stateLowering.writes).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'state:card',
+			path: ['label'],
+			passedTo: { argument: 'card', argumentIndex: 0 },
+		}),
+		expect.objectContaining({
+			graphNodeId: 'state:tags',
+			path: [],
+			passedTo: { argument: 'tags', argumentIndex: 0 },
+		}),
+	]);
+	const source = handler(result);
+	expect(source).toContain('marklessChanged');
+	expect(source).toMatch(/\[\s*"state:card",\s*\[\s*"label"\s*\]\s*\]/);
+	expect(source).toMatch(/\[\s*"state:tags",\s*\[\s*\]\s*\]/);
+	expect(diagnostics(result, 'MARKLESS_CALL_WRITES_ASSUMED')).toEqual([]);
+	expect(result.semanticGraph.importedFunctionWriteRequests).toBeUndefined();
+});
+
+test('a helper that only reads what it is passed marks nothing', async () => {
+	const result = await compile(
+		page(
+			`() => { count = describe(card).length; }`,
+			`import { describe } from './helpers.ts';`,
+		),
+		facts,
+	);
+
+	expect(result.stateLowering.writes.filter((write) => write.passedTo)).toEqual([]);
+	expect(handler(result)).not.toContain('marklessChanged');
+});
+
+test('without the helper module facts the compile asks for them and assumes the whole value', async () => {
+	const result = await compile(page(`() => setLabel(card, 'b')`));
+
+	expect(result.semanticGraph.importedFunctionWriteRequests).toEqual(['./helpers.ts']);
+	expect(result.stateLowering.writes).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'state:card',
+			path: [],
+			passedTo: { argument: 'card', argumentIndex: 0, assumed: true },
+		}),
+	]);
+	// The host supplies the facts and compiles again, so nothing is reported yet.
+	expect(diagnostics(result, 'MARKLESS_CALL_WRITES_ASSUMED')).toEqual([]);
+});
+
+test('a package function is assumed to change all of what it is handed, and says so', async () => {
+	const result = await compile(page(`() => setLabel(card, 'b')`), { './helpers.ts': {} });
+
+	expect(result.stateLowering.writes).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'state:card',
+			path: [],
+			passedTo: expect.objectContaining({ assumed: true }),
+		}),
+	]);
+	expect(diagnostics(result, 'MARKLESS_CALL_WRITES_ASSUMED')).toEqual([
+		expect.objectContaining({ severity: 'info' }),
+	]);
+});
+
+test('a function looked up at run time is assumed to change all of what it is handed', async () => {
+	const result = await compile(
+		page(`() => registry.get('inc')?.(card)`, `import { registry } from './plugins.ts';`),
+		{ './plugins.ts': {} },
+	);
+
+	expect(result.stateLowering.writes).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'state:card',
+			path: [],
+			passedTo: expect.objectContaining({ assumed: true }),
+		}),
+	]);
+	expect(handler(result)).toMatch(/marklessChanged\(\s*registry\.get\(["']inc["']\)\?\.\(/);
+	expect(diagnostics(result, 'MARKLESS_CALL_WRITES_ASSUMED')).toHaveLength(1);
+});
+
+test('a function declared in the same file is read for the paths it writes', async () => {
+	const result = await compile(
+		page(
+			`() => rename(card)`,
+			`function rename(subject: { label: string }) { subject.label = 'z'; }`,
+		),
+	);
+
+	expect(result.stateLowering.writes).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'state:card',
+			path: ['label'],
+			passedTo: { argument: 'card', argumentIndex: 0 },
+		}),
+	]);
+	expect(result.semanticGraph.importedFunctionWriteRequests).toBeUndefined();
+});
+
+test('a handler local, a scalar and a reading platform call are left alone', async () => {
+	const result = await compile(
+		page(`(card) => { setLabel(card, 'b'); console.log(tags); setLabel(count, 'c'); }`),
+		facts,
+	);
+
+	expect(result.stateLowering.writes.filter((write) => write.passedTo)).toEqual([]);
+	expect(diagnostics(result, 'MARKLESS_CALL_WRITES_ASSUMED')).toEqual([]);
+});

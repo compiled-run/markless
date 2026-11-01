@@ -26,6 +26,8 @@ export type SemanticGraphInput = {
 	 * `importedConstants` on this module's props.
 	 */
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	/** What each imported module's exported functions write below their arguments, by specifier and export name. */
+	readonly importedFunctionWrites?: Readonly<Record<string, ModuleFunctionWrites>>;
 	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly additionalFrameworkApiSources?: readonly string[];
 	/**
@@ -836,10 +838,35 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_COMPONENT_TAG_UNRESOLVED'
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
-		| 'MARKLESS_ALLOW_STALE';
+		| 'MARKLESS_ALLOW_STALE'
+		| 'MARKLESS_CALL_WRITES_ASSUMED';
 	// The external TSRX parser fails before the graph pass runs; that diagnostic carries phase 'parse'.
 	readonly phase: 'parse' | 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
+};
+
+/** A member path below an argument that a function writes; `[]` is the whole value. */
+export type ParameterWrite = {
+	readonly path: ReadonlyArray<string>;
+	/** The function hands this value to code the analysis cannot see, so the write is assumed. */
+	readonly assumed?: true;
+};
+
+/** What a function writes below each value it is passed, by argument position. */
+export type FunctionParameterWrites = {
+	readonly parameters: ReadonlyArray<ReadonlyArray<ParameterWrite>>;
+	/** Every argument from `parameters.length` on, when the last parameter is a rest parameter. */
+	readonly rest?: ReadonlyArray<ParameterWrite>;
+};
+
+export type ModuleFunctionWrites = Readonly<Record<string, FunctionParameterWrites>>;
+
+/** State handed to a function call that changes it in place before the call returns. */
+export type PassedStateWrite = {
+	/** The argument as authored, which the lowering finds the call by. */
+	readonly argument: string;
+	readonly argumentIndex: number;
+	readonly assumed?: true;
 };
 
 export type SemanticStateWrite = {
@@ -863,6 +890,8 @@ export type SemanticStateWrite = {
 	readonly through?: SemanticWriteThrough;
 	/** `Object.assign(target, ...sources)`: `target` is the first argument, `argumentSources` the rest. */
 	readonly objectAssign?: true;
+	/** `target` is the path a function call writes below the state passed to it. */
+	readonly passedTo?: PassedStateWrite;
 };
 
 /**
@@ -1334,6 +1363,8 @@ export type SemanticGraphArtifact = {
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
+	/** Imported modules whose function write facts this compile was not given. */
+	readonly importedFunctionWriteRequests?: ReadonlyArray<string>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
 		readonly anchorOrder: number;
@@ -1535,6 +1566,8 @@ export type LoweredStateWrite = {
 	readonly through?: LoweredWriteThrough;
 	/** `Object.assign(target, ...sources)`: each member the sources carry is written. */
 	readonly objectAssign?: true;
+	/** A function call changed this path in place; it is marked changed once the call returns. */
+	readonly passedTo?: PassedStateWrite;
 };
 
 export type LoweredWriteThrough = {

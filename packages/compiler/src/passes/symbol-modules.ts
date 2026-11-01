@@ -6075,6 +6075,15 @@ export function buildEventHandlerEmission(
 						source: '@markless/web/fns/write-through',
 					}),
 				),
+			...(referenced.has(CHANGED_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: CHANGED_FN,
+							source: '@markless/web/fns/changed',
+						}),
+					]
+				: []),
 			...(referenced.has(CALLBACK_SLOT_FN)
 				? [
 						moduleImportNode({
@@ -6727,6 +6736,9 @@ function rewriteEventHandlerNode(
 	const unfilled = unfilledCallbackSlotNode(node, rewrite);
 	if (unfilled) return carryEventHandlerComments(node, unfilled);
 
+	const passed = passedStateCallNode(node, rewrite);
+	if (passed) return carryEventHandlerComments(node, passed);
+
 	const write = eventWriteNode(node, rewrite);
 	if (write) return carryEventHandlerComments(node, write);
 
@@ -6840,6 +6852,44 @@ function containsOwnAwait(node: unknown): boolean {
 	}
 
 	return false;
+}
+
+// The call runs as authored, then each path it wrote is marked changed before the handler reads on.
+function passedStateCallNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	const chain = node.type === 'ChainExpression' && isNode(node.expression) ? node : null;
+	const call = chain ? (chain.expression as AnyNode) : node;
+	if (call.type !== 'CallExpression') return null;
+	const args = asNodes(call.arguments);
+	const claimed = new Set<string>();
+	const writes = (rewrite.symbol.writes ?? []).filter((write) => {
+		const passedTo = write.passedTo;
+		if (!passedTo || rewrite.claimedWrites.has(write)) return false;
+		const argument = args[passedTo.argumentIndex];
+		if (!argument || valueNodeText(argument, rewrite.source) !== passedTo.argument)
+			return false;
+		const key = `${passedTo.argumentIndex}:${write.graphNodeId}:${JSON.stringify(write.path)}:${JSON.stringify(write.row?.itemPath ?? null)}`;
+		if (claimed.has(key)) return false;
+		claimed.add(key);
+		return true;
+	});
+	if (writes.length === 0) return null;
+	for (const write of writes) rewrite.claimedWrites.add(write);
+
+	const rewritten = rewriteEventHandlerChildren(call, (child) =>
+		rewriteEventHandlerNode(child, call, rewrite),
+	);
+	return callNode(identifierNode(CHANGED_FN), [
+		chain ? chainExpressionNode(chain, rewritten) : rewritten,
+		memberChainNode('context.graph'),
+		arrayNode(
+			writes.map((write) =>
+				arrayNode([
+					literalNode(write.graphNodeId),
+					rowItemPathNode(write) ?? stringArrayNode(write.path),
+				]),
+			),
+		),
+	]);
 }
 
 /**
@@ -7415,6 +7465,7 @@ function collectIdentifierNames(node: unknown, names: Set<string>): void {
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
 const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
+const CHANGED_FN = 'marklessChanged';
 
 // The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
 function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {

@@ -48,6 +48,7 @@ import {
 	collectAssignment,
 	collectCollectionCall,
 	collectObjectAssign,
+	collectPassedStateWrites,
 	collectComputedWriteDiagnostics,
 	collectDelete,
 	collectExpressionReads,
@@ -111,6 +112,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionWrites: input.importedFunctionWrites,
 		serverOnlyProps: input.serverOnlyProps,
 	});
 	state.walk = walk;
@@ -612,6 +614,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'CallExpression':
 			collectCollectionCall(node, state);
 			collectObjectAssign(node, state);
+			collectPassedStateWrites(node, state);
 			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
 				const [body, ...rest] = asNodes(node.arguments);
 				withFunctionSite(state, 'computed', () => {

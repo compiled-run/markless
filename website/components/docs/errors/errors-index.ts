@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 299,
+	total: 300,
 	guided: 45,
 	groups: [
 		{
@@ -92,6 +92,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_BRANCH_ELSE_SPELLING',
 					kind: 'compile error',
 					guided: true,
+				},
+				{
+					code: 'MARKLESS_CALL_WRITES_ASSUMED',
+					kind: 'compile error',
+					guided: false,
 				},
 				{
 					code: 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',

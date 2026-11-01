@@ -6,16 +6,26 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	callWritesAssumedDiagnostic,
 	stateWriteInComputedDiagnostic,
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { getFrameworkApiForCall } from './imports.ts';
-import type { SemanticStateWrite } from '../../artifacts.ts';
+import type {
+	FunctionParameterWrites,
+	ParameterWrite,
+	SemanticStateWrite,
+} from '../../artifacts.ts';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
-import { writeThroughLocal } from './write-through-locals.ts';
+import { isComponentFunction, writeThroughLocal } from './write-through-locals.ts';
+import {
+	argumentWrites,
+	FunctionWritesAnalysis,
+	isReadingGlobalCallName,
+} from './parameter-writes.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {
 	const target = unwrapChainExpression(node.left as AnyNode | undefined);
@@ -82,6 +92,180 @@ export function collectObjectAssign(node: AnyNode, state: WalkState): void {
 		objectAssign: true,
 		argumentSources: sources.map((source) => expressionSource(source, state.source)),
 	});
+}
+
+// State a handler hands to a function that may change it in place; an unseen callee changes all of it.
+export function collectPassedStateWrites(node: AnyNode, state: WalkState): void {
+	if (state.currentFunctionSite !== 'handler' || !state.currentComponentName) return;
+	if (state.currentSharedDefinitionId) return;
+	const callee = calleeWrites(node, state);
+	if (callee.kind === 'skip') return;
+	const callSource = expressionSource(node, state.source);
+	asNodes(node.arguments).forEach((argument, argumentIndex) => {
+		if (argument.type === 'SpreadElement') return;
+		const value = unwrapValueWrappers(argument);
+		if (value?.type !== 'Identifier' && value?.type !== 'MemberExpression') return;
+		if (!passesComponentState(value, state)) return;
+		const writes = callee.facts ? argumentWrites(callee.facts, argumentIndex) : WHOLE_VALUE;
+		if (writes.length === 0) return;
+		const source = expressionSource(value, state.source);
+		for (const write of writes)
+			state.graph.stateWrites.push({
+				target: source + write.path.map(memberSegmentSource).join(''),
+				...writeScope(state),
+				targetSpan: sourceSpan(value, state.filename),
+				...rowWriteScope(value, state),
+				operation: 'call',
+				passedTo: {
+					argument: source,
+					argumentIndex,
+					...(write.assumed ? { assumed: true as const } : {}),
+				},
+			});
+		if (!callee.quiet && writes.some((write) => write.assumed))
+			state.graph.diagnostics.push(
+				callWritesAssumedDiagnostic({
+					call: callSource,
+					argument: source,
+					node: value,
+					filename: state.filename,
+				}),
+			);
+	});
+}
+
+const WHOLE_VALUE: ReadonlyArray<ParameterWrite> = [{ path: [], assumed: true }];
+
+function memberSegmentSource(segment: string): string {
+	return /^[A-Za-z_$][\w$]*$/.test(segment) ? `.${segment}` : `[${JSON.stringify(segment)}]`;
+}
+
+type CalleeWrites =
+	| { readonly kind: 'skip' }
+	| {
+			readonly kind: 'call';
+			readonly facts: FunctionParameterWrites | null;
+			// A platform function, or an import whose facts the host has not supplied yet.
+			readonly quiet?: true;
+	  };
+
+const SKIP: CalleeWrites = { kind: 'skip' };
+const UNSEEN: CalleeWrites = { kind: 'call', facts: null };
+const UNSEEN_QUIETLY: CalleeWrites = { kind: 'call', facts: null, quiet: true };
+
+// What the called function writes, decided by the binding its callee resolves to.
+function calleeWrites(node: AnyNode, state: WalkState): CalleeWrites {
+	if (getFrameworkApiForCall(node, state.frameworkApiImports)) return SKIP;
+	const callee = unwrapValueWrappers(node.callee as AnyNode | undefined);
+	if (!callee) return SKIP;
+	const root = calleeRoot(callee);
+	if (!root || typeof root.start !== 'number') return UNSEEN;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, root.start);
+	if (symbolId === null)
+		return isReadingGlobalCall(callee) || isObjectAssignCall(callee) ? SKIP : UNSEEN_QUIETLY;
+	const binding = semantic.bindings[symbolId]!;
+	const owner = bindingOwner(binding);
+	if (owner === 'component') return SKIP;
+	if (owner === 'local') return UNSEEN;
+
+	const moduleImport = state.graph.moduleImports.find(
+		(candidate) => candidate.localName === binding.name && candidate.typeOnly !== true,
+	);
+	if (!moduleImport) {
+		if (callee !== root) return UNSEEN;
+		return { kind: 'call', facts: moduleFunctionWrites(state).ofBinding(binding) };
+	}
+	const exportName =
+		moduleImport.kind === 'namespace'
+			? callee.type === 'MemberExpression' &&
+				unwrapValueWrappers(callee.object as AnyNode) === root
+				? getStaticMemberPropertyName(callee)
+				: null
+			: callee === root
+				? (moduleImport.importedName ?? 'default')
+				: null;
+	if (!exportName) return UNSEEN;
+	const facts = state.importedFunctionWrites[moduleImport.source];
+	if (!facts) {
+		const requests = (state.graph.importedFunctionWriteRequests ??= []);
+		if (!requests.includes(moduleImport.source)) requests.push(moduleImport.source);
+		return UNSEEN_QUIETLY;
+	}
+	return { kind: 'call', facts: Object.hasOwn(facts, exportName) ? facts[exportName]! : null };
+}
+
+function calleeRoot(callee: AnyNode): AnyNode | null {
+	let cursor: AnyNode | undefined = callee;
+	while (cursor) {
+		cursor = unwrapValueWrappers(cursor);
+		if (cursor?.type === 'Identifier') return cursor;
+		if (cursor?.type === 'MemberExpression') cursor = cursor.object as AnyNode | undefined;
+		else if (cursor?.type === 'CallExpression') cursor = cursor.callee as AnyNode | undefined;
+		else return null;
+	}
+	return null;
+}
+
+// Where a callee's root is declared: the module, the component body, or a function inside it.
+function bindingOwner(
+	binding: ModuleSemantics['bindings'][number],
+): 'module' | 'component' | 'local' {
+	for (const scope of binding.scope.ancestors()) {
+		if (scope.kind !== 'function') continue;
+		return isComponentFunction(scope.node as unknown as AnyNode) ? 'component' : 'local';
+	}
+	return 'module';
+}
+
+function isReadingGlobalCall(callee: AnyNode): boolean {
+	const object =
+		callee.type === 'MemberExpression' ? unwrapValueWrappers(callee.object as AnyNode) : null;
+	const name =
+		callee.type === 'Identifier'
+			? callee.name
+			: object?.type === 'Identifier'
+				? `${String(object.name)}.${getStaticMemberPropertyName(callee) ?? ''}`
+				: null;
+	return typeof name === 'string' && isReadingGlobalCallName(name);
+}
+
+// `collectObjectAssign` owns these.
+function isObjectAssignCall(callee: AnyNode): boolean {
+	const object =
+		callee.type === 'MemberExpression' ? unwrapValueWrappers(callee.object as AnyNode) : null;
+	return (
+		object?.type === 'Identifier' &&
+		object.name === 'Object' &&
+		getStaticMemberPropertyName(callee) === 'assign'
+	);
+}
+
+const moduleFunctionWritesByState = new WeakMap<WalkState, FunctionWritesAnalysis>();
+
+function moduleFunctionWrites(state: WalkState): FunctionWritesAnalysis {
+	let analysis = moduleFunctionWritesByState.get(state);
+	if (!analysis) {
+		analysis = new FunctionWritesAnalysis(state.semantic());
+		moduleFunctionWritesByState.set(state, analysis);
+	}
+	return analysis;
+}
+
+// The argument names component state directly, not a handler local of the same name.
+function passesComponentState(value: AnyNode, state: WalkState): boolean {
+	if (writeThroughLocal(value, state, 'call')) return false;
+	const source = expressionSource(value, state.source);
+	if (repeatRowBindsName(source, state))
+		return rowWriteScope(value, state).rowRepeatId !== undefined;
+	const resolved = resolveGraphPath(
+		source,
+		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+	);
+	if (!resolved || resolved.binding.kind !== 'state' || !resolved.binding.writable) return false;
+	if (resolved.binding.sharedDefinitionId !== undefined) return false;
+	return resolved.path.length > 0 || resolved.binding.valueKind !== 'scalar';
 }
 
 export function collectCollectionCall(node: AnyNode, state: WalkState): void {
@@ -858,7 +1042,7 @@ function isGlobalReference(identifier: AnyNode, state: WalkState): boolean {
 	);
 }
 
-function isMutatingCollectionMethod(name: string): boolean {
+export function isMutatingCollectionMethod(name: string): boolean {
 	return (
 		name === 'add' ||
 		name === 'clear' ||
