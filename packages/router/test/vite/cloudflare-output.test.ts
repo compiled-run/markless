@@ -20,7 +20,9 @@ import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import {
+	cloudflareModule,
 	cloudflareNodeBuildsPlugin,
+	cloudflareWorkerTrimPlugin,
 	pruneRenderedPages,
 	workerFirstPatterns,
 } from '../../src/vite/nitro-cloudflare.ts';
@@ -425,4 +427,52 @@ test('CommonJS code that reads __filename as it loads runs in the Worker', async
 	const response = await get('/api/where');
 	expect(response.status).toBe(200);
 	expect(await response.json()).toEqual({ where: 'string:string' });
+});
+
+test('the Worker carries no list of the uploaded files, which Cloudflare serves before it runs', async () => {
+	const serverDir = join(root, '.output/server');
+	const code = await Promise.all(
+		(await readdir(serverDir, { recursive: true }))
+			.filter((file) => file.endsWith('.mjs'))
+			.map((file) => readFile(join(serverDir, file), 'utf8')),
+	);
+	expect(code.some((source) => source.includes('../public/guide.html'))).toBe(false);
+	expect((await get('/guide')).status).toBe(200);
+	expect((await get('/no-such-page')).status).toBe(404);
+});
+
+test('a Pages build, or one whose run_worker_first sends files to the Worker, keeps the list', async () => {
+	const plugin = cloudflareWorkerTrimPlugin();
+	const resolve = (plugin.resolveId as { handler: (source: string) => string | undefined })
+		.handler;
+	const setup = (preset: string) =>
+		cloudflareModule({ autoSubfolderIndex: false }).setup({
+			options: { preset, prerender: {}, output: { serverDir: '/tmp/none' } },
+		} as never);
+	await setup('cloudflare-pages');
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	await setup('cloudflare-module');
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeDefined();
+	await cloudflareModule({ autoSubfolderIndex: false }).setup({
+		options: {
+			preset: 'cloudflare-module',
+			prerender: {},
+			output: { serverDir: '/tmp/none' },
+			cloudflare: { wrangler: { assets: { run_worker_first: ['/*'] } } },
+		},
+	} as never);
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	const above = await mkdtemp(join(tmpdir(), 'markless-wrangler-above-'));
+	await writeFile(join(above, 'wrangler.jsonc'), '{ "assets": { "run_worker_first": true } }');
+	await mkdir(join(above, 'app'));
+	await cloudflareModule({ autoSubfolderIndex: false }).setup({
+		options: {
+			preset: 'cloudflare-module',
+			rootDir: join(above, 'app'),
+			prerender: {},
+			output: { serverDir: '/tmp/none' },
+		},
+	} as never);
+	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
+	await rm(above, { recursive: true, force: true });
 });

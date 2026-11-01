@@ -9,6 +9,10 @@ interface CloudflareNitro {
 	readonly options: {
 		readonly preset?: string;
 		readonly dev?: boolean;
+		readonly rootDir?: string;
+		readonly cloudflare?: {
+			readonly wrangler?: { readonly assets?: { readonly run_worker_first?: unknown } };
+		};
 		prerender: { autoSubfolderIndex?: boolean };
 		readonly output: { readonly serverDir: string };
 	};
@@ -32,8 +36,12 @@ interface CloudflareNitro {
 export function cloudflareModule(configured: { readonly autoSubfolderIndex: boolean }) {
 	return {
 		name: 'markless-router:cloudflare',
-		setup(nitro: CloudflareNitro) {
+		async setup(nitro: CloudflareNitro) {
 			if (nitro.options.dev || !isCloudflarePreset(nitro.options.preset)) return;
+			trim.pages = nitro.options.preset === 'cloudflare-pages';
+			trim.workerFirst =
+				Boolean(nitro.options.cloudflare?.wrangler?.assets?.run_worker_first) ||
+				(await nearestWranglerSays(nitro.options.rootDir ?? '.', /run_worker_first/));
 			if (!configured.autoSubfolderIndex) nitro.options.prerender.autoSubfolderIndex = false;
 			// Nitro prerenders before it writes the Worker, so the pages are left out once it is written.
 			let prerendered = new Set<string>();
@@ -262,6 +270,49 @@ export function cloudflareNodeBuildsPlugin(): Plugin {
 				);
 				return node ? resolve(found.root, node) : undefined;
 			},
+		},
+	};
+}
+
+const PUBLIC_ASSETS_DATA = '#nitro/virtual/public-assets-data';
+const EMPTY_PUBLIC_ASSETS = '\0markless-router:cloudflare-public-assets';
+
+/**
+ * Nitro lists every public file, with its etag and size, in the server bundle so a request for one can be forwarded to
+ * the assets. Cloudflare serves those files before the Worker runs, so the Worker drops the list (2.7 MB to parse on
+ * every cold isolate for 11,664 files), unless an app's run_worker_first sends asset URLs to the Worker.
+ */
+// Pages routes requests by _routes.json, which can send public files to the Function: it keeps the list, as does a
+// Worker whose run_worker_first sends asset URLs to it.
+const trim = { pages: false, workerFirst: false };
+
+// The wrangler config Nitro merges: the nearest wrangler.json, wrangler.jsonc or wrangler.toml at or above the app.
+async function nearestWranglerSays(rootDir: string, pattern: RegExp): Promise<boolean> {
+	for (let dir = resolve(rootDir); ; dir = dirname(dir)) {
+		for (const name of ['wrangler.json', 'wrangler.jsonc', 'wrangler.toml']) {
+			const text = await readFile(join(dir, name), 'utf8').catch(() => undefined);
+			if (text !== undefined) return pattern.test(text);
+		}
+		if (dir === dirname(dir)) return false;
+	}
+}
+
+export function cloudflareWorkerTrimPlugin(): Plugin {
+	return {
+		name: 'markless-router:cloudflare-worker-trim',
+		apply: 'build',
+		applyToEnvironment: (environment) =>
+			environment.name === 'nitro' &&
+			environment.config.resolve.conditions.includes('workerd'),
+		resolveId: {
+			order: 'pre',
+			handler(source) {
+				if (source === PUBLIC_ASSETS_DATA && !trim.workerFirst && !trim.pages)
+					return EMPTY_PUBLIC_ASSETS;
+			},
+		},
+		load(id) {
+			if (id === EMPTY_PUBLIC_ASSETS) return 'export default {};';
 		},
 	};
 }

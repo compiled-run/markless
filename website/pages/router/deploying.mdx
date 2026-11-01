@@ -91,6 +91,10 @@ build keeps that one.
 CommonJS code bundled into the Worker can still read `__filename` and `__dirname`, which a Worker never
 defines, so a Worker build defines them as `/index.mjs` and `/`.
 
+The Worker also leaves out Nitro's list of every uploaded file, which Cloudflare never needs because
+it serves those files before the Worker runs. On a large site that list is megabytes of code an
+isolate would parse every time it starts. A `run_worker_first` in your `wrangler.json` keeps it.
+
 Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`; Nitro merges that file
 into the one it writes.
 
