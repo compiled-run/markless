@@ -247,7 +247,7 @@ export async function refreshWhenShown(
 			graphNodeId: input.computed.graphNodeId,
 			settle() {
 				const waits = [...state!.nodes.values()].flatMap((node) =>
-					node.loading || node.pending ? [node.loading ?? node.pending] : [],
+					[node.loading, node.pending].filter((wait) => wait !== undefined),
 				);
 				return waits.length ? Promise.all(waits).then(() => undefined) : undefined;
 			},
@@ -296,8 +296,10 @@ export async function refreshWhenShown(
 		if (node.version === version) node.stale = false;
 	};
 	const pull = (node: OnReadNode) => {
-		if (!node.stale || node.pending) return;
+		if (!node.stale) return;
 		const id = node.record.graphNodeId;
+		// A read while the derive settles still answers the held value; the next one derives.
+		if (node.pending) return graph.pullBeforeRead!(id, () => pull(node));
 		const derived = node.derive && deriveSyncComputedNow(at(node.record), node.derive);
 		if (derived === true) node.stale = false;
 		else if (derived) {
