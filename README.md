@@ -36,8 +36,8 @@ export default function Order() @{
 }
 ```
 
-- `@{ }` is a component body. Statements come first, then the elements it shows.
-- `{ }` inside the elements holds a value. When `mugs` changes, every spot that shows it, or `total`, changes too.
+- `@{ }` holds JavaScript statements, like `let mugs = state(1);`, followed by the elements to show.
+- `{ }` inside the elements holds a JavaScript expression, like `{mugs}` or `{mugs * 4}`. When `mugs` changes, every spot that shows it, or `total`, changes too.
 - Lines that start with `@` (`@if`, `@for`, `@switch`, `@try`) control which elements show.
 - `mugs` is a plain `let`. You read it and assign to it like any variable.
 
@@ -45,11 +45,13 @@ export default function Order() @{
 
 ## What makes it different
 
-**Compiled reactivity.** `state()` and `computed()` are plain function calls, with nothing else to mark up. The compiler reads your code at build time and works out which text, attribute or list each value feeds. The update graph is built before anything runs, so the browser never has to discover it. Nothing to mark is also where the name comes from.
+**One way to build UI, designed for any device.** You write web-style elements, events and CSS. The compiler turns what a page shows into data (the state, the planned updates and where each lands) and keeps your event handlers as JavaScript. Any host that can draw that data can run your UI: the web works today, native targets are early.
 
-**Resumable.** The server sends HTML that arrives already wired, and the browser picks up where the server left off without running your components again. A click loads only the code for that handler, and only the text that reads the changed value updates.
+**Decided at compile time, resumed on interaction.** The compiler works out ahead of time what each piece of your app needs, on the server, in the browser or on a future host. In the example above it already knows that a click on "Add a mug" updates two numbers, and that the coffee line appears once there are more than three mugs. Nothing is rediscovered when the page runs, and a piece of code resumes only when someone interacts with it. On our shadcn/ui port, the home page runs about a tenth of the original's JavaScript before the first click, and answers that click 3 to 4x sooner on a 3G phone.
 
-**Rendering is data, interactions are JavaScript.** The compiler turns what a page shows into data: the state, the planned updates, and where each one lands. Your event handlers stay JavaScript, split into small pieces that load when they are needed. Data can be drawn by any host, and that is why Markless is designed to render on any device.
+**Plain JavaScript values, nothing to mark up.** `mugs++`, `person.name = "Frank"` and `items.push(item)` just work, with no signals, stores or wrappers to write. During the build, Markless maps your whole project once, so each change updates only what shows it. Data fetching is an async `computed()`, and fetches that don't depend on each other start in parallel. That's also where the name comes from: there's nothing to mark.
+
+**Bring your existing app.** [Markless Migrate](#migrate-an-existing-app) moves a site over one page at a time and proves each page matches the original first.
 
 ## Where it runs today
 
@@ -75,8 +77,10 @@ It is a preview. These are work-in-progress ports of public sites, not official 
 
 | Port | Original | Markless |
 | --- | --- | --- |
-| shadcn/ui docs, home page | 1,660 kB | 143 kB |
+| shadcn/ui docs, home page | 1,403 kB | 131 kB |
 | Docusaurus website | ~650 kB | ~107 kB |
+
+On a 3G phone the same shadcn/ui home page answers its first click in 3.9 s instead of 14.6 s (Chromium, both sites on Cloudflare, median of 3 runs, November 2026).
 
 More ports and their full reports: [markless.dev/start/migrate](https://markless.dev/start/migrate).
 
