@@ -32,6 +32,8 @@ test.each([false, true])(
 			expect(source.split(`"./action-${index}.js"`)).toHaveLength(2);
 		}
 		expect(source).not.toContain('import(/* @vite-ignore */ moduleUrls[row[0]])');
+		// With no URL list a row's module index is dead weight, so every row ships it as 0.
+		expect(source).toContain('"action:8":[0,8]');
 	},
 );
 
