@@ -286,7 +286,8 @@ function captureLoadListeners(d: Document, w: Window, into: LoadListener[]): () 
 		) {
 			// A bare call has no receiver; one for the event that already fired is kept off the target, which would hold it and its page for good.
 			const self = this ?? w;
-			if (kind === type && listener && self === target) return void into.push({ target, type, listener });
+			if (kind === type && listener && self === target)
+				return void into.push({ target, type, listener });
 			return add.call(self, kind, listener, options);
 		};
 		return () => {
@@ -395,8 +396,11 @@ function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> 
 	]);
 }
 
+// A stylesheet an abandoned navigation hid keeps its served media here, so the navigation that reuses it shows it.
+const servedMedia = new WeakMap<Element, string | null>();
+
 // Existing head nodes stay where they are (moving a stylesheet re-applies it); new ones go in the destination's order.
-async function mergeHead(d: Document, next: Document, stylesheetKey: string) {
+export async function mergeHead(d: Document, next: Document, stylesheetKey: string) {
 	// A stylesheet's name is a URL and outerHTML starts with "<", so the two never collide.
 	const key = (element: Element) => element.getAttribute(stylesheetKey) ?? element.outerHTML;
 	const current = new Map<string, Element[]>();
@@ -412,10 +416,12 @@ async function mergeHead(d: Document, next: Document, stylesheetKey: string) {
 	for (const element of Array.from(next.head.children)) {
 		const reused = current.get(key(element))?.shift();
 		const node = reused ?? d.adoptNode(element);
+		if (reused && servedMedia.has(reused)) hidden.push([reused, servedMedia.get(reused)!]);
 		if (!reused) {
 			// An arriving stylesheet applies only with its page: applied before, it restyles the leaving page for nothing.
 			if (isStyleNode(node)) {
 				hidden.push([node, node.getAttribute('media')]);
+				servedMedia.set(node, node.getAttribute('media'));
 				node.setAttribute('media', 'not all');
 			}
 			if (cursor) cursor.after(node);
@@ -436,9 +442,11 @@ async function mergeHead(d: Document, next: Document, stylesheetKey: string) {
 	}
 	await loaded(d.defaultView!, stylesheets);
 	const show = () => {
-		for (const [node, media] of hidden)
+		for (const [node, media] of hidden) {
+			servedMedia.delete(node);
 			if (media === null) node.removeAttribute('media');
 			else node.setAttribute('media', media);
+		}
 	};
 	return { stale, scripts, show };
 }
@@ -755,7 +763,8 @@ function withoutTransitions(d: Document): () => void {
 			const observer = new w.ResizeObserver(() => {
 				observer.disconnect();
 				for (const animation of d.getAnimations())
-					if (!running.has(animation) && animation instanceof w.CSSTransition) animation.cancel();
+					if (!running.has(animation) && animation instanceof w.CSSTransition)
+						animation.cancel();
 				if (frames > 1) w.requestAnimationFrame(() => beforePaint(frames - 1));
 			});
 			observer.observe(d.documentElement);
