@@ -9,9 +9,13 @@ import { describe, expect, test } from 'vitest';
 import {
 	changelogSectionBody,
 	ciRefusal,
+	cutFromOf,
 	insertChangelogSection,
+	isReleaseSubject,
 	newestGreenCommit,
 	nextMinor,
+	releasePoint,
+	releaseTagMessage,
 } from './cut.mjs';
 
 const cutCli = fileURLToPath(new URL('./cut.mjs', import.meta.url));
@@ -186,6 +190,58 @@ describe('release cut helpers', () => {
 		});
 	});
 
+	test('a release the merge queue squashed is found where main took its version', () => {
+		const [head, squashed, older] = ['1', '2', '3'].map((digit) => digit.repeat(40));
+		const versions: Record<string, string> = {
+			[head!]: '0.10.0',
+			[squashed!]: '0.10.0',
+			[older!]: '0.9.0',
+		};
+		const versionAt = (sha: string) => versions[sha];
+		const firstParents = [head!, squashed!, older!];
+		const tag = 'f'.repeat(40);
+		expect(
+			releasePoint(firstParents, {
+				taggedSha: tag,
+				tagOnMain: false,
+				versionAt,
+				version: '0.10.0',
+			}),
+		).toBe(squashed);
+		expect(
+			releasePoint(firstParents, {
+				taggedSha: tag,
+				tagOnMain: true,
+				versionAt,
+				version: '0.10.0',
+			}),
+		).toBe(tag);
+		expect(
+			releasePoint(firstParents, {
+				taggedSha: tag,
+				tagOnMain: false,
+				versionAt,
+				version: '0.11.0',
+			}),
+		).toBeNull();
+	});
+
+	test('the release tag records the commit the release was cut from', () => {
+		const sha = 'a'.repeat(40);
+		expect(releaseTagMessage('v0.11.0', sha)).toBe(`v0.11.0\n\nCut from ${sha}`);
+		expect(cutFromOf(releaseTagMessage('v0.11.0', sha))).toBe(sha);
+		expect(releaseTagMessage('v0.11.0', null)).toBe('v0.11.0');
+		expect(cutFromOf('v0.10.0\n')).toBeNull();
+		expect(cutFromOf(`fix: mentions Cut from ${sha} in passing`)).toBeNull();
+	});
+
+	test('a release commit is recognised as cut or as squashed by the merge queue', () => {
+		expect(isReleaseSubject('chore(release): v0.11.0', 'v0.11.0')).toBe(true);
+		expect(isReleaseSubject('chore(release): v0.11.0 (#412)', 'v0.11.0')).toBe(true);
+		expect(isReleaseSubject('chore(release): v0.11.0 and more', 'v0.11.0')).toBe(false);
+		expect(isReleaseSubject('chore(release): v0.11.00', 'v0.11.0')).toBe(false);
+	});
+
 	test('the new section lands above the newest release and its body is the GitHub Release', () => {
 		const next = insertChangelogSection(CHANGELOG, '## 1.2.0\n\n- **Fixed:** B.\n');
 		expect(next).toBe(
@@ -326,18 +382,7 @@ describe('release cut command', () => {
 	);
 
 	test(
-		'a version that was never tagged is refused rather than skipped',
-		async () => {
-			const fixture = await cutFixture('1.1.0', { tagged: false });
-			const result = runCut(fixture);
-			expect(result.exitCode).toBe(1);
-			expect(result.stderr).toContain('there is no v1.1.0 tag');
-		},
-		SPAWN_HEAVY_TIMEOUT_MS,
-	);
-
-	test(
-		'a merged release commit whose tag was never pushed is tagged and finished',
+		'a release whose tagged commit main only has squashed is cut from past the squash',
 		async () => {
 			const fixture = await cutFixture('1.0.0');
 			git(fixture.work, ['checkout', '-b', 'release']);
@@ -350,10 +395,59 @@ describe('release cut command', () => {
 				`${JSON.stringify({ name: '@example/a', version: '1.1.0' }, null, '\t')}\n`,
 			);
 			git(fixture.work, ['commit', '-am', 'chore(release): v1.1.0']);
-			const release = git(fixture.work, ['rev-parse', 'HEAD']);
+			git(fixture.work, ['tag', '-a', 'v1.1.0', '-m', 'v1.1.0']);
 			git(fixture.work, ['checkout', 'main']);
-			git(fixture.work, ['merge', '--no-ff', '-m', 'Merge release v1.1.0', 'release']);
+			git(fixture.work, ['merge', '--squash', 'release']);
+			git(fixture.work, ['commit', '-m', 'chore(release): v1.1.0 (#7)']);
 			git(fixture.work, ['push', 'origin', 'HEAD:main']);
+			const squashed = git(fixture.work, ['rev-parse', 'HEAD']);
+			const head = await commitOnMain(fixture, 'b.txt', 'fix: b');
+			fixture.github.runs[head] = 'failure';
+			await writeFile(join(fixture.work, 'CHANGELOG.md'), 'edited\n');
+			const result = runCut(fixture);
+			const tagged = git(fixture.work, ['rev-parse', 'v1.1.0^{commit}']);
+			expect(result.stdout).toContain(
+				`release-cut: main does not contain the v1.1.0 tag ${tagged.slice(0, 12)}; ${squashed.slice(0, 12)} is where main took 1.1.0`,
+			);
+			expect(result.stdout).toContain(
+				`release-cut: cutting from ${squashed.slice(0, 12)} "chore(release): v1.1.0 (#7)"`,
+			);
+			expect(result.stderr).toContain('uncommitted changes to tracked files');
+			expect(result.stderr).not.toContain('green push CI run');
+		},
+		SPAWN_HEAVY_TIMEOUT_MS,
+	);
+
+	test(
+		'a version that was never tagged is refused rather than skipped',
+		async () => {
+			const fixture = await cutFixture('1.1.0', { tagged: false });
+			const result = runCut(fixture);
+			expect(result.exitCode).toBe(1);
+			expect(result.stderr).toContain('there is no v1.1.0 tag');
+		},
+		SPAWN_HEAVY_TIMEOUT_MS,
+	);
+
+	test(
+		'a release commit the merge queue landed but whose tag was never pushed is tagged and finished',
+		async () => {
+			const fixture = await cutFixture('1.0.0');
+			git(fixture.work, ['checkout', '-b', 'release']);
+			await writeFile(
+				join(fixture.work, 'package.json'),
+				`${JSON.stringify({ version: '1.1.0' }, null, '\t')}\n`,
+			);
+			await writeFile(
+				join(fixture.work, 'packages', 'a', 'package.json'),
+				`${JSON.stringify({ name: '@example/a', version: '1.1.0' }, null, '\t')}\n`,
+			);
+			git(fixture.work, ['commit', '-am', 'chore(release): v1.1.0']);
+			git(fixture.work, ['checkout', 'main']);
+			git(fixture.work, ['merge', '--squash', 'release']);
+			git(fixture.work, ['commit', '-m', 'chore(release): v1.1.0 (#12)']);
+			git(fixture.work, ['push', 'origin', 'HEAD:main']);
+			const release = git(fixture.work, ['rev-parse', 'HEAD']);
 			const result = runCut(fixture);
 			expect(result.stderr).toBe('');
 			expect(result.exitCode).toBe(0);

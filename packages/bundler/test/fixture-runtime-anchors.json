@@ -1,6 +1,6 @@
 {
 	"@fixtures/vite-csr": {
-		"runtime/graph": 10653,
+		"runtime/graph": 10725,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
 		"runtime/graph-computed": 2224,
@@ -88,7 +88,7 @@
 		"web/storage-plane": 1920
 	},
 	"@fixtures/vite-plus": {
-		"runtime/graph": 10653,
+		"runtime/graph": 10725,
 		"runtime/graph-async": 4110,
 		"runtime/graph-collections": 4270,
 		"runtime/graph-computed": 2224,

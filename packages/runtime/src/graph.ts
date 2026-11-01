@@ -202,6 +202,11 @@ export type RuntimeGraphCall = {
 	readonly args?: ReadonlyArray<unknown>;
 };
 
+export type RuntimeGraphChange = {
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+};
+
 export type RuntimeGraphDelete = {
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
@@ -278,6 +283,8 @@ export type RuntimeGraph = {
 	readonly update: (update: RuntimeGraphUpdate) => unknown;
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
+	/** Code outside the graph changed the value at `path` in place; everything reading it updates. */
+	readonly changed: (change: RuntimeGraphChange) => void;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
 	/** How many subscriptions are registered on `graphNodeId`. */
 	readonly subscriptionCount?: (graphNodeId: string) => number;
@@ -650,6 +657,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 			return outcome.result;
 		},
+		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
 		defineAsyncComputed(asyncComputed) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncComputedNodes.has(id) || cells.has(id)) return false;

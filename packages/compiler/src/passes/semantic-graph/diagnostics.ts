@@ -546,6 +546,27 @@ export function crossModuleHelperStateReturnUnsupportedDiagnostic(input: {
 	});
 }
 
+export function callWritesAssumedDiagnostic(input: {
+	readonly call: string;
+	readonly argument: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		...semanticGraphDiagnostic({
+			code: 'MARKLESS_CALL_WRITES_ASSUMED',
+			title: 'This call is assumed to change the state it is passed',
+			message: `\`${input.call}\` is handed \`${input.argument}\`, and Markless cannot see which parts of it the call changes, so all of \`${input.argument}\` is treated as changed once the call returns.`,
+			why: 'The called function is looked up at run time, comes from a package, or passes the value on to code the compiler cannot read. Changes it makes before returning still reach the page; everything that reads the value updates, not only what changed.',
+			span: sourceSpan(input.node, input.filename),
+			suggestion:
+				'Call a function from a .ts or .tsrx file in this project so Markless can read which paths it writes, or write the state in the handler itself.',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_CALL_WRITES_ASSUMED',
+		}),
+		severity: 'info',
+	};
+}
+
 export function crossModuleStateImportDiagnostic(input: {
 	readonly importedName: string;
 	readonly sourceModule: string;

@@ -323,7 +323,7 @@ function qualifyingGraph<T extends MarklessScopedGraph>(
 ): T {
 	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
 	const qualified =
-		<K extends 'write' | 'update' | 'call' | 'delete' | 'subscribe'>(method: K) =>
+		<K extends 'write' | 'update' | 'call' | 'delete' | 'changed' | 'subscribe'>(method: K) =>
 		(operation: { readonly graphNodeId: string }) =>
 			(graph[method] as (operation: object) => unknown).call(graph, {
 				...operation,
@@ -338,6 +338,7 @@ function qualifyingGraph<T extends MarklessScopedGraph>(
 		update: qualified('update'),
 		call: qualified('call'),
 		delete: qualified('delete'),
+		changed: qualified('changed'),
 		subscribe: qualified('subscribe'),
 	}) as T;
 }

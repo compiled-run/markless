@@ -5,6 +5,7 @@ import { packTopLevelEdits } from './pack-top-level.ts';
 import { helperImporterRewrite } from './preload-helper-removal.ts';
 import { stripEmptyVitePreloadWrappers } from './preload-cleanup.ts';
 import { shortNameChunkFacts } from './short-export-names.ts';
+import { stylesheetlessPreloads } from './stylesheet-preload-deps.ts';
 
 // Pure analyses of one chunk's code: the same answer on the main thread or in a chunk worker.
 const CHUNK_TASKS = {
@@ -15,6 +16,7 @@ const CHUNK_TASKS = {
 	strippedPreloadHelper: (_fileName: string, code: string) => stripEmptyVitePreloadWrappers(code),
 	unwrappedAsyncImports: (_fileName: string, code: string) => unwrapAsyncImportWrappersInCode(code),
 	helperImporterRewrite,
+	stylesheetlessPreloads,
 } as const;
 
 export type ChunkTaskName = keyof typeof CHUNK_TASKS;

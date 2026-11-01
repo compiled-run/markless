@@ -2,6 +2,7 @@ import type {
 	LoweredRowItem,
 	LoweredStateRead,
 	LoweredStateWrite,
+	PassedStateWrite,
 	SemanticGraphAlias,
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
@@ -166,6 +167,13 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		if (write.passedTo) {
+			const passed = lowerPassedStateWrite(write, write.passedTo, input, lookup);
+			if (passed?.kind === 'write') writes.push(passed.write);
+			else if (passed) diagnostics.push(passed.diagnostic);
+			continue;
+		}
+
 		if (write.through) {
 			const through = lowerWriteThrough(
 				write,
@@ -327,6 +335,38 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		),
 		writes,
 		diagnostics,
+	};
+}
+
+// A call changed state in place; an assumed change to a value nothing may write is the call's own business.
+function lowerPassedStateWrite(
+	write: SemanticStateWrite,
+	passedTo: PassedStateWrite,
+	input: StateLoweringInput,
+	lookup: GraphLookup,
+): RowItemWriteLowering | null {
+	if (write.rowRepeatId) {
+		const row = lowerRowItemWrite(write, input);
+		if (row?.kind === 'write')
+			return { kind: 'write', write: { ...row.write, source: passedTo.argument, passedTo } };
+		return row && !passedTo.assumed ? row : null;
+	}
+	const resolved = resolveStateGraphPath(input, write.target, lookup, null, write.componentName);
+	if (!resolved) return null;
+	if (resolved.binding.kind !== 'state' || !resolved.binding.writable)
+		return passedTo.assumed
+			? null
+			: { kind: 'diagnostic', diagnostic: readOnlyWriteDiagnostic(write, resolved.binding) };
+	return {
+		kind: 'write',
+		write: {
+			source: passedTo.argument,
+			sourceSpan: write.targetSpan,
+			graphNodeId: resolved.binding.id,
+			path: resolved.path,
+			operation: 'call',
+			passedTo,
+		},
 	};
 }
 
