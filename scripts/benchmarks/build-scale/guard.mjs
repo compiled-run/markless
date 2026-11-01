@@ -129,7 +129,7 @@ try {
 		);
 		if (over) failures.push(name);
 	}
-	// Module counts do not vary between runs, so any rise is real: Rolldown spends memory and time on every module.
+	// Module and compile counts do not vary between runs, so any rise is real: each module costs Rolldown memory and time, each compile a result held until buildEnd.
 	const countRows = [
 		['client modules', atLarge.modules.client, budgets.clientModules],
 		[
@@ -137,6 +137,7 @@ try {
 			perPageOf((build) => build.modules.client),
 			budgets.clientModulesPerPage,
 		],
+		['whole-module compiles', atLarge.compiles, budgets.compiles],
 	];
 	for (const [name, measured, budget] of countRows) {
 		const value = Math.round(measured * 10) / 10;

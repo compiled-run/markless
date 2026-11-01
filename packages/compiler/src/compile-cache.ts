@@ -14,6 +14,7 @@ let maxEntries = DEFAULT_MAX_ENTRIES;
 // Outer key is the source text itself: stringifying it into every key cost more than the compiles the memo saved.
 const compiles = new Map<string, Map<string, Promise<CompileTsrxModuleResult>>>();
 let entries = 0;
+let runs = 0;
 
 // Sorted, because the two requests for one module build their interface records
 // in whatever order they resolved imports; the values are compiler artifacts,
@@ -123,6 +124,7 @@ export function memoizedCompile(
 		compiles.set(input.source, bySource!);
 		return cached;
 	}
+	runs++;
 	const pending = compileThroughStore(input, key, compile);
 	if (!bySource) compiles.set(input.source, (bySource = new Map()));
 	bySource.set(key, pending);
@@ -157,6 +159,11 @@ export function setCompileCacheLimit(limit: number | undefined): number {
 	const previous = maxEntries;
 	maxEntries = limit ?? DEFAULT_MAX_ENTRIES;
 	return previous;
+}
+
+/** Compiles this process has started that the memo did not answer, since it started. */
+export function compileRuns(): number {
+	return runs;
 }
 
 export function compileCacheSize(): number {

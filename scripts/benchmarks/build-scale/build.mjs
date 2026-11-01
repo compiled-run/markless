@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { writeHeapSnapshot } from 'node:v8';
 import { createBuilder } from 'vite';
+import { compileRuns } from '../../../packages/compiler/src/compile-cache.ts';
 import { markless } from '../../../packages/core/src/vite.ts';
 import { router } from '../../../packages/router/src/vite/index.ts';
 import { generateBuildScaleApp } from './generate.mjs';
@@ -111,6 +112,8 @@ console.log(
 		peakExternalBytes: peakExternal,
 		...(retained.length ? { retained } : {}),
 		modules,
+		// Whole-module compiles the memo did not answer: like the module count, the same on every run.
+		compiles: compileRuns(),
 		largestServerChunk: largest(
 			output,
 			(path) => isCode(path) && path.startsWith('.output/server/'),

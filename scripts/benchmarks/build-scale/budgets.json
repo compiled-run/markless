@@ -26,12 +26,16 @@
 			"reason": "6 MB: measured 4.63 MB (interaction-closures.json) at 180 pages; origin/main before wrote a 22.6 MB execution-demand.json."
 		},
 		"clientModules": {
-			"value": 4495,
-			"reason": "Client graph modules at 180 pages, measured 15,028 on main f79073248, 14,911 once #348 dropped the re-export wrappers, and 4,495 once a source's symbols the pack planner treats alike ship as one module (CI, 2026-10-29); the count is the same on every run, so the budget is the measurement. Rolldown spends about 90 KB of native memory per module whatever its size (#268), so a rise is a memory and time regression; lower it as module-cutting changes land."
+			"value": 4541,
+			"reason": "Client graph modules at 180 pages, measured 15,028 on main f79073248, 14,911 once #348 dropped the re-export wrappers, 4,495 once a source's symbols the pack planner treats alike ship as one module (CI, 2026-10-29), and 4,541 once the widgets call a helper module from their handlers (2026-11-01); the count is the same on every run, so the budget is the measurement. Rolldown spends about 90 KB of native memory per module whatever its size (#268), so a rise is a memory and time regression; lower it as module-cutting changes land."
 		},
 		"clientModulesPerPage": {
 			"value": 22.5,
 			"reason": "Client modules per extra page between 60 and 180 pages: (15,028 - 5,452) / 120 = 79.8 on main f79073248 (2026-10-28), 79.7 after #348 and 22.5 once symbols are grouped (CI, 2026-10-29), the same on every run. Each page adds its own symbol modules; this catches a change that multiplies them."
+		},
+		"compiles": {
+			"value": 994,
+			"reason": "Whole-module compiles the compile memo did not answer at 180 pages: 994 (2026-11-01, the same on every run). #401 compiled every module whose handler called an imported function a second time, even with no state passed: 1,062 here, and on the 498-page ui.shadcn.com port the client build went from fitting a 6,656 MB heap to running out of it. Each compile's result is held until buildEnd, so a rise is a memory regression."
 		},
 		"buildCpuPerPageInReferenceRuns": {
 			"value": 0.5,
