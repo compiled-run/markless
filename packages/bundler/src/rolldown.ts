@@ -278,7 +278,7 @@ export function createMarklessRolldownPlugin(input: {
 				...(packing && internalOptions.routeModules
 					? {
 							experimental: {
-								...input.experimental,
+								...withoutRegions.experimental,
 								chunkOptimization: {
 									mergeCommonChunks: true,
 									avoidRedundantChunkLoads: false,
