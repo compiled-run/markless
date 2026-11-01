@@ -641,24 +641,28 @@ function unstableCreationSiteText(
 	}[site];
 }
 
-export function asyncPostAwaitReadDiagnostic(
+export function asyncPostAwaitDependentReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,
+	awaitedSegment: string,
 ): SemanticGraphDiagnostic {
 	return {
 		code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
 		severity: 'error',
 		phase: 'semantic-graph',
-		title: 'Reactive reads after await are not resumable',
-		message: `Cannot read "${read.source}" after await in async computed "${computedName}". Snapshot the value before awaiting.`,
-		why: 'Async computed dependency keys are captured before the first await. Reading graph state after suspension would make revalidation and resume depend on hidden async timing.',
+		title: 'This read depends on a value the await produced',
+		message: `Cannot read "${read.source}" in async computed "${computedName}": the key "${awaitedSegment}" comes from awaited work, so the read cannot be part of the dependency key captured before the await.`,
+		why: 'Reads after an await join the dependency key, which is fixed before the await starts. This path is only known after the await, so the key could only hold the whole collection, and every write anywhere in it would rerun the awaited work.',
 		primarySpan: read.sourceSpan,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
+				message: `Return what "${awaitedSegment}" comes from in this computed's result, and do the lookup "${read.source}" in a sync computed() that reads it.`,
+			},
+			{
 				message:
-					'Read the graph value before the first await, or split post-await formatting into a separate sync computed().',
+					'Or copy the whole collection into a const before the first await and index that copy, accepting a rerun on any write to it.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_POST_AWAIT_READ',

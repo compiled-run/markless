@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { buildSemanticGraph, collectTsrxModuleDiagnostics, compileTsrxModule } from '../src/index.ts';
+import {
+	buildSemanticGraph,
+	collectTsrxModuleDiagnostics,
+	compileTsrxModule,
+} from '../src/index.ts';
 import type { AnyNode } from '../src/ast/nodes.ts';
 import { collectKeyedRepeat } from '../src/passes/semantic-graph/collect-repeat.ts';
 import {
@@ -385,8 +389,8 @@ test('a compiled module warns when markless-allow is stale for a site', async ()
 		),
 		symbols: [],
 	});
-	const diagnostics = collectTsrxModuleDiagnostics(result).filter(
-		(diagnostic) => diagnostic.code.startsWith('MARKLESS_ALLOW'),
+	const diagnostics = collectTsrxModuleDiagnostics(result).filter((diagnostic) =>
+		diagnostic.code.startsWith('MARKLESS_ALLOW'),
 	);
 
 	expect(diagnostics).toEqual([
@@ -959,46 +963,217 @@ test('B921 reports attribute and spread value discipline diagnostics without fla
 	);
 });
 
-test('buildSemanticGraph reports reactive reads after await in async computed bodies', async () => {
+test('buildSemanticGraph captures a static-path read after await into the dependency key', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/UserRoute.tsrx',
 		source: asyncPostAwaitReadSource,
 	});
-	const invalidReadStart = asyncPostAwaitReadSource.indexOf('settings.locale');
+	const user = graph.graphBindings.find((binding) => binding.name === 'user');
 
-	expect(graph.diagnostics).toEqual([
-		expect.objectContaining({
-			code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
-			severity: 'error',
-			phase: 'semantic-graph',
-			passId: 'tsrx-semantic-graph',
-			artifactKeys: ['semanticGraph'],
-			title: 'Reactive reads after await are not resumable',
-			message:
-				'Cannot read "settings.locale" after await in async computed "user". Snapshot the value before awaiting.',
-			why: 'Async computed dependency keys are captured before the first await. Reading graph state after suspension would make revalidation and resume depend on hidden async timing.',
-			primarySpan: {
-				filename: 'src/UserRoute.tsrx',
-				start: invalidReadStart,
-				end: invalidReadStart + 'settings.locale'.length,
-			},
-			suggestions: [
-				{
-					message:
-						'Read the graph value before the first await, or split post-await formatting into a separate sync computed().',
-				},
-			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_POST_AWAIT_READ',
-		}),
-	]);
-	expect(graph.diagnostics).not.toEqual(
+	expect(graph.diagnostics).toEqual([]);
+	expect(user?.dependencies).toEqual(
 		expect.arrayContaining([
-			expect.objectContaining({
-				code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
-				message: expect.stringContaining('route.params.userId'),
-			}),
+			expect.objectContaining({ source: 'settings.locale', path: ['locale'] }),
 		]),
 	);
+});
+
+test('buildSemanticGraph reports a read whose computed key comes from the awaited value', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let items = state({ a1: 'apple' } as Record<string, string>);
+	const chosen = computed(async () => {
+		const res = await fetch('/pick');
+		const id = res.id;
+		return items[res.id] + items[id] + items['a1'];
+	});
+
+	@try {
+		<p>{chosen}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Dependent.tsrx', source });
+
+	expect(
+		graph.diagnostics.map((diagnostic) => ({
+			code: diagnostic.code,
+			message: diagnostic.message,
+			start: diagnostic.primarySpan?.start,
+		})),
+	).toEqual([
+		{
+			code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
+			message:
+				'Cannot read "items[res.id]" in async computed "chosen": the key "res.id" comes from awaited work, so the read cannot be part of the dependency key captured before the await.',
+			start: source.indexOf('items[res.id]'),
+		},
+		{
+			code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
+			message:
+				'Cannot read "items[id]" in async computed "chosen": the key "id" comes from awaited work, so the read cannot be part of the dependency key captured before the await.',
+			start: source.indexOf('items[id]'),
+		},
+	]);
+});
+
+test('buildSemanticGraph reports an awaited-key read nested in an unresolved member chain', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let items = state({ a1: 'apple' } as Record<string, string>);
+	let count = state(1);
+	const chosen = computed(async () => {
+		const res = await fetch('/pick');
+		return items[res.id].length + [res.id].filter((id) => id === count).length;
+	});
+
+	@try {
+		<p>{chosen}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Chain.tsrx', source });
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.primarySpan?.start)).toEqual([
+		source.indexOf('items[res.id]'),
+	]);
+	expect(graph.graphBindings.find((binding) => binding.name === 'chosen')?.dependencies).toEqual(
+		expect.arrayContaining([expect.objectContaining({ source: 'count' })]),
+	);
+});
+
+test('buildSemanticGraph reports an awaited key inside a longer member chain and a shadowed repeat', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let shelf = state({ a1: { label: 'apple' } } as Record<string, { label: string }>);
+	const label = computed(async () => {
+		const key = 'a1';
+		const res = await fetch('/pick');
+		const first = shelf[key];
+		const late = (() => {
+			const key = res.id;
+			return shelf[key];
+		})();
+		return first.label + late.label + shelf[res.id]['label'];
+	});
+
+	@try {
+		<p>{label}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Shelf.tsrx', source });
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.primarySpan?.start).sort()).toEqual(
+		[source.lastIndexOf('shelf[key]'), source.indexOf('shelf[res.id]')].sort(),
+	);
+});
+
+test('buildSemanticGraph reports a key assigned from the first await', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let rack = state({ b2: 'banana' } as Record<string, string>);
+	const shown = computed(async () => {
+		let slot = '';
+		slot = await fetch('/slot');
+		return rack[slot];
+	});
+
+	@try {
+		<p>{shown}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Rack.tsrx', source });
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.primarySpan?.start)).toEqual([
+		source.indexOf('rack[slot]'),
+	]);
+});
+
+test('buildSemanticGraph reports an awaited key written inline or behind parentheses', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let rack = state({ b2: 'banana' } as Record<string, string>);
+	const shown = computed(async () => {
+		const first = rack[await fetch('/slot')];
+		const res = await fetch('/pick');
+		return first + (rack)[res.id] + (rack as Record<string, string>)[res.id];
+	});
+
+	@try {
+		<p>{shown}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Inline.tsrx', source });
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.primarySpan?.start).sort()).toEqual(
+		[
+			source.indexOf('rack[await'),
+			source.indexOf('(rack)[res.id]'),
+			source.indexOf('(rack as'),
+		].sort(),
+	);
+});
+
+test('buildSemanticGraph allows a post-await computed key settled before the await', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/SettledKey.tsrx',
+		source: `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let items = state({ a1: 'apple' } as Record<string, string>);
+	let sel = state('a1');
+	const chosen = computed(async () => {
+		const key = sel;
+		await Promise.resolve();
+		return items[key] + items[sel];
+	});
+
+	@try {
+		<p>{chosen}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
 });
 
 test('buildSemanticGraph allows post-await reads of a local snapshotted before the await', async () => {
@@ -1038,7 +1213,7 @@ export function App() @{
 	expect(graph.diagnostics).toEqual([]);
 });
 
-test('buildSemanticGraph still reports a graph read that creates a local after the await', async () => {
+test('buildSemanticGraph captures a graph read that creates a local after the await', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/LateSnapshot.tsrx',
 		source: `
@@ -1063,17 +1238,9 @@ export function App() @{
 `,
 	});
 
-	expect(
-		graph.diagnostics.map((diagnostic) => ({
-			code: diagnostic.code,
-			message: diagnostic.message,
-		})),
-	).toEqual([
-		{
-			code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
-			message:
-				'Cannot read "stratum" after await in async computed "shale". Snapshot the value before awaiting.',
-		},
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.graphBindings.find((binding) => binding.name === 'shale')?.dependencies).toEqual([
+		expect.objectContaining({ source: 'stratum' }),
 	]);
 });
 
@@ -1626,7 +1793,7 @@ export function App() @{
 	expect(graph.diagnostics).toEqual([]);
 });
 
-test('buildSemanticGraph still reports a graph read in a computed object key after the await', async () => {
+test('buildSemanticGraph captures a graph read in a computed object key after the await', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/KioskKey.tsrx',
 		source: `
@@ -1648,9 +1815,7 @@ export function App() @{
 `,
 	});
 
-	expect(graph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
-		'MARKLESS_ASYNC_POST_AWAIT_READ',
-	]);
+	expect(graph.diagnostics).toEqual([]);
 });
 
 test('a direct eval inside a component that reads its names, or cannot be read, fails the build', async () => {

@@ -216,23 +216,31 @@ Semantics:
 - `computed(async ({ signal }) => ...)` creates a lazy async graph node. It does
   not run at creation; it runs only when demanded by a DOM update or TSRX async
   boundary.
-- Reactive reads before the first `await` form the dependency key for the async
-  node. When that key changes, the runtime creates a new request version. A key
-  part that holds an object or array (a whole `filters` object handed to a
-  helper) changes whenever a write lands inside it: the object keeps its
-  identity when a field is written, so identity never decides that it stayed
-  the same.
-- Reactive reads after the first `await` are a compile-time diagnostic. Snapshot
-  the value before awaiting, or split the logic into an async computed plus a
-  sync computed:
+- Reactive reads in the body form the dependency key for the async node. When
+  that key changes, the runtime creates a new request version. A key part that
+  holds an object or array (a whole `filters` object handed to a helper)
+  changes whenever a write lands inside it: the object keeps its identity when
+  a field is written, so identity never decides that it stayed the same.
+- A read after an `await` whose path is known before the await starts (a state
+  path such as `filters.q`, a prop path such as `route.params.id`, or such a read
+  inside a component-body helper the body calls) joins the key exactly as if it
+  had been copied into a `const` before the first `await`. Its value is taken
+  when the run starts; if it changes while the run waits, the run is aborted and
+  a new run starts with the new value, so the committed result is the one a read
+  after the await would give.
+- A read whose path depends on the awaited value is a compile-time diagnostic
+  (`MARKLESS_ASYNC_POST_AWAIT_READ`): a computed member key that holds an
+  `await`, or a body local assigned from awaited work, such as `items[res.id]`.
+  The key is fixed before the await, so it could only hold the whole
+  collection. Such a lookup inside a called helper is not detected; it stays
+  correct because the whole collection is then a key part. Return the awaited
+  value and do the lookup in a sync computed:
 
 ```tsrx
 import { computed } from '@markless/core';
 
-const rawUser = computed(async ({ signal }) =>
-  fetchUser(route.params.userId, signal)
-);
-const formattedUser = computed(() => formatUser(rawUser, locale));
+const picked = computed(async ({ signal }) => fetchPick(signal));
+const item = computed(() => items[picked.id]);
 ```
 
 - Async computeds compose through their key phases. If an async computed's
@@ -295,9 +303,10 @@ record required for resumability.
 Rationale: runtime-only tracking systems lose dependencies after `await` unless
 users manually read them before suspension; Qwik solves that with `track()`, and
 Vue/Angular document the same synchronous-tracking constraint. Svelte's compiler
-can recover some async dependencies in compiler-visible expressions. This
-framework takes the TSRX-only route: no marker, but strict compiler diagnostics
-at the async boundary.
+restores tracking after `await` in compiler-visible expressions, but reads in
+called helpers lose it. This framework takes the TSRX-only route: no marker; the
+compiler captures every statically known read into the key before the run
+starts, and refuses only reads whose path comes from the awaited value.
 
 The state, async, element, event, and element-behavior APIs are
 **compiler-rewritten framework APIs**, not runtime reactive values. Authors must

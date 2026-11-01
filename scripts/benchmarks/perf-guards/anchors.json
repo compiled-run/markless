@@ -2296,6 +2296,34 @@
 				"jsGzipBytes": 1678250
 			},
 			"reason": "the docs pages' in-browser compiler carries the bundler's transform; holding link-pending refusals on a first pass adds 76 B gzip (measured on CI, PR #377 on #375)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1565036
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1565456
+			},
+			"reason": "the docs pages' in-browser compiler gains the post-await read classifier; measured on CI run 41244233368 (PR #397 on main 64dc4b798): docs / +420 B gzip, /concepts/state +513 B gzip, executed chars -1; the 93 B gap between the two pages is not attributed"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678250
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1678763
+			},
+			"reason": "the docs pages' in-browser compiler gains the post-await read classifier; measured on CI run 41244233368 (PR #397 on main 64dc4b798): docs / +420 B gzip, /concepts/state +513 B gzip, executed chars -1; the 93 B gap between the two pages is not attributed"
 		}
 	],
 	"runtimeModules": {
@@ -2498,12 +2526,12 @@
 				"jsGzipBytes": 87007
 			},
 			"docs /": {
-				"executedChars": 110778,
-				"jsGzipBytes": 1565036
+				"executedChars": 110777,
+				"jsGzipBytes": 1565456
 			},
 			"docs /concepts/state": {
-				"executedChars": 121828,
-				"jsGzipBytes": 1678250
+				"executedChars": 121827,
+				"jsGzipBytes": 1678763
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,

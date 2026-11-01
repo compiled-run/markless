@@ -543,20 +543,20 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'An async computed() reads state after an await.',
+		description: 'An async computed() looks a value up with a key that comes from an await.',
 		printed: [
-			'MARKLESS_ASYNC_POST_AWAIT_READ: Cannot read "<source>" after await in async computed "<computedName>". Snapshot the value before awaiting.',
-			'Async computed dependency keys are captured before the first await. Reading graph state after suspension would make revalidation and resume depend on hidden async timing.',
-			'Read the graph value before the first await, or split post-await formatting into a separate sync computed().',
+			'MARKLESS_ASYNC_POST_AWAIT_READ: Cannot read "<source>" in async computed "<computedName>": the key "<awaitedSegment>" comes from awaited work, so the read cannot be part of the dependency key captured before the await.',
+			'Reads after an await join the dependency key, which is fixed before the await starts. This path is only known after the await, so the key could only hold the whole collection, and every write anywhere in it would rerun the awaited work.',
+			'Return what "<awaitedSegment>" comes from in this computed\'s result, and do the lookup "<source>" in a sync computed() that reads it.',
 			'https://markless.dev/errors/MARKLESS_ASYNC_POST_AWAIT_READ',
 		],
 		structured: true,
 		guide: {
-			summary: 'An async computed() reads state after an await.',
+			summary: 'An async computed() looks a value up with a key that comes from an await.',
 			what: [
 				{
 					id: 's0',
-					text: 'Markless records which state an async ',
+					text: 'Markless reads every state an async ',
 				},
 				{
 					id: 's1',
@@ -565,7 +565,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's2',
-					text: ' reads before its first ',
+					text: ' names when it starts running, including reads after an ',
 				},
 				{
 					id: 's3',
@@ -574,31 +574,40 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's4',
-					text: '. A read after the ',
+					text: ', and runs it again when one of them changes. A lookup whose key is the awaited answer, such as ',
 				},
 				{
 					id: 's5',
-					text: 'await',
+					text: 'items[res.id]',
 					code: true,
 				},
 				{
 					id: 's6',
-					text: ' is invisible to it.',
+					text: ', cannot be read before the answer arrives.',
 				},
 			],
 			how: [
 				{
 					id: 's0',
-					text: 'Copy the value into a local before the first ',
+					text: 'Return the answer from the async ',
 				},
 				{
 					id: 's1',
-					text: 'await',
+					text: 'computed()',
 					code: true,
 				},
 				{
 					id: 's2',
-					text: '. Use the local after it.',
+					text: '. Do the lookup in a plain ',
+				},
+				{
+					id: 's3',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' that reads it.',
 				},
 			],
 			example: [
@@ -617,7 +626,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r2',
-							text: 'details',
+							text: 'picked',
 							style: 'color:#005cc5;--shiki-dark:#79b8ff',
 						},
 						{
@@ -672,7 +681,17 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r13',
-							text: ' {',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: 'loadPick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r15',
+							text: '(signal));',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 					],
@@ -682,87 +701,52 @@ export const errorEntries: readonly ErrorEntry[] = [
 					runs: [
 						{
 							id: 'r0',
-							text: '\t',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r1',
 							text: 'const',
 							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 						{
-							id: 'r2',
+							id: 'r1',
 							text: ' ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
-							id: 'r3',
-							text: 'q',
+							id: 'r2',
+							text: 'item',
 							style: 'color:#005cc5;--shiki-dark:#79b8ff',
 						},
 						{
-							id: 'r4',
+							id: 'r3',
 							text: ' ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
-							id: 'r5',
+							id: 'r4',
 							text: '=',
 							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 						{
-							id: 'r6',
-							text: ' name;',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-					],
-				},
-				{
-					id: 'l2',
-					runs: [
-						{
-							id: 'r0',
-							text: '\t',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r1',
-							text: 'return',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
-						},
-						{
-							id: 'r2',
-							text: ' { title: ',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r3',
-							text: 'await',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
-						},
-						{
-							id: 'r4',
+							id: 'r5',
 							text: ' ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
-							id: 'r5',
-							text: 'loadGreeting',
+							id: 'r6',
+							text: 'computed',
 							style: 'color:#6f42c1;--shiki-dark:#b392f0',
 						},
 						{
-							id: 'r6',
-							text: '(q, signal) };',
+							id: 'r7',
+							text: '(() ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
-					],
-				},
-				{
-					id: 'l3',
-					runs: [
 						{
-							id: 'r0',
-							text: '});',
+							id: 'r8',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' items[picked.id]);',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 					],
