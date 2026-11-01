@@ -417,3 +417,31 @@ export function firstLines(view: { size: number }, lines: string[]) {
 		firstLines: { parameters: [[], []] },
 	});
 });
+
+test('a toSorted comparator that changes the elements it compares is followed', () => {
+	const facts = analyzeModuleFunctionWrites({
+		filename: 'src/sorted.ts',
+		source: `export function rankInline(rows: { seen: boolean }[]) {
+	return rows.toSorted((a, b) => {
+		b.seen = true;
+		return 0;
+	});
+}
+function touch(a: { seen: boolean }, _b: { seen: boolean }) {
+	a.seen = true;
+	return 0;
+}
+export function rankNamed(rows: { seen: boolean }[]) {
+	return rows.toSorted(touch);
+}
+export function rankPlain(rows: { n: number }[]) {
+	return rows.toSorted((a, b) => a.n - b.n);
+}
+`,
+	});
+	expect(facts).toEqual({
+		rankInline: { parameters: [[{ path: [] }]] },
+		rankNamed: { parameters: [[{ path: [] }]] },
+		rankPlain: { parameters: [[]] },
+	});
+});

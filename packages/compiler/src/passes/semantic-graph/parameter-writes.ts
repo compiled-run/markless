@@ -406,17 +406,27 @@ export class FunctionWritesAnalysis {
 			out.add(receiver, true);
 			return;
 		}
-		if (ELEMENT_CALLBACK_METHODS.has(method) || method.startsWith('reduce'))
-			this.#callback(call, receiver, method.startsWith('reduce') ? 1 : 0, out, seen);
+		const args = (call.arguments as AnyNode[] | undefined) ?? [];
+		if (method.startsWith('reduce'))
+			// A reduce with no seed starts its accumulator at the first element.
+			this.#callback(call, receiver, args.length < 2 ? [0, 1, 3] : [1, 3], out, seen);
+		else if (method === 'toSorted') {
+			if (args.length > 0) this.#callback(call, receiver, [0, 1], out, seen);
+		} else if (ELEMENT_CALLBACK_METHODS.has(method))
+			this.#callback(call, receiver, [0, 2], out, seen);
 		if (ELEMENT_RESULT_METHODS.has(method)) this.#use(call, receiver, false, out, seen);
 	}
 
-	// An array callback is handed each element and then the array itself.
-	#callback(call: AnyNode, receiver: Path, element: number, out: WriteSet, seen: Set<string>): void {
+	// `indexes` are the callback parameters handed an element or the array itself.
+	#callback(
+		call: AnyNode,
+		receiver: Path,
+		indexes: ReadonlyArray<number>,
+		out: WriteSet,
+		seen: Set<string>,
+	): void {
 		const args = (call.arguments as AnyNode[] | undefined) ?? [];
 		const callback = unwrap((args[0] ?? call) as AnyNode);
-		// A reduce with no seed starts its accumulator at the first element.
-		const indexes = element === 1 && args.length < 2 ? [0, 1, 3] : [element, element + 2];
 		if (isFunctionNode(callback)) {
 			const params = (callback.params as AnyNode[]) ?? [];
 			for (const index of indexes)
