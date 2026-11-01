@@ -2395,6 +2395,26 @@ export function App() @{
 	expect(output.html).not.toContain('<style');
 });
 
+test('compileTsrxModule names the stylesheets a module imports for their effect, in source order', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SiteShell.tsrx',
+		source: `
+import './site.css';
+import type { Theme } from './theme.css';
+import tokens from './tokens.css?url';
+import 'some-kit/base.scss';
+import './polyfill.ts';
+
+export function Shell() @{
+	<main class="shell"><p>{tokens}</p></main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.stylesheetImports).toEqual(['./site.css', 'some-kit/base.scss']);
+});
+
 // A scoped rule only matches an element carrying the scope class, so an element
 // whose class is an expression has to compose with it too.
 test('compileTsrxModule scopes an element whose class is a dynamic expression', async () => {

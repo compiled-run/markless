@@ -2506,6 +2506,232 @@
 				"jsGzipBytes": 1682502
 			},
 			"reason": "main's v0.10.0 release lengthens the version string the docs pages' in-browser compiler carries (0.9.0 to 0.10.0), one more byte on top of this PR's write analysis; measured on merge_group run 41329326175 (PR #401 on main 177f49ba9): +1 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "runtime",
+			"subject": "router/vite/entries/client-entry",
+			"from": 2666,
+			"to": 2816,
+			"reason": "a page rendered in the browser (a '#/' route) loads the stylesheets its document lacks itself, since dynamic imports no longer wait on CSS the documents carry inline (PR #391); +150 B rendered, measured on CI"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 29345,
+			"to": 29709,
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +364 B rendered, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -2517,8 +2743,8 @@
 		"router/route-renderer": 1735,
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
-		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 29345,
+		"router/vite/entries/client-entry": 2816,
+		"router/vite/entries/fragment-entry": 29709,
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
@@ -2671,15 +2897,15 @@
 		"darwin-arm64": {
 			"bench /": {
 				"executedChars": 10775,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87105
 			},
 			"bench /records": {
 				"executedChars": 10791,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87105
 			},
 			"bench /settings": {
 				"executedChars": 10741,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87105
 			},
 			"docs /": {
 				"executedChars": 110612,
@@ -2696,16 +2922,16 @@
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11370,
-				"jsGzipBytes": 87016
+				"executedChars": 11235,
+				"jsGzipBytes": 87128
 			},
 			"bench /records": {
-				"executedChars": 11386,
-				"jsGzipBytes": 87016
+				"executedChars": 11251,
+				"jsGzipBytes": 87128
 			},
 			"bench /settings": {
-				"executedChars": 11443,
-				"jsGzipBytes": 87016
+				"executedChars": 11308,
+				"jsGzipBytes": 87128
 			},
 			"docs /": {
 				"executedChars": 110777,

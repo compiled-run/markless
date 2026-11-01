@@ -40,6 +40,7 @@ export function emptyPlan(
 	return {
 		passId: 'public-render-plan',
 		styleScopes: [],
+		stylesheetImports: [],
 		diagnostics,
 	};
 }

@@ -65,7 +65,11 @@ import { LINK_ATTRIBUTE, PREFETCH_ATTRIBUTE } from '../link-attributes.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
 import { listenForLinkIntent } from './link-intent.ts';
 import { documentHandlerError, documentNavigationFor } from './document-navigation.ts';
-import { runFragmentNavigation, startFragmentNavigation } from './fragment-navigation.ts';
+import {
+	STYLESHEET_KEY_ATTRIBUTE,
+	runFragmentNavigation,
+	startFragmentNavigation,
+} from './fragment-navigation.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
 	brotliCopiesPlugin,
@@ -129,6 +133,7 @@ const FRAGMENT_ENTRY_PATH_ID = 'virtual:markless-router/fragment-entry-path';
 const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
+const STYLESHEET_SOURCES_PLACEHOLDER = '__MARKLESS_ROUTER_STYLESHEET_SOURCES__';
 const LINK_BRIDGE_PATHS_PLACEHOLDER = '__MARKLESS_ROUTER_LINK_BRIDGE_PATHS__';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
@@ -458,6 +463,9 @@ function routerConfigPlugin(
 						?.chunkImportMap === 'function',
 			) as { api: { chunkImportMap(): boolean; enableChunkImportMap?(): void } } | undefined;
 			markless?.api.enableChunkImportMap?.();
+			if (config.command === 'build')
+				(markless?.api as { deliverStylesheetsInDocuments?(): void } | undefined)
+					?.deliverStylesheetsInDocuments?.();
 			routePreloads.chunkSpecifiers = markless?.api.chunkImportMap() === true;
 		},
 		configEnvironment(_name, config) {
@@ -487,6 +495,7 @@ function routerConfigPlugin(
 				fragmentEntry.fileName = undefined;
 				routePreloads.routes = { navigation: {}, ssr: {}, styles: {} };
 				routePreloads.resumeModules = {};
+				routePreloads.stylesheetSources = {};
 				routePreloads.persisted = false;
 				routePreloads.importMap = undefined;
 				await removeClientAssetsManifest(clientOutDir);
@@ -509,6 +518,11 @@ function routerConfigPlugin(
 			fragmentEntry.imports = manifest.entries.fragmentImports;
 			routePreloads.routes = manifest.routes;
 			routePreloads.resumeModules = manifest.resumeModules ?? {};
+			routePreloads.stylesheetSources = await clientStylesheetSources(
+				clientOutDir,
+				manifest.base,
+				Object.values(manifest.routes.styles).flat(),
+			);
 			routePreloads.persisted = true;
 			routePreloads.importMap = manifest.importMap;
 		},
@@ -518,14 +532,16 @@ function routerConfigPlugin(
 			handler(_options, bundle) {
 				if (this.environment?.config.consumer !== 'client') {
 					if (this.environment?.config.consumer === 'server') {
-						patchDocumentStylesheetsInBundle(
+						const documentStylesheets = documentStylesheetsFromBundle(
 							bundle,
-							documentStylesheetsFromBundle(
-								bundle,
-								routePreloads.root,
-								routePreloads.base,
-							),
+							routePreloads.root,
+							routePreloads.base,
 						);
+						patchDocumentStylesheetsInBundle(bundle, documentStylesheets);
+						patchStylesheetSourcesInBundle(bundle, {
+							...routePreloads.stylesheetSources,
+							...bundleStylesheetSources(bundle, routePreloads.base, documentStylesheets),
+						});
 					}
 					return;
 				}
@@ -925,6 +941,8 @@ interface RoutePreloadState {
 	root: string;
 	routes: RoutePreloadMaps;
 	resumeModules: RouteResumeModules;
+	/** The text of each stylesheet a page links, so its document carries the CSS instead of a request for it. */
+	stylesheetSources: Record<string, string>;
 }
 
 type RoutePreloadMaps = MarklessRouterClientAssetRoutes;
@@ -941,6 +959,7 @@ function routePreloadState(): RoutePreloadState {
 		root: '.',
 		routes: { navigation: {}, ssr: {}, styles: {} },
 		resumeModules: {},
+		stylesheetSources: {},
 	};
 }
 
@@ -1251,7 +1270,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { prerenderWakeEntryPath } from ${JSON.stringify(`${PRERENDER_WAKE_ENTRY_PATH_ID}${query}`)};`,
 		`import { navigationEntryPath } from ${JSON.stringify(`${NAVIGATION_ENTRY_PATH_ID}${query}`)};`,
 		`import { fragmentEntryPath } from ${JSON.stringify(`${FRAGMENT_ENTRY_PATH_ID}${query}`)};`,
-		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, documentImportMap, routeResumeModules } from ${JSON.stringify(`${ROUTE_PRELOADS_ID}${query}`)};`,
+		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, stylesheetSources, documentImportMap, routeResumeModules } from ${JSON.stringify(`${ROUTE_PRELOADS_ID}${query}`)};`,
 		`import { pageModuleLoaders, routeFileIds } from ${JSON.stringify(`${ROUTE_DISCOVERY_ID}${query}`)};`,
 		`import { documentNavigation } from ${JSON.stringify(`${ROUTER_OPTIONS_ID}${query}`)};`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
@@ -1272,6 +1291,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  routeResumeModules,`,
 		`  routeStylesheets,`,
 		`  documentStylesheets,`,
+		`  stylesheetSources,`,
 		`  importMap: documentImportMap,`,
 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
 		`  documentNavigation,`,
@@ -1325,7 +1345,10 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		: [
 				`export const routeStylesheets = ${state.persisted ? 'routePreloadData.styles ?? {}' : 'undefined'};`,
 				`const documentStylesheetsJson = globalThis.__marklessRouterDocumentStylesheetsJson ?? ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)};`,
-				`export const documentStylesheets = documentStylesheetsJson === ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)} ? [] : JSON.parse(documentStylesheetsJson);`,
+				// The placeholder is spelled once: a second server bundle pass (Nitro's) must find nothing left to patch.
+				`export const documentStylesheets = documentStylesheetsJson.startsWith('[') ? JSON.parse(documentStylesheetsJson) : [];`,
+				`const stylesheetSourcesJson = globalThis.__marklessRouterStylesheetSourcesJson ?? ${JSON.stringify(STYLESHEET_SOURCES_PLACEHOLDER)};`,
+				`export const stylesheetSources = stylesheetSourcesJson.startsWith('{') ? JSON.parse(stylesheetSourcesJson) : {};`,
 				`export const documentImportMap = ${JSON.stringify(state.persisted && state.importMap ? importMapScript(state.importMap) : '')};`,
 				`export const routeResumeModules = ${JSON.stringify(state.persisted ? state.resumeModules : {})};`,
 			];
@@ -1336,6 +1359,7 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
 		...routeStylesheetExport,
+		...(client ? clientRouteStylesheetsSource() : []),
 		`export function preloadRouteModule(file, document = globalThis.document) {`,
 		`  const hrefs = routeModulePreloads[file];`,
 		`  if (!hrefs?.length || !document?.head) return [];`,
@@ -1354,6 +1378,35 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		`  return appended;`,
 		`}`,
 	].join('\n');
+}
+
+// A page rendered in the browser (a '#/' route) brings the stylesheets its document lacks, as files; one that fails fails the render.
+function clientRouteStylesheetsSource(): string[] {
+	const key = JSON.stringify(STYLESHEET_KEY_ATTRIBUTE);
+	return [
+		`const pageStylesheets = routePreloadData.styles ?? {};`,
+		`const stylesheetLoads = new Map();`,
+		`export function loadRouteStylesheets(file, document = globalThis.document) {`,
+		`  const hrefs = pageStylesheets[file];`,
+		`  if (!hrefs?.length || !document?.head) return Promise.resolve();`,
+		`  const have = new Set([...document.head.children].map((node) => node.getAttribute(${key}) ?? (node.rel === 'stylesheet' ? node.getAttribute('href') : null)));`,
+		`  return Promise.all(hrefs.map((href) => {`,
+		`    if (stylesheetLoads.has(href)) return stylesheetLoads.get(href);`,
+		`    if (have.has(href)) return undefined;`,
+		`    const load = new Promise((done, fail) => {`,
+		`      const link = document.createElement('link');`,
+		`      link.rel = 'stylesheet';`,
+		`      link.href = href;`,
+		`      link.setAttribute(${key}, href);`,
+		`      link.onload = () => { stylesheetLoads.delete(href); done(); };`,
+		`      link.onerror = () => { stylesheetLoads.delete(href); link.remove(); fail(new Error('Unable to load the stylesheet ' + href)); };`,
+		`      document.head.appendChild(link);`,
+		`    });`,
+		`    stylesheetLoads.set(href, load);`,
+		`    return load;`,
+		`  }));`,
+		`}`,
+	];
 }
 
 function patchRoutePreloadsInBundle(
@@ -1393,6 +1446,46 @@ function documentStylesheetsFromBundle(
 		chunksByFileName,
 		base,
 	);
+}
+
+async function clientStylesheetSources(
+	clientOutDir: string,
+	base: string,
+	hrefs: readonly string[],
+): Promise<Record<string, string>> {
+	const sources: Record<string, string> = {};
+	for (const href of new Set(hrefs))
+		sources[href] = await readFile(join(clientOutDir, clientAssetFileName(href, base)), 'utf8');
+	return sources;
+}
+
+function bundleStylesheetSources(
+	bundle: Record<string, unknown>,
+	base: string,
+	hrefs: readonly string[],
+): Record<string, string> {
+	const sources: Record<string, string> = {};
+	for (const href of hrefs) {
+		const asset = bundle[clientAssetFileName(href, base)] as
+			| { readonly type?: unknown; readonly source?: unknown }
+			| undefined;
+		if (asset?.type !== 'asset') continue;
+		const source = asset.source;
+		if (typeof source === 'string') sources[href] = source;
+		else if (source instanceof Uint8Array) sources[href] = new TextDecoder().decode(source);
+	}
+	return sources;
+}
+
+function patchStylesheetSourcesInBundle(
+	bundle: Record<string, unknown>,
+	sources: Readonly<Record<string, string>>,
+): void {
+	const replacement = jsStringLiteralContent(JSON.stringify(sources));
+	for (const chunk of outputChunks(bundle)) {
+		if (!chunk.code?.includes(STYLESHEET_SOURCES_PLACEHOLDER)) continue;
+		chunk.code = chunk.code.replace(STYLESHEET_SOURCES_PLACEHOLDER, () => replacement);
+	}
 }
 
 function patchDocumentStylesheetsInBundle(

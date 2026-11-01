@@ -577,16 +577,16 @@ function renderedCellValue(
 
 function renderHeadInjection(injection: RenderHeadInjection, nonce: string | undefined): string {
 	const attributes = { ...injection.attributes };
-	if (nonce && injection.tag === 'script' && !attributes.nonce) {
+	if (nonce && (injection.tag === 'script' || injection.tag === 'style') && !attributes.nonce) {
 		attributes.nonce = nonce;
 	}
 	const renderedAttributes = Object.entries(attributes)
 		.map(([name, value]) => `${name}="${escapeAttribute(value)}"`)
 		.join(' ');
 	const suffix = renderedAttributes ? ` ${renderedAttributes}` : '';
-	return injection.tag === 'link'
-		? `<${injection.tag}${suffix}>`
-		: `<${injection.tag}${suffix}>${escapeInlineScript(injection.children ?? '')}</${injection.tag}>`;
+	if (injection.tag === 'link') return `<${injection.tag}${suffix}>`;
+	const children = injection.children ?? '';
+	return `<${injection.tag}${suffix}>${injection.tag === 'style' ? escapeInlineStyle(children) : escapeInlineScript(children)}</${injection.tag}>`;
 }
 
 function renderModulePreloadLinks(
@@ -1237,4 +1237,9 @@ function escapeAttribute(value: string): string {
 
 function escapeInlineScript(value: string): string {
 	return value.replace(/<\/script/gi, '<\\/script');
+}
+
+// `</style` can only sit in a CSS string or comment, where `\/` reads as `/`.
+function escapeInlineStyle(value: string): string {
+	return value.replace(/<\/style/gi, '<\\/style');
 }
