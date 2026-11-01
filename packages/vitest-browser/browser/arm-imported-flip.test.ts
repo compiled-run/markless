@@ -2,16 +2,10 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import { afterEach, expect, test } from 'vitest';
 import App from './fixtures/arm-imported-flip.tsrx';
 
-// T056: the component in the flippable arm comes from ANOTHER FILE, so its
-// markup is not in the page module's render data at all. Its own module
-// publishes that markup on its interface, and the flip rebuilds the arm from it
-// with the caller's props substituted in. The child never runs.
-//
-// The value it shows is decided by the caller: a value that CHANGES after the
-// child is shown refreshes through records the child's module owns, which this
-// module cannot address, so the build refuses that shape instead of showing it
-// once and leaving it stale (proven at the compiler boundary in
-// @markless/compiler's arm-branch-flips.test.ts).
+// The component in the flippable arm comes from another file: its module
+// publishes its markup, and the flip rebuilds the arm from it with the caller's
+// constant props substituted in. The child never runs. A child shown with a
+// value that changes renders by running it instead (branch-imported-arms/).
 
 afterEach(cleanup);
 

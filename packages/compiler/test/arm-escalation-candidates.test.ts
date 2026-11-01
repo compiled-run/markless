@@ -121,7 +121,11 @@ export function Counter({ label }) @{
 `;
 
 async function compileHost(props: string) {
-	const child = await compileTsrxModule({ filename: 'src/Counter.tsrx', source: IMPORTED_COUNTER, symbols: [] });
+	const child = await compileTsrxModule({
+		filename: 'src/Counter.tsrx',
+		source: IMPORTED_COUNTER,
+		symbols: [],
+	});
 	return compileTsrxModule({
 		filename: 'src/Host.tsrx',
 		source: `
@@ -157,15 +161,71 @@ test('an imported child given only constants escalates and says it renders in th
 	});
 });
 
-test('an imported child given a value that changes is refused, not escalated', async () => {
+test('an imported child given a value that changes escalates and says it renders in the browser', async () => {
 	const result = await compileHost('label={name}');
-	expect(result.symbolModules.armEscalationCandidates ?? []).toHaveLength(0);
+	expect(result.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
 	expect(
-		result.symbolModules.diagnostics.map((candidate) => candidate.code),
-	).toEqual(expect.arrayContaining(['MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED']));
-	expect(
-		result.symbolModules.diagnostics.some(
+		result.symbolModules.diagnostics.find(
 			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
 		),
-	).toBe(false);
+	).toMatchObject({
+		severity: 'warning',
+		message: expect.stringContaining('by running <Counter>'),
+	});
+	expect(
+		result.symbolModules.diagnostics.find(
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		)?.severity,
+	).toBe('error');
+});
+
+const IMPORTED_SCENE = `
+function describe(seed) {
+	return 'scene-' + seed;
+}
+
+export function Scene({ seed }) @{
+	<p title={seed}>{describe(seed)}</p>
+}
+`;
+
+// No state and no handler: the child publishes markup, but what it shows moves with the caller's value.
+test('an imported child showing a value derived from a changing prop escalates', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Scene.tsrx',
+		source: IMPORTED_SCENE,
+		symbols: [],
+	});
+	const result = await compileTsrxModule({
+		filename: 'src/SceneHost.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Scene } from './Scene.tsrx';
+
+export function App() @{
+	let view = state('none');
+	let seed = state(3);
+
+	<main>
+		<button type="button" onClick={() => view = 'scene'}>Show</button>
+		<button type="button" onClick={() => seed = seed + 1}>Seed</button>
+		@switch (view) {
+			@case 'scene': { <Scene seed={seed} /> }
+			@default: { <p>none</p> }
+		}
+	</main>
+}
+`,
+		symbols: [],
+		importedModuleInterfaces: { './Scene.tsrx': child.moduleGraphInterface },
+	});
+	expect(result.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
+	expect(
+		result.symbolModules.diagnostics.find(
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+		),
+	).toMatchObject({
+		severity: 'warning',
+		message: expect.stringContaining('by running <Scene>'),
+	});
 });

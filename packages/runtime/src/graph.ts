@@ -279,6 +279,13 @@ export type RuntimeGraph = {
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
+	/** How many subscriptions are registered on `graphNodeId`. */
+	readonly subscriptionCount?: (graphNodeId: string) => number;
+	/**
+	 * Runs `pull` once, at the next read of `graphNodeId` and before that read
+	 * answers, so a value derived on demand can write itself first.
+	 */
+	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
 	/**
@@ -305,6 +312,7 @@ type RuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitio
 export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
 	const readInitializers = new Map<string, () => unknown>();
+	const readPulls = new Map<string, () => void>();
 	const computedNodes = createRuntimeComputedNodes(input.computed);
 	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
 	let dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
@@ -338,6 +346,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return readAsyncComputedNode(asyncComputed, path, () =>
 				demandAsyncComputed(asyncComputed),
 			);
+		}
+
+		const pull = readPulls.size > 0 ? readPulls.get(graphNodeId) : undefined;
+		if (pull) {
+			readPulls.delete(graphNodeId);
+			pull();
 		}
 
 		const initialize = readInitializers.get(graphNodeId);
@@ -658,6 +672,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				bucket.splice(index, 1);
 				subscriptionOrder.delete(subscription);
 			};
+		},
+		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,
+		pullBeforeRead(graphNodeId, pull) {
+			readPulls.set(graphNodeId, pull);
 		},
 		subscribeWrite(observer) {
 			writeObservers.push(observer);

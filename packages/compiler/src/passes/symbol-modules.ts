@@ -1594,7 +1594,7 @@ function branchArmUnsupportedDiagnostic(
 		phase: 'public-render',
 		title: `Changing this ${label} cannot rebuild what it shows`,
 		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
-		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 		...(refusal?.span ? { primarySpan: refusal.span } : {}),
 		passId: 'symbol-modules',
 		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
@@ -1648,7 +1648,8 @@ function renderChunkParts(
 		context.refusals?.push({
 			detail,
 			...(span ? { span } : {}),
-			...(escalatable ? { escalatable: true } : {}),
+			// An imported child renders in its own module when the browser runs it.
+			...(escalatable || child?.imported ? { escalatable: true } : {}),
 		});
 		return null;
 	};
@@ -1673,9 +1674,7 @@ function renderChunkParts(
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
 					return refuse('a value it shows comes from a prop the flip cannot recompute');
-				// A value inside an imported child refreshes through records that
-				// module owns, and this module cannot address them, so only a value
-				// that is already decided may be shown there.
+				// An imported child's changing value refreshes through records its own module owns.
 				if (child?.imported && (!scoped || 'read' in scoped))
 					return refuse(
 						`<${child.componentName}> shows a value that changes after it is shown`,
@@ -2070,10 +2069,8 @@ function staticChildComponentMarkup(
 	return wired ? null : chunk.statics.join('');
 }
 
-// Names the one value that kept the flip out; falls back to the shape-level
-// refusal for a child this descent cannot express for any other reason. Only a
-// same-module child's own value is escalatable: an imported child's markup and
-// records belong to a module this one cannot address.
+// Names the one value that kept the flip out. A child given only constants, or
+// one from another file without projected children, renders in the browser by running it.
 function childRefusalReason(
 	context: ArmPartsContext,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
@@ -2086,14 +2083,16 @@ function childRefusalReason(
 		semanticGraph && edge && !edge.importSource
 			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
 			: undefined;
-	// A child given only constants renders the same in the browser as on the server, whichever module it lives in.
-	const constantProps =
-		edge !== undefined &&
-		edge.children.childCount === 0 &&
-		edge.props.every((prop) => prop.kind === 'serializable');
 	return own
 		? { detail: own, escalatable: true }
-		: { detail: 'has to run to produce its content', escalatable: constantProps };
+		: {
+				detail: 'has to run to produce its content',
+				escalatable:
+					edge !== undefined &&
+					edge.children.childCount === 0 &&
+					(edge.importSource !== undefined ||
+						edge.props.every((prop) => prop.kind === 'serializable')),
+			};
 }
 
 function componentEdgeSpan(

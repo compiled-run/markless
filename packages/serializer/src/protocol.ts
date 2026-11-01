@@ -196,6 +196,9 @@ export type ProtocolStatePayload = {
 		// A roster derive only: the host-id prefix of the component that declared it,
 		// which its symbol-space id cannot spell once a module holds several components.
 		readonly hostScope?: string;
+		// Only subscriptions and other such computeds read it, so resume re-derives it
+		// when it is read rather than on every dependency write.
+		readonly deriveOnRead?: true;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which

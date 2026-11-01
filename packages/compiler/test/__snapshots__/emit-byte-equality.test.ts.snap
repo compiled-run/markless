@@ -3122,7 +3122,8 @@ function createUnknownSymbolError(id) {
             "graphNodeId": "state:count",
             "path": []
           }
-        ]
+        ],
+        "deriveOnRead": true
       }
     ],
     "sharedDefinitions": []
@@ -3156,7 +3157,7 @@ function createUnknownSymbolError(id) {
     "branches": [],
     "asyncBoundaries": []
   },
-  "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:count\\",\\"name\\":\\"count\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":2,\\"records\\":[]}}],\\"computed\\":[{\\"graphNodeId\\":\\"computed:doubled\\",\\"name\\":\\"doubled\\",\\"async\\":false,\\"deriveSymbolId\\":\\"symbol:1\\",\\"dependencies\\":[{\\"graphNodeId\\":\\"state:count\\",\\"path\\":[]}]}],\\"sharedDefinitions\\":[]}</script>",
+  "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:count\\",\\"name\\":\\"count\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":2,\\"records\\":[]}}],\\"computed\\":[{\\"graphNodeId\\":\\"computed:doubled\\",\\"name\\":\\"doubled\\",\\"async\\":false,\\"deriveSymbolId\\":\\"symbol:1\\",\\"dependencies\\":[{\\"graphNodeId\\":\\"state:count\\",\\"path\\":[]}],\\"deriveOnRead\\":true}],\\"sharedDefinitions\\":[]}</script>",
   "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h0\\",\\"strategy\\":\\"dom-order\\",\\"index\\":0,\\"tagName\\":\\"output\\"}],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h0\\",\\"source\\":\\"doubled\\",\\"graphNodeId\\":\\"computed:doubled\\",\\"path\\":[],\\"target\\":{\\"kind\\":\\"text\\"},\\"symbolId\\":\\"symbol:0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
 }",
     "protocolState": "{
@@ -3184,7 +3185,8 @@ function createUnknownSymbolError(id) {
           "graphNodeId": "state:count",
           "path": []
         }
-      ]
+      ],
+      "deriveOnRead": true
     }
   ],
   "sharedDefinitions": []

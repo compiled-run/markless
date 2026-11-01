@@ -203,7 +203,8 @@ test('a prop forwarded through a middle module reaches the grandchild', async ()
 	expect(foreignIn(firstUse(PARENT, 'other++'), LEAF)).toEqual([]);
 });
 
-test('an imported child inside a parent @if arm is created whole when the arm opens', async () => {
+// The arm renders in the browser by running the child, so the toggle's first use is the whole route's.
+test('an imported child inside a parent @if arm leaves the opening first use unbounded', async () => {
 	const { result, firstUse } = await compile([
 		readout(`
 			<p onClick={() => console.info('child click')}>
@@ -216,10 +217,8 @@ test('an imported child inside a parent @if arm is created whole when the arm op
 			}
 		`),
 	]);
-	const child = result(CHILD);
-	expect(foreignIn(firstUse(PARENT, 'open = !open'), CHILD).sort()).toEqual(
-		child.symbolResolver.symbols.map((symbol) => symbol.id).sort(),
-	);
+	expect(result(CHILD).symbolResolver.symbols.length).toBeGreaterThan(0);
+	expect(firstUse(PARENT, 'open = !open')).toBe('unknown');
 });
 
 test('a same-module child re-renders through its props', async () => {

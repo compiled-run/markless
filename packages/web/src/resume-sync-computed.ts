@@ -3,6 +3,7 @@ import type {
 	ElementHandleRegistry,
 	ResumeDomElement,
 	ResumeRuntimeInput,
+	ResumeSymbol,
 } from './resume-types.ts';
 
 // The node to write and the symbol that derives it: all a refresh needs, and the
@@ -39,18 +40,67 @@ type RosterResumeHost = {
 
 // One import per loader: every import() of an evaluated module still resolves a task later.
 const rosterLoads = new WeakMap<() => Promise<RosterResumeModule>, Promise<RosterResumeModule>>();
+const rosters = new WeakMap<() => Promise<RosterResumeModule>, RosterResumeModule>();
 function loadRosterResume(): Promise<RosterResumeModule> | undefined {
 	const load = (globalThis as RosterResumeHost).__marklessRosterResume;
 	if (!load) return undefined;
 	let pending = rosterLoads.get(load);
 	if (!pending) {
-		pending = load().catch((error: unknown) => {
-			rosterLoads.delete(load);
-			throw error;
-		});
+		pending = load().then(
+			(roster) => (rosters.set(load, roster), roster),
+			(error: unknown) => {
+				rosterLoads.delete(load);
+				throw error;
+			},
+		);
 		rosterLoads.set(load, pending);
 	}
 	return pending;
+}
+
+/** The roster reader a synchronous derive still waits for; `undefined` when none is needed or it is here. */
+export function pendingRosterResume(): Promise<unknown> | undefined {
+	const load = (globalThis as RosterResumeHost).__marklessRosterResume;
+	return load && !rosters.has(load) ? loadRosterResume() : undefined;
+}
+
+type RefreshInput = Parameters<typeof refreshSyncComputed>[0];
+
+function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeModule | undefined) {
+	const graph = seedSourceGraph(input.graph, input.computed);
+	return symbol({
+		graph,
+		read: graph.read,
+		element: input.root,
+		getElementHandle: input.elementHandles.get,
+		rosterPosition: roster?.createRosterPositionReader(input),
+		rosterCount: roster?.createRosterCountReader(input),
+	});
+}
+
+/**
+ * Derives the computed at once and writes it, or once its value settles when the
+ * symbol answers a promise; false when its roster reader or an async ancestor is
+ * not ready.
+ */
+export function deriveSyncComputedNow(
+	input: RefreshInput,
+	symbol: ResumeSymbol,
+): boolean | Promise<unknown> {
+	const load = (globalThis as RosterResumeHost).__marklessRosterResume;
+	const roster = load && rosters.get(load);
+	if (
+		(load && !roster) ||
+		(input.records && awaitsAsyncAncestor(input.computed, input.records, input.graph))
+	)
+		return false;
+	const write = (value: unknown) =>
+		input.graph.write({ graphNodeId: input.computed.graphNodeId, value });
+	const value = derive(input, symbol, roster || undefined);
+	if (typeof (value as PromiseLike<unknown> | null)?.then === 'function')
+		return Promise.resolve(value).then(write);
+	write(value);
+	return true;
 }
 
 export async function refreshSyncComputed(
@@ -60,6 +110,7 @@ export async function refreshSyncComputed(
 		readonly root: ResumeDomElement;
 		readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 		readonly elementHandles: ElementHandleRegistry;
+		readonly derive?: ResumeSymbol;
 		readonly records?: ReadonlyArray<
 			Omit<ResumeSyncComputedRecord, 'deriveSymbolId'> & {
 				readonly async?: boolean;
@@ -77,22 +128,18 @@ export async function refreshSyncComputed(
 		);
 		if (record && !deriving.has(graphNodeId) && input.graph.read(graphNodeId, []) === undefined)
 			await refreshSyncComputed(
-				{ ...input, computed: record as ResumeSyncComputedRecord },
+				{ ...input, computed: record as ResumeSyncComputedRecord, derive: undefined },
 				deriving,
 			);
 	}
 	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
 	if (input.records && awaitsAsyncAncestor(input.computed, input.records, input.graph)) return;
-	const graph = seedSourceGraph(input.graph, input.computed);
 	const roster = await loadRosterResume();
-	const result = (await input.loadSymbol(input.computed.deriveSymbolId))({
-		graph,
-		read: graph.read,
-		element: input.root,
-		getElementHandle: input.elementHandles.get,
-		rosterPosition: roster?.createRosterPositionReader(input),
-		rosterCount: roster?.createRosterCountReader(input),
-	});
+	const result = derive(
+		input,
+		input.derive ?? (await input.loadSymbol(input.computed.deriveSymbolId)),
+		roster,
+	);
 	input.graph.write({
 		graphNodeId: input.computed.graphNodeId,
 		value: await result,
