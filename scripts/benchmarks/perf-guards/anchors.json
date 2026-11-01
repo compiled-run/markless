@@ -2324,6 +2324,76 @@
 				"jsGzipBytes": 1678763
 			},
 			"reason": "the docs pages' in-browser compiler gains the post-await read classifier; measured on CI run 41244233368 (PR #397 on main 64dc4b798): docs / +420 B gzip, /concepts/state +513 B gzip, executed chars -1; the 93 B gap between the two pages is not attributed"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87016
+			},
+			"reason": "graph.changed, so a handler that hands state to a helper which changes it in place can mark what changed; measured on CI run 41290852179 (PR #401 on main 8a3787394): +9 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87016
+			},
+			"reason": "graph.changed, so a handler that hands state to a helper which changes it in place can mark what changed; measured on CI run 41290852179 (PR #401 on main 8a3787394): +9 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87016
+			},
+			"reason": "graph.changed, so a handler that hands state to a helper which changes it in place can mark what changed; measured on CI run 41290852179 (PR #401 on main 8a3787394): +9 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1565456
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1568939
+			},
+			"reason": "the docs pages' in-browser compiler gains the parameter-write analysis that reads which paths a helper writes; measured on CI run 41290852179 (PR #401 on main 8a3787394): docs / +3,483 B gzip, /concepts/state +3,481 B gzip downloaded, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1678763
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682244
+			},
+			"reason": "the docs pages' in-browser compiler gains the parameter-write analysis that reads which paths a helper writes; measured on CI run 41290852179 (PR #401 on main 8a3787394): docs / +3,483 B gzip, /concepts/state +3,481 B gzip downloaded, executed chars within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -2515,23 +2585,23 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11370,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87016
 			},
 			"bench /records": {
 				"executedChars": 11386,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87016
 			},
 			"bench /settings": {
 				"executedChars": 11443,
-				"jsGzipBytes": 87007
+				"jsGzipBytes": 87016
 			},
 			"docs /": {
 				"executedChars": 110777,
-				"jsGzipBytes": 1565456
+				"jsGzipBytes": 1568939
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
-				"jsGzipBytes": 1678763
+				"jsGzipBytes": 1682244
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,
