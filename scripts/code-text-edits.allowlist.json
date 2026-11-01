@@ -127,6 +127,10 @@
 		"replace": 1,
 		"kind": "unreviewed"
 	},
+	"packages/bundler/src/build/lazy-module-facades.ts#namespaceObjectEdits": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
+	},
 	"packages/bundler/src/build/lazy-module-facades.ts#strip": {
 		"replaceAll": 1,
 		"kind": "edits-emitted-chunks"
@@ -142,6 +146,18 @@
 	"packages/bundler/src/build/machine-paths.ts#withoutMachinePaths": {
 		"replaceAll": 1,
 		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/namespace-lazy-loads.ts#<module>": {
+		"RegExp": 3,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/namespace-lazy-loads.ts#namespaceLoadTexts": {
+		"RegExp": 1,
+		"kind": "edits-emitted-chunks"
+	},
+	"packages/bundler/src/build/namespace-lazy-loads.ts#namespaceObjects": {
+		"search-splice": 1,
+		"kind": "edits-emitted-chunks"
 	},
 	"packages/bundler/src/build/preload-cleanup.ts#<module>": {
 		"RegExp": 1,
@@ -295,6 +311,10 @@
 	},
 	"packages/bundler/src/build/symbol-table.ts#namespacePickReaches": {
 		"RegExp": 1,
+		"kind": "unreviewed"
+	},
+	"packages/bundler/src/build/symbol-table.ts#packLoaderReaches": {
+		"RegExp": 2,
 		"kind": "unreviewed"
 	},
 	"packages/bundler/src/build/symbol-table.ts#parseStringArray": {
@@ -780,12 +800,12 @@
 		"replace": 1,
 		"kind": "edits-emitted-chunks"
 	},
-	"packages/router/src/vite/index.ts#routerConfigPlugin": {
-		"RegExp": 1,
-		"kind": "unreviewed"
-	},
 	"packages/router/src/vite/index.ts#routeScopedDynamicImports": {
 		"search-splice": 1,
+		"kind": "unreviewed"
+	},
+	"packages/router/src/vite/index.ts#routerConfigPlugin": {
+		"RegExp": 1,
 		"kind": "unreviewed"
 	},
 	"packages/router/src/vite/index.ts#writeBundle": {
@@ -837,13 +857,17 @@
 		"replace": 1,
 		"kind": "unreviewed"
 	},
+	"packages/router/src/vite/runtime/create-server-entry.ts#headContentStart": {
+		"search-splice": 1,
+		"kind": "edits-rendered-html"
+	},
 	"packages/router/src/vite/runtime/create-server-entry.ts#insertHeadHtml": {
 		"search-splice": 1,
 		"kind": "unreviewed"
 	},
-	"packages/router/src/vite/runtime/create-server-entry.ts#insertImportMap": {
+	"packages/router/src/vite/runtime/create-server-entry.ts#insertHeadModulePreloads": {
 		"search-splice": 1,
-		"kind": "unreviewed"
+		"kind": "edits-rendered-html"
 	},
 	"packages/router/src/vite/runtime/create-server-entry.ts#takeHeadModulePreloads": {
 		"replace": 1,
