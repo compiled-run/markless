@@ -154,19 +154,14 @@ function emptyPreloadUnwrap(code: string, call: AnalyzedNode): CodeEdit | undefi
 	)
 		return undefined;
 	const body = loader.body as AnalyzedNode;
-	if (loader.async)
-		return {
-			start: call.start,
-			end: call.end,
-			text: `(${code.slice(loader.start, loader.end)})()`,
-		};
+	const { start, end } = call;
+	if (loader.async) return { start, end, before: '(', keep: loader, after: ')()' };
 	if (body.type === 'BlockStatement') return undefined;
-	const text = code.slice(body.start, body.end);
 	const tight =
 		body.type === 'CallExpression' ||
 		body.type === 'ImportExpression' ||
 		body.type === 'ParenthesizedExpression';
-	return { start: call.start, end: call.end, text: tight ? text : `(${text})` };
+	return { start, end, before: tight ? '' : '(', keep: body, after: tight ? '' : ')' };
 }
 
 export function stripImportedVitePreloadHelper(code: string): string {

@@ -295,6 +295,15 @@ describe('Vite preload cleanup', () => {
 		);
 	});
 
+	test('unwraps an empty wrapper inside another, and the rest of the chunk with them', () => {
+		const code =
+			'import{__vitePreload as p}from"./preload.js";const a=()=>p(()=>import("./a.js").then(m=>m.boot(()=>p(()=>import("./b.js"),[]))),[]);const c=()=>p(()=>import("./c.js"),void 0);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__vitePreload as p}from"./preload.js";const a=()=>import("./a.js").then(m=>m.boot(()=>import("./b.js")));const c=()=>import("./c.js");',
+		);
+	});
+
 	test('keeps a wrapper whose deps argument runs code', () => {
 		const code =
 			'import{__vitePreload as p}from"./preload.js";const a=()=>p(()=>import("./a.js"),void recordLoad());';
