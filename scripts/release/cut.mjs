@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Cut the next MINOR release from the newest main commit whose push CI run passed main's required
 // checks (main's head when that is green): bump every release package in lockstep, write the
-// CHANGELOG section, commit on top of that commit, and tag v<X.Y.0>.
+// CHANGELOG section and commit on top of that commit.
 // Markless releases minor versions only, so there is no release-type argument to get wrong.
 //
-// Pushing, publishing and the GitHub Release belong to release.yml's mode=cut jobs.
-// --dry-run performs every step in a throwaway worktree (commit hooks included), skips the
-// tag, then runs the same pack and publish checks release.yml runs, without touching npm.
+// Landing the commit through main's merge queue, tagging what landed, publishing and the GitHub
+// Release belong to release.yml's mode=cut jobs (scripts/release/land.mjs tags v<X.Y.0>).
+// --dry-run performs every step in a throwaway worktree (commit hooks included), then runs the
+// same pack and publish checks release.yml runs, without touching npm.
 //
 // When the current version is tagged but has no GitHub Release, the last cut stopped after
 // pushing; a rerun finishes that release instead of cutting the next one.
@@ -34,6 +35,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const RELEASE_VERSION = /^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$/u;
 const CHANGED_BY_A_CUT = /^(?:package\.json|packages\/.+\/package\.json|CHANGELOG\.md)$/u;
 const GREEN_SEARCH_DEPTH = 50;
+const CUT_FROM = /^Cut from (?<sha>[0-9a-f]{40})$/mu;
 
 export class CutError extends Error {}
 
@@ -46,6 +48,40 @@ export function nextMinor(version) {
 		);
 	}
 	return `${match.groups.major}.${Number(match.groups.minor) + 1}.0`;
+}
+
+/** The annotated tag message land.mjs writes: the version, then the main commit the release was cut from. */
+export function releaseTagMessage(tag, cutFrom) {
+	return cutFrom ? `${tag}\n\nCut from ${cutFrom}` : tag;
+}
+
+/** The commit an annotated release tag says its release was cut from, or null. */
+export function cutFromOf(tagMessage) {
+	return CUT_FROM.exec(String(tagMessage ?? ''))?.groups?.sha ?? null;
+}
+
+/**
+ * Where main took `version`: the tagged commit when main contains it, else the oldest commit of
+ * the run of `firstParents` (main's, newest first) whose root package.json already says `version`.
+ * The second case is a release commit the merge queue squashed into a new commit.
+ */
+export function releasePoint(firstParents, { taggedSha, tagOnMain, versionAt, version }) {
+	if (taggedSha && tagOnMain) return taggedSha;
+	let point = null;
+	for (const sha of firstParents) {
+		if (versionAt(sha) !== version) break;
+		point = sha;
+	}
+	return point;
+}
+
+/** Whether `subject` is the release commit for `tag`, as the cut wrote it or as the merge queue squashed it. */
+export function isReleaseSubject(subject, tag) {
+	const expected = `chore(release): ${tag}`;
+	return (
+		subject === expected ||
+		(subject.startsWith(expected) && /^ \(#\d+\)$/u.test(subject.slice(expected.length)))
+	);
 }
 
 /** Why CI does not license releasing `sha`, or null when its latest main run is green. */
@@ -129,17 +165,45 @@ function tagSha(git, tag) {
 
 /** The `chore(release): <tag>` commit `head` merged, when its tag was never pushed; null otherwise. */
 function untaggedReleaseCommit(git, head, tag) {
-	const subject = `chore(release): ${tag}`;
 	const found = git(
 		'log',
 		'-1',
 		'--format=%H%x00%s',
 		'--fixed-strings',
-		`--grep=${subject}`,
+		`--grep=chore(release): ${tag}`,
 		head,
 	);
 	const [sha, foundSubject] = found.split('\0');
-	return sha && foundSubject === subject ? sha : null;
+	return sha && isReleaseSubject(foundSubject, tag) ? sha : null;
+}
+
+/** The main commit a squashed release commit was cut from: the parent of its pull request's head. */
+function cutFromOfLanded(sha) {
+	try {
+		const head = gh(`repos/${repository}/commits/${sha}/pulls`)[0]?.head?.sha;
+		return head ? (gh(`repos/${repository}/commits/${head}`).parents?.[0]?.sha ?? null) : null;
+	} catch {
+		return null;
+	}
+}
+
+function tagMessage(git, tag) {
+	return git('for-each-ref', '--format=%(objecttype)%00%(contents)', `refs/tags/${tag}`).split(
+		'\0',
+	);
+}
+
+/** Where the next changelog section starts: the commit the last release was cut from, else its tag. */
+function notesStart(git, root, tag, to) {
+	const [type, message] = tagMessage(git, tag);
+	const cutFrom = type === 'tag' ? cutFromOf(message) : null;
+	if (
+		cutFrom &&
+		spawnSync('git', ['merge-base', '--is-ancestor', cutFrom, to], { cwd: root }).status === 0
+	) {
+		return cutFrom;
+	}
+	return tag;
 }
 
 function checkoutRefusals(git) {
@@ -195,6 +259,39 @@ function releaseCommitRefusal(sha, root) {
 		: `${refusal}, and its inherited statuses do not cover main's required checks (${inherited.join('; ')})`;
 }
 
+function isAncestor(root, ancestor, descendant) {
+	return (
+		spawnSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { cwd: root })
+			.status === 0
+	);
+}
+
+function mainReleasePoint(git, root, head, taggedSha, version) {
+	const point = releasePoint(git('rev-list', '--first-parent', head).split('\n'), {
+		taggedSha,
+		tagOnMain: isAncestor(root, taggedSha, head),
+		versionAt: (sha) => {
+			try {
+				return JSON.parse(git('show', `${sha}:package.json`)).version;
+			} catch {
+				return null;
+			}
+		},
+		version,
+	});
+	if (point === null) {
+		throw new CutError(
+			`main never says ${version} and does not contain the v${version} tag, so it is unclear what was released`,
+		);
+	}
+	if (point !== taggedSha) {
+		console.log(
+			`release-cut: main does not contain the v${version} tag ${taggedSha.slice(0, 12)}; ${point.slice(0, 12)} is where main took ${version}`,
+		);
+	}
+	return point;
+}
+
 /** Main's first-parent commits from `head` back to the released commit, newest first. */
 function releasableCommits(git, root, head, releasedSha) {
 	const releasable = [];
@@ -204,10 +301,7 @@ function releasableCommits(git, root, head, releasedSha) {
 		`--max-count=${GREEN_SEARCH_DEPTH}`,
 		head,
 	).split('\n')) {
-		const containsRelease =
-			spawnSync('git', ['merge-base', '--is-ancestor', releasedSha, sha], { cwd: root })
-				.status === 0;
-		if (!containsRelease) break;
+		if (!isAncestor(root, releasedSha, sha)) break;
 		releasable.push(sha);
 	}
 	return releasable;
@@ -288,8 +382,10 @@ export function main(argv) {
 				`package.json says ${current} but there is no ${currentTag} tag, so it is unclear what was released`,
 			);
 		}
-		if (!dryRun)
-			run('git', ['tag', '-a', currentTag, '-m', currentTag, currentSha], { cwd: root });
+		if (!dryRun) {
+			const message = releaseTagMessage(currentTag, cutFromOfLanded(currentSha));
+			run('git', ['tag', '-a', currentTag, '-m', message, currentSha], { cwd: root });
+		}
 		pushTag = true;
 	}
 	// A tag without a GitHub Release is a cut that stopped after pushing: finish it, never skip it.
@@ -300,7 +396,12 @@ export function main(argv) {
 		const ciProblem = releaseCommitRefusal(currentSha, root);
 		if (ciProblem) refusals.push(ciProblem);
 	} else {
-		const green = greenBase(git, root, head, currentSha);
+		const green = greenBase(
+			git,
+			root,
+			head,
+			mainReleasePoint(git, root, head, currentSha, current),
+		);
 		for (const line of green.passedOver) console.log(`release-cut: passed over ${line}`);
 		if (green.sha === null) {
 			refusals.push(
@@ -375,19 +476,24 @@ export function main(argv) {
 		run('node', ['scripts/release/sync-version.mjs', '--check'], { cwd: workdir });
 
 		const sectionFile = path.join(scratch, 'changelog-section.md');
+		// This checkout's release-notes.mjs: an older base's copy may not take every argument below.
 		run(
 			'node',
 			[
-				'scripts/release/release-notes.mjs',
+				path.join(scriptDirectory, 'release-notes.mjs'),
 				'--changelog',
 				'--version',
 				version,
+				'--from',
+				notesStart(git, root, currentTag, base),
+				'--since',
+				currentTag,
 				'--to',
 				base,
 				'--out',
 				sectionFile,
 			],
-			{ cwd: workdir },
+			{ cwd: workdir, env: { MARKLESS_REPO_ROOT: workdir } },
 		);
 		const section = readFileSync(sectionFile, 'utf8');
 		const changelogPath = path.join(workdir, 'CHANGELOG.md');
@@ -414,12 +520,10 @@ export function main(argv) {
 
 		if (dryRun) {
 			console.log(
-				`release-cut: dry run, so ${tag} is not tagged; the real cut tags ${sha.slice(0, 12)}`,
+				`release-cut: dry run, so ${sha.slice(0, 12)} does not land; the real cut tags the commit main's merge queue lands`,
 			);
 			console.log(`\n${section}`);
 			packChecks(workdir, version);
-		} else {
-			run('git', ['tag', '-a', tag, '-m', tag], { cwd: workdir });
 		}
 		writeOutputs({
 			version,
@@ -430,7 +534,7 @@ export function main(argv) {
 			base_run_id: baseRun?.databaseId ?? '',
 			notes_file: notesFile,
 			resumed: 'false',
-			push_tag: dryRun ? 'false' : 'true',
+			push_tag: 'false',
 		});
 	} finally {
 		if (inWorktree) {
