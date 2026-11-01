@@ -75,6 +75,8 @@ export interface MarklessVirtualModule {
 	bundledSymbolModuleIds?: ReadonlyArray<string>;
 	/** Symbols and resolvers may resolve during linking, but never serve first-pass code. */
 	provisional?: boolean;
+	/** Registered by a first pass: it fills an empty slot but never replaces a final publication. */
+	firstPass?: boolean;
 }
 
 export interface TransformTsrxModuleInput {
