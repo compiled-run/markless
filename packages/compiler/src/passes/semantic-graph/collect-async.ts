@@ -404,6 +404,9 @@ function postAwaitGraphReads(
 	const locals = bodyLocals(node, firstAwait, state, bodyRegion);
 	const readAt = (candidate: AnyNode): SemanticStateRead | null =>
 		postAwaitRead(candidate, firstAwait.end, state, bindings, aliases, bodyRegion);
+	// `items[await key()]` reads `items` only once its own key's await resolves.
+	const readAnywhere = (candidate: AnyNode): SemanticStateRead | null =>
+		postAwaitRead(candidate, -1, state, bindings, aliases, bodyRegion);
 
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate) return;
@@ -424,9 +427,10 @@ function postAwaitGraphReads(
 			if (candidate.computed === true) {
 				const object = candidate.object as AnyNode;
 				const property = candidate.property as AnyNode;
-				const objectRead = staticPrefixRead(object, readAt);
+				const keyAwaits = containsAwait(property);
+				const objectRead = staticPrefixRead(object, keyAwaits ? readAnywhere : readAt);
 				if (objectRead) {
-					const awaited = dependsOnAwaitedValue(property, state, locals);
+					const awaited = keyAwaits || dependsOnAwaitedValue(property, state, locals);
 					reads.push({
 						read: {
 							...objectRead,
@@ -469,7 +473,25 @@ function staticPrefixRead(
 	const direct = readAt(node);
 	if (direct) return direct;
 	if (node.type === 'MemberExpression') return staticPrefixRead(node.object as AnyNode, readAt);
+	if (node.type && transparentWrappers.has(node.type))
+		return staticPrefixRead(node.expression as AnyNode, readAt);
 	return null;
+}
+
+const transparentWrappers = new Set([
+	'ParenthesizedExpression',
+	'TSAsExpression',
+	'TSSatisfiesExpression',
+	'TSNonNullExpression',
+	'TSTypeAssertion',
+]);
+
+function containsAwait(node: AnyNode): boolean {
+	let found = false;
+	walkNode(node, (candidate) => {
+		if (candidate.type === 'AwaitExpression') found = true;
+	});
+	return found;
 }
 
 type BodyLocals = { readonly all: ReadonlySet<number>; readonly settled: ReadonlySet<number> };

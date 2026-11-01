@@ -1115,6 +1115,38 @@ export function App() @{
 	]);
 });
 
+test('buildSemanticGraph reports an awaited key written inline or behind parentheses', async () => {
+	const source = `
+import { state, computed } from '@markless/core';
+
+export function App() @{
+	let rack = state({ b2: 'banana' } as Record<string, string>);
+	const shown = computed(async () => {
+		const first = rack[await fetch('/slot')];
+		const res = await fetch('/pick');
+		return first + (rack)[res.id] + (rack as Record<string, string>)[res.id];
+	});
+
+	@try {
+		<p>{shown}</p>
+	} @pending {
+		<p>Loading</p>
+	} @catch {
+		<p>Failed</p>
+	}
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Inline.tsrx', source });
+
+	expect(graph.diagnostics.map((diagnostic) => diagnostic.primarySpan?.start).sort()).toEqual(
+		[
+			source.indexOf('rack[await'),
+			source.indexOf('(rack)[res.id]'),
+			source.indexOf('(rack as'),
+		].sort(),
+	);
+});
+
 test('buildSemanticGraph allows a post-await computed key settled before the await', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/SettledKey.tsrx',
