@@ -2966,6 +2966,90 @@
 				"jsGzipBytes": 88100
 			},
 			"reason": "PR #405: a derive read before its symbol arrived is held until it settles, so a flip waits for it (+5 B gzip in the preloaded resume-sync-computed); measured on CI run 41358265312 (gzip bytes are the same build on both platforms)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
 		}
 	],
 	"runtimeModules": {
@@ -3131,15 +3215,15 @@
 		"darwin-arm64": {
 			"bench /": {
 				"executedChars": 10862,
-				"jsGzipBytes": 88100
+				"jsGzipBytes": 88104
 			},
 			"bench /records": {
 				"executedChars": 10878,
-				"jsGzipBytes": 88100
+				"jsGzipBytes": 88104
 			},
 			"bench /settings": {
 				"executedChars": 10935,
-				"jsGzipBytes": 88100
+				"jsGzipBytes": 88104
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3157,15 +3241,15 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11342,
-				"jsGzipBytes": 88100
+				"jsGzipBytes": 88104
 			},
 			"bench /records": {
 				"executedChars": 11251,
-				"jsGzipBytes": 88100
+				"jsGzipBytes": 88104
 			},
 			"bench /settings": {
 				"executedChars": 11308,
-				"jsGzipBytes": 88100
+				"jsGzipBytes": 88104
 			},
 			"docs /": {
 				"executedChars": 110777,
