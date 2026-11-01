@@ -10,6 +10,28 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.11.0
+
+### @markless/bundler
+
+- **Faster:** The closures asset names each module's own code hash, so a route's runnable code compares without its packs.
+- **Faster:** A source's symbols the pack planner treats alike ship as one module.
+- **Faster:** The client environment builds in its own process.
+- **Faster:** An environment drops its transform memos once its module graph is built.
+- **Fixed:** Compile error frames clip long lines, pluginCode built on first read.
+- **Faster:** A first pass holds the refusals its link can clear instead of throwing and compiling again.
+- **Faster:** Compiles run in child processes that exit once the module graph is built.
+- **Fixed:** Removing the Vite preload helper keeps calls to a local named like its init.
+- **Fixed:** Retiring compile processes waits for them to exit, so their store writes land first.
+- **Faster:** A router build stops rendering a facade chunk for every lazily loaded module.
+
+### @markless/compiler
+
+- **Fixed:** An @if whose test reads nothing never flips, so it no longer warns that it cannot rebuild its arms.
+- **New:** Reads after an await in an async computed join its key.
+
+[All 36 commits since v0.10.0](https://github.com/compiled-run/markless/compare/v0.10.0...v0.11.0)
+
 ## 0.10.0
 
 ### @markless/bundler
