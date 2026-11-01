@@ -315,12 +315,11 @@ export async function refreshWhenShown(
 		} else {
 			// Read before its symbol arrived: a flip reads again once it has, and a shown reader refreshes.
 			graph.pullBeforeRead!(id, () => pull(node));
-			const loaded = () => {
-				if (node.stale && shown(id)) void refresh(node);
-			};
-			const loading = prepare(node);
-			if (loading) void loading.then(loaded);
-			else loaded();
+			const cleared = () => void (node.pending = undefined);
+			// Held in pending, so a flip settling the write observers waits for this derive too.
+			node.pending = Promise.resolve(prepare(node))
+				.then(() => (node.stale && shown(id) ? refresh(node) : undefined))
+				.then(cleared, cleared);
 		}
 	};
 	const markStale = (graphNodeId: string, seen = new Set<string>()) => {
