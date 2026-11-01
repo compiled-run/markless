@@ -2478,6 +2478,34 @@
 				"jsGzipBytes": 1682501
 			},
 			"reason": "the toSorted comparator fix on the parameter-write analysis grows the docs pages' in-browser compiler; measured on CI run 41326242234 (PR #401 at 482b5a4a0 on main 8a3787394): +8 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569196
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569197
+			},
+			"reason": "main's v0.10.0 release lengthens the version string the docs pages' in-browser compiler carries (0.9.0 to 0.10.0), one more byte on top of this PR's write analysis; measured on merge_group run 41329326175 (PR #401 on main 177f49ba9): +1 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682501
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682502
+			},
+			"reason": "main's v0.10.0 release lengthens the version string the docs pages' in-browser compiler carries (0.9.0 to 0.10.0), one more byte on top of this PR's write analysis; measured on merge_group run 41329326175 (PR #401 on main 177f49ba9): +1 B gzip downloaded on both pages, executed chars within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -2681,11 +2709,11 @@
 			},
 			"docs /": {
 				"executedChars": 110777,
-				"jsGzipBytes": 1569196
+				"jsGzipBytes": 1569197
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
-				"jsGzipBytes": 1682501
+				"jsGzipBytes": 1682502
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,
