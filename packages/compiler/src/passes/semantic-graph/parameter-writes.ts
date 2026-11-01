@@ -67,6 +67,19 @@ const READING_METHODS = new Set([
 	'values',
 ]);
 
+// Reading methods whose result can hold the receiver's own elements.
+const ELEMENT_RESULT_METHODS = new Set([
+	...ELEMENT_RETURNING_METHODS,
+	...COPYING_METHODS,
+	'entries',
+	'flatMap',
+	'get',
+	'map',
+	'reduce',
+	'reduceRight',
+	'values',
+]);
+
 // Platform functions that only read the values they are handed.
 const READING_GLOBAL_CALLS = new Set([
 	'Array.isArray',
@@ -279,7 +292,11 @@ export class FunctionWritesAnalysis {
 			case 'AssignmentExpression':
 				if (parent.left === top) {
 					if (member) out.add(path);
-				} else out.add(path, true);
+					return;
+				}
+				// Storing the value changes nothing; a local it is stored in is followed.
+				for (const alias of patternBindings(parent.left as AnyNode, this.#module))
+					this.#track(alias, path, false, out, seen);
 				return;
 			case 'UpdateExpression':
 				if (member) out.add(path);
@@ -360,16 +377,18 @@ export class FunctionWritesAnalysis {
 		}
 		if (ELEMENT_CALLBACK_METHODS.has(method) || method.startsWith('reduce'))
 			this.#callback(call, receiver, method.startsWith('reduce') ? 1 : 0, out, seen);
-		if (ELEMENT_RETURNING_METHODS.has(method) || COPYING_METHODS.has(method))
-			this.#use(call, receiver, false, out, seen);
+		if (ELEMENT_RESULT_METHODS.has(method)) this.#use(call, receiver, false, out, seen);
 	}
 
 	// An array callback is handed each element and then the array itself.
 	#callback(call: AnyNode, receiver: Path, element: number, out: WriteSet, seen: Set<string>): void {
-		const callback = unwrap(((call.arguments as AnyNode[] | undefined)?.[0] ?? call) as AnyNode);
+		const args = (call.arguments as AnyNode[] | undefined) ?? [];
+		const callback = unwrap((args[0] ?? call) as AnyNode);
+		// A reduce with no seed starts its accumulator at the first element.
+		const indexes = element === 1 && args.length < 2 ? [0, 1, 3] : [element, element + 2];
 		if (isFunctionNode(callback)) {
 			const params = (callback.params as AnyNode[]) ?? [];
-			for (const index of [element, element + 2])
+			for (const index of indexes)
 				for (const alias of patternBindings(params[index], this.#module))
 					this.#track(alias, receiver, false, out, seen);
 			return;
@@ -383,12 +402,17 @@ export class FunctionWritesAnalysis {
 			out.add(receiver, true);
 			return;
 		}
-		for (const index of [element, element + 2])
+		for (const index of indexes)
 			for (const write of argumentWrites(facts, index)) out.add(receiver, write.assumed);
 	}
 
 	#argument(call: AnyNode, index: number, path: Path, exact: boolean, out: WriteSet): void {
 		const callee = unwrap(call.callee as AnyNode);
+		// A spread before the value moves it to a parameter position no fact names.
+		if ((call.arguments as AnyNode[]).slice(0, index).some((arg) => arg.type === 'SpreadElement')) {
+			out.add(path, true);
+			return;
+		}
 		if (callee.type === 'Identifier') {
 			const binding = this.#module.referenceOf(callee as never)?.binding ?? null;
 			if (!binding && READING_GLOBAL_CALLS.has(String(callee.name))) return;

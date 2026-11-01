@@ -349,3 +349,44 @@ export function Board() @{
 	);
 	expect(result.stateLowering.writes.filter((write) => write.passedTo)).toEqual([]);
 });
+
+test('a mapped array, a seedless reduce, and an argument after a spread inside a helper are followed', () => {
+	const facts = analyzeModuleFunctionWrites({
+		filename: 'src/more.ts',
+		source: `export function bumpFirst(rows: { hits: number }[]) {
+	const kept = rows.map((row) => row);
+	kept[0]!.hits++;
+}
+export function foldInto(rows: { hits: number }[]) {
+	rows.reduce((first, row) => {
+		first.hits += row.hits;
+		return first;
+	});
+}
+function mark(_skip: number, target: { seen: boolean }) {
+	target.seen = true;
+}
+export function markAfterSpread(target: { seen: boolean }) {
+	mark(...[0], target);
+}
+`,
+	});
+	expect(facts).toEqual({
+		bumpFirst: { parameters: [[{ path: [] }]] },
+		foldInto: { parameters: [[{ path: [] }]] },
+		markAfterSpread: { parameters: [[{ path: [], assumed: true }]] },
+	});
+});
+
+test('state handed through a type assertion is still marked', async () => {
+	const result = await compile(page(`() => setLabel(card!, 'b')`), facts);
+
+	expect(result.stateLowering.writes).toEqual([
+		expect.objectContaining({
+			graphNodeId: 'state:card',
+			path: ['label'],
+			passedTo: expect.objectContaining({ argument: 'card!' }),
+		}),
+	]);
+	expect(handler(result)).toContain('marklessChanged');
+});

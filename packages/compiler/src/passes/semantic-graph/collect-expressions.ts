@@ -1,4 +1,4 @@
-import { asNodes, childNodes, isNode, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, isNode, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
@@ -109,7 +109,7 @@ export function collectPassedStateWrites(node: AnyNode, state: WalkState): void 
 			shifted = true;
 			return;
 		}
-		const value = unwrapValueWrappers(argument);
+		const value = unwrapPassedValue(argument);
 		if (value?.type !== 'Identifier' && value?.type !== 'MemberExpression') return;
 		const passed = passedState(value, state);
 		if (!passed) return;
@@ -127,7 +127,7 @@ export function collectPassedStateWrites(node: AnyNode, state: WalkState): void 
 				...rowWriteScope(value, state),
 				operation: 'call',
 				passedTo: {
-					argument: source,
+					argument: expressionSource(argument, state.source),
 					argumentIndex,
 					callee: calleeSource,
 					...(write.assumed ? { assumed: true as const } : {}),
@@ -143,6 +143,16 @@ export function collectPassedStateWrites(node: AnyNode, state: WalkState): void 
 				}),
 			);
 	});
+}
+
+// `user!`, `user as User` and `(user)` hand the call the same value.
+function unwrapPassedValue(node: AnyNode): AnyNode | undefined {
+	let current = node;
+	for (;;) {
+		const next = unwrapTypeAssertion(unwrapValueWrappers(current));
+		if (!next || next === current) return next;
+		current = next;
+	}
 }
 
 const WHOLE_VALUE: ReadonlyArray<ParameterWrite> = [{ path: [], assumed: true }];
