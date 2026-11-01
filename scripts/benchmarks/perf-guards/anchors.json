@@ -2422,6 +2422,34 @@
 				"jsGzipBytes": 1682383
 			},
 			"reason": "the second review round on the parameter-write analysis (type assertions, mapped arrays, seedless reduces, stores) grows the docs pages' in-browser compiler; measured on CI run 41293354099 (PR #401 on main 8a3787394): +139 B gzip downloaded on both pages, executed chars unchanged"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569078
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569188
+			},
+			"reason": "the third review round on the parameter-write analysis (loop targets, values followed through where they were stored, unknown reader methods) grows the docs pages' in-browser compiler; measured on CI run 41321602773 (PR #401 at 8315f1de9 on main 8a3787394): +110 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682383
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682493
+			},
+			"reason": "the third review round on the parameter-write analysis (loop targets, values followed through where they were stored, unknown reader methods) grows the docs pages' in-browser compiler; measured on CI run 41321602773 (PR #401 at 8315f1de9 on main 8a3787394): +110 B gzip downloaded on both pages, executed chars within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -2625,11 +2653,11 @@
 			},
 			"docs /": {
 				"executedChars": 110777,
-				"jsGzipBytes": 1569078
+				"jsGzipBytes": 1569188
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
-				"jsGzipBytes": 1682383
+				"jsGzipBytes": 1682493
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22657,
