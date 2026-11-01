@@ -73,15 +73,16 @@ permissions:
     contents: read
 
 jobs:
-    # Never holds id-token: it can push to main, but it cannot publish.
+    # Never holds id-token: it lands the release on main and tags it, but it cannot publish.
     cut:
         if: github.repository == 'compiled-run/markless' && startsWith(inputs.mode, 'cut')
         runs-on: ubuntu-latest
-        timeout-minutes: 90
+        # Up to about 30 minutes to cut, plus land.mjs's 100-minute wait for the merge queue.
+        timeout-minutes: 150
         permissions:
             # Push the release branch and the tag.
             contents: write
-            # Open the release pull request into main.
+            # Open the release pull request and add it to main's merge queue.
             pull-requests: write
             # Approve and watch the release pull request's CI run.
             actions: write
@@ -92,7 +93,7 @@ jobs:
         outputs:
             version: ${{ steps.cut.outputs.version }}
             tag: ${{ steps.cut.outputs.tag }}
-            sha: ${{ steps.cut.outputs.sha }}
+            sha: ${{ steps.land.outputs.sha || steps.cut.outputs.sha }}
             ecosystem_run: ${{ steps.ecosystem.outputs.run_id }}
         env:
             GH_TOKEN: ${{ github.token }}
@@ -131,6 +132,18 @@ jobs:
 
             - name: Check that ci.yml reports every check main's protection requires
               run: node scripts/release/required-checks.mjs --names
+
+            # A cut that stopped while its release pull request was open, possibly in the merge queue.
+            - name: Withdraw release pull requests a stopped cut left open
+              if: inputs.mode == 'cut'
+              run: |
+                  set -euo pipefail
+                  gh pr list --base main --state open --json id,number,headRefName \
+                    --jq '.[] | select(.headRefName | startswith("release/v")) | "\(.id) \(.number)"' |
+                    while read -r id number; do
+                      gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' -f id="$id" >/dev/null 2>&1 || true
+                      gh pr close "$number" --delete-branch --comment "A stopped release cut left this open; the next cut starts again."
+                    done
 
             # The release commit runs the pre-commit hook, which runs CI's fast jobs; their unit
             # tests launch Chromium and WebKit.
@@ -282,48 +295,19 @@ jobs:
                   SHA: ${{ steps.cut.outputs.sha }}
               run: node scripts/release/required-checks.mjs --sha "$SHA"
 
-            # Fast-forwards main when it is still the commit the release was cut from. When main has
-            # moved on, the release pull request is merged with a merge commit instead: main never
-            # moves backwards, and the checks main requires are read on the release commit itself.
-            - name: Move main to the release commit
+            # main takes changes only through its squashing merge queue, so the commit that lands is the
+            # queue's, not the release commit; land.mjs verifies it, supplies its required checks and tags it.
+            - name: Land the release commit through main's merge queue
+              id: land
               if: inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
                   SHA: ${{ steps.cut.outputs.sha }}
-              run: |
-                  set -euo pipefail
-                  base="$(git rev-parse "${SHA}^")"
-                  main="$(git ls-remote origin refs/heads/main | cut -f1)"
-                  if [ "$main" = "$base" ] && git push origin "${SHA}:refs/heads/main"; then
-                    echo "Fast-forwarded main from ${base} to ${SHA}"
-                    exit 0
-                  fi
-                  echo "main is at ${main}, past ${base} the release was cut from; merging the release commit into it"
-                  pr="$(gh pr list --base main --head "release/${TAG}" --state open --json url --jq '.[0].url // empty')"
-                  if [ -z "$pr" ]; then
-                    pr="$(gh pr create --base main --head "release/${TAG}" --title "chore(release): ${TAG}" \
-                      --body "The release cut's commit for ${TAG}, cut from ${base}. main moved past it, so the cut merges it.")"
-                  fi
-                  for attempt in $(seq 1 12); do
-                    if gh pr merge "$pr" --merge --match-head-commit "$SHA"; then
-                      echo "Merged ${pr} into main"
-                      # An inherited release never approves the pull request's waiting CI run.
-                      { gh run list --workflow ci.yml --event pull_request --commit "$SHA" --json databaseId,conclusion \
-                        --jq '.[] | select(.conclusion == "action_required") | .databaseId' |
-                        while read -r id; do gh run cancel "$id"; done; } || true
-                      exit 0
-                    fi
-                    if [ "$(gh pr view "$pr" --json mergeable --jq .mergeable)" = CONFLICTING ]; then
-                      echo "::error::${pr} conflicts with main: main changed package.json or CHANGELOG.md since ${base}. Nothing was released; run the cut again."
-                      exit 1
-                    fi
-                    sleep 10
-                  done
-                  echo "::error::Could not merge ${pr} into main. Nothing was released; run the cut again."
-                  exit 1
+                  BASE: ${{ steps.cut.outputs.base }}
+              run: node scripts/release/land.mjs --tag "$TAG" --release "$SHA" --cut-from "$BASE"
 
             - name: Push the tag
-              if: inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'
+              if: inputs.mode == 'cut' && (steps.cut.outputs.push_tag == 'true' || steps.land.outputs.tagged == 'true')
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
               run: git push origin "refs/tags/${TAG}"
@@ -333,6 +317,11 @@ jobs:
               env:
                   TAG: ${{ steps.cut.outputs.tag }}
               run: |
+                  # A queued pull request's branch cannot be deleted.
+                  id="$(gh pr list --base main --head "release/${TAG}" --state open --json id --jq '.[0].id // empty')"
+                  if [ -n "$id" ]; then
+                    gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' -f id="$id" >/dev/null 2>&1 || true
+                  fi
                   if git ls-remote --exit-code --heads origin "release/${TAG}" >/dev/null; then
                     git push origin --delete "release/${TAG}"
                   fi
