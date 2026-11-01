@@ -390,3 +390,30 @@ test('state handed through a type assertion is still marked', async () => {
 	]);
 	expect(handler(result)).toContain('marklessChanged');
 });
+
+test('a loop target, a value changed through the object it was stored in, and an unknown reader method are caught', () => {
+	const facts = analyzeModuleFunctionWrites({
+		filename: 'src/edges.ts',
+		source: `export function cycle(slot: { current: string }, items: string[]) {
+	for (slot.current of items);
+}
+export function stash(value: { label: string }) {
+	const holder = { inner: null as null | { label: string } };
+	holder.inner = value;
+	holder.inner.label = 'z';
+}
+export function lookUp(key: { id: string }, api: { get(key: object): unknown }) {
+	return api.get(key);
+}
+export function firstLines(view: { size: number }, lines: string[]) {
+	return lines.slice(0, view.size);
+}
+`,
+	});
+	expect(facts).toEqual({
+		cycle: { parameters: [[{ path: ['current'] }], []] },
+		stash: { parameters: [[{ path: [], assumed: true }]] },
+		lookUp: { parameters: [[{ path: [], assumed: true }], []] },
+		firstLines: { parameters: [[], []] },
+	});
+});

@@ -207,12 +207,19 @@ export class FunctionWritesAnalysis {
 		return rest ? { parameters, rest } : { parameters };
 	}
 
-	#track(binding: Binding, base: Path, exact: boolean, out: WriteSet, seen: Set<string>): void {
+	#track(
+		binding: Binding,
+		base: Path,
+		exact: boolean,
+		out: WriteSet,
+		seen: Set<string>,
+		skip?: object,
+	): void {
 		const key = `${binding.id}:${exact}:${JSON.stringify(base)}`;
 		if (seen.has(key)) return;
 		seen.add(key);
 		for (const reference of binding.references) {
-			if (reference.inTypePosition || reference.isWrite) continue;
+			if (reference.inTypePosition || reference.isWrite || reference.node === skip) continue;
 			this.#use(reference.node as unknown as AnyNode, base, exact, out, seen);
 		}
 	}
@@ -294,9 +301,8 @@ export class FunctionWritesAnalysis {
 					if (member) out.add(path);
 					return;
 				}
-				// Storing the value changes nothing; a local it is stored in is followed.
-				for (const alias of patternBindings(parent.left as AnyNode, this.#module))
-					this.#track(alias, path, false, out, seen);
+				// Storing changes nothing; whatever it is stored in is followed, or assumed written when unnamed.
+				this.#store(parent.left as AnyNode, path, out, seen);
 				return;
 			case 'UpdateExpression':
 				if (member) out.add(path);
@@ -323,7 +329,12 @@ export class FunctionWritesAnalysis {
 					this.#track(alias, path, exact && (parent.left as AnyNode).type === 'Identifier', out, seen);
 				return;
 			case 'ForOfStatement':
-				if (parent.right !== top) return;
+			case 'ForInStatement':
+				if (parent.left === top) {
+					if (member) out.add(path);
+					return;
+				}
+				if (parent.type === 'ForInStatement' || parent.right !== top) return;
 				for (const alias of declaredBindings(parent.left as AnyNode, this.#module))
 					this.#track(alias, path, false, out, seen);
 				return;
@@ -354,6 +365,26 @@ export class FunctionWritesAnalysis {
 			default:
 				if (!READING_PARENTS.has(parent.type ?? '')) out.add(path, true);
 		}
+	}
+
+	#store(target: AnyNode, path: Path, out: WriteSet, seen: Set<string>): void {
+		if (target.type !== 'MemberExpression') {
+			for (const alias of patternBindings(target, this.#module))
+				this.#track(alias, path, false, out, seen);
+			return;
+		}
+		let root = unwrap(target);
+		while (root.type === 'MemberExpression') root = unwrap(root.object as AnyNode);
+		const binding =
+			root.type === 'Identifier' ? (this.#module.referenceOf(root as never)?.binding ?? null) : null;
+		if (!binding) {
+			out.add(path, true);
+			return;
+		}
+		// A write through the holder may or may not reach the stored value.
+		const through = new WriteSet();
+		this.#track(binding, path, false, through, seen, root);
+		for (const write of through.list()) out.add(write.path, true);
 	}
 
 	#methodCall(
@@ -555,8 +586,31 @@ function isGlobalReadingCall(callee: AnyNode, module: ModuleSemantics): boolean 
 }
 
 // A reduce hands its seed to the callback, which may change it.
+// Builtin array and string readers whose names user objects rarely reuse for methods that change an argument.
+const ARGUMENT_READING_METHODS = new Set([
+	'at',
+	'charAt',
+	'charCodeAt',
+	'codePointAt',
+	'endsWith',
+	'includes',
+	'indexOf',
+	'join',
+	'lastIndexOf',
+	'localeCompare',
+	'padEnd',
+	'padStart',
+	'repeat',
+	'slice',
+	'split',
+	'startsWith',
+	'substring',
+	'toFixed',
+	'toPrecision',
+]);
+
 function readsItsArguments(method: string | null): boolean {
-	return method !== null && READING_METHODS.has(method) && !method.startsWith('reduce');
+	return method !== null && ARGUMENT_READING_METHODS.has(method);
 }
 
 function staticKey(member: AnyNode): string | null {
