@@ -1039,7 +1039,7 @@ function composedBoundaryArmRecords(
 	const prefix = local ? boundary.id.slice(0, local.index) : '';
 	if (!prefix) return set;
 	// Host ids take the whole prefix; symbol ids the symbol prefix, which past one level of nesting differs; graph ids its instance-path part.
-	const symbols = symbolPrefix ?? prefix;
+	const symbols = symbolPrefix ?? boundary.composedSymbolPrefix ?? prefix;
 	const instancePath = marklessInstancePath(symbols);
 	const registry = marklessGraphWidgetRegistry(graph);
 	const routes = boundary.composedGraphProps ?? [];
@@ -1182,8 +1182,9 @@ function composedBoundaryArmRecords(
 						composedInstancePath: instancePath,
 						composedGraphProps: routes,
 					}),
+					...(symbols !== prefix && { composedSymbolPrefix: symbols }),
 					...(armRecords && {
-						armRecords: composedBoundaryArmRecords({ ...boundary, id }, armRecords, graph, symbolPrefix),
+						armRecords: composedBoundaryArmRecords({ ...boundary, id }, armRecords, graph, symbols),
 					}),
 				};
 			}),

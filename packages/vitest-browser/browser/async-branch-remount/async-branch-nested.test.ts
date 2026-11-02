@@ -4,6 +4,7 @@ import Workspace from './abr-deep-host.tsrx';
 import FillPage from './abr-fill-page.tsrx';
 import LayeredPage from './abr-layer-host.tsrx';
 import SearchHost from './abr-nested-host.tsrx';
+import Shop from './abr-pick-host.tsrx';
 
 afterEach(cleanup);
 
@@ -15,6 +16,11 @@ const type = (value: string) => {
 	query.value = value;
 	query.dispatchEvent(new Event('input', { bubbles: true }));
 };
+// Clicking rows a @try settle painted before their records register is a separate race; these steps wait it out.
+const registered = () =>
+	[...document.querySelectorAll('*')].every(
+		(node) => !((node as { __marklessArmRegistering?: Set<unknown> }).__marklessArmRegistering?.size ?? 0),
+	);
 const errors: string[] = [];
 const onError = (event: ErrorEvent | PromiseRejectionEvent) =>
 	errors.push(String('reason' in event ? event.reason : event.message));
@@ -112,4 +118,34 @@ test('CSR: an @if rendered in the browser inside a layer component reads its pro
 test('SSR: an @if rendered in the browser inside a layer component reads its prop and runs its component fresh', async () => {
 	await renderSSR(FillPage);
 	await filledArmKeepsItsProp();
+});
+
+async function pickAfterResettle() {
+	click('[data-open]');
+	await expect.poll(names).toEqual(['Fig', 'Grape', 'Guava', 'Kiwi']);
+	type('g');
+	await expect.poll(names).toEqual(['Grape', 'Guava']);
+	await expect.poll(registered).toBe(true);
+	(document.querySelectorAll('[data-result]')[1] as HTMLElement).click();
+	await expect.poll(() => document.querySelector('[data-picked]')?.textContent).toBe('Guava');
+	click('[data-open]');
+	await expect.poll(list).toBeNull();
+	type('k');
+	click('[data-open]');
+	await expect.poll(() => document.querySelector('[data-loading]')).not.toBeNull();
+	await expect.poll(names).toEqual(['Kiwi']);
+	await expect.poll(registered).toBe(true);
+	(document.querySelector('[data-result]') as HTMLElement).click();
+	await expect.poll(() => document.querySelector('[data-picked]')?.textContent).toBe('Kiwi');
+	expect(errors).toEqual([]);
+}
+
+test('CSR: rows a re-settled @try renders two components down answer their clicks', async () => {
+	await render(Shop);
+	await pickAfterResettle();
+});
+
+test('SSR: rows a re-settled @try renders two components down answer their clicks', async () => {
+	await renderSSR(Shop);
+	await pickAfterResettle();
 });
