@@ -6,10 +6,10 @@ export const art: { readonly sun: Drawing; readonly moon: Drawing } = {
 		"width": 48,
 		"height": 48,
 		"box": [
-			-3,
-			-3,
-			54,
-			54
+			-5,
+			-5,
+			58,
+			58
 		],
 		"layers": [
 			{
@@ -30,10 +30,10 @@ export const art: { readonly sun: Drawing; readonly moon: Drawing } = {
 		"width": 48,
 		"height": 48,
 		"box": [
-			0,
-			0,
-			51,
-			48
+			-4,
+			-3,
+			58,
+			55
 		],
 		"layers": [
 			{

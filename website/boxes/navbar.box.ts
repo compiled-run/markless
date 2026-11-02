@@ -179,10 +179,10 @@ export default box(
 			await mobile.goto(url('/concepts/state'), { waitUntil: 'networkidle' });
 			for (const path of ['/router/pages', '/start/migrate', '/how-it-works']) {
 				await mobile.locator('.mobile-bar [aria-label="Open menu"]').click();
-				await expect(mobile.locator('.menu-panel')).toBeVisible();
+				await expect(mobile.locator('.menu-panel')).toBeVisible(POLL);
 				await mobile.locator(`.menu-panel a[href="${path}"]`).click();
 				await expect.poll(() => mobile.evaluate(() => location.pathname), POLL).toBe(path);
-				await expect(mobile.locator('.menu-panel')).toBeHidden();
+				await expect(mobile.locator('.menu-panel')).toBeHidden(POLL);
 			}
 			expect(errors).toEqual([]);
 			await receipt.capture('navbar works after seven in-place navigations, scroll-away matches on every page, and the theme toggle never shows the wrong drawing');

@@ -55,6 +55,9 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 					<NavDropdown panel={panel} pathname={pathname} />
 				}
 			</div>
+			<div class="nav-box" aria-hidden="true">
+				<InkEdge name="panel" />
+			</div>
 			<div class="nav-tools">
 				<navbar.itemlink class="tool-link" href={github} aria-label="Markless on GitHub">
 					<lucide.github class="tool-icon" aria-hidden="true" />
@@ -190,7 +193,6 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 			<span>{panel.label}</span>
 		</navbar.itemtrigger>
 		<navbar.itemcontent class={'nav-panel nav-panel-' + panel.layout}>
-			<InkEdge name="panel" />
 			@for (const card of panel.cards; key card.label) {
 				<NavCardLink card={card} pathname={pathname} />
 			}
@@ -232,28 +234,57 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				color: var(--on-accent);
 			}
 
-			/* The bar's translate makes it this panel's containing block, so the offsets are from the bar's padding box. */
-			.nav-panel {
+			/* The bar's translate makes it the containing block of the panels and the box behind them, so the offsets are from the bar's padding box. */
+			:is(.nav-panel, .nav-box) {
 				position: fixed;
 				top: calc(100% + 1rem + 2px);
 				left: 50%;
-				z-index: 60;
 				box-sizing: border-box;
+				inline-size: 37.5rem;
+				block-size: 28rem;
+				margin: 0;
+				border-radius: 1rem;
+				translate: -50% 0;
+			}
+
+			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. */
+			.nav-box {
+				z-index: 59;
+				display: none;
+				background: var(--raised);
+				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
+				opacity: 0;
+				scale: 0.96;
+				transform-origin: top center;
+				transition:
+					opacity 200ms ease,
+					scale 200ms ease,
+					display 200ms allow-discrete;
+			}
+
+			.nav-pill[ui-open] .nav-box {
+				display: block;
+				opacity: 1;
+				scale: 1;
+
+				@starting-style {
+					opacity: 0;
+					scale: 0.96;
+				}
+			}
+
+			.nav-panel {
+				z-index: 60;
 				display: grid;
 				grid-template-columns: 1fr 1fr;
 				grid-template-rows: 12.5rem 12.5rem;
 				gap: 1rem;
-				inline-size: 37.5rem;
-				margin: 0;
 				padding: 1rem;
-				border-radius: 1rem;
-				background: var(--raised);
-				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
-				translate: -50% 0;
+				overflow: clip;
 				opacity: 1;
 				transition:
-					opacity 325ms ease-in-out,
-					display 325ms allow-discrete;
+					opacity 200ms ease,
+					display 200ms allow-discrete;
 
 				@starting-style {
 					opacity: 0;
@@ -265,6 +296,63 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				opacity: 0;
 			}
 
+			/* Switching: the next panel's cards slide in from the side the pointer moved toward, the last panel's slide out the other way. */
+			.nav-panel[ui-from] {
+				@starting-style {
+					opacity: 1;
+				}
+			}
+
+			.nav-panel[hidden][ui-to] {
+				opacity: 1;
+				transition: display 250ms allow-discrete;
+			}
+
+			@media (prefers-reduced-motion: no-preference) {
+				.nav-panel[ui-from='end'] > .card {
+					animation: navbar-from-end 250ms ease both;
+				}
+
+				.nav-panel[ui-from='start'] > .card {
+					animation: navbar-from-start 250ms ease both;
+				}
+
+				.nav-panel[ui-to='start'] > .card {
+					animation: navbar-to-start 250ms ease both;
+				}
+
+				.nav-panel[ui-to='end'] > .card {
+					animation: navbar-to-end 250ms ease both;
+				}
+			}
+
+			@keyframes navbar-from-end {
+				from {
+					opacity: 0;
+					translate: 13rem 0;
+				}
+			}
+
+			@keyframes navbar-from-start {
+				from {
+					opacity: 0;
+					translate: -13rem 0;
+				}
+			}
+
+			@keyframes navbar-to-start {
+				to {
+					opacity: 0;
+					translate: -13rem 0;
+				}
+			}
+
+			@keyframes navbar-to-end {
+				to {
+					opacity: 0;
+					translate: 13rem 0;
+				}
+			}
 
 			@media (prefers-reduced-motion: reduce) {
 				.nav-panel {
@@ -322,12 +410,12 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				grid-row: 1 / 3;
 			}
 
-			/* The drawing gets the card above the text band, whole and centred, as QDS's picture does. */
+			/* The drawing fills the card, whole and centred, and runs on under the text as QDS's picture does. */
 			.card-art {
 				position: absolute;
-				inset: 0.75rem 0.75rem 4.6rem;
+				inset: 0.75rem 0.75rem 1.75rem;
 				inline-size: calc(100% - 1.5rem);
-				block-size: calc(100% - 5.35rem);
+				block-size: calc(100% - 2.5rem);
 				overflow: visible;
 				transition: scale 300ms ease;
 				will-change: transform;
@@ -343,14 +431,19 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				outline-offset: 3px;
 			}
 
-			/* QDS's band: clear over the picture, then darkening just under the title and description. */
+			/* QDS's overlay: one gradient over the whole card, clear at the top and deepening to the text, measured in rem so every card size darkens alike. */
 			.card-scrim {
 				position: absolute;
-				inset-inline: 0;
-				bottom: 0;
-				block-size: 5.25rem;
+				inset: 0;
 				pointer-events: none;
-				background: linear-gradient(to top, var(--card-scrim) 0%, var(--card-scrim) 62%, transparent 100%);
+				background: linear-gradient(
+					to top,
+					var(--card-scrim) 0,
+					color-mix(in oklch, var(--card-scrim) 96%, transparent) 3.6rem,
+					color-mix(in oklch, var(--card-scrim) 62%, transparent) 5.6rem,
+					color-mix(in oklch, var(--card-scrim) 22%, transparent) 7.6rem,
+					transparent 9.6rem
+				);
 			}
 
 			.card-text {
@@ -387,7 +480,7 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 					--hover: 1;
 				}
 
-				.nav-panel:not([hidden]) .card-art {
+				.nav-panel:not([hidden], [ui-from]) .card-art {
 					animation: navbar-ink-in 180ms ease-out both;
 				}
 
@@ -406,11 +499,11 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 
 			@keyframes navbar-ink-in {
 				from {
-					clip-path: inset(0 100% 0 0);
+					clip-path: inset(-1rem 100% -1rem -1rem);
 				}
 
 				to {
-					clip-path: inset(0 0 0 0);
+					clip-path: inset(-1rem);
 				}
 			}
 
@@ -519,6 +612,9 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 											class="menu-link"
 											href={card.href}
 											aria-current={!card.skipActive && isCurrent(pathname, card.href) ? 'page' : undefined}
+											onClick={() => {
+												menu.open = false;
+											}}
 										><span class="menu-link-text">{card.label}</span></a>
 									}
 								</div>

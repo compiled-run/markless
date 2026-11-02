@@ -10,6 +10,11 @@ export type LayerKind = 'paper' | 'wash' | 'hatch' | 'ink';
 export interface Motion {
 	readonly transform: string;
 	readonly origin: P;
+	/** An opacity that also follows `--hover`, for something that appears only while hovered. */
+	readonly opacity?: string;
+	/** Milliseconds to wait before moving, so one motion can follow another. */
+	readonly delay?: number;
+	readonly easing?: string;
 }
 
 const sway = (deg: number, origin: P): Motion => ({ transform: `rotate(calc(var(--hover, 0) * ${deg}deg))`, origin });
@@ -73,10 +78,10 @@ class Sheet {
 		return ++this.#seed;
 	}
 
-	#cover(points: P[]) {
+	#cover(points: P[], margin = 0) {
 		for (const [x, y] of points) {
-			this.#min = [Math.min(this.#min[0], x), Math.min(this.#min[1], y)];
-			this.#max = [Math.max(this.#max[0], x), Math.max(this.#max[1], y)];
+			this.#min = [Math.min(this.#min[0], x - margin), Math.min(this.#min[1], y - margin)];
+			this.#max = [Math.max(this.#max[0], x + margin), Math.max(this.#max[1], y + margin)];
 		}
 	}
 
@@ -111,6 +116,7 @@ class Sheet {
 	}
 
 	tone(poly: P[], angle: number, gap = 2.6, skip = 0.3) {
+		this.#cover(poly, 1);
 		this.#parts.hatch += hatch(poly, rad(angle), gap, this.#next(), { cluster: 5, skip, trim: 0.5 });
 	}
 
@@ -132,14 +138,16 @@ class Sheet {
 		if (first < 0) return;
 		const chain: P[] = [ring[first]!];
 		for (let k = first; faces[k % n]; k++) chain.push(ring[(k + 1) % n]!);
+		this.#cover([...chain, ...move(chain, dx, dy)], 1);
 		this.#parts.cast += hatch([...chain, ...move(chain, dx, dy).reverse()], rad(-28), gap, this.#next(), { cluster: 5, skip: 0.35, trim: 0.5 });
 	}
 
 	wash(poly: P[], grow = 2, rough = 3) {
+		this.#cover(move(poly, 1.6, -1.2), grow + rough + 1);
 		this.#parts.wash += wash(poly, this.#next(), grow, rough);
 	}
 
-	done(pad = 6): Drawing {
+	done(pad = 8): Drawing {
 		this.object();
 		const [x0, y0] = this.#min;
 		const [x1, y1] = this.#max;
@@ -197,18 +205,16 @@ function start(): Drawing {
 	return s.done();
 }
 
-/** Core concepts: the State figure's jar of beans, its lid on, a wire leading out. */
+/** Core concepts: the State figure's jar of beans with its tag wired out; hovering drops a bean in and the tag swings. */
 function concepts(): Drawing {
 	const s = new Sheet(276, 128, 2);
-	s.line(wander([[110, 117], [272, 117]], 6, 1), 1.5);
-	s.line(wander([[226, 64], [244, 58], [254, 44], [258, 26], [268, 10]], 7, 1.4, 8), 1.6, 0.8);
-	s.line(wander([[227, 68], [247, 62], [258, 48], [262, 30], [272, 14]], 8, 1.4, 8), 0.7, 0.5);
+	s.line(wander([[110, 117], [262, 117]], 6, 1), 1.5);
 	s.object();
-	const body = roundRect(166, 32, 230, 116, 12);
+	const body = roundRect(166, 30, 230, 116, 12);
 	s.cast(body, 9, 4, 2.3);
 	s.shape(body, 2.2, 1.6);
 	s.shade(quad(216, 40, 227, 110), 74, 1.8);
-	s.line(arc(198, 42, 29, 4, 200, 340, 14), 0.9);
+	s.shape(ellipse(198, 31, 30, 4.5, 28), 1.5, 0.6, false);
 	s.object();
 	const beans: P[] = [[178, 104], [192, 108], [206, 105], [219, 102], [184, 94], [199, 95], [213, 91], [177, 84], [192, 84], [207, 81], [186, 74], [200, 71]];
 	s.wash(roundRect(172, 66, 225, 112, 9), 2, 3);
@@ -217,11 +223,18 @@ function concepts(): Drawing {
 		s.shape(bean, 1.1, 0.7);
 		s.line(turn([[at[0] - 3.4, at[1] + 0.4], [at[0], at[1] - 0.6], [at[0] + 3.4, at[1] + 0.4]], k * 37, at), 0.7, 0.1);
 	});
-	s.object({ transform: 'translate(0, calc(var(--hover, 0) * -6px)) rotate(calc(var(--hover, 0) * -8deg))', origin: [171, 34] });
-	const lid = roundRect(171, 20, 225, 34, 4);
-	s.cast(lid, 3, 3, 2);
-	s.shape(lid, 1.9);
-	for (let x = 176; x < 222; x += 5) s.line([[x, 22.5], [x + 0.3, 31.5]], 0.6, 0.1);
+	s.object({ transform: 'translate(0, calc(var(--hover, 0) * 50px)) rotate(calc(var(--hover, 0) * 70deg))', origin: [214, 12], opacity: 'var(--hover, 0)', easing: 'cubic-bezier(.5,0,.8,.6)' });
+	const drop: P = [214, 12];
+	s.shape(turn(ellipse(drop[0], drop[1], 6, 4, 18), -20, drop), 1.1, 0.7);
+	s.line(turn([[drop[0] - 3.4, drop[1] + 0.4], [drop[0], drop[1] - 0.6], [drop[0] + 3.4, drop[1] + 0.4]], -20, drop), 0.7, 0.1);
+	s.object({ ...sway(16, [228, 44]), delay: 260 });
+	s.line([[228, 44], [240, 56]], 0.9, 0.2);
+	s.line(wander([[262, 66], [270, 52], [272, 34], [274, 20]], 8, 1, 8), 1.6, 0.8);
+	const tag: P[] = turn([[236, 54], [258, 54], [264, 62], [258, 70], [236, 70]], 8, [236, 62]);
+	s.wash(tag, 1.5, 2);
+	s.shape(tag, 1.6);
+	s.shape(ellipse(240, 58, 1.6, 1.6, 10), 0.8, 0.2);
+	s.line(turn([[244, 63], [254, 63]], 8, [236, 62]), 1.2, 0.2);
 	return s.done();
 }
 

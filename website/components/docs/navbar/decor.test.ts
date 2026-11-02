@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { relative } from '../ink-logos.ts';
-import { type Drawing, decor, edges, type LayerKind, themeArt } from './decor.ts';
+import { type Drawing, decor, edges, type LayerKind, type Motion, themeArt } from './decor.ts';
 import { NAV_DECOR, panels } from './sections.ts';
 
 const cards = decor();
@@ -19,6 +19,16 @@ const PAINT: Record<LayerKind, string> = {
 	ink: 'fill="currentColor"',
 };
 
+function motionStyle(motion: Motion, box: readonly number[]): string {
+	const delay = motion.delay ? ` ${motion.delay}ms` : '';
+	const move = `transform 320ms ${motion.easing ?? 'cubic-bezier(.3,1.5,.5,1)'}${delay}`;
+	return [
+		`transform:${motion.transform}`,
+		`transform-origin:${motion.origin[0] - box[0]!}px ${motion.origin[1] - box[1]!}px`,
+		...(motion.opacity ? [`opacity:${motion.opacity}`, `transition:${move},opacity 120ms`] : [`transition:${move}`]),
+	].join(';');
+}
+
 function sprite(): string {
 	const symbols = Object.entries(cards).map(([name, drawing]) => {
 		const { box, layers } = frozen(drawing);
@@ -28,7 +38,7 @@ function sprite(): string {
 			let group = '';
 			for (; k < layers.length && layers[k]!.motion === motion; k++) group += `<path ${PAINT[layers[k]!.kind]} d="${layers[k]!.d}"/>`;
 			// Inline, because a stylesheet cannot reach into a <use> clone; the card sets --hover and the clone inherits it.
-			body += motion ? `<g style="transform:${motion.transform};transform-origin:${motion.origin[0] - box[0]}px ${motion.origin[1] - box[1]}px;transition:transform 320ms cubic-bezier(.3,1.5,.5,1)">${group}</g>` : group;
+			body += motion ? `<g style="${motionStyle(motion, box)}">${group}</g>` : group;
 		}
 		return `<symbol id="${name}" viewBox="${box.join(' ')}" overflow="visible">${body}</symbol>`;
 	});
