@@ -312,6 +312,15 @@ declare namespace __MarklessTypeService {
 		type?: string;
 	};
 
+	type LinkAttributes = AnchorAttributes & {
+		/**
+		 * `false` keeps the router from requesting this page before the click. Omit it
+		 * and a link to one of your pages is requested early when the reader hovers it,
+		 * or at idle when it is in view.
+		 */
+		prefetch?: boolean;
+	};
+
 	type ImageAttributes = {
 		alt?: string;
 		crossorigin?: 'anonymous' | 'use-credentials' | '';
@@ -427,122 +436,124 @@ declare namespace __MarklessTypeService {
 		MarklessAttributes<E> &
 		NativeEventAttributes<E>;
 
-	type TagNameSpecificAttributes<Tag extends PropertyKey> = Tag extends 'a' | 'area'
-		? AnchorAttributes
-		: Tag extends 'audio'
-			? MediaAttributes
-			: Tag extends 'base'
-				? { href?: string; target?: string }
-				: Tag extends 'button'
-					? FormAttributes & {
-							disabled?: boolean;
-							popovertarget?: SingleIdrefValue;
-							popovertargetaction?: 'hide' | 'show' | 'toggle';
-							type?: 'button' | 'reset' | 'submit';
-							value?: string;
-						}
-					: Tag extends 'canvas'
-						? { height?: NumericAttributeValue; width?: NumericAttributeValue }
-						: Tag extends 'fieldset'
-							? // `disabled` is what the native "disable every control inside" cascade reads.
-								{ disabled?: boolean; form?: string; name?: string }
-							: Tag extends 'form'
-								? {
-										action?: string;
-										autocomplete?: string;
-										enctype?: string;
-										method?: string;
-										name?: string;
-										novalidate?: boolean;
-										target?: string;
-									}
-								: Tag extends 'iframe'
+	type TagNameSpecificAttributes<Tag extends PropertyKey> = Tag extends 'a'
+		? LinkAttributes
+		: Tag extends 'area'
+			? AnchorAttributes
+			: Tag extends 'audio'
+				? MediaAttributes
+				: Tag extends 'base'
+					? { href?: string; target?: string }
+					: Tag extends 'button'
+						? FormAttributes & {
+								disabled?: boolean;
+								popovertarget?: SingleIdrefValue;
+								popovertargetaction?: 'hide' | 'show' | 'toggle';
+								type?: 'button' | 'reset' | 'submit';
+								value?: string;
+							}
+						: Tag extends 'canvas'
+							? { height?: NumericAttributeValue; width?: NumericAttributeValue }
+							: Tag extends 'fieldset'
+								? // `disabled` is what the native "disable every control inside" cascade reads.
+									{ disabled?: boolean; form?: string; name?: string }
+								: Tag extends 'form'
 									? {
-											allow?: string;
-											allowfullscreen?: boolean;
-											height?: string | number;
-											loading?: 'eager' | 'lazy';
+											action?: string;
+											autocomplete?: string;
+											enctype?: string;
+											method?: string;
 											name?: string;
-											referrerpolicy?: ReferrerPolicy;
-											sandbox?: string;
-											src?: string;
-											srcdoc?: string;
-											width?: string | number;
+											novalidate?: boolean;
+											target?: string;
 										}
-									: Tag extends 'img'
-										? ImageAttributes
-										: Tag extends 'input'
-											? InputAttributes
-											: Tag extends 'label'
-												? { for?: SingleIdrefValue }
-												: Tag extends 'link'
-													? AnchorAttributes & {
-															as?: string;
-															disabled?: boolean;
-															sizes?: string;
-														}
-													: Tag extends 'meta'
-														? {
-																charset?: string;
-																content?: string;
-																'http-equiv'?: string;
-																media?: string;
-																name?: string;
-																property?: string;
+									: Tag extends 'iframe'
+										? {
+												allow?: string;
+												allowfullscreen?: boolean;
+												height?: string | number;
+												loading?: 'eager' | 'lazy';
+												name?: string;
+												referrerpolicy?: ReferrerPolicy;
+												sandbox?: string;
+												src?: string;
+												srcdoc?: string;
+												width?: string | number;
+											}
+										: Tag extends 'img'
+											? ImageAttributes
+											: Tag extends 'input'
+												? InputAttributes
+												: Tag extends 'label'
+													? { for?: SingleIdrefValue }
+													: Tag extends 'link'
+														? AnchorAttributes & {
+																as?: string;
+																disabled?: boolean;
+																sizes?: string;
 															}
-														: Tag extends 'script'
+														: Tag extends 'meta'
 															? {
-																	src?: string;
-																	type?: string;
-																	async?: boolean;
-																	defer?: boolean;
-																	crossorigin?:
-																		| ''
-																		| 'anonymous'
-																		| 'use-credentials';
+																	charset?: string;
+																	content?: string;
+																	'http-equiv'?: string;
+																	media?: string;
+																	name?: string;
+																	property?: string;
 																}
-															: Tag extends 'source'
+															: Tag extends 'script'
 																? {
-																		media?: string;
-																		sizes?: string;
 																		src?: string;
-																		srcset?: string;
 																		type?: string;
+																		async?: boolean;
+																		defer?: boolean;
+																		crossorigin?:
+																			| ''
+																			| 'anonymous'
+																			| 'use-credentials';
 																	}
-																: Tag extends 'select'
-																	? FormAttributes & {
-																			disabled?: boolean;
-																			multiple?: boolean;
-																			required?: boolean;
-																			size?: NumericAttributeValue;
-																			value?:
-																				| string
-																				| readonly string[];
+																: Tag extends 'source'
+																	? {
+																			media?: string;
+																			sizes?: string;
+																			src?: string;
+																			srcset?: string;
+																			type?: string;
 																		}
-																	: Tag extends 'td'
-																		? TableCellAttributes
-																		: Tag extends 'th'
-																			? TableHeaderAttributes
-																			: Tag extends 'textarea'
-																				? FormAttributes & {
-																						cols?: NumericAttributeValue;
-																						disabled?: boolean;
-																						placeholder?: string;
-																						readonly?: boolean;
-																						required?: boolean;
-																						rows?: NumericAttributeValue;
-																						value?: string;
-																					}
-																				: Tag extends 'video'
-																					? MediaAttributes & {
-																							height?: NumericAttributeValue;
-																							playsinline?: boolean;
-																							poster?: string;
-																							width?: NumericAttributeValue;
+																	: Tag extends 'select'
+																		? FormAttributes & {
+																				disabled?: boolean;
+																				multiple?: boolean;
+																				required?: boolean;
+																				size?: NumericAttributeValue;
+																				value?:
+																					| string
+																					| readonly string[];
+																			}
+																		: Tag extends 'td'
+																			? TableCellAttributes
+																			: Tag extends 'th'
+																				? TableHeaderAttributes
+																				: Tag extends 'textarea'
+																					? FormAttributes & {
+																							cols?: NumericAttributeValue;
+																							disabled?: boolean;
+																							placeholder?: string;
+																							readonly?: boolean;
+																							required?: boolean;
+																							rows?: NumericAttributeValue;
+																							value?: string;
 																						}
-																					: Tag extends keyof SVGElementTagNameMap
-																						? SvgAttributes
-																						: {};
+																					: Tag extends 'video'
+																						? MediaAttributes & {
+																								height?: NumericAttributeValue;
+																								playsinline?: boolean;
+																								poster?: string;
+																								width?: NumericAttributeValue;
+																							}
+																						: Tag extends keyof SVGElementTagNameMap
+																							? SvgAttributes
+																							: {};
 
 	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
