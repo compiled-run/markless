@@ -80,7 +80,7 @@
 	--navbar-clear: var(--header-height);
 	--theme-toggle-size: 1.9rem;
 
-	@media (min-width: 80rem) {
+	@media (min-width: 80rem) and (min-height: 37.5rem) {
 		--header-height: 0rem;
 		--navbar-clear: 6.5rem;
 	}

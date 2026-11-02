@@ -79,8 +79,8 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				display: none;
 			}
 
-			/* A wide screen floats the bar over the prose, with room beside the sidebar. */
-			@media (min-width: 80rem) {
+			/* A wide screen floats the bar over the prose, with room beside the sidebar; a short one keeps the top bar, since the open panel needs about 35rem of height. */
+			@media (min-width: 80rem) and (min-height: 37.5rem) {
 				.nav-shade {
 					display: block;
 				}
@@ -647,7 +647,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				display: block;
 			}
 
-			@media (min-width: 80rem) {
+			@media (min-width: 80rem) and (min-height: 37.5rem) {
 				.mobile-nav {
 					display: none;
 				}

@@ -20,7 +20,7 @@
 		if (event.target instanceof Element && event.target.closest('.nav-pill')) root.removeAttribute('data-nav-away');
 	});
 	// The full-screen menu belongs to the narrow layout: widening past it closes the menu, or the page would stay inert behind a menu nobody can see.
-	matchMedia('(min-width: 80rem)').addEventListener('change', (event) => {
+	matchMedia('(min-width: 80rem) and (min-height: 37.5rem)').addEventListener('change', (event) => {
 		if (!event.matches) return;
 		if (document.querySelector('.menu-backdrop:not([hidden])'))
 			document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
