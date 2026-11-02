@@ -359,6 +359,12 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
+			 * Props this component's tree re-derives from after resume, served only
+			 * while they arrive as a constant. A module forwarding one of its own
+			 * props here serves that prop itself. Absent when there are none.
+			 */
+			readonly derivedProps?: ReadonlyArray<string>;
+			/**
 			 * Present when a keyed repeat sits at this component's top level, so its
 			 * rows need the container as their parent.
 			 */

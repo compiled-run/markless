@@ -3303,6 +3303,20 @@
 		},
 		{
 			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1570040
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1571123
+			},
+			"reason": "the docs' live code blocks run the compiler in a worker the page fetches at idle; publishing derivedProps and serving forwarded props (PR #422) adds 1083 B gzip to it, and no other built JS file changes (a local before/after site build has the same per-module rendered bytes in byte-attribution.json); measured on CI run 41468171523, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
 			"guard": "runtime",
 			"subject": "web/fns/instance-scope",
 			"from": 20104,
@@ -3553,7 +3567,7 @@
 			},
 			"docs /": {
 				"executedChars": 110777,
-				"jsGzipBytes": 1570040
+				"jsGzipBytes": 1571123
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,

@@ -29,6 +29,7 @@ import {
 	type ChildrenSeedPathsInput,
 } from './passes/link/children-seed-paths.ts';
 import { withClosureActionOwners } from './passes/link/closure-action-owners.ts';
+import { withDerivedProps } from './passes/link/derived-props.ts';
 import { withRosterDerivations } from './passes/link/roster-derivations.ts';
 import { withStorageCells } from './passes/link/storage-cells.ts';
 import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
@@ -117,10 +118,25 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 			withClosureActionOwners(
 				withRosterDerivations(
 					withRowSlotReaders(
-						withSeedsFromProps(withStorageCells(artifacts.semanticGraph.moduleGraphInterface, storageCellsInput), {
-							symbolResolver: artifacts.symbolResolver,
-							protocolState: artifacts.protocolState,
-						}),
+						withSeedsFromProps(
+							withStorageCells(
+								withDerivedProps(artifacts.semanticGraph.moduleGraphInterface, {
+									source: input,
+									semanticGraph: artifacts.semanticGraph,
+									renderData: artifacts.renderData,
+									publicRenderPlan: artifacts.publicRenderPlan,
+									symbolResolver: artifacts.symbolResolver,
+									captureAnalysis: artifacts.captureAnalysis,
+									protocolState: artifacts.protocolState,
+									protocolView: artifacts.protocolView,
+								}),
+								storageCellsInput,
+							),
+							{
+								symbolResolver: artifacts.symbolResolver,
+								protocolState: artifacts.protocolState,
+							},
+						),
 						{
 							componentEdges: artifacts.semanticGraph.componentEdges,
 							protocolView: artifacts.protocolView,
@@ -592,7 +608,9 @@ function parseErrorDiagnostic(
 		severity: 'error',
 		phase: 'parse',
 		title: rule?.title ?? 'TSRX parser rejected this source',
-		message: rule ? `${rule.message} (@tsrx/yuku reported: ${message})` : `@tsrx/yuku reported: ${message}`,
+		message: rule
+			? `${rule.message} (@tsrx/yuku reported: ${message})`
+			: `@tsrx/yuku reported: ${message}`,
 		why: 'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
 		primarySpan: parserErrorSpan(error, source),
 		passId: 'tsrx-semantic-graph',
@@ -615,10 +633,14 @@ function templateRuleBroken(
 	source: CompileTsrxModuleInput,
 ): { title: string; message: string; fix: string } | null {
 	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
-	const line = typeof position === 'number' ? source.source.slice(0, position).split('\n').length : null;
+	const line =
+		typeof position === 'number' ? source.source.slice(0, position).split('\n').length : null;
 	const at = line === null ? '' : ` on line ${line}`;
 	if (message.startsWith('TSRX2011')) {
-		const tag = typeof position === 'number' ? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(position))?.[0] : undefined;
+		const tag =
+			typeof position === 'number'
+				? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(position))?.[0]
+				: undefined;
 		const subject = tag ? `\`${tag}>\`${at}` : `The node${at}`;
 		return {
 			title: 'A code block renders a single node',
