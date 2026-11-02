@@ -39,6 +39,8 @@ export async function resumeContainerEvent(input: {
 interface RouteResumeModule {
 	readonly resumeContainerEvent?: (input: unknown) => unknown;
 	readonly loadSymbol?: (symbolId: string) => unknown;
+	// An MDX page's loader is on its default export.
+	readonly default?: { readonly loadSymbol?: (symbolId: string) => unknown };
 }
 
 // The next page of an in-place navigation, still off screen, takes the document's live shared() values.
@@ -51,14 +53,17 @@ export async function prepareSharedSwap(input: {
 	const module = (route ? await loadRouteResumeModule(route) : undefined) as
 		| RouteResumeModule
 		| undefined;
-	if (typeof module?.loadSymbol !== 'function') return undefined;
+	const loadSymbol = module?.loadSymbol ?? module?.default?.loadSymbol;
 	const { prepareSharedSwap, wakeSharedContainer } = await import('@markless/web/shared-swap');
-	const prepared = await prepareSharedSwap({
-		root: input.root,
-		document: input.document,
-		container: input.container,
-		loadSymbol: module.loadSymbol as Parameters<typeof prepareSharedSwap>[0]['loadSymbol'],
-	});
+	const prepared =
+		typeof loadSymbol === 'function'
+			? await prepareSharedSwap({
+					root: input.root,
+					document: input.document,
+					container: input.container,
+					loadSymbol: loadSymbol as Parameters<typeof prepareSharedSwap>[0]['loadSymbol'],
+				})
+			: { wake: true };
 	return prepared?.wake
 		? {
 				wake: (container) =>

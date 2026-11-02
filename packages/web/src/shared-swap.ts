@@ -4,7 +4,7 @@ import { createRuntimeGraph, type DomJournalResult } from '@markless/runtime';
 import { decodePayloadScriptsWithVersion } from '../../serializer/src/protocol-client.ts';
 import { applyDirectJournalEntries } from './dom-journal-direct.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
-import { bindDefinitions, cloneValue } from './fns/shared-instances.ts';
+import { bindDefinitions, cloneValue, sameValue } from './fns/shared-instances.ts';
 import { readPayloadScriptsFromDocument } from './payload-document-common.ts';
 import { decodeResumeCells } from './payload-graph-construct.ts';
 import { materializeDomLocators } from './resume-locators.ts';
@@ -25,10 +25,17 @@ export async function prepareSharedSwap(input: {
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 }): Promise<{ readonly wake: boolean } | undefined> {
 	const root = input.root as ResumeDomElement;
-	const { state, view } = decodePayloadScriptsWithVersion(
-		readPayloadScriptsFromDocument(root as unknown as Parameters<typeof readPayloadScriptsFromDocument>[0]),
-		true,
-	);
+	let decoded: ReturnType<typeof decodePayloadScriptsWithVersion>;
+	try {
+		decoded = decodePayloadScriptsWithVersion(
+			readPayloadScriptsFromDocument(root as unknown as Parameters<typeof readPayloadScriptsFromDocument>[0]),
+			true,
+		);
+	} catch {
+		// A page that ships its records elsewhere (prerender wake, linked render data) binds when its runtime starts.
+		return { wake: true };
+	}
+	const { state, view } = decoded;
 	if (!hasLiveSharedDefinitions(state)) return undefined;
 	const cells = await decodeResumeCells(state);
 	const places = { document: input.document, container: input.container };
@@ -95,7 +102,13 @@ export async function prepareSharedSwap(input: {
 	const entries = graph.takeJournal();
 	const slots = entries.filter((entry) => entry.type === 'setText' || entry.type === 'setAttr');
 	applyDirectJournalEntries(slots, (locator) => elements.get(locator));
-	return { wake: wake || slots.length !== entries.length };
+	// A write that landed while this ran is newer than what was painted; the runtime catches up on it.
+	const moved = bound.some((binding) =>
+		binding.cellIds.some(
+			(id) => values.has(id) && !sameValue(binding.instance.cells[id], values.get(id)),
+		),
+	);
+	return { wake: wake || moved || slots.length !== entries.length };
 }
 
 // Something other than a value slot reads a changed cell: an arm, a list, an async value or a behaviour.

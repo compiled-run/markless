@@ -53,7 +53,9 @@ export function bindSharedCells(
 		connect: (graph) => {
 			if (bound.length === 0) return;
 			reconcileReads.set(graph, [...differing]);
-			connectGraph(host, graph, bound);
+			const agreed = new Map(cells.map((cell) => [cell.graphNodeId, cell.value]));
+			for (const id of differing) agreed.set(id, live.get(id)!.cells[id]);
+			connectGraph(host, graph, bound, agreed);
 		},
 	};
 }
@@ -142,22 +144,33 @@ export function bindDefinitions(
 	return { bound, differing };
 }
 
-function connectGraph(root: Host, graph: RuntimeGraph, bound: ReadonlyArray<Bound>): void {
+function connectGraph(
+	root: Host,
+	graph: RuntimeGraph,
+	bound: ReadonlyArray<Bound>,
+	agreed: ReadonlyMap<string, unknown>,
+): void {
 	const life = root.__mL;
 	const alive = () => root.__mL === life && root.isConnected !== false;
 	// The value another container delivered, so its write here is not published back.
 	const received = new Map<string, unknown>();
+	// What this container last agreed with the instance; a cell that moved since has a write of its own still to publish.
+	const synced = new Map<string, unknown>();
 	for (const { instance, cellIds } of bound) {
 		const listener = {
 			root,
 			apply: (graphNodeId: string, value: unknown) => {
 				if (!alive()) return false;
 				if (!cellIds.includes(graphNodeId)) return true;
+				if (synced.has(graphNodeId) && !sameValue(graph.read(graphNodeId, []), synced.get(graphNodeId)))
+					return true;
 				received.set(graphNodeId, value);
+				synced.set(graphNodeId, cloneValue(value));
 				graph.write({ graphNodeId, value });
 				return true;
 			},
 		};
+		for (const id of cellIds) synced.set(id, cloneValue(agreed.get(id)));
 		const others = instance.listeners.filter((other) => other.root !== root);
 		instance.listeners.splice(0, instance.listeners.length, ...others, listener);
 		for (const graphNodeId of cellIds)
@@ -168,6 +181,7 @@ function connectGraph(root: Host, graph: RuntimeGraph, bound: ReadonlyArray<Boun
 				run: (value) => {
 					const delivered = received.has(graphNodeId) && received.get(graphNodeId) === value;
 					received.delete(graphNodeId);
+					synced.set(graphNodeId, cloneValue(value));
 					if (delivered || !alive() || sameValue(instance.cells[graphNodeId], value)) return;
 					instance.cells[graphNodeId] = cloneValue(value);
 					publish(root, instance, graphNodeId);
@@ -229,25 +243,31 @@ function reportShapeMismatch(root: object, definition: Definition, live: string,
 }
 
 // Field names and value types, recursively; array items are not compared.
-function shapeOf(value: unknown): string {
+function shapeOf(value: unknown, seen = new Set<object>()): string {
 	if (value === null) return 'null';
 	if (Array.isArray(value)) return 'array';
 	if (typeof value !== 'object') return typeof value;
 	const prototype = Object.getPrototypeOf(value);
 	if (prototype !== Object.prototype && prototype !== null)
 		return Object.prototype.toString.call(value);
+	if (seen.has(value)) return 'cycle';
+	seen.add(value);
 	const record = value as Record<string, unknown>;
-	return `{${Object.keys(record)
+	const shape = `{${Object.keys(record)
 		.sort()
-		.map((key) => `${JSON.stringify(key)}:${shapeOf(record[key])}`)
+		.map((key) => `${JSON.stringify(key)}:${shapeOf(record[key], seen)}`)
 		.join(',')}}`;
+	seen.delete(value);
+	return shape;
 }
 
 // Plain data compares by structure; any other object only by identity.
-function sameValue(left: unknown, right: unknown): boolean {
+export function sameValue(left: unknown, right: unknown, seen = new Map<object, object>()): boolean {
 	if (Object.is(left, right)) return true;
 	if (!isPlain(left) || !isPlain(right) || Array.isArray(left) !== Array.isArray(right))
 		return false;
+	if (seen.get(left) === right) return true;
+	seen.set(left, right);
 	const leftKeys = Object.keys(left);
 	const rightRecord = right as Record<string, unknown>;
 	return (
@@ -255,7 +275,7 @@ function sameValue(left: unknown, right: unknown): boolean {
 		leftKeys.every(
 			(key) =>
 				Object.hasOwn(rightRecord, key) &&
-				sameValue((left as Record<string, unknown>)[key], rightRecord[key]),
+				sameValue((left as Record<string, unknown>)[key], rightRecord[key], seen),
 		)
 	);
 }

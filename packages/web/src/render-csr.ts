@@ -229,7 +229,7 @@ export async function renderCsrRuntime(input: {
 		(await import('./fns/shared-instances.ts')).registerDormantContainer(
 			output.root,
 			state,
-			() => void deferredRuntime.start(),
+			() => void (disposed || deferredRuntime.start()),
 		);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);

@@ -1133,8 +1133,10 @@ export async function navigate(
 	if (resumeUrl && (bound(d) || bound(container))) {
 		try {
 			const entry = (await import(/* @vite-ignore */ resumeUrl)) as SharedSwapEntry;
-			wakeShared = (await entry.prepareSharedSwap?.({ root: incoming, document: d, container }))
-				?.wake;
+			const root = isContainer(incoming)
+				? incoming
+				: (incoming.querySelector(`[${containerAttribute}]`) ?? incoming);
+			wakeShared = (await entry.prepareSharedSwap?.({ root, document: d, container }))?.wake;
 		} catch (error) {
 			reportAsync(error);
 		}

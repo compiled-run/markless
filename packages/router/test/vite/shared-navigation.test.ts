@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
@@ -14,15 +14,25 @@ import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 vi.setConfig({ testTimeout: 30_000 });
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
-let root = '';
-let server: BuiltServer | undefined;
+const roots: string[] = [];
+const servers: Record<'region' | 'document', BuiltServer | undefined> = {
+	region: undefined,
+	document: undefined,
+};
 let browser: Browser | undefined;
 
-beforeAll(async () => {
-	root = await mkdtemp(join(tmpdir(), 'markless-shared-navigation-'));
+// The same app twice: its page swaps as a region, and, with a document that reads its props, as the whole body.
+async function serveApp(mode: 'region' | 'document'): Promise<BuiltServer> {
+	const root = await mkdtemp(join(tmpdir(), `markless-shared-navigation-${mode}-`));
+	roots.push(root);
 	await cp(resolve(import.meta.dirname, '../fixtures/shared-navigation-app'), root, {
 		recursive: true,
 	});
+	if (mode === 'document')
+		await writeFile(
+			join(root, 'document.tsrx'),
+			'export default function Document(props) @{ <html><head><meta charset="utf-8" /></head><body data-path={props.url.pathname}>{props.children}</body></html> }\n',
+		);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
@@ -33,29 +43,41 @@ beforeAll(async () => {
 		plugins: [markless(), router()],
 	});
 	await builder.buildApp();
-	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
+	return startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
+}
+
+beforeAll(async () => {
+	[servers.region, servers.document] = await Promise.all([
+		serveApp('region'),
+		serveApp('document'),
+	]);
 	browser = await launchBrowser(chromium);
 }, 240_000);
 
 afterAll(async () => {
 	await browser?.close();
-	await server?.close();
-	if (root) await rm(root, { recursive: true, force: true });
+	await Promise.all(Object.values(servers).map((server) => server?.close()));
+	await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
-async function open(path: string): Promise<{ page: Page; errors: string[] }> {
+async function open(
+	path: string,
+	mode: 'region' | 'document' = 'region',
+): Promise<{ page: Page; errors: string[] }> {
 	const page = await browser!.newPage();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	page.on('console', (message) => {
 		if (message.type() === 'error') errors.push(message.text());
 	});
-	await page.goto(`${server!.origin}${path}`);
+	await page.goto(`${servers[mode]!.origin}${path}`);
 	await page.waitForLoadState('networkidle');
 	return { page, errors };
 }
+
+const origin = () => servers.region!.origin;
 
 type Frame = { readonly title?: string; readonly shown?: string; readonly mode?: string };
 
@@ -101,8 +123,8 @@ const settleFrames = (page: Page) =>
 			),
 	);
 
-test('a value set on one page is the value every frame of the next page shows after an in-place navigation', async () => {
-	const { page, errors } = await open('/');
+test.each(['region', 'document'] as const)('a value set on one page is the value every frame of the next page shows after an in-place navigation (%s swap)', async (mode) => {
+	const { page, errors } = await open('/', mode);
 	await page.click('[data-manual]');
 	await expect.poll(() => shown(page)).toBe('manual');
 	await recordFrames(page);
@@ -182,7 +204,7 @@ test('a server request never sees a value another request or a browser wrote', a
 	await expect.poll(() => shown(page)).toBe('manual');
 	const responses = await Promise.all(
 		['/', '/next', '/_markless/fragment/next', '/_markless/fragment/'].map(async (path) =>
-			(await fetch(`${server!.origin}${path}`)).text(),
+			(await fetch(`${origin()}${path}`)).text(),
 		),
 	);
 	for (const html of responses) {
@@ -194,7 +216,7 @@ test('a server request never sees a value another request or a browser wrote', a
 
 test('an async computed that reads the instance re-derives from the live value after a navigation', async () => {
 	const { page, errors } = await open('/');
-	expect(await (await fetch(`${server!.origin}/async`)).text()).toMatch(
+	expect(await (await fetch(`${origin()}/async`)).text()).toMatch(
 		/data-label[^>]*>label cli</,
 	);
 	await page.click('[data-manual]');
