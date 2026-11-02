@@ -3364,6 +3364,48 @@
 				"jsGzipBytes": 88506
 			},
 			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
 		}
 	],
 	"runtimeModules": {
@@ -3554,16 +3596,16 @@
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11342,
-				"jsGzipBytes": 88379
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
-				"executedChars": 11251,
-				"jsGzipBytes": 88379
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
-				"executedChars": 11308,
-				"jsGzipBytes": 88379
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
 				"executedChars": 110777,
