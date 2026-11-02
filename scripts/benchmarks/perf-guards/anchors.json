@@ -3256,6 +3256,20 @@
 				"jsGzipBytes": 1569238
 			},
 			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +41 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569238
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569463
+			},
+			"reason": "the fragment swap module's morph dry run (PR #415) on main 520c96247 (after #414 and #416): the docs page downloads +266 B gzip over main (the same change measured +41 B on an older main; the page's pack compresses differently around it); measured on CI run 41427605874, executed chars at load within budget"
 		}
 	],
 	"runtimeModules": {
@@ -3459,7 +3473,7 @@
 			},
 			"docs /": {
 				"executedChars": 110777,
-				"jsGzipBytes": 1569238
+				"jsGzipBytes": 1569463
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
