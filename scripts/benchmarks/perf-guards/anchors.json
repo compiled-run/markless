@@ -3420,6 +3420,56 @@
 				"jsGzipBytes": 1571252
 			},
 			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 20104,
+			"to": 21487,
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88660
+			},
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); +154 B gzip downloaded on darwin-arm64"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88660
+			},
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); +154 B gzip downloaded on darwin-arm64"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88660
+			},
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); +154 B gzip downloaded on darwin-arm64"
 		}
 	],
 	"runtimeModules": {
@@ -3476,7 +3526,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 20104,
+		"web/fns/instance-scope": 21487,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
@@ -3585,15 +3635,15 @@
 		"darwin-arm64": {
 			"bench /": {
 				"executedChars": 10989,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88660
 			},
 			"bench /records": {
 				"executedChars": 10898,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88660
 			},
 			"bench /settings": {
 				"executedChars": 10955,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88660
 			},
 			"docs /": {
 				"executedChars": 108937,
