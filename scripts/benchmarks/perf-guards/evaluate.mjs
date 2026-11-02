@@ -59,6 +59,8 @@ export function evaluate(measurement, anchors) {
 		checkResumeRows(measurement.resumeRows, anchors.resumeRows ?? {}, fail, note);
 	if (measurement.hiddenContent) checkHiddenContent(measurement.hiddenContent, fail, note);
 	if (measurement.routeTable) checkRouteTable(measurement.routeTable, fail, note);
+	if (measurement.serverStylesheets)
+		checkServerStylesheets(measurement.serverStylesheets, fail, note);
 	for (const [site, siteResult] of Object.entries(measurement.sites))
 		for (const [route, result] of Object.entries(siteResult.routes))
 			if (result.resumeData)
@@ -498,6 +500,31 @@ function checkRouteTable({ few, many }, fail, note) {
 			`${line}: +${grown} chars run at load for links nobody touched (budget +${BUDGETS.routeTableLoadChars}). A page's route table must stay inert until idle or a link intent: the shadcn port's docs pages evaluated a 109 kB table of their 136 linked routes at load, 63% of all JavaScript they ran by the load event. ${INVARIANT}`,
 		);
 	note('G15', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
+}
+
+function checkServerStylesheets({ small, large }, fail, note) {
+	const css = large.clientCssBytes - small.clientCssBytes;
+	const grown = large.workerBytes - small.workerBytes;
+	const line = `the inline-CSS fixture's Worker is ${kb(small.workerBytes)} with its prerendered page's stylesheet small and ${kb(large.workerBytes)} with it ${kb(css)} bigger`;
+	if (css < BUDGETS.serverStylesheetMinCssGrowth)
+		return fail(
+			'G17',
+			`${line}: the large build must ship at least ${kb(BUDGETS.serverStylesheetMinCssGrowth)} more CSS, or this guard compares two equal builds. Grow the fixture's large stylesheet.`,
+		);
+	for (const [variant, result] of Object.entries({ small, large })) {
+		const { prerendered, runtime, document } = result.copies;
+		if (prerendered !== 0 || runtime !== 1 || document !== 1)
+			return fail(
+				'G17',
+				`${line}: the ${variant} Worker carries the prerendered page's stylesheet text ${prerendered} times, the runtime page's ${runtime} times and the document's ${document} times; it must carry them 0, 1 and 1 times. A prerendered page is served as a file, so the Worker never writes its CSS, and a sheet's text ships once. ${INVARIANT}`,
+			);
+	}
+	if (grown > BUDGETS.serverStylesheetGrowthBytes)
+		return fail(
+			'G17',
+			`${line}: +${kb(grown)} of Worker for CSS only a prerendered page uses (budget +${kb(BUDGETS.serverStylesheetGrowthBytes)}). The server bundle carries stylesheet text only for pages it renders at runtime: the shadcn port's Worker carried 54 MB of prerendered pages' CSS, past Cloudflare's 64 MiB limit. ${INVARIANT}`,
+		);
+	note('G17', `${line}: ${grown >= 0 ? '+' : ''}${grown} B`);
 }
 
 function noteResumeData(subject, data, anchors, note) {

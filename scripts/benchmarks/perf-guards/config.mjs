@@ -40,6 +40,10 @@ export const BUDGETS = {
 	routeTableLoadChars: 512,
 	// Below this the many-link page no longer ships a bigger route table, and G15 would compare two equal pages.
 	routeTableMinHtmlGrowth: 4 * 1024,
+	// The two Workers differ only in a prerendered page's stylesheet; they measured 1 B apart.
+	serverStylesheetGrowthBytes: 1024,
+	// Below this the large build no longer ships a bigger prerendered stylesheet, and G17 would compare two equal builds.
+	serverStylesheetMinCssGrowth: 64 * 1024,
 	executionGrowth: 0.25,
 	executionMinChars: 2048,
 	initializerMinExtra: 2,

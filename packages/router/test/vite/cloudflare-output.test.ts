@@ -40,6 +40,13 @@ let root = '';
 let origin = '';
 let worker: ChildProcess | undefined;
 
+// Stylesheets the pages import: intro's only a prerendered page uses, held's only a runtime page, shared both kinds.
+const SHEET_MARKS = {
+	intro: 'prerendered-intro-sheet',
+	held: 'runtime-held-sheet',
+	shared: 'runtime-shared-sheet',
+};
+
 const heldAnswers: ServerResponse[] = [];
 let holding = false;
 const gate = createServer((_request, response) => {
@@ -57,14 +64,24 @@ beforeAll(async () => {
 	await new Promise<void>((listening) => gate.listen(0, '127.0.0.1', listening));
 	const gateUrl = `http://127.0.0.1:${(gate.address() as AddressInfo).port}/`;
 	await mkdir(join(root, 'pages/docs'), { recursive: true });
+	await mkdir(join(root, 'styles'), { recursive: true });
+	for (const [name, mark] of Object.entries(SHEET_MARKS))
+		await writeFile(join(root, `styles/${name}.css`), `.${name} { --sheet: ${mark}; }\n`);
 	await writeFile(
 		join(root, 'pages/docs/intro.tsrx'),
-		'export default function Intro() @{\n\t<main data-page="intro">Prerendered intro</main>\n}\n',
+		'import \'../../styles/intro.css\';\nimport \'../../styles/shared.css\';\n\nexport default function Intro() @{\n\t<main data-page="intro" class="intro shared">Prerendered intro</main>\n}\n',
+	);
+	await mkdir(join(root, 'pages/live'), { recursive: true });
+	await writeFile(
+		join(root, 'pages/live/[id].tsrx'),
+		'import \'../../styles/shared.css\';\n\nexport default function Live() @{\n\t<main data-page="live" class="shared">Live page</main>\n}\n',
 	);
 	await writeFile(
 		join(root, 'pages/held.tsrx'),
 		[
 			"import { computed } from '@markless/core';",
+			"import '../styles/held.css';",
+			"import '../styles/shared.css';",
 			'',
 			'export default function Held() @{',
 			'\tconst report = computed(async () => {',
@@ -72,7 +89,7 @@ beforeAll(async () => {
 			"\t\treturn { text: 'report ready' };",
 			'\t});',
 			'',
-			'\t<main data-page="held">',
+			'\t<main data-page="held" class="held shared">',
 			'\t\t@try {',
 			'\t\t\t<p data-settled>{report.text}</p>',
 			'\t\t} @pending {',
@@ -280,6 +297,33 @@ test('the Worker leaves out the modules of pages it never renders, because every
 	expect(shipped('loading report')).toBe(true);
 	const missing = await get('/no-such-page');
 	expect(missing.status).toBe(404);
+});
+
+test('the Worker carries the text of only the stylesheets its runtime pages use, each once, and renders them inline', async () => {
+	const serverDir = join(root, '.output/server');
+	const code = (
+		await Promise.all(
+			(await readdir(serverDir, { recursive: true }))
+				.filter((file) => file.endsWith('.mjs'))
+				.map((file) => readFile(join(serverDir, file), 'utf8')),
+		)
+	).join('\n');
+	const copies = (text: string) => code.split(text).length - 1;
+	expect(copies(SHEET_MARKS.intro)).toBe(0);
+	expect(copies(SHEET_MARKS.held)).toBe(1);
+	expect(copies(SHEET_MARKS.shared)).toBe(1);
+	releaseGate();
+	for (const path of ['/held', '/live/one']) {
+		const html = await (await get(path)).text();
+		const head = html.slice(0, html.indexOf('</head>'));
+		expect(head, path).toMatch(
+			new RegExp(`<style data-markless-css="[^"]+">[^<]*${SHEET_MARKS.shared}`),
+		);
+		expect(head, path).not.toContain('rel="stylesheet"');
+	}
+	expect(await (await get('/held')).text()).toMatch(
+		new RegExp(`<style data-markless-css="[^"]+">[^<]*${SHEET_MARKS.held}`),
+	);
 });
 
 test('a page whose URL, in either spelling, run_worker_first sends to the Worker keeps its module', async () => {

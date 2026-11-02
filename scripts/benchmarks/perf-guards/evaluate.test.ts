@@ -106,6 +106,18 @@ function measurement(): Json {
 			short: { shippedBytes: 330_000, executedChars: 55_000, answered: true, errors: [] },
 			long: { shippedBytes: 355_000, executedChars: 55_001, answered: true, errors: [] },
 		},
+		serverStylesheets: {
+			small: {
+				workerBytes: 498_145,
+				clientCssBytes: 939,
+				copies: { prerendered: 0, runtime: 1, document: 1 },
+			},
+			large: {
+				workerBytes: 498_146,
+				clientCssBytes: 358_845,
+				copies: { prerendered: 0, runtime: 1, document: 1 },
+			},
+		},
 	};
 }
 
@@ -358,6 +370,34 @@ describe('performance guards', () => {
 			expect.stringContaining(
 				'[G14] the hidden-panel fixture did not answer its date panel or help button: boom',
 			),
+		]);
+	});
+
+	test('G17 fails a Worker that carries the stylesheet text of a prerendered page, or a sheet twice', () => {
+		const over = measurement();
+		over.serverStylesheets.large.workerBytes += 178_376;
+		expect(failures(over)).toEqual([
+			expect.stringContaining(
+				"[G17] the inline-CSS fixture's Worker is 486.5 KB with its prerendered page's stylesheet small and 660.7 KB with it 349.5 KB bigger: +174.2 KB of Worker for CSS only a prerendered page uses (budget +1.0 KB)",
+			),
+		]);
+
+		const carried = measurement();
+		carried.serverStylesheets.small.copies.prerendered = 1;
+		expect(failures(carried)).toEqual([
+			expect.stringContaining(
+				"the small Worker carries the prerendered page's stylesheet text 1 times, the runtime page's 1 times and the document's 1 times",
+			),
+		]);
+
+		const twice = measurement();
+		twice.serverStylesheets.large.copies.runtime = 2;
+		expect(failures(twice)).toEqual([expect.stringContaining("the runtime page's 2 times")]);
+
+		const toothless = measurement();
+		toothless.serverStylesheets.large.clientCssBytes = 939;
+		expect(failures(toothless)).toEqual([
+			expect.stringContaining('the large build must ship at least 64.0 KB more CSS'),
 		]);
 	});
 

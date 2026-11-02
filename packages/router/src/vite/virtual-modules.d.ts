@@ -30,6 +30,8 @@ declare module 'virtual:markless-router/route-preloads' {
 	export const documentImportMap: string;
 	// Server lane only: the text of each stylesheet a page carries inline.
 	export const stylesheetSources: Readonly<Record<string, string>>;
+	// Server lane only: route stylesheets whose text the page modules carry.
+	export const inlineStylesheets: readonly string[];
 	// Server lane only.
 	export const routeResumeModules: Readonly<Record<string, readonly string[]>>;
 

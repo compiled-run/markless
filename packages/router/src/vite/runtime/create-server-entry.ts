@@ -92,8 +92,10 @@ export interface ServerEntryOptions {
 	readonly routeStylesheets?: Record<string, readonly string[]>;
 	// The document shell's scoped CSS, linked on every route ahead of the route's own.
 	readonly documentStylesheets?: readonly string[];
-	// The text of the stylesheets above: a page carries each one inline instead of requesting it.
+	// The text of the document's stylesheets: a page carries each one inline instead of requesting it.
 	readonly stylesheetSources?: Readonly<Record<string, string>>;
+	// Route stylesheets whose text arrives with the page module that uses them, under PAGE_STYLESHEET_SOURCES_EXPORT.
+	readonly inlineStylesheets?: readonly string[];
 	// `<script type="importmap">` resolving the chunk specifiers built chunks import each other by.
 	readonly importMap?: string;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
@@ -137,9 +139,13 @@ interface SsrArtifact {
 	readonly storageSeeds?: SsrRenderArtifact['storageSeeds'];
 }
 
+/** The page module export, added by the build, holding the text of the stylesheets its route links. */
+export const PAGE_STYLESHEET_SOURCES_EXPORT = 'marklessStylesheetSources';
+
 interface PageModule {
 	readonly default?: SsrArtifact;
 	readonly marklessRenderSsr?: SsrRender;
+	readonly [PAGE_STYLESHEET_SOURCES_EXPORT]?: Readonly<Record<string, string>>;
 }
 
 interface DocumentModule {
@@ -405,7 +411,11 @@ export function createServerEntry(options: ServerEntryOptions) {
 			},
 			options.navigationEntryPath,
 			(pageStylesheets(options, file) ?? []).map((href) =>
-				inlineStylesheets.injection(href, fragment),
+				inlineStylesheets.injection(
+					href,
+					fragment,
+					pageModule[PAGE_STYLESHEET_SOURCES_EXPORT],
+				),
 			),
 			documentModule?.default?.headInjections ?? [],
 			linkIntent
@@ -604,18 +614,27 @@ function dedupeHeadLinks(
 // A stylesheet the build holds the text of rides inside the page. A fragment carries the text only of those its own route
 // alone uses; the rest it names, so a document keeps the one it has and fetches, as a file, one it lacks.
 function inlineStylesheetPlan(options: ServerEntryOptions) {
-	const sources = options.stylesheetSources ?? {};
+	const resident = options.stylesheetSources ?? {};
+	const held = new Set([...Object.keys(resident), ...(options.inlineStylesheets ?? [])]);
 	const routes = new Map<string, number>();
 	for (const hrefs of Object.values(options.routeStylesheets ?? {}))
 		for (const href of new Set(hrefs)) routes.set(href, (routes.get(href) ?? 0) + 1);
 	const documentHrefs = new Set(options.documentStylesheets ?? []);
-	const inlines = (href: string) => Object.hasOwn(sources, href);
 	const routeOwn = (href: string) => routes.get(href) === 1 && !documentHrefs.has(href);
 	return {
 		// What a destination's fragment carries as text, so a press need not fetch it.
-		carries: (href: string) => inlines(href) && routeOwn(href),
-		injection(href: string, fragment: boolean): RenderHeadInjection {
-			if (!inlines(href))
+		carries: (href: string) => held.has(href) && routeOwn(href),
+		injection(
+			href: string,
+			fragment: boolean,
+			pageSources: Readonly<Record<string, string>> = {},
+		): RenderHeadInjection {
+			const text = Object.hasOwn(pageSources, href)
+				? pageSources[href]
+				: Object.hasOwn(resident, href)
+					? resident[href]
+					: undefined;
+			if (text === undefined)
 				return { tag: 'link', location: 'head', attributes: { rel: 'stylesheet', href } };
 			if (fragment && !routeOwn(href))
 				return {
@@ -627,7 +646,7 @@ function inlineStylesheetPlan(options: ServerEntryOptions) {
 				tag: 'style',
 				location: 'head',
 				attributes: { [STYLESHEET_KEY_ATTRIBUTE]: href },
-				children: sources[href]!,
+				children: text,
 			};
 		},
 	};
