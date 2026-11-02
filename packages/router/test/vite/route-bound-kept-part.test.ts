@@ -201,8 +201,21 @@ test('a kept part whose root carries the attribute a prop sets keeps its frame, 
 	await page.close();
 });
 
-test('a part whose text a prop sets is not kept', async () => {
+test('a part whose text or field value a prop sets is not kept', async () => {
 	const guide = await fetchText('/guide');
 	expect(openingTag(guide, 'data-page-note')).not.toContain(PROTOCOL_KEEP_ATTRIBUTE);
+	expect(openingTag(guide, 'data-section-field')).not.toContain(PROTOCOL_KEEP_ATTRIBUTE);
 	expect(guide.match(new RegExp(`${PROTOCOL_KEEP_ATTRIBUTE}=`, 'g'))).toHaveLength(2);
+});
+
+test('a field whose value a prop sets shows the next page value, even after someone typed in it', async () => {
+	const { page, errors } = await open('/guide');
+	await page.fill('[data-shell-field]', 'typed by hand');
+	await page.click('[data-nav="reference"]');
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Reference page',
+	);
+	expect(await page.inputValue('[data-shell-field]')).toBe('reference');
+	expect(errors).toEqual([]);
+	await page.close();
 });

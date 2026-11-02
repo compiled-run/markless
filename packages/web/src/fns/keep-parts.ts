@@ -171,8 +171,17 @@ function ownSlot(html: string, projected: string): { start: number; end: number 
 const ATTRIBUTE_NAME = /^[a-zA-Z_:][\w:.-]*$/;
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title']);
 
-const attributeIn = (name: string) =>
-	new RegExp(`\\s${name.replaceAll('.', '\\.')}(?:="[^"]*"|='[^']*')?(?=[\\s/]|$)`, 'g');
+const ATTRIBUTE = /(\s+)([^\s"'>/=]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?|[\s\S]/y;
+
+// A start tag's attribute text without the named attributes, read one attribute at a time so no value is searched.
+function withoutAttributes(text: string, names: readonly string[]): string {
+	const dropped = new Set(names.map((name) => name.toLowerCase()));
+	let kept = '';
+	ATTRIBUTE.lastIndex = 0;
+	for (let match = ATTRIBUTE.exec(text); match; match = ATTRIBUTE.exec(text))
+		if (!match[2] || !dropped.has(match[2].toLowerCase())) kept += match[0];
+	return kept;
+}
 
 function startTagEnd(html: string, at: number): number {
 	let quote = '';
@@ -237,8 +246,7 @@ function markVarying(
 		if (!varying) continue;
 		const list = [...varying].sort();
 		const vary = ` ${PROTOCOL_VARY_ATTRIBUTE}="${list.join(' ')}"`;
-		let rest = html.slice(tag.nameEnd, tag.end);
-		for (const name of list) rest = rest.replace(attributeIn(name), '');
+		const rest = withoutAttributes(html.slice(tag.nameEnd, tag.end), list);
 		marked += html.slice(from, tag.nameEnd) + vary + html.slice(tag.nameEnd, tag.end);
 		shape += html.slice(from, tag.nameEnd) + vary + rest;
 		from = tag.end;

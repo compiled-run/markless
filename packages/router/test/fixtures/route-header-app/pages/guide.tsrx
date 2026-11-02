@@ -1,6 +1,7 @@
 import SiteHeader from '../src/site-header.tsrx';
 import DocsShell from '../src/docs-shell.tsrx';
 import PageNote from '../src/page-note.tsrx';
+import SectionField from '../src/section-field.tsrx';
 
 export default function Page() @{
 	<>
@@ -12,5 +13,6 @@ export default function Page() @{
 			</main>
 		</DocsShell>
 		<PageNote label="Guide" />
+		<SectionField section="guide" />
 	</>
 }
