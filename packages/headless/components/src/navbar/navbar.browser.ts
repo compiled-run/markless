@@ -6,6 +6,7 @@ import ClickOnly from './scenarios/click-only.tsrx';
 import ConditionalItem from './scenarios/conditional-item.tsrx';
 import CurrentPage from './scenarios/current-page.tsrx';
 import Grace from './scenarios/grace.tsrx';
+import SafeZoneInstant from './scenarios/safe-zone-instant.tsrx';
 import SafeZone from './scenarios/safe-zone.tsrx';
 import HoverTiming from './scenarios/hover-timing.tsrx';
 import ItemsFromData from './scenarios/items-from-data.tsrx';
@@ -709,6 +710,44 @@ test('CSR: brushing the next trigger on the way into an open panel keeps the pan
 	expect(el(DocsTrigger).getAttribute('aria-expanded')).toBe('false');
 });
 
+test('CSR: with the default switch delay, sliding along the bar switches at once', async () => {
+	await render(SafeZoneInstant);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(DocsTrigger));
+	await expect
+		.poll(() => el(DocsTrigger).getAttribute('aria-expanded'), { timeout: 50, interval: 5 })
+		.toBe('true');
+});
+
+// Geometry rather than time: a pointer heading down across the next trigger is on its way into the open panel.
+test('CSR: with the default switch delay, heading down across the next trigger keeps the open panel', async () => {
+	await render(SafeZoneInstant);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	const products = el(ProductsTrigger);
+	const docs = el(DocsTrigger);
+	const box = docs.getBoundingClientRect();
+	const at = (x: number, y: number) => ({ bubbles: true, clientX: x, clientY: y });
+	for (const [x, y] of [[box.left - 20, box.top + 4], [box.left - 6, box.top + 14], [box.left + 6, box.top + 26]] as const)
+		document.dispatchEvent(new PointerEvent('pointermove', at(x, y)));
+	products.dispatchEvent(new PointerEvent('pointerout', { ...at(box.left + 6, box.top + 26), relatedTarget: docs }));
+	docs.dispatchEvent(new PointerEvent('pointerover', { ...at(box.left + 6, box.top + 26), relatedTarget: products }));
+	await new Promise((resolve) => setTimeout(resolve, 60));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	expect(docs.getAttribute('aria-expanded')).toBe('false');
+
+	const link = el(KeyboardsLink);
+	const into = link.getBoundingClientRect();
+	document.dispatchEvent(new PointerEvent('pointermove', at(into.left + 4, into.top + 4)));
+	docs.dispatchEvent(new PointerEvent('pointerout', { ...at(into.left + 4, into.top + 4), relatedTarget: link }));
+	await new Promise((resolve) => setTimeout(resolve, 200));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	expect(docs.getAttribute('aria-expanded')).toBe('false');
+});
+
 // QDS's safe zone: the hull of the trigger and its panel. The gap between a bar and a floating
 // panel is page that belongs to no part, and crossing it must not lose the panel.
 test('CSR: crossing the gap between a trigger and its floating panel keeps the panel showing', async () => {
@@ -766,6 +805,18 @@ test('CSR: hovering an item that holds only a link closes the dropdown and leave
 	await new Promise((resolve) => setTimeout(resolve, 200));
 	expect(el(Root).hasAttribute('ui-open')).toBe(false);
 	expect(el(page.getByTestId('blog-item')).hasAttribute('ui-open')).toBe(false);
+});
+
+// A click inside the hover delay opens the dropdown itself; the pending hover must not re-open it after it closes.
+test('CSR: a dropdown opened by a click during the hover delay stays closed once closed', async () => {
+	await render(HoverTiming);
+	await userEvent.hover(el(ProductsTrigger));
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded'), { timeout: 40, interval: 2 }).toBe('true');
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded'), { timeout: 40, interval: 2 }).toBe('false');
+	await new Promise((resolve) => setTimeout(resolve, 150));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
 });
 
 test('CSR: a click inside the grace window leaves a hover-opened dropdown showing', async () => {

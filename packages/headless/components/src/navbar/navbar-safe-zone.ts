@@ -93,3 +93,29 @@ export function leaveSafeZone(item: HTMLElement): void {
 export function takeSafeZoneExit(item: HTMLElement): boolean {
 	return exited.delete(item);
 }
+
+const trail: Array<readonly [number, number]> = [];
+let isTracking = false;
+
+/** Starts remembering the last few pointer positions, once per page. */
+export function trackPointer(): void {
+	if (isTracking) return;
+	isTracking = true;
+	document.addEventListener(
+		'pointermove',
+		(event) => {
+			trail.push([event.clientX, event.clientY]);
+			if (trail.length > 3) trail.shift();
+		},
+		{ passive: true },
+	);
+}
+
+/** Whether the pointer's last moves head down, toward the panels below the bar, rather than along it. */
+export function isHeadingDown(): boolean {
+	if (trail.length < 2) return false;
+	const [x0, y0] = trail[0]!;
+	const [x1, y1] = trail[trail.length - 1]!;
+	const dy = y1 - y0;
+	return dy > 0 && dy >= Math.abs(x1 - x0) * 0.3;
+}

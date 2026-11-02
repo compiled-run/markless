@@ -59,7 +59,9 @@ A press outside the open dropdown closes it too.
 ## Hover
 
 By default a dropdown opens when the pointer rests on its item. The first one waits for `delay`.
-Once one shows, moving to the next item waits for the shorter `switchDelay` instead.
+Once one shows, moving along the bar to the next item opens it at once (`switchDelay`, 0 by
+default). A pointer heading down across a trigger on its way into the open panel is held back, so
+the panel never swaps under it.
 
 A dropdown stays open while the pointer is on its trigger, on its panel, or on the way between the
 two. As soon as the pointer is anywhere else, even elsewhere in the navbar, the dropdown closes.
@@ -86,7 +88,7 @@ stylesheet.
 | `value`      | `string`          | The `value` of the item whose dropdown shows. Omit it, or pass `''`, and every dropdown closes. |
 | `hover`      | `boolean`         | Opens a dropdown when the pointer rests on its item. Omit it and hover is on.                   |
 | `delay`      | `number`          | How long the pointer rests before the first dropdown opens, in ms. Omit it and it is 200.       |
-| `switchDelay` | `number`         | How long the pointer rests before the next dropdown replaces an open one, in ms. The default is 137.5. |
+| `switchDelay` | `number`         | How long the pointer rests before the next dropdown replaces an open one, in ms. The default is 0. |
 | `clickGrace` | `number`          | How long a click on the trigger is ignored after a hover opened it, in ms. The default is 300.  |
 | `onChange`   | `(value) => void` | Gets the `value` now showing, or `''` when everything closed.                                   |
 

@@ -80,10 +80,13 @@ disclosure directly:
    research recommends a dev-mode diagnostic when neither `aria-label` nor
    `aria-labelledby` is present; that needs compiler or core work and is **not**
    in this family.
-6. **`switchDelay` matches the QDS docs header.** While a dropdown is showing,
-   the next one opens after `switchDelay` (137.5 ms, QDS's default) instead of
-   `delay`. An earlier version opened it at once; side by side with the QDS docs
-   that read as twitchy, so the family now follows QDS.
+6. **Switching is instant, guarded by direction rather than time.** QDS waits
+   137.5 ms before the next dropdown replaces an open one. Side by side, the
+   owner found that a noticeable lag, so `switchDelay` defaults to 0. What the
+   delay protected against, a pointer brushing the next trigger on its way down
+   into the open panel, is guarded by geometry instead: if the pointer's last
+   moves head down, the trigger it crosses waits 120 ms before taking over, and
+   leaving it on the way into the panel cancels that.
 6a. **`ui-from` and `ui-to` replace Radix's `data-motion`.** Radix NavigationMenu
    portals every panel into one shared viewport and writes `data-motion` on it.
    SPEC.md rules `viewport` out as a role, so the panels stay in their items and

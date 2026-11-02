@@ -37,7 +37,9 @@ export type NavbarRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 	readonly delay?: number;
 	/**
 	 * How long the pointer must rest on an item before its dropdown replaces the
-	 * one already showing, in milliseconds. Omit it and it is 137.5, as in QDS.
+	 * one already showing, in milliseconds. Omit it and it is 0: sliding along the
+	 * bar switches at once. A pointer heading down across a trigger toward the
+	 * open panel is held back regardless, so it never swaps the panel under it.
 	 */
 	readonly switchDelay?: number;
 	/**

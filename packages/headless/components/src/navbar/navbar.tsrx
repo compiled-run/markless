@@ -1,5 +1,5 @@
 import { computed, element, shared, state } from '@markless/core';
-import { isInSafeZone, leaveSafeZone, takeSafeZoneExit, watchSafeZone } from './navbar-safe-zone.ts';
+import { isHeadingDown, isInSafeZone, leaveSafeZone, takeSafeZoneExit, trackPointer, watchSafeZone } from './navbar-safe-zone.ts';
 import { controlAt, controlsInside, directionTo, panelAt, stepTo, topLevelControls } from './navbar-walk.ts';
 import type {
 	NavbarInstanceState,
@@ -17,6 +17,9 @@ import type {
 // Walks start at `event.target`: a lazily loaded handler has no `currentTarget`.
 // The runtime hands an event to the nearest part that declared a handler and stops, so the root and the item each see only the pointer crossings that land on them.
 
+// How long a pointer crossing a trigger on its way down into the open panel must rest before that trigger takes over.
+const BRUSH_HOLD = 120;
+
 // Which dropdown is showing lives on the root, named by value: an instance rooted by an item cannot reach its siblings.
 export const navbarState = shared(
 	() => {
@@ -24,7 +27,7 @@ export const navbarState = shared(
 			value: '',
 			hover: true,
 			delay: 200,
-			switchDelay: 137.5,
+			switchDelay: 0,
 			clickGrace: 300,
 			from: '',
 			previous: '',
@@ -95,7 +98,7 @@ export function NavbarRoot({
 	value = '',
 	hover = true,
 	delay = 200,
-	switchDelay = 137.5,
+	switchDelay = 0,
 	clickGrace = 300,
 	onChange,
 	children,
@@ -200,8 +203,14 @@ export function NavbarItem({
 			}
 
 			const now = Date.now();
-			// QDS's switch delay: a person browsing an open navbar waits less than one arriving cold.
-			const wait = navbar.value !== '' ? navbar.switchDelay : navbar.delay;
+			trackPointer();
+			// Sliding along the bar switches after switchDelay; heading down across this trigger toward the open panel holds a moment longer, so a diagonal into the panel never swaps it.
+			const wait =
+				navbar.value === ''
+					? navbar.delay
+					: isHeadingDown()
+						? Math.max(navbar.switchDelay, BRUSH_HOLD)
+						: navbar.switchDelay;
 			const isReadyToOpen = wait <= 0 || (item.restingUntil !== 0 && now >= item.restingUntil);
 			if (isReadyToOpen) {
 				window.clearTimeout(item.openTimer);
@@ -264,6 +273,10 @@ export function NavbarItemTrigger({
 		onClick={(event) => {
 			// A dropdown that just opened under the resting pointer must not be shut by the click that followed.
 			if (item.graceUntil <= Date.now()) {
+				// The click decides now, so the hover delay it interrupted must not re-open the dropdown later.
+				window.clearTimeout(item.openTimer);
+				item.openTimer = 0;
+				item.restingUntil = 0;
 				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
 				navbar.toggle(item.value);
 			}
@@ -284,6 +297,9 @@ export function NavbarItemTrigger({
 			const from = event.target as HTMLElement;
 
 			if (key === 'ArrowDown') {
+				window.clearTimeout(item.openTimer);
+				item.openTimer = 0;
+				item.restingUntil = 0;
 				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
 				navbar.show(item.value);
 				// One call, no retry: the runtime commits the `hidden` write before this returns, so the link is focusable now.

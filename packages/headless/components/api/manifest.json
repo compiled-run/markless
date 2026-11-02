@@ -2507,8 +2507,8 @@
 						"name": "switchDelay",
 						"type": "number",
 						"required": false,
-						"default": "137.5",
-						"doc": "How long the pointer must rest on an item before its dropdown replaces the\none already showing, in milliseconds. Omit it and it is 137.5, as in QDS."
+						"default": "0",
+						"doc": "How long the pointer must rest on an item before its dropdown replaces the\none already showing, in milliseconds. Omit it and it is 0: sliding along the\nbar switches at once. A pointer heading down across a trigger toward the\nopen panel is held back regardless, so it never swaps the panel under it."
 					},
 					{
 						"name": "clickGrace",
