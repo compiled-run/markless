@@ -1758,6 +1758,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_CLIENT_BUILD_STALLED',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For <idleSeconds> s it used no CPU and had no compile or chunk job on a build worker<value>, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/separate-client-build.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/separate-client-build.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_COMPILE_BLOCKED',
 		packageName: '@markless/bundler',
 		stage: 'build',

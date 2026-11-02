@@ -18,6 +18,7 @@ import {
 import { executionLogActivationInjection } from './execution-log.ts';
 import { outputDefaults } from './build/chunking.ts';
 import { nativePackingPlugins, type PackOwnership } from './build/native-packing.ts';
+import { watchRenderChunkFailures } from './build/render-barrier.ts';
 import {
 	chunkImportMapEnabled,
 	DEPRECATED_NATIVE_PACKING_WARNING,
@@ -255,6 +256,7 @@ export function createMarklessRolldownPlugin(input: {
 		},
 		name,
 		options(input: InputOptions) {
+			if (facades) watchRenderChunkFailures(input.plugins);
 			const currentEnvironment = getEnvironment(this);
 			if (currentEnvironment !== 'client') {
 				return input;
