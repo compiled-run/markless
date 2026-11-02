@@ -3284,6 +3284,142 @@
 				"jsGzipBytes": 1570040
 			},
 			"reason": "the in-browser compiler behind the docs' live code blocks (assets/compile-worker.js, fetched at idle) carries the element-only attribute check that refuses a misplaced prefetch={false}; measured on CI run 41433570242 (PR #418 on main 2ec91d8bb): +577 B gzip downloaded, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 9858,
+			"to": 10693,
+			"reason": "measured: settle tracking and the re-settle hold now start in this @try-only chunk, moved out of resume-runtime-start, so a @try an @if renders after start can be wired"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 9385,
+			"to": 8979,
+			"reason": "measured: settle tracking and re-settle hold setup moved to resume-async-wiring, which only pages with a @try load"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1570040
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1571123
+			},
+			"reason": "the docs' live code blocks run the compiler in a worker the page fetches at idle; publishing derivedProps and serving forwarded props (PR #422) adds 1083 B gzip to it, and no other built JS file changes (a local before/after site build has the same per-module rendered bytes in byte-attribution.json); measured on CI run 41468171523, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 31647,
+			"to": 32404,
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10863,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10879,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10829,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1571123
+			},
+			"to": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
+			},
+			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
 		}
 	],
 	"runtimeModules": {
@@ -3296,7 +3432,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2816,
-		"router/vite/entries/fragment-entry": 31647,
+		"router/vite/entries/fragment-entry": 32404,
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
@@ -3381,7 +3517,7 @@
 		"web/resume-arm-keyed-repeats": 1225,
 		"web/resume-arm-records": 7741,
 		"web/resume-arm-records-lazy": 219,
-		"web/resume-async-wiring": 9858,
+		"web/resume-async-wiring": 10693,
 		"web/resume-behaviors": 8804,
 		"web/resume-branches": 15037,
 		"web/resume-census": 1471,
@@ -3397,7 +3533,7 @@
 		"web/resume-resettle-hold": 2929,
 		"web/resume-runtime": 15275,
 		"web/resume-runtime-shared": 2089,
-		"web/resume-runtime-start": 9385,
+		"web/resume-runtime-start": 8979,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2414,
 		"web/resume-sync-computed": 7870,
@@ -3448,16 +3584,16 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10863,
-				"jsGzipBytes": 88379
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
-				"executedChars": 10879,
-				"jsGzipBytes": 88379
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
-				"executedChars": 10829,
-				"jsGzipBytes": 88379
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3474,20 +3610,20 @@
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11342,
-				"jsGzipBytes": 88379
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
-				"executedChars": 11251,
-				"jsGzipBytes": 88379
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
-				"executedChars": 11308,
-				"jsGzipBytes": 88379
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
-				"executedChars": 110777,
-				"jsGzipBytes": 1570040
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,

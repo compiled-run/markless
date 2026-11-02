@@ -270,7 +270,7 @@ test('resume runtime preserves a branch flip dispatched before branch wiring con
 				resettleBoundary: async () => {},
 				holdPendingFlip: () => false,
 			});
-			return undefined;
+			return () => undefined;
 		},
 	}));
 	try {

@@ -83,6 +83,16 @@ test('a damaged entry compiles again instead of failing the build', async () => 
 	).toBeUndefined();
 });
 
+test('a compile that finishes after the store flushed writes nothing', async () => {
+	const directory = join(scratch, 'after-flush');
+	const store = createPersistentCompileCache({ directory, fingerprint: 'f' });
+	store.write(source, 'key', { marker: 1 } as never);
+	await store.flush();
+	store.write(`${source}\n`, 'key', { marker: 2 } as never);
+	await new Promise((done) => setTimeout(done, 200));
+	expect(files(directory)).toHaveLength(1);
+});
+
 test('past its size budget the store drops results this process did not use', async () => {
 	const directory = join(scratch, 'trim');
 	const earlier = createPersistentCompileCache({ directory, fingerprint: 'f' });

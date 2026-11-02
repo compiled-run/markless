@@ -229,3 +229,57 @@ export function App() @{
 		message: expect.stringContaining('by running <Scene>'),
 	});
 });
+
+const ASYNC_LIST_IN_IF = `
+import { computed, state } from '@markless/core';
+
+async function find(term) {
+	return [{ slug: term, title: term }];
+}
+
+export function Finder() @{
+	let shown = state(false);
+	let term = state('');
+	const found = computed(async () => await find(term));
+
+	<section>
+		<button type="button" onClick={() => shown = !shown}>Find</button>
+		@if (shown) {
+			<ol>
+				@try {
+					@for (const hit of found; key hit.slug) {
+						<li>{hit.title}</li>
+					}
+				} @pending {
+					<li>Waiting</li>
+				}
+			</ol>
+		}
+	</section>
+}
+`;
+
+test('an @if holding a @try block escalates and says the @try block renders in the browser', async () => {
+	const compiled = await compilePage(ASYNC_LIST_IN_IF, 'src/Finder.tsrx');
+	const candidates = compiled.symbolModules.armEscalationCandidates ?? [];
+	expect(candidates).toHaveLength(1);
+	const warning = compiled.symbolModules.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+	);
+	expect(warning).toMatchObject({ severity: 'warning' });
+	expect(warning?.message).toBe(
+		"when shown changes, the browser renders this @if's content by running the @try block it holds, instead of rebuilding it from compiled markup. Each time the content appears, the @try block it holds starts fresh: anything it kept from the last time it was shown is gone.",
+	);
+	expect(
+		compiled.symbolModules.diagnostics.find(
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		)?.message,
+	).toBe('this @if (shown) cannot be rebuilt when shown changes because it holds a @try block.');
+	const symbols = linkedRenderDataBoundarySymbols({
+		...linkInput(compiled),
+		branchExportName: (index: number) => `branchUpdate${String(index)}`,
+	} as never);
+	expect(
+		symbols.find((symbol) => symbol.manifest.kind === 'branch-update')?.branchSiteId,
+	).toBe(candidates[0]?.branchSiteId);
+});

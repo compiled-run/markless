@@ -173,13 +173,13 @@ export async function renderCsrRuntime(input: {
 			for (const release of cleanup.splice(0).reverse()) release();
 			runtime?.dispose();
 		},
-		// A page with no async boundary has nothing to settle; answering without the full runtime keeps a route swap demand-loaded.
+		// Without a served @try or a started runtime nothing can be settling, so a route swap stays demand-loaded.
 		whenAsyncBoundariesSettled: async () => {
-			if (view.asyncBoundaries.length === 0) return;
+			if (view.asyncBoundaries.length === 0 && !runtime) return;
 			await (await demandRuntime()).whenAsyncBoundariesSettled?.();
 		},
 		holdPendingSettleCommits: async (ms) => {
-			if (view.asyncBoundaries.length === 0) return;
+			if (view.asyncBoundaries.length === 0 && !runtime) return;
 			await (await demandRuntime()).holdPendingSettleCommits?.(ms);
 		},
 	};
