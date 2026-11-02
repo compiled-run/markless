@@ -1320,6 +1320,7 @@ type CompiledTransformInput = Pick<
 	| 'artifactChildMaterializations'
 	| 'executionLog'
 	| 'serverOnlyProps'
+	| 'elementOnlyAttributes'
 	| 'routeRoot'
 >;
 
@@ -1330,6 +1331,9 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 		moduleId: input.moduleId,
 		source: input.source,
 		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
+		...(input.elementOnlyAttributes?.length
+			? { elementOnlyAttributes: input.elementOnlyAttributes }
+			: {}),
 		...(input.routeRoot ? { routeRoot: true } : {}),
 		buildId: input.buildId,
 		resolverId: `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`,

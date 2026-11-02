@@ -24,6 +24,7 @@ export function spreadHostsField(
 				? [
 						{
 							hostNodeId: host.hostNodeId,
+							tagName: host.tagName.toLowerCase(),
 							excludeNames: slot.excludeNames,
 							destructuredNames: slot.destructuredNames ?? [],
 							...(slot.leadingClass ? { leadingClass: slot.leadingClass } : {}),

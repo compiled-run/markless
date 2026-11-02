@@ -20,6 +20,7 @@ export type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	// The host's documents carry every stylesheet their pages' code can load.
 	documentStylesheets?: boolean;
 	serverOnlyProps?: (moduleId: string) => SemanticGraphInput['serverOnlyProps'];
+	elementOnlyAttributes?: SemanticGraphInput['elementOnlyAttributes'];
 	routeModules?: (moduleId: string) => boolean;
 	// Set per build: a page no file imports, so only the router renders it and its props never change.
 	unimportedRouteModule?: (moduleId: string) => boolean;

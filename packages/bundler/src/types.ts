@@ -90,6 +90,7 @@ export interface TransformTsrxModuleInput {
 	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
 	importedFunctionWrites?: SemanticGraphInput['importedFunctionWrites'];
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
+	elementOnlyAttributes?: SemanticGraphInput['elementOnlyAttributes'];
 	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
 	/** Pages are rendered on the server, so a browser-side render loads full render data only when it runs. */
@@ -274,6 +275,8 @@ export type MarklessRolldownPluginApi = {
 	declareServerOnlyProps: (
 		resolve: (moduleId: string) => SemanticGraphInput['serverOnlyProps'],
 	) => void;
+	/** A host plugin names the attributes only one kind of element acts on; a component given one must spread it onto such an element. */
+	declareElementOnlyAttributes: (attributes: SemanticGraphInput['elementOnlyAttributes']) => void;
 	/** A host plugin names, per root-relative module id, the modules it renders as pages. */
 	declareRouteModules: (isRoute: (moduleId: string) => boolean) => void;
 	/** The packing pass names the pack each module went into, so the import map can list only chunks several pages load. */

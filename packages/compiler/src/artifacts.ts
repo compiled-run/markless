@@ -37,10 +37,25 @@ export type SemanticGraphInput = {
 	 */
 	readonly serverOnlyProps?: readonly ServerOnlyProp[];
 	/**
+	 * Attributes only one kind of element acts on. A component given one must pass
+	 * it, through the spread of its props, to such an element, or the build fails:
+	 * on any other element nothing would act on it and nothing would say so.
+	 */
+	readonly elementOnlyAttributes?: readonly ElementOnlyAttribute[];
+	/**
 	 * The router renders this module's root component as a page, and no module
 	 * renders it as a child, so its props never change in the browser.
 	 */
 	readonly routeRoot?: boolean;
+};
+
+export type ElementOnlyAttribute = {
+	/** The attribute as the element carries it. */
+	readonly name: string;
+	/** The one element that acts on it, lowercase. */
+	readonly tagName: string;
+	/** How an author writes it, which is what the diagnostic quotes. */
+	readonly authored: string;
 };
 
 export type ServerOnlyProp = {
@@ -455,6 +470,8 @@ export type ModuleGraphInterfaceArmMaterial = {
  */
 export type ModuleGraphInterfaceSpreadHost = {
 	readonly hostNodeId: string;
+	/** The element the spread lands on, lowercase. */
+	readonly tagName: string;
 	readonly excludeNames: ReadonlyArray<string>;
 	readonly destructuredNames: ReadonlyArray<string>;
 	/** The class the element writes ahead of a spread-carried `class`: its module's style scope. */
@@ -792,6 +809,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_SCOPE_INVALID'
 		| 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
+		| 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
 		| 'MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF'
 		| 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED'
