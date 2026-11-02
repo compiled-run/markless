@@ -3318,10 +3318,10 @@
 		{
 			"date": "2026-11-02",
 			"guard": "runtime",
-			"subject": "web/fns/instance-scope",
-			"from": 20104,
-			"to": 21395,
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load"
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 31647,
+			"to": 32404,
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe)"
 		},
 		{
 			"date": "2026-11-02",
@@ -3332,10 +3332,10 @@
 				"jsGzipBytes": 88379
 			},
 			"to": {
-				"executedChars": 10862,
-				"jsGzipBytes": 88513
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
 			},
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load (+134 B gzip downloaded on darwin-arm64)"
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
 		},
 		{
 			"date": "2026-11-02",
@@ -3346,10 +3346,10 @@
 				"jsGzipBytes": 88379
 			},
 			"to": {
-				"executedChars": 10878,
-				"jsGzipBytes": 88513
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
 			},
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load (+134 B gzip downloaded on darwin-arm64)"
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
 		},
 		{
 			"date": "2026-11-02",
@@ -3360,10 +3360,10 @@
 				"jsGzipBytes": 88379
 			},
 			"to": {
-				"executedChars": 10935,
-				"jsGzipBytes": 88513
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
 			},
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load (+134 B gzip downloaded on darwin-arm64)"
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
 		},
 		{
 			"date": "2026-11-02",
@@ -3374,10 +3374,10 @@
 				"jsGzipBytes": 88379
 			},
 			"to": {
-				"executedChars": 11342,
-				"jsGzipBytes": 88513
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
 			},
-			"reason": "the composed-record qualifier in fns/instance-scope learns to commit an @if (holding a @try block or a component) that a nested or layer component renders in the browser (PR #428): flip-time code, none of it executed at load; measured on CI run 41495559415, executed chars at load within budget and left as anchored"
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
 		},
 		{
 			"date": "2026-11-02",
@@ -3388,10 +3388,10 @@
 				"jsGzipBytes": 88379
 			},
 			"to": {
-				"executedChars": 11251,
-				"jsGzipBytes": 88513
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
 			},
-			"reason": "the composed-record qualifier in fns/instance-scope learns to commit an @if (holding a @try block or a component) that a nested or layer component renders in the browser (PR #428): flip-time code, none of it executed at load; measured on CI run 41495559415, executed chars at load within budget and left as anchored"
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
 		},
 		{
 			"date": "2026-11-02",
@@ -3402,10 +3402,10 @@
 				"jsGzipBytes": 88379
 			},
 			"to": {
-				"executedChars": 11308,
-				"jsGzipBytes": 88513
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
 			},
-			"reason": "the composed-record qualifier in fns/instance-scope learns to commit an @if (holding a @try block or a component) that a nested or layer component renders in the browser (PR #428): flip-time code, none of it executed at load; measured on CI run 41495559415, executed chars at load within budget and left as anchored"
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
 		},
 		{
 			"date": "2026-11-02",
@@ -3416,10 +3416,10 @@
 				"jsGzipBytes": 1571123
 			},
 			"to": {
-				"executedChars": 110777,
-				"jsGzipBytes": 1571272
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
 			},
-			"reason": "the composed-record qualifier in fns/instance-scope learns to commit an @if (holding a @try block or a component) that a nested or layer component renders in the browser (PR #428): flip-time code, none of it executed at load; measured on CI run 41495559415, executed chars at load within budget and left as anchored"
+			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
 		}
 	],
 	"runtimeModules": {
@@ -3432,7 +3432,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2816,
-		"router/vite/entries/fragment-entry": 31647,
+		"router/vite/entries/fragment-entry": 32404,
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
@@ -3476,7 +3476,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 21395,
+		"web/fns/instance-scope": 20104,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
@@ -3584,16 +3584,16 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10862,
-				"jsGzipBytes": 88513
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
-				"executedChars": 10878,
-				"jsGzipBytes": 88513
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
-				"executedChars": 10935,
-				"jsGzipBytes": 88513
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3610,20 +3610,20 @@
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11342,
-				"jsGzipBytes": 88513
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
-				"executedChars": 11251,
-				"jsGzipBytes": 88513
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
-				"executedChars": 11308,
-				"jsGzipBytes": 88513
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
-				"executedChars": 110777,
-				"jsGzipBytes": 1571272
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
