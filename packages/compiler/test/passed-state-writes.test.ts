@@ -185,6 +185,17 @@ test('a helper that only reads what it is passed marks nothing', async () => {
 	expect(handler(result)).not.toContain('marklessChanged');
 });
 
+test('a call that hands no state to an imported helper asks for no write facts', async () => {
+	const result = await compile(
+		page(
+			`(event) => { setLabel(event.currentTarget, 'b'); append([], count); count = 1; }`,
+		),
+	);
+
+	expect(result.semanticGraph.importedFunctionWriteRequests).toBeUndefined();
+	expect(handler(result)).not.toContain('marklessChanged');
+});
+
 test('without the helper module facts the compile asks for them and assumes the whole value', async () => {
 	const result = await compile(page(`() => setLabel(card, 'b')`));
 

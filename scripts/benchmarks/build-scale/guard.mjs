@@ -50,7 +50,14 @@ async function build(dir, pages) {
 	const line = stdout.split('\n').find((candidate) => candidate.startsWith('{'));
 	if (!line) throw new Error(`the ${pages}-page build printed no measurement`);
 	const measured = JSON.parse(line);
-	measured.retainedHeapBytes = Math.max(...measured.retained.map((entry) => entry.heapBytes));
+	const heldAt = (graphEnd) =>
+		Math.max(
+			...measured.retained
+				.filter((entry) => (entry.phase === 'graphEnd') === graphEnd)
+				.map((entry) => entry.heapBytes),
+		);
+	measured.retainedHeapBytes = heldAt(false);
+	measured.graphEndHeapBytes = heldAt(true);
 	return measured;
 }
 
@@ -110,6 +117,11 @@ try {
 		['peak resident memory per page', perPage('peakRssBytes'), budgets.peakRssBytesPerPage],
 		['heap held after a full collection', atLarge.retainedHeapBytes, budgets.retainedHeapBytes],
 		['held heap per page', perPage('retainedHeapBytes'), budgets.retainedHeapBytesPerPage],
+		[
+			'heap held at the end of the module graph',
+			atLarge.graphEndHeapBytes,
+			budgets.graphEndHeapBytes,
+		],
 		['largest server chunk', atLarge.largestServerChunk.bytes, MARKLESS_SERVER_CHUNK_MAX_BYTES],
 		['largest client chunk', atLarge.largestClientChunk.bytes, budgets.largestClientChunkBytes],
 		[
@@ -129,7 +141,7 @@ try {
 		);
 		if (over) failures.push(name);
 	}
-	// Module counts do not vary between runs, so any rise is real: Rolldown spends memory and time on every module.
+	// Module and compile counts do not vary between runs, so any rise is real: each module costs Rolldown memory and time, each compile a result held until buildEnd.
 	const countRows = [
 		['client modules', atLarge.modules.client, budgets.clientModules],
 		[
@@ -137,6 +149,7 @@ try {
 			perPageOf((build) => build.modules.client),
 			budgets.clientModulesPerPage,
 		],
+		['whole-module compiles', atLarge.compiles, budgets.compiles],
 	];
 	for (const [name, measured, budget] of countRows) {
 		const value = Math.round(measured * 10) / 10;

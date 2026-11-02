@@ -98,6 +98,15 @@ export function collectObjectAssign(node: AnyNode, state: WalkState): void {
 export function collectPassedStateWrites(node: AnyNode, state: WalkState): void {
 	if (state.currentFunctionSite !== 'handler' || !state.currentComponentName) return;
 	if (state.currentSharedDefinitionId) return;
+	const passedArguments = asNodes(node.arguments).map((argument) => {
+		if (argument.type === 'SpreadElement') return null;
+		const value = unwrapPassedValue(argument);
+		if (value?.type !== 'Identifier' && value?.type !== 'MemberExpression') return null;
+		const passed = passedState(value, state);
+		return passed ? { value, passed } : null;
+	});
+	// Asking for an imported module's facts costs the host a second compile of this module.
+	if (!passedArguments.some(Boolean)) return;
 	const callee = calleeWrites(node, state);
 	if (callee.kind === 'skip') return;
 	const callSource = expressionSource(node, state.source);
@@ -109,10 +118,9 @@ export function collectPassedStateWrites(node: AnyNode, state: WalkState): void 
 			shifted = true;
 			return;
 		}
-		const value = unwrapPassedValue(argument);
-		if (value?.type !== 'Identifier' && value?.type !== 'MemberExpression') return;
-		const passed = passedState(value, state);
-		if (!passed) return;
+		const passedArgument = passedArguments[argumentIndex];
+		if (!passedArgument) return;
+		const { value, passed } = passedArgument;
 		const facts = shifted ? null : callee.facts;
 		const known = facts ? argumentWrites(facts, argumentIndex) : WHOLE_VALUE;
 		// Lowering refuses a known write to a value nothing may write, as it refuses the same write in the handler.
@@ -274,11 +282,13 @@ function moduleFunctionWrites(state: WalkState): FunctionWritesAnalysis {
 }
 
 // The argument names component state directly, not a handler local of the same name.
+// Names are checked before the local-shadowing check, which analyzes the whole module.
 function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only' | null {
-	if (writeThroughLocal(value, state, 'call')) return null;
 	const source = expressionSource(value, state.source);
-	if (repeatRowBindsName(source, state))
+	if (repeatRowBindsName(source, state)) {
+		if (writeThroughLocal(value, state, 'call')) return null;
 		return rowWriteScope(value, state).rowRepeatId !== undefined ? 'writable' : null;
+	}
 	const resolved = resolveGraphPath(
 		source,
 		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
@@ -287,6 +297,7 @@ function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only'
 	if (!resolved || resolved.binding.sharedDefinitionId !== undefined) return null;
 	if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
 	if (resolved.path.length === 0 && resolved.binding.valueKind === 'scalar') return null;
+	if (writeThroughLocal(value, state, 'call')) return null;
 	return resolved.binding.kind === 'state' && resolved.binding.writable ? 'writable' : 'read-only';
 }
 
