@@ -753,8 +753,8 @@ function ThemeToggle() @{
 function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
 	let theme = storage('theme', 'system');
-	// The handler reads the choice off the pressed button: a handler in a component its parent renders twice reads the other copy's props.
 	const label = to === 'dark' ? 'Switch to the dark theme' : 'Switch to the light theme';
+	const other = to === 'dark' ? 'light' : 'dark';
 
 	<>
 		<navbar.trigger
@@ -764,13 +764,11 @@ function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 			title={label}
 			onClick={(event) => {
 				const root = document.documentElement;
-				const pressed = (event.target as Element).closest<HTMLElement>('[data-theme-toggle]');
-				const island = pressed?.closest('.theme-toggle-island');
-				const chosen = pressed?.dataset.themeToggle === 'dark' ? 'dark' : 'light';
+				const island = (event.target as Element).closest('.theme-toggle-island');
 				root.dataset.themeSwitching = '';
-				theme = chosen;
+				theme = to;
 				// The pressed button is hidden now, so focus moves to the one that took its place.
-				setTimeout(() => island?.querySelector<HTMLElement>(`[data-theme-toggle="${chosen === 'dark' ? 'light' : 'dark'}"]`)?.focus(), 0);
+				setTimeout(() => island?.querySelector<HTMLElement>(`[data-theme-toggle="${other}"]`)?.focus(), 0);
 				setTimeout(() => delete root.dataset.themeSwitching, 700);
 			}}
 		>
