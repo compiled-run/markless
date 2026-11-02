@@ -476,6 +476,18 @@ export function planBoundSymbolResolver(
 						: [];
 				});
 				if (captureSlots.length !== edgeDependentSlots.length) continue;
+				// A widget callback is answered through the graph on any path, so a part a nested component renders binds only to deliver its consumer's callback.
+				if (
+					componentEdgePath.length > 1 &&
+					edgeDependentSlots.some((slot) =>
+						slot.routes.some(
+							(route) =>
+								route.kind === 'callback-slot-route' && route.componentEdgeId === undefined,
+						),
+					) &&
+					!captureSlots.some((slot) => slot.route.kind === 'callback-route')
+				)
+					continue;
 				if (
 					symbol.kind !== 'event-handler' &&
 					symbol.kind !== 'callback-prop' &&

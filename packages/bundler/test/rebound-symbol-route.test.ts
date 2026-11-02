@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { expect, test } from 'vitest';
+import { emitSymbolRouteTable } from '../src/rebound-symbol-route.ts';
 import { markless } from '../src/vite/index.ts';
 
 // The page composes RelayRow twice; each RelayRow hands its Row an arrow that calls
@@ -9,7 +10,7 @@ import { markless } from '../src/vite/index.ts';
 const fixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route', import.meta.url));
 
 const ROUTE_FUNCTION =
-	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
+	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, local = ""\) \{[\s\S]*?\n\}/;
 const REBOUND_IMPORT =
 	/import \{ marklessReboundSymbol as marklessSsrLoadSymbolRouteRebound \} from "[^"]*rebound-symbol[^"]*";/;
 
@@ -84,4 +85,27 @@ test('a child symbol its edge binds is answered by that edge bound row, under th
 	expect(calls.at(-1)).toBe(
 		'import /relay-row.tsrx?import&markless-symbols -> bound:symbol%3A0:0',
 	);
+});
+
+// The bound child sits under a local component of this module: its row scopes
+// itself under the local component's path too, so the rebound prefix carries both.
+test('a child bound under a local component is rebound under the local path as well', () => {
+	const source = emitSymbolRouteTable({
+		routes: [
+			{ prefix: 'c3:p5:' },
+			{
+				prefix: 'c1:p2:',
+				importSource: './list.tsrx',
+				boundSymbols: { 'symbol:0': 'bound:symbol%3A0:5/2' },
+			},
+		],
+		functionName: 'marklessSsrLoadSymbolRoute',
+		fallbackName: 'marklessLoadLocalSymbol',
+		reboundName: 'marklessSsrLoadSymbolRouteRebound',
+	}).replace(/^import .*$/m, '');
+	const { route } = runRoute(source);
+
+	const rebound = route('c3:p5:c1:p2:symbol:0') as { loaded: unknown; prefix: string };
+	expect(rebound.loaded).toBe('local bound:symbol%3A0:5/2');
+	expect(rebound.prefix).toBe('c3:p5:c1:p2:');
 });

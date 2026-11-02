@@ -31,22 +31,55 @@ export function marklessOwningSurface(
 		for (const reach of frontier) {
 			if (seen.has(reach.surface)) continue;
 			seen.add(reach.surface);
-			for (const definition of Object.values(reach.surface.components))
-				for (const edge of definition.edges ?? []) {
-					const imported = reach.surface.components[edge.childComponentName]
-						? undefined
-						: reach.surface.imports[edge.childComponentName];
-					if (imported)
-						next.push({
-							surface: imported,
-							hostPrefix: reach.hostPrefix + edge.hostPrefix,
-							symbolPrefix: reach.symbolPrefix + edge.symbolPrefix,
-							edge,
-							edgePrefix: reach.symbolPrefix,
-						});
-				}
+			const local = localPlacements(reach.surface);
+			for (const [name, definition] of Object.entries(reach.surface.components))
+				for (const at of local.get(name) ?? [UNPLACED])
+					for (const edge of definition.edges ?? []) {
+						const imported = reach.surface.components[edge.childComponentName]
+							? undefined
+							: reach.surface.imports[edge.childComponentName];
+						if (imported)
+							next.push({
+								surface: imported,
+								hostPrefix: reach.hostPrefix + at.hostPrefix + edge.hostPrefix,
+								symbolPrefix: reach.symbolPrefix + at.symbolPrefix + edge.symbolPrefix,
+								edge,
+								edgePrefix: reach.symbolPrefix + at.symbolPrefix,
+							});
+					}
 		}
 		frontier = next;
 	}
 	return undefined;
+}
+
+type Placement = { readonly hostPrefix: string; readonly symbolPrefix: string };
+const UNPLACED: Placement = { hostPrefix: '', symbolPrefix: '' };
+
+// A component its own module renders sits under the local edges that placed it, and so does every import it composes.
+function localPlacements(
+	surface: PrerenderDataSurface,
+): ReadonlyMap<string, ReadonlyArray<Placement>> {
+	const placed = new Map<string, Placement[]>();
+	const place = (name: string, at: Placement, path: ReadonlySet<string>): void => {
+		placed.set(name, [...(placed.get(name) ?? []), at]);
+		for (const edge of surface.components[name]?.edges ?? [])
+			if (surface.components[edge.childComponentName] && !path.has(edge.childComponentName))
+				place(
+					edge.childComponentName,
+					{
+						hostPrefix: at.hostPrefix + edge.hostPrefix,
+						symbolPrefix: at.symbolPrefix + edge.symbolPrefix,
+					},
+					new Set(path).add(edge.childComponentName),
+				);
+	};
+	const composed = new Set(
+		Object.values(surface.components).flatMap((definition) =>
+			(definition.edges ?? []).map((edge) => edge.childComponentName),
+		),
+	);
+	for (const name of Object.keys(surface.components))
+		if (!composed.has(name)) place(name, UNPLACED, new Set([name]));
+	return placed;
 }

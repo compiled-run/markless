@@ -559,7 +559,7 @@ let count = state(0);
 		expect(result.code).not.toContain('function resumeContainerEvent');
 		expect(resumeModule?.source).toContain('export function resumeContainerEvent(input) {');
 		expect(result.code).toContain('export { marklessSsrLoadSymbolRoute as loadSymbol };');
-		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
+		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId, local = "")');
 		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
 		expect(result.code).not.toContain('function marklessResumeLoadSymbol');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
@@ -591,7 +591,7 @@ let count = state(0);
 		expect(resumeModule?.source).toContain('export function resumeContainerEvent(input) {');
 		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
 		expect(result.code).toContain('const marklessLoadLocalSymbol = loadSymbol;');
-		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
+		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId, local = "")');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
 		expect(result.code).toContain('return marklessLoadLocalSymbol(symbolId);');
 		expect(result.code).not.toContain('@markless/web/fns/csr');

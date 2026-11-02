@@ -27,7 +27,10 @@ import {
 	type RowMintGraph,
 } from './row-mint.ts';
 import { marklessRowSlotReader } from './row-slot-mint.ts';
-import { PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS } from '../../../serializer/src/protocol-constants.ts';
+import {
+	PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS,
+	protocolIslandSegment,
+} from '../../../serializer/src/protocol-constants.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -748,7 +751,15 @@ function ownerRecordsInPageSpace(
 		ownerHostPrefix ? { ...record, hostNodeId: ownerHostPrefix + record.hostNodeId } : record;
 	const registry = instanceScope.marklessGraphWidgetRegistry(graph);
 	const own = (id: string) => !instanceScope.marklessInstancePath(id);
-	const symbol = (symbolId: string) => (own(symbolId) ? ownerSymbolPrefix + symbolId : symbolId);
+	// The row's render already led its own symbols with the owner's island; the rest of the owner's path still belongs between.
+	const lead = ownerSymbolPrefix.slice(0, ownerSymbolPrefix.indexOf(':') + 1);
+	const island = lead === protocolIslandSegment(Number(lead.slice(1, -1))) ? lead : '';
+	const symbol = (symbolId: string) =>
+		own(symbolId)
+			? ownerSymbolPrefix + symbolId
+			: island && instanceScope.marklessInstancePath(symbolId) === island
+				? ownerSymbolPrefix + symbolId.slice(island.length)
+				: symbolId;
 	const graphNode = (graphNodeId: string): string => {
 		if (graphNodeId.startsWith('prop:'))
 			throw new Error(
