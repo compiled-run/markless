@@ -37,6 +37,7 @@ const guards = {
 	G14: 'code for content a page has not shown does not run at load',
 	G15: 'a page runs no more code at load for linking more routes',
 	G16: 'no page runs or downloads more JS at load than its anchor',
+	G17: 'the server bundle carries no stylesheet text of prerendered pages, and each sheet once',
 } as const;
 
 for (const [guard, title] of Object.entries(guards)) {

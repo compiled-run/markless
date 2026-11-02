@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+	PAGE_STYLESHEET_SOURCES_EXPORT,
 	createServerEntry,
 	type ServerEntryOptions,
 } from '../../src/vite/runtime/create-server-entry.ts';
@@ -118,4 +119,32 @@ test('stylesheet text that spells a closing style tag cannot end its element', a
 		}).fetch(new Request('https://app.test/'))
 	).text();
 	expect(html).toContain('.a::after{content:"<\\/style><b>"}</style>');
+});
+
+test('a route stylesheet whose text arrives with its page module rides inline, and a destination that carries it is not preloaded', async () => {
+	const { '/assets/doc.css': doc, ...routeSources } = sources;
+	const pageWithSheets = (html: string) => async () => ({
+		...(await page(html)()),
+		[PAGE_STYLESHEET_SOURCES_EXPORT]: routeSources,
+	});
+	const app = entry({
+		stylesheetSources: { '/assets/doc.css': doc },
+		inlineStylesheets: Object.keys(routeSources),
+		pageModuleLoaders: {
+			'pages/index.tsrx': pageWithSheets(
+				'<div data-async-container><a href="/next" data-markless-router-link>Next</a></div>',
+			),
+			'pages/next.tsrx': pageWithSheets('<div data-async-container><h1>Next</h1></div>'),
+			'pages/last.tsrx': pageWithSheets('<div data-async-container><h1>Last</h1></div>'),
+		},
+	});
+	const html = await (await app.fetch(new Request('https://app.test/'))).text();
+	const head = headOf(html);
+	expect(head).not.toContain('rel="stylesheet"');
+	for (const href of ['/assets/doc.css', '/assets/shared.css', '/assets/index.css'])
+		expect(head).toContain(
+			`<style data-markless-css="${href}">${sources[href as keyof typeof sources]}</style>`,
+		);
+	expect(html).not.toContain('/assets/next.css');
+	expect(html).toContain('/assets/pair.css');
 });

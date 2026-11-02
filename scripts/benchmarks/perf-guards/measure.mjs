@@ -32,6 +32,7 @@ import {
 import { measureConstructGlue } from './construct-glue.mjs';
 import { measureHiddenContent } from './hidden-content.mjs';
 import { measureRouteTable } from './route-table.mjs';
+import { measureServerStylesheets } from './server-stylesheets.mjs';
 import { measureResumeRows } from './resume-rows.mjs';
 import { resumeDataBreakdown } from '../resume-data/breakdown.mjs';
 import { LEAN_DISPATCH_MARKER_MODULES } from '../../../packages/compiler/src/lean-dispatch-modules.ts';
@@ -630,5 +631,7 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 	result.hiddenContent = await measureHiddenContent(log);
 	log('load execution on a page linking a few and many routes');
 	result.routeTable = await measureRouteTable(log);
+	log('Worker size with a small and a large prerendered stylesheet');
+	result.serverStylesheets = await measureServerStylesheets(log);
 	return result;
 }
