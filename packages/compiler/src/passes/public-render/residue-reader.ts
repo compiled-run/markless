@@ -592,7 +592,8 @@ function componentBodyLookup(
 /**
  * The value of a row name that also has an outer binding: the row's inside a row
  * of a loop that declares it, which the context's row chain says, and
- * `outerSource` everywhere else.
+ * `outerSource` everywhere else. The walk variable is a compiler name, so an
+ * authored name in `outerSource` cannot be shadowed by it.
  */
 export function shadowedRowNameSource(
 	repeats: KeyedRepeats,
@@ -609,7 +610,7 @@ export function shadowedRowNameSource(
 			)
 			.map((repeat) => repeat.id),
 	);
-	return `((r)=>{for(;r;r=r.repeatOuter)if(r.repeatId===undefined?r.repeatItem!==undefined:${ids}.includes(r.repeatId))return r.${binding.field};return ${outerSource};})(${context})`;
+	return `((marklessRow)=>{for(;marklessRow;marklessRow=marklessRow.repeatOuter)if(marklessRow.repeatId===undefined?marklessRow.repeatItem!==undefined:${ids}.includes(marklessRow.repeatId))return marklessRow.${binding.field};return ${outerSource};})(${context})`;
 }
 
 const CONTEXT = 'marklessResidueContext';
