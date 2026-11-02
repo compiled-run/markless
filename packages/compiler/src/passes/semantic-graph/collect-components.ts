@@ -419,7 +419,8 @@ function componentPropBindings(
 			expression && opaqueSource === source ? constantPropValue(expression, state) : null;
 		const lifted =
 			expression && opaqueSource === source && !constant?.value.ok
-				? (liftArmModuleValue(expression, state) ?? liftArmRenderLocalValue(expression, state))
+				? (liftArmModuleValue(expression, state) ??
+					liftArmRenderLocalValue(expression, state))
 				: null;
 		if (lifted) {
 			props.push({

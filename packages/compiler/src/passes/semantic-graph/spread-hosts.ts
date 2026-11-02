@@ -1,7 +1,4 @@
-import type {
-	ModuleGraphInterfaceSpreadHost,
-	SemanticMarkupChunk,
-} from '../../artifacts.ts';
+import type { ModuleGraphInterfaceSpreadHost, SemanticMarkupChunk } from '../../artifacts.ts';
 
 /**
  * The elements of one component's markup that spread the component's own props,
@@ -9,9 +6,9 @@ import type {
  * props it passes. The slot says what the spread can never carry; the host at
  * the same coordinate says which element it lands on.
  */
-export function spreadHostsField(
-	chunks: ReadonlyArray<SemanticMarkupChunk>,
-): { readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost> } {
+export function spreadHostsField(chunks: ReadonlyArray<SemanticMarkupChunk>): {
+	readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
+} {
 	const spreadHosts = chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => {
 			if (slot.kind !== 'spread-attributes') return [];
@@ -25,6 +22,7 @@ export function spreadHostsField(
 						{
 							hostNodeId: host.hostNodeId,
 							tagName: host.tagName.toLowerCase(),
+							...(slot.carriesProps ? { carriesProps: true as const } : {}),
 							excludeNames: slot.excludeNames,
 							destructuredNames: slot.destructuredNames ?? [],
 							...(slot.leadingClass ? { leadingClass: slot.leadingClass } : {}),

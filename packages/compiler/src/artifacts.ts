@@ -472,6 +472,8 @@ export type ModuleGraphInterfaceSpreadHost = {
 	readonly hostNodeId: string;
 	/** The element the spread lands on, lowercase. */
 	readonly tagName: string;
+	/** The spread is the component's props rest binding; a spread of any other object carries none of a consumer's props. */
+	readonly carriesProps?: true;
 	readonly excludeNames: ReadonlyArray<string>;
 	readonly destructuredNames: ReadonlyArray<string>;
 	/** The class the element writes ahead of a spread-carried `class`: its module's style scope. */
@@ -1262,6 +1264,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly kind: 'spread-attributes';
 				readonly residue: SemanticMarkupResidue;
 				readonly excludeNames: ReadonlyArray<string>;
+				// The spread is the component's props rest binding, so it carries what a consumer passed.
+				readonly carriesProps?: true;
 				// Prop names the component signature already took out of the rest
 				// binding, so they never reach this spread at all.
 				readonly destructuredNames?: ReadonlyArray<string>;

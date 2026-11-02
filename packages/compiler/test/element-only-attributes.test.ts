@@ -111,3 +111,15 @@ export default function Header() @{
 }`);
 	expect(diagnostics).toHaveLength(1);
 });
+
+test('a component that spreads some other object onto its <a> is refused', async () => {
+	const diagnostics = await misplaced(`
+const linkDefaults = { rel: 'noopener' };
+function OwnLink({ children, ...rest }: { children?: unknown; href: string }) @{
+	<a {...linkDefaults} href={rest.href}>{children}</a>
+}
+export default function Header() @{
+	<nav><OwnLink href="/" data-router-prefetch="none">Home</OwnLink></nav>
+}`);
+	expect(diagnostics).toHaveLength(1);
+});

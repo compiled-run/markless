@@ -51,8 +51,13 @@ export function patternIdentifiers(pattern: AnyNode): ReadonlyArray<AnyNode> {
 		if (node.type === 'Identifier') names.push(node);
 		else if (node.type === 'ObjectPattern')
 			for (const property of asNodes(node.properties))
-				visit((property.type === 'RestElement' ? property.argument : property.value) as AnyNode);
-		else if (node.type === 'ArrayPattern') for (const element of asNodes(node.elements)) visit(element);
+				visit(
+					(property.type === 'RestElement'
+						? property.argument
+						: property.value) as AnyNode,
+				);
+		else if (node.type === 'ArrayPattern')
+			for (const element of asNodes(node.elements)) visit(element);
 		else if (node.type === 'RestElement') visit(node.argument as AnyNode);
 		else if (node.type === 'AssignmentPattern') visit(node.left as AnyNode);
 	};
@@ -69,7 +74,8 @@ function patternNameIsReassigned(pattern: AnyNode, state: WalkState): boolean {
 			reference.binding !== null &&
 			reference.binding !== undefined &&
 			starts.has(semantic.bindings[reference.binding.id]!.declarations[0]?.start ?? -1) &&
-			reference.node.start !== semantic.bindings[reference.binding.id]!.declarations[0]?.start,
+			reference.node.start !==
+				semantic.bindings[reference.binding.id]!.declarations[0]?.start,
 	);
 }
 

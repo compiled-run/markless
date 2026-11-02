@@ -33,11 +33,14 @@ export function elementOnlyAttributeDiagnostics(input: {
 				)?.spreadHosts ?? [];
 			const reaches = spreads.some(
 				(spread) =>
+					spread.carriesProps === true &&
 					spread.tagName === attribute.tagName &&
 					!spread.excludeNames.includes(attribute.name) &&
 					!spread.destructuredNames.includes(attribute.name),
 			);
-			return reaches ? [] : [misplaced(attribute, edge, prop.sourceSpan, moduleInterface !== undefined)];
+			return reaches
+				? []
+				: [misplaced(attribute, edge, prop.sourceSpan, moduleInterface !== undefined)];
 		}),
 	);
 }

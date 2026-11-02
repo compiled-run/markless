@@ -1304,8 +1304,11 @@ function collectStyleObjectAttribute(
 	if (lowering?.kind === 'static') return;
 
 	const composite =
-		lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, definitions, inlinedNames, state) : null;
-	if (composite) for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+		lowering?.kind === 'dynamic'
+			? mintStyleObjectComputed(lowering, definitions, inlinedNames, state)
+			: null;
+	if (composite)
+		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
 	if (
 		lowering?.kind === 'dynamic' &&
 		(composite || lowering.valueExpressions.every((value) => rendersStyleValue(value, state)))
@@ -1375,13 +1378,20 @@ function mintStyleObjectComputed(
 	if (!readSources) return null;
 	// An inlined const's definition reads stand in for the const itself.
 	const sources = new Set(
-		readSources.filter((source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? '')),
+		readSources.filter(
+			(source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? ''),
+		),
 	);
 	for (const definition of definitions)
-		for (const dependency of collectGraphDependencies(definition, state)) sources.add(dependency.source);
+		for (const dependency of collectGraphDependencies(definition, state))
+			sources.add(dependency.source);
 	if (sources.size === 0) return null;
 
-	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, [...sources], state);
+	return mintTemplateExpressionComputed(
+		`() => ${lowering.expressionSource}`,
+		[...sources],
+		state,
+	);
 }
 
 function collectDuplicateAttributeDiagnostics(
