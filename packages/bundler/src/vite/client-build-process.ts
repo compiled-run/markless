@@ -6,6 +6,7 @@ import {
 	configFingerprint,
 	MARKLESS_VITE_PLUGIN_NAME,
 	parseInlineConfig,
+	reportClientBuildProgress,
 	type ClientBuildRequest,
 } from './separate-client-build.ts';
 
@@ -13,6 +14,7 @@ type ClientBuildPlugin = Plugin & {
 	api: { buildClientOnly(builder: ViteBuilder, handoffFile: string): Promise<void> };
 };
 
+reportClientBuildProgress();
 const request = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as ClientBuildRequest;
 try {
 	const { createBuilder } = (await import(request.vite)) as typeof import('vite');
