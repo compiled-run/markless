@@ -139,12 +139,22 @@ export type SearchView = {
 	readonly idle: boolean;
 	/** Something typed, and the index is still on its way. */
 	readonly waiting: boolean;
+	/** Something typed, and the index failed to load. */
+	readonly failed: boolean;
 	/** Something typed, the index is here, and nothing matches. */
 	readonly nothing: boolean;
 };
 
-export function searchView(index: SearchIndex | undefined, typed: string): SearchView {
+export function searchView(index: SearchIndex | undefined, typed: string, failed = false): SearchView {
 	const query = typed.trim();
 	const rows = searchRows(index, query);
-	return { query, rows, idle: query === '', waiting: query !== '' && !index, nothing: query !== '' && !!index && rows.length === 0 };
+	const typing = query !== '';
+	return {
+		query,
+		rows,
+		idle: !typing,
+		waiting: typing && !index && !failed,
+		failed: typing && !index && failed,
+		nothing: typing && !!index && rows.length === 0,
+	};
 }

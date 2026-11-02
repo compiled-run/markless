@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { searchDocs, searchRows, snippetOf, type SearchIndex } from './search-index.ts';
+import { searchDocs, searchRows, searchView, snippetOf, type SearchIndex } from './search-index.ts';
 
 const index: SearchIndex = {
 	pages: [
@@ -63,5 +63,15 @@ describe('snippetOf', () => {
 		expect(match).toBe('needle');
 		expect(after.endsWith('…')).toBe(true);
 		expect((before + match + after).length).toBeLessThan(160);
+	});
+});
+
+describe('searchView', () => {
+	it('says which note stands in for the rows: idle, waiting, failed or nothing', () => {
+		expect(searchView(index, '  ')).toMatchObject({ idle: true, waiting: false, failed: false, nothing: false });
+		expect(searchView(undefined, 'state')).toMatchObject({ idle: false, waiting: true, failed: false, rows: [] });
+		expect(searchView(undefined, 'state', true)).toMatchObject({ waiting: false, failed: true });
+		expect(searchView(index, 'zzz')).toMatchObject({ nothing: true, rows: [] });
+		expect(searchView(index, 'state').rows.length).toBeGreaterThan(0);
 	});
 });

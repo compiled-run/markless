@@ -4,7 +4,7 @@ import { navigate } from '@markless/router';
 import InkLogo from '../ink-logo.tsrx';
 import NothingFound from './nothing-found.tsrx';
 import { searchView, type SearchRow } from './search-index.ts';
-import { cachedSearchIndex, loadSearchIndex } from './search-load.ts';
+import { cachedSearchIndex, loadSearchIndex, searchIndexFailed } from './search-load.ts';
 import { OPENER_ATTRIBUTE } from './open.ts';
 
 // oxlint-disable-next-line no-unused-vars -- read by <script>{shortcut}</script>
@@ -153,6 +153,7 @@ function SearchBox({ onOpen }: { readonly onOpen: () => void }) @{
 		rows: [] as readonly SearchRow[],
 		idle: true,
 		waiting: false,
+		failed: false,
 		nothing: false,
 	});
 
@@ -168,22 +169,28 @@ function SearchBox({ onOpen }: { readonly onOpen: () => void }) @{
 				box.value = '';
 				const field = box.inputEl;
 				field?.focus();
-				// A write after the dispatch has ended never lands, so the arrived index is handed to the field's own input handler.
-				loadSearchIndex().then(
-					() => field?.dispatchEvent(new Event('input', { bubbles: true })),
-					() => {},
-				);
+				// A write after the dispatch has ended never lands, so the load's outcome is handed to the field's own input handler.
+				const settle = () => field?.dispatchEvent(new Event('input', { bubbles: true }));
+				loadSearchIndex().then(settle, settle);
 			}}
 		>Open search</button>
 		<div
 			class="field"
 			onInput={(event) => {
-				const next = searchView(cachedSearchIndex(), (event.target as HTMLInputElement).value);
+				const field = event.target as HTMLInputElement;
+				// A keystroke after a failed load tries again; the settle event it sends is not trusted, so this never loops.
+				const retry = event.isTrusted && !cachedSearchIndex() && searchIndexFailed();
+				const next = searchView(cachedSearchIndex(), field.value, searchIndexFailed() && !retry);
 				view.query = next.query;
 				view.rows = next.rows;
 				view.idle = next.idle;
 				view.waiting = next.waiting;
+				view.failed = next.failed;
 				view.nothing = next.nothing;
+				if (retry) {
+					const settle = () => field.dispatchEvent(new Event('input', { bubbles: true }));
+					loadSearchIndex().then(settle, settle);
+				}
 			}}
 		>
 			<combobox.label class="lens">
@@ -196,6 +203,7 @@ function SearchBox({ onOpen }: { readonly onOpen: () => void }) @{
 		<combobox.content class="results">
 			<p role="presentation" class="hint" hidden={!view.idle}>Type a word, a function name or an error code.</p>
 			<p role="presentation" class="hint" hidden={!view.waiting}>Opening the index…</p>
+			<p role="presentation" class="hint" hidden={!view.failed}>The search index did not load. Type again to retry.</p>
 			@for (const hit of view.rows; key hit.key) {
 				<combobox.item value={hit.value} label={hit.title} class="hit" ui-first={hit.first}>
 					<span class="page" hidden={!hit.first}>
