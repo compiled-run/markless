@@ -7,7 +7,7 @@ import {
 	type SerializedGraphPayload,
 } from '@markless/serializer';
 import type { PublicRenderModuleInput, SemanticModuleImport } from '../../artifacts.ts';
-import { boundRowChildSymbolId } from '../../component-edge-instance.ts';
+import { componentEdgeBoundSymbolEntries } from '../../component-edge-instance.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { strippedExpressionSource } from './authored-strip.ts';
@@ -21,7 +21,6 @@ import {
 	memberTagRootName,
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
-import { boundSymbolIdPrefix } from '../symbol-resolver.ts';
 import {
 	adoptedWidgetDefinitionIds,
 	widgetFallbackComponents,
@@ -49,22 +48,8 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 				? [[`${symbol.componentEdgeId}:${symbol.propName}`, symbol.id] as const]
 				: [],
 		),
-		...(input.captureAnalysis.boundResolverRows ?? []).flatMap((row) =>
-			row.componentEdgePath.flatMap((edgeId, index, path) => {
-				const child = boundRowChildSymbolId(row, input.captureAnalysis.extractedSymbols);
-				if (!child) return [];
-				const childSymbolId = child.symbolId;
-				// An outer edge's child owns its own ids, so only an inner bound id may rebind through it.
-				if (index < path.length - 1)
-					return [[`bound:${edgeId}:${boundSymbolIdPrefix(childSymbolId)}`, row.id] as const];
-				// A forwarded claim reaches this edge as the bound id its child composed, never as the child's own id.
-				return [
-					[`bound:${edgeId}:${childSymbolId}`, row.id] as const,
-					...(child.forwarded
-						? [[`bound:${edgeId}:${boundSymbolIdPrefix(childSymbolId)}`, row.id] as const]
-						: []),
-				];
-			}),
+		...componentEdgeBoundSymbolEntries(input.captureAnalysis).map(
+			(entry) => [`bound:${entry.edgeId}:${entry.key}`, entry.rowId] as const,
 		),
 	]);
 }
