@@ -3526,6 +3526,20 @@
 				"jsGzipBytes": 1571417
 			},
 			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41515772192, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571417
+			},
+			"to": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571419
+			},
+			"reason": "the same PR #428 tree built on main 4a528b9b7 (#429), measured on CI run 41537045785: +2 B gzip downloaded, executed chars within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -3729,7 +3743,7 @@
 			},
 			"docs /": {
 				"executedChars": 109103,
-				"jsGzipBytes": 1571417
+				"jsGzipBytes": 1571419
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
