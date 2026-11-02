@@ -1,15 +1,31 @@
 // The site navbar's card drawings and the theme toggle's sun and moon, drawn with the figures' ink pen.
 import { ellipse, roundRect } from '../../figures/ink/desk.ts';
-import { hatch, hull, line, outline, type P, resample, seeded, stroke, wash } from '../../figures/ink/ink.ts';
+import { hatch, hull, line, outline, type P, pathOf, resample, seeded, stroke, wash } from '../../figures/ink/ink.ts';
 
-/** One drawing's layers: a loose yellow wash, clustered hatching and the inked lines. */
+/** What a layer paints: the paper an object is cut from, its wash, its hatching or its ink. */
+export type LayerKind = 'paper' | 'wash' | 'hatch' | 'ink';
+
+/** One drawing, as layers painted in order: each object's paper, wash, hatching and ink, back to front. */
+/** How an object moves while its card is hovered: a transform scaled by `--hover` (0 or 1), about a point on the sheet. */
+export interface Motion {
+	readonly transform: string;
+	readonly origin: P;
+}
+
+const sway = (deg: number, origin: P): Motion => ({ transform: `rotate(calc(var(--hover, 0) * ${deg}deg))`, origin });
+const shift = (dx: number, dy: number, origin: P = [0, 0]): Motion => ({ transform: `translate(calc(var(--hover, 0) * ${dx}px), calc(var(--hover, 0) * ${dy}px))`, origin });
+
 export interface Drawing {
 	readonly width: number;
 	readonly height: number;
-	readonly wash: string;
-	readonly hatch: string;
-	readonly ink: string;
+	/** The box the drawing actually covers, `[x, y, width, height]`: a card fits this, not the sheet, into its picture area. */
+	readonly box: readonly [number, number, number, number];
+	readonly layers: readonly { readonly kind: LayerKind; readonly d: string; readonly motion?: Motion }[];
 }
+
+/** The order one object paints in: the shadow it casts on what is behind it, then itself. */
+export const OBJECT_ORDER = ['cast', 'paper', 'wash', 'hatch', 'ink'] as const;
+type Part = (typeof OBJECT_ORDER)[number];
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
 const move = (pts: P[], dx: number, dy: number): P[] => pts.map(([x, y]) => [x + dx, y + dy]);
@@ -30,38 +46,72 @@ function wander(points: P[], seed: number, amount = 0.8, step = 14): P[] {
 	return resample(points, step).map(([x, y], k, all) => (k === 0 || k === all.length - 1 ? [x, y] : [x + (rnd() - 0.5) * amount, y + (rnd() - 0.5) * amount]));
 }
 
+/**
+ * A drawing built object by object, back to front. `object()` starts the next one; everything drawn
+ * until the next call belongs to it, and each object's closed shapes are filled with paper, so it
+ * hides what lies behind it before its own wash, hatching and ink go on.
+ */
 class Sheet {
-	#wash = '';
-	#hatch = '';
-	#ink = '';
+	#layers: { kind: LayerKind; d: string; motion?: Motion }[] = [];
+	#motion: Motion | undefined;
+	#parts: Record<Part, string> = { cast: '', paper: '', wash: '', hatch: '', ink: '' };
 	#seed: number;
+	#min: P = [Infinity, Infinity];
+	#max: P = [-Infinity, -Infinity];
+	readonly #paper: boolean;
 	readonly width: number;
 	readonly height: number;
 
-	constructor(width: number, height: number, seed: number) {
+	constructor(width: number, height: number, seed: number, paper = true) {
 		this.width = width;
 		this.height = height;
 		this.#seed = seed * 1000;
+		this.#paper = paper;
 	}
 
 	#next() {
 		return ++this.#seed;
 	}
 
-	shape(points: P[], w = 1.8, heavy = 1.2) {
-		this.#ink += outline(points, { w, heavy, seed: this.#next() });
+	#cover(points: P[]) {
+		for (const [x, y] of points) {
+			this.#min = [Math.min(this.#min[0], x), Math.min(this.#min[1], y)];
+			this.#max = [Math.max(this.#max[0], x), Math.max(this.#max[1], y)];
+		}
+	}
+
+	/** Ends the object being drawn and starts the next, which moves by `motion` while its card is hovered. */
+	object(motion?: Motion): this {
+		for (const part of OBJECT_ORDER) {
+			const d = this.#parts[part];
+			if (!d) continue;
+			const kind: LayerKind = part === 'cast' ? 'hatch' : part;
+			const last = this.#layers.at(-1);
+			if (last && last.kind === kind && last.motion === this.#motion) last.d += d;
+			else this.#layers.push(this.#motion ? { kind, d, motion: this.#motion } : { kind, d });
+			this.#parts[part] = '';
+		}
+		this.#motion = motion;
+		return this;
+	}
+
+	shape(points: P[], w = 1.8, heavy = 1.2, fill = this.#paper) {
+		this.#cover(points);
+		if (fill) this.#parts.paper += pathOf(points, true);
+		this.#parts.ink += outline(points, { w, heavy, seed: this.#next() });
 	}
 
 	line(points: P[], w = 1.4, wobble = 0.5) {
-		this.#ink += line(points, { w, wobble, seed: this.#next() });
+		this.#cover(points);
+		this.#parts.ink += line(points, { w, wobble, seed: this.#next() });
 	}
 
 	dot(at: P, r: number) {
-		this.#ink += stroke([[at[0] - r * 0.4, at[1]], [at[0] + r * 0.4, at[1] + 0.2]], { w: r * 1.6, seed: this.#next(), over: 0, wobble: 0.1 });
+		this.#parts.ink += stroke([[at[0] - r * 0.4, at[1]], [at[0] + r * 0.4, at[1] + 0.2]], { w: r * 1.6, seed: this.#next(), over: 0, wobble: 0.1 });
 	}
 
 	tone(poly: P[], angle: number, gap = 2.6, skip = 0.3) {
-		this.#hatch += hatch(poly, rad(angle), gap, this.#next(), { cluster: 5, skip, trim: 0.5 });
+		this.#parts.hatch += hatch(poly, rad(angle), gap, this.#next(), { cluster: 5, skip, trim: 0.5 });
 	}
 
 	/** The darkest pocket: two passes at different angles, never a solid fill. */
@@ -82,91 +132,96 @@ class Sheet {
 		if (first < 0) return;
 		const chain: P[] = [ring[first]!];
 		for (let k = first; faces[k % n]; k++) chain.push(ring[(k + 1) % n]!);
-		this.tone([...chain, ...move(chain, dx, dy).reverse()], -28, gap, 0.35);
+		this.#parts.cast += hatch([...chain, ...move(chain, dx, dy).reverse()], rad(-28), gap, this.#next(), { cluster: 5, skip: 0.35, trim: 0.5 });
 	}
 
 	wash(poly: P[], grow = 2, rough = 3) {
-		this.#wash += wash(poly, this.#next(), grow, rough);
+		this.#parts.wash += wash(poly, this.#next(), grow, rough);
 	}
 
-	done(): Drawing {
-		return { width: this.width, height: this.height, wash: this.#wash, hatch: this.#hatch, ink: this.#ink };
+	done(pad = 6): Drawing {
+		this.object();
+		const [x0, y0] = this.#min;
+		const [x1, y1] = this.#max;
+		const box = [x0 - pad, y0 - pad, x1 - x0 + pad * 2, y1 - y0 + pad * 2].map((v) => Math.round(v)) as [number, number, number, number];
+		return { width: this.width, height: this.height, box, layers: this.#layers };
 	}
+}
+
+/** A card's or panel's edge dotted round with a pen: uneven gaps, uneven dots, never quite on the line. */
+function edge(width: number, height: number, seed: number, radius: number): Drawing {
+	const s = new Sheet(width, height, seed, false);
+	const rnd = seeded(seed * 97 + 5);
+	const ring = resample(roundRect(3, 3, width - 3, height - 3, radius, 6), 1, true);
+	let next = 0;
+	let walked = 0;
+	for (let k = 1; k < ring.length; k++) {
+		const [ax, ay] = ring[k - 1]!;
+		const [bx, by] = ring[k]!;
+		walked += Math.hypot(bx - ax, by - ay);
+		if (walked < next) continue;
+		s.dot([bx + (rnd() - 0.5) * 0.9, by + (rnd() - 0.5) * 0.9], 1 + rnd() * 0.9);
+		next = walked + 5.5 + rnd() * 4.5;
+	}
+	return s.done(0);
 }
 
 /** Start here: a fingerpost by a path, its top board pointing the way in. */
 function start(): Drawing {
-	const s = new Sheet(276, 280, 1);
-	const post = quad(128, 58, 140, 196);
+	const s = new Sheet(276, 128, 1);
+	s.line(wander([[96, 112], [272, 108]], 3, 1.2), 1.6);
+	s.line(wander([[120, 120], [168, 119]], 4, 1), 1);
+	for (const x of [132, 236, 254]) for (let k = 0; k < 4; k++) s.line([[x + k * 3, 112], [x + k * 3 + (k - 1.5) * 2.2, 103 - (k % 2) * 4]], 0.9, 0.2);
+	s.object();
+	const post = quad(195, 14, 205, 111);
+	s.cast(post, 26, 5, 2);
 	s.shape(post, 2);
-	s.tone(quad(134, 60, 140, 194), 80, 2.2);
+	s.tone(quad(200, 16, 205, 110), 80, 2.2);
 	const board = (y: number, dir: 1 | -1, len: number, deg: number): P[] => {
-		const tip = 134 + dir * len;
-		const back = 134 - dir * 26;
-		return turn([[back, y], [tip - dir * 16, y], [tip, y + 13], [tip - dir * 16, y + 26], [back, y + 26]], deg, [134, y + 13]);
+		const tip = 200 + dir * len;
+		const back = 200 - dir * 20;
+		return turn([[back, y], [tip - dir * 13, y], [tip, y + 11], [tip - dir * 13, y + 22], [back, y + 22]], deg, [200, y + 11]);
 	};
-	const top = board(64, 1, 96, -3);
-	const lower = board(104, -1, 82, 4);
+	s.object();
+	const lower = board(52, -1, 76, 4);
+	s.cast(lower, 4, 4, 2.6);
+	s.shape(lower, 1.9);
+	s.tone(lower.slice(2), 20, 2.8);
+	for (const at of [[212, 63], [134, 62]] as P[]) s.dot(at, 1.4);
+	s.object(sway(-7, [200, 31]));
+	const top = board(20, 1, 66, -3);
 	s.wash(top, 2.5, 3.5);
 	s.cast(top, 4, 5, 2.6);
 	s.shape(top, 2.1);
-	s.shape(lower, 1.9);
-	s.tone(move(lower.slice(2), 0, 0), 20, 2.8);
-	for (const [x, y] of [[124, 77], [205, 72], [102, 118], [158, 119]] as P[]) s.dot([x, y], 1.6);
-	s.line(wander([[40, 205], [236, 200]], 3, 1.2), 1.6);
-	s.line(wander([[62, 214], [120, 212]], 4, 1), 1);
-	s.line(wander([[176, 213], [222, 211]], 5, 1), 1);
-	s.cast(quad(126, 196, 142, 200), 34, 7, 2);
-	for (const x of [70, 96, 188, 214]) for (let k = 0; k < 4; k++) s.line([[x + k * 3, 204], [x + k * 3 + (k - 1.5) * 2.4, 192 - (k % 2) * 5]], 0.9, 0.2);
+	for (const at of [[188, 31], [252, 29]] as P[]) s.dot(at, 1.4);
 	return s.done();
 }
 
 /** Core concepts: the State figure's jar of beans, its lid on, a wire leading out. */
 function concepts(): Drawing {
-	const s = new Sheet(276, 280, 2);
-	const body = roundRect(88, 70, 188, 206, 18);
-	const lid = roundRect(96, 50, 180, 70, 5);
-	s.cast(body, 10, 7, 2.3);
-	s.shape(body, 2.3, 1.6);
-	s.shape(lid, 2);
-	for (let x = 102; x < 178; x += 7) s.line([[x, 53], [x + 0.4, 67]], 0.7, 0.1);
-	s.shade(quad(166, 78, 184, 200), 74, 1.8);
-	s.line(arc(138, 92, 46, 6, 200, 340, 18), 1);
-	const beans: P[] = [[110, 182], [130, 188], [152, 184], [172, 180], [118, 166], [142, 168], [164, 162], [106, 150], [130, 150], [154, 146], [120, 134], [144, 130]];
-	s.wash(roundRect(96, 124, 182, 200, 12), 2, 3);
+	const s = new Sheet(276, 128, 2);
+	s.line(wander([[110, 117], [272, 117]], 6, 1), 1.5);
+	s.line(wander([[226, 64], [244, 58], [254, 44], [258, 26], [268, 10]], 7, 1.4, 8), 1.6, 0.8);
+	s.line(wander([[227, 68], [247, 62], [258, 48], [262, 30], [272, 14]], 8, 1.4, 8), 0.7, 0.5);
+	s.object();
+	const body = roundRect(166, 32, 230, 116, 12);
+	s.cast(body, 9, 4, 2.3);
+	s.shape(body, 2.2, 1.6);
+	s.shade(quad(216, 40, 227, 110), 74, 1.8);
+	s.line(arc(198, 42, 29, 4, 200, 340, 14), 0.9);
+	s.object();
+	const beans: P[] = [[178, 104], [192, 108], [206, 105], [219, 102], [184, 94], [199, 95], [213, 91], [177, 84], [192, 84], [207, 81], [186, 74], [200, 71]];
+	s.wash(roundRect(172, 66, 225, 112, 9), 2, 3);
 	beans.forEach((at, k) => {
-		const bean = turn(ellipse(at[0], at[1], 9, 6, 20), k * 37, at);
-		s.shape(bean, 1.3, 0.8);
-		s.line(turn([[at[0] - 5, at[1] + 0.5], [at[0], at[1] - 0.8], [at[0] + 5, at[1] + 0.5]], k * 37, at), 0.8, 0.1);
+		const bean = turn(ellipse(at[0], at[1], 6, 4, 18), k * 37, at);
+		s.shape(bean, 1.1, 0.7);
+		s.line(turn([[at[0] - 3.4, at[1] + 0.4], [at[0], at[1] - 0.6], [at[0] + 3.4, at[1] + 0.4]], k * 37, at), 0.7, 0.1);
 	});
-	s.line(wander([[186, 120], [214, 112], [232, 92], [238, 64], [252, 40]], 7, 2, 10), 1.8, 0.9);
-	s.line(wander([[189, 125], [217, 118], [236, 98], [243, 68], [257, 44]], 8, 2, 10), 0.8, 0.6);
-	return s.done();
-}
-
-/** Building an app: wooden blocks stacked into something, one block still in hand's reach. */
-function build(): Drawing {
-	const s = new Sheet(276, 280, 3);
-	const blocks: [number, number, number, number, number][] = [
-		[54, 158, 112, 214, -1],
-		[118, 162, 176, 214, 1.5],
-		[182, 170, 230, 214, -1],
-		[82, 104, 140, 156, 2],
-		[146, 110, 202, 160, -2],
-		[110, 54, 168, 104, 1],
-	];
-	blocks.forEach(([x0, y0, x1, y1, deg], k) => {
-		const face = turn(roundRect(x0, y0, x1, y1, 3, 3), deg, [(x0 + x1) / 2, (y0 + y1) / 2]);
-		if (k === 5) s.wash(face, 3, 4);
-		s.cast(face, 6, 4, 2.6);
-		s.shape(face, k < 3 ? 2.3 : 2);
-		const [cx, cy] = [(x0 + x1) / 2, (y0 + y1) / 2];
-		if (k % 2 === 0) s.shape(turn(ellipse(cx, cy, 12, 12, 24), deg, [cx, cy]), 1.2, 0.6);
-		else s.shape(turn([[cx - 12, cy + 10], [cx, cy - 12], [cx + 12, cy + 10]], deg, [cx, cy]), 1.2, 0.6);
-		s.tone(turn(quad(x1 - 10, y0 + 4, x1 - 2, y1 - 3), deg, [cx, cy]), 78, 2);
-	});
-	s.line(wander([[30, 216], [250, 216]], 9, 1.2), 1.7);
-	s.shade(quad(40, 216, 244, 224), -18, 2);
+	s.object({ transform: 'translate(0, calc(var(--hover, 0) * -6px)) rotate(calc(var(--hover, 0) * -8deg))', origin: [171, 34] });
+	const lid = roundRect(171, 20, 225, 34, 4);
+	s.cast(lid, 3, 3, 2);
+	s.shape(lid, 1.9);
+	for (let x = 176; x < 222; x += 5) s.line([[x, 22.5], [x + 0.3, 31.5]], 0.6, 0.1);
 	return s.done();
 }
 
@@ -186,7 +241,9 @@ function router(): Drawing {
 	s.line(wander([[214, 24], [222, 92]], 13, 0.8), 0.9);
 	const route: P[] = resample([[130, 82], [158, 74], [176, 60], [196, 64], [214, 50], [226, 40]], 7);
 	for (let k = 0; k + 1 < route.length; k += 2) s.line([route[k]!, route[k + 1]!], 1.5, 0.2);
+	s.object(shift(0, -6));
 	const pin: P[] = [...arc(228, 26, 9, 9, 150, 390, 18), [228, 44]];
+	s.cast(pin, 4, 3, 2);
 	s.wash(pin, 2, 2.5);
 	s.shape(pin, 1.9);
 	s.shape(ellipse(228, 26, 3.2, 3.2, 12), 1.1, 0.4);
@@ -199,16 +256,19 @@ function ui(): Drawing {
 	const card = roundRect(118, 14, 254, 100, 8);
 	s.cast(card, 6, 6, 2.6);
 	s.shape(card, 2);
+	s.line(wander([[182, 37], [236, 37]], 21, 0.6), 1);
+	s.line(wander([[160, 67], [214, 67]], 22, 0.6), 1);
+	s.object();
 	const track = roundRect(132, 28, 170, 46, 9, 6);
 	s.wash(track, 1.5, 2);
 	s.shape(track, 1.6);
+	s.object(shift(-21, 0));
 	s.shape(ellipse(161, 37, 6.5, 6.5, 18), 1.6);
 	s.shade(ellipse(161, 37, 5.2, 5.2, 14), 30, 1.4);
-	s.line(wander([[182, 37], [236, 37]], 21, 0.6), 1);
-	const box = roundRect(132, 58, 150, 76, 3, 3);
-	s.shape(box, 1.6);
+	s.object();
+	s.shape(roundRect(132, 58, 150, 76, 3, 3), 1.6);
 	s.line([[135, 66], [141, 72], [152, 54]], 2, 0.2);
-	s.line(wander([[160, 67], [214, 67]], 22, 0.6), 1);
+	s.object();
 	const button = roundRect(200, 76, 244, 94, 6, 4);
 	s.cast(button, 3, 3, 1.8);
 	s.shape(button, 1.6);
@@ -230,53 +290,165 @@ function how(): Drawing {
 		}
 		return pts;
 	};
+	s.line(arc(116, 128, 76, 76, 150, 196, 12), 1.1, 0.4);
+	s.line([[44, 160], [38, 170], [50, 168]], 1.1, 0.2);
+	s.object(sway(-16, [116, 128]));
 	const big = gear(116, 128, 62, 12, 0);
-	const small = gear(204, 74, 34, 8, 11);
 	s.cast(big, 9, 7, 2.4);
-	s.cast(small, 7, 6, 2.4);
-	s.wash(small, 2.5, 3);
 	s.shape(big, 2.3, 1.5);
-	s.shape(small, 2.1, 1.3);
-	for (const [cx, cy, r] of [[116, 128, 18], [204, 74, 10]] as [number, number, number][]) {
-		s.shape(ellipse(cx, cy, r, r, 28), 1.6);
-		s.shade(ellipse(cx + 1, cy + 1, r * 0.6, r * 0.6, 16), 40, 1.5);
-	}
+	s.tone(arc(116, 128, 54, 54, -20, 100, 16).concat(arc(116, 128, 36, 36, 100, -20, 12)), 60, 2.4);
 	for (let k = 0; k < 5; k++) {
 		const a = rad(30 + k * 72);
 		s.line([[116 + 24 * Math.cos(a), 128 + 24 * Math.sin(a)], [116 + 46 * Math.cos(a), 128 + 46 * Math.sin(a)]], 1.6, 0.3);
 	}
-	s.tone(arc(116, 128, 54, 54, -20, 100, 16).concat(arc(116, 128, 36, 36, 100, -20, 12)), 60, 2.4);
-	s.line(arc(116, 128, 76, 76, 150, 196, 12), 1.1, 0.4);
-	s.line([[44, 160], [38, 170], [50, 168]], 1.1, 0.2);
+	s.object(sway(-16, [116, 128]));
+	s.shape(ellipse(116, 128, 18, 18, 28), 1.6);
+	s.shade(ellipse(117, 129, 10.8, 10.8, 16), 40, 1.5);
+	s.object(sway(29, [204, 74]));
+	const small = gear(204, 74, 34, 8, 11);
+	s.cast(small, 7, 6, 2.4);
+	s.wash(small, 2.5, 3);
+	s.shape(small, 2.1, 1.3);
+	s.object(sway(29, [204, 74]));
+	s.shape(ellipse(204, 74, 10, 10, 28), 1.6);
+	s.shade(ellipse(205, 75, 6, 6, 16), 40, 1.5);
+	return s.done();
+}
+
+/** Native targets: a laptop with a phone propped against it, both showing the same screen. */
+function native(): Drawing {
+	const s = new Sheet(276, 128, 10);
+	s.line(wander([[96, 108], [272, 108]], 41, 1), 1.5);
+	s.object();
+	const lid = roundRect(134, 28, 226, 90, 5, 3);
+	s.cast(lid, 8, 5, 2.4);
+	s.shape(lid, 2);
+	s.shape(roundRect(142, 35, 218, 84, 2, 2), 1, 0.4, false);
+	s.line(wander([[150, 48], [190, 48]], 42, 0.5), 1.4);
+	s.line(wander([[150, 58], [176, 58]], 43, 0.5), 0.9);
+	s.object();
+	const base: P[] = [[128, 91], [232, 91], [244, 106], [116, 106]];
+	s.cast(base, 6, 2, 2.4);
+	s.shape(base, 2, 1.6);
+	s.tone(quad(150, 94, 210, 102), 10, 2.6);
+	s.object(sway(-7, [232, 106]));
+	const phone = turn(roundRect(212, 36, 248, 106, 7, 4), 4, [230, 71]);
+	s.cast(phone, 7, 4, 2.2);
+	s.shape(phone, 2, 1.4);
+	const screen = turn(roundRect(217, 46, 243, 96, 2, 2), 6, [230, 71]);
+	s.wash(screen, 1.5, 2);
+	s.shape(screen, 1, 0.4, false);
+	s.line(turn([[225, 41], [235, 41]], 6, [230, 71]), 1.1, 0.1);
+	s.line(turn(wander([[221, 58], [238, 58]], 44, 0.4), 6, [230, 71]), 1.3);
+	s.line(turn(wander([[221, 66], [233, 66]], 45, 0.4), 6, [230, 71]), 0.9);
 	return s.done();
 }
 
 /** Contributing: a pencil laid across a notebook page that already carries a tick. */
 function contributing(): Drawing {
-	const s = new Sheet(276, 280, 7);
-	const page = turn(roundRect(56, 42, 212, 210, 4, 3), -4, [134, 126]);
-	s.cast(page, 8, 7, 2.4);
+	const s = new Sheet(276, 128, 7);
+	const tilt = (pts: P[]) => turn(pts, -5, [186, 58]);
+	const page = tilt(roundRect(124, 10, 248, 106, 4, 3));
+	s.cast(page, 7, 6, 2.4);
 	s.shape(page, 2.1);
-	for (let k = 0; k < 7; k++) s.line(turn(wander([[74, 74 + k * 18], [196, 74 + k * 18]], 30 + k, 0.6), -4, [134, 126]), 0.7, 0.2);
-	s.line(turn([[66, 50], [66, 202]], -4, [134, 126]), 1, 0.2);
-	for (let k = 0; k < 5; k++) s.shape(turn(ellipse(62, 66 + k * 32, 3.5, 3.5, 12), -4, [134, 126]), 1, 0.3);
-	s.line(turn([[84, 104], [96, 116], [120, 86]], -4, [134, 126]), 2.6, 0.4);
-	const pencil = turn([[60, 214], [196, 214], [222, 222], [196, 230], [60, 230]], -28, [140, 222]);
-	const lead = turn([[214, 219.5], [222, 222], [214, 224.5]], -28, [140, 222]);
-	const band = turn(quad(60, 214, 76, 230), -28, [140, 222]);
-	s.wash(turn(quad(76, 214, 196, 230), -28, [140, 222]), 2, 2.5);
-	s.cast(pencil, 6, 6, 2.2);
+	for (let k = 0; k < 5; k++) s.line(tilt(wander([[140, 28 + k * 16], [238, 28 + k * 16]], 30 + k, 0.6)), 0.7, 0.2);
+	s.line(tilt([[134, 14], [134, 102]]), 1, 0.2);
+	for (let k = 0; k < 4; k++) s.shape(tilt(ellipse(130, 22 + k * 24, 2.6, 2.6, 12)), 0.9, 0.3);
+	s.line(tilt([[148, 38], [156, 46], [172, 26]]), 2.4, 0.4);
+	s.object(sway(9, [190, 86]));
+	const lay = (pts: P[]) => turn(pts, -22, [190, 86]);
+	const pencil = lay([[118, 80], [238, 80], [262, 86], [238, 92], [118, 92]]);
+	s.cast(pencil, 5, 6, 2.2);
+	s.wash(lay(quad(132, 80, 238, 92)), 2, 2.5);
 	s.shape(pencil, 1.9);
-	s.shape(band, 1.4);
-	s.shape(lead, 1.2);
-	s.line(turn([[76, 222], [196, 222]], -28, [140, 222]), 0.8, 0.2);
-	s.tone(turn(quad(76, 223, 196, 230), -28, [140, 222]), -28 + 90, 2);
+	s.shape(lay(quad(118, 80, 132, 92)), 1.4);
+	s.shape(lay([[255, 84], [262, 86], [255, 88]]), 1.2);
+	s.line(lay([[132, 86], [238, 86]]), 0.8, 0.2);
+	s.tone(lay(quad(132, 87, 238, 92)), -22 + 90, 2);
+	return s.done();
+}
+
+/** Migrate an app: a moving box, flaps open, the app's page lifting out of it. */
+function migrate(): Drawing {
+	const s = new Sheet(276, 280, 11);
+	s.line(wander([[28, 236], [250, 236]], 51, 1.2), 1.6);
+	s.object();
+	const leftFlap: P[] = [[64, 132], [36, 100], [112, 96], [138, 132]];
+	s.shape(leftFlap, 1.8);
+	s.tone(leftFlap, 20, 2.8);
+	const rightFlap: P[] = [[138, 132], [166, 92], [242, 98], [212, 132]];
+	s.shape(rightFlap, 1.8);
+	s.tone(rightFlap, -20, 2.8);
+	s.object(shift(0, -14));
+	const sheet = turn(roundRect(92, 46, 186, 150, 5, 3), -4, [139, 98]);
+	s.cast(sheet, 5, 5, 2.4);
+	s.shape(sheet, 2);
+	const bar = turn(quad(92, 46, 186, 62), -4, [139, 98]);
+	s.wash(bar, 2, 2.5);
+	s.line(turn([[92, 62], [186, 62]], -4, [139, 98]), 1.2, 0.2);
+	for (const [x, y] of [[100, 54], [108, 54], [116, 54]] as P[]) s.shape(turn(ellipse(x, y, 2.4, 2.4, 10), -4, [139, 98]), 0.9, 0.3);
+	s.line(turn(wander([[104, 78], [170, 78]], 52, 0.5), -4, [139, 98]), 1.5);
+	s.line(turn(wander([[104, 92], [152, 92]], 53, 0.5), -4, [139, 98]), 1);
+	s.object();
+	const body = quad(64, 132, 212, 236);
+	s.cast(body, 9, 4, 2.4);
+	s.shape(body, 2.3, 1.6);
+	s.shade(quad(184, 136, 210, 234), 70, 2);
+	s.shape(quad(126, 132, 150, 170), 1.2, 0.5);
+	s.object();
+	const label = turn(quad(82, 182, 140, 222), -3, [111, 202]);
+	s.shape(label, 1.4);
+	s.line(turn([[92, 202], [128, 202]], -3, [111, 202]), 1.6, 0.2);
+	s.line(turn([[120, 194], [129, 202], [120, 210]], -3, [111, 202]), 1.6, 0.2);
+	return s.done();
+}
+
+/** Apps being moved: a clipboard log of ports, every line ticked off. */
+function apps(): Drawing {
+	const s = new Sheet(276, 128, 12);
+	s.line(wander([[110, 118], [272, 118]], 61, 1), 1.4);
+	s.object(sway(5, [196, 118]));
+	const tilt = (pts: P[]) => turn(pts, 5, [196, 64]);
+	const board = tilt(roundRect(152, 12, 240, 116, 6, 3));
+	s.cast(board, 7, 4, 2.4);
+	s.shape(board, 2.1, 1.5);
+	s.shape(tilt(roundRect(160, 26, 232, 110, 2, 2)), 1, 0.4);
+	for (let k = 0; k < 4; k++) {
+		const y = 40 + k * 18;
+		s.shape(tilt(roundRect(166, y - 5, 176, y + 5, 2, 2)), 1, 0.4);
+		s.line(tilt([[167.5, y], [170.5, y + 3], [177, y - 6]]), 1.5, 0.2);
+		s.line(tilt(wander([[182, y], [222 - (k % 2) * 12, y]], 62 + k, 0.5)), 0.9);
+	}
+	const clip = tilt(roundRect(180, 4, 212, 18, 4, 3));
+	s.wash(clip, 1.5, 2);
+	s.shape(clip, 1.8);
+	return s.done();
+}
+
+/** Markless Migrate on GitHub: a repository folder with its branch graph, and the arrow out to another site. */
+function repo(): Drawing {
+	const s = new Sheet(276, 128, 13);
+	const folder: P[] = [[132, 30], [168, 30], [176, 40], [244, 40], [244, 112], [132, 112]];
+	s.cast(folder, 7, 5, 2.4);
+	s.shape(folder, 2.1, 1.5);
+	s.line([[133, 46], [243, 46]], 1, 0.3);
+	const nodes: P[] = [[156, 92], [184, 92], [214, 92], [198, 64]];
+	s.line([nodes[0]!, nodes[2]!], 1.6, 0.3);
+	s.line([[184, 92], [192, 72], [198, 64]], 1.6, 0.3);
+	for (const [x, y] of nodes) s.shape(ellipse(x, y, 5, 5, 14), 1.4, 0.5);
+	s.wash(ellipse(198, 64, 5.5, 5.5, 14), 1.5, 1.5);
+	s.object(shift(4, -4));
+	const badge = roundRect(226, 16, 262, 52, 6, 3);
+	s.cast(badge, 3, 3, 2);
+	s.shape(badge, 1.8);
+	s.line([[236, 43], [252, 26]], 2, 0.2);
+	s.line([[242, 25], [253, 25], [253, 36]], 2, 0.2);
 	return s.done();
 }
 
 /** The sun the light theme's toggle shows: a disc and a ring of tapered rays. */
 function sun(): Drawing {
-	const s = new Sheet(48, 48, 8);
+	const s = new Sheet(48, 48, 8, false);
 	const disc = ellipse(24, 24, 9, 9, 32);
 	s.wash(disc, 1.5, 1.5);
 	s.shape(disc, 1.9, 1.2);
@@ -305,7 +477,7 @@ function crescent(o: P, r: number, i: P, ri: number): P[] {
 
 /** The moon the dark theme's toggle shows: a crescent hatched on its inner edge, and two stars. */
 function moon(): Drawing {
-	const s = new Sheet(48, 48, 9);
+	const s = new Sheet(48, 48, 9, false);
 	const body = crescent([22, 26], 16, [31, 19], 13);
 	s.wash(body, 1.2, 1.5);
 	s.shape(body, 1.9, 1.2);
@@ -317,12 +489,23 @@ function moon(): Drawing {
 	return s.done();
 }
 
-/** The seven cards' drawings, keyed by the symbol id the navbar links. */
+/** The cards' drawings, keyed by the symbol id the navbar links. */
 export function decor() {
-	return { start: start(), concepts: concepts(), build: build(), router: router(), ui: ui(), how: how(), contributing: contributing() };
+	return { start: start(), concepts: concepts(), router: router(), ui: ui(), migrate: migrate(), apps: apps(), repo: repo(), how: how(), native: native(), contributing: contributing() };
 }
 
 export type DecorName = keyof ReturnType<typeof decor>;
+
+/** The inked edges of the cards and panels, by the size each is drawn for. */
+export const EDGE_SIZES = {
+	card: [276, 200],
+	tall: [276, 416],
+	panel: [600, 448],
+} as const satisfies Record<string, readonly [number, number]>;
+
+export function edges() {
+	return Object.fromEntries(Object.entries(EDGE_SIZES).map(([name, [w, h]], k) => [name, edge(w, h, 20 + k, name === 'panel' ? 16 : 10)])) as Record<keyof typeof EDGE_SIZES, Drawing>;
+}
 
 /** The toggle's two drawings, frozen into a module so they render inline with no request. */
 export function themeArt() {

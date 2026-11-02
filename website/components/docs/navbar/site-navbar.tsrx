@@ -2,11 +2,11 @@ import { state, storage } from '@markless/core';
 import { lucide, modal, navbar } from '@markless/ui';
 import { asset } from '../../../site-base.ts';
 import { INK_MARKS } from '../ink-marks.ts';
+import { github, isCurrent, NAV_DECOR, type NavCard, type NavPanel, panels } from './sections.ts';
 import { art } from './theme-art.art.ts';
-import { getStarted, github, isCurrent, NAV_DECOR, type NavCard, type NavPanel, panels } from './sections.ts';
 
 
-/** The site's header: a floating bar of three panels on a wide screen, a top bar and a full-screen menu on a narrow one. */
+/** The site's header: a floating bar with two panels and the Migrate link on a wide screen, a top bar and a full-screen menu on a narrow one. */
 export default function SiteNavbar({ pathname }: { readonly pathname: string }) @{
 	<header class="site-navbar">
 		<MobileMenu pathname={pathname} />
@@ -25,48 +25,29 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 	</header>
 }
 
-function Brand({ compact }: { readonly compact?: boolean }) @{
-	<span class={compact ? 'brand brand-compact' : 'brand'}>
-		<svg class="brand-mug" viewBox="0 0 108 108" aria-hidden="true">
-			<use href={asset(INK_MARKS) + '#markless-mug'} />
-		</svg>
-		<span class="brand-name">Markless</span>
+/** The home link's mark: the ink mug alone, since every page already carries the name. */
+function Brand() @{
+	<svg class="brand-mug" viewBox="0 0 108 108" aria-hidden="true">
+		<use href={asset(INK_MARKS) + '#markless-mug'} />
 
 		<style>
-			.brand {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.45rem;
-			}
-
 			.brand-mug {
-				inline-size: 1.9rem;
-				block-size: 1.9rem;
+				display: block;
+				inline-size: 1.65rem;
+				block-size: 1.65rem;
 				overflow: visible;
-				translate: 0 -0.1rem;
-			}
-
-			.brand-name {
-				font-family: 'Joy Elia', 'Shantell Sans', system-ui, sans-serif;
-				font-size: 1.6rem;
-				font-weight: 700;
-				line-height: 1;
-			}
-
-			.brand-compact .brand-name {
-				font-size: 1.35rem;
 			}
 		</style>
-	</span>
+	</svg>
 }
 
-// The bar shows on every page, so its home and Get started links skip idle prefetch: it would download those pages' code everywhere.
+// The bar shows on every page, so its home link skips idle prefetch: it would download that page's code everywhere.
 function DesktopNav({ pathname }: { readonly pathname: string }) @{
 	const homepage = pathname === '/';
 
 	<div class="nav-shade">
-		<navbar.root class="nav-pill navbar-edge" aria-label="Main" data-scroll-hide={homepage ? undefined : ''}>
-			<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage}>
+		<navbar.root class="nav-pill navbar-edge" aria-label="Main">
+			<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage} aria-label="Markless home">
 				<Brand />
 			</navbar.itemlink>
 			<div class="nav-items">
@@ -79,10 +60,6 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 					<lucide.github class="tool-icon" aria-hidden="true" />
 				</navbar.itemlink>
 				<ThemeToggle />
-				<navbar.itemlink prefetch={false} class="cta" href={getStarted} current={isCurrent(pathname, getStarted)}>
-					<span>Get started</span>
-					<lucide.arrowright class="cta-arrow" aria-hidden="true" />
-				</navbar.itemlink>
 			</div>
 		</navbar.root>
 
@@ -105,12 +82,12 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				inset: 0;
 				z-index: 59;
 				pointer-events: none;
-				background: color-mix(in oklch, var(--ink) 38%, transparent);
+				background: color-mix(in oklch, var(--ink) 52%, transparent);
 				opacity: 0;
-				transition: opacity 500ms ease;
+				transition: opacity 325ms ease-in-out;
 
 				html.dark & {
-					background: color-mix(in oklch, black 62%, transparent);
+					background: color-mix(in oklch, black 58%, transparent);
 				}
 			}
 
@@ -128,7 +105,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				align-items: center;
 				justify-content: space-between;
 				inline-size: 100%;
-				max-inline-size: 42rem;
+				max-inline-size: 37.5rem;
 				block-size: 4.375rem;
 				padding-inline: 1.5rem 0.9rem;
 				border: 2px solid var(--ink);
@@ -142,7 +119,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 			}
 
 			/* public/navbar.js marks the page while the reader scrolls down it; focus brings the bar back. */
-			html[data-nav-away] .nav-pill[data-scroll-hide]:not([ui-open]) {
+			html[data-nav-away] .nav-pill:not([ui-open]) {
 				translate: -50% calc(-100% - 1.5rem);
 				opacity: 0;
 			}
@@ -150,9 +127,16 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 			.brand-link {
 				display: inline-flex;
 				align-items: center;
+				justify-content: center;
+				inline-size: 2.5rem;
+				block-size: 2.5rem;
+				margin-inline-start: -0.5rem;
 				color: var(--ink);
-				text-decoration: none;
-				border-radius: 6px;
+				border-radius: 999px;
+			}
+
+			.brand-link:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
 			}
 
 			.nav-items {
@@ -185,42 +169,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				block-size: 1.3rem;
 			}
 
-			.cta {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.4rem;
-				margin-inline-start: 0.4rem;
-				padding: 0.35rem 0.85rem;
-				border: 2px solid var(--ink);
-				border-radius: 8px 10px 8px 11px;
-				background: var(--pink);
-				color: var(--on-accent);
-				font-weight: 700;
-				font-size: 0.95rem;
-				text-decoration: none;
-				white-space: nowrap;
-				box-shadow: 3px 3px 0 var(--ink);
-				transition:
-					translate 140ms ease,
-					box-shadow 140ms ease;
-			}
-
-			.cta:hover {
-				translate: -1px -1px;
-				box-shadow: 4px 4px 0 var(--ink);
-			}
-
-			.cta:active {
-				translate: 2px 2px;
-				box-shadow: 1px 1px 0 var(--ink);
-			}
-
-			.cta-arrow {
-				inline-size: 1rem;
-				block-size: 1rem;
-			}
-
-			:is(.brand-link, .tool-link, .cta):focus-visible {
+			:is(.brand-link, .tool-link):focus-visible {
 				outline: 2px solid var(--ink);
 				outline-offset: 2px;
 			}
@@ -236,11 +185,12 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 }
 
 function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly pathname: string }) @{
-	<navbar.item class="nav-item" value={panel.label} active={panel.cards.some((card) => isCurrent(pathname, card.href))}>
+	<navbar.item class="nav-item" value={panel.label}>
 		<navbar.itemtrigger class="nav-trigger">
 			<span>{panel.label}</span>
 		</navbar.itemtrigger>
 		<navbar.itemcontent class={'nav-panel nav-panel-' + panel.layout}>
+			<InkEdge name="panel" />
 			@for (const card of panel.cards; key card.label) {
 				<NavCardLink card={card} pathname={pathname} />
 			}
@@ -282,13 +232,6 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				color: var(--on-accent);
 			}
 
-			.nav-item[ui-active] .nav-trigger span {
-				text-decoration: underline;
-				text-decoration-color: var(--pink);
-				text-decoration-thickness: 0.12em;
-				text-underline-offset: 0.2em;
-			}
-
 			/* The bar's translate makes it this panel's containing block, so the offsets are from the bar's padding box. */
 			.nav-panel {
 				position: fixed;
@@ -298,14 +241,14 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				box-sizing: border-box;
 				display: grid;
 				grid-template-columns: 1fr 1fr;
+				grid-template-rows: 12.5rem 12.5rem;
 				gap: 1rem;
-				inline-size: 42rem;
+				inline-size: 37.5rem;
 				margin: 0;
 				padding: 1rem;
-				border: 2px solid var(--ink);
 				border-radius: 1rem;
 				background: var(--raised);
-				box-shadow: 6px 6px 0 var(--muted-ink);
+				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
 				translate: -50% 0;
 				opacity: 1;
 				transition:
@@ -322,13 +265,6 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				opacity: 0;
 			}
 
-			.nav-panel-pair {
-				grid-template-rows: max-content;
-			}
-
-			.nav-panel-stack {
-				grid-template-rows: max-content max-content;
-			}
 
 			@media (prefers-reduced-motion: reduce) {
 				.nav-panel {
@@ -341,13 +277,20 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 
 function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly pathname: string }) @{
 	<navbar.itemlink class={'card card-' + card.size} href={card.href} current={isCurrent(pathname, card.href)}>
-		<svg class="card-art" viewBox={card.size === 'short' ? '0 0 276 128' : '0 0 276 280'} preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
-			<use href={asset(NAV_DECOR) + '#' + card.art} />
+		<svg class="card-art" aria-hidden="true">
+			<use href={asset(NAV_DECOR) + '#' + card.art} width="100%" height="100%" />
 		</svg>
+		<span class="card-scrim" aria-hidden="true"></span>
 		<span class="card-text">
-			<span class="card-label">{card.label}</span>
+			<span class="card-label">
+				{card.label}
+				@if (card.external) {
+					<lucide.arrowupright class="card-out" aria-hidden="true" />
+				}
+			</span>
 			<span class="card-note">{card.description}</span>
 		</span>
+		<InkEdge name={card.size === 'tall' ? 'tall' : 'card'} />
 
 		<style>
 			.card {
@@ -355,18 +298,23 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				display: flex;
 				flex-direction: column;
 				overflow: hidden;
-				border: 2px solid var(--ink);
 				border-radius: 0.6rem;
 				background: var(--paper);
 				color: var(--ink);
 				text-decoration: none;
+				--decor-paper: var(--paper);
 				--decor-wash: var(--yellow);
 				--decor-wash-opacity: 0.75;
 				--decor-wash-blend: multiply;
+				/* QDS sets white type on a gradient to its darkest tone; here the darkest tone is the ink in light and near-black in dark. */
+				--card-scrim: var(--ink);
+				--card-text: color-mix(in oklch, var(--paper) 35%, white);
 
 				html.dark & {
 					--decor-wash-opacity: 0.4;
 					--decor-wash-blend: normal;
+					--card-scrim: oklch(12% 0.006 70);
+					--card-text: var(--ink);
 				}
 			}
 
@@ -374,20 +322,15 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				grid-row: 1 / 3;
 			}
 
-			.card-short {
-				grid-column: 2;
-			}
-
+			/* The drawing gets the card above the text band, whole and centred, as QDS's picture does. */
 			.card-art {
-				display: block;
-				inline-size: 100%;
-				block-size: 17.5rem;
+				position: absolute;
+				inset: 0.75rem 0.75rem 4.6rem;
+				inline-size: calc(100% - 1.5rem);
+				block-size: calc(100% - 5.35rem);
+				overflow: visible;
 				transition: scale 300ms ease;
 				will-change: transform;
-			}
-
-			.card-short .card-art {
-				block-size: 8rem;
 			}
 
 			.card:hover .card-art,
@@ -397,27 +340,28 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 
 			.card:focus-visible {
 				outline: 2px solid var(--ink);
-				outline-offset: 2px;
+				outline-offset: 3px;
 			}
 
-			/* The label sits on a fade of the card's own paper, the way QDS sets white type over a dark gradient. */
+			/* QDS's band: clear over the picture, then darkening just under the title and description. */
+			.card-scrim {
+				position: absolute;
+				inset-inline: 0;
+				bottom: 0;
+				block-size: 5.25rem;
+				pointer-events: none;
+				background: linear-gradient(to top, var(--card-scrim) 0%, var(--card-scrim) 62%, transparent 100%);
+			}
+
 			.card-text {
 				position: absolute;
 				inset-inline: 0;
 				bottom: 0;
 				display: flex;
 				flex-direction: column;
-				padding: 1.6rem 0.6rem 0.5rem;
-				background: linear-gradient(to top, var(--paper) 0%, var(--paper) 45%, transparent 100%);
+				padding: 0.5rem 0.65rem 0.55rem;
+				color: var(--card-text);
 				pointer-events: none;
-			}
-
-			.card-short .card-text {
-				inset-inline-end: 38%;
-				top: 0;
-				justify-content: flex-end;
-				padding-top: 0.5rem;
-				background: linear-gradient(to right, var(--paper) 0%, var(--paper) 60%, transparent 100%);
 			}
 
 			.card-label {
@@ -425,20 +369,49 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				line-height: 1.3;
 			}
 
+			.card-out {
+				inline-size: 0.9em;
+				block-size: 0.9em;
+				margin-inline-start: 0.2em;
+				vertical-align: -0.05em;
+			}
+
 			.card-note {
 				font-size: 0.85rem;
 				line-height: 1.35;
-				color: color-mix(in oklch, var(--ink) 72%, var(--paper));
 			}
 
-			.card[ui-active] .card-label {
-				justify-self: start;
-				align-self: flex-start;
-				padding-inline: 0.2em;
-				margin-inline-start: -0.2em;
-				background: var(--yellow);
-				color: var(--on-accent);
-				border-radius: 3px 5px 3px 6px;
+			/* Hovering a card moves one object in its drawing; switching panels inks the next panel's drawings in, card by card. */
+			@media (prefers-reduced-motion: no-preference) {
+				.card:is(:hover, :focus-visible) {
+					--hover: 1;
+				}
+
+				.nav-panel:not([hidden]) .card-art {
+					animation: navbar-ink-in 180ms ease-out both;
+				}
+
+				.nav-panel .card:nth-of-type(2) .card-art {
+					animation-delay: 30ms;
+				}
+
+				.nav-panel .card:nth-of-type(3) .card-art {
+					animation-delay: 60ms;
+				}
+
+				.nav-panel .card:nth-of-type(4) .card-art {
+					animation-delay: 90ms;
+				}
+			}
+
+			@keyframes navbar-ink-in {
+				from {
+					clip-path: inset(0 100% 0 0);
+				}
+
+				to {
+					clip-path: inset(0 0 0 0);
+				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {
@@ -448,6 +421,25 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 			}
 		</style>
 	</navbar.itemlink>
+}
+
+/** A card's or panel's hand-inked edge, from the same sprite as the card drawings. */
+function InkEdge({ name }: { readonly name: string }) @{
+	<svg class="ink-edge" aria-hidden="true">
+		<use href={asset(NAV_DECOR) + '#edge-' + name} />
+
+		<style>
+			.ink-edge {
+				position: absolute;
+				inset: 0;
+				inline-size: 100%;
+				block-size: 100%;
+				overflow: visible;
+				color: var(--ink);
+				pointer-events: none;
+			}
+		</style>
+	</svg>
 }
 
 function MobileMenu({ pathname }: { readonly pathname: string }) @{
@@ -478,7 +470,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 					<lucide.panelleftopen class="bar-icon" aria-hidden="true" />
 				</button>
 				<a prefetch={false} class="bar-brand" href="/" aria-label="Markless home">
-					<Brand compact />
+					<Brand />
 				</a>
 				<span class="bar-end">
 					<ThemeToggle />
@@ -510,7 +502,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 							<lucide.panelleftopen class="bar-icon" aria-hidden="true" />
 						</button>
 						<a prefetch={false} class="bar-brand" href="/" aria-label="Markless home">
-							<Brand compact />
+							<Brand />
 						</a>
 						<modal.close class="bar-button menu-close" aria-label="Close menu">
 							<lucide.x class="bar-icon" aria-hidden="true" />
@@ -524,7 +516,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 									<span class="menu-heading">{panel.label}</span>
 									@for (const card of panel.cards; key card.href) {
 										<a
-											class={!card.skipActive && isCurrent(pathname, card.href) ? 'menu-link menu-link-current' : 'menu-link'}
+											class="menu-link"
 											href={card.href}
 											aria-current={!card.skipActive && isCurrent(pathname, card.href) ? 'page' : undefined}
 										><span class="menu-link-text">{card.label}</span></a>
@@ -536,10 +528,6 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 								<a class="menu-link" href={github}><span class="menu-link-text">GitHub</span></a>
 							</div>
 						</div>
-						<a class="menu-cta" href={getStarted}>
-							<span>Get started</span>
-							<lucide.arrowright class="cta-arrow" aria-hidden="true" />
-						</a>
 					</div>
 				</modal.content>
 			</modal.backdrop>
@@ -688,40 +676,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				border-bottom-color: var(--pink);
 			}
 
-			.menu-link-current {
-				border-bottom-color: var(--pink);
-			}
-
-			.menu-link-current .menu-link-text {
-				padding-inline: 0.2em;
-				margin-inline-start: -0.2em;
-				background: var(--yellow);
-				color: var(--on-accent);
-				border-radius: 3px 5px 3px 6px;
-			}
-
-			.menu-cta {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.4rem;
-				margin-block-start: 2rem;
-				padding: 0.35rem 0.85rem;
-				border: 2px solid var(--ink);
-				border-radius: 8px 10px 8px 11px;
-				background: var(--pink);
-				color: var(--on-accent);
-				font-size: 0.875rem;
-				font-weight: 700;
-				text-decoration: none;
-				box-shadow: 3px 3px 0 var(--ink);
-			}
-
-			.menu-cta .cta-arrow {
-				inline-size: 1rem;
-				block-size: 1rem;
-			}
-
-			:is(.bar-button, .bar-brand, .menu-link, .menu-cta):focus-visible {
+			:is(.bar-button, .bar-brand, .menu-link):focus-visible {
 				outline: 2px solid var(--ink);
 				outline-offset: 2px;
 			}
@@ -791,12 +746,12 @@ function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 			}
 
 			/* Only a click animates the swap, never a page load or a navigation that renders the toggle afresh. */
+			/* No display transition: the drawing being replaced leaves in the same frame the new one arrives, so no frame shows both. */
 			html[data-theme-switching] .theme-toggle {
 				transition:
 					rotate 420ms cubic-bezier(0.3, 1.5, 0.5, 1),
 					scale 420ms cubic-bezier(0.3, 1.5, 0.5, 1),
-					opacity 240ms ease,
-					display 420ms allow-discrete;
+					opacity 240ms ease;
 
 				@starting-style {
 					rotate: -70deg;
@@ -849,15 +804,26 @@ function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 		viewBox={'0 0 ' + drawing.width + ' ' + drawing.height}
 		aria-hidden="true"
 	>
-		<path class="theme-toggle-wash" d={drawing.wash} />
-		<path class="theme-toggle-hatch" d={drawing.hatch} />
-		<path class="theme-toggle-ink" d={drawing.ink} />
+		@for (const layer of drawing.layers; key layer.d) {
+			<path class={'theme-toggle-' + layer.kind} d={layer.d} />
+		}
 
 		<style>
 			.theme-toggle-icon {
 				inline-size: 1.9rem;
 				block-size: 1.9rem;
 				overflow: visible;
+				transition: rotate 320ms cubic-bezier(0.3, 1.5, 0.5, 1);
+			}
+
+			@media (prefers-reduced-motion: no-preference) {
+				:is(:hover, :focus-visible) > .theme-toggle-sun {
+					rotate: 30deg;
+				}
+
+				:is(:hover, :focus-visible) > .theme-toggle-moon {
+					rotate: -16deg;
+				}
 			}
 
 			/* The wash spreads after the ink lands, like paint soaking into the paper. */

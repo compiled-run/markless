@@ -1,32 +1,64 @@
 import { describe, expect, it } from 'vitest';
 import { relative } from '../ink-logos.ts';
-import { type Drawing, decor, themeArt } from './decor.ts';
+import { type Drawing, decor, edges, type LayerKind, themeArt } from './decor.ts';
 import { NAV_DECOR, panels } from './sections.ts';
 
 const cards = decor();
 const theme = themeArt();
+const frames = edges();
 
 const frozen = (drawing: Drawing): Drawing => ({
 	...drawing,
-	wash: relative(drawing.wash),
-	hatch: relative(drawing.hatch),
-	ink: relative(drawing.ink),
+	layers: drawing.layers.map((layer) => ({ ...layer, d: relative(layer.d) })),
 });
+
+const PAINT: Record<LayerKind, string> = {
+	paper: 'style="fill:var(--decor-paper)"',
+	wash: 'style="fill:var(--decor-wash);opacity:var(--decor-wash-opacity);mix-blend-mode:var(--decor-wash-blend)"',
+	hatch: 'fill="none" stroke="currentColor" stroke-width=".7" stroke-linecap="round" opacity=".75"',
+	ink: 'fill="currentColor"',
+};
 
 function sprite(): string {
 	const symbols = Object.entries(cards).map(([name, drawing]) => {
-		const { width, height, wash, hatch, ink } = frozen(drawing);
-		return `<symbol id="${name}" viewBox="0 0 ${width} ${height}" overflow="visible"><path style="fill:var(--decor-wash);opacity:var(--decor-wash-opacity);mix-blend-mode:var(--decor-wash-blend)" d="${wash}"/><path fill="none" stroke="currentColor" stroke-width=".7" stroke-linecap="round" opacity=".75" d="${hatch}"/><path fill="currentColor" d="${ink}"/></symbol>`;
+		const { box, layers } = frozen(drawing);
+		let body = '';
+		for (let k = 0; k < layers.length; ) {
+			const motion = layers[k]!.motion;
+			let group = '';
+			for (; k < layers.length && layers[k]!.motion === motion; k++) group += `<path ${PAINT[layers[k]!.kind]} d="${layers[k]!.d}"/>`;
+			// Inline, because a stylesheet cannot reach into a <use> clone; the card sets --hover and the clone inherits it.
+			body += motion ? `<g style="transform:${motion.transform};transform-origin:${motion.origin[0] - box[0]}px ${motion.origin[1] - box[1]}px;transition:transform 320ms cubic-bezier(.3,1.5,.5,1)">${group}</g>` : group;
+		}
+		return `<symbol id="${name}" viewBox="${box.join(' ')}" overflow="visible">${body}</symbol>`;
 	});
-	return `<svg xmlns="http://www.w3.org/2000/svg">\n${symbols.join('\n')}\n</svg>\n`;
+	// An edge stretches to its card or panel, which keeps the size it was drawn for.
+	const edgeSymbols = Object.entries(frames).map(([name, drawing]) => {
+		const { width, height, layers } = frozen(drawing);
+		return `<symbol id="edge-${name}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" overflow="visible">${layers.map((layer) => `<path ${PAINT[layer.kind]} d="${layer.d}"/>`).join('')}</symbol>`;
+	});
+	return `<svg xmlns="http://www.w3.org/2000/svg">\n${[...symbols, ...edgeSymbols].join('\n')}\n</svg>\n`;
 }
 
+const module = (name: string, type: string, value: unknown) => `// Written by decor.test.ts from decor.ts. Run \`vp test -u\` to refresh.
+import type { Drawing } from './decor.ts';
+
+export const ${name}: ${type} = ${JSON.stringify(value, null, '\t')};
+`;
+
 describe('navbar drawings', () => {
-	it('draws every card with one wash, hatching and ink', () => {
+	it('draws every card with a wash, hatching and ink', () => {
 		for (const drawing of [...Object.values(cards), ...Object.values(theme)]) {
-			for (const layer of [drawing.wash, drawing.hatch, drawing.ink])
-				expect(layer.length).toBeGreaterThan(40);
-			expect(drawing.wash.match(/Z/g)?.length, 'one loose wash per drawing').toBe(1);
+			for (const kind of ['wash', 'hatch', 'ink'] as const)
+				expect(drawing.layers.some((layer) => layer.kind === kind && layer.d.length > 40)).toBe(true);
+		}
+	});
+
+	// Paper is what lets a front object hide what it rests on: a pencil on a page covers the page's rules.
+	it('paints objects back to front, each one hiding the ink behind it', () => {
+		for (const [name, drawing] of Object.entries(cards)) {
+			const kinds = drawing.layers.map((layer) => layer.kind);
+			expect(kinds.lastIndexOf('paper'), `${name} lays a later object over an earlier one's ink`).toBeGreaterThan(kinds.indexOf('ink'));
 		}
 	});
 
@@ -37,7 +69,7 @@ describe('navbar drawings', () => {
 	});
 
 	it('keeps the card sprite small', () => {
-		expect(sprite().length).toBeLessThan(140_000);
+		expect(sprite().length).toBeLessThan(205_000);
 	});
 
 	it('freezes the card drawings into one sprite the navbar links into (run with -u after editing)', async () => {
@@ -45,11 +77,7 @@ describe('navbar drawings', () => {
 	});
 
 	it('freezes the sun and moon into a module the theme toggle inlines (run with -u after editing)', async () => {
-		const module = `// Written by decor.test.ts from decor.ts. Run \`vp test -u\` to refresh.
-import type { Drawing } from './decor.ts';
-
-export const art: { readonly sun: Drawing; readonly moon: Drawing } = ${JSON.stringify({ sun: frozen(theme.sun), moon: frozen(theme.moon) }, null, '\t')};
-`;
-		await expect(module).toMatchFileSnapshot('./theme-art.art.ts');
+		await expect(module('art', '{ readonly sun: Drawing; readonly moon: Drawing }', { sun: frozen(theme.sun), moon: frozen(theme.moon) })).toMatchFileSnapshot('./theme-art.art.ts');
 	});
+
 });
