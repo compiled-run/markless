@@ -219,3 +219,24 @@ test('a field whose value a prop sets shows the next page value, even after some
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a script that copies a vary-marked element into the kept part leaves the navigation working', async () => {
+	const { page, errors } = await open('/guide');
+	await page.evaluate(() => {
+		const link = document.querySelector('[data-nav="blog"]')!;
+		link.after(link.cloneNode(true));
+	});
+	await page.click('[data-nav="reference"]');
+	await page.waitForFunction(
+		() => document.querySelector('[data-title]')?.textContent === 'Reference page',
+	);
+	expect(
+		await page.evaluate(() =>
+			[...document.querySelectorAll('[data-nav]')].map((link) =>
+				link.getAttribute('data-active'),
+			),
+		),
+	).toEqual(['false', 'true', 'false']);
+	expect(errors).toEqual([]);
+	await page.close();
+});

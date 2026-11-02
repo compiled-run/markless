@@ -169,6 +169,8 @@ function ownSlot(html: string, projected: string): { start: number; end: number 
 }
 
 const ATTRIBUTE_NAME = /^[a-zA-Z_:][\w:.-]*$/;
+// A field's live state follows these only until someone edits it, so a part that varies them is not kept.
+const CONTROL_STATE = /^(value|checked|selected)$/i;
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title']);
 
 const ATTRIBUTE = /(\s+)([^\s"'>/=]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?|[\s\S]/y;
@@ -232,7 +234,7 @@ function markVarying(
 	if (!sites.length) return { marked: html, shape: html };
 	const names = new Map<number, Set<string>>();
 	for (const site of sites) {
-		if (!ATTRIBUTE_NAME.test(site.name)) return undefined;
+		if (!ATTRIBUTE_NAME.test(site.name) || CONTROL_STATE.test(site.name)) return undefined;
 		names.set(site.index, (names.get(site.index) ?? new Set()).add(site.name));
 	}
 	let marked = '';

@@ -32,3 +32,17 @@ test('leaving out a prop-set attribute leaves a word of the same name inside ano
 	expect(worded).not.toBe(plain);
 	expect(hash(`<button class="button disabled extra">${filler}</button>`)).toBe(worded);
 });
+
+test('a part whose prop sets a field value through an attribute update is not kept', () => {
+	const field = {
+		...child,
+		view: {
+			...child.view,
+			domUpdates: [
+				{ ...child.view.domUpdates[0], target: { kind: 'attribute', name: 'value' } },
+			],
+		},
+	};
+	const html = `<input class="field" value="typed">${filler}`;
+	expect(keep(`<div>${html}</div>`, undefined, field)).not.toContain(PROTOCOL_KEEP_ATTRIBUTE);
+});
