@@ -1811,13 +1811,15 @@ jobs:
 
             # On main the base is the last commit whose CI run passed, not the previous push: a red or
             # unfinished run before this one leaves commits that still need benchmarking.
+            # A pull request runs on GitHub's merge of the head into main, so its base is that merge's
+            # first parent: the event's base.sha can predate main commits the merge already carries.
             - name: Decide whether benchmarks can be affected
               id: filter
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-                    base="${{ github.event.pull_request.base.sha }}"
+                    base="$(git rev-parse HEAD^1)"
                   elif [ "$GITHUB_EVENT_NAME" = "merge_group" ]; then
                     base="${{ github.event.merge_group.base_sha }}"
                   elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ -n "$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=merge_group&status=success&per_page=1" --jq '.workflow_runs[0].id // empty' || true)" ]; then
