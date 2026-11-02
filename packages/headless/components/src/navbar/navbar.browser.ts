@@ -6,6 +6,7 @@ import ClickOnly from './scenarios/click-only.tsrx';
 import ConditionalItem from './scenarios/conditional-item.tsrx';
 import CurrentPage from './scenarios/current-page.tsrx';
 import Grace from './scenarios/grace.tsrx';
+import SafeZone from './scenarios/safe-zone.tsrx';
 import HoverTiming from './scenarios/hover-timing.tsrx';
 import ItemsFromData from './scenarios/items-from-data.tsrx';
 import SiteHeader from './scenarios/site-header.tsrx';
@@ -119,7 +120,7 @@ function expectEachItemMintsItsOwnPanelId() {
 // A prop the part destructured out of its parameters must not come back through
 // `{...rest}`.
 function expectRootDropsDestructuredProps() {
-	for (const name of ['value', 'hover', 'delay', 'clickGrace']) {
+	for (const name of ['value', 'hover', 'delay', 'switchDelay', 'clickGrace']) {
 		expect(el(Root).hasAttribute(name)).toBe(false);
 	}
 	expect(el(ProductsItem).hasAttribute('value')).toBe(false);
@@ -634,27 +635,20 @@ test('CSR: the pointer resting on an entry opens it after the delay', async () =
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(false);
 });
 
-test('CSR: moving to the next entry while one is showing opens it at once', async () => {
+test('CSR: with no switch delay, moving to the next entry while one is showing opens it at once', async () => {
 	await render(HoverTiming);
 	await userEvent.hover(el(ProductsTrigger));
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
 
 	await userEvent.hover(el(DocsTrigger));
-	// No delay this time: the switch is what QDS's model makes instant, and the
-	// assertion is that the second panel is showing before the cold-start delay
-	// could have elapsed. Vitest 5 stops polling at the timeout, so the checks must come faster than it.
+	// The second panel must show before the cold-start delay could have elapsed. Vitest 5 stops polling at the timeout, so the checks must come faster than it.
 	await expect
 		.poll(() => el(DocsTrigger).getAttribute('aria-expanded'), { timeout: 50, interval: 5 })
 		.toBe('true');
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
 });
 
-// Leaving the LANDMARK is what closes, not leaving the entry: moving from a
-// trigger into its own dropdown, or across to the next entry, has to keep the
-// navbar open. The sign-in button outside the nav is where the pointer goes, and
-// it is why this row uses the realistic header rather than the timing scenario -
-// `unhover` parks the cursor on document.body, which in a page this short is
-// still inside the landmark, so it proves nothing.
+// `unhover` parks the cursor on document.body, which proves nothing here: the sign-in button outside the nav is where the pointer goes.
 test('CSR: the pointer leaving the landmark closes what it opened', async () => {
 	await render(SiteHeader);
 	await userEvent.hover(el(ProductsTrigger));
@@ -665,21 +659,75 @@ test('CSR: the pointer leaving the landmark closes what it opened', async () => 
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
 });
 
-// Radix NavigationMenu waits 150 ms before a leave closes: a pointer that clips
-// the edge of the landmark on its way somewhere does not lose the dropdown. The
-// call count is the witness, because a close-then-reopen ends up looking open.
-test('CSR: the pointer coming straight back after leaving keeps the dropdown showing', async () => {
-	await render(WithOnChangeLeaving);
+test('CSR: moving to the next entry while one is showing opens it after the switch delay', async () => {
+	await render(SafeZone);
 	await userEvent.hover(el(ProductsTrigger));
-	await expect.poll(() => el(Value).textContent).toBe('products');
-	await expect.poll(() => el(Calls).textContent).toBe('1');
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(DocsTrigger));
+	expect(el(DocsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	await expect.poll(() => el(DocsTrigger).getAttribute('aria-expanded')).toBe('true');
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+});
+
+// The bug a docs header shows without a switch delay: moving down into an open panel brushes the
+// next trigger, the next panel replaces this one under the pointer, and the click lands on its card.
+test('CSR: brushing the next trigger on the way into an open panel keeps the panel showing', async () => {
+	await render(SafeZone);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(DocsTrigger));
+	await userEvent.hover(el(KeyboardsLink));
+	await new Promise((resolve) => setTimeout(resolve, 200));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	expect(el(DocsTrigger).getAttribute('aria-expanded')).toBe('false');
+});
+
+// QDS's safe zone: the hull of the trigger and its panel. The gap between a bar and a floating
+// panel is page that belongs to no part, and crossing it must not lose the panel.
+test('CSR: crossing the gap between a trigger and its floating panel keeps the panel showing', async () => {
+	await render(SafeZone);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(page.getByTestId('gap')));
+	await new Promise((resolve) => setTimeout(resolve, 300));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(KeyboardsLink));
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
 
 	await userEvent.hover(el(SignIn));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+});
+
+// Leaving the safe zone closes at once, even when the pointer is still inside the landmark.
+test('CSR: sliding along the bar past the safe zone closes the dropdown at once', async () => {
+	await render(SafeZone);
 	await userEvent.hover(el(ProductsTrigger));
-	await new Promise((resolve) => setTimeout(resolve, 400));
-	expect(el(Calls).textContent).toBe('1');
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(page.getByTestId('pricing-itemlink')));
+	await expect
+		.poll(() => el(ProductsTrigger).getAttribute('aria-expanded'), { timeout: 100, interval: 5 })
+		.toBe('false');
+	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
+});
+
+test('SSR: crossing the gap keeps the panel showing, and leaving the safe zone closes it', async () => {
+	await renderSSR(SafeZone);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(page.getByTestId('gap')));
+	await new Promise((resolve) => setTimeout(resolve, 300));
 	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
-	expect(el(ProductsContent).hasAttribute('hidden')).toBe(false);
+
+	await userEvent.hover(el(page.getByTestId('pricing-itemlink')));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
 });
 
 test('CSR: a click inside the grace window leaves a hover-opened dropdown showing', async () => {

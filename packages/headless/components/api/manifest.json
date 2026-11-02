@@ -2494,14 +2494,21 @@
 						"type": "boolean",
 						"required": false,
 						"default": "true",
-						"doc": "Dropdowns open when the pointer rests on an item, and close once the pointer\nhas been out of the landmark for a moment. Omit it and they do."
+						"doc": "Dropdowns open when the pointer rests on an item, and close once the pointer\nleaves the item's trigger and panel, allowing for the way between the two.\nOmit it and they do."
 					},
 					{
 						"name": "delay",
 						"type": "number",
 						"required": false,
 						"default": "200",
-						"doc": "How long the pointer must rest on an item before its dropdown opens, in\nmilliseconds. Omit it and it is 200. It applies to the first dropdown only:\nonce one is showing, moving to another opens it at once."
+						"doc": "How long the pointer must rest on an item before its dropdown opens, in\nmilliseconds, while no dropdown is showing. Omit it and it is 200."
+					},
+					{
+						"name": "switchDelay",
+						"type": "number",
+						"required": false,
+						"default": "137.5",
+						"doc": "How long the pointer must rest on an item before its dropdown replaces the\none already showing, in milliseconds. Omit it and it is 137.5, as in QDS."
 					},
 					{
 						"name": "clickGrace",

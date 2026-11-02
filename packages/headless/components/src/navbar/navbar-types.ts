@@ -26,15 +26,20 @@ export type NavbarRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 	readonly value?: string;
 	/**
 	 * Dropdowns open when the pointer rests on an item, and close once the pointer
-	 * has been out of the landmark for a moment. Omit it and they do.
+	 * leaves the item's trigger and panel, allowing for the way between the two.
+	 * Omit it and they do.
 	 */
 	readonly hover?: boolean;
 	/**
 	 * How long the pointer must rest on an item before its dropdown opens, in
-	 * milliseconds. Omit it and it is 200. It applies to the first dropdown only:
-	 * once one is showing, moving to another opens it at once.
+	 * milliseconds, while no dropdown is showing. Omit it and it is 200.
 	 */
 	readonly delay?: number;
+	/**
+	 * How long the pointer must rest on an item before its dropdown replaces the
+	 * one already showing, in milliseconds. Omit it and it is 137.5, as in QDS.
+	 */
+	readonly switchDelay?: number;
 	/**
 	 * How long after a dropdown opened under the pointer a click on the same
 	 * trigger is ignored, in milliseconds. Omit it and it is 300. Without it the
@@ -111,18 +116,12 @@ export type NavbarItemLinkProps = PropsOf<'a'> & {
  * The shared instance every navbar part reads and writes: the root's seeded
  * fields, plus the consumer's `onChange`, stored by the root for `show()`,
  * `toggle()` and `closeAll()` to call.
- *
- * The two numbers are what a pointer leaving the landmark has to remember: the
- * timer that will re-deliver the leave, and the moment after which that leave
- * closes. Both are zero while the pointer is inside.
  */
 export type NavbarInstanceState = Seeded<
 	NavbarRootProps,
-	'value' | 'hover' | 'delay' | 'clickGrace'
+	'value' | 'hover' | 'delay' | 'switchDelay' | 'clickGrace'
 > & {
 	onChange?: NavbarRootProps['onChange'];
-	leaveTimer: number;
-	leaveUntil: number;
 };
 
 /**
