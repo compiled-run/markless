@@ -1,3 +1,4 @@
+import { protocolBoundSymbolBaseEnd } from '@markless/serializer';
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import { componentEdgeBoundSymbolEntries } from '../src/component-edge-instance.ts';
@@ -36,7 +37,7 @@ export default function Deep() @{
 	<div><Panel side="x" /><Panel side="y" /></div>
 }`;
 
-// Composition binds innermost edge first, then each enclosing edge rebinds what the inner one handed up.
+// Innermost edge first; each enclosing edge rebinds the id handed up by exact id, else by its base, as the runtime does.
 async function composedRowsReachEveryBoundRow(source: string) {
 	const compiled = await compileTsrxModule({ filename: 'src/Page.tsrx', source, symbols: [] });
 	const tables = new Map<string, Map<string, string>>();
@@ -49,8 +50,11 @@ async function composedRowsReachEveryBoundRow(source: string) {
 	expect(rows.some((row) => row.componentEdgePath.length > 1)).toBe(true);
 	for (const row of rows) {
 		let id = row.baseSymbolId;
-		for (const edgeId of [...row.componentEdgePath].reverse())
-			id = tables.get(edgeId)?.get(id) ?? id;
+		for (const edgeId of [...row.componentEdgePath].reverse()) {
+			const table = tables.get(edgeId);
+			const base = protocolBoundSymbolBaseEnd(id);
+			id = table?.get(id) ?? (base > 0 ? table?.get(id.slice(0, base)) : undefined) ?? id;
+		}
 		expect(id).toBe(row.id);
 	}
 }
@@ -61,4 +65,8 @@ test('every instance of a component nested in another reaches its own bound row'
 
 test('every instance three components deep reaches its own bound row', async () => {
 	await composedRowsReachEveryBoundRow(threeLevels);
+});
+
+test('outer instances with one inner instance each reach their own row through the base key', async () => {
+	await composedRowsReachEveryBoundRow(twoLevels.replace('<Choice to="light" name={name} />', ''));
 });

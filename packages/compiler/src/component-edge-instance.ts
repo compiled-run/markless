@@ -271,6 +271,7 @@ export function componentEdgeBoundSymbolEntries(
 		forwarded?: true;
 	}> = [];
 	const baseRows = new Map<string, Set<string>>();
+	const innerByBase = new Map<string, Map<string, string>>();
 	for (const { row, child } of rows) {
 		const path = row.componentEdgePath;
 		path.forEach((edgeId, at) => {
@@ -278,7 +279,7 @@ export function componentEdgeBoundSymbolEntries(
 			const base = `${edgeId}\n${protocolBoundSymbolPrefix(child.symbolId)}`;
 			if (at < path.length - 1) {
 				const inner = representatives.get(suffixKey(child.symbolId, path.slice(at + 1)))!;
-				entries.push({ edgeId, key: inner, rowId, via: 'inner' });
+				innerByBase.set(base, (innerByBase.get(base) ?? new Map()).set(inner, rowId));
 				baseRows.set(base, (baseRows.get(base) ?? new Set()).add(rowId));
 				return;
 			}
@@ -293,11 +294,15 @@ export function componentEdgeBoundSymbolEntries(
 			if (child.forwarded) baseRows.set(base, (baseRows.get(base) ?? new Set()).add(rowId));
 		});
 	}
-	// The base key answers an inner id this module did not mint, so it stands only where every row agrees.
+	// One row behind a base answers every inner id; only several need the exact id each inner edge hands up.
 	for (const [base, rowIds] of baseRows) {
-		if (rowIds.size !== 1) continue;
 		const [edgeId, key] = base.split('\n') as [string, string];
-		entries.push({ edgeId, key, rowId: [...rowIds][0]!, via: 'base' });
+		if (rowIds.size === 1) {
+			entries.push({ edgeId, key, rowId: [...rowIds][0]!, via: 'base' });
+			continue;
+		}
+		for (const [inner, rowId] of innerByBase.get(base) ?? [])
+			entries.push({ edgeId, key: inner, rowId, via: 'inner' });
 	}
 	return entries;
 }
