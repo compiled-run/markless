@@ -373,8 +373,14 @@ export function computeInteractionClosures(input: {
 		const bootSeeds = new Set(bootRoots);
 		let bootBounded =
 			resume !== 'unknown' && [...files].every((file) => !demand.get(file)!.replaced);
+		let bootConservative: string | undefined;
+		// A symbol no module carries widens boot to its own file, as it does a control: never to the whole page.
 		const seedBoot = (file: string, symbolId: string) => {
-			if (!seedSymbol(bootSeeds, file, symbolId)) bootBounded = false;
+			if (seedSymbol(bootSeeds, file, symbolId)) return;
+			const known = symbolsByFile.get(file) ?? [];
+			if (!known.length) bootBounded = false;
+			bootConservative ??= 'unresolved-symbol';
+			for (const id of known) bootSeeds.add(id);
 		};
 		for (const file of files)
 			for (const symbolId of demand.get(file)!.landingSymbols) seedBoot(file, symbolId);
@@ -402,6 +408,7 @@ export function computeInteractionClosures(input: {
 			{
 				key: 'boot',
 				kind: 'boot',
+				...(bootBounded && bootConservative ? { conservative: bootConservative } : {}),
 				modules: bootBounded
 					? useClosure(route, reach, bootSeeds, bootBound, bootSeeds)
 					: useClosure(route, reach, bootRoots),
