@@ -1,5 +1,7 @@
 import { storage } from '@markless/core';
 import { asset } from '../../site-base.ts';
+import DocsSearch from './search/docs-search.tsrx';
+import SearchButton from './search/search-button.tsrx';
 
 export default function ThemeToggle() @{
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
@@ -47,6 +49,8 @@ export default function ThemeToggle() @{
 				}
 			}
 		</style>
+		<SearchButton />
+		<DocsSearch />
 		<button
 			class="theme-toggle theme-toggle-to-dark"
 			type="button"
