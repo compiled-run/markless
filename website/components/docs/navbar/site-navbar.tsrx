@@ -60,13 +60,13 @@ function Brand({ compact }: { readonly compact?: boolean }) @{
 	</span>
 }
 
-// The bar shows on every page, so its home and Get started links opt out of idle prefetch: it would download those pages' code everywhere (decor.test.ts pins the attribute to the router's).
+// The bar shows on every page, so its home and Get started links skip idle prefetch: it would download those pages' code everywhere.
 function DesktopNav({ pathname }: { readonly pathname: string }) @{
 	const homepage = pathname === '/';
 
 	<div class="nav-shade">
 		<navbar.root class="nav-pill navbar-edge" aria-label="Main" data-scroll-hide={homepage ? undefined : ''}>
-			<navbar.itemlink data-markless-router-prefetch="none" class="brand-link" href="/" current={homepage}>
+			<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage}>
 				<Brand />
 			</navbar.itemlink>
 			<div class="nav-items">
@@ -79,7 +79,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 					<lucide.github class="tool-icon" aria-hidden="true" />
 				</navbar.itemlink>
 				<ThemeToggle />
-				<navbar.itemlink data-markless-router-prefetch="none" class="cta" href={getStarted} current={isCurrent(pathname, getStarted)}>
+				<navbar.itemlink prefetch={false} class="cta" href={getStarted} current={isCurrent(pathname, getStarted)}>
 					<span>Get started</span>
 					<lucide.arrowright class="cta-arrow" aria-hidden="true" />
 				</navbar.itemlink>
@@ -477,7 +477,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				>
 					<lucide.panelleftopen class="bar-icon" aria-hidden="true" />
 				</button>
-				<a data-markless-router-prefetch="none" class="bar-brand" href="/" aria-label="Markless home">
+				<a prefetch={false} class="bar-brand" href="/" aria-label="Markless home">
 					<Brand compact />
 				</a>
 				<span class="bar-end">
@@ -509,7 +509,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 						>
 							<lucide.panelleftopen class="bar-icon" aria-hidden="true" />
 						</button>
-						<a data-markless-router-prefetch="none" class="bar-brand" href="/" aria-label="Markless home">
+						<a prefetch={false} class="bar-brand" href="/" aria-label="Markless home">
 							<Brand compact />
 						</a>
 						<modal.close class="bar-button menu-close" aria-label="Close menu">

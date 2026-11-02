@@ -11,8 +11,6 @@ import {
 import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
 import { rememberRequestLocals } from './request-locals.ts';
 
-/** The attribute that keeps a plain `<a>` the router would idle-prefetch from being prefetched: set it to `'none'`. `<Link prefetch={false}>` writes it for you. */
-export { PREFETCH_ATTRIBUTE };
 export {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,

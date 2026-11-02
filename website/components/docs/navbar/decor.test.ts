@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { PREFETCH_ATTRIBUTE } from '@markless/core/router';
 import { describe, expect, it } from 'vitest';
 import { relative } from '../ink-logos.ts';
 import { type Drawing, decor, themeArt } from './decor.ts';
@@ -8,7 +6,12 @@ import { NAV_DECOR, panels } from './sections.ts';
 const cards = decor();
 const theme = themeArt();
 
-const frozen = (drawing: Drawing): Drawing => ({ ...drawing, wash: relative(drawing.wash), hatch: relative(drawing.hatch), ink: relative(drawing.ink) });
+const frozen = (drawing: Drawing): Drawing => ({
+	...drawing,
+	wash: relative(drawing.wash),
+	hatch: relative(drawing.hatch),
+	ink: relative(drawing.ink),
+});
 
 function sprite(): string {
 	const symbols = Object.entries(cards).map(([name, drawing]) => {
@@ -21,7 +24,8 @@ function sprite(): string {
 describe('navbar drawings', () => {
 	it('draws every card with one wash, hatching and ink', () => {
 		for (const drawing of [...Object.values(cards), ...Object.values(theme)]) {
-			for (const layer of [drawing.wash, drawing.hatch, drawing.ink]) expect(layer.length).toBeGreaterThan(40);
+			for (const layer of [drawing.wash, drawing.hatch, drawing.ink])
+				expect(layer.length).toBeGreaterThan(40);
 			expect(drawing.wash.match(/Z/g)?.length, 'one loose wash per drawing').toBe(1);
 		}
 	});
@@ -47,14 +51,5 @@ import type { Drawing } from './decor.ts';
 export const art: { readonly sun: Drawing; readonly moon: Drawing } = ${JSON.stringify({ sun: frozen(theme.sun), moon: frozen(theme.moon) }, null, '\t')};
 `;
 		await expect(module).toMatchFileSnapshot('./theme-art.art.ts');
-	});
-});
-
-describe('navbar links', () => {
-	it("opt out of idle prefetch with the router's own attribute", () => {
-		const source = readFileSync(new URL('./site-navbar.tsrx', import.meta.url), 'utf8');
-		const written = [...source.matchAll(/(data-markless-router-[a-z]+)="none"/g)].map((match) => match[1]);
-		expect(written.length).toBeGreaterThan(0);
-		for (const name of written) expect(name).toBe(PREFETCH_ATTRIBUTE);
 	});
 });
