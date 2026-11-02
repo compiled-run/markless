@@ -3150,6 +3150,126 @@
 			"from": 7991,
 			"to": 8056,
 			"reason": "measured +65 B: an @if test's synthetic computed now names the component that wrote it, so resume derives it on read (deriveOnRead flag in the payload and render data) instead of eagerly as an ownerless module node; the root no longer runs a child's derive"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 29709,
+			"to": 31647,
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 10863,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on this Mac, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 10879,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on this Mac, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 10829,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on this Mac, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569197
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569238
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +41 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569238
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569463
+			},
+			"reason": "the fragment swap module's morph dry run (PR #415) on main 520c96247 (after #414 and #416): the docs page downloads +266 B gzip over main (the same change measured +41 B on an older main; the page's pack compresses differently around it); measured on CI run 41427605874, executed chars at load within budget"
 		}
 	],
 	"runtimeModules": {
@@ -3162,7 +3282,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2816,
-		"router/vite/entries/fragment-entry": 29709,
+		"router/vite/entries/fragment-entry": 31647,
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
@@ -3314,16 +3434,16 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10862,
-				"jsGzipBytes": 88111
+				"executedChars": 10863,
+				"jsGzipBytes": 88379
 			},
 			"bench /records": {
-				"executedChars": 10878,
-				"jsGzipBytes": 88111
+				"executedChars": 10879,
+				"jsGzipBytes": 88379
 			},
 			"bench /settings": {
-				"executedChars": 10935,
-				"jsGzipBytes": 88111
+				"executedChars": 10829,
+				"jsGzipBytes": 88379
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3341,19 +3461,19 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11342,
-				"jsGzipBytes": 88111
+				"jsGzipBytes": 88379
 			},
 			"bench /records": {
 				"executedChars": 11251,
-				"jsGzipBytes": 88111
+				"jsGzipBytes": 88379
 			},
 			"bench /settings": {
 				"executedChars": 11308,
-				"jsGzipBytes": 88111
+				"jsGzipBytes": 88379
 			},
 			"docs /": {
 				"executedChars": 110777,
-				"jsGzipBytes": 1569197
+				"jsGzipBytes": 1569463
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
