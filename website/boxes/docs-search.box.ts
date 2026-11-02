@@ -20,6 +20,8 @@ export default box(
 		const server = await pipeline.dev({
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
+		// A page's first compile writes its code-block modules, and a new module file reloads open pages.
+		for (const route of ['/concepts/state', '/build/shared']) await fetch(new URL(route, server.url));
 		const browser = await chromium.launch({ headless: true });
 		try {
 			const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
