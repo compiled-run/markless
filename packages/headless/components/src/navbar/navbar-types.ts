@@ -122,6 +122,10 @@ export type NavbarInstanceState = Seeded<
 	'value' | 'hover' | 'delay' | 'switchDelay' | 'clickGrace'
 > & {
 	onChange?: NavbarRootProps['onChange'];
+	/** Which side the dropdown now showing came from when it replaced another: `start`, `end`, or empty. */
+	from: '' | 'start' | 'end';
+	/** The value that was showing before the last change. */
+	previous: string;
 };
 
 /**

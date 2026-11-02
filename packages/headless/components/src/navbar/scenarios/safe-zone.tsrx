@@ -19,6 +19,9 @@ export default function SafeZone() @{
 				</navbar.itemcontent>
 			</navbar.item>
 			<navbar.itemlink href="/pricing" class="far" data-testid="pricing-itemlink">Pricing</navbar.itemlink>
+			<navbar.item value="blog" data-testid="blog-item">
+				<navbar.itemlink href="/blog" data-testid="blog-itemlink">Blog</navbar.itemlink>
+			</navbar.item>
 		</navbar.root>
 		<div class="gap" data-testid="gap"></div>
 		<button type="button" class="signin" data-testid="signin">Sign in</button>

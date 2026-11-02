@@ -1,6 +1,6 @@
 import { computed, element, shared, state } from '@markless/core';
 import { isInSafeZone, leaveSafeZone, takeSafeZoneExit, watchSafeZone } from './navbar-safe-zone.ts';
-import { controlAt, controlsInside, panelAt, stepTo, topLevelControls } from './navbar-walk.ts';
+import { controlAt, controlsInside, directionTo, panelAt, stepTo, topLevelControls } from './navbar-walk.ts';
 import type {
 	NavbarInstanceState,
 	NavbarItemContentProps,
@@ -26,6 +26,8 @@ export const navbarState = shared(
 			delay: 200,
 			switchDelay: 137.5,
 			clickGrace: 300,
+			from: '',
+			previous: '',
 		});
 		const navEl = element<HTMLElement>();
 		// The array type argument makes a handle plural: bound on every trigger and
@@ -41,8 +43,11 @@ export const navbarState = shared(
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// `next = ''` rather than `next: string`: the inlined handler is re-parsed as plain JavaScript and an annotation throws (MARKLESS_CAPTURE_OPAQUE_PROP).
+			// A caller switching dropdowns writes `from` first; opening from closed or closing clears it.
 			show(next = '') {
 				if (navbar.value === next) return;
+				navbar.previous = navbar.value;
+				if (navbar.previous === '' || next === '') navbar.from = '';
 				navbar.value = next;
 				navbar.onChange?.(next);
 			},
@@ -50,11 +55,15 @@ export const navbarState = shared(
 			toggle(next = '') {
 				const to = navbar.value === next ? '' : next;
 				if (navbar.value === to) return;
+				navbar.previous = navbar.value;
+				if (navbar.previous === '' || to === '') navbar.from = '';
 				navbar.value = to;
 				navbar.onChange?.(to);
 			},
 			closeAll() {
 				if (navbar.value === '') return;
+				navbar.previous = navbar.value;
+				navbar.from = '';
 				navbar.value = '';
 				navbar.onChange?.('');
 			},
@@ -178,10 +187,12 @@ export function NavbarItem({
 			const box = item.boxEl;
 			const came = event.relatedTarget as Node | null;
 			// pointerover fires again for every element inside the item; only a crossing from outside it is an enter.
+			// An item that holds only a link has no dropdown to open.
 			if (
 				navbar.hover !== true ||
 				navbar.value === item.value ||
 				box === undefined ||
+				item.contentEl === undefined ||
 				(came !== null && box.contains(came) === true)
 			) {
 				onPointerover?.(event);
@@ -197,6 +208,7 @@ export function NavbarItem({
 				item.openTimer = 0;
 				item.restingUntil = 0;
 				item.graceUntil = now + navbar.clickGrace;
+				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
 				navbar.show(item.value);
 			} else if (item.restingUntil === 0) {
 				// The timer re-delivers the crossing rather than opening: shared reads are rewritten only at the handler's top level, so `navbar.show()` inside this closure is a ReferenceError.
@@ -251,7 +263,10 @@ export function NavbarItemTrigger({
 		ui-closed={isOpen !== true}
 		onClick={(event) => {
 			// A dropdown that just opened under the resting pointer must not be shut by the click that followed.
-			if (item.graceUntil <= Date.now()) navbar.toggle(item.value);
+			if (item.graceUntil <= Date.now()) {
+				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
+				navbar.toggle(item.value);
+			}
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -269,6 +284,7 @@ export function NavbarItemTrigger({
 			const from = event.target as HTMLElement;
 
 			if (key === 'ArrowDown') {
+				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
 				navbar.show(item.value);
 				// One call, no retry: the runtime commits the `hidden` write before this returns, so the link is focusable now.
 				controlsInside(navbar.controlEls, item.contentEl)[0]?.focus();
@@ -301,6 +317,13 @@ export function NavbarItemContent({
 	const navbar = navbarState();
 	const item = navbarItemState();
 	const isOpen = computed(() => navbar.value === item.value);
+	// Which side this panel slides in from, or out to, while the navbar switches between dropdowns.
+	const from = computed(() => (navbar.value === item.value && navbar.from !== '' ? navbar.from : undefined));
+	const to = computed(() =>
+		navbar.value !== item.value && navbar.value !== '' && navbar.previous === item.value && navbar.from !== ''
+			? navbar.from === 'end' ? 'start' : 'end'
+			: undefined,
+	);
 
 	// Closed hides the panel, never detaches it: the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
 	// `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses as `dismiss`, closing nothing and moving no focus itself.
@@ -311,6 +334,8 @@ export function NavbarItemContent({
 		hidden={isOpen !== true}
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
+		ui-from={from}
+		ui-to={to}
 		onDismiss={(event) => {
 			const box = item.boxEl;
 			const back = item.triggerEl;

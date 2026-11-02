@@ -33,6 +33,10 @@ A screen reader hears plain links and buttons, which is what site navigation is.
 The root, the item, the trigger and the dropdown write `ui-open` while a dropdown shows. They write
 `ui-closed` while it does not. `navbar.item` writes `ui-active` when you set `active` on it.
 `navbar.itemlink` writes `ui-active` and `aria-current="page"` when you set `current` on it.
+When one dropdown replaces another, the dropdown coming in writes `ui-from="end"` if its trigger is
+after the old one in the bar, or `ui-from="start"` if it is before. The one going out writes
+`ui-to` with the opposite side. Use them to slide the panels the way the pointer moved. Opening from
+closed, or closing, writes neither.
 
 Set `current` on the one link for the page a person is on. Set `active` on the item for the section
 that page sits in. Only `current` reaches a screen reader.

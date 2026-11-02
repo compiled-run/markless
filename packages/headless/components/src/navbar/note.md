@@ -84,6 +84,12 @@ disclosure directly:
    the next one opens after `switchDelay` (137.5 ms, QDS's default) instead of
    `delay`. An earlier version opened it at once; side by side with the QDS docs
    that read as twitchy, so the family now follows QDS.
+6a. **`ui-from` and `ui-to` replace Radix's `data-motion`.** Radix NavigationMenu
+   portals every panel into one shared viewport and writes `data-motion` on it.
+   SPEC.md rules `viewport` out as a role, so the panels stay in their items and
+   the family writes only the direction: `ui-from="start|end"` on the panel
+   coming in and `ui-to` on the one going out. A consumer that wants the
+   shared-box look draws the box itself and slides the panels inside it.
 7. **No `orientation`.** QDS defers vertical navbars and so does this. A vertical
    top level needs `ArrowUp`/`ArrowDown`, which collides with
    `ArrowDown`-opens-the-dropdown.

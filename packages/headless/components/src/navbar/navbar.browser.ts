@@ -279,6 +279,30 @@ test('CSR: a click calls onChange once with the entry now showing', async () => 
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 });
 
+// Which way the next panel comes from, so a consumer can slide it in the way the pointer moved.
+test('CSR: switching dropdowns marks where the incoming panel comes from and where the outgoing one goes', async () => {
+	await render(Basic);
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	expect(el(ProductsContent).hasAttribute('ui-from')).toBe(false);
+
+	el(DocsTrigger).click();
+	await expect.poll(() => el(DocsContent).getAttribute('ui-from')).toBe('end');
+	expect(el(ProductsContent).getAttribute('ui-to')).toBe('start');
+
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsContent).getAttribute('ui-from')).toBe('start');
+	expect(el(DocsContent).getAttribute('ui-to')).toBe('end');
+	expect(el(DocsContent).hasAttribute('ui-from')).toBe(false);
+
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	for (const content of [el(ProductsContent), el(DocsContent)]) {
+		expect(content.hasAttribute('ui-from')).toBe(false);
+		expect(content.hasAttribute('ui-to')).toBe(false);
+	}
+});
+
 test('CSR: switching entries calls onChange once with the new one', async () => {
 	await render(WithOnChange);
 	el(ProductsTrigger).click();
@@ -728,6 +752,20 @@ test('SSR: crossing the gap keeps the panel showing, and leaving the safe zone c
 
 	await userEvent.hover(el(page.getByTestId('pricing-itemlink')));
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+});
+
+// An item that holds only a link has nothing to show: hovering it closes the open dropdown and opens nothing,
+// so the landmark is not left open behind a link.
+test('CSR: hovering an item that holds only a link closes the dropdown and leaves the navbar closed', async () => {
+	await render(SafeZone);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.hover(el(page.getByTestId('blog-itemlink')));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	await new Promise((resolve) => setTimeout(resolve, 200));
+	expect(el(Root).hasAttribute('ui-open')).toBe(false);
+	expect(el(page.getByTestId('blog-item')).hasAttribute('ui-open')).toBe(false);
 });
 
 test('CSR: a click inside the grace window leaves a hover-opened dropdown showing', async () => {

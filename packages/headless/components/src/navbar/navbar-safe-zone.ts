@@ -8,7 +8,6 @@ type Point = readonly [number, number];
 
 const MARGIN = 10;
 const EDGE = 5;
-const THROTTLE_MS = 16;
 
 function isInsideRect(x: number, y: number, rect: DOMRect, grow: number): boolean {
 	return x >= rect.left - grow && x <= rect.right + grow && y >= rect.top - grow && y <= rect.bottom + grow;
@@ -70,15 +69,12 @@ const exited = new WeakSet<HTMLElement>();
 export function watchSafeZone(item: HTMLElement, trigger: HTMLElement, panel: HTMLElement): void {
 	if (watching.has(item)) return;
 	watching.add(item);
-	let last = -Infinity;
 	const stop = () => {
 		watching.delete(item);
 		document.removeEventListener('pointermove', onMove);
 	};
 	const onMove = (event: PointerEvent) => {
 		if (panel.hidden) return stop();
-		if (event.timeStamp - last < THROTTLE_MS) return;
-		last = event.timeStamp;
 		if (isInSafeZone(event.clientX, event.clientY, trigger, panel)) return;
 		stop();
 		exited.add(item);

@@ -81,3 +81,15 @@ export function stepTo(
 	if (raw > last) return walk[0];
 	return walk[raw];
 }
+
+/**
+ * Which side a dropdown opening at `to` comes from while another is showing: `end` when `to` is
+ * after the open one in the bar, `start` when before, and the empty string when none is open.
+ */
+export function directionTo(controls: Parts, to: HTMLElement | undefined): 'start' | 'end' | '' {
+	if (to === undefined) return '';
+	let open: HTMLElement | undefined;
+	for (const control of controls ?? []) if (control !== to && control.getAttribute('aria-expanded') === 'true') open = control;
+	if (open === undefined) return '';
+	return open.compareDocumentPosition(to) & Node.DOCUMENT_POSITION_FOLLOWING ? 'end' : 'start';
+}
