@@ -3,9 +3,11 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import Direct from './forwarded-constant-props/direct.tsrx';
 import Iterated from './forwarded-constant-props/iterated.tsrx';
 import Live from './forwarded-constant-props/live.tsrx';
+import OneFile from './forwarded-constant-props/one-file.tsrx';
 import SameFileChildren from './forwarded-constant-props/same-file-children.tsrx';
 import ThreeLevels from './forwarded-constant-props/three-levels.tsrx';
 import TwoLevels from './forwarded-constant-props/two-levels.tsrx';
+import TwoPairs from './forwarded-constant-props/two-pairs.tsrx';
 
 afterEach(() => cleanup());
 
@@ -51,6 +53,25 @@ test('SSR resume: a constant prop forwarded inside one imported file reaches com
 	await forwardedPropReachesReaders(
 		(await renderSSR(SameFileChildren)).container as HTMLElement,
 		'local',
+	);
+});
+test('CSR: constant props forwarded into two instances of one imported component reach each instance', async () => {
+	const container = (await render(TwoPairs)).container as HTMLElement;
+	await forwardedPropReachesReaders(container, 'one');
+	await forwardedPropReachesReaders(container, 'two');
+});
+test('SSR resume: constant props forwarded into two instances of one imported component reach each instance', async () => {
+	const container = (await renderSSR(TwoPairs)).container as HTMLElement;
+	await forwardedPropReachesReaders(container, 'one');
+	await forwardedPropReachesReaders(container, 'two');
+});
+test('CSR: a constant prop forwarded inside the page file reaches computed and handler readers', async () => {
+	await forwardedPropReachesReaders((await render(OneFile)).container as HTMLElement, 'inline');
+});
+test('SSR resume: a constant prop forwarded inside the page file reaches computed and handler readers', async () => {
+	await forwardedPropReachesReaders(
+		(await renderSSR(OneFile)).container as HTMLElement,
+		'inline',
 	);
 });
 
