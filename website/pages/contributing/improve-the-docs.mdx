@@ -43,14 +43,15 @@ PORT=4310 node website/.output/server/index.mjs
 
 ## The shape of a page
 
-Each page is an `.mdx` file. The top imports the components it uses. Then come the sidebar, one `H1`, the meta line and the theme toggle. The prose follows.
+Each page is an `.mdx` file. The top imports the components it uses. Then come the navbar, the sidebar, one `H1` and the meta line. The prose follows.
 
 ```txt
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # One title per page

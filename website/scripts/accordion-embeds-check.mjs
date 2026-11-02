@@ -91,7 +91,7 @@ try {
   await page.getByRole('link', { name: '← Accordion examples', exact: true }).click();
   await page.waitForURL(base + '/ui/accordion#examples');
   await examples.waitFor();
-  await page.locator('.site-navbar').waitFor();
+  await page.locator('.site-navbar').waitFor({ state: 'attached' });
   console.log('PASS: ' + id + ' opens its retained treatment and returns to the docs.');
  }
  const plain = await browser.newPage({ javaScriptEnabled: false });

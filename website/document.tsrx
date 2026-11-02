@@ -43,7 +43,7 @@ export default function Document({
 			<script src={asset('theme.js')}></script>
 			<script src={asset('mascot.js')}></script>
 			<script type="module" src={asset('outline.js')}></script>
-			<script type="module" src={asset('navbar-scroll.js')}></script>
+			<script type="module" src={asset('navbar.js')}></script>
 			@if (examplePage) {
 				<script type="module" src={asset('accordion-preview.js')}></script>;
 			}

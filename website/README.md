@@ -141,8 +141,9 @@ screenshots into the markless repo's goal notes.
   full-screen `modal` menu below it. `sections.ts` names the panels and their cards. `decor.ts`
   draws each card's picture and the theme toggle's sun and moon with the figures' ink pen;
   `decor.test.ts` freezes the cards into `public/nav-decor.svg` and the sun and moon into
-  `theme-art.art.ts` (run it with `-u` after editing a drawing). `public/navbar-scroll.js` slides the
-  floating bar away while the reader scrolls down.
+  `theme-art.art.ts` (run it with `-u` after editing a drawing). `public/navbar.js` slides the floating
+  bar away while the reader scrolls down, and closes the full-screen menu when the window widens
+  into the desktop layout.
 - `components/sprite.tsrx`, `components/mascot.tsrx`, `components/sticker.tsrx` — the hand-drawn
   accents. `public/sprites/`, `public/mascots/` and `public/stickers/` hold the cut assets;
   `tooling/cut-sprites.ts` is what cut them and is not part of the build. Sprites are the flat
@@ -191,14 +192,16 @@ The dark theme is the paper design with the ground and the ink swapped and the s
 accents. Every dark value sits nested inside the rule that holds its light value, under an
 `html.dark &` (or `&.dark` on `:root`) selector, so the two are never apart.
 
-`components/docs/theme-toggle.tsrx` is the control, and `storage('theme', 'system')` is the whole of
+The toggle's `ThemeToggle` in `components/docs/navbar/site-navbar.tsrx` is the control, and `storage('theme', 'system')` is the whole of
 it: assigning to that binding writes `localStorage.theme` and stamps `data-theme` on `<html>`, and
 the seed script the router puts in the head applies the stored value before the first paint.
 `public/theme.js` resolves that stored choice (`system` against the OS setting) into a `dark` or
 `light` class on `<html>`, which is the only thing the CSS reads, so the theme never flashes.
 
 The toggle and the navbar that holds it are an island each `.mdx` page renders (`<SiteNavbar />`,
-beside `<Sidebar />`), because the router serves only the document's HTML and drops its state
+beside `<Sidebar />`). The toggle lives in the navbar's own module because a page collects storage
+seeds only from the modules it renders directly, and that seed paints the stored theme before first
+paint. It is an island because the router serves only the document's HTML and drops its state
 payload, so nothing on the document path can resume. Each button draws the theme it stands in, so
 the sun is only ever painted on paper and the moon only ever on the dark ground; a click swaps
 them with a small turn and lets the yellow wash spread in after the ink.
