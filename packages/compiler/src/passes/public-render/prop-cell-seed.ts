@@ -27,8 +27,8 @@ type PropRead = {
 	readonly path: ReadonlyArray<string>;
 };
 
-// The prop reads a browser flip makes to rebuild this component's arms — an arm
-// showing projected `children` is the common one.
+// The prop reads a browser flip or arm render makes to rebuild this component's
+// arms, in text or attributes — an arm showing projected `children` is the common one.
 function armRebuildPropReads(
 	input: PublicRenderModuleInput,
 	componentName: string,
@@ -38,7 +38,8 @@ function armRebuildPropReads(
 		(chunk.kind !== 'branch-arm' && chunk.kind !== 'async-arm')
 			? []
 			: chunk.slots.flatMap((slot) =>
-					slot.kind === 'text' && slot.residue.kind === 'graph-read'
+					(slot.kind === 'text' || slot.kind === 'attribute') &&
+					slot.residue.kind === 'graph-read'
 						? [{ graphNodeId: slot.residue.graphNodeId, path: slot.residue.path }]
 						: [],
 				),

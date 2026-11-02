@@ -1,5 +1,6 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
 import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
+import { composedArmRecordQualifier } from './resume-handle-qualifier.ts';
 import type {
 	ResumeBehaviorRecord,
 	ResumeBranchRecord,
@@ -171,7 +172,12 @@ function createBranchRegistration(
 			paintArm(update.arm);
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
-			if (update.armRecords) return input.commitArm(branch, { ...update, html });
+			// A composed child's escalated render spells its ids in the child's own space.
+			if (update.armRecords)
+				return input.commitArm(branch, {
+					...(composedArmRecordQualifier()?.branchUpdate?.(branch, update as never, input.graph) ?? update),
+					html,
+				});
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
 						html,

@@ -3300,6 +3300,56 @@
 			"from": 9385,
 			"to": 8979,
 			"reason": "measured: settle tracking and re-settle hold setup moved to resume-async-wiring, which only pages with a @try load"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 20104,
+			"to": 21395,
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10863,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88513
+			},
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load (+134 B gzip downloaded on darwin-arm64)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10879,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88513
+			},
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load (+134 B gzip downloaded on darwin-arm64)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10829,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88513
+			},
+			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds); flip-time code, none of it executed at load (+134 B gzip downloaded on darwin-arm64)"
 		}
 	],
 	"runtimeModules": {
@@ -3356,7 +3406,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 20104,
+		"web/fns/instance-scope": 21395,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
@@ -3464,16 +3514,16 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10863,
-				"jsGzipBytes": 88379
+				"executedChars": 10862,
+				"jsGzipBytes": 88513
 			},
 			"bench /records": {
-				"executedChars": 10879,
-				"jsGzipBytes": 88379
+				"executedChars": 10878,
+				"jsGzipBytes": 88513
 			},
 			"bench /settings": {
-				"executedChars": 10829,
-				"jsGzipBytes": 88379
+				"executedChars": 10935,
+				"jsGzipBytes": 88513
 			},
 			"docs /": {
 				"executedChars": 108937,
