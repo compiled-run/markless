@@ -1364,9 +1364,10 @@ function armPartReadPath(
 type ArmRefusal = {
 	readonly detail: string;
 	readonly span?: SourceSpan;
-	// A same-module component that has to run: the one refusal a re-render of the
-	// page through the prerender evaluator can answer.
+	// A component that has to run, or a @try block that has to settle: what a
+	// re-render of the page through the prerender evaluator can answer.
 	readonly escalatable?: boolean;
+	readonly tryBlock?: boolean;
 };
 
 type ArmPartsContext = {
@@ -1553,6 +1554,7 @@ function branchArmRendersInBrowserDiagnostic(
 	const names = [
 		...new Set(refusals.flatMap((refusal) => /^<([^>]+)>/.exec(refusal.detail)?.[1] ?? [])),
 	].map((name) => `<${name}>`);
+	if (refusals.some((refusal) => refusal.tryBlock)) names.push('the @try block it holds');
 	const shown = names.length > 0 ? names.join(', ') : 'its components';
 	return {
 		code: BRANCH_ARM_RENDERS_IN_BROWSER_CODE,
@@ -1894,6 +1896,14 @@ function renderChunkParts(
 				});
 				continue;
 			}
+			if (slot.kind === 'async') {
+				context.refusals?.push({
+					detail: armSlotRefusalDetail(slot),
+					escalatable: true,
+					tryBlock: true,
+				});
+				return null;
+			}
 			return refuse(armSlotRefusalDetail(slot));
 		}
 	}
@@ -1908,7 +1918,8 @@ function armSlotRefusalDetail(slot: SemanticMarkupSlot): string {
 		return 'an element() handle it binds is named by an IDREF, and that id is minted for the rendered widget, which a flip has no way to mint again';
 	if ('residue' in slot && slot.residue.kind === 'element-handle-id-list')
 		return 'an element() handle it binds is named by an IDREF list, and those ids are minted for the rendered widget, which a flip has no way to mint again';
-	return `it holds ${slot.kind === 'attribute' || slot.kind === 'async' ? 'an' : 'a'} ${slot.kind} binding`;
+	if (slot.kind === 'async') return 'it holds a @try block';
+	return `it holds ${slot.kind === 'attribute' ? 'an' : 'a'} ${slot.kind} binding`;
 }
 
 // One prop name to the value a flip rebuilds the child's markup with.

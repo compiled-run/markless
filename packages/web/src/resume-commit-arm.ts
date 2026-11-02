@@ -119,7 +119,7 @@ export function createArmCommitter(
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
 		) => Promise<void>;
-		readonly asyncBoundaryWiring?: () => AsyncBoundaryWiring | undefined;
+		readonly asyncBoundaryWiring?: () => Promise<AsyncBoundaryWiring> | undefined;
 		readonly documentHost?: CommitDocument;
 	},
 	installEventType: (eventType: string) => void,
@@ -465,7 +465,7 @@ async function registerNestedAsyncBoundaries(
 	records: NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
 	computed: ArmCommitUpdate['computed'],
 ): Promise<void> {
-	const wiring = deps.asyncBoundaryWiring?.();
+	const wiring = await deps.asyncBoundaryWiring?.();
 	if (!wiring || !deps.graph || !deps.loadSymbol)
 		throw new Error('Markless nested async boundary registration is unavailable.');
 	const census = commentsBetween(range.startAnchor, range.endAnchor);

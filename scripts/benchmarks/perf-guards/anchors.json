@@ -3284,6 +3284,22 @@
 				"jsGzipBytes": 1570040
 			},
 			"reason": "the in-browser compiler behind the docs' live code blocks (assets/compile-worker.js, fetched at idle) carries the element-only attribute check that refuses a misplaced prefetch={false}; measured on CI run 41433570242 (PR #418 on main 2ec91d8bb): +577 B gzip downloaded, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 9858,
+			"to": 10693,
+			"reason": "measured: settle tracking and the re-settle hold now start in this @try-only chunk, moved out of resume-runtime-start, so a @try an @if renders after start can be wired"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 9385,
+			"to": 8979,
+			"reason": "measured: settle tracking and re-settle hold setup moved to resume-async-wiring, which only pages with a @try load"
 		}
 	],
 	"runtimeModules": {
@@ -3381,7 +3397,7 @@
 		"web/resume-arm-keyed-repeats": 1225,
 		"web/resume-arm-records": 7741,
 		"web/resume-arm-records-lazy": 219,
-		"web/resume-async-wiring": 9858,
+		"web/resume-async-wiring": 10693,
 		"web/resume-behaviors": 8804,
 		"web/resume-branches": 15037,
 		"web/resume-census": 1471,
@@ -3397,7 +3413,7 @@
 		"web/resume-resettle-hold": 2929,
 		"web/resume-runtime": 15275,
 		"web/resume-runtime-shared": 2089,
-		"web/resume-runtime-start": 9385,
+		"web/resume-runtime-start": 8979,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2414,
 		"web/resume-sync-computed": 7870,
