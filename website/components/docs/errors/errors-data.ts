@@ -1165,7 +1165,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'Changing this <label> cannot rebuild what it shows: a Markless build error.',
 		printed: [
 			'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: this <label> (<testSource>) cannot be rebuilt when <testSource> changes because <detail>.',
-			'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+			'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 			'Move the component outside the <label> and hide it with an attribute, lift its state up to the component that owns the <label>, or keep the <label> content to plain elements, text, and state reads.',
 			'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		],

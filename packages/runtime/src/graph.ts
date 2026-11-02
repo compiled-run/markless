@@ -286,6 +286,13 @@ export type RuntimeGraph = {
 	/** Code outside the graph changed the value at `path` in place; everything reading it updates. */
 	readonly changed: (change: RuntimeGraphChange) => void;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
+	/** How many subscriptions are registered on `graphNodeId`. */
+	readonly subscriptionCount?: (graphNodeId: string) => number;
+	/**
+	 * Runs `pull` once, at the next read of `graphNodeId` and before that read
+	 * answers, so a value derived on demand can write itself first.
+	 */
+	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
 	/**
@@ -613,7 +620,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const seeded = cells.has(write.graphNodeId);
 			if (
 				!seeded ||
-				!(plane?.commitDerived(write, path) || Object.is(readPath(current, path), write.value))
+				!(
+					plane?.commitDerived(write, path) ||
+					Object.is(readPath(current, path), write.value)
+				)
 			)
 				commitCell(write.graphNodeId, path, write.value);
 			return write.value;
@@ -666,6 +676,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				bucket.splice(index, 1);
 				subscriptionOrder.delete(subscription);
 			};
+		},
+		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,
+		pullBeforeRead(graphNodeId, pull) {
+			// The pull writes the node itself, so the initializer answers what it held before.
+			readInitializers.set(graphNodeId, () => {
+				const before = cells.get(graphNodeId);
+				pull();
+				return before;
+			});
 		},
 		subscribeWrite(observer) {
 			writeObservers.push(observer);

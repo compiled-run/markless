@@ -149,14 +149,23 @@ function createBranchRegistration(
 					graph,
 					branch,
 				);
-			const update = await symbol({
+			const context = {
 				graph,
 				arm,
 				branchId: branch.sourceId ?? branch.id,
 				composedBranchId: branch.id,
 				element: input.root,
 				getElementHandle: input.elementHandles.get,
-			});
+			};
+			// A computed only the incoming arm reads derives as the arm reads it.
+			await input.graph.settleWriteObservers?.();
+			let update = await symbol(context);
+			// One that derives through a promise lands after this read, so the arm reads again.
+			const derived = !update?.armRecords && input.graph.settleWriteObservers?.();
+			if (derived) {
+				await derived;
+				update = await symbol(context);
+			}
 			if (!isResumeBranchUpdate(update)) return;
 			currentArm = update.arm;
 			paintArm(update.arm);
