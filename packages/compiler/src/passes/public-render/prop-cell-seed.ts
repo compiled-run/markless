@@ -129,13 +129,14 @@ export function derivedPropKeys(
 	visiting: ReadonlySet<string> = new Set(),
 ): ReadonlySet<string> {
 	if (visiting.has(componentName)) return new Set();
-	const bag = ssrPropCellSeedsForCell(
-		input,
-		PROTOCOL_PROPS_GRAPH_NODE_ID,
-		componentName,
-		new Set([...visiting, componentName]),
-	).find((seed) => seed.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID);
-	return new Set(bag?.scalarKeys ?? []);
+	return (
+		propCellKeys(
+			input,
+			PROTOCOL_PROPS_GRAPH_NODE_ID,
+			componentName,
+			new Set([...visiting, componentName]),
+		).deriveKeysByCell.get(PROTOCOL_PROPS_GRAPH_NODE_ID) ?? new Set()
+	);
 }
 
 // The props read back after resume whatever their value: a row template's expression
@@ -217,8 +218,43 @@ export function ssrPropCellSeedsForCell(
 	input: PublicRenderModuleInput,
 	bagCellId: string | null,
 	componentName: string,
-	visiting: ReadonlySet<string> = new Set([componentName]),
 ): ReadonlyArray<SsrPropCellSeed> {
+	const { armKeysByCell, deriveKeysByCell, rowKeysByCell } = propCellKeys(
+		input,
+		bagCellId,
+		componentName,
+		new Set([componentName]),
+	);
+	return [
+		...new Set([...armKeysByCell.keys(), ...deriveKeysByCell.keys(), ...rowKeysByCell.keys()]),
+	].flatMap((graphNodeId): SsrPropCellSeed[] => {
+		const armKeys = armKeysByCell.has(graphNodeId)
+			? (armKeysByCell.get(graphNodeId) ?? null)
+			: new Set<string>();
+		const rowKeys = [...(rowKeysByCell.get(graphNodeId) ?? [])];
+		// A row key is carried whatever its value, which already covers a derive read of it.
+		const deriveKeys = [...(deriveKeysByCell.get(graphNodeId) ?? [])].filter(
+			(key) => !rowKeys.includes(key),
+		);
+		if (armKeys === null) return [{ graphNodeId, keys: null }];
+		if (armKeys.size === 0 && deriveKeys.length === 0 && rowKeys.length === 0) return [];
+		return [
+			{
+				graphNodeId,
+				keys: [...armKeys],
+				...(deriveKeys.length > 0 ? { scalarKeys: deriveKeys } : {}),
+				...(rowKeys.length > 0 ? { rowKeys } : {}),
+			},
+		];
+	});
+}
+
+function propCellKeys(
+	input: PublicRenderModuleInput,
+	bagCellId: string | null,
+	componentName: string,
+	visiting: ReadonlySet<string>,
+) {
 	const armKeysByCell = new Map<string, Set<string> | null>();
 	for (const { graphNodeId, path } of armRebuildPropReads(input, componentName)) {
 		if (!graphNodeId.startsWith('prop:')) continue;
@@ -251,28 +287,10 @@ export function ssrPropCellSeedsForCell(
 			])
 		: new Set<string>();
 	for (const key of rowKeys)
-		if (!armKeysByCell.get(bagCellId!)?.has(key) && !deriveKeysByCell.get(bagCellId!)?.has(key))
+		if (!armKeysByCell.get(bagCellId!)?.has(key))
 			rowKeysByCell.set(bagCellId!, (rowKeysByCell.get(bagCellId!) ?? new Set()).add(key));
 
-	return [
-		...new Set([...armKeysByCell.keys(), ...deriveKeysByCell.keys(), ...rowKeysByCell.keys()]),
-	].flatMap((graphNodeId): SsrPropCellSeed[] => {
-		const armKeys = armKeysByCell.has(graphNodeId)
-			? (armKeysByCell.get(graphNodeId) ?? null)
-			: new Set<string>();
-		const deriveKeys = [...(deriveKeysByCell.get(graphNodeId) ?? [])];
-		const rowKeys = [...(rowKeysByCell.get(graphNodeId) ?? [])];
-		if (armKeys === null) return [{ graphNodeId, keys: null }];
-		if (armKeys.size === 0 && deriveKeys.length === 0 && rowKeys.length === 0) return [];
-		return [
-			{
-				graphNodeId,
-				keys: [...armKeys],
-				...(deriveKeys.length > 0 ? { scalarKeys: deriveKeys } : {}),
-				...(rowKeys.length > 0 ? { rowKeys } : {}),
-			},
-		];
-	});
+	return { armKeysByCell, deriveKeysByCell, rowKeysByCell };
 }
 
 // The composed state a server-rendered component returns, plus the prop cells

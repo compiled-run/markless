@@ -96,3 +96,24 @@ export function Node({ name }: { readonly name: string }) @{
 	);
 	expect(derivedProps(tree, 'Node')).toEqual(['name']);
 });
+
+test('a list a component iterates and forwards to a derive is still published', async () => {
+	const counter = await compile(
+		'src/count.tsrx',
+		`import { computed, state } from '@markless/core';
+export function Count({ entries }: { readonly entries: ReadonlyArray<string> }) @{
+	const hits = state({ n: 0 });
+	const total = computed(() => entries.length + hits.n);
+	<b>{total}</b>
+}`,
+	);
+	const listing = await compile(
+		'src/listing.tsrx',
+		`import { Count } from './count.tsrx';
+export function Listing({ rows }: { readonly rows: ReadonlyArray<string> }) @{
+	<ol>@for (const row of rows; key row) {<li>{row}</li>}<Count entries={rows} /></ol>
+}`,
+		{ './count.tsrx': counter },
+	);
+	expect(derivedProps(listing, 'Listing')).toEqual(['rows']);
+});

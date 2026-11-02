@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import Direct from './forwarded-constant-props/direct.tsrx';
+import Iterated from './forwarded-constant-props/iterated.tsrx';
 import Live from './forwarded-constant-props/live.tsrx';
 import SameFileChildren from './forwarded-constant-props/same-file-children.tsrx';
 import ThreeLevels from './forwarded-constant-props/three-levels.tsrx';
@@ -70,4 +71,21 @@ test('CSR: a state prop forwarded through two files follows the page write', asy
 });
 test('SSR resume: a state prop forwarded through two files follows the page write', async () => {
 	await forwardedStateFollowsWrites((await renderSSR(Live)).container as HTMLElement);
+});
+
+// The middle component iterates the constant list it also forwards to a child computed.
+async function iteratedAndForwardedListStaysWhole(container: HTMLElement) {
+	container.querySelector<HTMLButtonElement>('[data-item="green"]')!.click();
+	await expect.poll(() => container.querySelector('[data-picked]')?.textContent).toBe('green');
+	container.querySelector<HTMLButtonElement>('[data-tally]')!.click();
+	await expect
+		.poll(() => container.querySelector('[data-tally]')?.textContent)
+		.toBe('3 items, 1 clicks');
+}
+
+test('CSR: a constant list iterated and forwarded to a child computed stays whole', async () => {
+	await iteratedAndForwardedListStaysWhole((await render(Iterated)).container as HTMLElement);
+});
+test('SSR resume: a constant list iterated and forwarded to a child computed stays whole', async () => {
+	await iteratedAndForwardedListStaysWhole((await renderSSR(Iterated)).container as HTMLElement);
 });
