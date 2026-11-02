@@ -5,6 +5,7 @@ import { INK_MARKS } from '../ink-marks.ts';
 import { art } from './theme-art.art.ts';
 import { getStarted, github, isCurrent, NAV_DECOR, type NavCard, panels } from './sections.ts';
 
+
 /** The site's header: a floating bar of three panels on a wide screen, a top bar and a full-screen menu on a narrow one. */
 export default function SiteNavbar({ pathname }: { readonly pathname: string }) @{
 	<header class="site-navbar">
@@ -59,12 +60,13 @@ function Brand({ compact }: { readonly compact?: boolean }) @{
 	</span>
 }
 
+// The bar shows on every page, so its home and Get started links opt out of idle prefetch: it would download those pages' code everywhere (decor.test.ts pins the attribute to the router's).
 function DesktopNav({ pathname }: { readonly pathname: string }) @{
 	const homepage = pathname === '/';
 
 	<div class="nav-shade">
 		<navbar.root class="nav-pill navbar-edge" aria-label="Main" data-scroll-hide={homepage ? undefined : ''}>
-			<navbar.itemlink class="brand-link" href="/" current={homepage}>
+			<navbar.itemlink data-markless-router-prefetch="none" class="brand-link" href="/" current={homepage}>
 				<Brand />
 			</navbar.itemlink>
 			<div class="nav-items">
@@ -76,8 +78,8 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				<navbar.itemlink class="tool-link" href={github} aria-label="Markless on GitHub">
 					<lucide.github class="tool-icon" aria-hidden="true" />
 				</navbar.itemlink>
-				<ThemeToggle inBar />
-				<navbar.itemlink class="cta" href={getStarted} current={isCurrent(pathname, getStarted)}>
+				<ThemeToggle />
+				<navbar.itemlink data-markless-router-prefetch="none" class="cta" href={getStarted} current={isCurrent(pathname, getStarted)}>
 					<span>Get started</span>
 					<lucide.arrowright class="cta-arrow" aria-hidden="true" />
 				</navbar.itemlink>
@@ -491,7 +493,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				>
 					<lucide.panelleftopen class="bar-icon" aria-hidden="true" />
 				</button>
-				<a class="bar-brand" href="/" aria-label="Markless home">
+				<a data-markless-router-prefetch="none" class="bar-brand" href="/" aria-label="Markless home">
 					<Brand compact />
 				</a>
 				<span class="bar-end">
@@ -523,7 +525,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 						>
 							<lucide.panelleftopen class="bar-icon" aria-hidden="true" />
 						</button>
-						<a class="bar-brand" href="/" aria-label="Markless home">
+						<a data-markless-router-prefetch="none" class="bar-brand" href="/" aria-label="Markless home">
 							<Brand compact />
 						</a>
 						<modal.close class="bar-button menu-close" aria-label="Close menu">
@@ -744,11 +746,11 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 }
 
 // The theme switch lives in this module because a page collects storage seeds only from the modules it renders directly, and the seed is what paints the stored theme before first paint.
-/** `inBar` makes each button a `navbar.trigger`, so the bar's arrow keys stop on it; it must then sit inside `navbar.root`. */
-function ThemeToggle({ inBar }: { readonly inBar?: boolean }) @{
+/** Each button is a `navbar.trigger`: inside `navbar.root` the bar's arrow keys stop on it, and outside every navbar it is a plain button. */
+function ThemeToggle() @{
 	<span class="theme-toggle-island">
-		<ThemeButton to="dark" inBar={inBar === true} />
-		<ThemeButton to="light" inBar={inBar === true} />
+		<ThemeButton to="dark" />
+		<ThemeButton to="light" />
 
 		<style>
 			.theme-toggle-island {
@@ -764,55 +766,32 @@ function ThemeToggle({ inBar }: { readonly inBar?: boolean }) @{
 }
 
 /** The button that switches to `to`. It draws the theme it stands in: the sun on the light page, the moon on the dark one. */
-function ThemeButton({ to, inBar }: { readonly to: 'dark' | 'light'; readonly inBar: boolean }) @{
+function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
 	let theme = storage('theme', 'system');
-	// The handlers read the choice off the pressed button: a prop read in this arm's handler resolved to the other instance's value.
+	// The handler reads the choice off the pressed button: a prop read in a handler of a component rendered twice resolved to the other instance's value.
 	const label = to === 'dark' ? 'Switch to the dark theme' : 'Switch to the light theme';
 
 	<>
-		@if (inBar) {
-			<navbar.trigger
-				class={'theme-toggle theme-toggle-to-' + to}
-				data-theme-toggle={to}
-				aria-label={label}
-				title={label}
-				onClick={(event) => {
-					const root = document.documentElement;
-					const pressed = (event.target as Element).closest<HTMLElement>('[data-theme-toggle]');
-					const island = pressed?.closest('.theme-toggle-island');
-					const chosen = pressed?.dataset.themeToggle === 'dark' ? 'dark' : 'light';
-					root.dataset.themeSwitching = '';
-					theme = chosen;
-					// The pressed button is hidden now, so focus moves to the one that took its place.
-					setTimeout(() => island?.querySelector<HTMLElement>(`[data-theme-toggle="${chosen === 'dark' ? 'light' : 'dark'}"]`)?.focus(), 0);
-					setTimeout(() => delete root.dataset.themeSwitching, 700);
-				}}
-			>
-				<ThemeDrawing to={to} />
-			</navbar.trigger>
-		} @else {
-			<button
-				type="button"
-				class={'theme-toggle theme-toggle-to-' + to}
-				data-theme-toggle={to}
-				aria-label={label}
-				title={label}
-				onClick={(event) => {
-					const root = document.documentElement;
-					const pressed = (event.target as Element).closest<HTMLElement>('[data-theme-toggle]');
-					const island = pressed?.closest('.theme-toggle-island');
-					const chosen = pressed?.dataset.themeToggle === 'dark' ? 'dark' : 'light';
-					root.dataset.themeSwitching = '';
-					theme = chosen;
-					// The pressed button is hidden now, so focus moves to the one that took its place.
-					setTimeout(() => island?.querySelector<HTMLElement>(`[data-theme-toggle="${chosen === 'dark' ? 'light' : 'dark'}"]`)?.focus(), 0);
-					setTimeout(() => delete root.dataset.themeSwitching, 700);
-				}}
-			>
-				<ThemeDrawing to={to} />
-			</button>
-		}
+		<navbar.trigger
+			class={'theme-toggle theme-toggle-to-' + to}
+			data-theme-toggle={to}
+			aria-label={label}
+			title={label}
+			onClick={(event) => {
+				const root = document.documentElement;
+				const pressed = (event.target as Element).closest<HTMLElement>('[data-theme-toggle]');
+				const island = pressed?.closest('.theme-toggle-island');
+				const chosen = pressed?.dataset.themeToggle === 'dark' ? 'dark' : 'light';
+				root.dataset.themeSwitching = '';
+				theme = chosen;
+				// The pressed button is hidden now, so focus moves to the one that took its place.
+				setTimeout(() => island?.querySelector<HTMLElement>(`[data-theme-toggle="${chosen === 'dark' ? 'light' : 'dark'}"]`)?.focus(), 0);
+				setTimeout(() => delete root.dataset.themeSwitching, 700);
+			}}
+		>
+			<ThemeDrawing to={to} />
+		</navbar.trigger>
 
 		<style>
 			.theme-toggle {

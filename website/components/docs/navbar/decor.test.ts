@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { PREFETCH_ATTRIBUTE } from '@markless/core/router';
 import { describe, expect, it } from 'vitest';
 import { relative } from '../ink-logos.ts';
 import { type Drawing, decor, themeArt } from './decor.ts';
@@ -45,5 +47,14 @@ import type { Drawing } from './decor.ts';
 export const art: { readonly sun: Drawing; readonly moon: Drawing } = ${JSON.stringify({ sun: frozen(theme.sun), moon: frozen(theme.moon) }, null, '\t')};
 `;
 		await expect(module).toMatchFileSnapshot('./theme-art.art.ts');
+	});
+});
+
+describe('navbar links', () => {
+	it("opt out of idle prefetch with the router's own attribute", () => {
+		const source = readFileSync(new URL('./site-navbar.tsrx', import.meta.url), 'utf8');
+		const written = [...source.matchAll(/(data-markless-router-[a-z]+)="none"/g)].map((match) => match[1]);
+		expect(written.length).toBeGreaterThan(0);
+		for (const name of written) expect(name).toBe(PREFETCH_ATTRIBUTE);
 	});
 });
