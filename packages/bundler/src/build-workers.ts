@@ -328,6 +328,16 @@ export async function retireCompileWorkers(): Promise<void> {
 	await Promise.all(retired.map((entry) => entry.handle.exited));
 }
 
+/** Compiles and chunk reads handed to a build worker or waiting for one. */
+export function buildWorkerJobsInFlight(): number {
+	let count = 0;
+	for (const lane of [compiles, chunkReads]) {
+		count += lane.queue.length;
+		for (const entry of lane.workers) if (entry.job) count++;
+	}
+	return count;
+}
+
 /** Process ids of the compile processes running now. */
 export function compileWorkerPids(): number[] {
 	return compiles.workers.flatMap((entry) =>

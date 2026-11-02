@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,6 +10,7 @@ import {
 	clientBuildRequest,
 	parseInlineConfig,
 	SEPARATE_CLIENT_BUILD_ENV,
+	waitForClientBuildProcess,
 } from '../src/vite/separate-client-build.ts';
 
 const packages = join(import.meta.dirname, '../..');
@@ -161,3 +162,22 @@ console.log(String(clientBuildRequest(builder, 'client')));`;
 		}).trim(),
 	).toBe('undefined');
 });
+
+const stallChild = (mode: 'stall' | 'busy') =>
+	spawn(
+		process.execPath,
+		[join(import.meta.dirname, 'fixtures/client-build-stall/child.ts'), mode],
+		{
+			stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+		},
+	);
+
+test('a client build process that waits on something that never settles fails the build', async () => {
+	const child = stallChild('stall');
+	await expect(waitForClientBuildProcess(child)).rejects.toThrow('MARKLESS_CLIENT_BUILD_STALLED');
+	expect(child.killed).toBe(true);
+}, 30_000);
+
+test('a client build process that keeps working is never called stalled', async () => {
+	await expect(waitForClientBuildProcess(stallChild('busy'))).resolves.toBeNull();
+}, 30_000);

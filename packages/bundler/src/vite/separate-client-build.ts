@@ -1,12 +1,13 @@
 // Rolldown keeps a build's native memory until its process exits, so the client graph is built in a child process
 // and the server environments start in this one without it.
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { InlineConfig, ResolvedConfig, ViteBuilder } from 'vite';
+import { buildWorkerJobsInFlight } from '../build-workers.ts';
 import type { ClientBuildHandoff } from '../types.ts';
 
 export const SEPARATE_CLIENT_BUILD_ENV = 'MARKLESS_CLIENT_BUILD_PROCESS';
@@ -131,14 +132,9 @@ export async function buildClientInChildProcess(
 		const child = spawn(
 			process.execPath,
 			[...(childExecArgv() ?? []), clientBuildProcessFile(), requestFile],
-			{ stdio: 'inherit', env: process.env },
+			{ stdio: ['inherit', 'inherit', 'inherit', 'ipc'], env: process.env },
 		);
-		const exit = await new Promise<string | null>((resolve, reject) => {
-			child.once('error', reject);
-			child.once('exit', (code, signal) =>
-				resolve(code === 0 ? null : signal ? `signal ${signal}` : `exit code ${code}`),
-			);
-		});
+		const exit = await waitForClientBuildProcess(child);
 		if (exit === `exit code ${CLIENT_CONFIG_MISMATCH_EXIT}`) return undefined;
 		if (exit)
 			throw new Error(
@@ -148,6 +144,75 @@ export async function buildClientInChildProcess(
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
+}
+
+type ClientBuildProgress = {
+	readonly kind: 'progress';
+	readonly cpuMicros: number;
+	readonly workerJobs: number;
+	readonly intervalMs: number;
+};
+
+const PROGRESS_INTERVAL_MS = 5_000;
+// Twelve reports, about a minute, in which the child spent no CPU of its own and handed no build worker a job.
+const STALLED_REPORTS = 12;
+// A report itself costs microseconds; a build doing anything spends far more than this share of one core.
+const IDLE_CPU_SHARE = 0.01;
+
+/** In the child: reports the CPU it has used and the worker jobs it waits on, without holding the process open. */
+export function reportClientBuildProgress(intervalMs = PROGRESS_INTERVAL_MS): void {
+	if (!process.send) return;
+	process.channel?.unref();
+	setInterval(() => {
+		const { user, system } = process.cpuUsage();
+		const progress: ClientBuildProgress = {
+			kind: 'progress',
+			cpuMicros: user + system,
+			workerJobs: buildWorkerJobsInFlight(),
+			intervalMs,
+		};
+		process.send?.(progress, undefined, undefined, () => {});
+	}, intervalMs).unref();
+}
+
+/**
+ * The child's exit, `null` when it succeeded. A child that reports no CPU spent and no worker job pending for
+ * `stalledReports` reports in a row waits on something that will never settle, so it is stopped and the build fails.
+ */
+export function waitForClientBuildProcess(
+	child: ChildProcess,
+	stalledReports = STALLED_REPORTS,
+): Promise<string | null> {
+	return new Promise((resolve, reject) => {
+		let previousCpu: number | undefined;
+		let idleReports = 0;
+		let lastWork = '';
+		child.on('message', (message: ClientBuildProgress) => {
+			if (message?.kind !== 'progress') return;
+			const used =
+				previousCpu === undefined
+					? Number.POSITIVE_INFINITY
+					: message.cpuMicros - previousCpu;
+			previousCpu = message.cpuMicros;
+			if (message.workerJobs > 0 || used >= message.intervalMs * 1000 * IDLE_CPU_SHARE) {
+				idleReports = 0;
+				lastWork = `${Math.round(message.cpuMicros / 1e6)} s of CPU in`;
+				return;
+			}
+			if (++idleReports < stalledReports) return;
+			child.kill('SIGKILL');
+			const idleSeconds = Math.round((idleReports * message.intervalMs) / 1000);
+			reject(
+				new Error(
+					`MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For ${idleSeconds} s it used no CPU and had no compile or chunk job on a build worker${lastWork ? ` (${lastWork})` : ''}, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.`,
+				),
+			);
+		});
+		child.once('error', reject);
+		child.once('exit', (code, signal) =>
+			resolve(code === 0 ? null : signal ? `signal ${signal}` : `exit code ${code}`),
+		);
+	});
 }
 
 function clientBuildProcessFile(): string {
