@@ -391,6 +391,7 @@ export function mintTemplateExpressionComputed(
 		asyncCapable: false,
 		functionSource,
 		dependencies: uniqueDependencies(dependencies),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
 	return { graphNodeId };
 }
