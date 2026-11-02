@@ -3050,6 +3050,22 @@
 				"jsGzipBytes": 88104
 			},
 			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "construct",
+			"subject": "text binding",
+			"from": 4211,
+			"to": 4256,
+			"reason": "measured +45 B: a text binding's synthetic computed now names the component that wrote it, so resume derives it on read (deriveOnRead flag in the payload and render data) instead of eagerly as an ownerless module node; the root no longer runs a child's derive"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "construct",
+			"subject": "@if",
+			"from": 7991,
+			"to": 8056,
+			"reason": "measured +65 B: an @if test's synthetic computed now names the component that wrote it, so resume derives it on read (deriveOnRead flag in the payload and render data) instead of eagerly as an ownerless module node; the root no longer runs a child's derive"
 		}
 	],
 	"runtimeModules": {
@@ -3176,8 +3192,8 @@
 	},
 	"constructGlue": {
 		"event handler": 3184,
-		"text binding": 4211,
-		"@if": 7991,
+		"text binding": 4256,
+		"@if": 8056,
 		"keyed @for": 6879,
 		"async boundary": 10095
 	},
