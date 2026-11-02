@@ -1011,13 +1011,38 @@ export function marklessSsrHandedDown(
 	return externalSymbolIds.filter((symbolId) => received.has(symbolId));
 }
 
-function marklessSsrComposedView(
+// Every component of a module carries the module's whole view, and a record stated for a child's spread host is this render's only when it placed that child through the same edge.
+function marklessSsrEdgeOwnedView(
 	structure: SsrDataStructure,
 	view: SsrViewDraft,
+	idPrefix: string,
+): SsrViewDraft {
+	const placed = new Set(structure.componentEdgeIds ?? []);
+	const own = <T extends SsrRecord>(records: ReadonlyArray<T>, mark?: SsrRecord): T[] =>
+		records.flatMap((record) => {
+			const edgeId = record.componentEdgeId;
+			if (typeof edgeId !== 'string') return [record];
+			if (!placed.has(idPrefix + edgeId)) return [];
+			const { componentEdgeId: _edgeId, ...rest } = record;
+			return [{ ...rest, ...mark } as T];
+		});
+	return {
+		...view,
+		locators: own(view.locators),
+		events: own(view.events, { forwarded: true }),
+		domUpdates: own(view.domUpdates),
+		elementHandles: own(view.elementHandles),
+	};
+}
+
+function marklessSsrComposedView(
+	structure: SsrDataStructure,
+	moduleView: SsrViewDraft,
 	children: ReadonlyArray<SsrComposedChild>,
 	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
 	idPrefix = '',
 ) {
+	const view = marklessSsrEdgeOwnedView(structure, moduleView, idPrefix);
 	// View composition qualifies child dom updates before state composition runs,
 	// so the widget roots must be known by here or a widget's reads land on the
 	// first widget of its family.

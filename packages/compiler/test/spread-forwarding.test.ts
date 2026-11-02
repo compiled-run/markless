@@ -93,7 +93,7 @@ export function App() @{
 	);
 
 	expect(result.protocolView?.elementHandles).toEqual([
-		{ hostNodeId: 'c1:h1', handleId: 'element:mine', name: 'mine' },
+		{ hostNodeId: 'c1:h1', handleId: 'element:mine', name: 'mine', componentEdgeId: expect.stringMatching(/^component-edge:\d+$/) },
 	]);
 });
 
@@ -154,6 +154,6 @@ export function App() @{
 		})),
 	).toEqual([{ hostNodeId: 'c1:h1', eventName: 'pointerdown' }]);
 	expect(result.protocolView?.elementHandles).toEqual([
-		{ hostNodeId: 'c1:h1', handleId: 'element:spot', name: 'spot' },
+		{ hostNodeId: 'c1:h1', handleId: 'element:spot', name: 'spot', componentEdgeId: expect.stringMatching(/^component-edge:\d+$/) },
 	]);
 });

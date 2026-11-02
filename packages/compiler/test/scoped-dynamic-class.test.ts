@@ -260,6 +260,7 @@ test('every prop crossing into the spread host gets an update record on the cons
 		path: [],
 		target: { kind: 'class', leadingClass: familyScope },
 		symbolId: expect.stringMatching(/^symbol:\d+$/),
+		componentEdgeId: expect.stringMatching(/^component-edge:\d+$/),
 	});
 	expect(first).toContainEqual({
 		hostNodeId: `c0:${host.hostNodeId}`,
@@ -268,6 +269,7 @@ test('every prop crossing into the spread host gets an update record on the cons
 		path: ['tone'],
 		target: { kind: 'attribute', name: 'data-tone' },
 		symbolId: expect.stringMatching(/^symbol:\d+$/),
+		componentEdgeId: expect.stringMatching(/^component-edge:\d+$/),
 	});
 	// A static attribute is final at render; nothing is planned for it.
 	expect(first.map((update) => update.target)).not.toContainEqual({
@@ -280,6 +282,7 @@ test('every prop crossing into the spread host gets an update record on the cons
 		strategy: 'dom-order',
 		index: 0,
 		tagName: '*',
+		componentEdgeId: expect.stringMatching(/^component-edge:\d+$/),
 	});
 
 	// Each record's symbol is a planned dom-update the resolver can load.
