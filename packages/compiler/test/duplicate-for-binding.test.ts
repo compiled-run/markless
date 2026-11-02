@@ -154,3 +154,33 @@ test('a name that is one loop\'s item and another loop\'s index is refused loudl
 	expect(conflict?.primarySpan?.filename).toBe('src/Clash.tsrx');
 	expect(typeof conflict?.primarySpan?.start).toBe('number');
 });
+
+const itemVersusIndexAcrossComponentsSource = `import { state } from '@markless/core';
+
+function Firsts() @{
+	let first = state([{ id: 'f1', label: 'First' }]);
+	<ul class="first">
+		@for (const i of first; key i.id) {
+			<li>{i.label}</li>
+		}
+	</ul>
+}
+
+export default function Seconds() @{
+	let second = state([{ id: 's1', label: 'Second' }]);
+	<main>
+		<Firsts />
+		<ul class="second">
+			@for (const entry of second; index i; key entry.id) {
+				<li data-at={i}>{entry.label}</li>
+			}
+		</ul>
+	</main>
+}`;
+
+test('an item in one component and an index in another may share a name', async () => {
+	const html = await renderHtml('src/Spread.tsrx', itemVersusIndexAcrossComponentsSource);
+
+	expect(html).toContain('First');
+	expect(html).toMatch(/<li data-at="0"[^>]*>Second<\/li>/);
+});

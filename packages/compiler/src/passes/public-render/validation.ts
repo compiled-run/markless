@@ -337,26 +337,31 @@ export function collectRepeatBindingConflictDiagnostics(input: {
 	readonly root: AnyNode;
 	readonly filename: string;
 }) {
-	const asItem = new Set<string>();
-	const asIndex = new Set<string>();
 	const conflicts: Array<{ readonly name: string; readonly node: AnyNode }> = [];
-	walkNode(input.root, (node) => {
-		// Only `@for` heads: a plain JS for-of in module code declares no index and
-		// contributes no row binding to the emitted readers.
-		if (node.type !== 'JSXForExpression') return;
-		const itemName = getIdentifierName(
-			asNodes((node.left as AnyNode | undefined)?.declarations)[0]?.id as AnyNode | undefined,
-		);
-		const indexName = getIdentifierName(node.index as AnyNode | undefined);
-		if (itemName) {
-			if (asIndex.has(itemName)) conflicts.push({ name: itemName, node });
-			asItem.add(itemName);
-		}
-		if (indexName) {
-			if (asItem.has(indexName)) conflicts.push({ name: indexName, node });
-			asIndex.add(indexName);
-		}
-	});
+	// Each component's readers bind only its own loops, so the two uses clash only inside one component.
+	for (const statement of asNodes(input.root.body)) {
+		const component = getComponentFunction(statement)?.node;
+		if (!component) continue;
+		const asItem = new Set<string>();
+		const asIndex = new Set<string>();
+		walkNode(component, (node) => {
+			// Only `@for` heads: a plain JS for-of in module code declares no index and
+			// contributes no row binding to the emitted readers.
+			if (node.type !== 'JSXForExpression') return;
+			const itemName = getIdentifierName(
+				asNodes((node.left as AnyNode | undefined)?.declarations)[0]?.id as AnyNode | undefined,
+			);
+			const indexName = getIdentifierName(node.index as AnyNode | undefined);
+			if (itemName) {
+				if (asIndex.has(itemName)) conflicts.push({ name: itemName, node });
+				asItem.add(itemName);
+			}
+			if (indexName) {
+				if (asItem.has(indexName)) conflicts.push({ name: indexName, node });
+				asIndex.add(indexName);
+			}
+		});
+	}
 	return conflicts.map((conflict) =>
 		repeatBindingNameConflictDiagnostic({
 			name: conflict.name,
@@ -371,7 +376,6 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 	readonly component: AnyNode;
 	readonly filename: string;
 	readonly moduleImports: ReadonlyArray<string>;
-	readonly repeatLocals: ReadonlyArray<string>;
 	readonly root: AnyNode;
 	readonly source: string;
 }) {
@@ -384,13 +388,19 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 	if (unresolved.length === 0) return [];
 	// Render policy rather than scope mechanics: these names are in scope when
 	// the render module runs without any declaration the analyzer can see.
-	const inRenderScope = new Set([...knownRenderGlobals, ...input.repeatLocals]);
+	const loopHeads = undeclaredLoopBindings(input.root);
+	const inRenderScope = (reference: { readonly name: string; readonly start: number }) =>
+		knownRenderGlobals.has(reference.name) ||
+		loopHeads.some(
+			(loop) =>
+				loop.names.includes(reference.name) &&
+				reference.start >= loop.start &&
+				reference.start < loop.end,
+		);
 	for (const read of emittedTemplateReads(input.root, input.source)) {
 		const found = unresolved.find(
 			(reference) =>
-				reference.start >= read.start &&
-				reference.end <= read.end &&
-				!inRenderScope.has(reference.name),
+				reference.start >= read.start && reference.end <= read.end && !inRenderScope(reference),
 		);
 		if (!found) continue;
 		return [
@@ -402,6 +412,32 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 		];
 	}
 	return [];
+}
+
+type LoopBinding = {
+	readonly names: ReadonlyArray<string>;
+	readonly start: number;
+	readonly end: number;
+};
+
+// A bare `@for (row of rows)` head declares `row` to the render, not to the analyzer, and only inside that loop.
+function undeclaredLoopBindings(
+	root: AnyNode,
+): ReadonlyArray<LoopBinding> {
+	const loops: LoopBinding[] = [];
+	walkNode(root, (node) => {
+		if (node.type !== 'JSXForExpression') return;
+		const left = node.left as AnyNode | undefined;
+		const item = getIdentifierName(
+			left?.type === 'VariableDeclaration'
+				? (asNodes(left.declarations)[0]?.id as AnyNode | undefined)
+				: left,
+		);
+		const index = getIdentifierName(node.index as AnyNode | undefined);
+		const names = [item, index].filter((name): name is string => !!name);
+		if (names.length > 0) loops.push({ names, start: node.start ?? 0, end: node.end ?? 0 });
+	});
+	return loops;
 }
 
 /**

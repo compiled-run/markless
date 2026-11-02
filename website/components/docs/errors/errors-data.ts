@@ -6007,8 +6007,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'Two @for loops give the same name two different meanings: a Markless build error.',
 		printed: [
-			'MARKLESS_REPEAT_BINDING_NAME_CONFLICT: "<name>" is one @for loop\'s item and another @for loop\'s index in the same file. Rename one of them.',
-			'Every @for expression in a file is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
+			'MARKLESS_REPEAT_BINDING_NAME_CONFLICT: "<name>" is one @for loop\'s item and another @for loop\'s index in the same component. Rename one of them.',
+			'Every @for expression in a component is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
 			"Rename this loop's binding - two loops may reuse a name freely as long as both use it the same way (both items, or both indexes).",
 			'https://markless.dev/errors/MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
 		],
