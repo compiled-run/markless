@@ -205,36 +205,39 @@ function start(): Drawing {
 	return s.done();
 }
 
-/** Core concepts: the State figure's jar of beans with its tag wired out; hovering drops a bean in and the tag swings. */
+/** Core concepts: the State figure's jar of beans with its tag wired out; hovering crosses out the tag's number and inks the new one in. */
 function concepts(): Drawing {
 	const s = new Sheet(276, 128, 2);
 	s.line(wander([[110, 117], [262, 117]], 6, 1), 1.5);
+	s.line(wander([[223, 54], [246, 50], [258, 38], [264, 22], [272, 10]], 7, 1.2, 8), 1.6, 0.8);
 	s.object();
-	const body = roundRect(166, 30, 230, 116, 12);
+	const body = roundRect(162, 30, 226, 116, 12);
 	s.cast(body, 9, 4, 2.3);
 	s.shape(body, 2.2, 1.6);
-	s.shade(quad(216, 40, 227, 110), 74, 1.8);
-	s.shape(ellipse(198, 31, 30, 4.5, 28), 1.5, 0.6, false);
+	s.shade(quad(212, 40, 223, 110), 74, 1.8);
 	s.object();
-	const beans: P[] = [[178, 104], [192, 108], [206, 105], [219, 102], [184, 94], [199, 95], [213, 91], [177, 84], [192, 84], [207, 81], [186, 74], [200, 71]];
-	s.wash(roundRect(172, 66, 225, 112, 9), 2, 3);
+	const beans: P[] = [[174, 104], [188, 108], [202, 105], [215, 102], [180, 94], [195, 95], [209, 91], [173, 84], [188, 84], [203, 81]];
+	s.wash(roundRect(168, 76, 221, 112, 9), 2, 3);
 	beans.forEach((at, k) => {
 		const bean = turn(ellipse(at[0], at[1], 6, 4, 18), k * 37, at);
 		s.shape(bean, 1.1, 0.7);
 		s.line(turn([[at[0] - 3.4, at[1] + 0.4], [at[0], at[1] - 0.6], [at[0] + 3.4, at[1] + 0.4]], k * 37, at), 0.7, 0.1);
 	});
-	s.object({ transform: 'translate(0, calc(var(--hover, 0) * 50px)) rotate(calc(var(--hover, 0) * 70deg))', origin: [214, 12], opacity: 'var(--hover, 0)', easing: 'cubic-bezier(.5,0,.8,.6)' });
-	const drop: P = [214, 12];
-	s.shape(turn(ellipse(drop[0], drop[1], 6, 4, 18), -20, drop), 1.1, 0.7);
-	s.line(turn([[drop[0] - 3.4, drop[1] + 0.4], [drop[0], drop[1] - 0.6], [drop[0] + 3.4, drop[1] + 0.4]], -20, drop), 0.7, 0.1);
-	s.object({ ...sway(16, [228, 44]), delay: 260 });
-	s.line([[228, 44], [240, 56]], 0.9, 0.2);
-	s.line(wander([[262, 66], [270, 52], [272, 34], [274, 20]], 8, 1, 8), 1.6, 0.8);
-	const tag: P[] = turn([[236, 54], [258, 54], [264, 62], [258, 70], [236, 70]], 8, [236, 62]);
-	s.wash(tag, 1.5, 2);
-	s.shape(tag, 1.6);
-	s.shape(ellipse(240, 58, 1.6, 1.6, 10), 0.8, 0.2);
-	s.line(turn([[244, 63], [254, 63]], 8, [236, 62]), 1.2, 0.2);
+	s.object();
+	const lid = roundRect(167, 18, 221, 32, 4);
+	s.cast(lid, 3, 3, 2);
+	s.shape(lid, 1.9);
+	for (let x = 172; x < 218; x += 5) s.line([[x, 20.5], [x + 0.3, 29.5]], 0.6, 0.1);
+	s.object();
+	s.shape(roundRect(170, 40, 222, 68, 3, 3), 1.6);
+	s.line([[178, 47], [182, 44.5], [187, 46], [187, 50.5], [182, 53]], 1.7, 0.2);
+	s.line([[182, 53], [188, 55.5], [188, 60.5], [183, 63], [177, 61]], 1.7, 0.2);
+	s.object({ transform: 'scale(var(--hover, 0), 1)', origin: [175, 60], easing: 'ease-out' });
+	s.line([[175, 60], [192, 46]], 1.8, 0.2);
+	s.object({ transform: 'translate(calc((1 - var(--hover, 0)) * -3px), 0)', origin: [206, 54], opacity: 'var(--hover, 0)', delay: 150, easing: 'ease-out' });
+	s.wash(ellipse(207, 54, 9, 10, 18), 1.5, 2);
+	s.line([[209, 44], [200, 57], [214, 57]], 1.7, 0.2);
+	s.line([[209, 48], [209, 64]], 1.7, 0.2);
 	return s.done();
 }
 
@@ -474,6 +477,20 @@ function sun(): Drawing {
 	return s.done();
 }
 
+/** The search button's magnifying glass: a washed lens and a hatched handle. */
+function magnifier(): Drawing {
+	const s = new Sheet(48, 48, 14, false);
+	const handle = turn(roundRect(27, 26, 44, 33, 3, 3), 45, [30, 30]);
+	s.shape(handle, 1.8, 1.2);
+	s.tone(handle, -45, 1.6);
+	s.object();
+	const lens = ellipse(20, 20, 12, 12, 36);
+	s.wash(ellipse(20, 20, 9, 9, 24), 1.2, 1.5);
+	s.shape(lens, 2, 1.3);
+	s.line(arc(20, 20, 8, 8, 200, 260, 8), 1.1, 0.2);
+	return s.done(0);
+}
+
 /** The part of one disc a second disc does not cover, traced as one ring. */
 function crescent(o: P, r: number, i: P, ri: number): P[] {
 	const run = (c: P, rr: number, keep: (p: P) => boolean): P[] => {
@@ -522,5 +539,5 @@ export function edges() {
 
 /** The toggle's two drawings, frozen into a module so they render inline with no request. */
 export function themeArt() {
-	return { sun: sun(), moon: moon() };
+	return { sun: sun(), moon: moon(), magnifier: magnifier() };
 }

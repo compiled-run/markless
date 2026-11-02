@@ -87,7 +87,7 @@ describe('navbar drawings', () => {
 	});
 
 	it('freezes the sun and moon into a module the theme toggle inlines (run with -u after editing)', async () => {
-		await expect(module('art', '{ readonly sun: Drawing; readonly moon: Drawing }', { sun: frozen(theme.sun), moon: frozen(theme.moon) })).toMatchFileSnapshot('./theme-art.art.ts');
+		await expect(module('art', '{ readonly sun: Drawing; readonly moon: Drawing; readonly magnifier: Drawing }', { sun: frozen(theme.sun), moon: frozen(theme.moon), magnifier: frozen(theme.magnifier) })).toMatchFileSnapshot('./theme-art.art.ts');
 	});
 
 });

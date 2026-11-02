@@ -70,10 +70,15 @@ async function exerciseBar(page: Page, where: string) {
 	}
 }
 
+/** The address changes before the next page is swapped in; the sidebar marking it current means the swap is done. */
+async function landed(page: Page, path: string) {
+	await expect.poll(() => page.evaluate(() => location.pathname), POLL).toBe(path);
+	await expect(page.locator(`#docs-sidebar a[aria-current="page"][href="${path}"]`)).toHaveCount(1, POLL);
+}
+
 async function navigateBy(page: Page, how: () => Promise<void>, path: string) {
 	await how();
-	await expect.poll(() => page.evaluate(() => location.pathname), POLL).toBe(path);
-	await expect(page.locator('h1').first()).toBeVisible();
+	await landed(page, path);
 }
 
 export default box(
@@ -120,8 +125,7 @@ export default box(
 					document.querySelector('main')!.append(link);
 					link.click();
 				}, path);
-				await expect.poll(() => page.evaluate(() => location.pathname), POLL).toBe(path);
-				await expect(page.locator('h1').first()).toBeVisible();
+				await landed(page, path);
 				await fresh.goto(url(path), { waitUntil: 'networkidle' });
 				expect(await navbarMarkup(page), `the navbar on ${path} after in-place navigation`).toBe(await navbarMarkup(fresh));
 			}
@@ -155,7 +159,7 @@ export default box(
 
 			// The arrow keys walk the bar in document order and wrap, as QDS's do.
 			await page.locator('.nav-pill .brand-link').focus();
-			for (const stop of ['Docs', 'Migrate', 'Learn', 'Markless on GitHub', 'Switch to the dark theme', 'Markless home']) {
+			for (const stop of ['Markless on GitHub', 'Docs', 'Migrate', 'Learn', 'Search docs', 'Switch to the dark theme', 'Markless home']) {
 				await page.keyboard.press('ArrowRight');
 				await expect.poll(() => focused(page), { ...POLL, message: `ArrowRight reaches ${stop}` }).toBe(stop);
 			}
@@ -181,7 +185,7 @@ export default box(
 				await mobile.locator('.mobile-bar [aria-label="Open menu"]').click();
 				await expect(mobile.locator('.menu-panel')).toBeVisible(POLL);
 				await mobile.locator(`.menu-panel a[href="${path}"]`).click();
-				await expect.poll(() => mobile.evaluate(() => location.pathname), POLL).toBe(path);
+				await landed(mobile, path);
 				await expect(mobile.locator('.menu-panel')).toBeHidden(POLL);
 			}
 			expect(errors).toEqual([]);

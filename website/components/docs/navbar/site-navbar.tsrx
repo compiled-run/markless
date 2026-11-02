@@ -47,9 +47,14 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 
 	<div class="nav-shade">
 		<navbar.root class="nav-pill navbar-edge" aria-label="Main">
-			<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage} aria-label="Markless home">
-				<Brand />
-			</navbar.itemlink>
+			<div class="nav-tools">
+				<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage} aria-label="Markless home">
+					<Brand />
+				</navbar.itemlink>
+				<navbar.itemlink class="tool-link" href={github} aria-label="Markless on GitHub">
+					<lucide.github class="tool-icon" aria-hidden="true" />
+				</navbar.itemlink>
+			</div>
 			<div class="nav-items">
 				@for (const panel of panels; key panel.label) {
 					<NavDropdown panel={panel} pathname={pathname} />
@@ -59,9 +64,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				<InkEdge name="panel" />
 			</div>
 			<div class="nav-tools">
-				<navbar.itemlink class="tool-link" href={github} aria-label="Markless on GitHub">
-					<lucide.github class="tool-icon" aria-hidden="true" />
-				</navbar.itemlink>
+				<SearchButton />
 				<ThemeToggle />
 			</div>
 		</navbar.root>
@@ -110,7 +113,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				inline-size: 100%;
 				max-inline-size: 37.5rem;
 				block-size: 4.375rem;
-				padding-inline: 1.5rem 0.9rem;
+				padding-inline: 0.9rem;
 				border: 2px solid var(--ink);
 				border-radius: 1rem;
 				background: var(--raised);
@@ -133,7 +136,6 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				justify-content: center;
 				inline-size: 2.5rem;
 				block-size: 2.5rem;
-				margin-inline-start: -0.5rem;
 				color: var(--ink);
 				border-radius: 999px;
 			}
@@ -254,22 +256,20 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				background: var(--raised);
 				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
 				opacity: 0;
-				scale: 0.96;
-				transform-origin: top center;
 				transition:
 					opacity 200ms ease,
-					scale 200ms ease,
+					translate 200ms ease,
 					display 200ms allow-discrete;
 			}
 
+			/* Opening from closed drops the box a few pixels and settles it; it never slides sideways. */
 			.nav-pill[ui-open] .nav-box {
 				display: block;
 				opacity: 1;
-				scale: 1;
 
 				@starting-style {
 					opacity: 0;
-					scale: 0.96;
+					translate: -50% -0.5rem;
 				}
 			}
 
@@ -284,10 +284,12 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				opacity: 1;
 				transition:
 					opacity 200ms ease,
+					translate 200ms ease,
 					display 200ms allow-discrete;
 
 				@starting-style {
 					opacity: 0;
+					translate: -50% -0.5rem;
 				}
 			}
 
@@ -296,10 +298,11 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				opacity: 0;
 			}
 
-			/* Switching: the next panel's cards slide in from the side the pointer moved toward, the last panel's slide out the other way. */
+			/* Switching: the cards slide solid, a whole panel's width, the next in from the side the pointer moved toward and the last out the other way. */
 			.nav-panel[ui-from] {
 				@starting-style {
 					opacity: 1;
+					translate: -50% 0;
 				}
 			}
 
@@ -328,29 +331,25 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 
 			@keyframes navbar-from-end {
 				from {
-					opacity: 0;
-					translate: 13rem 0;
+					translate: 37.5rem 0;
 				}
 			}
 
 			@keyframes navbar-from-start {
 				from {
-					opacity: 0;
-					translate: -13rem 0;
+					translate: -37.5rem 0;
 				}
 			}
 
 			@keyframes navbar-to-start {
 				to {
-					opacity: 0;
-					translate: -13rem 0;
+					translate: -37.5rem 0;
 				}
 			}
 
 			@keyframes navbar-to-end {
 				to {
-					opacity: 0;
-					translate: 13rem 0;
+					translate: 37.5rem 0;
 				}
 			}
 
@@ -474,36 +473,10 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				line-height: 1.35;
 			}
 
-			/* Hovering a card moves one object in its drawing; switching panels inks the next panel's drawings in, card by card. */
+			/* Hovering a card moves one object in its drawing. */
 			@media (prefers-reduced-motion: no-preference) {
 				.card:is(:hover, :focus-visible) {
 					--hover: 1;
-				}
-
-				.nav-panel:not([hidden], [ui-from]) .card-art {
-					animation: navbar-ink-in 180ms ease-out both;
-				}
-
-				.nav-panel .card:nth-of-type(2) .card-art {
-					animation-delay: 30ms;
-				}
-
-				.nav-panel .card:nth-of-type(3) .card-art {
-					animation-delay: 60ms;
-				}
-
-				.nav-panel .card:nth-of-type(4) .card-art {
-					animation-delay: 90ms;
-				}
-			}
-
-			@keyframes navbar-ink-in {
-				from {
-					clip-path: inset(-1rem 100% -1rem -1rem);
-				}
-
-				to {
-					clip-path: inset(-1rem);
 				}
 			}
 
@@ -514,6 +487,57 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 			}
 		</style>
 	</navbar.itemlink>
+}
+
+// The search dialog is another unit's; until it lands the button is in the walk and opens nothing.
+function SearchButton() @{
+	const drawing = art.magnifier;
+
+	<navbar.trigger class="search-button" aria-label="Search docs" aria-keyshortcuts="Meta+K Control+K" title="Search docs (⌘K or Ctrl K)">
+		<svg class="search-icon" viewBox={'0 0 ' + drawing.width + ' ' + drawing.height} aria-hidden="true">
+			@for (const layer of drawing.layers; key layer.d) {
+				<path class={'theme-toggle-' + layer.kind} d={layer.d} />
+			}
+		</svg>
+
+		<style>
+			.search-button {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				inline-size: 2.5rem;
+				block-size: 2.5rem;
+				padding: 0;
+				border: 0;
+				border-radius: 999px;
+				background: none;
+				color: var(--ink);
+				cursor: pointer;
+			}
+
+			.search-button:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.search-button:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 1px;
+			}
+
+			.search-icon {
+				inline-size: 1.55rem;
+				block-size: 1.55rem;
+				overflow: visible;
+				transition: rotate 320ms cubic-bezier(0.3, 1.5, 0.5, 1);
+			}
+
+			@media (prefers-reduced-motion: no-preference) {
+				.search-button:is(:hover, :focus-visible) .search-icon {
+					rotate: -14deg;
+				}
+			}
+		</style>
+	</navbar.trigger>
 }
 
 /** A card's or panel's hand-inked edge, from the same sprite as the card drawings. */
