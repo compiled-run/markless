@@ -3420,6 +3420,34 @@
 				"jsGzipBytes": 1571252
 			},
 			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
+			},
+			"to": {
+				"executedChars": 110540,
+				"jsGzipBytes": 1596759
+			},
+			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41522458302 (PR #410, linux-x64)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
+			},
+			"to": {
+				"executedChars": 23307,
+				"jsGzipBytes": 420118
+			},
+			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41522458302 (PR #410, linux-x64)"
 		}
 	],
 	"runtimeModules": {
@@ -3622,16 +3650,16 @@
 				"jsGzipBytes": 88506
 			},
 			"docs /": {
-				"executedChars": 109103,
-				"jsGzipBytes": 1571252
+				"executedChars": 110540,
+				"jsGzipBytes": 1596759
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
 				"jsGzipBytes": 1682502
 			},
 			"docs /ui/accordion": {
-				"executedChars": 22657,
-				"jsGzipBytes": 406069
+				"executedChars": 23307,
+				"jsGzipBytes": 420118
 			}
 		}
 	}
