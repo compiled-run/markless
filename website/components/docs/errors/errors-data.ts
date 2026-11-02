@@ -1764,7 +1764,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A Markless build tooling error from @markless/bundler.',
 		printed: [
-			'MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For <idleSeconds> s it used no CPU and had no compile or chunk job on a build worker<value>, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.',
+			'MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For <idleSeconds> s it used no CPU, had no compile or chunk job on a build worker and waited on no request, socket or process<value>, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.',
 		],
 		structured: false,
 		sources: [
