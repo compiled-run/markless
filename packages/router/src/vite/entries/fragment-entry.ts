@@ -677,11 +677,9 @@ function morphRange(
 
 let keepAttributes: readonly [keep: string, own: string, vary: string] = ['', '', ''];
 
-type KeptSlots = [leaving: Element[], arriving: Element[], varying: [Element, Element][]];
-
 // Both pages render this element byte for byte but for its vary-marked attributes: it stays, with what scripts did to it.
-function keptSlots(from: ChildNode, to: ChildNode): KeptSlots | undefined {
-	const [keep, own, vary] = keepAttributes;
+function keptSlots(from: ChildNode, to: ChildNode): [Element[], Element[]] | undefined {
+	const [keep, own] = keepAttributes;
 	const hash = keep && from.nodeType === 1 && (from as Element).getAttribute(keep);
 	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return undefined;
 	const slots = (root: Element) =>
@@ -690,38 +688,33 @@ function keptSlots(from: ChildNode, to: ChildNode): KeptSlots | undefined {
 			: [...root.querySelectorAll(`[${own}]`)].filter(
 					(slot) => !root.contains(slot.parentElement!.closest(`[${own}]`)),
 				);
-	const varied = (root: Element, slots: Element[]) =>
-		vary
-			? [root, ...root.querySelectorAll(`[${vary}]`)].filter(
-					(element) =>
-						element.hasAttribute(vary) &&
-						!slots.some((slot) => slot !== element && slot.contains(element)),
-				)
-			: [];
 	const leaving = slots(from as Element);
 	const arriving = slots(to as Element);
-	if (leaving.length !== arriving.length) return undefined;
-	const leavingVaried = varied(from as Element, leaving);
-	const arrivingVaried = varied(to as Element, arriving);
-	if (leavingVaried.length !== arrivingVaried.length) return undefined;
-	return [
-		leaving,
-		arriving,
-		leavingVaried.map((element, index) => [element, arrivingVaried[index]!]),
-	];
+	return leaving.length === arriving.length ? [leaving, arriving] : undefined;
 }
+
+// The hash covers the vary marks outside the page's own elements, so both sides pair up in document order.
+const varied = (root: Element, slots: Element[], vary: string) =>
+	[root, ...root.querySelectorAll(`[${vary}]`)].filter(
+		(element) =>
+			element.hasAttribute(vary) &&
+			!slots.some((slot) => slot !== element && slot.contains(element)),
+	);
 
 function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
 	const slots = keptSlots(from, to);
 	if (!slots) return false;
-	const [leaving, arriving, varying] = slots;
+	const [leaving, arriving] = slots;
 	const vary = keepAttributes[2];
-	for (const [element, next] of varying)
-		for (const name of (next.getAttribute(vary) ?? '').split(' ').filter(Boolean)) {
+	const nextVaried = varied(to as Element, arriving, vary);
+	varied(from as Element, leaving, vary).forEach((element, index) => {
+		const next = nextVaried[index]!;
+		for (const name of next.getAttribute(vary)!.split(' ')) {
 			const value = next.getAttribute(name);
 			if (value === null) element.removeAttribute(name);
 			else if (element.getAttribute(name) !== value) element.setAttribute(name, value);
 		}
+	});
 	leaving.forEach((slot, index) => {
 		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
 		slot.replaceChildren(...nodes);
