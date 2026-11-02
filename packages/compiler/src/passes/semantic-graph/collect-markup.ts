@@ -513,6 +513,7 @@ function emitNode(
 					coordinate: { kind: 'child-index', path },
 					residue,
 					excludeNames,
+					...(spreadsRestBinding ? { carriesProps: true as const } : {}),
 					...(context.destructuredNames.length > 0
 						? { destructuredNames: context.destructuredNames }
 						: {}),
@@ -1090,7 +1091,8 @@ function expressionResidue(
 	);
 	if (residue.kind !== 'authored-expression' || residue.source !== source) return residue;
 	// No computed stands behind it, so the render writes the object's CSS text itself.
-	const styleSource = attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
+	const styleSource =
+		attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
 	if (styleSource !== null) return { kind: 'authored-expression', source: styleSource };
 	const inlined = context.nestedLocalSource?.(expression);
 	return inlined ? { kind: 'authored-expression', source: inlined } : residue;

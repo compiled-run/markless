@@ -3270,6 +3270,20 @@
 				"jsGzipBytes": 1569463
 			},
 			"reason": "the fragment swap module's morph dry run (PR #415) on main 520c96247 (after #414 and #416): the docs page downloads +266 B gzip over main (the same change measured +41 B on an older main; the page's pack compresses differently around it); measured on CI run 41427605874, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569463
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1570040
+			},
+			"reason": "the in-browser compiler behind the docs' live code blocks (assets/compile-worker.js, fetched at idle) carries the element-only attribute check that refuses a misplaced prefetch={false}; measured on CI run 41433570242 (PR #418 on main 2ec91d8bb): +577 B gzip downloaded, executed chars within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -3473,7 +3487,7 @@
 			},
 			"docs /": {
 				"executedChars": 110777,
-				"jsGzipBytes": 1569463
+				"jsGzipBytes": 1570040
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,

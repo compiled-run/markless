@@ -3584,6 +3584,337 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'prefetch={false} sits on something that never renders the link.',
+		printed: [
+			'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED: `<authored>` on <<childComponentName>> does nothing: <childComponentName> does not pass its props to an <tag>.',
+			'Only an <tag> acts on `<authored>`. On a component, it works when the component spreads its props (`{...rest}`) onto an <tag> that does not set it itself; anywhere else nothing would act on it and the page would behave as if it were not there.',
+			'Put `<authored>` on the <tag> itself, or on a component that spreads its props onto one.',
+			'https://markless.dev/errors/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED',
+		],
+		structured: true,
+		guide: {
+			summary: 'prefetch={false} sits on something that never renders the link.',
+			what: [
+				{
+					id: 's0',
+					text: 'Only an ',
+				},
+				{
+					id: 's1',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' acts on ',
+				},
+				{
+					id: 's3',
+					text: 'prefetch={false}',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: '. Here it is on another element, or on a component that does not pass its props on to an ',
+				},
+				{
+					id: 's5',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', so the router would still request the page early and nothing would tell you.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Put ',
+				},
+				{
+					id: 's1',
+					text: 'prefetch={false}',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' on the ',
+				},
+				{
+					id: 's3',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' or ',
+				},
+				{
+					id: 's5',
+					text: '<Link>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' itself. A component of your own can take it when it spreads its props onto its ',
+				},
+				{
+					id: 's7',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ' and does not set the same attribute there itself.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'NavLink',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'children',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r7',
+							text: ', ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '...',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: 'rest',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r10',
+							text: ' }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r11',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r12',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r13',
+							text: 'PropsOf',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r14',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r15',
+							text: "'a'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r16',
+							text: '>) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r17',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'a',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '...',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: 'rest}>{children}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'a',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r6',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'NavLink',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'href',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '"/logout"',
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r6',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'prefetch',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: '{',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'false',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r11',
+							text: '}>Log out</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'NavLink',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/element-only-attributes.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/element-only-attributes.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/router/src/vite/anchor-transform.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/anchor-transform.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ELEMENT_UNADDRESSABLE',
 		packageName: '@markless/compiler',
 		stage: 'compile',

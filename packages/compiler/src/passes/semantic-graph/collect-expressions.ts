@@ -298,7 +298,9 @@ function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only'
 	if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
 	if (resolved.path.length === 0 && resolved.binding.valueKind === 'scalar') return null;
 	if (writeThroughLocal(value, state, 'call')) return null;
-	return resolved.binding.kind === 'state' && resolved.binding.writable ? 'writable' : 'read-only';
+	return resolved.binding.kind === 'state' && resolved.binding.writable
+		? 'writable'
+		: 'read-only';
 }
 
 export function collectCollectionCall(node: AnyNode, state: WalkState): void {
@@ -552,7 +554,11 @@ function collectReadsIn(
 		// template literal, a call result - names no binding, so recording the
 		// whole spelling as one read hides the graph reads inside the receiver.
 		// An optional link can short-circuit, so the read stops at the value before it.
-		if (!namesABinding(node) || hasOptionalLink(node) || chainKeysIntoOneStateCell(node, state)) {
+		if (
+			!namesABinding(node) ||
+			hasOptionalLink(node) ||
+			chainKeysIntoOneStateCell(node, state)
+		) {
 			collectReadsIn(node.object as AnyNode | undefined, state, region);
 			if (node.computed === true) {
 				collectReadsIn(node.property as AnyNode | undefined, state, region);

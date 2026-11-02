@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 300,
-	guided: 45,
+	total: 301,
+	guided: 46,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -287,6 +287,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
 					kind: 'compile error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED',
+					kind: 'compile error',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_ELEMENT_UNADDRESSABLE',

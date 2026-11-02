@@ -264,7 +264,9 @@ export class FunctionWritesAnalysis {
 			// A new object or array holding the value is followed in its place, at no finer path.
 			const holder = parentOf(module, parent);
 			if (
-				(parent.type === 'Property' && parent.value === top && holder?.type === 'ObjectExpression') ||
+				(parent.type === 'Property' &&
+					parent.value === top &&
+					holder?.type === 'ObjectExpression') ||
 				parent.type === 'ArrayExpression' ||
 				(parent.type === 'SpreadElement' &&
 					(holder?.type === 'ObjectExpression' || holder?.type === 'ArrayExpression'))
@@ -326,7 +328,13 @@ export class FunctionWritesAnalysis {
 			case 'AssignmentPattern':
 				if (parent.right !== top) return;
 				for (const alias of patternBindings(parent.left as AnyNode, this.#module))
-					this.#track(alias, path, exact && (parent.left as AnyNode).type === 'Identifier', out, seen);
+					this.#track(
+						alias,
+						path,
+						exact && (parent.left as AnyNode).type === 'Identifier',
+						out,
+						seen,
+					);
 				return;
 			case 'ForOfStatement':
 			case 'ForInStatement':
@@ -376,7 +384,9 @@ export class FunctionWritesAnalysis {
 		let root = unwrap(target);
 		while (root.type === 'MemberExpression') root = unwrap(root.object as AnyNode);
 		const binding =
-			root.type === 'Identifier' ? (this.#module.referenceOf(root as never)?.binding ?? null) : null;
+			root.type === 'Identifier'
+				? (this.#module.referenceOf(root as never)?.binding ?? null)
+				: null;
 		if (!binding) {
 			out.add(path, true);
 			return;
@@ -450,7 +460,11 @@ export class FunctionWritesAnalysis {
 	#argument(call: AnyNode, index: number, path: Path, exact: boolean, out: WriteSet): void {
 		const callee = unwrap(call.callee as AnyNode);
 		// A spread before the value moves it to a parameter position no fact names.
-		if ((call.arguments as AnyNode[]).slice(0, index).some((arg) => arg.type === 'SpreadElement')) {
+		if (
+			(call.arguments as AnyNode[])
+				.slice(0, index)
+				.some((arg) => arg.type === 'SpreadElement')
+		) {
 			out.add(path, true);
 			return;
 		}

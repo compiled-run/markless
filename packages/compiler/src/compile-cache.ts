@@ -50,6 +50,7 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 			input.omitAuthoredSource === true,
 			input.additionalFrameworkApiSources ?? null,
 			input.serverOnlyProps ?? null,
+			input.elementOnlyAttributes ?? null,
 			input.routeRoot === true,
 			input.symbols,
 		])}${sortedRecordJson(input.importedModuleInterfaces)}${sortedRecordJson(
