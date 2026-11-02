@@ -26,6 +26,9 @@ A screen reader hears plain links and buttons, which is what site navigation is.
   `aria-expanded` and `aria-controls`.
 - `navbar.itemcontent` is the dropdown. It carries `hidden` while it is closed.
 - `navbar.itemlink` is an `<a>`. It works at the top level and inside a dropdown.
+- `navbar.trigger` is a `<button>` that opens no dropdown, such as a theme switch or a search
+  button. The arrow keys stop on it like any other control in the bar. What it does is up to your
+  `onClick`.
 
 The root, the item, the trigger and the dropdown write `ui-open` while a dropdown shows. They write
 `ui-closed` while it does not. `navbar.item` writes `ui-active` when you set `active` on it.
@@ -42,7 +45,7 @@ that page sits in. Only `current` reaches a screen reader.
 | Left arrow or Right arrow | Moves between top-level controls, and wraps at the ends. It skips dropdown links. |
 | Home or End               | Jumps to the first or last top-level control.                                     |
 | Down arrow on a trigger   | Opens the dropdown and moves focus to its first link.                             |
-| Arrows inside a dropdown  | Move between that dropdown's links, and wrap at the ends.                         |
+| Arrows inside a dropdown  | Move between that dropdown's links and buttons, and wrap at the ends.             |
 | Home or End in a dropdown | Jumps to the dropdown's first or last link.                                       |
 | Escape                    | Closes the dropdown. If focus was inside it, focus goes back to the trigger.      |
 | Tab                       | Moves on as normal. When focus leaves the landmark, the open dropdown closes.     |

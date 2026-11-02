@@ -8,6 +8,8 @@
 type Parts = ReadonlyArray<HTMLElement> | undefined;
 
 function isWalkable(part: HTMLElement): boolean {
+	// A control hidden in its own right (`hidden`, `display: none`) cannot take focus; one inside a dropdown that is opening can.
+	if (getComputedStyle(part).display === 'none') return false;
 	if (part.tagName === 'A') return part.hasAttribute('href');
 	if (part.tagName !== 'BUTTON') return false;
 	return (part as HTMLButtonElement).disabled !== true;

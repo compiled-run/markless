@@ -2517,6 +2517,12 @@
 						"doc": "Called with the value of the item now showing its dropdown, or the empty\nstring when everything closed. Omit it and the navbar still opens and\ncloses; the call site simply does nothing."
 					}
 				]
+			},
+			{
+				"part": "trigger",
+				"component": "NavbarTrigger",
+				"doc": "A button in the bar that opens no dropdown: a theme switch, a search opener,\nthe button that shows a mobile menu. It is a stop in the bar's arrow walk in\ndocument order, or in its dropdown's walk when it sits inside one, and it\nwrites no `aria-expanded`: what it does is the consumer's `onClick`. Outside\nevery navbar it is a plain button.",
+				"props": []
 			}
 		]
 	},

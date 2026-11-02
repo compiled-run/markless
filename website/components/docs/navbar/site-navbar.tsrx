@@ -76,7 +76,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				<navbar.itemlink class="tool-link" href={github} aria-label="Markless on GitHub">
 					<lucide.github class="tool-icon" aria-hidden="true" />
 				</navbar.itemlink>
-				<ThemeToggle />
+				<ThemeToggle inBar />
 				<navbar.item value="get-started">
 					<navbar.itemlink class="cta" href={getStarted} current={isCurrent(pathname, getStarted)}>
 						<span>Get started</span>

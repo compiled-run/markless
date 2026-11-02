@@ -8,6 +8,7 @@ import type {
 	NavbarItemProps,
 	NavbarItemTriggerProps,
 	NavbarRootProps,
+	NavbarTriggerProps,
 } from './navbar-types.ts';
 
 // A disclosure, not a menubar - see navbar-types.ts.
@@ -405,6 +406,13 @@ export function NavbarItemContent({
 			onKeydown?.(event);
 		}}
 	>{children}</div>
+}
+
+export function NavbarTrigger({ children, ...rest }: NavbarTriggerProps) @{
+	const navbar = navbarState();
+
+	// The root's keydown walks it: binding the roster is the whole of joining the bar.
+	<button {...rest} el={navbar.controlEls} type="button">{children}</button>
 }
 
 export function NavbarItemLink({ current, children, onKeydown, ...rest }: NavbarItemLinkProps) @{

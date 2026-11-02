@@ -86,6 +86,15 @@ export type NavbarItemTriggerProps = PropsOf<'button'>;
 export type NavbarItemContentProps = PropsOf<'div'>;
 
 /**
+ * A button in the bar that opens no dropdown: a theme switch, a search opener,
+ * the button that shows a mobile menu. It is a stop in the bar's arrow walk in
+ * document order, or in its dropdown's walk when it sits inside one, and it
+ * writes no `aria-expanded`: what it does is the consumer's `onClick`. Outside
+ * every navbar it is a plain button.
+ */
+export type NavbarTriggerProps = PropsOf<'button'>;
+
+/**
  * A navigation link. It works at the top level of the navbar and inside a
  * dropdown, and it is the only part that can carry `aria-current="page"`.
  */
