@@ -128,6 +128,8 @@ test.each([
 	'html-attribute-errors',
 	'standard-attribute-spellings',
 	'attribute-spelling-errors',
+	'anchor-prefetch',
+	'anchor-prefetch-errors',
 ])('TypeScript 7.1 with the content mapper reports what markless-tsc reports: %s', (fixture) => {
 	const typescript5 = runMarklessTsc(fixture);
 	const typescript7 = runTypescript7(fixture);
@@ -141,4 +143,17 @@ test('non-numeric strings in numeric attributes and misspelled events still fail
 	expect(result.output).toContain('grid.tsrx(4,8): error TS2322');
 	expect(result.output).toContain('grid.tsrx(5,10): error TS2322');
 	expect(result.output).toContain("Property 'onKeyDwn' does not exist");
+});
+
+test('prefetch is a boolean on an <a> and on a component whose props are an <a>', () => {
+	const result = runMarklessTsc('anchor-prefetch');
+	expect(result.output).toBe('');
+	expect(result.status).toBe(0);
+});
+
+test('prefetch on another element, or with a value that is not a boolean, fails', () => {
+	const result = runMarklessTsc('anchor-prefetch-errors');
+	expect(result.status).not.toBe(0);
+	expect(result.output).toContain('buttons.tsrx(4,25): error TS2322');
+	expect(result.output).toContain('buttons.tsrx(5,15): error TS2322');
 });
