@@ -21,7 +21,8 @@ const PAINT: Record<LayerKind, string> = {
 
 function motionStyle(motion: Motion, box: readonly number[]): string {
 	const delay = motion.delay ? ` ${motion.delay}ms` : '';
-	const move = `transform 320ms ${motion.easing ?? 'cubic-bezier(.3,1.5,.5,1)'}${delay}`;
+	// The hover spring comes from the card, which carries the navbar's spring variables.
+	const move = `transform ${motion.easing ? `320ms ${motion.easing}` : 'var(--spring-hover-ms) var(--spring-hover)'}${delay}`;
 	return [
 		`transform:${motion.transform}`,
 		`transform-origin:${motion.origin[0] - box[0]!}px ${motion.origin[1] - box[1]!}px`,

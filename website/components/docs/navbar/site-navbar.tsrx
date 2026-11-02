@@ -13,7 +13,12 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 		<DesktopNav pathname={pathname} />
 
 		<style>
+			/* From springs.ts, each spring sampled into a linear() easing over the time it takes to settle; springs.test.ts keeps these in step. */
 			.site-navbar {
+				--spring-slide: linear(0, 0.003 0.8%, 0.01 1.7%, 0.021 2.5%, 0.053 4.2%, 0.096 5.8%, 0.173 8.3%, 0.403 15%, 0.485 17.5%, 0.585 20.8%, 0.673 24.2%, 0.747 27.5%, 0.808 30.8%, 0.857 34.2%, 0.896 37.5%, 0.933 41.7%, 0.958 45.8%, 0.979 50.8%, 0.993 56.7%, 0.999 62.5%, 1.003 70%, 1);
+				--spring-slide-ms: 426ms;
+				--spring-hover: linear(0, 0.008 0.8%, 0.03 1.7%, 0.065 2.5%, 0.111 3.3%, 0.165 4.2%, 0.227 5%, 0.294 5.8%, 0.657 10%, 0.794 11.7%, 0.856 12.5%, 0.915 13.3%, 0.968 14.2%, 1.016 15%, 1.059 15.8%, 1.097 16.7%, 1.129 17.5%, 1.155 18.3%, 1.177 19.2%, 1.193 20%, 1.205 20.8%, 1.212 21.7%, 1.215 23.3%, 1.211 24.2%, 1.195 25.8%, 1.158 28.3%, 1.064 33.3%, 1.011 36.7%, 0.991 38.3%, 0.975 40%, 0.964 41.7%, 0.957 43.3%, 0.954 45.8%, 0.957 48.3%, 0.997 59.2%, 1.009 65.8%, 1.009 70.8%, 0.998 86.7%, 1);
+				--spring-hover-ms: 748ms;
 				position: relative;
 				z-index: 60;
 				font-family: 'Shantell Sans', system-ui, sans-serif;
@@ -257,9 +262,9 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
 				opacity: 0;
 				transition:
-					opacity 200ms ease,
-					translate 200ms ease,
-					display 200ms allow-discrete;
+					opacity 150ms ease,
+					translate var(--spring-slide-ms) var(--spring-slide),
+					display 150ms allow-discrete;
 			}
 
 			/* Opening from closed drops the box a few pixels and settles it; it never slides sideways. */
@@ -283,9 +288,9 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				overflow: clip;
 				opacity: 1;
 				transition:
-					opacity 200ms ease,
-					translate 200ms ease,
-					display 200ms allow-discrete;
+					opacity 150ms ease,
+					translate var(--spring-slide-ms) var(--spring-slide),
+					display 150ms allow-discrete;
 
 				@starting-style {
 					opacity: 0;
@@ -298,7 +303,7 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				opacity: 0;
 			}
 
-			/* Switching: the cards slide solid, a whole panel's width, the next in from the side the pointer moved toward and the last out the other way. */
+			/* Switching: the cards slide solid, a whole panel's width, on the slide spring. Transitions, not keyframes: a switch mid-slide carries on from where the cards are. */
 			.nav-panel[ui-from] {
 				@starting-style {
 					opacity: 1;
@@ -308,47 +313,31 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 
 			.nav-panel[hidden][ui-to] {
 				opacity: 1;
-				transition: display 250ms allow-discrete;
+				transition: display var(--spring-slide-ms) allow-discrete;
 			}
 
 			@media (prefers-reduced-motion: no-preference) {
+				.nav-panel > .card {
+					transition: translate var(--spring-slide-ms) var(--spring-slide);
+				}
+
 				.nav-panel[ui-from='end'] > .card {
-					animation: navbar-from-end 250ms ease both;
+					@starting-style {
+						translate: 37.5rem 0;
+					}
 				}
 
 				.nav-panel[ui-from='start'] > .card {
-					animation: navbar-from-start 250ms ease both;
+					@starting-style {
+						translate: -37.5rem 0;
+					}
 				}
 
-				.nav-panel[ui-to='start'] > .card {
-					animation: navbar-to-start 250ms ease both;
-				}
-
-				.nav-panel[ui-to='end'] > .card {
-					animation: navbar-to-end 250ms ease both;
-				}
-			}
-
-			@keyframes navbar-from-end {
-				from {
-					translate: 37.5rem 0;
-				}
-			}
-
-			@keyframes navbar-from-start {
-				from {
+				.nav-panel[hidden][ui-to='start'] > .card {
 					translate: -37.5rem 0;
 				}
-			}
 
-			@keyframes navbar-to-start {
-				to {
-					translate: -37.5rem 0;
-				}
-			}
-
-			@keyframes navbar-to-end {
-				to {
+				.nav-panel[hidden][ui-to='end'] > .card {
 					translate: 37.5rem 0;
 				}
 			}
@@ -416,7 +405,7 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				inline-size: calc(100% - 1.5rem);
 				block-size: calc(100% - 2.5rem);
 				overflow: visible;
-				transition: scale 300ms ease;
+				transition: scale var(--spring-hover-ms) var(--spring-hover);
 				will-change: transform;
 			}
 
@@ -528,7 +517,7 @@ function SearchButton() @{
 				inline-size: 1.55rem;
 				block-size: 1.55rem;
 				overflow: visible;
-				transition: rotate 320ms cubic-bezier(0.3, 1.5, 0.5, 1);
+				transition: rotate var(--spring-hover-ms) var(--spring-hover);
 			}
 
 			@media (prefers-reduced-motion: no-preference) {
@@ -933,7 +922,7 @@ function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 				inline-size: 1.9rem;
 				block-size: 1.9rem;
 				overflow: visible;
-				transition: rotate 320ms cubic-bezier(0.3, 1.5, 0.5, 1);
+				transition: rotate var(--spring-hover-ms) var(--spring-hover);
 			}
 
 			@media (prefers-reduced-motion: no-preference) {
