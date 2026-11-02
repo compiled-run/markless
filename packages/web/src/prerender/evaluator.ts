@@ -413,12 +413,42 @@ export async function renderPrerenderBranch(
 			| ReadonlyArray<{ readonly id: string; readonly servedArmRecords?: ResumeArmRecordSet }>
 			| undefined
 	)?.find((branch) => branch.id === branchSiteId)?.servedArmRecords;
+	const range = records.view.branches?.find((candidate) => candidate.id === branchSiteId);
+	const nested = range ? boundariesInside(records.view, range) : [];
+	const armRecords = served ?? arm.armRecords;
 	return {
 		...arm,
-		...(served ? { armRecords: served } : {}),
+		armRecords: nested.length > 0 ? { ...armRecords, asyncBoundaries: nested } : armRecords,
 		computed: records.state.computed,
 		cells: freshArmCells(output, freshCellIds),
 	};
+}
+
+// @try blocks inside a range, re-addressed from its start anchor so the commit can wire them.
+function boundariesInside(
+	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
+	range: {
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	},
+): NonNullable<ResumeArmRecordSet['asyncBoundaries']> {
+	const start = range.startAnchor.index;
+	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
+		...anchor,
+		index: anchor.index - start - 1,
+	});
+	return view.asyncBoundaries
+		.filter(
+			(candidate) =>
+				candidate.startAnchor.index > start &&
+				candidate.endAnchor.index < range.endAnchor.index,
+		)
+		.map(({ armRecords: served, ...candidate }) => ({
+			...candidate,
+			...(served && !Array.isArray(served) && { armRecords: served as ResumeArmRecordSet }),
+			startAnchor: armIndex(candidate.startAnchor),
+			endAnchor: armIndex(candidate.endAnchor),
+		}));
 }
 
 // Taken before serialization: nothing in the live graph answers for a component this render is creating.
@@ -1260,22 +1290,7 @@ async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string
 	if (!anchor || !armRecords || Array.isArray(armRecords)) {
 		throw new Error(`MARKLESS_PRERENDER_BOUNDARY_MISSING: ${boundaryId}`);
 	}
-	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
-		...anchor,
-		index: anchor.index - boundary.startAnchor.index - 1,
-	});
-	const nested = records.view.asyncBoundaries
-		.filter(
-			(candidate) =>
-				candidate.startAnchor.index > boundary.startAnchor.index &&
-				candidate.endAnchor.index < boundary.endAnchor.index,
-		)
-		.map(({ armRecords: served, ...candidate }) => ({
-			...candidate,
-			...(served && !Array.isArray(served) && { armRecords: served as ResumeArmRecordSet }),
-			startAnchor: armIndex(candidate.startAnchor),
-			endAnchor: armIndex(candidate.endAnchor),
-		}));
+	const nested = boundariesInside(records.view, boundary);
 	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
 	const set = armRecords as ResumeArmRecordSet;
 	return {

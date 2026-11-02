@@ -94,7 +94,7 @@ export async function startResumeRuntime(input: {
 		readonly holdPendingFlip: (graphNodeId: string) => boolean;
 	}) => void;
 	readonly connectAsyncBoundaryWiring: (
-		wiring: import('./resume-async-wiring.ts').AsyncBoundaryWiring,
+		wiring: () => Promise<import('./resume-async-wiring.ts').AsyncBoundaryWiring>,
 	) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
@@ -201,7 +201,7 @@ export async function startResumeRuntime(input: {
 		});
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
-	if (runtimeInput.view.asyncBoundaries.length > 0) {
+	const wireAsync = async () => {
 		const asyncWiring = await import('./resume-async-wiring.ts');
 		// D8: settled-content tracking (deadline-gated pending, the navigation-
 		// transition settle promise, pending minimum duration).
@@ -217,7 +217,7 @@ export async function startResumeRuntime(input: {
 			commitArm: input.commitArm,
 			hasHtmlRenderer: !!runtimeInput.renderBranchHtml,
 		});
-		input.connectAsyncBoundaryWiring(asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
+		return asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
 			asyncBoundariesById: prepared.asyncBoundariesById,
 			graph: runtimeInput.graph,
 			root: runtimeInput.root,
@@ -230,8 +230,13 @@ export async function startResumeRuntime(input: {
 			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 			settleTracker,
 			onAsyncSnapshot,
-		}));
-	}
+		});
+	};
+	// A page that served no @try still wires one an escalated @if renders later.
+	let wiring: ReturnType<typeof wireAsync> | undefined;
+	const wire = () => (wiring ??= wireAsync());
+	if (runtimeInput.view.asyncBoundaries.length > 0) await wire();
+	input.connectAsyncBoundaryWiring(wire);
 	for (const computed of runtimeInput.state?.computed ?? []) {
 		if (
 			computed.snapshot?.status === 'pending' &&
