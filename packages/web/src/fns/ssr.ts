@@ -879,7 +879,10 @@ export function marklessSsrSeedPropCells(
 		const derived = new Map<string, unknown>();
 		for (const key of cell.deriveKeys ?? []) {
 			const raw = props?.[key];
-			const paths = cell.derivePaths?.[key];
+			const paths =
+				cell.derivePaths && Object.hasOwn(cell.derivePaths, key)
+					? cell.derivePaths[key]
+					: undefined;
 			const value = paths ? valueAlongPaths(raw, paths) : raw;
 			// A forced-arm probe hands structured props over as placeholders, not data.
 			if (

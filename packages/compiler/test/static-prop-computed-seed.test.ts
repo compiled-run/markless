@@ -195,6 +195,13 @@ export function Profile({ user, roles }) @{
 	);
 	expect(carried).toContain('ada');
 	expect(carried).not.toContain('never-served');
+	// A key with no path entry is carried whole, even one spelled like an Object.prototype member.
+	const inherited = JSON.stringify(
+		marklessSsrSeedPropCells({ cells: [] }, { constructor: { kept: 'whole' } }, [
+			{ graphNodeId: 'prop:props', keys: [], deriveKeys: ['constructor'], derivePaths: {} },
+		]).cells?.[0],
+	);
+	expect(inherited).toContain('whole');
 });
 
 // Projected children a derive reads stay scalar-only: their markup is already in the served HTML.

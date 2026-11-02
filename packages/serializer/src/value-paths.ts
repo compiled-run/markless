@@ -1,7 +1,10 @@
+import { isPlainObject } from './value.ts';
+
 /**
  * The value with only what `paths` reach kept, so the page ships the fields
  * browser code reads and not the whole value. An empty path keeps it whole; an
- * array read only for its length keeps its length.
+ * array read only for its length keeps its length; any other built-in (a Map's
+ * `size`, a Date) is kept whole, since its fields are not own data.
  */
 export function valueAlongPaths(
 	value: unknown,
@@ -30,6 +33,7 @@ export function valueAlongPaths(
 			kept[index] = valueAlongPaths(value[index], rests.get(String(index)) ?? []);
 		return kept;
 	}
+	if (!isPlainObject(value)) return value;
 	const kept: Record<string, unknown> = {};
 	for (const [key, rest] of rests)
 		if (Object.hasOwn(value, key))

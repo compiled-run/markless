@@ -163,3 +163,26 @@ export function Branch({ node }: { readonly node: { readonly label: string; read
 	expect(derivedProps(tree, 'Branch')).toEqual(['node']);
 	expect(derivedPropPaths(tree, 'Branch')).toEqual({ node: [['label'], ['next']] });
 });
+
+test('a forwarded prop named like an Object.prototype member is read whole when no path names it', async () => {
+	const leaf = await compile(
+		'src/ui/leaf.tsrx',
+		`import { computed, state } from '@markless/core';
+export function Leaf({ constructor, info }: { readonly constructor: string; readonly info: { readonly id: string } }) @{
+	const seen = state({ n: 0 });
+	const text = computed(() => constructor + info.id + seen.n);
+	<i onClick={() => { seen.n++; }}>{text}</i>
+}`,
+	);
+	expect(derivedPropPaths(leaf, 'Leaf')).toEqual({ info: [['id']] });
+	const holder = await compile(
+		'src/ui/holder.tsrx',
+		`import { Leaf } from './leaf.tsrx';
+export function Holder({ kind, data }: { readonly kind: string; readonly data: { readonly id: string } }) @{
+	<div><Leaf constructor={kind} info={data} /></div>
+}`,
+		{ './leaf.tsrx': leaf },
+	);
+	expect(derivedProps(holder, 'Holder')).toEqual(['kind', 'data']);
+	expect(derivedPropPaths(holder, 'Holder')).toEqual({ data: [['id']] });
+});

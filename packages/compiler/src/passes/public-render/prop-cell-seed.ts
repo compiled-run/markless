@@ -153,7 +153,9 @@ function importedDerivedProps(
 		? new Map(
 				component.derivedProps.map((key) => [
 					key,
-					component.derivedPropPaths?.[key] ?? [[]],
+					component.derivedPropPaths && Object.hasOwn(component.derivedPropPaths, key)
+						? component.derivedPropPaths[key]!
+						: [[]],
 				]),
 			)
 		: undefined;
