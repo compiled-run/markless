@@ -1,6 +1,7 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
 import { derivedReconcilePlane } from './reconcile-plane-slot.ts';
+import { hasLiveSharedDefinitions } from './shared-live.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
 
 type RuntimeModule = typeof import('@markless/runtime');
@@ -37,11 +38,12 @@ export async function createRuntimeGraphFromResumePayload(
 	const { createRuntimeGraph } = await runtimeModule();
 	let graph!: RuntimeGraph;
 	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
+	const cells = await decodeResumeCells(input.state, input.root.__marklessEventOnlyGraph);
+	const shared = hasLiveSharedDefinitions(input.state)
+		? (await import('./fns/shared-instances.ts')).bindSharedCells(input.root, input.state, cells)
+		: undefined;
 	graph = createRuntimeGraph({
-		cells: [
-			...(await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph)),
-			...(await decodeServedComputedValues(input.state, input.root.__marklessEventOnlyGraph)),
-		],
+		cells: shared?.cells ?? cells,
 		computed: input.state.computed.map((computed) => ({
 			...computed,
 			dependencies: computed.dependencies ?? [],
@@ -50,7 +52,18 @@ export async function createRuntimeGraphFromResumePayload(
 		asyncComputed,
 		reconcile: derivedReconcilePlane(),
 	});
+	shared?.connect(graph);
 	return graph;
+}
+
+export async function decodeResumeCells(
+	state: ProtocolStatePayload,
+	eventOnlyValues?: ReadonlyMap<string, unknown>,
+) {
+	return [
+		...(await decodeStateCells(state, eventOnlyValues)),
+		...(await decodeServedComputedValues(state, eventOnlyValues)),
+	];
 }
 
 async function decodeStateCells(

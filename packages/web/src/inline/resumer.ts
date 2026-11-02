@@ -297,6 +297,61 @@ export function createInlineResumerStorageWakeSource(
 	return `;(${runInlineResumerStorageWake.toString()})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE},${inlineDeferSource()}));`;
 }
 
+// Appended only to a page whose state declares a page- or request-scoped shared() definition: the
+// container listens on the document's instance for that id, so another container's write wakes it.
+export function createInlineResumerSharedWakeSource(
+	resumeModuleUrl: string | undefined,
+	instancesProperty: string,
+	instancesVersion: number,
+	definitionIdsJson: string,
+): string {
+	return `;(${runInlineResumerSharedWake.toString()})(${JSON.stringify(resumeModuleUrl)},${JSON.stringify(instancesProperty)},${instancesVersion},${definitionIdsJson},${INLINE_MODULE_LOADER_SOURCE});`;
+}
+
+function runInlineResumerSharedWake(
+	fallbackResumeModuleUrl: string | undefined,
+	property: string,
+	version: number,
+	definitionIds: ReadonlyArray<string>,
+	loadModule: (url: string) => Promise<InlineResumeModule>,
+): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+	const resumeModuleUrl =
+		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+	if (!root || !resumeModuleUrl) return;
+	const life = (root.__mL ||= {});
+	const apply = () => {
+		if (root.__mL === life && root.isConnected) {
+			root.__marklessDelegatedDispatch = true;
+			(root.__mResume ||= loadModule(resumeModuleUrl)).then(
+				(module) => root.__mL === life && module.resumeContainerEvent({ root, event: 0 }),
+			);
+		}
+		return false;
+	};
+	const host = document as unknown as Record<string, InlineSharedInstances | undefined>;
+	const store = (host[property] ||= { version, instances: Object.create(null) });
+	if (store.version !== version) return;
+	for (const id of definitionIds)
+		(store.instances[id] ||= { shape: '', cells: {}, listeners: [] }).listeners.push({
+			root,
+			apply,
+		});
+}
+
+type InlineSharedInstances = {
+	readonly version: number;
+	readonly instances: Record<
+		string,
+		{
+			readonly shape: string;
+			readonly cells: Record<string, unknown>;
+			readonly listeners: Array<{ readonly root: object; readonly apply: () => boolean }>;
+		}
+	>;
+};
+
 function runInlineResumerStorageWake(
 	slotSymbolKey: string,
 	rendered: ReadonlyArray<readonly [slotKey: string, value: string]>,

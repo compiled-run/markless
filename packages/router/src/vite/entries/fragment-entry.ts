@@ -14,6 +14,9 @@ export interface FragmentNavigationConfig {
 	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
 	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
+	// Where the document (or a container element) holds its live shared() instances, which the swap keeps,
+	// and the resumer script attribute naming the module that binds the next page to them.
+	readonly sharedInstances: readonly [property: string, resumeModuleAttribute: string];
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
 	readonly streamOpenProperty: string;
@@ -865,11 +868,20 @@ function withoutTransitions(d: Document): () => void {
 		);
 }
 
+type SharedSwapEntry = {
+	readonly prepareSharedSwap?: (input: {
+		readonly root: Element;
+		readonly document: Document;
+		readonly container?: Element;
+	}) => Promise<{ readonly wake?: (container: Element) => void } | undefined>;
+};
+
 // Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.
-function forgetRuntimeState(root: Element): void {
+function forgetRuntimeState(root: Element, kept: string): void {
 	const forget = (node: Node) => {
 		for (const key of Object.keys(node))
-			if (key.startsWith('__m')) delete (node as unknown as Record<string, unknown>)[key];
+			if (key.startsWith('__m') && key !== kept)
+				delete (node as unknown as Record<string, unknown>)[key];
 		if (isContainer(node)) (node as unknown as Record<string, unknown>).__mL = {};
 	};
 	forget(root);
@@ -1102,6 +1114,32 @@ export async function navigate(
 	const head = await mergeHead(d, next, state.config.stylesheetKeyAttribute);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (stale()) return abandon();
+	// The next page is served with shared() defaults; it takes the live values before it is shown.
+	const container = isContainer(outgoing)
+		? outgoing
+		: (outgoing.querySelector(`[${containerAttribute}]`) ?? undefined);
+	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
+	const resumeUrl = incoming
+		.querySelector(`[${resumeAttribute}]`)
+		?.getAttribute(resumeAttribute);
+	let wakeShared: ((container: Element) => void) | undefined;
+	// Only an instance a runtime has bound holds values; a page that only listens has none to give.
+	const bound = (place: object | undefined) =>
+		Object.values(
+			(place as Record<string, { instances?: Record<string, { shape?: string }> }> | undefined)?.[
+				sharedProperty
+			]?.instances ?? {},
+		).some((instance) => instance.shape);
+	if (resumeUrl && (bound(d) || bound(container))) {
+		try {
+			const entry = (await import(/* @vite-ignore */ resumeUrl)) as SharedSwapEntry;
+			wakeShared = (await entry.prepareSharedSwap?.({ root: incoming, document: d, container }))
+				?.wake;
+		} catch (error) {
+			reportAsync(error);
+		}
+		if (stale()) return abandon();
+	}
 	let restore = scroll;
 	if (mode === 'traverse') {
 		const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
@@ -1138,7 +1176,7 @@ export async function navigate(
 		}
 		state.scrolled.clear();
 		retire(state, outgoing);
-		forgetRuntimeState(outgoing);
+		forgetRuntimeState(outgoing, sharedProperty);
 		(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
 		for (const element of d.querySelectorAll(state.config.streamedArmSelector))
 			element.remove();
@@ -1243,6 +1281,7 @@ export async function navigate(
 		ranFiles,
 		() => id === session.navigation,
 	);
+	if (wakeShared && container?.isConnected) wakeShared(container);
 	const active = d.activeElement as HTMLElement | null;
 	if (active && active !== d.body && !region.contains(active)) active.blur?.();
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();

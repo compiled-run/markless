@@ -38,6 +38,35 @@ export async function resumeContainerEvent(input: {
 
 interface RouteResumeModule {
 	readonly resumeContainerEvent?: (input: unknown) => unknown;
+	readonly loadSymbol?: (symbolId: string) => unknown;
+}
+
+// The next page of an in-place navigation, still off screen, takes the document's live shared() values.
+export async function prepareSharedSwap(input: {
+	readonly root: ParentNode;
+	readonly document: Document;
+	readonly container?: Element;
+}): Promise<{ readonly wake?: (container: Element) => void } | undefined> {
+	const route = routeFromRoot(input.root);
+	const module = (route ? await loadRouteResumeModule(route) : undefined) as
+		| RouteResumeModule
+		| undefined;
+	if (typeof module?.loadSymbol !== 'function') return undefined;
+	const { prepareSharedSwap, wakeSharedContainer } = await import('@markless/web/shared-swap');
+	const prepared = await prepareSharedSwap({
+		root: input.root,
+		document: input.document,
+		container: input.container,
+		loadSymbol: module.loadSymbol as Parameters<typeof prepareSharedSwap>[0]['loadSymbol'],
+	});
+	return prepared?.wake
+		? {
+				wake: (container) =>
+					wakeSharedContainer(container, {
+						resumeContainerEvent: (wake) => resumeContainerEvent({ ...wake, root: container }),
+					}),
+			}
+		: undefined;
 }
 
 interface RouteScript {

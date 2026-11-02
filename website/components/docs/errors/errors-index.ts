@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 301,
+	total: 302,
 	guided: 46,
 	groups: [
 		{
@@ -1430,6 +1430,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_SETTLE_SLOT_UNKNOWN',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_SHARED_SHAPE_MISMATCH',
 					kind: 'runtime error',
 					guided: false,
 				},

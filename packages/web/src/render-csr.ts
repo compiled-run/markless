@@ -1,3 +1,4 @@
+import { hasLiveSharedDefinitions } from './shared-live.ts';
 import { markupNodes } from './markup-nodes.ts';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
@@ -224,6 +225,12 @@ export async function renderCsrRuntime(input: {
 		await (await demandRuntime()).activateBehaviors(hostNodeId);
 	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
 	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
+	if (hasLiveSharedDefinitions(state))
+		(await import('./fns/shared-instances.ts')).registerDormantContainer(
+			output.root,
+			state,
+			() => void deferredRuntime.start(),
+		);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();

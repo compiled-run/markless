@@ -19,7 +19,7 @@ function entry(
 		.code.replace(/^import .*$/m, '')
 		.replaceAll('import(', 'load(')
 		.replaceAll('import.meta.env.DEV', 'false')
-		.replace('export async function', 'async function');
+		.replaceAll('export async function', 'async function');
 	return new Function(
 		'mdxResumeModules',
 		'tsrxResumeModules',

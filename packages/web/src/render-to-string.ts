@@ -41,6 +41,7 @@ import {
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	createInlineResumerStorageWakeSource,
+	createInlineResumerSharedWakeSource,
 	renderPrerenderInlineResumerSource,
 	renderInlineResumerPageSource,
 	INLINE_PAGE_FORWARDS_UNKNOWN,
@@ -51,7 +52,11 @@ import {
 } from './inline/resumer.ts';
 import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
-import { CONTAINER_ATTRIBUTE } from './fns/container-region.ts';
+import { CONTAINER_ATTRIBUTE, RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
+import {
+	PROTOCOL_SHARED_INSTANCES_PROPERTY,
+	PROTOCOL_SHARED_INSTANCES_VERSION,
+} from '../../serializer/src/protocol-shared-instances.ts';
 import {
 	marklessSsrRosterCounted,
 	marklessSsrRosterPositionContext,
@@ -270,7 +275,8 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)),
+						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)) +
+						sharedWakeSource(state, selectedResumeModuleUrl),
 					artifactSources?.defer,
 				)
 			: '';
@@ -362,7 +368,8 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)),
+						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)) +
+						sharedWakeSource(state, resumeModuleUrl),
 					artifactInlineResumerSources(component)?.defer,
 				)
 			: '';
@@ -542,6 +549,20 @@ function renderStorageSeedScript(
 	// The cookie is read first: it is the value a server render with this request saw.
 	const source = `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={},c=document.cookie.split('; ');for(const[k,d,a,f,n]of ${escapeScriptJson(JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, storageAttributeName(seed.driverKey), seed.fallback, storageCookieName(seed.driverKey)])))}){let v=f;try{const e=c.find(e=>e.startsWith(n+'='));v=e?decodeURIComponent(e.slice(n.length+1)):localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute(a,v)}})()`;
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
+}
+
+// The page- and request-scoped shared() definitions this container resolves; container and widget instances are its own.
+function sharedWakeSource(state: ProtocolStatePayload, resumeModuleUrl: string | undefined): string {
+	const ids = (state.sharedDefinitions ?? [])
+		.filter((definition) => definition.scope !== 'widget' && definition.scope !== 'container')
+		.map((definition) => definition.id);
+	if (ids.length === 0) return '';
+	return createInlineResumerSharedWakeSource(
+		resumeModuleUrl,
+		PROTOCOL_SHARED_INSTANCES_PROPERTY,
+		PROTOCOL_SHARED_INSTANCES_VERSION,
+		escapeScriptJson(JSON.stringify(ids)),
+	);
 }
 
 // Each storage cell's slot key and the value this render gave it.
@@ -1114,7 +1135,7 @@ function renderInlineResumerScript(
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
-		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
+		? ` ${RESUME_MODULE_ATTRIBUTE}="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
 	const settleModuleAttribute = settleModuleUrl
 		? ` data-markless-settle-module="${escapeAttribute(settleModuleUrl)}"`

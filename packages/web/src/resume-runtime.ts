@@ -2,6 +2,7 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalResult } from '@markless/runtime';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
+import { hasLiveSharedDefinitions } from './shared-live.ts';
 import type { ArmCommitUpdate, ArmRegistrationDeps } from './resume-commit-arm.ts';
 import type {
 	ResumeArmRange,
@@ -450,6 +451,11 @@ export function createResumeRuntime(
 		});
 		// The seeded-value reconcile flushed before the journal listener existed; the graph kept its entries.
 		if (storagePlane) await input.graph.flush();
+		if (
+			hasLiveSharedDefinitions(input.state) &&
+			(await import('./fns/shared-instances.ts')).reconcileSharedCells(input.graph)
+		)
+			await input.graph.flush();
 		captureListenersStarted = true;
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
 			if (disposed) return;

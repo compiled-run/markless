@@ -533,16 +533,16 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('page-scoped shared state starts from the server on the new page', async () => {
+		test('page-scoped shared state keeps its live value on the new page', async () => {
 			const { page, errors } = await open(browser);
 			await page.locator('[data-hit]').click();
 			await page.locator('[data-hit]').click();
 			await expect.poll(() => text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
-			expect(await text(page, '[data-hits]')).toBe('0');
+			expect(await text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-hit]').click();
-			await expect.poll(() => text(page, '[data-hits]')).toBe('1');
+			await expect.poll(() => text(page, '[data-hits]')).toBe('3');
 			expect(errors).toEqual([]);
 			await page.close();
 		});
