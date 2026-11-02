@@ -62,7 +62,7 @@ export function createResumeRuntime(
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(),
 		containerSubscriptionReleases: Array<() => void> = [];
 	const asyncBoundariesById = prepared.asyncBoundariesById;
-	let settleTracker: AsyncBoundarySettleTracker | undefined;
+	let settleTracker: () => AsyncBoundarySettleTracker | undefined = () => undefined;
 	let asyncBoundaryWiring:
 		| (() => Promise<import('./resume-async-wiring.ts').AsyncBoundaryWiring>)
 		| undefined;
@@ -490,7 +490,7 @@ export function createResumeRuntime(
 					status: 'missing' as const,
 					runVersion: null,
 					pendingSince: null,
-					hasSettledContent: settleTracker?.hasSettledContent(boundary.id) === true,
+					hasSettledContent: settleTracker()?.hasSettledContent(boundary.id) === true,
 					missingReason,
 				});
 				let snapshot: { readonly status?: unknown; readonly version?: unknown } | undefined;
@@ -522,7 +522,7 @@ export function createResumeRuntime(
 					hasSettledContent:
 						status === 'fulfilled' ||
 						status === 'rejected' ||
-						settleTracker?.hasSettledContent(boundary.id) === true,
+						settleTracker()?.hasSettledContent(boundary.id) === true,
 				};
 			}),
 		);
@@ -537,12 +537,13 @@ export function createResumeRuntime(
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
 		whenAsyncBoundariesSettled: async () => {
-			if (!settleTracker) return;
-			await settleTracker.whenAllSettled();
+			const tracker = settleTracker();
+			if (!tracker) return;
+			await tracker.whenAllSettled();
 			await input.graph.flush();
 		},
 		holdPendingSettleCommits: (minVisibleMs: number) => {
-			settleTracker?.holdSettleCommitsFor(minVisibleMs);
+			settleTracker()?.holdSettleCommitsFor(minVisibleMs);
 		},
 		getElement: (hostNodeId: string) =>
 			connectedElement(input.root, elementsByHostId.get(hostNodeId)),

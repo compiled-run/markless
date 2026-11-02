@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import NotesDrawer from './abr-notes.tsrx';
 import SearchDialog from './abr-search.tsrx';
+import SlowPicker from './abr-slow.tsrx';
 
 afterEach(cleanup);
 
@@ -91,4 +92,19 @@ test('CSR: an @if/@else holding a @try block settles fresh content each time it 
 test('SSR: an @if/@else holding a @try block settles fresh content each time it shows', async () => {
 	await renderSSR(NotesDrawer);
 	await drawerSettlesFreshEachTime();
+});
+
+// Navigation waits on this; a @try the page did not serve still counts once an @if renders it.
+test('CSR: waiting for async content covers a @try that an @if rendered after start', async () => {
+	const screen = await render(SlowPicker);
+	click('[data-word]');
+	click('[data-pick]');
+	await expect.poll(() => document.querySelector('[data-wait]')).not.toBeNull();
+
+	await (screen.runtime.runtime as { whenAsyncBoundariesSettled: () => Promise<void> }).whenAsyncBoundariesSettled();
+
+	expect([...document.querySelectorAll('[data-option]')].map((node) => node.textContent)).toEqual([
+		'fancy one',
+		'fancy two',
+	]);
 });

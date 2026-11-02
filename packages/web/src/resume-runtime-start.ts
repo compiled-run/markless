@@ -104,7 +104,7 @@ export async function startResumeRuntime(input: {
 		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
 	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
-}): Promise<AsyncBoundarySettleTracker | undefined> {
+}): Promise<() => AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
 		prepared,
@@ -367,7 +367,8 @@ export async function startResumeRuntime(input: {
 			capture: true,
 		});
 	}
-	return settleTracker;
+	// A getter: the tracker is created when the first @try is wired, which can be after start.
+	return () => settleTracker;
 }
 
 async function disposeRemovedAsyncRangeHosts(
