@@ -89,33 +89,31 @@ function derivePropReads(
 function forwardedDerivePropReads(
 	input: PublicRenderModuleInput,
 	componentName: string,
-	visiting: ReadonlySet<string>,
 ): ReadonlyArray<PropRead> {
-	return input.semanticGraph.componentEdges.flatMap((edge) => {
-		if (edge.parentComponentName !== componentName) return [];
-		const childKeys = childDerivedPropKeys(input, edge, visiting);
-		if (childKeys.size === 0) return [];
-		return edge.props.flatMap((prop) =>
-			prop.kind === 'graph-reference' &&
-			prop.graphBindingKind === 'prop' &&
-			childKeys.has(prop.name)
-				? [{ graphNodeId: prop.graphNodeId, path: prop.path }]
-				: [],
-		);
-	});
+	const derived = moduleDerivedPropKeys(input);
+	return input.semanticGraph.componentEdges.flatMap((edge) =>
+		edge.parentComponentName === componentName ? edgeForwardedReads(input, edge, derived) : [],
+	);
 }
 
-function childDerivedPropKeys(
+function edgeForwardedReads(
 	input: PublicRenderModuleInput,
 	edge: PublicRenderModuleInput['semanticGraph']['componentEdges'][number],
-	visiting: ReadonlySet<string>,
-): ReadonlySet<string> {
-	if (edge.importSource === undefined)
-		return derivedPropKeys(input, edge.childComponentName, visiting);
-	const child = input.source.importedModuleInterfaces?.[
-		edge.importSource
-	]?.render.components.find((component) => component.componentName === edge.childComponentName);
-	return new Set(child?.derivedProps ?? []);
+	derived: ReadonlyMap<string, ReadonlySet<string>>,
+): ReadonlyArray<PropRead> {
+	const childKeys =
+		edge.importSource === undefined
+			? derived.get(edge.childComponentName)
+			: input.source.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
+					(component) => component.componentName === edge.childComponentName,
+				)?.derivedProps;
+	if (!childKeys) return [];
+	const keys = new Set(childKeys);
+	return edge.props.flatMap((prop) =>
+		prop.kind === 'graph-reference' && prop.graphBindingKind === 'prop' && keys.has(prop.name)
+			? [{ graphNodeId: prop.graphNodeId, path: prop.path }]
+			: [],
+	);
 }
 
 /**
@@ -126,17 +124,62 @@ function childDerivedPropKeys(
 export function derivedPropKeys(
 	input: PublicRenderModuleInput,
 	componentName: string,
-	visiting: ReadonlySet<string> = new Set(),
 ): ReadonlySet<string> {
-	if (visiting.has(componentName)) return new Set();
-	return (
-		propCellKeys(
-			input,
-			PROTOCOL_PROPS_GRAPH_NODE_ID,
+	return moduleDerivedPropKeys(input).get(componentName) ?? new Set();
+}
+
+const derivedPropKeysByModule = new WeakMap<
+	PublicRenderModuleInput,
+	ReadonlyMap<string, ReadonlySet<string>>
+>();
+
+// Grown to a fixpoint over the module's edges, so each component is analyzed once whatever the shape of its tree.
+function moduleDerivedPropKeys(
+	input: PublicRenderModuleInput,
+): ReadonlyMap<string, ReadonlySet<string>> {
+	const cached = derivedPropKeysByModule.get(input);
+	if (cached) return cached;
+	const names = new Set([
+		...input.semanticGraph.components.map((component) => component.name),
+		...input.semanticGraph.componentEdges.map((edge) => edge.parentComponentName),
+	]);
+	const derived = new Map<string, Set<string>>();
+	const armKeys = new Map<string, ReadonlySet<string>>();
+	const add = (componentName: string, reads: ReadonlyArray<PropRead>): boolean => {
+		const keys = derived.get(componentName)!;
+		const size = keys.size;
+		for (const { graphNodeId, path } of reads)
+			if (
+				graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID &&
+				path[0] &&
+				!armKeys.get(componentName)?.has(path[0])
+			)
+				keys.add(path[0]);
+		return keys.size > size;
+	};
+	for (const componentName of names) {
+		derived.set(componentName, new Set());
+		armKeys.set(
 			componentName,
-			new Set([...visiting, componentName]),
-		).deriveKeysByCell.get(PROTOCOL_PROPS_GRAPH_NODE_ID) ?? new Set()
-	);
+			new Set(
+				armRebuildPropReads(input, componentName).flatMap(({ graphNodeId, path }) =>
+					graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID && path[0] ? [path[0]] : [],
+				),
+			),
+		);
+		add(componentName, derivePropReads(input, componentName));
+	}
+	for (let grew = true; grew;) {
+		grew = false;
+		for (const edge of input.semanticGraph.componentEdges)
+			if (
+				derived.has(edge.parentComponentName) &&
+				add(edge.parentComponentName, edgeForwardedReads(input, edge, derived))
+			)
+				grew = true;
+	}
+	derivedPropKeysByModule.set(input, derived);
+	return derived;
 }
 
 // The props read back after resume whatever their value: a row template's expression
@@ -223,7 +266,6 @@ export function ssrPropCellSeedsForCell(
 		input,
 		bagCellId,
 		componentName,
-		new Set([componentName]),
 	);
 	return [
 		...new Set([...armKeysByCell.keys(), ...deriveKeysByCell.keys(), ...rowKeysByCell.keys()]),
@@ -253,7 +295,6 @@ function propCellKeys(
 	input: PublicRenderModuleInput,
 	bagCellId: string | null,
 	componentName: string,
-	visiting: ReadonlySet<string>,
 ) {
 	const armKeysByCell = new Map<string, Set<string> | null>();
 	for (const { graphNodeId, path } of armRebuildPropReads(input, componentName)) {
@@ -270,7 +311,7 @@ function propCellKeys(
 	const deriveKeysByCell = new Map<string, Set<string>>();
 	for (const { graphNodeId, path } of [
 		...derivePropReads(input, componentName),
-		...forwardedDerivePropReads(input, componentName, visiting),
+		...forwardedDerivePropReads(input, componentName),
 	]) {
 		if (graphNodeId !== 'prop:props' && graphNodeId !== bagCellId) continue;
 		if (!path[0] || armKeysByCell.get(graphNodeId)?.has(path[0])) continue;
