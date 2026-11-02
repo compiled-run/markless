@@ -3134,6 +3134,22 @@
 				"jsGzipBytes": 88111
 			},
 			"reason": "the widget-root lookup leaves a root above a row to the row-free walk (PR #413); the same +7 B gzip CI run 41403541377 measured on linux-x64, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "construct",
+			"subject": "text binding",
+			"from": 4211,
+			"to": 4256,
+			"reason": "measured +45 B: a text binding's synthetic computed now names the component that wrote it, so resume derives it on read (deriveOnRead flag in the payload and render data) instead of eagerly as an ownerless module node; the root no longer runs a child's derive"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "construct",
+			"subject": "@if",
+			"from": 7991,
+			"to": 8056,
+			"reason": "measured +65 B: an @if test's synthetic computed now names the component that wrote it, so resume derives it on read (deriveOnRead flag in the payload and render data) instead of eagerly as an ownerless module node; the root no longer runs a child's derive"
 		}
 	],
 	"runtimeModules": {
@@ -3260,8 +3276,8 @@
 	},
 	"constructGlue": {
 		"event handler": 3184,
-		"text binding": 4211,
-		"@if": 7991,
+		"text binding": 4256,
+		"@if": 8056,
 		"keyed @for": 6879,
 		"async boundary": 10095
 	},

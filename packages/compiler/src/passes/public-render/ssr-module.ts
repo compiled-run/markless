@@ -1312,7 +1312,9 @@ function emitSsrDataLines(
 			!(binding.componentName === componentName || (!binding.componentName && componentName === input.renderData.root?.componentName)) ||
 			(binding.kind === 'computed' && binding.async === true) ||
 			// Seeded from the render props just above; its name may be a user local.
-			binding.id === 'prop:props'
+			binding.id === 'prop:props' ||
+			// A synthetic computed has no render-body local; the template computed lines seed it.
+			binding.id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX)
 		)
 			return [];
 		if (binding.kind === 'computed') derivedComputedIds.push(binding.id);
