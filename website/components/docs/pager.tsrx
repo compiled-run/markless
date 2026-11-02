@@ -194,7 +194,7 @@ export default function Pager({ pathname }: { readonly pathname: string }) @{
 					transition: none;
 				}
 
-				.pager-doodle:hover svg {
+				.pager-doodle:nth-child(n):hover svg {
 					animation: none;
 					transform: none;
 				}
