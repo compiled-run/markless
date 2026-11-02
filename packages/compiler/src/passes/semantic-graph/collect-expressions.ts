@@ -282,11 +282,13 @@ function moduleFunctionWrites(state: WalkState): FunctionWritesAnalysis {
 }
 
 // The argument names component state directly, not a handler local of the same name.
+// Names are checked before the local-shadowing check, which analyzes the whole module.
 function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only' | null {
-	if (writeThroughLocal(value, state, 'call')) return null;
 	const source = expressionSource(value, state.source);
-	if (repeatRowBindsName(source, state))
+	if (repeatRowBindsName(source, state)) {
+		if (writeThroughLocal(value, state, 'call')) return null;
 		return rowWriteScope(value, state).rowRepeatId !== undefined ? 'writable' : null;
+	}
 	const resolved = resolveGraphPath(
 		source,
 		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
@@ -295,6 +297,7 @@ function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only'
 	if (!resolved || resolved.binding.sharedDefinitionId !== undefined) return null;
 	if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
 	if (resolved.path.length === 0 && resolved.binding.valueKind === 'scalar') return null;
+	if (writeThroughLocal(value, state, 'call')) return null;
 	return resolved.binding.kind === 'state' && resolved.binding.writable ? 'writable' : 'read-only';
 }
 
