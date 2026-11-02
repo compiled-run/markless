@@ -902,11 +902,11 @@ function marklessWidgetRootPathThroughRows(
 	instancePath: string,
 	registry: MarklessWidgetRegistry,
 ): string {
-	const withRows = widgetRootPathFor(graphNodeId, instancePath, registry);
-	if (withRows !== undefined) return withRows;
-	const rowFree = instancePath.replace(ROW_SEGMENT, '');
-	if (rowFree === instancePath) return '';
-	return widgetRootPathFor(graphNodeId, rowFree, registry) ?? '';
+	// A root above the first row is the row-free walk's to answer: it also sees any deeper root the row hid.
+	const rowStart = instancePath.search(ROW_SEGMENT);
+	const withRows = widgetRootPathFor(graphNodeId, instancePath, registry, rowStart);
+	if (withRows !== undefined || rowStart < 0) return withRows ?? '';
+	return widgetRootPathFor(graphNodeId, instancePath.replace(ROW_SEGMENT, ''), registry) ?? '';
 }
 
 /**
@@ -951,10 +951,11 @@ function widgetRootPathFor(
 	graphNodeId: string,
 	instancePath: string,
 	registry: MarklessWidgetRegistry,
+	floor = 0,
 ): string | undefined {
 	const widgetRootPaths = registry.rootPaths;
 	if (widgetRootPaths.size === 0) return undefined;
-	for (let end = instancePath.length; end > 0; end--) {
+	for (let end = instancePath.length; end > floor; end--) {
 		if (instancePath[end - 1] !== ':') continue;
 		const prefix = instancePath.slice(0, end);
 		const rootPath = byDefinition(graphNodeId, (key) => widgetRootPaths.get(prefix + key));

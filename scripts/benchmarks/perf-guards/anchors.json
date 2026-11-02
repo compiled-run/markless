@@ -3053,6 +3053,90 @@
 		},
 		{
 			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk, so a part outside every root no longer captures a navbar's row parts; measured on CI run 41403541377 (PR #413 on main 6d2b94bf0): +7 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk, so a part outside every root no longer captures a navbar's row parts; measured on CI run 41403541377 (PR #413 on main 6d2b94bf0): +7 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk, so a part outside every root no longer captures a navbar's row parts; measured on CI run 41403541377 (PR #413 on main 6d2b94bf0): +7 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk (PR #413); the same +7 B gzip CI run 41403541377 measured on linux-x64, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk (PR #413); the same +7 B gzip CI run 41403541377 measured on linux-x64, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk (PR #413); the same +7 B gzip CI run 41403541377 measured on linux-x64, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
 			"guard": "construct",
 			"subject": "text binding",
 			"from": 4211,
@@ -3231,15 +3315,15 @@
 		"darwin-arm64": {
 			"bench /": {
 				"executedChars": 10862,
-				"jsGzipBytes": 88104
+				"jsGzipBytes": 88111
 			},
 			"bench /records": {
 				"executedChars": 10878,
-				"jsGzipBytes": 88104
+				"jsGzipBytes": 88111
 			},
 			"bench /settings": {
 				"executedChars": 10935,
-				"jsGzipBytes": 88104
+				"jsGzipBytes": 88111
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3257,15 +3341,15 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11342,
-				"jsGzipBytes": 88104
+				"jsGzipBytes": 88111
 			},
 			"bench /records": {
 				"executedChars": 11251,
-				"jsGzipBytes": 88104
+				"jsGzipBytes": 88111
 			},
 			"bench /settings": {
 				"executedChars": 11308,
-				"jsGzipBytes": 88104
+				"jsGzipBytes": 88111
 			},
 			"docs /": {
 				"executedChars": 110777,
