@@ -1421,9 +1421,14 @@ function boundSymbolIds(
 			kinds.has(symbol.kind) ? [symbol.id] : [],
 		),
 	);
+	const rows = new Map<string, string[]>();
+	for (const row of input.captureAnalysis?.boundResolverRows ?? [])
+		if (baseSymbolIds.has(row.baseSymbolId))
+			rows.set(row.baseSymbolId, [...(rows.get(row.baseSymbolId) ?? []), row.id]);
+	// A symbol bound once per instance keeps its own id: each instance's composition binds it to that instance's row.
 	return new Map(
-		(input.captureAnalysis?.boundResolverRows ?? []).flatMap((row) =>
-			baseSymbolIds.has(row.baseSymbolId) ? [[row.baseSymbolId, row.id] as const] : [],
+		[...rows].flatMap(([baseSymbolId, ids]) =>
+			ids.length === 1 ? [[baseSymbolId, ids[0]!] as const] : [],
 		),
 	);
 }
