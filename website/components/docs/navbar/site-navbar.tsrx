@@ -3,7 +3,7 @@ import { lucide, modal, navbar } from '@markless/ui';
 import { asset } from '../../../site-base.ts';
 import { INK_MARKS } from '../ink-marks.ts';
 import { art } from './theme-art.art.ts';
-import { getStarted, github, isCurrent, NAV_DECOR, type NavCard, panels } from './sections.ts';
+import { getStarted, github, isCurrent, NAV_DECOR, type NavCard, type NavPanel, panels } from './sections.ts';
 
 
 /** The site's header: a floating bar of three panels on a wide screen, a top bar and a full-screen menu on a narrow one. */
@@ -70,8 +70,8 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				<Brand />
 			</navbar.itemlink>
 			<div class="nav-items">
-				@for (const top of panels; key top.label) {
-					<NavDropdown label={top.label} pathname={pathname} />
+				@for (const panel of panels; key panel.label) {
+					<NavDropdown panel={panel} pathname={pathname} />
 				}
 			</div>
 			<div class="nav-tools">
@@ -235,16 +235,14 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 	</div>
 }
 
-function NavDropdown({ label, pathname }: { readonly label: string; readonly pathname: string }) @{
-	const dropdown = panels.find((candidate) => candidate.label === label) ?? panels[0]!;
-
-	<navbar.item class="nav-item" value={dropdown.label} active={dropdown.cards.some((linked) => isCurrent(pathname, linked.href))}>
+function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly pathname: string }) @{
+	<navbar.item class="nav-item" value={panel.label} active={panel.cards.some((card) => isCurrent(pathname, card.href))}>
 		<navbar.itemtrigger class="nav-trigger">
-			<span>{dropdown.label}</span>
+			<span>{panel.label}</span>
 		</navbar.itemtrigger>
-		<navbar.itemcontent class={'nav-panel nav-panel-' + dropdown.layout}>
-			@for (const card of dropdown.cards; key card.label) {
-				<NavCardLink href={card.href} label={card.label} description={card.description} art={card.art} size={card.size} pathname={pathname} />
+		<navbar.itemcontent class={'nav-panel nav-panel-' + panel.layout}>
+			@for (const card of panel.cards; key card.label) {
+				<NavCardLink card={card} pathname={pathname} />
 			}
 		</navbar.itemcontent>
 
@@ -341,28 +339,14 @@ function NavDropdown({ label, pathname }: { readonly label: string; readonly pat
 	</navbar.item>
 }
 
-function NavCardLink({
-	href,
-	label,
-	description,
-	art,
-	size,
-	pathname,
-}: {
-	readonly href: NavCard['href'];
-	readonly label: string;
-	readonly description: string;
-	readonly art: NavCard['art'];
-	readonly size: NavCard['size'];
-	readonly pathname: string;
-}) @{
-	<navbar.itemlink class={'card card-' + size} href={href} current={isCurrent(pathname, href)}>
-		<svg class="card-art" viewBox={size === 'short' ? '0 0 276 128' : '0 0 276 280'} preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
-			<use href={asset(NAV_DECOR) + '#' + art} />
+function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly pathname: string }) @{
+	<navbar.itemlink class={'card card-' + card.size} href={card.href} current={isCurrent(pathname, card.href)}>
+		<svg class="card-art" viewBox={card.size === 'short' ? '0 0 276 128' : '0 0 276 280'} preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+			<use href={asset(NAV_DECOR) + '#' + card.art} />
 		</svg>
 		<span class="card-text">
-			<span class="card-label">{label}</span>
-			<span class="card-note">{description}</span>
+			<span class="card-label">{card.label}</span>
+			<span class="card-note">{card.description}</span>
 		</span>
 
 		<style>
@@ -535,15 +519,15 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 
 					<div class="menu-body">
 						<div class="menu-grid">
-							@for (const section of panels; key section.label) {
+							@for (const panel of panels; key panel.label) {
 								<div class="menu-section">
-									<span class="menu-heading">{section.label}</span>
-									@for (const link of section.cards; key link.href) {
+									<span class="menu-heading">{panel.label}</span>
+									@for (const card of panel.cards; key card.href) {
 										<a
-											class={!link.skipActive && isCurrent(pathname, link.href) ? 'menu-link menu-link-current' : 'menu-link'}
-											href={link.href}
-											aria-current={!link.skipActive && isCurrent(pathname, link.href) ? 'page' : undefined}
-										><span class="menu-link-text">{link.label}</span></a>
+											class={!card.skipActive && isCurrent(pathname, card.href) ? 'menu-link menu-link-current' : 'menu-link'}
+											href={card.href}
+											aria-current={!card.skipActive && isCurrent(pathname, card.href) ? 'page' : undefined}
+										><span class="menu-link-text">{card.label}</span></a>
 									}
 								</div>
 							}
@@ -769,7 +753,7 @@ function ThemeToggle() @{
 function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
 	let theme = storage('theme', 'system');
-	// The handler reads the choice off the pressed button: a prop read in a handler of a component rendered twice resolved to the other instance's value.
+	// The handler reads the choice off the pressed button: a handler in a component its parent renders twice reads the other copy's props.
 	const label = to === 'dark' ? 'Switch to the dark theme' : 'Switch to the light theme';
 
 	<>
