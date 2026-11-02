@@ -164,6 +164,12 @@ export default box(
 				await expect.poll(() => focused(page), { ...POLL, message: `ArrowRight reaches ${stop}` }).toBe(stop);
 			}
 
+			// The search button opens nothing yet, and pressing it must not reach another button's handler.
+			const themeBefore = await page.evaluate(() => document.documentElement.className);
+			await page.locator('.nav-pill button[aria-label="Search docs"]').click();
+			await page.waitForTimeout(300);
+			expect(await page.evaluate(() => document.documentElement.className)).toBe(themeBefore);
+
 			// The toggle swaps its drawing in one frame: no frame shows the button for the theme already painted.
 			await wrongThemeFrames(page);
 			for (let k = 0; k < 4; k++) {

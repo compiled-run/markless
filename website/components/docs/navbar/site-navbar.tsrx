@@ -482,7 +482,12 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 function SearchButton() @{
 	const drawing = art.magnifier;
 
-	<navbar.trigger class="search-button" aria-label="Search docs" aria-keyshortcuts="Meta+K Control+K" title="Search docs (⌘K or Ctrl K)">
+	<navbar.trigger
+		class="search-button"
+		aria-label="Search docs"
+		aria-keyshortcuts="Meta+K Control+K"
+		title="Search docs (⌘K or Ctrl K)"
+	>
 		<svg class="search-icon" viewBox={'0 0 ' + drawing.width + ' ' + drawing.height} aria-hidden="true">
 			@for (const layer of drawing.layers; key layer.d) {
 				<path class={'theme-toggle-' + layer.kind} d={layer.d} />
@@ -818,7 +823,6 @@ function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
 	let theme = storage('theme', 'system');
 	const label = to === 'dark' ? 'Switch to the dark theme' : 'Switch to the light theme';
-	const other = to === 'dark' ? 'light' : 'dark';
 
 	<>
 		<navbar.trigger
@@ -827,12 +831,16 @@ function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 			aria-label={label}
 			title={label}
 			onClick={(event) => {
+				// Read off the pressed button, not the props: until the forwarded-callback fix lands, a navbar.trigger with no theme can route its click here.
+				const pressed = (event.target as Element).closest<HTMLElement>('[data-theme-toggle]');
+				const next = pressed?.dataset.themeToggle;
+				if (next !== 'dark' && next !== 'light') return;
 				const root = document.documentElement;
-				const island = (event.target as Element).closest('.theme-toggle-island');
+				const island = pressed!.closest('.theme-toggle-island');
 				root.dataset.themeSwitching = '';
-				theme = to;
+				theme = next;
 				// The pressed button is hidden now, so focus moves to the one that took its place.
-				setTimeout(() => island?.querySelector<HTMLElement>(`[data-theme-toggle="${other}"]`)?.focus(), 0);
+				setTimeout(() => island?.querySelector<HTMLElement>(`[data-theme-toggle="${next === 'dark' ? 'light' : 'dark'}"]`)?.focus(), 0);
 				setTimeout(() => delete root.dataset.themeSwitching, 700);
 			}}
 		>
