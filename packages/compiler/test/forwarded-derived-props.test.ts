@@ -117,3 +117,49 @@ export function Listing({ rows }: { readonly rows: ReadonlyArray<string> }) @{
 	);
 	expect(derivedProps(listing, 'Listing')).toEqual(['rows']);
 });
+
+function derivedPropPaths(moduleInterface: ModuleGraphInterfaceArtifact, componentName: string) {
+	return moduleInterface.render.components.find(
+		(component) => component.componentName === componentName,
+	)?.derivedPropPaths;
+}
+
+// The paths a derive reads below a prop travel with it, so a composer serves only those fields.
+test('the fields a derive reads are published across modules, and a whole read publishes none', async () => {
+	const badge = await compile(
+		'src/ui/badge.tsrx',
+		`import { computed, state } from '@markless/core';
+export function Badge({ person, tags }: { readonly person: { readonly first: string; readonly email: string }; readonly tags: ReadonlyArray<string> }) @{
+	const seen = state({ n: 0 });
+	const text = computed(() => person.first + tags.join(',') + seen.n);
+	<i onClick={() => { seen.n++; }}>{text}</i>
+}`,
+	);
+	expect(derivedProps(badge, 'Badge')).toEqual(['person', 'tags']);
+	expect(derivedPropPaths(badge, 'Badge')).toEqual({ person: [['first']] });
+
+	const card = await compile(
+		'src/ui/card.tsrx',
+		`import { Badge } from './badge.tsrx';
+export function Card({ owner, labels }: { readonly owner: { readonly profile: { readonly first: string } }; readonly labels: ReadonlyArray<string> }) @{
+	<article><Badge person={owner.profile} tags={labels} /></article>
+}`,
+		{ './badge.tsrx': badge },
+	);
+	expect(derivedProps(card, 'Card')).toEqual(['owner', 'labels']);
+	expect(derivedPropPaths(card, 'Card')).toEqual({ owner: [['profile', 'first']] });
+});
+
+test('a component that forwards a field of its prop into itself serves that field whole, without looping', async () => {
+	const tree = await compile(
+		'src/branch.tsrx',
+		`import { computed, state } from '@markless/core';
+export function Branch({ node }: { readonly node: { readonly label: string; readonly next: unknown } }) @{
+	const open = state({ on: false });
+	const label = computed(() => node.label + (open.on ? '!' : ''));
+	<div>{label}@if (open.on) {<Branch node={node.next} />}</div>
+}`,
+	);
+	expect(derivedProps(tree, 'Branch')).toEqual(['node']);
+	expect(derivedPropPaths(tree, 'Branch')).toEqual({ node: [['label'], ['next']] });
+});

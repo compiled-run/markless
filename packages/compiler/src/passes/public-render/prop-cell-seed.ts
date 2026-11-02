@@ -12,7 +12,8 @@ import { componentPropCellId } from './shared.ts';
  * A prop cell the served payload has to carry, and which of its properties.
  * `keys` names the properties the bag must hold; `null` marks a cell that IS one
  * destructured prop. `deriveKeys` names properties only a resume-time derive
- * reads, carried when their value is data the serializer encodes; `scalarKeys`
+ * reads, carried when their value is data the serializer encodes, narrowed to
+ * `derivePaths` when the derives read only some of it; `scalarKeys`
  * is projected children a derive reads, carried only as a scalar, since markup
  * is already in the served HTML. `rowKeys` names properties a minted row's slots
  * or a behavior's inputs read, carried whatever their value. A derive or row key
@@ -23,6 +24,7 @@ export type SsrPropCellSeed = {
 	readonly keys: ReadonlyArray<string> | null;
 	readonly scalarKeys?: ReadonlyArray<string>;
 	readonly deriveKeys?: ReadonlyArray<string>;
+	readonly derivePaths?: Readonly<Record<string, ReadonlyArray<ReadonlyArray<string>>>>;
 	readonly rowKeys?: ReadonlyArray<string>;
 };
 
@@ -95,75 +97,125 @@ function forwardedDerivePropReads(
 	input: PublicRenderModuleInput,
 	componentName: string,
 ): ReadonlyArray<PropRead> {
-	const derived = moduleDerivedPropKeys(input);
+	const derived = moduleDerivedProps(input);
 	return input.semanticGraph.componentEdges.flatMap((edge) =>
 		edge.parentComponentName === componentName ? edgeForwardedReads(input, edge, derived) : [],
 	);
 }
 
+// Each prop's read paths below the prop, as the child's derives read it; an empty path reads it whole.
+type DerivedProps = ReadonlyMap<string, ReadonlyArray<ReadonlyArray<string>>>;
+
 function edgeForwardedReads(
 	input: PublicRenderModuleInput,
 	edge: PublicRenderModuleInput['semanticGraph']['componentEdges'][number],
-	derived: ReadonlyMap<string, ReadonlySet<string>>,
+	derived: ReadonlyMap<string, DerivedProps>,
 ): ReadonlyArray<PropRead> {
-	const childKeys =
+	const child =
 		edge.importSource === undefined
 			? derived.get(edge.childComponentName)
-			: input.source.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
-					(component) => component.componentName === edge.childComponentName,
-				)?.derivedProps;
-	if (!childKeys) return [];
-	const keys = new Set(childKeys);
-	return edge.props.flatMap((prop) =>
-		prop.kind === 'graph-reference' && prop.graphBindingKind === 'prop' && keys.has(prop.name)
-			? [{ graphNodeId: prop.graphNodeId, path: prop.path }]
-			: [],
-	);
+			: importedDerivedProps(
+					input.source.importedModuleInterfaces?.[
+						edge.importSource
+					]?.render.components.find(
+						(component) => component.componentName === edge.childComponentName,
+					),
+				);
+	if (!child) return [];
+	// A component that places itself again reads its prop at every depth, so it forwards the prop whole.
+	const recursive =
+		edge.importSource === undefined &&
+		reachesComponent(input, edge.childComponentName, edge.parentComponentName);
+	return edge.props.flatMap((prop) => {
+		const paths =
+			prop.kind === 'graph-reference' &&
+			prop.graphBindingKind === 'prop' &&
+			child.get(prop.name);
+		if (!paths) return [];
+		return (recursive ? [[]] : paths).map((rest) => ({
+			graphNodeId: prop.graphNodeId,
+			path: [...prop.path, ...rest],
+		}));
+	});
+}
+
+function importedDerivedProps(
+	component:
+		| {
+				readonly derivedProps?: ReadonlyArray<string>;
+				readonly derivedPropPaths?: Readonly<
+					Record<string, ReadonlyArray<ReadonlyArray<string>>>
+				>;
+		  }
+		| undefined,
+): DerivedProps | undefined {
+	return component?.derivedProps
+		? new Map(
+				component.derivedProps.map((key) => [
+					key,
+					component.derivedPropPaths?.[key] ?? [[]],
+				]),
+			)
+		: undefined;
+}
+
+function reachesComponent(input: PublicRenderModuleInput, from: string, to: string): boolean {
+	const seen = new Set<string>();
+	const queue = [from];
+	while (queue.length > 0) {
+		const name = queue.pop()!;
+		if (name === to) return true;
+		if (seen.has(name)) continue;
+		seen.add(name);
+		for (const edge of input.semanticGraph.componentEdges)
+			if (edge.importSource === undefined && edge.parentComponentName === name)
+				queue.push(edge.childComponentName);
+	}
+	return false;
 }
 
 /**
  * The props a component's served bag carries only for a resume-time derive, in
- * its own tree or one it forwards them into. Published on the module interface
- * so a module forwarding its own prop into this component carries it in turn.
+ * its own tree or one it forwards them into, each with the paths below it those
+ * derives read. Published on the module interface so a module forwarding its own
+ * prop into this component carries it in turn, narrowed the same way.
  */
-export function derivedPropKeys(
-	input: PublicRenderModuleInput,
-	componentName: string,
-): ReadonlySet<string> {
-	return moduleDerivedPropKeys(input).get(componentName) ?? new Set();
+export function derivedProps(input: PublicRenderModuleInput, componentName: string): DerivedProps {
+	return moduleDerivedProps(input).get(componentName) ?? new Map();
 }
 
-const derivedPropKeysByModule = new WeakMap<
+const derivedPropsByModule = new WeakMap<
 	PublicRenderModuleInput,
-	ReadonlyMap<string, ReadonlySet<string>>
+	ReadonlyMap<string, DerivedProps>
 >();
 
 // Grown to a fixpoint over the module's edges, so each component is analyzed once whatever the shape of its tree.
-function moduleDerivedPropKeys(
-	input: PublicRenderModuleInput,
-): ReadonlyMap<string, ReadonlySet<string>> {
-	const cached = derivedPropKeysByModule.get(input);
+function moduleDerivedProps(input: PublicRenderModuleInput): ReadonlyMap<string, DerivedProps> {
+	const cached = derivedPropsByModule.get(input);
 	if (cached) return cached;
 	const names = new Set([
 		...input.semanticGraph.components.map((component) => component.name),
 		...input.semanticGraph.componentEdges.map((edge) => edge.parentComponentName),
 	]);
-	const derived = new Map<string, Set<string>>();
+	const derived = new Map<string, Map<string, Array<ReadonlyArray<string>>>>();
 	const armKeys = new Map<string, ReadonlySet<string>>();
 	const add = (componentName: string, reads: ReadonlyArray<PropRead>): boolean => {
-		const keys = derived.get(componentName)!;
-		const size = keys.size;
-		for (const { graphNodeId, path } of reads)
-			if (
-				graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID &&
-				path[0] &&
-				!armKeys.get(componentName)?.has(path[0])
-			)
-				keys.add(path[0]);
-		return keys.size > size;
+		const props = derived.get(componentName)!;
+		let grew = false;
+		for (const { graphNodeId, path } of reads) {
+			const [key, ...rest] = path;
+			if (graphNodeId !== PROTOCOL_PROPS_GRAPH_NODE_ID || !key) continue;
+			if (armKeys.get(componentName)?.has(key)) continue;
+			const paths = props.get(key) ?? [];
+			if (!props.has(key)) props.set(key, paths);
+			if (readsWhole(paths) || paths.some((known) => samePath(known, rest))) continue;
+			paths.push(rest);
+			grew = true;
+		}
+		return grew;
 	};
 	for (const componentName of names) {
-		derived.set(componentName, new Set());
+		derived.set(componentName, new Map());
 		armKeys.set(
 			componentName,
 			new Set(
@@ -183,8 +235,16 @@ function moduleDerivedPropKeys(
 			)
 				grew = true;
 	}
-	derivedPropKeysByModule.set(input, derived);
+	derivedPropsByModule.set(input, derived);
 	return derived;
+}
+
+function readsWhole(paths: ReadonlyArray<ReadonlyArray<string>>): boolean {
+	return paths.some((path) => path.length === 0);
+}
+
+function samePath(left: ReadonlyArray<string>, right: ReadonlyArray<string>): boolean {
+	return left.length === right.length && left.every((key, index) => key === right[index]);
 }
 
 // The props read back after resume whatever their value: a row template's expression
@@ -280,19 +340,22 @@ export function ssrPropCellSeedsForCell(
 			: new Set<string>();
 		const rowKeys = [...(rowKeysByCell.get(graphNodeId) ?? [])];
 		// A row key is carried whatever its value, which already covers a derive read of it.
-		const deriveKeys = [...(deriveKeysByCell.get(graphNodeId) ?? [])].filter(
-			(key) => !rowKeys.includes(key),
+		const derivePaths = [...(deriveKeysByCell.get(graphNodeId) ?? [])].filter(
+			([key]) => !rowKeys.includes(key),
 		);
+		const deriveKeys = derivePaths.map(([key]) => key);
 		if (armKeys === null) return [{ graphNodeId, keys: null }];
 		if (armKeys.size === 0 && deriveKeys.length === 0 && rowKeys.length === 0) return [];
 		const projected = deriveKeys.filter((key) => key === PROJECTION_PROP_NAME);
-		const data = deriveKeys.filter((key) => key !== PROJECTION_PROP_NAME);
+		const data = derivePaths.filter(([key]) => key !== PROJECTION_PROP_NAME);
+		const narrowed = data.filter(([, paths]) => !readsWhole(paths));
 		return [
 			{
 				graphNodeId,
 				keys: [...armKeys],
 				...(projected.length > 0 ? { scalarKeys: projected } : {}),
-				...(data.length > 0 ? { deriveKeys: data } : {}),
+				...(data.length > 0 ? { deriveKeys: data.map(([key]) => key) } : {}),
+				...(narrowed.length > 0 ? { derivePaths: Object.fromEntries(narrowed) } : {}),
 				...(rowKeys.length > 0 ? { rowKeys } : {}),
 			},
 		];
@@ -316,15 +379,19 @@ function propCellKeys(
 
 	// A derive read only widens a bag: the whole-prop cells stay whatever the arm
 	// rebuilds asked for.
-	const deriveKeysByCell = new Map<string, Set<string>>();
+	const deriveKeysByCell = new Map<string, Map<string, Array<ReadonlyArray<string>>>>();
 	for (const { graphNodeId, path } of [
 		...derivePropReads(input, componentName),
 		...forwardedDerivePropReads(input, componentName),
 	]) {
+		const [key, ...rest] = path;
 		if (graphNodeId !== 'prop:props' && graphNodeId !== bagCellId) continue;
-		if (!path[0] || armKeysByCell.get(graphNodeId)?.has(path[0])) continue;
-		const keys = deriveKeysByCell.get(graphNodeId) ?? new Set<string>();
-		keys.add(path[0]);
+		if (!key || armKeysByCell.get(graphNodeId)?.has(key)) continue;
+		const keys =
+			deriveKeysByCell.get(graphNodeId) ?? new Map<string, Array<ReadonlyArray<string>>>();
+		const paths = keys.get(key) ?? [];
+		if (!paths.some((known) => samePath(known, rest))) paths.push(rest);
+		keys.set(key, paths);
 		deriveKeysByCell.set(graphNodeId, keys);
 	}
 

@@ -21,3 +21,4 @@ export * from './resume-record-delta.ts';
 export * from './storage-cookie.ts';
 export * from './storage-slot.ts';
 export * from './value.ts';
+export { valueAlongPaths } from './value-paths.ts';

@@ -158,6 +158,45 @@ export function Summary({ updates, weight }) @{
 	expect(probed).not.toContain('updates');
 });
 
+// A derive that reads some fields of a structured prop ships only those fields.
+test('a derive key is narrowed to the paths its derives read', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Profile.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+export function Profile({ user, roles }) @{
+	let hits = state(0);
+	const line = computed(() => user.name + ' ' + roles.length + ' ' + hits);
+	<p onClick={() => hits++}>{line}</p>
+}
+`,
+		symbols: [],
+	});
+
+	const seed =
+		/marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\]), marklessSsrRenderContext\);/.exec(
+			componentSsrSource(result.publicRenderModule.ssrModuleSource, 'marklessRenderSsr'),
+		)?.[1];
+	const cells = JSON.parse(seed as string);
+	expect(cells).toEqual([
+		{
+			graphNodeId: 'prop:props',
+			keys: [],
+			deriveKeys: ['user', 'roles'],
+			derivePaths: { user: [['name']], roles: [['length']] },
+		},
+	]);
+	const carried = JSON.stringify(
+		marklessSsrSeedPropCells(
+			{ cells: [] },
+			{ user: { name: 'ada', email: 'never-served' }, roles: ['a', 'b'] },
+			cells,
+		).cells?.[0],
+	);
+	expect(carried).toContain('ada');
+	expect(carried).not.toContain('never-served');
+});
+
 // Projected children a derive reads stay scalar-only: their markup is already in the served HTML.
 test('a derive over projected children keeps that key scalar-only', async () => {
 	const result = await compileTsrxModule({

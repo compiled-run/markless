@@ -364,6 +364,10 @@ export type ModuleGraphInterfaceArtifact = {
 			 * props here serves that prop itself. Absent when there are none.
 			 */
 			readonly derivedProps?: ReadonlyArray<string>;
+			/** The paths below each derived prop its derives read, for a prop they do not read whole. */
+			readonly derivedPropPaths?: Readonly<
+				Record<string, ReadonlyArray<ReadonlyArray<string>>>
+			>;
 			/**
 			 * Present when a keyed repeat sits at this component's top level, so its
 			 * rows need the container as their parent.

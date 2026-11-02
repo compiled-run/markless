@@ -3,8 +3,8 @@ import { Card } from './card.tsrx';
 
 export default function CardRows() @{
 	const rows = state([
-		{ id: 1, title: 'alpha-card-title', tags: ['p', 'q'] },
-		{ id: 2, title: 'beta-card-title', tags: ['r'] },
+		{ id: 1, title: 'alpha-card-title', tags: ['tag-p-alpha', 'tag-q-alpha'], note: 'unread-note-alpha' },
+		{ id: 2, title: 'beta-card-title', tags: ['tag-r-beta'], note: 'unread-note-beta' },
 	]);
 	<ul>
 		@for (const row of rows; key row.id) {

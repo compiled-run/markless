@@ -9,6 +9,8 @@ afterEach(() => cleanup());
 
 // The computed label reads an array and an object prop, which only it reads.
 async function structuredPropsReachTheComputed(container: HTMLElement, title: string) {
+	// The page ships only the fields the computed reads.
+	expect(servedState(container)).not.toContain('unread-secret');
 	const button = () => container.querySelector<HTMLButtonElement>(`[data-summary="${title}"]`)!;
 	expect(button().textContent).toBe(`${title} [x+y] 3 items, 0 clicks`);
 	button().click();
@@ -43,21 +45,34 @@ test('SSR resume: constant array and object props forwarded through two files re
 // Each row hands its item object to a child whose computed reads it.
 async function rowObjectReachesTheComputed(container: HTMLElement) {
 	const card = (id: number) => container.querySelector<HTMLButtonElement>(`[data-card="${id}"]`)!;
-	expect(card(1).textContent).toBe('alpha-card-title [p+q] 0');
-	expect(card(2).textContent).toBe('beta-card-title [r] 0');
+	expect(card(1).textContent).toBe('alpha-card-title [tag-p-alpha+tag-q-alpha] 0');
+	expect(card(2).textContent).toBe('beta-card-title [tag-r-beta] 0');
 	card(2).click();
-	await expect.poll(() => card(2).textContent).toBe('beta-card-title [r] 1');
+	await expect.poll(() => card(2).textContent).toBe('beta-card-title [tag-r-beta] 1');
 	card(1).click();
-	await expect.poll(() => card(1).textContent).toBe('alpha-card-title [p+q] 1');
+	await expect
+		.poll(() => card(1).textContent)
+		.toBe('alpha-card-title [tag-p-alpha+tag-q-alpha] 1');
 }
 
-// The row objects live in page state, so the served payload carries each once.
-function servedOnce(container: HTMLElement) {
-	const state = [...container.querySelectorAll('script[type="markless/state"]')]
+function servedState(container: HTMLElement) {
+	return [...container.querySelectorAll('script[type="markless/state"]')]
 		.map((script) => script.textContent ?? '')
 		.join('');
-	expect(state.split('alpha-card-title').length - 1).toBe(1);
-	expect(state.split('beta-card-title').length - 1).toBe(1);
+}
+
+// The row objects live in page state: the child's copy holds only the fields its computed
+// reads, and the arrays it reads whole are served once.
+function servedOnce(container: HTMLElement) {
+	const state = servedState(container);
+	for (const text of [
+		'tag-p-alpha',
+		'tag-q-alpha',
+		'tag-r-beta',
+		'unread-note-alpha',
+		'unread-note-beta',
+	])
+		expect(state.split(text).length - 1).toBe(1);
 }
 
 test('CSR: a row item object reaches an imported child computed', async () => {
