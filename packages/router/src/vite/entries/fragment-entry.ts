@@ -678,10 +678,10 @@ function morphRange(
 let keepAttributes: readonly [keep: string, own: string] = ['', ''];
 
 // Both pages render this element byte for byte: it stays, with what scripts did to it; only the page's own children inside are replaced.
-function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
+function keptSlots(from: ChildNode, to: ChildNode): [Element[], Element[]] | undefined {
 	const [keep, own] = keepAttributes;
 	const hash = keep && from.nodeType === 1 && (from as Element).getAttribute(keep);
-	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return false;
+	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return undefined;
 	const slots = (root: Element) =>
 		root.hasAttribute(own)
 			? [root]
@@ -690,13 +690,79 @@ function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): bo
 				);
 	const leaving = slots(from as Element);
 	const arriving = slots(to as Element);
-	if (leaving.length !== arriving.length) return false;
+	return leaving.length === arriving.length ? [leaving, arriving] : undefined;
+}
+
+function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
+	const slots = keptSlots(from, to);
+	if (!slots) return false;
+	const [leaving, arriving] = slots;
 	leaving.forEach((slot, index) => {
 		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
 		slot.replaceChildren(...nodes);
 		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
 	});
 	return true;
+}
+
+// A template's content is not its children, so a morph cannot see it; a custom element owns its own state.
+const replacedWhole = (element: Element, incoming: Element, page: boolean): boolean =>
+	element.localName === 'template' ||
+	(element.localName === 'script' && (page || !element.isEqualNode(incoming))) ||
+	(element.localName.includes('-') && !element.isEqualNode(incoming));
+
+type MorphRange = readonly [
+	parent: Node,
+	cursor: ChildNode | null,
+	stop: Node | null,
+	incoming: readonly ChildNode[],
+	page: boolean,
+];
+
+// Whether morphing `range` removes `node`, pairing nodes exactly as morphRange does, without changing anything.
+function morphDrops([parent, start, stop, incoming, page]: MorphRange, node: Node): boolean {
+	let own: Node | null = node;
+	while (own && own.parentNode !== parent) own = own.parentNode;
+	if (!own) return false;
+	let cursor = start;
+	for (const next of incoming) {
+		if (!cursor || cursor === stop) return false;
+		const slots = keptSlots(cursor, next);
+		if (slots) {
+			if (cursor === own)
+				return slots[0].some((slot) => slot !== node && slot.contains(node));
+			cursor = cursor.nextSibling;
+			continue;
+		}
+		if (!sameKind(cursor, next)) {
+			const after = cursor.nextSibling;
+			if (after && after !== stop && sameKind(after, next)) {
+				if (cursor === own) return true;
+				cursor = after;
+			}
+		}
+		if (sameKind(cursor, next)) {
+			if (cursor === own) {
+				if (own.nodeType !== 1) return false;
+				const element = own as Element;
+				const inPage = page || isContainer(element);
+				if (replacedWhole(element, next as Element, inPage)) return true;
+				if (
+					own === node ||
+					(!inPage && element.isEqualNode(next)) ||
+					element.localName === 'script'
+				)
+					return false;
+				return morphDrops(
+					[element, element.firstChild, null, Array.from(next.childNodes), inPage],
+					node,
+				);
+			}
+			cursor = cursor.nextSibling;
+		}
+	}
+	for (; cursor && cursor !== stop; cursor = cursor.nextSibling) if (cursor === own) return true;
+	return false;
 }
 
 function morphNode(
@@ -715,12 +781,7 @@ function morphNode(
 	const incoming = to as Element;
 	const name = element.localName;
 	page ||= isContainer(element);
-	// A template's content is not its children, so a morph cannot see it; a custom element owns its own state.
-	if (
-		name === 'template' ||
-		(name === 'script' && (page || !element.isEqualNode(incoming))) ||
-		(name.includes('-') && !element.isEqualNode(incoming))
-	) {
+	if (replacedWhole(element, incoming, page)) {
 		const node = d.adoptNode(incoming);
 		element.replaceWith(node);
 		fresh.push(node);
@@ -1060,73 +1121,81 @@ export async function navigate(
 		for (const element of d.querySelectorAll(state.config.streamedArmSelector))
 			element.remove();
 		state.shown = pageKey(new URL(w.location.href));
+		const wholeBody = documentLoads && !isContainer(d.body);
+		const leavingEnd = wholeBody ? undefined : pageEnd(outgoing, state.config.pageEndComment);
+		let startMark: Comment | undefined;
+		const ranges: MorphRange[] = [];
+		if (wholeBody)
+			ranges.push([
+				outgoing,
+				outgoing.firstChild,
+				null,
+				Array.from(incoming.childNodes),
+				false,
+			]);
+		else if (leavingEnd) {
+			const arrivingEnd = pageEnd(incoming, state.config.pageEndComment) ?? null;
+			const arrivingStart = pageStart(incoming, state.config.pageStartComment);
+			const leavingStart = pageStart(outgoing, state.config.pageStartComment);
+			startMark =
+				leavingStart ??
+				(arrivingStart ? d.createComment(state.config.pageStartComment) : undefined);
+			ranges.push([
+				outgoing,
+				leavingStart ? leavingStart.nextSibling : outgoing.firstChild,
+				leavingEnd,
+				nodesBetween(incoming, arrivingStart, arrivingEnd),
+				true,
+			]);
+			// The document's own nodes around the page stay; a document app morphs them to its next shell.
+			if (documentLoads) {
+				ranges.push([
+					outgoing,
+					leavingEnd.nextSibling,
+					null,
+					arrivingEnd ? nodesBetween(incoming, arrivingEnd, null) : [],
+					false,
+				]);
+				if (startMark)
+					ranges.push([
+						outgoing,
+						leavingStart ? outgoing.firstChild : null,
+						startMark,
+						arrivingStart ? nodesBetween(incoming, undefined, arrivingStart) : [],
+						false,
+					]);
+			}
+		} else
+			ranges.push([
+				outgoing,
+				outgoing.firstChild,
+				null,
+				Array.from(incoming.childNodes),
+				true,
+			]);
+		// Removing the focused element mid-swap forces a style recalculation of the half-built page; on a clean document a blur costs nothing.
+		const focused = d.activeElement as HTMLElement | null;
+		if (focused && focused !== d.body && ranges.some((range) => morphDrops(range, focused)))
+			focused.blur?.();
 		if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
 		const fresh: Element[] = [];
 		region = outgoing;
-		if (documentLoads && !isContainer(d.body)) {
-			syncBodyAttributes(d, next.body, state.config.servedBodyAttributesProperty);
-			morphChildren(d, region, incoming, fresh);
-			region.append((end = d.createComment('')));
-		} else {
-			const own = state.config.containerAttributes;
-			if (outgoing === d.body)
-				syncBodyAttributes(d, incoming, state.config.servedBodyAttributesProperty, own);
-			else syncHostAttributes(d, outgoing, incoming, own);
-			const leavingEnd = pageEnd(outgoing, state.config.pageEndComment);
-			if (leavingEnd) {
-				const arrivingEnd = pageEnd(incoming, state.config.pageEndComment) ?? null;
-				const arrivingStart = pageStart(incoming, state.config.pageStartComment);
-				let leavingStart = pageStart(outgoing, state.config.pageStartComment);
-				if (!leavingStart && arrivingStart)
-					leavingStart = outgoing.insertBefore(
-						d.createComment(state.config.pageStartComment),
-						outgoing.firstChild,
-					);
-				morphRange(
-					d,
-					outgoing,
-					leavingStart ? leavingStart.nextSibling : outgoing.firstChild,
-					leavingEnd,
-					nodesBetween(incoming, arrivingStart, arrivingEnd),
-					fresh,
-					true,
-				);
-				end = leavingEnd;
-				// The document's own nodes around the page stay; a document app morphs them to its next shell.
-				if (documentLoads) {
-					morphRange(
-						d,
-						outgoing,
-						leavingEnd.nextSibling,
-						null,
-						arrivingEnd ? nodesBetween(incoming, arrivingEnd, null) : [],
-						fresh,
-						false,
-					);
-					if (leavingStart)
-						morphRange(
-							d,
-							outgoing,
-							outgoing.firstChild,
-							leavingStart,
-							arrivingStart ? nodesBetween(incoming, undefined, arrivingStart) : [],
-							fresh,
-							false,
-						);
-				}
-			} else {
-				morphRange(
-					d,
-					outgoing,
-					outgoing.firstChild,
-					null,
-					Array.from(incoming.childNodes),
-					fresh,
-					true,
-				);
-				outgoing.after((end = d.createComment('')));
-			}
-		}
+		if (wholeBody) syncBodyAttributes(d, next.body, state.config.servedBodyAttributesProperty);
+		else if (outgoing === d.body)
+			syncBodyAttributes(
+				d,
+				incoming,
+				state.config.servedBodyAttributesProperty,
+				state.config.containerAttributes,
+			);
+		else syncHostAttributes(d, outgoing, incoming, state.config.containerAttributes);
+		if (startMark && !startMark.isConnected)
+			outgoing.insertBefore(startMark, outgoing.firstChild);
+		for (const [parent, cursor, stop, nodes, page] of ranges)
+			morphRange(d, parent, cursor, stop, nodes, fresh, page);
+		if (leavingEnd) end = leavingEnd;
+		else if (wholeBody) region.append((end = d.createComment('')));
+		else outgoing.after((end = d.createComment('')));
 		scripts = fresh.flatMap(scriptsIn);
 		// A box the swap kept still has its offset; scrolling it again would lay out the page before it paints.
 		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
