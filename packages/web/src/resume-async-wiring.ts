@@ -224,6 +224,32 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	};
 }
 
+type WiringInput = Parameters<typeof wireAsyncBoundariesWithoutLoadingCapability>[0];
+
+// D8 settle tracking, the re-settle hold and boundary wiring, started together when the first @try needs them.
+export async function startAsyncBoundaries(
+	input: Omit<WiringInput, 'settleTracker' | 'onAsyncSnapshot'> & {
+		readonly commitArm: NonNullable<WiringInput['commitArm']>;
+	},
+): Promise<AsyncBoundaryWiring & { readonly settleTracker: AsyncBoundarySettleTracker }> {
+	const settleTracker = createAsyncBoundarySettleTracker({
+		boundaries: input.asyncBoundariesById.values(),
+	});
+	// Captures the mounted @pending arms before the runners are demanded.
+	const { wireResettleHold } = await import('./resume-resettle-hold.ts');
+	const onAsyncSnapshot = wireResettleHold({
+		tracker: settleTracker,
+		boundaries: input.asyncBoundariesById.values(),
+		readStatus: (graphNodeId) => input.graph.read(graphNodeId, ['status']),
+		commitArm: input.commitArm,
+		hasHtmlRenderer: !!input.renderBranchHtml,
+	});
+	return {
+		settleTracker,
+		...wireAsyncBoundariesWithoutLoadingCapability({ ...input, settleTracker, onAsyncSnapshot }),
+	};
+}
+
 function clearBusyUnlessRerun(
 	graph: ResumeRuntimeInput['graph'],
 	boundary: ResumeAsyncBoundaryRecord,
