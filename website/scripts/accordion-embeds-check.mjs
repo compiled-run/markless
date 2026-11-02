@@ -82,7 +82,7 @@ try {
   await page.waitForURL(base + '/examples/accordion/' + id);
   await page.locator(`[data-scene="${id}"]`).waitFor();
   assert.equal(await page.locator(`[data-scene="${id}"]`).getAttribute('data-treatment'), id === 'case-file' ? 'B' : 'C');
-  assert.equal(await page.locator('.sidebar, .site-header, .site-shell, .pager').count(), 0, 'Linked examples have no documentation layout');
+  assert.equal(await page.locator('.sidebar, .site-navbar, .site-shell, .pager').count(), 0, 'Linked examples have no documentation layout');
   if (id === 'road-trip') {
    assert.equal(await page.locator('[data-example-trigger][aria-expanded="true"]').count(), 2);
    await page.getByRole('button', { name: /Day 4/ }).click();
@@ -91,7 +91,7 @@ try {
   await page.getByRole('link', { name: '← Accordion examples', exact: true }).click();
   await page.waitForURL(base + '/ui/accordion#examples');
   await examples.waitFor();
-  await page.locator('.site-header').waitFor();
+  await page.locator('.site-navbar').waitFor();
   console.log('PASS: ' + id + ' opens its retained treatment and returns to the docs.');
  }
  const plain = await browser.newPage({ javaScriptEnabled: false });

@@ -1,5 +1,5 @@
 import { storage } from '@markless/core';
-import { asset } from '../../site-base.ts';
+import { art } from './navbar/theme-art.art.ts';
 
 export default function ThemeToggle() @{
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
@@ -8,25 +8,93 @@ export default function ThemeToggle() @{
 	<span class="theme-toggle-island">
 		<style>
 			.theme-toggle-island {
-				position: fixed;
-				top: 0;
-				right: var(--space-s-l);
-				z-index: 40;
-				block-size: var(--header-height);
-				display: flex;
+				display: inline-flex;
 				align-items: center;
-				font-size: var(--step--1);
+				justify-content: center;
+				inline-size: 2.5rem;
+				block-size: 2.5rem;
+				flex: none;
 			}
 
-			/* The drawing inside the button. It is a die-cut sticker with its own white
-			   border and shadow, so it is given the button's whole box and no chrome of its
-			   own: the ring the button used to draw around a glyph would be a second edge
-			   around an edge. */
+			.theme-toggle {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				inline-size: 100%;
+				block-size: 100%;
+				padding: 0;
+				color: var(--ink);
+				background: none;
+				border: 0;
+				border-radius: 999px;
+				cursor: pointer;
+			}
+
+			/* Only a click animates the swap, never a page load or a navigation that renders the toggle afresh. */
+			html[data-theme-switching] .theme-toggle {
+				transition:
+					rotate 420ms cubic-bezier(0.3, 1.5, 0.5, 1),
+					scale 420ms cubic-bezier(0.3, 1.5, 0.5, 1),
+					opacity 240ms ease,
+					display 420ms allow-discrete;
+
+				@starting-style {
+					rotate: -70deg;
+					scale: 0.4;
+					opacity: 0;
+				}
+			}
+
+			.theme-toggle:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.theme-toggle:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 1px;
+			}
+
 			.theme-toggle-icon {
-				display: block;
-				inline-size: var(--theme-toggle-size);
-				block-size: var(--theme-toggle-size);
-				object-fit: contain;
+				inline-size: 1.9rem;
+				block-size: 1.9rem;
+				overflow: visible;
+			}
+
+			/* The wash spreads after the ink lands, like paint soaking into the paper. */
+			.theme-toggle-wash {
+				fill: var(--yellow);
+				opacity: 0.75;
+				mix-blend-mode: multiply;
+				transform-origin: center;
+				transform-box: fill-box;
+
+				html[data-theme-switching] & {
+					transition:
+						scale 520ms 160ms ease-out,
+						opacity 520ms 160ms ease-out;
+
+					@starting-style {
+						scale: 0.3;
+						opacity: 0;
+					}
+				}
+
+				html.dark & {
+					opacity: 0.45;
+					mix-blend-mode: normal;
+				}
+			}
+
+			.theme-toggle-hatch {
+				fill: none;
+				stroke: currentColor;
+				stroke-width: 0.6;
+				stroke-linecap: round;
+				opacity: 0.75;
+			}
+
+			.theme-toggle-ink {
+				fill: currentColor;
 			}
 
 			/* The button offered is the one for the palette not painted: theme.js
@@ -46,6 +114,12 @@ export default function ThemeToggle() @{
 					display: inline-flex;
 				}
 			}
+
+			@media (prefers-reduced-motion: reduce) {
+				html[data-theme-switching] :is(.theme-toggle, .theme-toggle-wash) {
+					transition: none;
+				}
+			}
 		</style>
 		<button
 			class="theme-toggle theme-toggle-to-dark"
@@ -53,17 +127,21 @@ export default function ThemeToggle() @{
 			data-theme-toggle="dark"
 			aria-label="Switch to the dark theme"
 			title="Switch to the dark theme"
-			onClick={() => {
+			onClick={(event) => {
+				const root = document.documentElement;
+				const island = (event.target as Element).closest('.theme-toggle-island');
+				root.dataset.themeSwitching = '';
 				theme = 'dark';
+				// The pressed button is hidden now, so focus moves to the one that took its place.
+				setTimeout(() => island?.querySelector<HTMLElement>('[data-theme-toggle="light"]')?.focus(), 0);
+				setTimeout(() => delete root.dataset.themeSwitching, 700);
 			}}
 		>
-			<img
-				class="theme-toggle-icon"
-				src={asset('theme/sun.png')}
-				alt=""
-				aria-hidden="true"
-				decoding="async"
-			/>
+			<svg class="theme-toggle-icon theme-toggle-sun" viewBox={'0 0 ' + art.sun.width + ' ' + art.sun.height} aria-hidden="true">
+				<path class="theme-toggle-wash" d={art.sun.wash} />
+				<path class="theme-toggle-hatch" d={art.sun.hatch} />
+				<path class="theme-toggle-ink" d={art.sun.ink} />
+			</svg>
 		</button>
 		<button
 			class="theme-toggle theme-toggle-to-light"
@@ -71,17 +149,21 @@ export default function ThemeToggle() @{
 			data-theme-toggle="light"
 			aria-label="Switch to the light theme"
 			title="Switch to the light theme"
-			onClick={() => {
+			onClick={(event) => {
+				const root = document.documentElement;
+				const island = (event.target as Element).closest('.theme-toggle-island');
+				root.dataset.themeSwitching = '';
 				theme = 'light';
+				// The pressed button is hidden now, so focus moves to the one that took its place.
+				setTimeout(() => island?.querySelector<HTMLElement>('[data-theme-toggle="dark"]')?.focus(), 0);
+				setTimeout(() => delete root.dataset.themeSwitching, 700);
 			}}
 		>
-			<img
-				class="theme-toggle-icon"
-				src={asset('theme/moon.png')}
-				alt=""
-				aria-hidden="true"
-				decoding="async"
-			/>
+			<svg class="theme-toggle-icon theme-toggle-moon" viewBox={'0 0 ' + art.moon.width + ' ' + art.moon.height} aria-hidden="true">
+				<path class="theme-toggle-wash" d={art.moon.wash} />
+				<path class="theme-toggle-hatch" d={art.moon.hatch} />
+				<path class="theme-toggle-ink" d={art.moon.ink} />
+			</svg>
 		</button>
 	</span>
 }

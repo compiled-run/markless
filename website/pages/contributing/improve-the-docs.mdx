@@ -1,16 +1,15 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import TypoCountDemo from '../../components/demos/contributing/typo-count-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # Improve the docs
 
 <PageMeta time="7 min" assumes="nothing" />
-
-<ThemeToggle />
 
 Last page covered the rules for the framework code. This site lives in the same repo, in `website/`, and it has a short list of its own.
 
@@ -36,7 +35,7 @@ PORT=4310 node website/.output/server/index.mjs
 ## Where things live
 
 - `website/pages/` holds the pages. A file's path is its URL: `pages/concepts/state.mdx` is `/concepts/state`. An `index.mdx` is its folder's own page.
-- `website/nav.ts` is the one list of pages. The sidebar, the breadcrumb, the pager and the document head all read it. A new page needs an entry there with a title, an `href` and a one-sentence `description`.
+- `website/nav.ts` is the one list of pages. The sidebar, the pager and the document head all read it. A new page needs an entry there with a title, an `href` and a one-sentence `description`.
 - `website/components/demos/<section>/` holds the live demos, one folder per docs section.
 - `website/components/docs/` holds the page chrome: `Callout`, `Collapsible`, `Subtitle`, the sidebar and the pager.
 - `website/styles/global.css` holds the tokens, the type scale and the site-wide rules.
@@ -57,8 +56,6 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 # One title per page
 
 <PageMeta time="3 min" assumes="state,events" />
-
-<ThemeToggle />
 
 Prose, demos and callouts go here.
 ```

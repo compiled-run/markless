@@ -2,16 +2,15 @@ import PageMeta from '../../components/page-meta.tsrx';
 import FeedSteps from '../../components/demos/router/feed-steps.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # Page data arrives in the same response
 
 <PageMeta time="2 min" assumes="async, routes" />
-
-<ThemeToggle />
 
 A page needs data from somewhere slow, like a database. You don't want the whole page to wait for
 it. You also don't want the browser to make a second trip to fetch it.

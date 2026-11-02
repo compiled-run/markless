@@ -1,8 +1,7 @@
 // The foot of every page: the previous and next entries in `nav.ts` reading
 // order, with a strip of doodles between them. Each doodle reacts to the
 // pointer with a movement of its own, written in styles/global.css against its
-// position in this row. `pagerFor` is plain TypeScript
-// for the same reason the header's breadcrumb is, and an
+// position in this row. `pagerFor` is plain TypeScript, and an
 // end of the run keeps its link box, hidden, so the doodles stay centred.
 import Sprite from '../sprite.tsrx';
 import Sticker from '../sticker.tsrx';

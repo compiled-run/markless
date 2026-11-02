@@ -125,8 +125,7 @@ screenshots into the markless repo's goal notes.
   it in the playground frame, because a page places each component as its own top-level block. `callout.tsrx` and
   `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`.
 - `components/docs/sidebar.tsrx`, `document.tsrx`, `nav.ts` — the chrome. `nav.ts` is the single
-  source for the page list: the sidebar loops it, and the breadcrumb, the pager and the witness read
-  it. Adding a page means adding an entry there and nothing else. `document.tsrx` renders a plain
+  source for the page list: the sidebar loops it, and the pager and the witness read it. Adding a page means adding an entry there and nothing else. `document.tsrx` renders a plain
   `<html>` root.
 - `styles/global.css` — the look, copied from the markless repo's `docs/` app, plus the code-block
   palette, the hover-doc box and the dark theme. Below `70rem` the sidebar's list is collapsed
@@ -134,10 +133,16 @@ screenshots into the markless repo's goal notes.
   the first phone screenful is the article rather than the navigation.
 - `public/favicon.svg` — the head icon. The crawler files `robots.txt`, `sitemap.xml` and
   `llms.txt` are not in `public/`; `tooling/seo-files.ts` writes them into the build output.
-- `public/theme/sun.png`, `public/theme/moon.png` — the two drawings on the theme toggle, cut from
-  the top pair of `theme-icons-sheet.png` by `tooling/cut-sprites.ts theme`. Each button carries the
-  drawing of the theme it is standing in, so the sun is only ever painted on paper and the moon only
-  ever on the dark ground.
+- `public/theme/sun.png`, `public/theme/moon.png` — the old raster theme drawings, cut from the top
+  pair of `theme-icons-sheet.png` by `tooling/cut-sprites.ts theme`. Only the linked accordion
+  examples page still paints them; the docs toggle draws in ink.
+- `components/docs/navbar/` — the site header. `site-navbar.tsrx` is the `@markless/ui` navbar laid
+  out like the QDS docs header: a floating bar of three panels from `80rem` up, and a top bar with a
+  full-screen `modal` menu below it. `sections.ts` names the panels and their cards. `decor.ts`
+  draws each card's picture and the theme toggle's sun and moon with the figures' ink pen;
+  `decor.test.ts` freezes the cards into `public/nav-decor.svg` and the sun and moon into
+  `theme-art.art.ts` (run it with `-u` after editing a drawing). `public/navbar-scroll.js` slides the
+  floating bar away while the reader scrolls down.
 - `components/sprite.tsrx`, `components/mascot.tsrx`, `components/sticker.tsrx` — the hand-drawn
   accents. `public/sprites/`, `public/mascots/` and `public/stickers/` hold the cut assets;
   `tooling/cut-sprites.ts` is what cut them and is not part of the build. Sprites are the flat
@@ -192,10 +197,11 @@ the seed script the router puts in the head applies the stored value before the 
 `public/theme.js` resolves that stored choice (`system` against the OS setting) into a `dark` or
 `light` class on `<html>`, which is the only thing the CSS reads, so the theme never flashes.
 
-The toggle is an island each `.mdx` page renders rather than part of `site-header.tsrx`, because the
-router serves only the document's HTML and drops its state payload, so nothing on the document path
-can resume. The header reserves `.theme-toggle-slot` at the end of its tools row and the island is
-pinned to it.
+The toggle and the navbar that holds it are an island each `.mdx` page renders (`<SiteNavbar />`,
+beside `<Sidebar />`), because the router serves only the document's HTML and drops its state
+payload, so nothing on the document path can resume. Each button draws the theme it stands in, so
+the sun is only ever painted on paper and the moon only ever on the dark ground; a click swaps
+them with a small turn and lets the yellow wash spread in after the ink.
 
 ## Live code
 
