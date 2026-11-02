@@ -84,6 +84,60 @@ function derivePropReads(
 	);
 }
 
+// Forwarding a prop to a child whose tree re-derives from it: the child drops its copy once
+// this component routes the prop live, so this component's own bag has to carry it.
+function forwardedDerivePropReads(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	visiting: ReadonlySet<string>,
+): ReadonlyArray<PropRead> {
+	return input.semanticGraph.componentEdges.flatMap((edge) => {
+		if (edge.parentComponentName !== componentName) return [];
+		const childKeys = childDerivedPropKeys(input, edge, visiting);
+		if (childKeys.size === 0) return [];
+		return edge.props.flatMap((prop) =>
+			prop.kind === 'graph-reference' &&
+			prop.graphBindingKind === 'prop' &&
+			childKeys.has(prop.name)
+				? [{ graphNodeId: prop.graphNodeId, path: prop.path }]
+				: [],
+		);
+	});
+}
+
+function childDerivedPropKeys(
+	input: PublicRenderModuleInput,
+	edge: PublicRenderModuleInput['semanticGraph']['componentEdges'][number],
+	visiting: ReadonlySet<string>,
+): ReadonlySet<string> {
+	if (edge.importSource === undefined)
+		return derivedPropKeys(input, edge.childComponentName, visiting);
+	const child = input.source.importedModuleInterfaces?.[
+		edge.importSource
+	]?.render.components.find((component) => component.componentName === edge.childComponentName);
+	return new Set(child?.derivedProps ?? []);
+}
+
+/**
+ * The props a component's served bag carries only for a resume-time derive, in
+ * its own tree or one it forwards them into. Published on the module interface
+ * so a module forwarding its own prop into this component carries it in turn.
+ */
+export function derivedPropKeys(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	visiting: ReadonlySet<string> = new Set(),
+): ReadonlySet<string> {
+	if (visiting.has(componentName)) return new Set();
+	const bag = ssrPropCellSeedsForCell(
+		input,
+		PROTOCOL_PROPS_GRAPH_NODE_ID,
+		componentName,
+		new Set([...visiting, componentName]),
+	).find((seed) => seed.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID);
+	return new Set(bag?.scalarKeys ?? []);
+}
+
 // The props read back after resume whatever their value: a row template's expression
 // slots, read by a row minted later, and an attach factory's arguments, read when it runs.
 function rowTemplatePropKeys(input: PublicRenderModuleInput, componentName: string): Set<string> {
@@ -163,6 +217,7 @@ export function ssrPropCellSeedsForCell(
 	input: PublicRenderModuleInput,
 	bagCellId: string | null,
 	componentName: string,
+	visiting: ReadonlySet<string> = new Set([componentName]),
 ): ReadonlyArray<SsrPropCellSeed> {
 	const armKeysByCell = new Map<string, Set<string> | null>();
 	for (const { graphNodeId, path } of armRebuildPropReads(input, componentName)) {
@@ -177,7 +232,10 @@ export function ssrPropCellSeedsForCell(
 	// A derive read only widens a bag: the whole-prop cells stay whatever the arm
 	// rebuilds asked for.
 	const deriveKeysByCell = new Map<string, Set<string>>();
-	for (const { graphNodeId, path } of derivePropReads(input, componentName)) {
+	for (const { graphNodeId, path } of [
+		...derivePropReads(input, componentName),
+		...forwardedDerivePropReads(input, componentName, visiting),
+	]) {
 		if (graphNodeId !== 'prop:props' && graphNodeId !== bagCellId) continue;
 		if (!path[0] || armKeysByCell.get(graphNodeId)?.has(path[0])) continue;
 		const keys = deriveKeysByCell.get(graphNodeId) ?? new Set<string>();
