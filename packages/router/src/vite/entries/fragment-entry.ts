@@ -1123,23 +1123,16 @@ export async function navigate(
 		state.shown = pageKey(new URL(w.location.href));
 		const wholeBody = documentLoads && !isContainer(d.body);
 		const leavingEnd = wholeBody ? undefined : pageEnd(outgoing, state.config.pageEndComment);
-		let startMark: Comment | undefined;
 		const ranges: MorphRange[] = [];
-		if (wholeBody)
-			ranges.push([
-				outgoing,
-				outgoing.firstChild,
-				null,
-				Array.from(incoming.childNodes),
-				false,
-			]);
-		else if (leavingEnd) {
+		if (leavingEnd) {
 			const arrivingEnd = pageEnd(incoming, state.config.pageEndComment) ?? null;
 			const arrivingStart = pageStart(incoming, state.config.pageStartComment);
-			const leavingStart = pageStart(outgoing, state.config.pageStartComment);
-			startMark =
-				leavingStart ??
-				(arrivingStart ? d.createComment(state.config.pageStartComment) : undefined);
+			let leavingStart = pageStart(outgoing, state.config.pageStartComment);
+			if (!leavingStart && arrivingStart)
+				leavingStart = outgoing.insertBefore(
+					d.createComment(state.config.pageStartComment),
+					outgoing.firstChild,
+				);
 			ranges.push([
 				outgoing,
 				leavingStart ? leavingStart.nextSibling : outgoing.firstChild,
@@ -1156,11 +1149,11 @@ export async function navigate(
 					arrivingEnd ? nodesBetween(incoming, arrivingEnd, null) : [],
 					false,
 				]);
-				if (startMark)
+				if (leavingStart)
 					ranges.push([
 						outgoing,
-						leavingStart ? outgoing.firstChild : null,
-						startMark,
+						outgoing.firstChild,
+						leavingStart,
 						arrivingStart ? nodesBetween(incoming, undefined, arrivingStart) : [],
 						false,
 					]);
@@ -1171,26 +1164,19 @@ export async function navigate(
 				outgoing.firstChild,
 				null,
 				Array.from(incoming.childNodes),
-				true,
+				!wholeBody,
 			]);
 		// Removing the focused element mid-swap forces a style recalculation of the half-built page; on a clean document a blur costs nothing.
 		const focused = d.activeElement as HTMLElement | null;
-		if (focused && focused !== d.body && ranges.some((range) => morphDrops(range, focused)))
-			focused.blur?.();
+		if (focused && ranges.some((range) => morphDrops(range, focused))) focused.blur();
 		if (documentLoads) syncHtmlAttributes(d, next, state.config.servedHtmlAttributesProperty);
-		const fresh: Element[] = [];
-		region = outgoing;
+		const own = state.config.containerAttributes;
 		if (wholeBody) syncBodyAttributes(d, next.body, state.config.servedBodyAttributesProperty);
 		else if (outgoing === d.body)
-			syncBodyAttributes(
-				d,
-				incoming,
-				state.config.servedBodyAttributesProperty,
-				state.config.containerAttributes,
-			);
-		else syncHostAttributes(d, outgoing, incoming, state.config.containerAttributes);
-		if (startMark && !startMark.isConnected)
-			outgoing.insertBefore(startMark, outgoing.firstChild);
+			syncBodyAttributes(d, incoming, state.config.servedBodyAttributesProperty, own);
+		else syncHostAttributes(d, outgoing, incoming, own);
+		const fresh: Element[] = [];
+		region = outgoing;
 		for (const [parent, cursor, stop, nodes, page] of ranges)
 			morphRange(d, parent, cursor, stop, nodes, fresh, page);
 		if (leavingEnd) end = leavingEnd;
