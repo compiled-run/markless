@@ -150,14 +150,26 @@ type ClientBuildProgress = {
 	readonly kind: 'progress';
 	readonly cpuMicros: number;
 	readonly workerJobs: number;
+	/** Requests, sockets and processes holding the child's event loop open, such as a plugin's fetch. */
+	readonly pendingIo: readonly string[];
 	readonly intervalMs: number;
 };
 
 const PROGRESS_INTERVAL_MS = 5_000;
-// Twelve reports, about a minute, in which the child spent no CPU of its own and handed no build worker a job.
+// Twelve reports, about a minute, in which the child spent no CPU, handed no build worker a job and waited on no I/O.
 const STALLED_REPORTS = 12;
 // A report itself costs microseconds; a build doing anything spends far more than this share of one core.
 const IDLE_CPU_SHARE = 0.01;
+// Held open without anything to wait for: timers, stdio, and file watchers a plugin left running.
+const IDLE_RESOURCES = new Set([
+	'Timeout',
+	'Immediate',
+	'TTYWrap',
+	'PipeWrap',
+	'SignalWrap',
+	'FSEventWrap',
+	'StatWatcher',
+]);
 
 /** In the child: reports the CPU it has used and the worker jobs it waits on, without holding the process open. */
 export function reportClientBuildProgress(intervalMs = PROGRESS_INTERVAL_MS): void {
@@ -169,6 +181,7 @@ export function reportClientBuildProgress(intervalMs = PROGRESS_INTERVAL_MS): vo
 			kind: 'progress',
 			cpuMicros: user + system,
 			workerJobs: buildWorkerJobsInFlight(),
+			pendingIo: process.getActiveResourcesInfo().filter((type) => !IDLE_RESOURCES.has(type)),
 			intervalMs,
 		};
 		process.send?.(progress, undefined, undefined, () => {});
@@ -176,7 +189,7 @@ export function reportClientBuildProgress(intervalMs = PROGRESS_INTERVAL_MS): vo
 }
 
 /**
- * The child's exit, `null` when it succeeded. A child that reports no CPU spent and no worker job pending for
+ * The child's exit, `null` when it succeeded. A child that reports no CPU spent, no worker job and no I/O pending for
  * `stalledReports` reports in a row waits on something that will never settle, so it is stopped and the build fails.
  */
 export function waitForClientBuildProcess(
@@ -194,7 +207,11 @@ export function waitForClientBuildProcess(
 					? Number.POSITIVE_INFINITY
 					: message.cpuMicros - previousCpu;
 			previousCpu = message.cpuMicros;
-			if (message.workerJobs > 0 || used >= message.intervalMs * 1000 * IDLE_CPU_SHARE) {
+			if (
+				message.workerJobs > 0 ||
+				message.pendingIo.length > 0 ||
+				used >= message.intervalMs * 1000 * IDLE_CPU_SHARE
+			) {
 				idleReports = 0;
 				lastWork = `${Math.round(message.cpuMicros / 1e6)} s of CPU in`;
 				return;
@@ -204,7 +221,7 @@ export function waitForClientBuildProcess(
 			const idleSeconds = Math.round((idleReports * message.intervalMs) / 1000);
 			reject(
 				new Error(
-					`MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For ${idleSeconds} s it used no CPU and had no compile or chunk job on a build worker${lastWork ? ` (${lastWork})` : ''}, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.`,
+					`MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For ${idleSeconds} s it used no CPU, had no compile or chunk job on a build worker and waited on no request, socket or process${lastWork ? ` (${lastWork})` : ''}, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.`,
 				),
 			);
 		});
