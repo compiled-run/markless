@@ -92,7 +92,10 @@ import {
 	elementBoundKeySource,
 	widgetInstanceReadSource,
 	renderDecisionSources,
+	componentKeyedRepeats,
+	componentRowNames,
 	repeatLocalSource,
+	shadowedRowNameSource,
 	sharedInstancePreludeLines,
 } from './residue-reader.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
@@ -617,34 +620,62 @@ export function ssrSeedForwardBlockLines(
 	];
 }
 
-// Sibling `@for` loops may bind the same authored name - two lists both calling
-// their item `row` is ordinary authoring. This prelude is ONE scope shared by
-// every row render, so each name may be declared once; the declaration is the
-// same whichever loop asked for it, because a row context names its own row and
-// the rows enclosing it. A name meaning an item in one loop and an index in another is
-// refused by `collectRepeatBindingConflictDiagnostics` before emission.
+// One declaration per name the component's own loops bind, shared by every row render of it.
 function repeatLocalLines(
-	repeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'],
+	input: PublicRenderModuleInput,
+	componentName: string,
+	repeats: ReturnType<typeof componentKeyedRepeats>,
+	rowNames: ReturnType<typeof componentRowNames>,
 ): string[] {
-	const declared = new Map<string, string>();
-	for (const repeat of repeats)
-		if (!declared.has(repeat.itemName))
-			declared.set(
-				repeat.itemName,
-				repeatLocalSource(repeats, repeat.itemName, 'repeatItem', 'marklessSsrDataContext'),
-			);
-	for (const repeat of repeats)
-		if (repeat.indexName && !declared.has(repeat.indexName))
-			declared.set(
-				repeat.indexName,
-				repeatLocalSource(
-					repeats,
-					repeat.indexName,
-					'repeatIndex',
-					'marklessSsrDataContext',
-				),
-			);
-	return [...declared].map(([name, source]) => `const ${name}=${source};`);
+	return rowNames.map(
+		(binding) =>
+			`const ${binding.name}=${
+				binding.shadowsOuter
+					? shadowedRowNameSource(
+							repeats,
+							binding,
+							'marklessSsrDataContext',
+							outerRowNameSource(input, componentName, binding.name),
+						)
+					: repeatLocalSource(repeats, binding.name, binding.field, 'marklessSsrDataContext')
+			};`,
+	);
+}
+
+// A graph binding is read from the values map at the read, as a graph-read residue is; any other outer name is aliased before the readers shadow it.
+function outerRowNameSource(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	name: string,
+): string {
+	const binding = ownedGraphBinding(input, componentName, name);
+	return binding
+		? `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(binding.id)}),[])`
+		: `marklessSsrOuter$${name}`;
+}
+
+function outerRowNameAliasLines(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	rowNames: ReturnType<typeof componentRowNames>,
+): string[] {
+	return rowNames.flatMap((binding) =>
+		binding.shadowsOuter && !ownedGraphBinding(input, componentName, binding.name)
+			? [
+					`const marklessSsrOuter$${binding.name}=typeof ${binding.name}==='undefined'?undefined:${binding.name};`,
+				]
+			: [],
+	);
+}
+
+function ownedGraphBinding(input: PublicRenderModuleInput, componentName: string, name: string) {
+	return input.semanticGraph.graphBindings.find(
+		(binding) =>
+			binding.name === name &&
+			binding.sharedDefinitionId === undefined &&
+			(binding.componentName === componentName ||
+				(!binding.componentName && componentName === input.renderData.root?.componentName)),
+	);
 }
 
 // A component-body `computed()` whose expression names a shared instance rebuilds
@@ -679,7 +710,8 @@ function emitSsrDataLines(
 	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
 	const componentGraphNodeIds = componentDeriveGraphNodeIds(input, componentName);
 	const residueSources = authoredResidueSources(chunks);
-	const repeats = input.semanticGraph.keyedRepeats;
+	const repeats = componentKeyedRepeats(input, componentName);
+	const rowNames = componentRowNames(input, componentName, repeats);
 	// The prelude serves every callback, not just the markup reader: an arm test
 	// the compiler could not reduce to one graph read is authored in the same
 	// scope and may spell shared instances the markup never mentions. Same union
@@ -688,21 +720,15 @@ function emitSsrDataLines(
 		...new Set([...residueSources, ...renderDecisionSources(input, componentName)]),
 	].join('\n');
 	// A row variable named `error` takes the name, as the client residue reader already decides.
-	const rowNamesError = repeats.some(
-		(repeat) => repeat.itemName === 'error' || repeat.indexName === 'error',
-	);
+	const rowNamesError = rowNames.some((binding) => binding.name === 'error');
 	const localLines = [
-		...repeatLocalLines(repeats),
+		...repeatLocalLines(input, componentName, repeats, rowNames),
 		...(rowNamesError ? [] : ['const error=marklessSsrDataContext.asyncError;']),
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
 			componentName,
 			preludeText,
-			new Set([
-				...repeats.map((repeat) => repeat.itemName),
-				...repeats.flatMap((repeat) => (repeat.indexName ? [repeat.indexName] : [])),
-				'error',
-			]),
+			new Set([...rowNames.map((binding) => binding.name), 'error']),
 			(graphNodeId, path) =>
 				`marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(
 					graphNodeId,
@@ -1414,6 +1440,7 @@ function emitSsrDataLines(
 		...sharedComputedLines,
 		...templateComputedLines,
 		"const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';",
+		...outerRowNameAliasLines(input, componentName, rowNames),
 		...deferLine,
 		`const marklessSsrReadData=(marklessResidue,marklessSsrDataContext)=>{${mintCase}if(marklessResidue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessResidue.graphNodeId),marklessResidue.path);if(marklessResidue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,marklessResidue.path);${localLines.join('')}switch(marklessResidue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+marklessResidue.source);}};`,
 		// A component placed inside a widget root renders that widget's parts from
