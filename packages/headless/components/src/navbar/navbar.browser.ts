@@ -695,6 +695,18 @@ test('CSR: a click inside the grace window leaves a hover-opened dropdown showin
 	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
 });
 
+test('CSR: a real press and click inside the grace window leaves a hover-opened dropdown showing', async () => {
+	await render(Grace);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	// The same gesture as above with its pointerdown, which the overlay reports as a
+	// press on the open panel's own trigger: the grace has to cover the press too.
+	await userEvent.click(el(ProductsTrigger));
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+});
+
 test('CSR: a click after the grace window closes a hover-opened dropdown', async () => {
 	await render(Grace);
 	await userEvent.hover(el(ProductsTrigger));
@@ -716,9 +728,7 @@ test('CSR: a right click on the trigger leaves a hover-opened dropdown showing',
 	await userEvent.hover(el(ProductsTrigger));
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
 
-	el(ProductsTrigger).dispatchEvent(
-		new MouseEvent('contextmenu', { bubbles: true, button: 2 }),
-	);
+	el(ProductsTrigger).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 2 }));
 	el(ProductsTrigger).dispatchEvent(new MouseEvent('auxclick', { bubbles: true, button: 2 }));
 	await new Promise((resolve) => setTimeout(resolve, 100));
 	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');

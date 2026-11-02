@@ -361,6 +361,11 @@ export function NavbarItemContent({
 			// `contains` rather than `===`: a consumer may put an icon inside the trigger, and the press lands on that.
 			const pressed = event.detail.pressTarget;
 			const onOwnTrigger = pressed !== undefined && back !== undefined && back.contains(pressed);
+			// A press on the trigger of a dropdown that hover just opened is the click grace's to swallow, like the click that follows it.
+			if (onOwnTrigger && item.graceUntil > Date.now()) {
+				onDismiss?.(event);
+				return;
+			}
 			navbar.closeAll();
 			// Without this, pressing an open dropdown's trigger closes it on the press and re-opens it on the click; armed by identity, so a press elsewhere leaves the next click free.
 			if (onOwnTrigger) item.graceUntil = Date.now() + navbar.clickGrace;
