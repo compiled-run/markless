@@ -145,9 +145,7 @@ export function pureCompositeReadSources(
 	}
 	if (node.type === 'TemplateLiteral') {
 		return joinReadSources(
-			asNodes(node.expressions).map((part) =>
-				pureCompositeReadSources(part, state, options),
-			),
+			asNodes(node.expressions).map((part) => pureCompositeReadSources(part, state, options)),
 		);
 	}
 	return null;
@@ -240,7 +238,10 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 	if (offset === null) return false;
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, offset);
-	if (symbolId !== null && semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module')
+	if (
+		symbolId !== null &&
+		semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module'
+	)
 		return false;
 	if (repeatRowBindsName(source, state)) return false;
 	return (
@@ -343,8 +344,10 @@ export function mintTemplateExpressionComputed(
 	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
 	propObjectRoots?: ReadonlySet<string>,
 ): { readonly graphNodeId: string } | null {
-	const bindings = scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
-	const aliases = scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+	const bindings =
+		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
+	const aliases =
+		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
 	const dependencies: SemanticGraphDependency[] = [];
 	for (const source of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.
@@ -451,7 +454,9 @@ export function readsUnroutedGraphCell(
 	const visit = (node: AnyNode, parent: AnyNode | null): void => {
 		const isName =
 			parent &&
-			((parent.type === 'MemberExpression' && parent.property === node && parent.computed !== true) ||
+			((parent.type === 'MemberExpression' &&
+				parent.property === node &&
+				parent.computed !== true) ||
 				((parent.type === 'Property' || parent.type === 'ObjectProperty') &&
 					parent.key === node &&
 					parent.computed !== true));

@@ -211,6 +211,11 @@ export function createMarklessRolldownPlugin(input: {
 			) => {
 				internalOptions.serverOnlyProps = resolve;
 			},
+			declareElementOnlyAttributes: (
+				attributes: InternalMarklessRolldownOptions['elementOnlyAttributes'],
+			) => {
+				internalOptions.elementOnlyAttributes = attributes;
+			},
 			declareRouteModules: (isRoute: (moduleId: string) => boolean) => {
 				internalOptions.routeModules = isRoute;
 			},

@@ -1,3 +1,4 @@
+import { ELEMENT_ONLY_ATTRIBUTE_MISPLACED_CODE } from '@markless/compiler';
 import { parseTsrxModule } from './tsrx-ast.ts';
 import type { RouteManifestRoute } from '../route-manifest.ts';
 import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
@@ -112,7 +113,10 @@ function lowerRouterLinks(code: string, ast: Node): string {
 		if (current.type !== 'JSXElement') return;
 		const opening = node(current.openingElement);
 		const name = opening && node(opening.name);
-		if (!name || !linkNames.has(jsxName(name) ?? '')) return;
+		if (!name || !linkNames.has(jsxName(name) ?? '')) {
+			lowerElementPrefetch(code, opening, name, edits);
+			return;
+		}
 		const attributes = nodes(opening?.attributes);
 		if (attributes.some((attribute) => attribute.type === 'JSXSpreadAttribute')) return;
 		if (findJsxAttribute(attributes, 'children')) return;
@@ -123,25 +127,10 @@ function lowerRouterLinks(code: string, ast: Node): string {
 		if (closingName) edits.push({ ...rangeOf(closingName), text: 'a' });
 		for (const attribute of attributes) {
 			const attributeName = jsxName(node(attribute.name));
-			if (attributeName === 'params' || (attributeName === 'prefetch' && !attribute.value)) {
+			if (attributeName === 'params') {
 				edits.push({ ...attributeRemovalRange(code, attribute), text: '' });
 			} else if (attributeName === 'prefetch') {
-				const value = node(attribute.value)!;
-				const literal = jsxExpression(value) ?? value;
-				if (['Literal', 'StringLiteral', 'BooleanLiteral'].includes(literal.type ?? '')) {
-					const choice = literal.value;
-					edits.push(
-						choice === false
-							? { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="none"` }
-							: { ...attributeRemovalRange(code, attribute), text: '' },
-					);
-					continue;
-				}
-				const expression = `(${slice(code, jsxExpression(value) ?? value)})`;
-				edits.push({
-					...rangeOf(attribute),
-					text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : undefined}`,
-				});
+				edits.push(prefetchEdit(code, attribute));
 			} else if (attributeName === 'replace' || attributeName === 'scroll') {
 				const value = node(attribute.value);
 				const expression = value ? slice(code, jsxExpression(value) ?? value) : 'true';
@@ -156,6 +145,44 @@ function lowerRouterLinks(code: string, ast: Node): string {
 		}
 	});
 	return applyEdits(code, edits);
+}
+
+/**
+ * `prefetch` on a plain <a>, or on a component the compiler then checks passes it
+ * to one (the attribute is declared element-only), lowers the way it does on <Link>.
+ * On any other element nothing would act on it, so the build stops here.
+ */
+function lowerElementPrefetch(
+	code: string,
+	opening: Node | undefined,
+	name: Node | undefined,
+	edits: Edit[],
+) {
+	const attribute = findJsxAttribute(nodes(opening?.attributes), 'prefetch');
+	if (!attribute || !name) return;
+	const tag = jsxName(name);
+	if (tag !== undefined && tag !== 'a' && /^[a-z]/.test(tag)) {
+		fail(
+			`${ELEMENT_ONLY_ATTRIBUTE_MISPLACED_CODE}: \`${slice(code, attribute)}\` on <${tag}> does nothing: only an <a>, or a component that spreads its props onto one, acts on prefetch. Put it on the link itself.`,
+		);
+	}
+	edits.push(prefetchEdit(code, attribute));
+}
+
+function prefetchEdit(code: string, attribute: Node): Edit {
+	if (!attribute.value) return { ...attributeRemovalRange(code, attribute), text: '' };
+	const value = node(attribute.value)!;
+	const literal = jsxExpression(value) ?? value;
+	if (['Literal', 'StringLiteral', 'BooleanLiteral'].includes(literal.type ?? '')) {
+		return literal.value === false
+			? { ...rangeOf(attribute), text: `${PREFETCH_ATTRIBUTE}="none"` }
+			: { ...attributeRemovalRange(code, attribute), text: '' };
+	}
+	const expression = `(${slice(code, jsxExpression(value) ?? value)})`;
+	return {
+		...rangeOf(attribute),
+		text: `${PREFETCH_ATTRIBUTE}={${expression} === false ? 'none' : undefined}`,
+	};
 }
 
 function parseTransformAst(
@@ -177,6 +204,7 @@ function parseTransformAst(
 function isTransformCandidateCode(code: string) {
 	return (
 		code.includes('<a') ||
+		code.includes('prefetch') ||
 		[...ROUTER_IMPORT_SOURCES].some((importSource) => code.includes(importSource))
 	);
 }

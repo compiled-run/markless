@@ -266,6 +266,13 @@ function pageServerOnlyPropsPlugin(): Plugin {
 								) => typeof PAGE_SERVER_ONLY_PROPS | undefined,
 							): void;
 							declareRouteModules?(isRoute: (moduleId: string) => boolean): void;
+							declareElementOnlyAttributes?(
+								attributes: ReadonlyArray<{
+									readonly name: string;
+									readonly tagName: string;
+									readonly authored: string;
+								}>,
+							): void;
 						};
 				  }
 				| undefined;
@@ -277,6 +284,10 @@ function pageServerOnlyPropsPlugin(): Plugin {
 			markless?.api.declareRouteModules?.((moduleId) =>
 				isPageModuleFile(normalizeRouteFileId(moduleId)),
 			);
+			// The anchor transform lowers `prefetch={false}` on a component to this attribute; only an <a> acts on it.
+			markless?.api.declareElementOnlyAttributes?.([
+				{ name: PREFETCH_ATTRIBUTE, tagName: 'a', authored: 'prefetch={false}' },
+			]);
 		},
 	};
 }

@@ -309,6 +309,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'}',
 		],
 	},
+	MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED: {
+		summary: 'prefetch={false} sits on something that never renders the link.',
+		what: 'Only an `<a>` acts on `prefetch={false}`. Here it is on another element, or on a component that does not pass its props on to an `<a>`, so the router would still request the page early and nothing would tell you.',
+		how: 'Put `prefetch={false}` on the `<a>` or `<Link>` itself. A component of your own can take it when it spreads its props onto its `<a>` and does not set the same attribute there itself.',
+		example: [
+			'export function NavLink({ children, ...rest }: PropsOf<\'a\'>) @{',
+			'\t<a {...rest}>{children}</a>',
+			'}',
+			'',
+			'<NavLink href="/logout" prefetch={false}>Log out</NavLink>',
+		],
+	},
 	MARKLESS_ROUTER_RESPONSE_COMMITTED: {
 		summary: 'A page changed its status or headers after the response started streaming.',
 		what: 'The router sends the status and headers with the first bytes of the page. A page that waits on data keeps streaming after that. This write came later and tried to change what was already sent.',

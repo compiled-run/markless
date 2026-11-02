@@ -26,6 +26,7 @@ import { collectComponentProps } from './collect-components.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
+import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach } from '../construct-reach.ts';
 import {
@@ -313,6 +314,15 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		return component ? [{ componentName: component.name, propName: declared.propName }] : [];
 	});
 
+	const misplacedAttributes = elementOnlyAttributeDiagnostics({
+		attributes: input.elementOnlyAttributes ?? [],
+		componentEdges: graph.componentEdges,
+		ownInterface: graph.moduleGraphInterface,
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
+	});
+
 	return {
 		...graph,
 		...(serverOnlyProps.length > 0 ? { serverOnlyProps } : {}),
@@ -320,7 +330,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 			{
 				source: input.source,
 				filename: input.filename,
-				diagnostics: graph.diagnostics,
+				diagnostics: [...graph.diagnostics, ...misplacedAttributes],
 				phase: 'semantic-graph',
 				passId: 'tsrx-semantic-graph',
 				artifactKeys: ['semanticGraph'],

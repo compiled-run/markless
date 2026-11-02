@@ -125,7 +125,10 @@ export type WalkState = {
 	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
 	/** Props the host provides only while rendering on the server, by component export. */
-	readonly serverOnlyProps: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
+	readonly serverOnlyProps: ReadonlyArray<{
+		readonly exportName: string;
+		readonly propName: string;
+	}>;
 	readonly hostIds: WeakMap<object, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
 	readonly handledTemplateValues: WeakSet<object>;
@@ -264,7 +267,10 @@ export function createWalkState(input: {
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	readonly importedFunctionWrites?: Readonly<Record<string, ModuleFunctionWrites>>;
-	readonly serverOnlyProps?: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
+	readonly serverOnlyProps?: ReadonlyArray<{
+		readonly exportName: string;
+		readonly propName: string;
+	}>;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {

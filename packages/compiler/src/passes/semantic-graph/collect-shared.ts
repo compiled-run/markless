@@ -339,7 +339,11 @@ function resolvePublishedSharedDefinition(input: {
 		// namespace and the rest of the path walks inside it; a named re-export
 		// renames one export, so the whole path continues under the new name.
 		const nextPath =
-			reexport.importedName === '*' ? rest : rest.length === 0 ? [reexport.importedName] : null;
+			reexport.importedName === '*'
+				? rest
+				: rest.length === 0
+					? [reexport.importedName]
+					: null;
 		if (!nextPath) continue;
 
 		const resolved = resolvePublishedSharedDefinition({
@@ -554,7 +558,8 @@ export function moduleInterfaceSharedDefinitions(input: {
 	return input.sharedDefinitions.flatMap((definition) => {
 		// A definition this module adopted from an import is that module's to
 		// publish; republishing it here would give one definition two owners.
-		if (definition.id !== sharedDefinitionId(input.moduleId, definition.exportedName)) return [];
+		if (definition.id !== sharedDefinitionId(input.moduleId, definition.exportedName))
+			return [];
 
 		return (exportNames.get(definition.name) ?? []).map((exportName) => ({
 			exportName,
@@ -919,7 +924,10 @@ export function findSharedInstance(
 	localName: string,
 	graph: Pick<SharedInstanceGraph, 'sharedDefinitions' | 'sharedInstances'>,
 	componentName?: string | null,
-): { readonly instance: SemanticSharedInstance; readonly definition: SemanticSharedDefinition } | null {
+): {
+	readonly instance: SemanticSharedInstance;
+	readonly definition: SemanticSharedDefinition;
+} | null {
 	const instance = findLast(
 		graph.sharedInstances,
 		(item) => item.localName === localName && sharedInstanceVisibleFrom(item, componentName),
