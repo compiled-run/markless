@@ -27,7 +27,7 @@ export interface FragmentNavigationConfig {
 	readonly pageStartComment: string;
 	// The container's own attributes, never carried from the leaving page's element to the next one.
 	readonly containerAttributes: readonly [container: string, paths: string];
-	readonly keepAttributes: readonly [keep: string, own: string];
+	readonly keepAttributes: readonly [keep: string, own: string, vary: string];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
 	readonly documentLoads: boolean;
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
@@ -675,11 +675,13 @@ function morphRange(
 	}
 }
 
-let keepAttributes: readonly [keep: string, own: string] = ['', ''];
+let keepAttributes: readonly [keep: string, own: string, vary: string] = ['', '', ''];
 
-// Both pages render this element byte for byte: it stays, with what scripts did to it; only the page's own children inside are replaced.
-function keptSlots(from: ChildNode, to: ChildNode): [Element[], Element[]] | undefined {
-	const [keep, own] = keepAttributes;
+type KeptSlots = [leaving: Element[], arriving: Element[], varying: [Element, Element][]];
+
+// Both pages render this element byte for byte but for its vary-marked attributes: it stays, with what scripts did to it.
+function keptSlots(from: ChildNode, to: ChildNode): KeptSlots | undefined {
+	const [keep, own, vary] = keepAttributes;
 	const hash = keep && from.nodeType === 1 && (from as Element).getAttribute(keep);
 	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return undefined;
 	const slots = (root: Element) =>
@@ -688,15 +690,38 @@ function keptSlots(from: ChildNode, to: ChildNode): [Element[], Element[]] | und
 			: [...root.querySelectorAll(`[${own}]`)].filter(
 					(slot) => !root.contains(slot.parentElement!.closest(`[${own}]`)),
 				);
+	const varied = (root: Element, slots: Element[]) =>
+		vary
+			? [root, ...root.querySelectorAll(`[${vary}]`)].filter(
+					(element) =>
+						element.hasAttribute(vary) &&
+						!slots.some((slot) => slot !== element && slot.contains(element)),
+				)
+			: [];
 	const leaving = slots(from as Element);
 	const arriving = slots(to as Element);
-	return leaving.length === arriving.length ? [leaving, arriving] : undefined;
+	if (leaving.length !== arriving.length) return undefined;
+	const leavingVaried = varied(from as Element, leaving);
+	const arrivingVaried = varied(to as Element, arriving);
+	if (leavingVaried.length !== arrivingVaried.length) return undefined;
+	return [
+		leaving,
+		arriving,
+		leavingVaried.map((element, index) => [element, arrivingVaried[index]!]),
+	];
 }
 
 function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
 	const slots = keptSlots(from, to);
 	if (!slots) return false;
-	const [leaving, arriving] = slots;
+	const [leaving, arriving, varying] = slots;
+	const vary = keepAttributes[2];
+	for (const [element, next] of varying)
+		for (const name of (next.getAttribute(vary) ?? '').split(' ').filter(Boolean)) {
+			const value = next.getAttribute(name);
+			if (value === null) element.removeAttribute(name);
+			else if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+		}
 	leaving.forEach((slot, index) => {
 		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
 		slot.replaceChildren(...nodes);
@@ -1100,7 +1125,7 @@ export async function navigate(
 		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
 		session.streaming?.abort();
 		const settle = withoutTransitions(d);
-		keepAttributes = state.config.keepAttributes ?? ['', ''];
+		keepAttributes = state.config.keepAttributes ?? ['', '', ''];
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
 			if (!element.isConnected || !scope.contains(element)) continue;

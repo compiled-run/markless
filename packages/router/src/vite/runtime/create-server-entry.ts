@@ -40,6 +40,7 @@ import {
 	installKeepParts,
 	PROTOCOL_KEEP_ATTRIBUTE,
 	PROTOCOL_OWN_ATTRIBUTE,
+	PROTOCOL_VARY_ATTRIBUTE,
 } from '@markless/web/fns/keep-parts';
 import {
 	normalizeMarklessDevError,
@@ -1029,7 +1030,9 @@ function insertHeadModulePreloads(html: string, importMap: string, preloads: str
 function isParserBlockingScript(attributes: string): boolean {
 	const type = /(?:^|\s)type=["']?([^"'\s>]*)/i.exec(attributes)?.[1]?.toLowerCase() ?? '';
 	if (type && !JAVASCRIPT_TYPE.test(type)) return false;
-	return !(/(?:^|\s)src=/i.test(attributes) && /(?:^|\s)(?:async|defer)(?=[\s=/]|$)/i.test(attributes));
+	return !(
+		/(?:^|\s)src=/i.test(attributes) && /(?:^|\s)(?:async|defer)(?=[\s=/]|$)/i.test(attributes)
+	);
 }
 
 function insertHeadHtml(documentHtml: string, headHtml: string): string {
@@ -1305,7 +1308,7 @@ function fragmentConfig(
 		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,
 		pageStartComment: PROTOCOL_CONTAINER_START_COMMENT,
 		containerAttributes: [CONTAINER_ATTRIBUTE, PROTOCOL_LOCATOR_PATHS_ATTRIBUTE],
-		keepAttributes: [PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_OWN_ATTRIBUTE],
+		keepAttributes: [PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_OWN_ATTRIBUTE, PROTOCOL_VARY_ATTRIBUTE],
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,
