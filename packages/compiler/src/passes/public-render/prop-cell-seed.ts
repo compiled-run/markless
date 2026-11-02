@@ -5,20 +5,24 @@ import {
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { componentDeriveGraphNodeIds, computedDependencyEdges } from './derive-set.ts';
+import { PROJECTION_PROP_NAME } from './shared-seed-pass.ts';
 import { componentPropCellId } from './shared.ts';
 
 /**
  * A prop cell the served payload has to carry, and which of its properties.
  * `keys` names the properties the bag must hold; `null` marks a cell that IS one
- * destructured prop. `scalarKeys` names properties only a resume-time derive
- * reads, which the payload carries only when their value is a scalar.
- * `rowKeys` names properties a minted row's slots or a behavior's inputs read,
- * carried whatever their value unless the composer routes them to its own node.
+ * destructured prop. `deriveKeys` names properties only a resume-time derive
+ * reads, carried when their value is data the serializer encodes; `scalarKeys`
+ * is projected children a derive reads, carried only as a scalar, since markup
+ * is already in the served HTML. `rowKeys` names properties a minted row's slots
+ * or a behavior's inputs read, carried whatever their value. A derive or row key
+ * is dropped when the composer routes it to its own node.
  */
 export type SsrPropCellSeed = {
 	readonly graphNodeId: string;
 	readonly keys: ReadonlyArray<string> | null;
 	readonly scalarKeys?: ReadonlyArray<string>;
+	readonly deriveKeys?: ReadonlyArray<string>;
 	readonly rowKeys?: ReadonlyArray<string>;
 };
 
@@ -281,11 +285,14 @@ export function ssrPropCellSeedsForCell(
 		);
 		if (armKeys === null) return [{ graphNodeId, keys: null }];
 		if (armKeys.size === 0 && deriveKeys.length === 0 && rowKeys.length === 0) return [];
+		const projected = deriveKeys.filter((key) => key === PROJECTION_PROP_NAME);
+		const data = deriveKeys.filter((key) => key !== PROJECTION_PROP_NAME);
 		return [
 			{
 				graphNodeId,
 				keys: [...armKeys],
-				...(deriveKeys.length > 0 ? { scalarKeys: deriveKeys } : {}),
+				...(projected.length > 0 ? { scalarKeys: projected } : {}),
+				...(data.length > 0 ? { deriveKeys: data } : {}),
 				...(rowKeys.length > 0 ? { rowKeys } : {}),
 			},
 		];
@@ -344,7 +351,7 @@ export function ssrComposeStateExpression(
 ): string {
 	const composed = 'marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren)';
 	const cells = ssrPropCellSeeds(input, component, componentName);
-	return cells.length === 0
-		? composed
-		: `marklessSsrSeedPropCells(${composed}, marklessSsrProps, ${JSON.stringify(cells)})`;
+	if (cells.length === 0) return composed;
+	const context = cells.some((cell) => cell.deriveKeys) ? ', marklessSsrRenderContext' : '';
+	return `marklessSsrSeedPropCells(${composed}, marklessSsrProps, ${JSON.stringify(cells)}${context})`;
 }

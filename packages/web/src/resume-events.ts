@@ -730,8 +730,8 @@ export function createEventWiring(input: {
 					const symbol = await input.loadSymbol(symbolId);
 					return await marklessRunAtCurrentTarget(context.event, element, symbol, {
 						...context,
-						...(rowScope && isBoundSymbolId(symbolId)
-							? rowScopedSymbolContext(context, rowScope)
+						...(rowScope && marklessIsBoundSymbolId(symbolId)
+							? marklessRowScopedSymbolContext(context, rowScope)
 							: {}),
 						invokeCallback,
 						invokeSymbol,
@@ -829,11 +829,12 @@ export function createEventWiring(input: {
 // instance through the path it already carries, which the loader boundary
 // consumes. A nested compose may have prefixed the bound id, so the reading is
 // taken past any instance path.
-function isBoundSymbolId(symbolId: string): boolean {
+export function marklessIsBoundSymbolId(symbolId: string): boolean {
 	return symbolId.slice(marklessInstancePath(symbolId).length).startsWith('bound:');
 }
 
-function rowScopedSymbolContext(
+/** A bound symbol's context placed in the row its record names: a handler's dispatching host, or the node a derive writes. */
+export function marklessRowScopedSymbolContext(
 	context: DispatchSymbolContext,
 	rowScope: MarklessRowScope,
 ): Pick<DispatchSymbolContext, 'graph'> & Partial<Pick<DispatchSymbolContext, 'getElementHandle'>> {

@@ -40,7 +40,7 @@ export function PanelContent({ value, children }) @{
 	const ssr = result.publicRenderModule.ssrModuleSource;
 	const content = componentSsrSource(ssr, 'marklessRenderSsrPanelContent');
 	expect(content).toContain(
-		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), marklessSsrProps, [{"graphNodeId":"prop:props","keys":[],"scalarKeys":["value"]}])',
+		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), marklessSsrProps, [{"graphNodeId":"prop:props","keys":[],"deriveKeys":["value"]}], marklessSsrRenderContext)',
 	);
 	// Projected children are already in the served markup; seeding the whole bag
 	// would ship that HTML a second time.
@@ -97,24 +97,25 @@ export function StepperStep({ slug, badge, note, children }) @{
 		result.publicRenderModule.ssrModuleSource,
 		'marklessRenderSsrStepperStep',
 	);
-	const seed = /marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\])\);/.exec(step)?.[1];
+	const seed =
+		/marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\]), marklessSsrRenderContext\);/.exec(
+			step,
+		)?.[1];
 	expect(seed).toBeDefined();
 	const cells = JSON.parse(seed as string) as ReadonlyArray<{
 		graphNodeId: string;
 		keys: ReadonlyArray<string> | null;
-		scalarKeys?: ReadonlyArray<string>;
+		deriveKeys?: ReadonlyArray<string>;
 	}>;
 	expect(cells).toHaveLength(1);
 	expect(cells[0]?.graphNodeId).toBe('prop:props');
 	expect(cells[0]?.keys).toEqual([]);
-	expect([...(cells[0]?.scalarKeys ?? [])].sort()).toEqual(['badge', 'slug']);
+	expect([...(cells[0]?.deriveKeys ?? [])].sort()).toEqual(['badge', 'slug']);
 });
 
-// A derive over a structured prop names the key, and the runtime seed leaves it
-// out: settled data the composing render routes from its own graph would ship
-// twice, and a build's forced-arm probe hands that prop as an unserializable
-// hole proxy.
-test('a derive over a structured prop seeds a scalar-only key the payload skips', async () => {
+// A derive over a structured prop names the key, and the seed carries the value as
+// data; a function, or a build's forced-arm probe placeholder, stays out.
+test('a derive over a structured prop seeds a key carried as data', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Summary.tsrx',
 		source: `
@@ -136,21 +137,49 @@ export function Summary({ updates, weight }) @{
 		result.publicRenderModule.ssrModuleSource,
 		'marklessRenderSsrSummary',
 	);
-	const seed = /marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\])\);/.exec(summary)?.[1];
+	const seed =
+		/marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\]), marklessSsrRenderContext\);/.exec(
+			summary,
+		)?.[1];
 	const cells = JSON.parse(seed as string) as ReadonlyArray<{
 		keys: ReadonlyArray<string> | null;
-		scalarKeys?: ReadonlyArray<string>;
+		deriveKeys?: ReadonlyArray<string>;
 	}>;
 	expect(cells[0]?.keys).toEqual([]);
-	expect([...(cells[0]?.scalarKeys ?? [])].sort()).toEqual(['updates', 'weight']);
+	expect([...(cells[0]?.deriveKeys ?? [])].sort()).toEqual(['updates', 'weight']);
 
-	const seeded = marklessSsrSeedPropCells({ cells: [] }, { updates: [{ id: 'a' }], weight: 2 }, [
-		{ graphNodeId: 'prop:props', keys: [], scalarKeys: ['updates', 'weight'] },
+	const cell = [{ graphNodeId: 'prop:props', keys: [], deriveKeys: ['updates', 'weight'] }];
+	const carried = (props: Record<string, unknown>, context?: { prerenderSettle: object }) =>
+		JSON.stringify(marklessSsrSeedPropCells({ cells: [] }, props, cell, context).cells?.[0]);
+	expect(carried({ updates: [{ id: 'a' }], weight: 2 })).toContain('updates');
+	expect(carried({ updates: () => [], weight: 2 })).not.toContain('updates');
+	const probed = carried({ updates: [{ id: 'a' }], weight: 2 }, { prerenderSettle: {} });
+	expect(probed).toContain('weight');
+	expect(probed).not.toContain('updates');
+});
+
+// Projected children a derive reads stay scalar-only: their markup is already in the served HTML.
+test('a derive over projected children keeps that key scalar-only', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Frame.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+export function Frame({ children, tag }) @{
+	let opened = state(false);
+	const summary = computed(() => (opened ? tag : '') + (children ? 'filled' : 'empty'));
+	<section data-summary={summary} onClick={() => (opened = true)}>{children}</section>
+}
+`,
+		symbols: [],
+	});
+
+	const seed =
+		/marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\]), marklessSsrRenderContext\);/.exec(
+			componentSsrSource(result.publicRenderModule.ssrModuleSource, 'marklessRenderSsr'),
+		)?.[1];
+	expect(JSON.parse(seed as string)).toEqual([
+		{ graphNodeId: 'prop:props', keys: [], scalarKeys: ['children'], deriveKeys: ['tag'] },
 	]);
-	expect(seeded.cells).toHaveLength(1);
-	const carried = JSON.stringify(seeded.cells?.[0]);
-	expect(carried).toContain('weight');
-	expect(carried).not.toContain('updates');
 });
 
 // The bound derive reads a live-routed prop off the composer's node, so the
@@ -158,7 +187,7 @@ export function Summary({ updates, weight }) @{
 test('composition drops a seeded derive key the composer routes live, keeps a static one', () => {
 	const seed = () =>
 		marklessSsrSeedPropCells({ cells: [] }, { updates: [{ id: 'a' }], weight: 2, label: 'x' }, [
-			{ graphNodeId: 'prop:props', keys: [], scalarKeys: ['updates', 'weight', 'label'] },
+			{ graphNodeId: 'prop:props', keys: [], deriveKeys: ['updates', 'weight', 'label'] },
 		]);
 
 	const routed = { state: seed() as { cells: ReadonlyArray<{ graphNodeId: string }> } };
@@ -265,10 +294,13 @@ export function ${component}({ ${prop} }) @{
 			result.publicRenderModule.ssrModuleSource,
 			'marklessRenderSsr',
 		);
-		const seed = /marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\])\)/.exec(ssr)?.[1];
+		const seed =
+			/marklessSsrSeedPropCells\(.*, marklessSsrProps, (\[.*?\]), marklessSsrRenderContext\)/.exec(
+				ssr,
+			)?.[1];
 		expect(seed).toBeDefined();
 		expect(JSON.parse(seed as string)).toEqual([
-			{ graphNodeId: 'prop:props', keys: [], scalarKeys: [prop] },
+			{ graphNodeId: 'prop:props', keys: [], deriveKeys: [prop] },
 		]);
 	});
 

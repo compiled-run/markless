@@ -30,6 +30,7 @@ import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
 	marklessRowSegment,
 } from '../fns/instance-scope.ts';
@@ -868,14 +869,22 @@ export function evaluatePrerenderDataComponent(input: {
 			composer = outer.composer;
 		}
 		const scope = composer;
+		// A route spells another instance without rows; this derive's own place supplies the rows it sits in.
+		const rows =
+			boundSymbolId && scope?.module
+				? marklessRecordRowScope(input.symbolPrefix.slice(scope.module.rootPrefix.length))
+				: undefined;
 		// Slot routes name the composer's nodes bare and any other instance by its path in the module; a minted row knows only its composer.
 		const deriveRead: PrerenderRead =
 			boundSymbolId && scope
 				? (graphNodeId, path) => {
 						const at = marklessInstancePath(graphNodeId),
 							local = graphNodeId.slice(at.length),
+							placed =
+								rows?.find((pair) => !pair.rowBoundary && pair.rowFree === at)
+									?.withRows ?? at,
 							holder = at
-								? scope.module?.instanceReads.get(scope.module.rootPrefix + at)
+								? scope.module?.instanceReads.get(scope.module.rootPrefix + placed)
 								: scope.read;
 						if (holder) return holder(local, path);
 						const own = read(graphNodeId, path);
@@ -888,7 +897,10 @@ export function evaluatePrerenderDataComponent(input: {
 			linkedInitializer ??
 				(input.loadSymbol(
 					boundSymbolId
-						? (composer?.symbolPrefix ?? '') + boundSymbolId
+						? marklessRowFreeSymbolId(
+								(composer?.symbolPrefix ?? '') + boundSymbolId,
+								composer?.symbolPrefix ?? '',
+							)
 						: marklessRowFreeSymbolId(
 								input.symbolPrefix + symbolId,
 								input.symbolPrefix,
