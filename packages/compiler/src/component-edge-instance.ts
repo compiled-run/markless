@@ -1,4 +1,8 @@
-import { protocolInstanceSegment, protocolProjectionSegment } from '@markless/serializer';
+import {
+	protocolBoundSymbolPrefix,
+	protocolInstanceSegment,
+	protocolProjectionSegment,
+} from '@markless/serializer';
 import type {
 	ArtifactChildMaterialization,
 	BoundSymbolResolverArtifact,
@@ -73,9 +77,7 @@ export function componentEdgeInstancePaths(
 // same paths. Cached per list so repeated emission stays linear.
 const pathsByEdgeList = new WeakMap<object, ComponentEdgeInstancePaths>();
 
-function instancePathsFor(
-	edges: ReadonlyArray<SemanticComponentEdge>,
-): ComponentEdgeInstancePaths {
+function instancePathsFor(edges: ReadonlyArray<SemanticComponentEdge>): ComponentEdgeInstancePaths {
 	const cached = pathsByEdgeList.get(edges);
 	if (cached) return cached;
 	const paths = componentEdgeInstancePaths(edges);
@@ -91,7 +93,10 @@ export function componentEdgeInstanceSegment(
 	edges: ReadonlyArray<SemanticComponentEdge>,
 ): string {
 	if (!edge) return '';
-	return instancePathsFor(edges).get(edge.id) ?? protocolInstanceSegment(componentEdgeIndex(edge, edges));
+	return (
+		instancePathsFor(edges).get(edge.id) ??
+		protocolInstanceSegment(componentEdgeIndex(edge, edges))
+	);
 }
 
 // The path of a component-edge chain, outermost segment first. Each edge
@@ -114,10 +119,7 @@ export type ComponentEdgeSymbolRoute = {
 	readonly componentEdgeId: string;
 	/** The child's own symbol ids this edge binds, to the bound row that carries the edge's captures. */
 	readonly boundSymbols?: Readonly<Record<string, string>>;
-} & (
-	| { readonly importSource: string; readonly selfRecursive?: true }
-	| { readonly self: true }
-);
+} & ({ readonly importSource: string; readonly selfRecursive?: true } | { readonly self: true });
 
 // Whether a same-module edge sits on a cycle: the component it places reaches
 // the component that placed it again through same-module edges. Rendering walks
@@ -224,19 +226,80 @@ export function boundRowChildSymbolId(
 }
 
 function edgeBoundSymbols(
-	captureAnalysis: Pick<CaptureAnalysisArtifact, 'boundResolverRows' | 'extractedSymbols'> | undefined,
+	captureAnalysis:
+		| Pick<CaptureAnalysisArtifact, 'boundResolverRows' | 'extractedSymbols'>
+		| undefined,
 ): ReadonlyMap<string, Readonly<Record<string, string>>> {
 	const byEdge = new Map<string, Record<string, string>>();
-	if (!captureAnalysis) return byEdge;
-	for (const row of captureAnalysis.boundResolverRows ?? []) {
-		const edgeId = row.componentEdgePath.at(-1);
-		const child = boundRowChildSymbolId(row, captureAnalysis.extractedSymbols);
-		if (!edgeId || !child || child.forwarded) continue;
-		const table = byEdge.get(edgeId) ?? {};
-		table[child.symbolId] = row.id;
-		byEdge.set(edgeId, table);
+	for (const entry of componentEdgeBoundSymbolEntries(captureAnalysis)) {
+		if (entry.via !== 'own' || entry.forwarded) continue;
+		byEdge.set(entry.edgeId, { ...byEdge.get(entry.edgeId), [entry.key]: entry.rowId });
 	}
 	return byEdge;
+}
+
+// An edge's table serves every instance under it, so an outer edge keys by the exact id its inner edge hands up, never by the symbol's base.
+export function componentEdgeBoundSymbolEntries(
+	captureAnalysis:
+		| Pick<CaptureAnalysisArtifact, 'boundResolverRows' | 'extractedSymbols'>
+		| undefined,
+): ReadonlyArray<{
+	readonly edgeId: string;
+	readonly key: string;
+	readonly rowId: string;
+	readonly via: 'own' | 'inner' | 'base';
+	readonly forwarded?: true;
+}> {
+	if (!captureAnalysis) return [];
+	const rows = (captureAnalysis.boundResolverRows ?? []).flatMap((row) => {
+		const child = boundRowChildSymbolId(row, captureAnalysis.extractedSymbols);
+		return child ? [{ row, child }] : [];
+	});
+	const representatives = new Map<string, string>();
+	const suffixKey = (symbolId: string, path: ReadonlyArray<string>) =>
+		JSON.stringify([symbolId, ...path]);
+	for (const { row, child } of rows)
+		for (let at = 0; at < row.componentEdgePath.length; at++) {
+			const key = suffixKey(child.symbolId, row.componentEdgePath.slice(at));
+			if (!representatives.has(key)) representatives.set(key, row.id);
+		}
+	const entries: Array<{
+		edgeId: string;
+		key: string;
+		rowId: string;
+		via: 'own' | 'inner' | 'base';
+		forwarded?: true;
+	}> = [];
+	const baseRows = new Map<string, Set<string>>();
+	for (const { row, child } of rows) {
+		const path = row.componentEdgePath;
+		path.forEach((edgeId, at) => {
+			const rowId = representatives.get(suffixKey(child.symbolId, path.slice(at)))!;
+			const base = `${edgeId}\n${protocolBoundSymbolPrefix(child.symbolId)}`;
+			if (at < path.length - 1) {
+				const inner = representatives.get(suffixKey(child.symbolId, path.slice(at + 1)))!;
+				entries.push({ edgeId, key: inner, rowId, via: 'inner' });
+				baseRows.set(base, (baseRows.get(base) ?? new Set()).add(rowId));
+				return;
+			}
+			entries.push({
+				edgeId,
+				key: child.symbolId,
+				rowId,
+				via: 'own',
+				...(child.forwarded && { forwarded: true as const }),
+			});
+			// A forwarded claim reaches this edge as the bound id its child composed, never as the child's own id.
+			if (child.forwarded) baseRows.set(base, (baseRows.get(base) ?? new Set()).add(rowId));
+		});
+	}
+	// The base key answers an inner id this module did not mint, so it stands only where every row agrees.
+	for (const [base, rowIds] of baseRows) {
+		if (rowIds.size !== 1) continue;
+		const [edgeId, key] = base.split('\n') as [string, string];
+		entries.push({ edgeId, key, rowId: [...rowIds][0]!, via: 'base' });
+	}
+	return entries;
 }
 
 // Only routes that name a CHILD module belong in the manifest: the manifest's
