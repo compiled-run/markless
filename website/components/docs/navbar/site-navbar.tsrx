@@ -20,7 +20,6 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 				--spring-hover: linear(0, 0.008 0.8%, 0.03 1.7%, 0.065 2.5%, 0.111 3.3%, 0.165 4.2%, 0.227 5%, 0.294 5.8%, 0.657 10%, 0.794 11.7%, 0.856 12.5%, 0.915 13.3%, 0.968 14.2%, 1.016 15%, 1.059 15.8%, 1.097 16.7%, 1.129 17.5%, 1.155 18.3%, 1.177 19.2%, 1.193 20%, 1.205 20.8%, 1.212 21.7%, 1.215 23.3%, 1.211 24.2%, 1.195 25.8%, 1.158 28.3%, 1.064 33.3%, 1.011 36.7%, 0.991 38.3%, 0.975 40%, 0.964 41.7%, 0.957 43.3%, 0.954 45.8%, 0.957 48.3%, 0.997 59.2%, 1.009 65.8%, 1.009 70.8%, 0.998 86.7%, 1);
 				--spring-hover-ms: 748ms;
 				position: relative;
-				z-index: 60;
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: 1rem;
 				line-height: 1.5;
@@ -67,11 +66,13 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 			</div>
 			<div class="nav-box" aria-hidden="true">
 				<InkEdge name="panel" />
+				<Grain />
 			</div>
 			<div class="nav-tools">
 				<SearchButton />
 				<ThemeToggle />
 			</div>
+			<Grain />
 		</navbar.root>
 
 		<style>
@@ -110,7 +111,6 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				position: fixed;
 				top: 1.5rem;
 				left: 50%;
-				z-index: 60;
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
@@ -124,6 +124,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				background: var(--raised);
 				box-shadow: 6px 6px 0 var(--muted-ink);
 				translate: -50% 0;
+				z-index: calc(var(--grain-z) + 1);
 				transition:
 					translate 300ms ease,
 					opacity 300ms ease;
@@ -367,6 +368,7 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 			<span class="card-note">{card.description}</span>
 		</span>
 		<InkEdge name={card.size === 'tall' ? 'tall' : 'card'} />
+		<Grain />
 
 		<style>
 			.card {
@@ -534,6 +536,44 @@ function SearchButton() @{
 	</navbar.trigger>
 }
 
+/** The page's paper grain, pinned to the surface it sits in: the page grain is drawn on the scrolling document, so a fixed surface would slide under it. */
+function Grain() @{
+	<span class="grain" aria-hidden="true">
+		<style>
+			.grain {
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+			}
+
+			.nav-pill > .grain {
+				inset: -2px;
+			}
+
+			.grain::before,
+			.grain::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+			}
+
+			.grain::before {
+				background-image: var(--grain-fiber);
+				mix-blend-mode: var(--grain-fiber-blend);
+				opacity: var(--grain-fiber-opacity);
+			}
+
+			.grain::after {
+				background-image: var(--grain-speck);
+				mix-blend-mode: var(--grain-speck-blend);
+				opacity: var(--grain-speck-opacity);
+			}
+		</style>
+	</span>
+}
+
 /** A card's or panel's hand-inked edge, from the same sprite as the card drawings. */
 function InkEdge({ name }: { readonly name: string }) @{
 	<svg class="ink-edge" aria-hidden="true">
@@ -589,6 +629,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 						<lucide.menu class="bar-icon" aria-hidden="true" />
 					</modal.trigger>
 				</span>
+				<Grain />
 			</div>
 
 			<modal.backdrop class="menu-backdrop">
@@ -662,7 +703,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				position: fixed;
 				inset-block-start: 0;
 				inset-inline: 0;
-				z-index: 60;
+				z-index: calc(var(--grain-z) + 1);
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
@@ -675,6 +716,11 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 			.menu-bar {
 				position: relative;
 				flex: none;
+			}
+
+			/* The open menu repeats the bar in the same spot; it stays under the page grain, since it is translucent and the page is locked behind it. */
+			.mobile-menu[ui-open] > .mobile-bar {
+				visibility: hidden;
 			}
 
 			.bar-button {

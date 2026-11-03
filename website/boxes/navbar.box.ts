@@ -36,6 +36,18 @@ const focused = (page: Page) =>
 		return active.getAttribute('aria-label') ?? active.textContent?.trim().replace(/\s+/g, ' ').slice(0, 20) ?? '';
 	});
 
+/** The inside of a fixed surface at each scroll offset: its paper grain is pinned to it, so every capture must match the first. */
+async function surfaceWhileScrolling(page: Page, selector: string, offsets: readonly number[]) {
+	const captures: Buffer[] = [];
+	for (const y of offsets) {
+		await page.evaluate((to) => scrollTo(0, to), y);
+		await page.waitForTimeout(450);
+		const box = (await page.locator(selector).first().boundingBox())!;
+		captures.push(await page.screenshot({ clip: { x: box.x + 16, y: box.y + 16, width: box.width - 32, height: box.height - 32 } }));
+	}
+	return captures.map((capture) => capture.equals(captures[0]!));
+}
+
 async function restPointer(page: Page) {
 	await page.mouse.move(800, 980, { steps: 4 });
 	await page.keyboard.press('Escape');
@@ -153,6 +165,14 @@ export default box(
 				for (let k = 0; k < 4; k++) await page.mouse.wheel(0, 200);
 				await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute('data-nav-away')), POLL).toBe(true);
 			}
+			// Scrolling up keeps the bar showing; neither it nor an open panel may slide over the page's paper.
+			await page.evaluate(() => scrollTo(0, 2000));
+			await page.waitForTimeout(400);
+			expect(await surfaceWhileScrolling(page, '.nav-pill', [1500, 1483, 1450, 1111]), 'the grain inside the bar stays put while the page scrolls').toEqual([true, true, true, true]);
+			await page.locator('.nav-pill .nav-trigger', { hasText: 'Docs' }).hover();
+			await expect.poll(() => expanded(page, 'Docs'), POLL).toBe('true');
+			expect(await surfaceWhileScrolling(page, '.nav-box', [1100, 1083, 1050]), 'the grain inside the open panel stays put while the page scrolls').toEqual([true, true, true]);
+			await restPointer(page);
 			await navigateBy(page, () => page.evaluate(() => (document.querySelector('#docs-sidebar a[href="/"]') as HTMLElement).click()), '/');
 			await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute('data-nav-away')), { ...POLL, message: 'a navigation from a scrolled page shows the bar' }).toBe(false);
 			await exerciseBar(page, 'after navigating home from a scrolled page');
@@ -187,6 +207,8 @@ export default box(
 			const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
 			mobile.on('pageerror', (error) => errors.push(String(error)));
 			await mobile.goto(url('/concepts/state'), { waitUntil: 'networkidle' });
+			expect(await surfaceWhileScrolling(mobile, '.mobile-menu > .mobile-bar', [0, 17, 250, 1201]), 'the grain inside the top bar stays put while the page scrolls').toEqual([true, true, true, true]);
+			await mobile.evaluate(() => scrollTo(0, 0));
 			for (const path of ['/router/pages', '/start/migrate', '/how-it-works']) {
 				await mobile.locator('.mobile-bar [aria-label="Open menu"]').click();
 				await expect(mobile.locator('.menu-panel')).toBeVisible(POLL);
@@ -195,7 +217,7 @@ export default box(
 				await expect(mobile.locator('.menu-panel')).toBeHidden(POLL);
 			}
 			expect(errors).toEqual([]);
-			await receipt.capture('navbar works after seven in-place navigations, scroll-away matches on every page, and the theme toggle never shows the wrong drawing');
+			await receipt.capture('navbar works after seven in-place navigations, scroll-away matches on every page, the theme toggle never shows the wrong drawing, and the paper grain inside the bars stays put while the page scrolls');
 		} finally {
 			await browser.close();
 		}
