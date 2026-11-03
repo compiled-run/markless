@@ -3423,11 +3423,49 @@
 		},
 		{
 			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 20104,
+			"to": 20368,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the dispatch reads a forwarded event row one edge above its host; measured on CI run 41525857883 (linux), +264 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/ssr",
+			"from": 30833,
+			"to": 31486,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): composition drops forwarded records whose edge this render did not place; measured on CI run 41525857883 (linux), +653 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 20878,
+			"to": 21060,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the render structure lists the component edges it placed; measured on CI run 41525857883 (linux), +182 B rendered"
+		},
+		{
+			"date": "2026-11-02",
 			"guard": "load",
 			"subject": "docs / (linux-x64)",
 			"from": {
 				"executedChars": 109103,
 				"jsGzipBytes": 1571252
+			},
+			"to": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
+			},
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix); measured on CI run 41525857883 (linux), +191 B gzip downloaded, executed chars within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
 			},
 			"to": {
 				"executedChars": 110540,
@@ -3504,7 +3542,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 20104,
+		"web/fns/instance-scope": 20368,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
@@ -3514,7 +3552,7 @@
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 3988,
-		"web/fns/ssr": 30833,
+		"web/fns/ssr": 31486,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
 		"web/fns/visible-trigger": 791,
@@ -3569,7 +3607,7 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20878,
+		"web/ssr-data/renderer": 21060,
 		"web/storage-plane": 1810
 	},
 	"constructGlue": {

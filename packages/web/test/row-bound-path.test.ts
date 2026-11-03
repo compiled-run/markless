@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '../src/fns/row-bound-path.ts';
+import { marklessRecordRowScope } from '../src/fns/instance-scope.ts';
 
 // A part two edges down a projection, inside one keyed repeat: host ids spell it c1:r:<key>:c0:, instance paths c1:p2:<row>c0:.
 const bound = {
@@ -43,4 +44,13 @@ test('only a row-local id takes the row; widget and page ids keep the row-free p
 	expect(marklessRowBoundGraphNodeId('shared:family/open', 'c1:p2:c0:', 'c1:p2:r:5:c0:')).toBe(
 		'c1:p2:c0:shared:family/open',
 	);
+});
+
+test('a forwarded record takes its row from the instance one edge above its host', () => {
+	const scope = marklessRecordRowScope('c1:r:light:c0:c0:h0', undefined, true);
+	expect(scope?.[0]?.withRows).toBe('c1:r:light:c0:');
+	expect(marklessRowBoundPath(bound, { marklessRowHostPath: scope?.[0]?.withRows })).toBe(
+		'c1:p2:r:light:c0:',
+	);
+	expect(marklessRecordRowScope('c1:r:light:c0:c0:h0')?.[0]?.withRows).toBe('c1:r:light:c0:c0:');
 });

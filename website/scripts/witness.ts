@@ -1690,54 +1690,46 @@ try {
 
 		// --- the footer doodles react to the pointer ----------------------------
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const doodles = page.locator('.pager-doodles .sprite');
+		const doodles = page.locator('.pager-doodles .pager-doodle');
 		await doodles.first().waitFor();
 		check(
-			(await doodles.count()) === 6,
-			'the pager carries its six doodles',
+			(await doodles.count()) === 8,
+			'the pager carries its eight ink doodles',
 			String(await doodles.count()),
 		);
-		const doodleImage = (index: number) => doodles.nth(index).locator('img.sprite-ink-light');
 		const doodleMotion = (index: number) =>
-			doodleImage(index).evaluate((node) => {
-				const style = getComputedStyle(node as Element);
-				return { transform: style.transform, animation: style.animationName };
-			});
-		const restingCrown = await doodleMotion(0);
+			doodles
+				.nth(index)
+				.locator('svg')
+				.evaluate((node) => {
+					const style = getComputedStyle(node as Element);
+					return { transform: style.transform, animation: style.animationName };
+				});
+		const restingFirst = await doodleMotion(0);
 		await doodles.first().hover();
 		await page.waitForTimeout(450);
-		const hoveredCrown = await doodleMotion(0);
+		const hoveredFirst = await doodleMotion(0);
 		check(
-			hoveredCrown.transform !== restingCrown.transform && hoveredCrown.transform !== 'none',
+			hoveredFirst.transform !== restingFirst.transform && hoveredFirst.transform !== 'none',
 			'the first pager doodle moves when it is pointed at',
-			`${restingCrown.transform} then ${hoveredCrown.transform}`,
+			`${restingFirst.transform} then ${hoveredFirst.transform}`,
 		);
-		// The sun is keyframed rather than swapped for another drawing: what proves
-		// the reaction is that an animation is running on the image the reader is
-		// looking at, not that its src changed. The flower turns on the row's own
-		// spring transition instead, so it is read as a transform.
-		for (const [index, name] of [[4, 'doodle-sun-turn']] as const) {
+		for (const index of [3, 4, 7]) {
 			await page.mouse.move(0, 0);
 			await page.waitForTimeout(80);
 			const resting = await doodleMotion(index);
-			check(
-				resting.animation === 'none',
-				`doodle ${index + 1} is still at rest`,
-				resting.animation,
-			);
+			check(resting.animation === 'none', `doodle ${index + 1} is still at rest`, resting.animation);
 			await doodles.nth(index).hover();
 			await page.waitForTimeout(60);
 			const hovered = await doodleMotion(index);
 			check(
-				hovered.animation === name,
-				`doodle ${index + 1} runs its ${name} reaction on hover`,
+				hovered.animation.startsWith('doodle-'),
+				`doodle ${index + 1} runs its reaction on hover`,
 				hovered.animation,
 			);
 		}
 		await page.mouse.move(0, 0);
 		await page.waitForTimeout(80);
-		// The strip on paper: the doodles are the low-contrast end of the palette,
-		// so both themes are shot for a look rather than only measured.
 		for (const theme of ['light', 'dark'] as const) {
 			await page.evaluate(
 				(wanted) => document.documentElement.setAttribute('data-theme', wanted),
@@ -1749,17 +1741,6 @@ try {
 				.screenshot({ path: `${shotsDir}/T034-pager-${theme}.png` });
 		}
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
-		await page.waitForTimeout(80);
-		const restingFlower = await doodleMotion(5);
-		await doodles.nth(5).hover();
-		await page.waitForTimeout(360);
-		const hoveredFlower = await doodleMotion(5);
-		check(
-			restingFlower.transform !== hoveredFlower.transform &&
-				hoveredFlower.transform !== 'none',
-			'the flower turns when it is pointed at',
-			`${restingFlower.transform} then ${hoveredFlower.transform}`,
-		);
 		await page.mouse.move(0, 0);
 
 		// --- batch 2: events, conditionals, lists ------------------------------
