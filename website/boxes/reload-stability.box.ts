@@ -4,7 +4,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, join } from 'node:path';
 import { box } from '@async/witness';
-import { chromium } from 'playwright-core';
+import { chromium, type Browser } from 'playwright-core';
 
 // The brand faces every page paints above the fold; Recursive (code) is left to load on use.
 const PRELOADED_FAMILIES = ['Joy Elia', 'Shantell Sans'];
@@ -96,9 +96,10 @@ export default box(
 		const server = await serveLikeWorkersAssets(out, cacheControl, (path, status) => {
 			if (/\.woff2?$/.test(path)) fetched.push(`${status} ${path}`);
 		});
-		// Headless Chromium hides scrollbars by default, which would hide the gutter this box checks.
-		const browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
+		let browser: Browser | undefined;
 		try {
+			// Headless Chromium hides scrollbars by default, which would hide the gutter this box checks.
+			browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
 			const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 			// A string, so the box's own transform adds no helpers the page does not have.
 			await page.addInitScript(RELOAD_TRACE);
@@ -126,7 +127,7 @@ export default box(
 				throw new Error(`The scrollbar gutter changed width across reload frames: ${trace.gutters.join(' -> ')} px`);
 			if (trace.shifts > 0) throw new Error(`The warm reload shifted layout after first paint (CLS ${trace.shifts.toFixed(4)}).`);
 		} finally {
-			await browser.close();
+			await browser?.close();
 			await new Promise((done) => server.close(done));
 		}
 		await receipt.capture('fonts are hashed, immutable and preloaded; a warm reload reads them from cache and shifts nothing');
