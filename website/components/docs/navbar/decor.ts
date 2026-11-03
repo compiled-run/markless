@@ -56,7 +56,7 @@ function wander(points: P[], seed: number, amount = 0.8, step = 14): P[] {
  * until the next call belongs to it, and each object's closed shapes are filled with paper, so it
  * hides what lies behind it before its own wash, hatching and ink go on.
  */
-class Sheet {
+export class Sheet {
 	#layers: { kind: LayerKind; d: string; motion?: Motion }[] = [];
 	#motion: Motion | undefined;
 	#parts: Record<Part, string> = { cast: '', paper: '', wash: '', hatch: '', ink: '' };

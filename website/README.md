@@ -123,7 +123,9 @@ screenshots into the markless repo's goal notes.
   `ui/<family>/` with `basic.tsrx` as the hero and one file per further example. In a section folder
   `counter.tsrx` is the teaching component shown verbatim on the page and `counter-demo.tsrx` wraps
   it in the playground frame, because a page places each component as its own top-level block. `callout.tsrx` and
-  `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`.
+  `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`. Both sit on the
+  `.ink-card` paper card that every MDX `>` blockquote also gets; its inked edge and the callout's
+  `info`, `warning` and `tip` marks are drawn in `components/docs/ink-card/card-ink.ts`.
 - `components/docs/sidebar.tsrx`, `document.tsrx`, `nav.ts` — the chrome. `nav.ts` is the single
   source for the page list: the sidebar loops it, and the pager and the witness read it. Adding a page means adding an entry there and nothing else. `document.tsrx` renders a plain
   `<html>` root.
@@ -151,7 +153,7 @@ screenshots into the markless repo's goal notes.
   `tooling/cut-sprites.ts` is what cut them and is not part of the build. Sprites are the flat
   crayon doodles and ship twice, once as drawn and once lifted to chalk for the dark ground.
   Stickers are die-cut, with their own white border and shadow, so they carry depth and one file
-  reads on both grounds; they are the larger accents — the landing hero, a callout corner, the
+  reads on both grounds; they are the larger accents — the landing hero and the
   footer strip — while sprites stay small and inline.
 - `components/mascot/mug-spot.tsrx`: the mug hiding on a few pages, peeking over the top edge of
   the code block, callout, figure or pager that follows it, with a face or pose that fits the text

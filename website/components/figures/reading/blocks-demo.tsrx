@@ -86,7 +86,7 @@ export default function BlocksDemo() @{
 		<style>
 			.blocks-demo {
 				container: blocks-demo / inline-size;
-				margin: var(--space-m) 0;
+				margin: var(--flow-block) 0;
 				--ring: oklch(55% 0.17 30);
 
 				html.dark & {
