@@ -53,8 +53,10 @@ test('typing dims the held results without swapping to @pending, then shows the 
 	expect(frames.some((frame) => frame.searching), '@pending replaced the results').toBe(false);
 	expect(frames.some((frame) => frame.list === null), 'a frame had no list').toBe(false);
 	expect(frames.some((frame) => frame.dimmed)).toBe(true);
-	expect(container.querySelector('ul')?.hasAttribute('aria-busy')).toBe(false);
-	expect(container.querySelector('ul')?.style.opacity).toBe('1');
+	// The answer's text and the busy flag clearing are separate updates; on a loaded runner the flag can land a frame later.
+	await expect
+		.poll(() => [container.querySelector('ul')?.hasAttribute('aria-busy'), container.querySelector('ul')?.style.opacity])
+		.toEqual([false, '1']);
 });
 
 test('Try again re-runs the search, holds the error busy, and shows the answer', async () => {
