@@ -12,11 +12,27 @@ const IMMUTABLE = /max-age=31536000\b.*\bimmutable/;
 // What Workers static assets answer for a file no _headers rule names.
 const WORKERS_DEFAULT_CACHE = 'public, max-age=0, must-revalidate';
 
+// Per frame after first paint: the width the scrollbar takes from the page, and every layout shift not caused by input.
+const RELOAD_TRACE = `{
+	const trace = { gutters: [], shifts: 0 };
+	window.reloadTrace = trace;
+	new PerformanceObserver((list) => {
+		for (const entry of list.getEntries()) if (!entry.hadRecentInput) trace.shifts += entry.value;
+	}).observe({ type: 'layout-shift', buffered: true });
+	const frame = () => {
+		const gutter = document.body ? Math.round(innerWidth - document.body.getBoundingClientRect().width) : 0;
+		const painted = document.body && performance.getEntriesByName('first-paint').length > 0;
+		if (painted && !trace.gutters.includes(gutter)) trace.gutters.push(gutter);
+		if (document.readyState !== 'complete' || performance.now() < 2000) requestAnimationFrame(frame);
+	};
+	requestAnimationFrame(frame);
+}`;
+
 type HeaderRule = { readonly pattern: RegExp; readonly cacheControl: string };
 
 export default box(
 	{
-		name: 'website fonts: hashed, immutable on Cloudflare, preloaded, and never refetched on reload',
+		name: 'website reload: fonts stay cached and preloaded, and nothing moves after first paint',
 		tags: ['website', 'build', 'browser'],
 		modes: ['build'],
 	},
@@ -80,9 +96,12 @@ export default box(
 		const server = await serveLikeWorkersAssets(out, cacheControl, (path, status) => {
 			if (/\.woff2?$/.test(path)) fetched.push(`${status} ${path}`);
 		});
-		const browser = await chromium.launch();
+		// Headless Chromium hides scrollbars by default, which would hide the gutter this box checks.
+		const browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
 		try {
-			const page = await browser.newPage();
+			const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+			// A string, so the box's own transform adds no helpers the page does not have.
+			await page.addInitScript(RELOAD_TRACE);
 			const cdp = await page.context().newCDPSession(page);
 			// Real round trips: a revalidation that costs nothing on localhost shows as a swap on a live connection.
 			await cdp.send('Network.emulateNetworkConditions', {
@@ -100,11 +119,17 @@ export default box(
 			await page.evaluate(() => document.fonts.ready);
 			if (fetched.length)
 				throw new Error(`A warm reload went to the network for fonts: ${fetched.join(', ')}`);
+			await page.waitForFunction(() => performance.now() > 2000);
+			const trace = (await page.evaluate('window.reloadTrace')) as { gutters: number[]; shifts: number };
+			// The parser paints the top of a long page before the rest arrives, so the scrollbar must not move the layout when it does.
+			if (trace.gutters.length !== 1)
+				throw new Error(`The scrollbar gutter changed width across reload frames: ${trace.gutters.join(' -> ')} px`);
+			if (trace.shifts > 0) throw new Error(`The warm reload shifted layout after first paint (CLS ${trace.shifts.toFixed(4)}).`);
 		} finally {
 			await browser.close();
 			await new Promise((done) => server.close(done));
 		}
-		await receipt.capture('fonts are hashed, immutable, preloaded, and a warm reload reads them from cache');
+		await receipt.capture('fonts are hashed, immutable and preloaded; a warm reload reads them from cache and shifts nothing');
 	},
 );
 
@@ -135,7 +160,7 @@ const TYPES: Record<string, string> = {
 	'.webp': 'image/webp',
 };
 
-// Workers static assets: the _headers cache rules, an ETag, and a 304 for a matching If-None-Match.
+// Workers static assets: the _headers cache rules, and a 304 for an asset's matching If-None-Match.
 async function serveLikeWorkersAssets(
 	dir: string,
 	cacheControl: (path: string) => string,
@@ -152,14 +177,22 @@ async function serveLikeWorkersAssets(
 		}
 		const body = readFileSync(file);
 		const etag = `"${createHash('md5').update(body).digest('hex')}"`;
+		const html = extname(file) === '.html';
+		// Live markless.dev sends prerendered pages without an ETag, so every reload downloads the page again.
 		const headers = {
 			'content-type': TYPES[extname(file)] ?? 'application/octet-stream',
 			'cache-control': cacheControl(path),
-			etag,
+			...(html ? {} : { etag }),
 		};
-		const status = req.headers['if-none-match'] === etag ? 304 : 200;
+		const status = !html && req.headers['if-none-match'] === etag ? 304 : 200;
 		served(path, status);
-		res.writeHead(status, headers).end(status === 304 ? undefined : body);
+		res.writeHead(status, headers);
+		if (status === 304) return void res.end();
+		// A page arrives in pieces on a real connection: hold the rest back once the first screen is sent, so the parser paints a partial page.
+		const firstScreen = html ? body.indexOf('</p>', body.indexOf('<main')) : -1;
+		if (firstScreen < 0) return void res.end(body);
+		res.write(body.subarray(0, firstScreen));
+		setTimeout(() => res.end(body.subarray(firstScreen)), 400);
 	});
 	await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
 	return server;

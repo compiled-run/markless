@@ -767,8 +767,10 @@ body {
 	overscroll-behavior: none;
 }
 
+/* The browser paints the top of a long page before the rest arrives; a reserved gutter keeps the late scrollbar from moving the layout. */
 html {
 	background: var(--paper);
+	scrollbar-gutter: stable;
 }
 
 /* ---------------------------------------------------------------------------
