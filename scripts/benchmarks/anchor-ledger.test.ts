@@ -414,10 +414,24 @@ describe('perf-guard accept replaces its own earlier entries', () => {
 		};
 		expect(covers('lean', '/')(exemption)).toBe(true);
 		expect(covers('lean', '/records')(exemption)).toBe(false);
+	});
+
+	test('a load accept on one platform keeps the other platform entries', () => {
+		const mac = {
+			surface: 'perf-guards',
+			path: ['loadWeight', 'darwin-arm64', 'bench /', 'jsGzipBytes'],
+			delta: 18,
+			reason: 'x',
+		};
+		expect(covers('load', 'bench /', 'linux-x64')(mac)).toBe(false);
+		expect(covers('load', '*', 'linux-x64')(mac)).toBe(false);
+		expect(covers('all', '*', 'linux-x64')(mac)).toBe(false);
+		expect(covers('load', 'bench /', 'darwin-arm64')(mac)).toBe(true);
 		expect(
 			covers(
 				'load',
 				'bench /',
+				'linux-x64',
 			)({
 				surface: 'perf-guards',
 				path: ['loadWeight', 'linux-x64', 'bench /', 'jsGzipBytes'],

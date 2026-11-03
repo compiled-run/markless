@@ -178,10 +178,11 @@ export function accept(
 }
 
 /** Which of this branch's earlier entries an accept of `guard subject` replaces. */
-export function covers(guard, subject) {
+export function covers(guard, subject, platform = LOAD_PLATFORM) {
 	return (entry) => {
 		const label = labelOf(entry);
 		if (guard !== 'all' && label.guard !== guard) return false;
+		if (entry.path[0] === 'loadWeight' && entry.path[1] !== platform) return false;
 		if (subject === '*' || guard === 'all') return true;
 		if (entry.path[0] === 'allowFullResume')
 			return (entry.append ?? []).some((exemption) => exemption.route === subject);
@@ -279,7 +280,7 @@ async function main(argv) {
 						throw error;
 					}
 				},
-				covers: covers(guard, subject),
+				covers: covers(guard, subject, platform),
 			},
 			{ reason },
 		);
