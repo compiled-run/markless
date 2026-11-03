@@ -283,3 +283,90 @@ test('an @if holding a @try block escalates and says the @try block renders in t
 		symbols.find((symbol) => symbol.manifest.kind === 'branch-update')?.branchSiteId,
 	).toBe(candidates[0]?.branchSiteId);
 });
+
+const CHECKED_ROWS_IN_IF = `
+import { state } from '@markless/core';
+
+const THEMES = [{ id: 'dusk', title: 'Dusk' }, { id: 'noon', title: 'Noon' }];
+
+export function ThemeMenu() @{
+	let open = state(true);
+	let theme = state('noon');
+
+	<nav>
+		<button type="button" onClick={() => open = !open}>Themes</button>
+		@if (open) {
+			<menu>
+				@for (const entry of THEMES; key entry.id) {
+					<li aria-current={theme === entry.id ? 'true' : undefined} onClick={() => theme = entry.id}>{entry.title}</li>
+				}
+			</menu>
+		}
+	</nav>
+}
+`;
+
+const NESTED_IF_IN_IF = `
+import { computed, state } from '@markless/core';
+
+export function Filters() @{
+	let visible = state(true);
+	let picks = state([]);
+	const count = computed(() => picks.length);
+
+	<aside>
+		<button type="button" onClick={() => visible = !visible}>Filter</button>
+		@if (visible) {
+			<fieldset>
+				<label onClick={() => picks = ['open']}>Open</label>
+				@if (count > 0) {
+					<button type="button" onClick={() => picks = []}>Reset</button>
+				}
+			</fieldset>
+		}
+	</aside>
+}
+`;
+
+for (const [shape, source, filename, test_, runs, refusal] of [
+	[
+		'rows whose attribute reads state from outside the row',
+		CHECKED_ROWS_IN_IF,
+		'src/ThemeMenu.tsrx',
+		'open',
+		'the @for block it holds',
+		'a repeated row inside it holds an attribute binding',
+	],
+	[
+		'a nested @if',
+		NESTED_IF_IN_IF,
+		'src/Filters.tsrx',
+		'visible',
+		'the @if it holds',
+		'it holds a branch binding',
+	],
+] as const)
+	test(`an @if holding ${shape} escalates and names what the browser runs`, async () => {
+		const compiled = await compilePage(source, filename);
+		const candidates = compiled.symbolModules.armEscalationCandidates ?? [];
+		expect(candidates).toHaveLength(1);
+		const warning = compiled.symbolModules.diagnostics.find(
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+		);
+		expect(warning).toMatchObject({ severity: 'warning' });
+		expect(warning?.message).toBe(
+			`when ${test_} changes, the browser renders this @if's content by running ${runs}, instead of rebuilding it from compiled markup. Each time the content appears, ${runs} starts fresh: anything it kept from the last time it was shown is gone.`,
+		);
+		expect(
+			compiled.symbolModules.diagnostics.find(
+				(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+			)?.message,
+		).toBe(`this @if (${test_}) cannot be rebuilt when ${test_} changes because ${refusal}.`);
+		const symbols = linkedRenderDataBoundarySymbols({
+			...linkInput(compiled),
+			branchExportName: (index: number) => `branchUpdate${String(index)}`,
+		} as never);
+		expect(
+			symbols.find((symbol) => symbol.manifest.kind === 'branch-update')?.branchSiteId,
+		).toBe(candidates[0]?.branchSiteId);
+	});
