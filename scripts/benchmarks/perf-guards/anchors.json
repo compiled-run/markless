@@ -3604,6 +3604,90 @@
 				"jsGzipBytes": 408677
 			},
 			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds (+160 B gzip downloaded by the docs pages that use shared(), measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11480,
+				"jsGzipBytes": 88941
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41567339239 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11389,
+				"jsGzipBytes": 88941
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41567339239 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11446,
+				"jsGzipBytes": 88941
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41567339239 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
+			},
+			"to": {
+				"executedChars": 109989,
+				"jsGzipBytes": 1575309
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41567339239 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682502
+			},
+			"to": {
+				"executedChars": 119936,
+				"jsGzipBytes": 1686318
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41567339239 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
+			},
+			"to": {
+				"executedChars": 22864,
+				"jsGzipBytes": 408679
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41567339239 (linux)"
 		}
 	],
 	"runtimeModules": {
@@ -3797,28 +3881,28 @@
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11362,
-				"jsGzipBytes": 88506
+				"executedChars": 11480,
+				"jsGzipBytes": 88941
 			},
 			"bench /records": {
-				"executedChars": 11271,
-				"jsGzipBytes": 88506
+				"executedChars": 11389,
+				"jsGzipBytes": 88941
 			},
 			"bench /settings": {
-				"executedChars": 11328,
-				"jsGzipBytes": 88506
+				"executedChars": 11446,
+				"jsGzipBytes": 88941
 			},
 			"docs /": {
-				"executedChars": 109124,
-				"jsGzipBytes": 1571443
+				"executedChars": 109989,
+				"jsGzipBytes": 1575309
 			},
 			"docs /concepts/state": {
-				"executedChars": 121827,
-				"jsGzipBytes": 1682502
+				"executedChars": 119936,
+				"jsGzipBytes": 1686318
 			},
 			"docs /ui/accordion": {
-				"executedChars": 22657,
-				"jsGzipBytes": 406069
+				"executedChars": 22864,
+				"jsGzipBytes": 408679
 			}
 		}
 	}
