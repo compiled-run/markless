@@ -250,7 +250,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				await prepareClientBuild();
 				const client = builder.environments[viteEnvironmentName('client', options)];
 				if (!client) throw new Error('The reloaded config has no client environment.');
-				await builder.build(client);
+				try {
+					await builder.build(client);
+				} catch (error) {
+					await flushCompileCache().catch(() => {});
+					throw error;
+				}
 				await flushCompileCache();
 				writeFileSync(handoffFile, JSON.stringify(basePlugin.api.clientBuildHandoff()));
 			},
@@ -303,6 +308,12 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				prerenderEntry = ssrTsrxInput(config, options);
 				rolldownOptions.prerender = prerender && prerenderEntry !== null;
 			}
+		},
+		async buildEnd(error) {
+			const hook = basePlugin.buildEnd;
+			await (typeof hook === 'function' ? hook : hook?.handler)?.call(this, error);
+			// A build Vite runs without `buildApp`, such as `build()`, never flushes the store, so it settles here.
+			await compileCache?.settle();
 		},
 		configResolved(resolvedConfig) {
 			if (options.experimentalNativePacking !== undefined)
@@ -383,17 +394,23 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			order: 'pre',
 			async handler(builder) {
 				const clientEnvironment = viteEnvironmentName('client', options);
-				const childRequest = clientBuildRequest(builder, clientEnvironment);
-				const handoff = childRequest && (await buildClientInChildProcess(childRequest));
-				if (childRequest && !handoff)
-					builder.config.logger.warn(
-						'markless: the client builds in this process, because a child process resolved this config differently.',
-					);
-				if (handoff) {
-					basePlugin.api.adoptClientBuildHandoff(handoff);
-					builder.environments[clientEnvironment]!.isBuilt = true;
-				} else await prepareClientBuild();
-				await buildMarklessEnvironments(builder, options);
+				try {
+					const childRequest = clientBuildRequest(builder, clientEnvironment);
+					const handoff = childRequest && (await buildClientInChildProcess(childRequest));
+					if (childRequest && !handoff)
+						builder.config.logger.warn(
+							'markless: the client builds in this process, because a child process resolved this config differently.',
+						);
+					if (handoff) {
+						basePlugin.api.adoptClientBuildHandoff(handoff);
+						builder.environments[clientEnvironment]!.isBuilt = true;
+					} else await prepareClientBuild();
+					await buildMarklessEnvironments(builder, options);
+				} catch (error) {
+					// A failed build still has compile results landing in the store; resolving first races whoever removes it.
+					await flushCompileCache().catch(() => {});
+					throw error;
+				}
 				await flushCompileCache();
 				if (prerender && prerenderEntry) {
 					const source = resolve(resolvedRoot, prerenderEntry);
@@ -482,7 +499,11 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 		},
 		transform: {
 			async handler(code, id, transformOptions) {
-				if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id) && !STRING_EXPORT_QUERY.test(id)) {
+				if (
+					rolldownOptions.dev === true &&
+					TSRX_INPUT_FILE.test(id) &&
+					!STRING_EXPORT_QUERY.test(id)
+				) {
 					transformedTsrxSources.set(parsePath(id).pathname, code);
 				}
 				try {
@@ -820,4 +841,3 @@ function getBuildEnvironment(context: unknown): MarklessEnvironment {
 }
 
 export type MarklessVitePlugin = ReturnType<typeof markless>[number];
-
