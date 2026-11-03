@@ -3468,10 +3468,10 @@
 				"jsGzipBytes": 1571443
 			},
 			"to": {
-				"executedChars": 110565,
-				"jsGzipBytes": 1596924
+				"executedChars": 110572,
+				"jsGzipBytes": 1596984
 			},
-			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41561942387 (PR #410 on main with #432, linux-x64)"
+			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41568664269 (PR #410 head 6d44ab6e9 on main with #432, linux-x64)"
 		},
 		{
 			"date": "2026-11-02",
@@ -3482,10 +3482,10 @@
 				"jsGzipBytes": 406069
 			},
 			"to": {
-				"executedChars": 23307,
-				"jsGzipBytes": 420276
+				"executedChars": 23306,
+				"jsGzipBytes": 420336
 			},
-			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41561942387 (PR #410 on main with #432, linux-x64)"
+			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41568664269 (PR #410 head 6d44ab6e9 on main with #432, linux-x64)"
 		}
 	],
 	"runtimeModules": {
@@ -3688,16 +3688,16 @@
 				"jsGzipBytes": 88506
 			},
 			"docs /": {
-				"executedChars": 110565,
-				"jsGzipBytes": 1596924
+				"executedChars": 110572,
+				"jsGzipBytes": 1596984
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
 				"jsGzipBytes": 1682502
 			},
 			"docs /ui/accordion": {
-				"executedChars": 23307,
-				"jsGzipBytes": 420276
+				"executedChars": 23306,
+				"jsGzipBytes": 420336
 			}
 		}
 	}
