@@ -17,6 +17,11 @@ export type ResumePayloadGraphInput = {
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 };
 
+// Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
+type SharedInstancesHost = {
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-instances.ts')>;
+};
+
 let runtimeModulePromise: Promise<RuntimeModule> | undefined;
 let valueDecoderPromise:
 	| Promise<typeof import('../../serializer/src/value-decode-client.ts')>
@@ -38,9 +43,16 @@ export async function createRuntimeGraphFromResumePayload(
 	const { createRuntimeGraph } = await runtimeModule();
 	let graph!: RuntimeGraph;
 	const asyncComputed = await asyncComputedFromPayload(input, () => graph);
-	const cells = await decodeResumeCells(input.state, input.root.__marklessEventOnlyGraph);
+	const cells = [
+		...(await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph)),
+		...(await decodeServedComputedValues(input.state, input.root.__marklessEventOnlyGraph)),
+	];
 	const shared = hasLiveSharedDefinitions(input.state)
-		? (await import('./fns/shared-instances.ts')).bindSharedCells(input.root, input.state, cells)
+		? (await (globalThis as SharedInstancesHost).__marklessSharedInstances?.())?.bindSharedCells(
+				input.root,
+				input.state,
+				cells,
+			)
 		: undefined;
 	graph = createRuntimeGraph({
 		cells: shared?.cells ?? cells,
@@ -56,17 +68,7 @@ export async function createRuntimeGraphFromResumePayload(
 	return graph;
 }
 
-export async function decodeResumeCells(
-	state: ProtocolStatePayload,
-	eventOnlyValues?: ReadonlyMap<string, unknown>,
-) {
-	return [
-		...(await decodeStateCells(state, eventOnlyValues)),
-		...(await decodeServedComputedValues(state, eventOnlyValues)),
-	];
-}
-
-async function decodeStateCells(
+export async function decodeStateCells(
 	payload: ProtocolStatePayload,
 	eventOnlyValues?: ReadonlyMap<string, unknown>,
 ) {
@@ -98,7 +100,7 @@ async function decodeStateCells(
 
 // A sync computed has no compute node here — `readGraph` answers it from the cells
 // map — so a served value belongs there for a handler's first read to see it.
-async function decodeServedComputedValues(
+export async function decodeServedComputedValues(
 	payload: ProtocolStatePayload,
 	eventOnlyValues?: ReadonlyMap<string, unknown>,
 ) {
@@ -194,7 +196,7 @@ async function deserializeAsyncComputedSnapshot(
 	return decoded as RuntimeGraphAsyncSnapshot;
 }
 
-function runtimeModule(): Promise<RuntimeModule> {
+export function runtimeModule(): Promise<RuntimeModule> {
 	runtimeModulePromise ??= import('@markless/runtime');
 	return runtimeModulePromise;
 }

@@ -18,6 +18,8 @@ export type ProtocolSharedInstance = {
 export type ProtocolSharedInstances = {
 	readonly version: typeof PROTOCOL_SHARED_INSTANCES_VERSION;
 	readonly instances: Record<string, ProtocolSharedInstance>;
+	// Server-rendered containers whose runtime has not started; a write wakes the ones that resolve its definition.
+	dormant?: object[];
 };
 
 // Widget instances are per rendered widget; every other scope outlives the page.

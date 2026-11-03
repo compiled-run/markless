@@ -887,14 +887,25 @@ How the browser keeps one instance per document:
   on its first read, which the runtime makes at start; that write brings every
   binding, derived value and arm to the live value, exactly as a write would. A
   container that has not woken yet is woken by the first write it has to show:
-  a server-rendered page that declares a `page` or `request` definition carries
-  a few bytes in its startup script that listen on the record, and a
-  client-rendered mount listens the same way until its runtime starts.
-- **The router binds before the swap.** When the document holds instances and
-  the next page's state declares shared definitions, the router asks the next
-  page's resume module (`prepareSharedSwap`) to update that page's direct and
-  sync-derived positions while it is still off screen, and starts the page's
-  runtime as soon as the swap lands when anything else reads a changed cell.
+  a server-rendered page that declares a `page` or `request` definition adds
+  its container to the record's dormant list from its startup script (one
+  push; no listener runs), and a write wakes each listed container whose state
+  resolves that definition. A client-rendered mount listens on the instance
+  until its runtime starts.
+- **The router binds before the swap.** When a runtime has bound an instance
+  on the document (or on the container), the router hands the next page to
+  `bindSharedSwap` from `@markless/web/shared-swap`, which loads that page's
+  route module through its resume module, updates its direct and sync-derived
+  positions while it is still off screen, and starts the page's runtime as soon
+  as the swap lands when anything else reads a changed cell. A document whose
+  instances hold no values yet swaps in the same task, as before.
+- **Only apps that declare one pay for it.** The binding module's `import()`
+  is written only by a compiled module whose state declares a non-widget
+  `shared()` definition (it installs `__marklessSharedInstances`, the way
+  elevation installs its loader), and the compiler demands it only for such a
+  module, so other apps neither emit, download nor run it. The swap binder is
+  never preloaded: the router starts loading it with the next page's fetch,
+  and only once a runtime has bound an instance.
 
 Named here rather than implied by the lowering:
 

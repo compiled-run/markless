@@ -1,18 +1,72 @@
 // Binds the next page of an in-place navigation, still off screen, to the document's live shared() instances.
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
-import { createRuntimeGraph, type DomJournalResult } from '@markless/runtime';
+import type { DomJournalResult } from '@markless/runtime';
 import { decodePayloadScriptsWithVersion } from '../../serializer/src/protocol-client.ts';
 import { applyDirectJournalEntries } from './dom-journal-direct.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import { bindDefinitions, cloneValue, sameValue } from './fns/shared-instances.ts';
 import { readPayloadScriptsFromDocument } from './payload-document-common.ts';
-import { decodeResumeCells } from './payload-graph-construct.ts';
+import {
+	decodeServedComputedValues,
+	decodeStateCells,
+	runtimeModule,
+} from './payload-graph-construct.ts';
 import { materializeDomLocators } from './resume-locators.ts';
 import { wireSyncComputedDemandRecordsWithoutLoadingCapability } from './resume-sync-demand.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume-types.ts';
-import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
+import {
+	hasLiveSharedDefinitions,
+	PROTOCOL_SHARED_INSTANCES_PROPERTY,
+	type ProtocolSharedInstances,
+} from '../../serializer/src/protocol-shared-instances.ts';
 
-export { wakeSharedContainer } from './fns/shared-instances.ts';
+import { wakeSharedContainer } from './fns/shared-instances.ts';
+
+export { wakeSharedContainer };
+
+type ResumeEntry = {
+	readonly routeModule?: (root: object) => Promise<unknown> | undefined;
+	resumeContainerEvent(input: { readonly root: object; readonly event: 0 }): unknown;
+};
+
+/**
+ * The router's half of an in-place navigation: binds `incoming` (the next page's region, off screen)
+ * to the document's live instances; the returned wake starts the page's runtime once it is shown.
+ */
+export async function bindSharedSwap(input: {
+	readonly document: Document;
+	readonly outgoing: Element;
+	readonly incoming: Element;
+	readonly containerAttribute: string;
+	readonly resumeAttribute: string;
+}): Promise<(() => void) | undefined> {
+	const selector = `[${input.containerAttribute}]`;
+	const containerOf = (region: Element) =>
+		region.hasAttribute(input.containerAttribute) ? region : region.querySelector(selector);
+	const container = containerOf(input.outgoing) ?? undefined;
+	const root = containerOf(input.incoming) ?? input.incoming;
+	const url = input.incoming
+		.querySelector(`[${input.resumeAttribute}]`)
+		?.getAttribute(input.resumeAttribute);
+	// Only an instance a runtime has bound holds values; a page that only listens has none to give.
+	const bound = (place: object | undefined) =>
+		Object.values(
+			(place as Record<string, ProtocolSharedInstances | undefined> | undefined)?.[
+				PROTOCOL_SHARED_INSTANCES_PROPERTY
+			]?.instances ?? {},
+		).some((instance) => instance.shape);
+	if (!url || !(bound(input.document) || bound(container))) return undefined;
+	const entry = (await import(/* @vite-ignore */ url)) as ResumeEntry;
+	const prepared = await prepareSharedSwap({
+		root,
+		document: input.document,
+		container,
+		route: await entry.routeModule?.(root),
+	});
+	return prepared?.wake && container
+		? () => container.isConnected && wakeSharedContainer(container, entry)
+		: undefined;
+}
 
 /**
  * Before an in-place navigation shows `root` (the next page, still off screen), writes every
@@ -22,8 +76,14 @@ export async function prepareSharedSwap(input: {
 	readonly root: object;
 	readonly document: object;
 	readonly container?: object;
-	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
+	// The page's route resume module: its loader is on the namespace, or on an MDX page's default export.
+	readonly route: unknown;
 }): Promise<{ readonly wake: boolean } | undefined> {
+	const route = input.route as
+		| { readonly loadSymbol?: unknown; readonly default?: { readonly loadSymbol?: unknown } }
+		| undefined;
+	const load = route?.loadSymbol ?? route?.default?.loadSymbol;
+	if (typeof load !== 'function') return { wake: true };
 	const root = input.root as ResumeDomElement;
 	let decoded: ReturnType<typeof decodePayloadScriptsWithVersion>;
 	try {
@@ -37,7 +97,8 @@ export async function prepareSharedSwap(input: {
 	}
 	const { state, view } = decoded;
 	if (!hasLiveSharedDefinitions(state)) return undefined;
-	const cells = await decodeResumeCells(state);
+	const { createRuntimeGraph } = await runtimeModule();
+	const cells = [...(await decodeStateCells(state)), ...(await decodeServedComputedValues(state))];
 	const places = { document: input.document, container: input.container };
 	const { bound, differing } = bindDefinitions(places, state, cells, input.container ?? root, false);
 	if (differing.size === 0) return undefined;
@@ -46,7 +107,7 @@ export async function prepareSharedSwap(input: {
 		for (const id of binding.cellIds)
 			if (differing.has(id)) values.set(id, cloneValue(binding.instance.cells[id]));
 	const wake = readOutsideValueSlots(state, view, differing);
-	const loadSymbol = marklessInstanceScopedLoadSymbol(input.loadSymbol);
+	const loadSymbol = marklessInstanceScopedLoadSymbol(load as ResumeRuntimeInput['loadSymbol']);
 	let elements: Map<string, ResumeDomElement>;
 	try {
 		elements = materializeDomLocators(root, view.locators);

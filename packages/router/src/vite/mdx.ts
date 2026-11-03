@@ -19,6 +19,7 @@ import { protocolIslandSegment } from '../../../serializer/src/protocol-constant
 import {
 	emitQueuedResumeContainerEvent,
 	emitRosterResumeLoaderInstall,
+	emitSharedInstancesLoaderInstall,
 } from '../../../bundler/src/source-module.ts';
 import { scalarPlanSourceReference } from '../../../bundler/src/scalar-plan-source.ts';
 import { servedRenderDataSourceReference } from '../../../bundler/src/served-render-data.ts';
@@ -125,6 +126,7 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts, resume)};`,
 		renderOverlayLoader(),
 		emitRosterResumeLoaderInstall(),
+		emitSharedInstancesLoaderInstall(),
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
@@ -155,6 +157,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		'',
 		renderOverlayLoader(),
 		emitRosterResumeLoaderInstall(),
+		emitSharedInstancesLoaderInstall(),
 		'',
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',

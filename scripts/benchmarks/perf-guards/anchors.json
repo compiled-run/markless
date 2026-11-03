@@ -33,7 +33,9 @@
 		}
 	},
 	"lean": {
-		"/": ["click@counter-increment"],
+		"/": [
+			"click@counter-increment"
+		],
 		"/records": [],
 		"/settings": []
 	},
@@ -165,7 +167,9 @@
 			"guard": "lean",
 			"subject": "/",
 			"from": null,
-			"to": ["click@counter-increment"],
+			"to": [
+				"click@counter-increment"
+			],
 			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
 		},
 		{
@@ -3420,45 +3424,138 @@
 				"jsGzipBytes": 1571252
 			},
 			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "*",
+			"from": null,
+			"to": "54 runtime modules re-anchored: router/route-dom, router/route-manifest, router/route-renderer, router/vite/entries/fragment-entry, router/vite/entries/resume-entry, router/vite/runtime/create-route-discovery, runtime/graph-computed, runtime/graph-reconcile, runtime/graph-scheduler, serializer/payload-scripts, serializer/protocol, serializer/protocol-client, serializer/protocol-event-names, serializer/protocol-record-keys, serializer/protocol-shared-instances, serializer/protocol-templated-lists, web/dom-journal, web/dom-journal-direct, web/fns/bound-symbol, web/fns/closure-action, web/fns/composition, web/fns/container-region, web/fns/instance-scope, web/fns/roster-resume, web/fns/row-locals, web/fns/row-slot-mint, web/fns/scalar-served, web/fns/shared-instances, web/fns/ssr, web/fns/visible-trigger, web/fns/write-scalar, web/inline/sync-policy-core, web/payload-document-common, web/payload-graph-construct, web/payload-resume, web/pending-timing, web/prerender/evaluator, web/render, web/render-csr, web/resume, web/resume-anchor-census, web/resume-arm-records, web/resume-behaviors, web/resume-branches, web/resume-census, web/resume-commit-arm, web/resume-events, web/resume-locators, web/resume-runtime, web/resume-sync-computed, web/shared-swap, web/ssr-data/branch-arm-idrefs, web/ssr-data/renderer, web/storage-plane",
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10999,
+				"jsGzipBytes": 88931
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+425 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11015,
+				"jsGzipBytes": 88931
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+425 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11072,
+				"jsGzipBytes": 88931
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+425 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 108937,
+				"jsGzipBytes": 1568228
+			},
+			"to": {
+				"executedChars": 109811,
+				"jsGzipBytes": 1574959
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 119276,
+				"jsGzipBytes": 1679186
+			},
+			"to": {
+				"executedChars": 119766,
+				"jsGzipBytes": 1685970
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 22495,
+				"jsGzipBytes": 404051
+			},
+			"to": {
+				"executedChars": 22685,
+				"jsGzipBytes": 408347
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, and bind when the runtime starts (measured on this Mac)"
 		}
 	],
 	"runtimeModules": {
 		"core/web/resume-storage-free": 219,
 		"router/link-attributes": 380,
 		"router/navigation-hold": 508,
-		"router/route-dom": 2193,
-		"router/route-manifest": 7039,
-		"router/route-renderer": 1735,
+		"router/route-dom": 2254,
+		"router/route-manifest": 6924,
+		"router/route-renderer": 1741,
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2816,
-		"router/vite/entries/fragment-entry": 32404,
-		"router/vite/entries/resume-entry": 2309,
+		"router/vite/entries/fragment-entry": 33125,
+		"router/vite/entries/resume-entry": 2423,
 		"router/vite/entries/resume-modules": 920,
-		"router/vite/runtime/create-route-discovery": 527,
+		"router/vite/runtime/create-route-discovery": 605,
 		"runtime/graph": 10737,
 		"runtime/graph-async": 4122,
 		"runtime/graph-collections": 4282,
-		"runtime/graph-computed": 2313,
+		"runtime/graph-computed": 2236,
 		"runtime/graph-core": 2231,
-		"runtime/graph-reconcile": 8625,
-		"runtime/graph-scheduler": 579,
+		"runtime/graph-reconcile": 8577,
+		"runtime/graph-scheduler": 311,
 		"runtime/graph-shared": 3658,
 		"runtime/index": 152,
 		"serializer/async-boundary-arm": 303,
-		"serializer/payload-scripts": 611,
-		"serializer/protocol": 570,
-		"serializer/protocol-client": 6652,
+		"serializer/payload-scripts": 730,
+		"serializer/protocol": 691,
+		"serializer/protocol-client": 6722,
 		"serializer/protocol-constants": 1171,
-		"serializer/protocol-event-names": 264,
+		"serializer/protocol-event-names": 327,
 		"serializer/protocol-locator-paths": 292,
 		"serializer/protocol-locator-paths-format": 352,
 		"serializer/protocol-page-markers": 564,
 		"serializer/protocol-prop-prefix": 270,
-		"serializer/protocol-record-keys": 1134,
+		"serializer/protocol-record-keys": 1157,
 		"serializer/protocol-record-templates": 1787,
+		"serializer/protocol-shared-instances": 442,
 		"serializer/protocol-shared-records-decode": 2061,
-		"serializer/protocol-templated-lists": 437,
+		"serializer/protocol-templated-lists": 521,
 		"serializer/storage-slot": 780,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,
@@ -3467,82 +3564,84 @@
 		"web/coded-error": 368,
 		"web/control-edit-hold": 1651,
 		"web/dom-attribute": 874,
-		"web/dom-journal": 7373,
-		"web/dom-journal-direct": 1223,
+		"web/dom-journal": 7478,
+		"web/dom-journal-direct": 1138,
 		"web/event-current-target": 477,
-		"web/fns/bound-symbol": 1497,
-		"web/fns/closure-action": 7539,
-		"web/fns/composition": 19974,
-		"web/fns/container-region": 279,
+		"web/fns/bound-symbol": 1340,
+		"web/fns/closure-action": 7579,
+		"web/fns/composition": 19958,
+		"web/fns/container-region": 246,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 20104,
+		"web/fns/instance-scope": 20168,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
-		"web/fns/roster-resume": 5123,
-		"web/fns/row-locals": 942,
+		"web/fns/roster-resume": 5251,
+		"web/fns/row-locals": 1018,
 		"web/fns/row-mint": 7992,
-		"web/fns/row-slot-mint": 2633,
-		"web/fns/scalar-served": 3982,
+		"web/fns/row-slot-mint": 2662,
+		"web/fns/scalar-served": 4091,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 3988,
-		"web/fns/ssr": 30833,
+		"web/fns/shared-instances": 4598,
+		"web/fns/ssr": 30793,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
-		"web/fns/visible-trigger": 791,
-		"web/fns/write-scalar": 983,
+		"web/fns/visible-trigger": 857,
+		"web/fns/write-scalar": 1004,
 		"web/inline/resume-errors": 1437,
-		"web/inline/sync-policy-core": 1255,
+		"web/inline/sync-policy-core": 1338,
 		"web/inline/sync-policy-core-lazy": 234,
 		"web/markup-nodes": 472,
-		"web/payload-document-common": 2608,
+		"web/payload-document-common": 2532,
 		"web/payload-full-storage-free": 773,
-		"web/payload-graph-construct": 4384,
-		"web/payload-resume": 5411,
+		"web/payload-graph-construct": 4706,
+		"web/payload-resume": 5490,
 		"web/payload-resume-lazy": 203,
 		"web/payload-resume-registry": 1916,
-		"web/pending-timing": 521,
-		"web/prerender/evaluator": 22981,
+		"web/pending-timing": 599,
+		"web/prerender/evaluator": 22965,
 		"web/prerender/owning-surface": 1212,
 		"web/prerender/shared-seed-slot": 2836,
 		"web/prerender/staged-graph": 411,
 		"web/reconcile-plane-slot": 344,
-		"web/render": 4003,
+		"web/render": 3867,
 		"web/render-canonical": 2642,
-		"web/render-csr": 17457,
+		"web/render-csr": 17701,
 		"web/render-route-holder": 1005,
 		"web/repeat-runtime": 2594,
-		"web/resume": 3419,
-		"web/resume-anchor-census": 1608,
+		"web/resume": 3195,
+		"web/resume-anchor-census": 1650,
 		"web/resume-arm-keyed-repeats": 1225,
-		"web/resume-arm-records": 7741,
+		"web/resume-arm-records": 7528,
 		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 10693,
-		"web/resume-behaviors": 8804,
-		"web/resume-branches": 15037,
-		"web/resume-census": 1471,
-		"web/resume-commit-arm": 12013,
-		"web/resume-events": 17992,
+		"web/resume-behaviors": 8577,
+		"web/resume-branches": 14875,
+		"web/resume-census": 1454,
+		"web/resume-commit-arm": 12019,
+		"web/resume-events": 18033,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 18824,
 		"web/resume-keyed-repeats-lazy": 227,
-		"web/resume-locators": 5644,
+		"web/resume-locators": 5695,
 		"web/resume-refresh-busy": 987,
 		"web/resume-repeat-branch-arm": 1785,
 		"web/resume-resettle-hold": 2929,
-		"web/resume-runtime": 15275,
+		"web/resume-runtime": 15373,
 		"web/resume-runtime-shared": 2089,
 		"web/resume-runtime-start": 8979,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2414,
-		"web/resume-sync-computed": 7870,
+		"web/resume-sync-computed": 7940,
 		"web/resume-sync-demand": 1530,
 		"web/runtime-error-reporting": 1876,
+		"web/shared-swap": 5124,
 		"web/ssr-data/awaitable": 856,
-		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20878,
-		"web/storage-plane": 1810
+		"web/ssr-data/branch-arm-idrefs": 1859,
+		"web/ssr-data/renderer": 20955,
+		"web/storage-plane": 1932
 	},
 	"constructGlue": {
 		"event handler": 3184,
@@ -3584,28 +3683,28 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10989,
-				"jsGzipBytes": 88506
+				"executedChars": 10999,
+				"jsGzipBytes": 88931
 			},
 			"bench /records": {
-				"executedChars": 10898,
-				"jsGzipBytes": 88506
+				"executedChars": 11015,
+				"jsGzipBytes": 88931
 			},
 			"bench /settings": {
-				"executedChars": 10955,
-				"jsGzipBytes": 88506
+				"executedChars": 11072,
+				"jsGzipBytes": 88931
 			},
 			"docs /": {
-				"executedChars": 108937,
-				"jsGzipBytes": 1568228
+				"executedChars": 109811,
+				"jsGzipBytes": 1574959
 			},
 			"docs /concepts/state": {
-				"executedChars": 119276,
-				"jsGzipBytes": 1679186
+				"executedChars": 119766,
+				"jsGzipBytes": 1685970
 			},
 			"docs /ui/accordion": {
-				"executedChars": 22495,
-				"jsGzipBytes": 404051
+				"executedChars": 22685,
+				"jsGzipBytes": 408347
 			}
 		},
 		"linux-x64": {

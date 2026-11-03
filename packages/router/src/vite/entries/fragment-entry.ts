@@ -868,14 +868,6 @@ function withoutTransitions(d: Document): () => void {
 		);
 }
 
-type SharedSwapEntry = {
-	readonly prepareSharedSwap?: (input: {
-		readonly root: Element;
-		readonly document: Document;
-		readonly container?: Element;
-	}) => Promise<{ readonly wake?: (container: Element) => void } | undefined>;
-};
-
 // Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.
 function forgetRuntimeState(root: Element, kept: string): void {
 	const forget = (node: Node) => {
@@ -1065,6 +1057,19 @@ export async function navigate(
 	};
 	const started = w.performance.now();
 	const taken = take(state, url, mode === 'traverse', started);
+	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
+	// live values before it is shown. A document whose instances hold no values swaps in this task.
+	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
+	const sharedSwap = [d, d.querySelector(`[${containerAttribute}]`)].some((place) =>
+		Object.values(
+			(place as { [key: string]: { instances?: Record<string, { shape?: string }> } } | null)?.[
+				sharedProperty
+			]?.instances ?? {},
+		).some((instance) => instance.shape),
+	)
+		? import('@markless/web/shared-swap')
+		: undefined;
+	sharedSwap?.catch(() => {});
 	const abandon = () => {
 		if (session.unshown === entered) session.unshown = undefined;
 		taken.abort();
@@ -1114,29 +1119,12 @@ export async function navigate(
 	const head = await mergeHead(d, next, state.config.stylesheetKeyAttribute);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (stale()) return abandon();
-	// The next page is served with shared() defaults; it takes the live values before it is shown.
-	const container = isContainer(outgoing)
-		? outgoing
-		: (outgoing.querySelector(`[${containerAttribute}]`) ?? undefined);
-	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
-	const resumeUrl = incoming
-		.querySelector(`[${resumeAttribute}]`)
-		?.getAttribute(resumeAttribute);
-	let wakeShared: ((container: Element) => void) | undefined;
-	// Only an instance a runtime has bound holds values; a page that only listens has none to give.
-	const bound = (place: object | undefined) =>
-		Object.values(
-			(place as Record<string, { instances?: Record<string, { shape?: string }> }> | undefined)?.[
-				sharedProperty
-			]?.instances ?? {},
-		).some((instance) => instance.shape);
-	if (resumeUrl && (bound(d) || bound(container))) {
+	let wakeShared: (() => void) | undefined;
+	if (sharedSwap) {
 		try {
-			const entry = (await import(/* @vite-ignore */ resumeUrl)) as SharedSwapEntry;
-			const root = isContainer(incoming)
-				? incoming
-				: (incoming.querySelector(`[${containerAttribute}]`) ?? incoming);
-			wakeShared = (await entry.prepareSharedSwap?.({ root, document: d, container }))?.wake;
+			wakeShared = await (
+				await sharedSwap
+			).bindSharedSwap({ document: d, outgoing, incoming, containerAttribute, resumeAttribute });
 		} catch (error) {
 			reportAsync(error);
 		}
@@ -1283,7 +1271,7 @@ export async function navigate(
 		ranFiles,
 		() => id === session.navigation,
 	);
-	if (wakeShared && container?.isConnected) wakeShared(container);
+	wakeShared?.();
 	const active = d.activeElement as HTMLElement | null;
 	if (active && active !== d.body && !region.contains(active)) active.blur?.();
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();

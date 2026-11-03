@@ -15,6 +15,10 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 
+// Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
+type SharedInstancesHost = {
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-instances.ts')>;
+};
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 type RuntimeShared = ReturnType<
 	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
@@ -453,7 +457,9 @@ export function createResumeRuntime(
 		if (storagePlane) await input.graph.flush();
 		if (
 			hasLiveSharedDefinitions(input.state) &&
-			(await import('./fns/shared-instances.ts')).reconcileSharedCells(input.graph)
+			(await (globalThis as SharedInstancesHost).__marklessSharedInstances?.())?.reconcileSharedCells(
+				input.graph,
+			)
 		)
 			await input.graph.flush();
 		captureListenersStarted = true;

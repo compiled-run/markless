@@ -41,6 +41,11 @@ type ExecutionLogGlobal = typeof globalThis & {
 	}>;
 };
 
+// Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
+type SharedInstancesHost = {
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-instances.ts')>;
+};
+
 export async function renderCsrRuntime(input: {
 	readonly output: CsrRenderOutput;
 	readonly options: CsrRenderOptions;
@@ -226,7 +231,7 @@ export async function renderCsrRuntime(input: {
 	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
 	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
 	if (hasLiveSharedDefinitions(state))
-		(await import('./fns/shared-instances.ts')).registerDormantContainer(
+		(await (globalThis as SharedInstancesHost).__marklessSharedInstances?.())?.registerDormantContainer(
 			output.root,
 			state,
 			() => void (disposed || deferredRuntime.start()),

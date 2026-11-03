@@ -276,7 +276,7 @@ export async function assembleSsrContainer(
 					overlayPrimer,
 					deferredTriggerSource(view) +
 						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)) +
-						sharedWakeSource(state, selectedResumeModuleUrl),
+						sharedWakeSource(state),
 					artifactSources?.defer,
 				)
 			: '';
@@ -369,7 +369,7 @@ export async function assemblePrerenderPageParts(
 					false,
 					deferredTriggerSource(view) +
 						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)) +
-						sharedWakeSource(state, resumeModuleUrl),
+						sharedWakeSource(state),
 					artifactInlineResumerSources(component)?.defer,
 				)
 			: '';
@@ -551,18 +551,17 @@ function renderStorageSeedScript(
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
-// The page- and request-scoped shared() definitions this container resolves; container and widget instances are its own.
-function sharedWakeSource(state: ProtocolStatePayload, resumeModuleUrl: string | undefined): string {
-	const ids = (state.sharedDefinitions ?? [])
-		.filter((definition) => definition.scope !== 'widget' && definition.scope !== 'container')
-		.map((definition) => definition.id);
-	if (ids.length === 0) return '';
-	return createInlineResumerSharedWakeSource(
-		resumeModuleUrl,
-		PROTOCOL_SHARED_INSTANCES_PROPERTY,
-		PROTOCOL_SHARED_INSTANCES_VERSION,
-		escapeScriptJson(JSON.stringify(ids)),
-	);
+// Only page- and request-scoped instances are shared with other containers; container and widget instances are a container's own.
+function sharedWakeSource(state: ProtocolStatePayload): string {
+	return (state.sharedDefinitions ?? []).some(
+		(definition) => definition.scope !== 'widget' && definition.scope !== 'container',
+	)
+		? createInlineResumerSharedWakeSource(
+				PROTOCOL_SHARED_INSTANCES_PROPERTY,
+				PROTOCOL_SHARED_INSTANCES_VERSION,
+				CONTAINER_ATTRIBUTE,
+			)
+		: '';
 }
 
 // Each storage cell's slot key and the value this render gave it.

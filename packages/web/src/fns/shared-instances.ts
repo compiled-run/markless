@@ -7,6 +7,8 @@ import {
 	type ProtocolSharedInstance,
 	type ProtocolSharedInstances,
 } from '../../../serializer/src/protocol-shared-instances.ts';
+import type { RuntimePayloadType } from '../../../serializer/src/protocol-client.ts';
+import { RESUME_MODULE_ATTRIBUTE } from './container-region.ts';
 
 
 type Definition = NonNullable<ProtocolStatePayload['sharedDefinitions']>[number];
@@ -22,9 +24,18 @@ type ResumeModule = { resumeContainerEvent(input: { readonly root: object; reado
 export type Places = { readonly document: object | null | undefined; readonly container: object | null | undefined };
 type Bound = {
 	readonly instance: ProtocolSharedInstance;
+	readonly definition: Definition;
 	readonly cellIds: ReadonlyArray<string>;
 };
 
+type DormantRoot = Host & {
+	readonly querySelector: (selector: string) => {
+		readonly textContent: string | null;
+		getAttribute(name: string): string | null;
+	} | null;
+	__mResume?: Promise<ResumeModule>;
+};
+const STATE_SCRIPT: RuntimePayloadType = 'markless/state';
 const reconcileReads = new WeakMap<RuntimeGraph, ReadonlyArray<string>>();
 const reported = new WeakMap<object, Set<string>>();
 
@@ -136,7 +147,7 @@ export function bindDefinitions(
 			reportShapeMismatch(reportOn, definition, instance.shape, shape);
 			continue;
 		}
-		bound.push({ instance, cellIds });
+		bound.push({ instance, definition, cellIds });
 		for (const id of cellIds)
 			if (!seeded.has(id) && Object.hasOwn(instance.cells, id) && !sameValue(instance.cells[id], served.get(id)))
 				differing.add(id);
@@ -156,7 +167,9 @@ function connectGraph(
 	const received = new Map<string, unknown>();
 	// What this container last agreed with the instance; a cell that moved since has a write of its own still to publish.
 	const synced = new Map<string, unknown>();
-	for (const { instance, cellIds } of bound) {
+	for (const { instance, definition, cellIds } of bound) {
+		const store = instancesAt(placesOf(root), definition);
+		if (store?.dormant?.includes(root)) store.dormant = store.dormant.filter((other) => other !== root);
 		const listener = {
 			root,
 			apply: (graphNodeId: string, value: unknown) => {
@@ -184,17 +197,37 @@ function connectGraph(
 					synced.set(graphNodeId, cloneValue(value));
 					if (delivered || !alive() || sameValue(instance.cells[graphNodeId], value)) return;
 					instance.cells[graphNodeId] = cloneValue(value);
-					publish(root, instance, graphNodeId);
+					publish(root, instance, definition, graphNodeId);
 				},
 			});
 	}
 }
 
-function publish(root: Host, instance: ProtocolSharedInstance, graphNodeId: string): void {
+function publish(
+	root: Host,
+	instance: ProtocolSharedInstance,
+	definition: Definition,
+	graphNodeId: string,
+): void {
 	for (const listener of instance.listeners.slice()) {
 		if (listener.root === root) continue;
 		if (listener.apply(graphNodeId, cloneValue(instance.cells[graphNodeId])) === false)
 			instance.listeners.splice(instance.listeners.indexOf(listener), 1);
+	}
+	if (definition.scope === 'container') return;
+	const store = instancesAt(placesOf(root), definition);
+	const id = JSON.stringify(definition.id);
+	for (const other of (store?.dormant ?? []).slice() as DormantRoot[]) {
+		const url = other.querySelector(`script[${RESUME_MODULE_ATTRIBUTE}]`)?.getAttribute(RESUME_MODULE_ATTRIBUTE);
+		if (!other.isConnected) store!.dormant = store!.dormant!.filter((root) => root !== other);
+		else if (url && other.querySelector(`script[type="${STATE_SCRIPT}"]`)?.textContent?.includes(id)) {
+			store!.dormant = store!.dormant!.filter((root) => root !== other);
+			other.__marklessDelegatedDispatch = true;
+			void (other.__mResume ||= import(/* @vite-ignore */ url) as Promise<ResumeModule>).then(
+				(module) => wakeSharedContainer(other, module),
+				(error) => globalThis.reportError?.(error),
+			);
+		}
 	}
 }
 
