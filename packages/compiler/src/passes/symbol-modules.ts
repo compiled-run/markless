@@ -1656,11 +1656,10 @@ function renderChunkParts(
 		});
 		return null;
 	};
-	// The page's own render answers it, so only content this module renders escalates.
+	// This module's own render answers it; an imported child's content keeps refuse()'s answer.
 	const renderedHere = (detail: string, runs: string) => {
-		context.refusals?.push(
-			context.inline && !child?.imported ? { detail, escalatable: true, runs } : { detail },
-		);
+		if (!context.inline || child?.imported) return refuse(detail);
+		context.refusals?.push({ detail, escalatable: true, runs });
 		return null;
 	};
 	const chunk = (child?.chunks ?? renderData.chunks).find(
