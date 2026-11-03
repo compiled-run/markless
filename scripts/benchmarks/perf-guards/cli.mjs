@@ -262,7 +262,7 @@ async function main(argv) {
 		const measurement = await load();
 		const base = baseFile
 			? JSON.parse(readFileSync(baseFile, 'utf8'))
-			: measureMergeBase({ sites });
+			: { ...measureMergeBase({ sites }), platform: LOAD_PLATFORM };
 		const platform = measurement.platform ?? LOAD_PLATFORM;
 		if (base.platform && base.platform !== platform)
 			throw new Error(
