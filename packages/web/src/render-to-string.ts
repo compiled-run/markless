@@ -13,7 +13,7 @@ import {
 	type ProtocolViewPayload,
 	type StorageSeedMetadata,
 } from '@markless/serializer';
-import { encodeProtocolPayloadLists, renderPayloadScripts } from '@markless/serializer';
+import { encodeProtocolPayloadLists, renderPayloadScripts, serializeGraphValue } from '@markless/serializer';
 import {
 	type ProtocolArmRecordSet,
 	protocolEventDispatchesMarkless,
@@ -164,6 +164,29 @@ export function storageRenderContext(cookie: string | null | undefined): {
 	return cookie ? { [STORAGE_RENDER_CONTEXT_READER]: createStorageCookieReader(cookie) } : {};
 }
 
+// The render leaves out a keyed @for value the serializer refuses, so parity is checked without it.
+function withoutUnservedComputedValues<T extends { readonly state: ProtocolStatePayload }>(
+	baseline: T,
+	request: ProtocolStatePayload,
+): T {
+	const served = new Set(
+		request.computed.flatMap((record) =>
+			record.value !== undefined || record.directValue !== undefined ? [record.graphNodeId] : [],
+		),
+	);
+	const unserved = (record: ProtocolStatePayload['computed'][number]) =>
+		record.directValue !== undefined &&
+		!served.has(record.graphNodeId) &&
+		!serializeGraphValue(record.directValue).ok;
+	if (!baseline.state.computed.some(unserved)) return baseline;
+	const computed = baseline.state.computed.map((record) => {
+		if (!unserved(record)) return record;
+		const { directValue: _, ...kept } = record;
+		return kept;
+	});
+	return { ...baseline, state: { ...baseline.state, computed } };
+}
+
 // Shared container assembly for the blocking (renderToString) and streaming
 // (renderToStream) paths: payload scripts, preload links, head injections,
 // and the inline resumer around the rendered page html.
@@ -182,7 +205,7 @@ export async function assembleSsrContainer(
 	const wakeChannelEnabled =
 		hasPayload && browserTriggers && prerenderWakeModuleUrl !== undefined;
 	const baseline = wakeChannelEnabled
-		? await derivePrerenderResumeRecords(component, options.props)
+		? withoutUnservedComputedValues(await derivePrerenderResumeRecords(component, options.props), state)
 		: undefined;
 	const requestRecords = { state, view };
 	const classification = baseline

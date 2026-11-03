@@ -1261,3 +1261,46 @@ function linkedBoundaryWithComposedBranch(
 		imports: { StatusBadge: childSurface },
 	};
 }
+
+// A keyed @for computed is served only when durable; the rebuilt records still hold the live value.
+test('a computed value the request could not serve is left out of the wake-channel parity check', async () => {
+	const view = {
+		version: 1 as const,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order' as const, index: 0, tagName: 'button' },
+		],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const record = {
+		graphNodeId: 'computed:rows',
+		name: 'rows',
+		async: false,
+		deriveSymbolId: 'symbol:1',
+		dependencies: [],
+	};
+	const state = (computed: ReadonlyArray<Record<string, unknown>>) => ({
+		version: 1 as const,
+		cells: [],
+		computed: computed as never,
+		sharedDefinitions: [],
+	});
+	const artifact: SsrRenderArtifact & { readonly prerenderWakeModuleUrl: string } = {
+		resumeModuleUrl: '/build/resume.js',
+		prerenderWakeModuleUrl: '/build/prerender-wake-A1b2.js',
+		renderSsr: () => ({
+			html: '<button>Rows</button>',
+			state: state([{ ...record, directValue: [{ id: 'a', run: () => 'a' }] }]),
+			view,
+		}),
+	};
+	const request = { html: '<button>Rows</button>', state: state([record]), view };
+
+	const html = await assembleSsrContainer(artifact, request, {});
+
+	expect(html.match(/<script type="markless\/(?:state|view)">/g) ?? []).toHaveLength(0);
+	expect(html).toContain('data-markless-resume-module="/build/prerender-wake-A1b2.js"');
+});

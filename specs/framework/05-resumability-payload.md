@@ -77,8 +77,18 @@ Within each SSR resumable container, the initial render phase emits alongside
 the HTML:
 
 1. **State values** — object state serializes with the tiered serializer above.
-   Sync `computed()` values are _not_ serialized; they re-derive lazily from
-   their dependencies on first read.
+   Sync `computed()` values are _not_ serialized by default; they re-derive
+   lazily from their dependencies on first read. The exception is a sync
+   computed whose value resume needs before any input changes: one an event
+   handler or callback prop reads, one a branch arm that flips after resume
+   reads, and one a keyed `@for` repeats. Resume keys the served rows off the
+   collection, so without the value it would have to run the derive (and load
+   its code) at startup. Such a computed carries the value the render already
+   derived, encoded like a cell value, and resume starts from it; it re-derives
+   only when a dependency is written (`03-state-graph.md`). A served value is
+   one more envelope in the state arena, so a subtree it shares with a state
+   cell is written once in the arena's shared records rather than twice; each
+   envelope still decodes to its own copy.
 2. **Async snapshots** — demanded async computed IDs, dependency keys, request
    versions, status (`pending`, `resolved`, `rejected`), and settled value/error
    data when available. This prevents resume from refetching data the initial
