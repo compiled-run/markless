@@ -381,7 +381,16 @@ export function marklessIslandSpacedSymbol(
 		);
 	};
 	if (composedSymbols.has(symbol)) composedSymbols.add(spaced);
-	return spaced;
+	// A rebound symbol places itself under the path that asks for it, so the island has to space what it places.
+	const rescope = (symbol as MarklessRescopingSymbol).marklessRescope;
+	return rescope
+		? Object.assign(spaced, {
+				marklessRescope: (
+					instancePath: string,
+					scope: (symbol: ResumeSymbol, instancePath: string) => ResumeSymbol,
+				) => marklessIslandSpacedSymbol(rescope(instancePath, scope), symbolPrefix),
+			})
+		: spaced;
 }
 
 export function marklessInstanceScopedLoadSymbol(

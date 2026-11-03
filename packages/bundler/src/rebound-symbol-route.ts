@@ -40,12 +40,13 @@ export function emitSymbolRouteTable(input: {
 		`const ${functionName}Imports = [${sources.map((source) => `() => import(${JSON.stringify(source)})`).join(', ')}];`,
 		keyLists.length > 0 ? `const ${functionName}BoundKeys = [${keyLists.join(', ')}];` : '',
 		`const ${functionName}Routes = [${table.join(', ')}];`,
-		`${input.exported ? 'export ' : ''}function ${functionName}(symbolId) {`,
+		// `local` is the path a same-module child's re-entry already consumed: the edge's bound row scopes itself under all of it.
+		`${input.exported ? 'export ' : ''}function ${functionName}(symbolId, local = "") {`,
 		`\tfor (const [prefix, at, bound] of ${functionName}Routes) {`,
 		'\t\tif (!symbolId.startsWith(prefix)) continue;',
 		'\t\tconst rest = symbolId.slice(prefix.length);',
 		// A same-module child re-enters the table: what is left can carry another child's path.
-		`\t\tconst unbound = () => at < 0 ? (prefix ? ${functionName}(rest) : ${fallbackName}(rest)) : ${functionName}Imports[at]().then((mod) => mod.loadSymbol ? mod.loadSymbol(rest) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
+		`\t\tconst unbound = () => at < 0 ? (prefix ? ${functionName}(rest, local + prefix) : ${fallbackName}(rest)) : ${functionName}Imports[at]().then((mod) => mod.loadSymbol ? mod.loadSymbol(rest) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
 		// A child symbol its edge binds goes through the edge's bound row, or a callback the
 		// child's own child invokes by instance path never sees the captures this edge supplies.
 		hasAnyBound(routes)
@@ -53,7 +54,7 @@ export function emitSymbolRouteTable(input: {
 					keyLists.length > 0
 						? `\t\tconst boundId = !bound ? undefined : Array.isArray(bound) ? (${functionName}BoundKeys[bound[1]].includes(rest) ? \`bound:\${encodeURIComponent(rest)}:\${bound[0]}\` : undefined) : Object.hasOwn(bound, rest) ? bound[rest] : undefined;`
 						: '\t\tconst boundId = bound && Object.hasOwn(bound, rest) ? bound[rest] : undefined;',
-					`\t\tif (boundId) return ${reboundName}(${fallbackName}(boundId), prefix, unbound);`,
+					`\t\tif (boundId) return ${reboundName}(${fallbackName}(boundId), local + prefix, unbound);`,
 				].join('\n')
 			: '',
 		'\t\treturn unbound();',

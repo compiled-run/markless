@@ -55,5 +55,18 @@ export function marklessRowBoundGraphNodeId(
 	registry?: MarklessWidgetRegistry,
 ): string {
 	if (!marklessPageSpaceId(graphNodeId)) return rowedPath + graphNodeId;
-	return registry ? marklessComposedGraphNodeId(graphNodeId, path, registry) : path + graphNodeId;
+	if (!registry) return path + graphNodeId;
+	// A widget the row roots is filed under the rowed instance path; the dispatch's row scope spells host ids, which a nested row does not share.
+	if (rowedPath !== path) {
+		const rowed = marklessComposedGraphNodeId(graphNodeId, rowedPath, registry);
+		const root = rowed.endsWith(graphNodeId) ? rowed.slice(0, -graphNodeId.length) : '';
+		const slash = graphNodeId.lastIndexOf('/');
+		if (
+			root.includes('r:') &&
+			(registry.rootPaths.get(root + graphNodeId) === root ||
+				(slash > 0 && registry.rootPaths.get(root + graphNodeId.slice(0, slash)) === root))
+		)
+			return rowed;
+	}
+	return marklessComposedGraphNodeId(graphNodeId, path, registry);
 }

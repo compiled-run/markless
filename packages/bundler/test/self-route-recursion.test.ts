@@ -13,7 +13,7 @@ import type { SourceLazySymbolRoute } from '../src/source-module.ts';
 const rowsFilename = fileURLToPath(new URL('./fixtures/self-route/rows.tsrx', import.meta.url));
 
 const ROUTE_FUNCTION =
-	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
+	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, local = ""\) \{[\s\S]*?\n\}/;
 
 async function rowsRouteFunctionSource(): Promise<string> {
 	const result = await transformTsrxModule({
@@ -139,7 +139,7 @@ test('a prerendered page routes its same-module children too', async () => {
 	// The self route survives into the prerendered page and recurses, so a level-2
 	// id routes there exactly as it does on the CSR page.
 	expect(source).toContain('["c4:p5:", -1, 0]');
-	expect(source).toContain('(prefix ? loadSymbol(rest) : marklessLoadLocalSymbol(rest))');
+	expect(source).toContain('(prefix ? loadSymbol(rest, local + prefix) : marklessLoadLocalSymbol(rest))');
 	expect(source).toContain('import("./rows.tsrx?markless-symbols")');
 	expect(source).toContain('import("./index.ts?markless-symbols")');
 	expect(source).toContain('\treturn marklessLoadLocalSymbol(symbolId);');

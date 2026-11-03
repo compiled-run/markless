@@ -1,4 +1,4 @@
-import { render, renderSSR } from '@markless/vitest-browser';
+import { render, renderCsrIslands, renderSSR, renderSSRIslands } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import { Basic } from './scenarios/basic.tsrx';
@@ -16,6 +16,14 @@ import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithCallbacks } from './scenarios/with-callbacks.tsrx';
 import { WithError } from './scenarios/with-error.tsrx';
 import { WithHelpAndError } from './scenarios/with-help-and-error.tsrx';
+import { InputHandler } from './scenarios/input-handler.tsrx';
+import { InputHandlerInChild } from './scenarios/input-handler-child.tsrx';
+import { InputHandlerWrapped } from './scenarios/input-handler-wrapped.tsrx';
+import { OptionsElsewhere } from './scenarios/options-elsewhere.tsrx';
+import { OptionsElsewhereMinted } from './scenarios/options-elsewhere-minted.tsrx';
+import { OptionsDeep } from './scenarios/options-deep.tsrx';
+import { OptionsHere } from './scenarios/options-here.tsrx';
+import { RootInChild } from './scenarios/root-in-child.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -955,3 +963,95 @@ test('CSR: Home and End move the caret while the list is closed', async () => {
 	await userEvent.keyboard('{End}');
 	await expect.poll(() => el<HTMLInputElement>(Input).selectionStart).toBe(3);
 });
+
+for (const mode of MODES) {
+	test(`${mode}: the consumer's onInput on the field runs`, async () => {
+		if (mode === 'CSR') await render(InputHandler);
+		else await renderSSR(InputHandler);
+		await typeInto(el<HTMLInputElement>(Input), 'ap');
+		await expect.poll(() => el(Typed).textContent).toBe('ap');
+	});
+
+	test(`${mode}: the consumer's onInput on the field runs from a child component`, async () => {
+		if (mode === 'CSR') await render(InputHandlerInChild);
+		else await renderSSR(InputHandlerInChild);
+		await typeInto(el<HTMLInputElement>(Input), 'ap');
+		await expect.poll(() => el(Typed).textContent).toBe('ap');
+	});
+
+	test(`${mode}: the consumer's onInput on the field runs from a child component another module renders`, async () => {
+		if (mode === 'CSR') await render(InputHandlerWrapped);
+		else await renderSSR(InputHandlerWrapped);
+		await typeInto(el<HTMLInputElement>(Input), 'ap');
+		await expect.poll(() => el(Typed).textContent).toBe('ap');
+	});
+}
+
+for (const mode of MODES)
+	test(`${mode}: options rendered from another module run their own handlers`, async () => {
+		if (mode === 'CSR') await render(OptionsElsewhere);
+		else await renderSSR(OptionsElsewhere);
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(3);
+		await typeInto(el<HTMLInputElement>(Input), 'an');
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(1);
+		(el(Rows).querySelector('[role="option"]') as HTMLElement).click();
+		await expect.poll(() => el(Picked).textContent).toBe('Banana');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
+	});
+
+for (const mode of MODES)
+	test(`${mode}: options rendered from the same module run their own handlers`, async () => {
+		if (mode === 'CSR') await render(OptionsHere);
+		else await renderSSR(OptionsHere);
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(3);
+		await typeInto(el<HTMLInputElement>(Input), 'an');
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(1);
+		(el(Rows).querySelector('[role="option"]') as HTMLElement).click();
+		await expect.poll(() => el(Picked).textContent).toBe('Banana');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
+	});
+
+for (const mode of MODES)
+	test(`${mode}: options another module mints after the first keystroke run their own handlers`, async () => {
+		if (mode === 'CSR') await render(OptionsElsewhereMinted);
+		else await renderSSR(OptionsElsewhereMinted);
+		expect(el(Rows).querySelectorAll('[role="option"]').length).toBe(0);
+		await typeInto(el<HTMLInputElement>(Input), 'an');
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(1);
+		(el(Rows).querySelector('[role="option"]') as HTMLElement).click();
+		await expect.poll(() => el(Picked).textContent).toBe('Banana');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
+	});
+
+for (const mode of MODES)
+	test(`${mode}: options a third module mints inside a nested component run their own handlers`, async () => {
+		if (mode === 'CSR') await render(OptionsDeep);
+		else await renderSSR(OptionsDeep);
+		expect(el(Rows).querySelectorAll('[role="option"]').length).toBe(0);
+		await typeInto(el<HTMLInputElement>(Input), 'an');
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(1);
+		(el(Rows).querySelector('[role="option"]') as HTMLElement).click();
+		await expect.poll(() => el(Picked).textContent).toBe('Banana');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
+	});
+
+for (const mode of MODES)
+	test(`${mode}: options a third module mints inside a nested component of an island run their own handlers`, async () => {
+		if (mode === 'CSR') await renderCsrIslands([OptionsDeep]);
+		else await renderSSRIslands([OptionsDeep]);
+		expect(el(Rows).querySelectorAll('[role="option"]').length).toBe(0);
+		await typeInto(el<HTMLInputElement>(Input), 'an');
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(1);
+		(el(Rows).querySelector('[role="option"]') as HTMLElement).click();
+		await expect.poll(() => el(Picked).textContent).toBe('Banana');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
+	});
+
+for (const mode of MODES)
+	test(`${mode}: the root's onChange runs in the component that renders the whole widget`, async () => {
+		if (mode === 'CSR') await render(RootInChild);
+		else await renderSSR(RootInChild);
+		el<HTMLElement>(Banana).click();
+		await expect.poll(() => el(Chosen).textContent).toBe('banana');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
+	});

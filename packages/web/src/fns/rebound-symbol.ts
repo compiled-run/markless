@@ -17,7 +17,7 @@ export function marklessReboundSymbol(
 ): LoadedSymbol {
 	return marklessThen(loaded, (bound): MarklessRescopingSymbol => {
 		const run = (context: ResumeSymbolContext) => bound(context);
-		return Object.assign(run, {
+		return Object.assign((context: ResumeSymbolContext) => run(context), {
 			marklessRescope: (
 				instancePath: string,
 				scope: (symbol: ResumeSymbol, instancePath: string) => ResumeSymbol,

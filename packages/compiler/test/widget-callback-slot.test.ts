@@ -254,3 +254,142 @@ test('invoking a slot no component fills is reported', async () => {
 		family.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code),
 	).toContain('MARKLESS_CALLBACK_SLOT_UNBOUND');
 });
+
+// A part a page-local component renders inside the root: its edge is reached
+// through that component's edge, never from the module top.
+async function compileNestedPart(family: Awaited<ReturnType<typeof compileFamily>>, field: string) {
+	const handler = family.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const source = `import { state } from '@markless/core';
+	import { BoxRoot, BoxTrigger } from './box.tsrx';
+	function Field() @{
+		let pressed = state(0);
+		<div>${field}<output>{pressed}</output></div>
+	}
+	export function App() @{
+		let seen = state('none');
+		<main>
+			<BoxRoot onChange={(next) => seen = 'changed:' + next}><Field /></BoxRoot>
+			<output>{seen}</output>
+		</main>
+	}`;
+	const bare = await compileTsrxModule({ filename: 'src/App.tsrx', source, symbols: [] });
+	const edges = bare.semanticGraph.componentEdges;
+	const path = [
+		edges.find((edge) => edge.childComponentName === 'Field')!.id,
+		edges.find((edge) => edge.childComponentName === 'BoxTrigger')!.id,
+	];
+	const app = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source,
+		symbols: [
+			{
+				id: 'imported:box:trigger:0',
+				chunk: 'virtual:markless:symbol:box:0',
+				exportName: 'boxTrigger',
+				componentEdgeId: path[1]!,
+				claimKind: linkedImportedClaimKind(handler),
+				captureSymbol: handler,
+			},
+		],
+	});
+	return { app, path };
+}
+
+test('a nested part answers its widget callback on the path through its component', async () => {
+	const { app, path } = await compileNestedPart(
+		await compileFamily(),
+		'<BoxTrigger>A</BoxTrigger>',
+	);
+
+	const routes = app.captureAnalysis.extractedSymbols
+		.filter((symbol) => symbol.loaderSymbolId)
+		.flatMap((symbol) => symbol.captureSlots.flatMap((slot) => slot.routes));
+	expect(
+		routes.flatMap((route) => (route.componentEdgeId ? [route.componentEdgePath] : [])),
+	).toEqual([path]);
+	// Nothing of the consumer's reaches the part, so it keeps running unbound and reads the slot from the graph.
+	expect(app.boundSymbolResolver.rows.map((row) => row.componentEdgePath)).not.toContainEqual(
+		path,
+	);
+});
+
+test('a nested part binds on that path to deliver the callback its consumer passed', async () => {
+	const family = await compileFamily(
+		FAMILY_SOURCE.replace(
+			'export function BoxTrigger({ children }) @{',
+			'export function BoxTrigger({ children, onPress }) @{',
+		).replace(
+			'<button onClick={() => box.toggle()}>{children}</button>',
+			'<button onClick={() => { box.toggle(); onPress?.(); }}>{children}</button>',
+		),
+	);
+	const { app, path } = await compileNestedPart(
+		family,
+		'<BoxTrigger onPress={() => pressed++}>A</BoxTrigger>',
+	);
+
+	const row = app.boundSymbolResolver.rows.find(
+		(candidate) => candidate.componentEdgePath.join() === path.join(),
+	)!;
+	expect(row.captureSlots.map((slot) => slot.route.kind)).toContain('callback-route');
+	expect(row.captureSlots.map((slot) => slot.route.kind)).toContain('callback-slot-route');
+});
+
+// The root and the part both sit in a page-local component, so the root's
+// callback belongs to that component's instance on every path to it.
+test('a nested root answers its part with a callback spelled under its own component', async () => {
+	const family = await compileFamily(
+		FAMILY_SOURCE.replace(
+			'export function BoxTrigger({ children }) @{',
+			'export function BoxTrigger({ children, onPress }) @{',
+		).replace(
+			'<button onClick={() => box.toggle()}>{children}</button>',
+			'<button onClick={() => { box.toggle(); onPress?.(); }}>{children}</button>',
+		),
+	);
+	const handler = family.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const source = `import { state } from '@markless/core';
+	import { BoxRoot, BoxTrigger } from './box.tsrx';
+	function Field() @{
+		let seen = state('none');
+		<div>
+			<BoxRoot onChange={(next) => seen = 'changed:' + next}>
+				<BoxTrigger onPress={() => seen = 'pressed'}>A</BoxTrigger>
+			</BoxRoot>
+			<output>{seen}</output>
+		</div>
+	}
+	export function App() @{
+		<main><Field /></main>
+	}`;
+	const bare = await compileTsrxModule({ filename: 'src/App.tsrx', source, symbols: [] });
+	const trigger = bare.semanticGraph.componentEdges.find(
+		(edge) => edge.childComponentName === 'BoxTrigger',
+	)!;
+	const app = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source,
+		symbols: [
+			{
+				id: 'imported:box:trigger:0',
+				chunk: 'virtual:markless:symbol:box:0',
+				exportName: 'boxTrigger',
+				componentEdgeId: trigger.id,
+				claimKind: linkedImportedClaimKind(handler),
+				captureSymbol: handler,
+			},
+		],
+	});
+
+	const widget = app.captureAnalysis.extractedSymbols
+		.filter((symbol) => symbol.loaderSymbolId)
+		.flatMap((symbol) => symbol.captureSlots)
+		.find((slot) => slot.id.includes(':onChange:'))!;
+	const routes = widget.routes.filter((route) => route.kind === 'callback-route');
+	expect(routes).toHaveLength(1);
+	expect(routes[0]).toMatchObject({ composerPath: expect.stringMatching(/^c\d+:$/) });
+});

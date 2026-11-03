@@ -153,8 +153,8 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
-		// The row spells its composer's callback from its own module, which may sit under an instance path.
-		'			return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, event: context.event, args });',
+		// The row spells its composer's callback from its own module, which may sit under an instance path; that path rides the id, so the callback gets the page graph.
+		'			return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });',
 		'		},',
 		'	};',
 		'}',
