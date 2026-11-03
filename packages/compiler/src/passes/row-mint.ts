@@ -445,16 +445,16 @@ export function expressionSlotValue(
 	for (const name of names.names) {
 		if (rowNames.has(name)) continue;
 		const resolved = resolveGraphPath(name, bindings, aliases);
-		// A shared instance or a prop reads ids this page does not spell as its own.
 		if (!resolved) {
-			if (
-				graph.sharedInstances.some(
-					(instance) =>
-						instance.localName === name &&
-						(instance.componentName ?? componentName) === componentName,
-				)
-			)
-				return null;
+			const instance = graph.sharedInstances.find(
+				(candidate) =>
+					candidate.localName === name &&
+					(candidate.componentName ?? componentName) === componentName,
+			);
+			if (!instance) continue;
+			const members = sharedInstanceMemberReads(graph, instance, slot.residue.source);
+			if (!members) return null;
+			reads.push(...members);
 			continue;
 		}
 		// A prop read is routed to the parent's node by composition, which drops the template when it cannot.
@@ -476,6 +476,25 @@ export function expressionSlotValue(
 		reads.push({ graphNodeId: resolved.binding.id, path: resolved.path });
 	}
 	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
+}
+
+// A page-space instance's members are graph nodes every instance path reads unprefixed; a widget's are per root.
+function sharedInstanceMemberReads(
+	graph: SemanticGraphArtifact,
+	instance: SemanticGraphArtifact['sharedInstances'][number],
+	source: string,
+): ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> | null {
+	const definition = graph.sharedDefinitions.find((candidate) => candidate.id === instance.definitionId);
+	if (!definition || definition.scope === 'widget') return null;
+	const members = memberReads(source, instance.localName);
+	if (!members) return null;
+	const reads: Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> = [];
+	for (const member of members) {
+		const property = definition.returnProperties?.findLast((candidate) => candidate.name === member);
+		if (property?.kind !== 'graph') return null;
+		reads.push({ graphNodeId: property.graphNodeId, path: property.path });
+	}
+	return reads;
 }
 
 // The members `name` is read through, or null when any mention is not a plain `.member` read.
