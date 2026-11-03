@@ -415,10 +415,15 @@ export async function renderPrerenderBranch(
 	)?.find((branch) => branch.id === branchSiteId)?.servedArmRecords;
 	const range = records.view.branches?.find((candidate) => candidate.id === branchSiteId);
 	const nested = range ? boundariesInside(records.view, range) : [];
+	const flips = range ? branchesInside(records.view, range) : [];
 	const armRecords = served ?? arm.armRecords;
 	return {
 		...arm,
-		armRecords: nested.length > 0 ? { ...armRecords, asyncBoundaries: nested } : armRecords,
+		armRecords: {
+			...armRecords,
+			...(flips.length > 0 && { branches: [...(armRecords.branches ?? []), ...flips] }),
+			...(nested.length > 0 && { asyncBoundaries: nested }),
+		},
 		computed: records.state.computed,
 		cells: freshArmCells(output, freshCellIds),
 	};
@@ -451,6 +456,32 @@ function boundariesInside(
 		}));
 }
 
+// @if and @switch blocks inside a range, outside any @try in it (whose own records carry those);
+// their comment anchors resolve by text against the committed content.
+function branchesInside(
+	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
+	range: {
+		readonly id: string;
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	},
+): NonNullable<ResumeArmRecordSet['branches']> {
+	type Range = {
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	};
+	const within = (inner: Range, outer: Range) =>
+		inner.startAnchor.index > outer.startAnchor.index &&
+		inner.endAnchor.index < outer.endAnchor.index;
+	const boundaries = view.asyncBoundaries.filter((boundary) => within(boundary, range));
+	return (view.branches ?? []).filter(
+		(branch) =>
+			branch.id !== range.id &&
+			within(branch, range) &&
+			!boundaries.some((boundary) => within(branch, boundary)),
+	) as unknown as NonNullable<ResumeArmRecordSet['branches']>;
+}
+
 // Taken before serialization: nothing in the live graph answers for a component this render is creating.
 function freshArmCells(
 	output: SsrRenderOutput,
@@ -480,7 +511,7 @@ async function evaluatePrerenderDataSurface(
 	props: Readonly<Record<string, unknown>> = {},
 	fresh?: { readonly branchSiteId?: string; readonly cellIds: Set<string> },
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
-	const rootName = surface.rootComponentName;
+	const rootName = branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
@@ -510,6 +541,19 @@ async function evaluatePrerenderDataSurface(
 	return roster.marklessResolveRosterCounts(
 		roster.marklessResolveDeferredCounts(rendered, positions.deferred ?? []),
 	);
+}
+
+// A flip's symbol runs as the instance of the component holding the branch, not always the module root.
+function branchOwnerName(
+	surface: PrerenderDataSurface,
+	branchSiteId: string | undefined,
+): string | undefined {
+	if (!branchSiteId) return undefined;
+	const holds = (name: string | null | undefined) =>
+		!!name &&
+		!!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId);
+	if (holds(surface.rootComponentName)) return undefined;
+	return Object.keys(surface.components).find(holds);
 }
 
 type RosterResumeHost = {
