@@ -3898,6 +3898,114 @@
 				"jsGzipBytes": 408871
 			},
 			"reason": "the same-page link early return (PR #441) measured on its rebased tree: CI run 41602532446 (linux), 19 B gzip on the docs pages rather than 18; none of it executed at load"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 18056,
+			"to": 18241,
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 10693,
+			"to": 11022,
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/resume-commit-arm",
+			"from": 12019,
+			"to": 12244,
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89170
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89275
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89170
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89275
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89170
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89275
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575505
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575654
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686514
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686663
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408871
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409020
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -3997,12 +4105,12 @@
 		"web/resume-arm-keyed-repeats": 1225,
 		"web/resume-arm-records": 7528,
 		"web/resume-arm-records-lazy": 219,
-		"web/resume-async-wiring": 10693,
+		"web/resume-async-wiring": 11022,
 		"web/resume-behaviors": 8577,
 		"web/resume-branches": 14986,
 		"web/resume-census": 1454,
-		"web/resume-commit-arm": 12019,
-		"web/resume-events": 18056,
+		"web/resume-commit-arm": 12244,
+		"web/resume-events": 18241,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
 		"web/resume-keyed-repeats": 18824,
@@ -4092,27 +4200,27 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11371,
-				"jsGzipBytes": 89170
+				"jsGzipBytes": 89275
 			},
 			"bench /records": {
 				"executedChars": 11387,
-				"jsGzipBytes": 89170
+				"jsGzipBytes": 89275
 			},
 			"bench /settings": {
 				"executedChars": 11444,
-				"jsGzipBytes": 89170
+				"jsGzipBytes": 89275
 			},
 			"docs /": {
 				"executedChars": 109992,
-				"jsGzipBytes": 1575505
+				"jsGzipBytes": 1575654
 			},
 			"docs /concepts/state": {
 				"executedChars": 119772,
-				"jsGzipBytes": 1686514
+				"jsGzipBytes": 1686663
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22830,
-				"jsGzipBytes": 408871
+				"jsGzipBytes": 409020
 			}
 		}
 	}
