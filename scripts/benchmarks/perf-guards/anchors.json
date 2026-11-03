@@ -3314,6 +3314,150 @@
 				"jsGzipBytes": 1571123
 			},
 			"reason": "the docs' live code blocks run the compiler in a worker the page fetches at idle; publishing derivedProps and serving forwarded props (PR #422) adds 1083 B gzip to it, and no other built JS file changes (a local before/after site build has the same per-module rendered bytes in byte-attribution.json); measured on CI run 41468171523, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 31647,
+			"to": 32404,
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10863,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10879,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10829,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1571123
+			},
+			"to": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
+			},
+			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 20104,
+			"to": 20368,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the dispatch reads a forwarded event row one edge above its host; measured on CI run 41525857883 (linux), +264 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/ssr",
+			"from": 30833,
+			"to": 31486,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): composition drops forwarded records whose edge this render did not place; measured on CI run 41525857883 (linux), +653 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 20878,
+			"to": 21060,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the render structure lists the component edges it placed; measured on CI run 41525857883 (linux), +182 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
+			},
+			"to": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
+			},
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix); measured on CI run 41525857883 (linux), +191 B gzip downloaded, executed chars within budget"
 		}
 	],
 	"runtimeModules": {
@@ -3326,7 +3470,7 @@
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
 		"router/vite/entries/client-entry": 2816,
-		"router/vite/entries/fragment-entry": 31647,
+		"router/vite/entries/fragment-entry": 32404,
 		"router/vite/entries/resume-entry": 2309,
 		"router/vite/entries/resume-modules": 920,
 		"router/vite/runtime/create-route-discovery": 527,
@@ -3370,7 +3514,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 20104,
+		"web/fns/instance-scope": 20368,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
@@ -3380,7 +3524,7 @@
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 3988,
-		"web/fns/ssr": 30833,
+		"web/fns/ssr": 31486,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
 		"web/fns/visible-trigger": 791,
@@ -3435,7 +3579,7 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20878,
+		"web/ssr-data/renderer": 21060,
 		"web/storage-plane": 1810
 	},
 	"constructGlue": {
@@ -3478,16 +3622,16 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10863,
-				"jsGzipBytes": 88379
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
-				"executedChars": 10879,
-				"jsGzipBytes": 88379
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
-				"executedChars": 10829,
-				"jsGzipBytes": 88379
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3504,20 +3648,20 @@
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11342,
-				"jsGzipBytes": 88379
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
-				"executedChars": 11251,
-				"jsGzipBytes": 88379
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
-				"executedChars": 11308,
-				"jsGzipBytes": 88379
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
-				"executedChars": 110777,
-				"jsGzipBytes": 1571123
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
