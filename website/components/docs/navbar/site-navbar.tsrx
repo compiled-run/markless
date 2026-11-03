@@ -42,6 +42,11 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 				inset: -2px;
 			}
 
+			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
+			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
+				visibility: hidden;
+			}
+
 			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
 				background-image: var(--grain-fiber);
 				mix-blend-mode: var(--grain-fiber-blend);
