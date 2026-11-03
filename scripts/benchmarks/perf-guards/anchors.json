@@ -3744,6 +3744,118 @@
 				"jsGzipBytes": 408852
 			},
 			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41574794000 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575486
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575504
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686495
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686513
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10998,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 10998,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 11014,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11014,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 11071,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11071,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
 		}
 	],
 	"runtimeModules": {
@@ -3912,15 +4024,15 @@
 		"darwin-arm64": {
 			"bench /": {
 				"executedChars": 10998,
-				"jsGzipBytes": 89152
+				"jsGzipBytes": 89170
 			},
 			"bench /records": {
 				"executedChars": 11014,
-				"jsGzipBytes": 89152
+				"jsGzipBytes": 89170
 			},
 			"bench /settings": {
 				"executedChars": 11071,
-				"jsGzipBytes": 89152
+				"jsGzipBytes": 89170
 			},
 			"docs /": {
 				"executedChars": 109825,
@@ -3938,23 +4050,23 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11371,
-				"jsGzipBytes": 89152
+				"jsGzipBytes": 89170
 			},
 			"bench /records": {
 				"executedChars": 11387,
-				"jsGzipBytes": 89152
+				"jsGzipBytes": 89170
 			},
 			"bench /settings": {
 				"executedChars": 11444,
-				"jsGzipBytes": 89152
+				"jsGzipBytes": 89170
 			},
 			"docs /": {
 				"executedChars": 109992,
-				"jsGzipBytes": 1575486
+				"jsGzipBytes": 1575504
 			},
 			"docs /concepts/state": {
 				"executedChars": 119772,
-				"jsGzipBytes": 1686495
+				"jsGzipBytes": 1686513
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22830,
