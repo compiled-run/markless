@@ -57,6 +57,9 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-resume-runtime-shared', test: fileBasenamePattern('resume-runtime-shared') },
 	{ name: 'markless-resume-events', test: fileBasenamePattern('resume-events') },
 	{ name: 'markless-resume-handoff', test: fileBasenamePattern('resume-handoff') },
+	// Only an app whose state declares a non-widget shared() loads these.
+	{ name: 'markless-shared-instances', test: fileBasenamePattern('shared-instances') },
+	{ name: 'markless-shared-swap', test: fileBasenamePattern('shared-swap') },
 	// The census splice chunks with the module that pins the census: a chunk of
 	// its own would cost every importer a preload for ~40 lines.
 	{

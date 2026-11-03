@@ -14,6 +14,9 @@ export interface FragmentNavigationConfig {
 	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
 	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
+	// Where the document (or a container element) holds its live shared() instances, which the swap keeps,
+	// and the resumer script attribute naming the module that binds the next page to them.
+	readonly sharedInstances: readonly [property: string, resumeModuleAttribute: string];
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
 	readonly streamOpenProperty: string;
@@ -866,10 +869,11 @@ function withoutTransitions(d: Document): () => void {
 }
 
 // Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.
-function forgetRuntimeState(root: Element): void {
+function forgetRuntimeState(root: Element, kept: string): void {
 	const forget = (node: Node) => {
 		for (const key of Object.keys(node))
-			if (key.startsWith('__m')) delete (node as unknown as Record<string, unknown>)[key];
+			if (key.startsWith('__m') && key !== kept)
+				delete (node as unknown as Record<string, unknown>)[key];
 		if (isContainer(node)) (node as unknown as Record<string, unknown>).__mL = {};
 	};
 	forget(root);
@@ -1053,6 +1057,19 @@ export async function navigate(
 	};
 	const started = w.performance.now();
 	const taken = take(state, url, mode === 'traverse', started);
+	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
+	// live values before it is shown. A document whose instances hold no values swaps in this task.
+	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
+	const sharedSwap = [d, d.querySelector(`[${containerAttribute}]`)].some((place) =>
+		Object.values(
+			(place as { [key: string]: { instances?: Record<string, { shape?: string }> } } | null)?.[
+				sharedProperty
+			]?.instances ?? {},
+		).some((instance) => instance.shape),
+	)
+		? import('@markless/web/shared-swap')
+		: undefined;
+	sharedSwap?.catch(() => {});
 	const abandon = () => {
 		if (session.unshown === entered) session.unshown = undefined;
 		taken.abort();
@@ -1102,6 +1119,17 @@ export async function navigate(
 	const head = await mergeHead(d, next, state.config.stylesheetKeyAttribute);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (stale()) return abandon();
+	let wakeShared: (() => void) | undefined;
+	if (sharedSwap) {
+		try {
+			wakeShared = await (
+				await sharedSwap
+			).bindSharedSwap({ document: d, outgoing, incoming, containerAttribute, resumeAttribute });
+		} catch (error) {
+			reportAsync(error);
+		}
+		if (stale()) return abandon();
+	}
 	let restore = scroll;
 	if (mode === 'traverse') {
 		const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
@@ -1138,7 +1166,7 @@ export async function navigate(
 		}
 		state.scrolled.clear();
 		retire(state, outgoing);
-		forgetRuntimeState(outgoing);
+		forgetRuntimeState(outgoing, sharedProperty);
 		(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
 		for (const element of d.querySelectorAll(state.config.streamedArmSelector))
 			element.remove();
@@ -1243,6 +1271,7 @@ export async function navigate(
 		ranFiles,
 		() => id === session.navigation,
 	);
+	wakeShared?.();
 	const active = d.activeElement as HTMLElement | null;
 	if (active && active !== d.body && !region.contains(active)) active.blur?.();
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();

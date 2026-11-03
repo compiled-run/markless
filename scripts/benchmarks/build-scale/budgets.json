@@ -30,8 +30,8 @@
 			"reason": "6 MB: measured 4.63 MB (interaction-closures.json) at 180 pages; origin/main before wrote a 22.6 MB execution-demand.json."
 		},
 		"clientModules": {
-			"value": 4541,
-			"reason": "Client graph modules at 180 pages, measured 15,028 on main f79073248, 14,911 once #348 dropped the re-export wrappers, 4,495 once a source's symbols the pack planner treats alike ship as one module (CI, 2026-10-29), and 4,541 once the widgets call a helper module from their handlers (2026-11-01); the count is the same on every run, so the budget is the measurement. Rolldown spends about 90 KB of native memory per module whatever its size (#268), so a rise is a memory and time regression; lower it as module-cutting changes land."
+			"value": 4544,
+			"reason": "Client graph modules at 180 pages, measured 15,028 on main f79073248, 14,911 once #348 dropped the re-export wrappers, 4,495 once a source's symbols the pack planner treats alike ship as one module (CI, 2026-10-29), 4,541 once the widgets call a helper module from their handlers (2026-11-01), and 4,544 once shared() instances outlive an in-place navigation (the binding module, its protocol constants and the router's swap binder, each loaded only by an app that declares a non-widget shared(); 2026-11-02); the count is the same on every run, so the budget is the measurement. Rolldown spends about 90 KB of native memory per module whatever its size (#268), so a rise is a memory and time regression; lower it as module-cutting changes land."
 		},
 		"clientModulesPerPage": {
 			"value": 22.5,

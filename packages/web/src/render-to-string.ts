@@ -41,6 +41,7 @@ import {
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	createInlineResumerStorageWakeSource,
+	createInlineResumerSharedWakeSource,
 	renderPrerenderInlineResumerSource,
 	renderInlineResumerPageSource,
 	INLINE_PAGE_FORWARDS_UNKNOWN,
@@ -51,7 +52,12 @@ import {
 } from './inline/resumer.ts';
 import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
-import { CONTAINER_ATTRIBUTE } from './fns/container-region.ts';
+import { CONTAINER_ATTRIBUTE, RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
+import {
+	hasLiveSharedDefinitions,
+	PROTOCOL_SHARED_INSTANCES_PROPERTY,
+	PROTOCOL_SHARED_INSTANCES_VERSION,
+} from '../../serializer/src/protocol-shared-instances.ts';
 import {
 	marklessSsrRosterCounted,
 	marklessSsrRosterPositionContext,
@@ -270,7 +276,8 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)),
+						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)) +
+						sharedWakeSource(state),
 					artifactSources?.defer,
 				)
 			: '';
@@ -362,7 +369,8 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)),
+						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)) +
+						sharedWakeSource(state),
 					artifactInlineResumerSources(component)?.defer,
 				)
 			: '';
@@ -544,6 +552,19 @@ function renderStorageSeedScript(
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
+// Only page- and request-scoped instances are shared with other containers; container and widget instances are a container's own.
+function sharedWakeSource(state: ProtocolStatePayload): string {
+	return (state.sharedDefinitions ?? []).some(
+		(definition) => definition.scope !== 'widget' && definition.scope !== 'container',
+	)
+		? createInlineResumerSharedWakeSource(
+				PROTOCOL_SHARED_INSTANCES_PROPERTY,
+				PROTOCOL_SHARED_INSTANCES_VERSION,
+				CONTAINER_ATTRIBUTE,
+			)
+		: '';
+}
+
 // Each storage cell's slot key and the value this render gave it.
 function storageWakeSource(
 	state: ProtocolStatePayload,
@@ -617,6 +638,8 @@ function renderModulePreloadLinks(
 function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
 	return (
 		(state.storage?.length ?? 0) > 0 ||
+		// A page that only reads a shared() instance still binds to its live value after a swap or another container's write.
+		hasLiveSharedDefinitions(state) ||
 		view.events.some(protocolEventDispatchesMarkless) ||
 		state.computed.some(
 			(computed) =>
@@ -1114,7 +1137,7 @@ function renderInlineResumerScript(
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
-		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
+		? ` ${RESUME_MODULE_ATTRIBUTE}="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
 	const settleModuleAttribute = settleModuleUrl
 		? ` data-markless-settle-module="${escapeAttribute(settleModuleUrl)}"`

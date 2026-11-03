@@ -192,6 +192,10 @@ URL itself answers the whole document.
   then loads the destination as a document.
 - The prefix is root-relative; apps served under a non-root base path are not
   covered yet.
+- A `shared()` instance outlives the swap: the next page is served with its
+  defaults, and before it is shown the router binds its reads to the live
+  value, so the first frame already shows it. See "Where an instance lives" in
+  `specs/framework/03-state-graph.md`.
 
 ### Kept parts
 
