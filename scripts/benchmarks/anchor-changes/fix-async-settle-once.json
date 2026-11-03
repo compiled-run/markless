@@ -1,108 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-async-wiring"
-			],
-			"delta": 249,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 13,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-repeat-branch-arm"
-			],
-			"delta": 88,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 13,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-async-wiring"
-			],
-			"delta": 249,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 13,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-repeat-branch-arm"
-			],
-			"delta": 88,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 4,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 8,
-			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
-			"date": "2026-11-03"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -182,6 +80,118 @@
 			],
 			"delta": 72,
 			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41727537193 against queue run 41720739647",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 249,
+			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 13,
+			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 190,
+			"reason": "a @try commits each settled value once, and a row repeat leaves rows a re-commit replaced: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 8,
+			"reason": "a @try commits each settled value once, and a row repeat leaves rows a re-commit replaced: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 249,
+			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 13,
+			"reason": "a @try commits each settled value once, so a settle heard twice no longer replaces rows under a press: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 190,
+			"reason": "a @try commits each settled value once, and a row repeat leaves rows a re-commit replaced: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "a @try commits each settled value once, and a row repeat leaves rows a re-commit replaced: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "a @try commits each settled value once, and a row repeat leaves rows a re-commit replaced: settle-time code",
+			"date": "2026-11-03"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 190,
+			"reason": "the branch-arm follow treats a repeat whose rows an arm re-commit replaced as not showing, so its reorder cannot put detached rows back: settle-time code",
 			"date": "2026-11-03"
 		}
 	]
