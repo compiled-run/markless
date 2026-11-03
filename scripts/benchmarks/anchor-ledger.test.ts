@@ -19,6 +19,7 @@ import {
 	recordChange,
 	SURFACES,
 } from './anchor-ledger.mjs';
+import { covers } from './perf-guards/cli.mjs';
 
 type Load = { executedChars: number; jsGzipBytes: number };
 type Anchors = {
@@ -321,5 +322,108 @@ describe('anchor change ledger', () => {
 				reason: 'a: a; b: b',
 			},
 		]);
+	});
+});
+
+describe('anchors main has no value for', () => {
+	const pageOn = (platform: string, load: Load) => (anchors: Anchors) => {
+		const next = structuredClone(anchors);
+		(next.loadWeight[platform] ??= {})['bench /'] = load;
+		return next;
+	};
+
+	test('a page anchored for the first time takes this tree measurement, even when the merge-base measures the same', () => {
+		const pr = checkout();
+		const load = { executedChars: 11_000, jsGzipBytes: 89_000 };
+		recordChange(
+			'perf-guards',
+			{
+				head: pageOn('darwin-arm64', load),
+				base: pageOn('darwin-arm64', load),
+				covers: () => true,
+			},
+			{ name: 'mac', dir: pr.dir, basePath: pr.basePath, reason: 'first Mac anchors' },
+		);
+		expect(pr.read().loadWeight['darwin-arm64']!['bench /']).toEqual(load);
+	});
+
+	test('a subject only this tree measures is set, not diffed', () => {
+		const pr = checkout();
+		recordChange(
+			'perf-guards',
+			{
+				head: (anchors: Anchors) => ({
+					...anchors,
+					runtimeModules: { ...anchors.runtimeModules, 'web/new': 640 },
+				}),
+				base: (anchors: Anchors) => anchors,
+				covers: () => true,
+			},
+			{ name: 'new', dir: pr.dir, basePath: pr.basePath, reason: 'a new runtime module' },
+		);
+		expect(readChangeFiles(pr.dir)[0]!.changes).toEqual([
+			expect.objectContaining({ path: ['runtimeModules', 'web/new'], set: 640 }),
+		]);
+	});
+
+	test('fold writes no anchor file when any surface fails to apply', () => {
+		const main = checkout();
+		const second = join(main.root, 'second.json');
+		writeFileSync(second, JSON.stringify({ modules: {}, walls: {}, history: [] }));
+		mkdirSync(main.dir, { recursive: true });
+		const set = (name: string) => ({
+			changes: [
+				{
+					surface: 'perf-guards',
+					path: ['runtimeModules', 'web/resume'],
+					delta: 1,
+					reason: name,
+				},
+				{
+					surface: 'fixture-runtime',
+					path: ['modules', 'x', 'web/a'],
+					set: 1,
+					reason: name,
+				},
+			],
+		});
+		writeFileSync(join(main.dir, 'one.json'), JSON.stringify(set('one')));
+		writeFileSync(join(main.dir, 'two.json'), JSON.stringify(set('two')));
+		const before = readFileSync(main.basePath, 'utf8');
+		expect(() =>
+			fold({
+				dir: main.dir,
+				surfaces: {
+					'perf-guards': { ...SURFACES['perf-guards']!, path: main.basePath },
+					'fixture-runtime': { ...SURFACES['fixture-runtime']!, path: second },
+				},
+			}),
+		).toThrow(/changed by both one and two/);
+		expect(readFileSync(main.basePath, 'utf8')).toBe(before);
+		expect(readdirSync(main.dir).sort()).toEqual(['one.json', 'two.json']);
+	});
+});
+
+describe('perf-guard accept replaces its own earlier entries', () => {
+	test('re-accepting a lean route covers the full-resume exemption it appended', () => {
+		const exemption = {
+			surface: 'perf-guards',
+			path: ['allowFullResume'],
+			append: [{ route: '/', action: 'click@counter-increment', reason: 'x' }],
+			reason: 'x',
+		};
+		expect(covers('lean', '/')(exemption)).toBe(true);
+		expect(covers('lean', '/records')(exemption)).toBe(false);
+		expect(
+			covers(
+				'load',
+				'bench /',
+			)({
+				surface: 'perf-guards',
+				path: ['loadWeight', 'linux-x64', 'bench /', 'jsGzipBytes'],
+				delta: 1,
+				reason: 'x',
+			}),
+		).toBe(true);
 	});
 });

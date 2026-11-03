@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -161,7 +161,10 @@ export function accept(
 			matched++;
 		}
 	}
-	if (!matched) throw new Error(`no measured ${guard} subject matches "${subject}"`);
+	if (!matched)
+		throw Object.assign(new Error(`no measured ${guard} subject matches "${subject}"`), {
+			code: 'NO_MEASURED_SUBJECT',
+		});
 	if (moved.length)
 		next.history.push({
 			date,
@@ -172,6 +175,18 @@ export function accept(
 			reason: reason.trim(),
 		});
 	return next;
+}
+
+/** Which of this branch's earlier entries an accept of `guard subject` replaces. */
+export function covers(guard, subject) {
+	return (entry) => {
+		const label = labelOf(entry);
+		if (guard !== 'all' && label.guard !== guard) return false;
+		if (subject === '*' || guard === 'all') return true;
+		if (entry.path[0] === 'allowFullResume')
+			return (entry.append ?? []).some((exemption) => exemption.route === subject);
+		return label.subject === subject || label.subject.startsWith(`${subject} (`);
+	};
 }
 
 /** Measures the merge-base with its own guard code, the way the anchors on main were measured. */
@@ -188,7 +203,11 @@ function measureMergeBase({ sites }) {
 				out,
 				...(sites ? ['--sites', sites.join(',')] : []),
 			],
-			{ cwd: checkout.root, stdio: ['ignore', 'ignore', 'inherit'] },
+			{
+				cwd: checkout.root,
+				stdio: ['ignore', 'ignore', 'inherit'],
+				env: { ...process.env, TMPDIR: mkdtempSync(join(checkout.root, '.tmp-')) },
+			},
 		);
 		return JSON.parse(readFileSync(out, 'utf8'));
 	} finally {
@@ -252,17 +271,15 @@ async function main(argv) {
 			'perf-guards',
 			{
 				head: (anchors) => accept(anchors, measurement, guard, subject, reason),
-				base: (anchors) => accept(anchors, { ...base, platform }, guard, subject, reason),
-				covers: (entry) => {
-					const label = labelOf(entry);
-					if (guard !== 'all' && label.guard !== guard) return false;
-					return (
-						subject === '*' ||
-						guard === 'all' ||
-						label.subject === subject ||
-						label.subject.startsWith(`${subject} (`)
-					);
+				base: (anchors) => {
+					try {
+						return accept(anchors, { ...base, platform }, guard, subject, reason);
+					} catch (error) {
+						if (error.code === 'NO_MEASURED_SUBJECT') return anchors;
+						throw error;
+					}
 				},
+				covers: covers(guard, subject),
 			},
 			{ reason },
 		);

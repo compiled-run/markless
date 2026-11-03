@@ -333,7 +333,7 @@ export function recordChange(
 	const file = join(dir, `${name}.json`);
 	const previous = existsSync(file) ? readJson(file).changes : [];
 	const opKey = (entry) => JSON.stringify([entry.path, opOf(entry), entry[opOf(entry)]]);
-	const ops = diffAnchors(base(structuredClone(others)), head(structuredClone(others))).map(
+	const ops = ownOps(others, base(structuredClone(others)), head(structuredClone(others))).map(
 		(op) =>
 			previous.find(
 				(entry) => entry.surface === surfaceName && opKey(entry) === opKey(op),
@@ -357,6 +357,25 @@ export function recordChange(
 		writeJson(file, { changes });
 	}
 	return { file, changes: ops };
+}
+
+const within = (path, prefix) => prefix.every((key, i) => path[i] === key);
+
+// An anchor main has no value for starts at this tree's measurement; every other anchor moves by head minus base.
+function ownOps(others, baseAnchors, headAnchors) {
+	const initial = diffAnchors(others, headAnchors).filter(
+		(op) => 'set' in op && getPath(others, op.path) === undefined,
+	);
+	const ops = [...initial];
+	for (const op of diffAnchors(baseAnchors, headAnchors)) {
+		if (initial.some((set) => within(op.path, set.path))) continue;
+		const current = getPath(others, op.path);
+		if ('remove' in op && current === undefined) continue;
+		if ('set' in op && typeof current === 'number' && typeof op.set === 'number')
+			ops.push({ path: op.path, delta: op.set - current });
+		else ops.push(op);
+	}
+	return ops;
 }
 
 /** The subject an entry belongs to, as its guard and subject names. */
@@ -433,9 +452,10 @@ export function fold({
 						: [...reasons].map(([name, reason]) => `${name}: ${reason}`).join('; '),
 			});
 		}
-		writeJson(surface.path, next);
 		folded[surfaceName] = next;
 	}
+	for (const [surfaceName, next] of Object.entries(folded))
+		writeJson(surfaces[surfaceName].path, next);
 	for (const file of files) rmSync(join(dir, `${file.name}.json`));
 	return { files: files.map((file) => file.name), folded };
 }
