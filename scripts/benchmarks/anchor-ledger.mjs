@@ -404,6 +404,7 @@ export function fold({
 	const files = readChangeFiles(dir);
 	const folded = {};
 	for (const [surfaceName, surface] of Object.entries(surfaces)) {
+		if (!files.some((file) => file.changes.some((entry) => entry.surface === surfaceName))) continue;
 		const base = readJson(surface.path);
 		const next = surface.normalize(applyChanges(base, files, surfaceName));
 		const subjects = new Map();
