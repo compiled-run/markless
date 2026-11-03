@@ -515,13 +515,16 @@ export function createEventWiring(input: {
 		// The host itself went with the redraw: nothing on the page is left to run.
 		if (!attached && !rowAnchor && pressPath[0] && !pressAnchor) return;
 		const bubbles = event.bubbles !== false;
-		const path = collectDispatchPath(
-			pressAnchor ?? target,
-			event.type,
-			eventRecords,
-			rowEventRecords,
-			bubbles,
-		);
+		const collect = () =>
+			collectDispatchPath(pressAnchor ?? target, event.type, eventRecords, rowEventRecords, bubbles);
+		let path = collect();
+		// Arm content lands before its records: a press on it waits for them instead of matching nothing.
+		for (
+			let registering = (input.root as ArmRegisteringRoot).__marklessArmRegistering;
+			path.length === 0 && registering?.size;
+			path = collect()
+		)
+			await Promise.all(registering);
 		// A broad forward of markup no record owns may find it already removed by a script (a copy fallback's textarea).
 		if (
 			!attached &&
@@ -883,6 +886,8 @@ async function marklessLogInteraction(input: {
 		// Execution logging is observability only; app dispatch must not depend on it.
 	}
 }
+
+type ArmRegisteringRoot = { readonly __marklessArmRegistering?: ReadonlySet<Promise<unknown>> };
 
 type ResumeDispatchMatch =
 	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }

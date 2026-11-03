@@ -101,7 +101,8 @@ export function createAsyncBoundarySettleTracker(input: {
 
 export type AsyncBoundaryWiring = {
 	// A boundary an arm commit rendered: rewires it against its fresh anchors.
-	readonly add: (boundary: ResumeAsyncBoundaryRecord) => void;
+	// `shown` names, per async read, the settled snapshot version the arm already shows.
+	readonly add: (boundary: ResumeAsyncBoundaryRecord, shown?: ReadonlyMap<string, unknown>) => void;
 };
 
 export function wireAsyncBoundariesWithoutLoadingCapability(input: {
@@ -139,7 +140,12 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 		disposed = true;
 		for (const boundaryId of releasesById.keys()) release(boundaryId);
 	});
-	const wire = (boundary: ResumeAsyncBoundaryRecord, demand: boolean, catchUp: boolean) => {
+	const wire = (
+		boundary: ResumeAsyncBoundaryRecord,
+		demand: boolean,
+		catchUp: boolean,
+		shown?: Map<string, unknown>,
+	) => {
 		if (disposed) return;
 		const releases: Array<() => void> = [];
 		releasesById.set(boundary.id, releases);
@@ -155,6 +161,13 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 						input.asyncBoundariesById.delete(boundary.id);
 						input.settleTracker?.forget(boundary.id);
 						return release(boundary.id);
+					}
+					// Committing the settle the range already shows would replace its rows under a press.
+					if (shown?.has(asyncRead.graphNodeId)) {
+						const version = shown.get(asyncRead.graphNodeId);
+						shown.delete(asyncRead.graphNodeId);
+						const observed = snapshot as { readonly status?: unknown; readonly version?: unknown } | null;
+						if (isSettledStatus(observed?.status) && observed?.version === version) return;
 					}
 					snapshot = boundaryGateSnapshot(
 						input.graph,
@@ -214,12 +227,12 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			input.demandOnStart === true,
 		);
 	return {
-		add(boundary) {
+		add(boundary, shown) {
 			release(boundary.id);
 			input.asyncBoundariesById.set(boundary.id, boundary);
 			input.settleTracker?.track(boundary);
 			const settled = input.settleTracker?.hasSettledContent(boundary.id) === true;
-			wire(boundary, !settled, !settled);
+			wire(boundary, !settled, !settled, settled && shown ? new Map(shown) : undefined);
 		},
 	};
 }
