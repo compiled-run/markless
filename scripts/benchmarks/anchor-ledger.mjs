@@ -12,10 +12,9 @@ import {
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
-import { ANCHORS_PATH } from './perf-guards/config.mjs';
+import { join, relative } from 'node:path';
+import { ANCHORS_PATH, ROOT_DIR as ROOT } from './perf-guards/config.mjs';
 
-const ROOT = resolve(import.meta.dirname, '../..');
 export const CHANGES_DIR = join(import.meta.dirname, 'anchor-changes');
 export const FIXTURE_RUNTIME_ANCHORS_PATH = join(
 	ROOT,
@@ -404,7 +403,8 @@ export function fold({
 	const files = readChangeFiles(dir);
 	const folded = {};
 	for (const [surfaceName, surface] of Object.entries(surfaces)) {
-		if (!files.some((file) => file.changes.some((entry) => entry.surface === surfaceName))) continue;
+		if (!files.some((file) => file.changes.some((entry) => entry.surface === surfaceName)))
+			continue;
 		const base = readJson(surface.path);
 		const next = surface.normalize(applyChanges(base, files, surfaceName));
 		const subjects = new Map();
