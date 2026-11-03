@@ -3420,6 +3420,56 @@
 				"jsGzipBytes": 1571252
 			},
 			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/prerender/owning-surface",
+			"from": 1212,
+			"to": 1702,
+			"reason": "a minted row's owner is found through the local components its module places imports under, starting from the component the page reached (docs search: an option list in its own file, rendered by a child component of the dialog, threw Unknown async symbol)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10883,
+				"jsGzipBytes": 88600
+			},
+			"reason": "family parts a nested or imported component renders reach their handlers: the owning-surface walk counts local placements, a row-bound widget lookup tries the row's own path, a rebound symbol keeps its rescope through island spacing, and route tables carry the consumed local path (+94 B gzip against main on this Mac, executed chars at load within budget)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10899,
+				"jsGzipBytes": 88600
+			},
+			"reason": "family parts a nested or imported component renders reach their handlers: the owning-surface walk counts local placements, a row-bound widget lookup tries the row's own path, a rebound symbol keeps its rescope through island spacing, and route tables carry the consumed local path (+94 B gzip against main on this Mac, executed chars at load within budget)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10956,
+				"jsGzipBytes": 88600
+			},
+			"reason": "family parts a nested or imported component renders reach their handlers: the owning-surface walk counts local placements, a row-bound widget lookup tries the row's own path, a rebound symbol keeps its rescope through island spacing, and route tables carry the consumed local path (+94 B gzip against main on this Mac, executed chars at load within budget)"
 		}
 	],
 	"runtimeModules": {
@@ -3503,7 +3553,7 @@
 		"web/payload-resume-registry": 1916,
 		"web/pending-timing": 521,
 		"web/prerender/evaluator": 22981,
-		"web/prerender/owning-surface": 1212,
+		"web/prerender/owning-surface": 1702,
 		"web/prerender/shared-seed-slot": 2836,
 		"web/prerender/staged-graph": 411,
 		"web/reconcile-plane-slot": 344,
@@ -3584,16 +3634,16 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10989,
-				"jsGzipBytes": 88506
+				"executedChars": 10883,
+				"jsGzipBytes": 88600
 			},
 			"bench /records": {
-				"executedChars": 10898,
-				"jsGzipBytes": 88506
+				"executedChars": 10899,
+				"jsGzipBytes": 88600
 			},
 			"bench /settings": {
-				"executedChars": 10955,
-				"jsGzipBytes": 88506
+				"executedChars": 10956,
+				"jsGzipBytes": 88600
 			},
 			"docs /": {
 				"executedChars": 108937,
