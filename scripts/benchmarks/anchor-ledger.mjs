@@ -1,7 +1,17 @@
 #!/usr/bin/env node
 // Anchor files hold main's anchors as of the last fold; each pull request records its own changes in its own file.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { ANCHORS_PATH } from './perf-guards/config.mjs';
 
@@ -126,7 +136,7 @@ function getPath(object, path) {
 /** One line per recorded change, with what its number counts. */
 export function formatChange(entry) {
 	const surface = surfaceOf(entry.surface);
-	const { guard, subject } = surface.label(entry.path.slice(0, surface.subjectDepth(entry.path)));
+	const { guard, subject } = labelOf(entry);
 	const field = entry.path.slice(surface.subjectDepth(entry.path)).join('.');
 	const op = opOf(entry);
 	const value =
@@ -296,12 +306,14 @@ export function readAnchorsWithChanges(surfaceName, { exclude, dir = CHANGES_DIR
 }
 
 /**
- * Records `target` as this change's anchors for one surface. `accept` maps the anchors read with this
- * change applied to the anchors it wants, so a second accept replaces this change's entries instead of adding to them.
+ * Records this branch's own change for one surface: `head` and `base` each anchor a copy of the other
+ * branches' anchors to a measurement (of this tree and of its merge-base, same machine, same command), and
+ * their difference is the entry. Measuring against the anchors instead would charge main's unrecorded
+ * drift to every open branch, once each. Earlier entries `covers` names are replaced; the rest are kept.
  */
 export function recordChange(
 	surfaceName,
-	accept,
+	{ head, base, covers },
 	{
 		name = changeName(),
 		dir = CHANGES_DIR,
@@ -311,45 +323,76 @@ export function recordChange(
 	} = {},
 ) {
 	if (!reason?.trim()) throw new Error('recording an anchor change needs a one-line reason');
-	const base = readJson(basePath);
-	const files = readChangeFiles(dir);
+	if (typeof head !== 'function' || typeof base !== 'function' || typeof covers !== 'function')
+		throw new Error('recordChange needs head, base and covers');
+	const anchorFile = readJson(basePath);
 	const others = applyChanges(
-		base,
-		files.filter((file) => file.name !== name),
+		anchorFile,
+		readChangeFiles(dir).filter((file) => file.name !== name),
 		surfaceName,
 	);
-	let own;
-	try {
-		own = applyChanges(base, files, surfaceName);
-	} catch (error) {
-		console.error(
-			`[anchors] ${error.message}\n[anchors] dropping ${name}'s earlier ${surfaceName} entries; accept every anchor this branch moves again.`,
-		);
-		own = others;
-	}
-	const target = accept(own);
 	const file = join(dir, `${name}.json`);
 	const previous = existsSync(file) ? readJson(file).changes : [];
-	const kept = previous.filter((entry) => entry.surface !== surfaceName);
 	const opKey = (entry) => JSON.stringify([entry.path, opOf(entry), entry[opOf(entry)]]);
-	const ops = diffAnchors(others, target).map(
+	const ops = diffAnchors(base(structuredClone(others)), head(structuredClone(others))).map(
 		(op) =>
 			previous.find(
 				(entry) => entry.surface === surfaceName && opKey(entry) === opKey(op),
-			) ?? {
-				surface: surfaceName,
-				...op,
-				reason: reason.trim(),
-				date,
-			},
+			) ?? { surface: surfaceName, ...op, reason: reason.trim(), date },
+	);
+	const replaced = new Set(ops.map((op) => JSON.stringify(op.path)));
+	const kept = previous.filter(
+		(entry) =>
+			entry.surface !== surfaceName ||
+			(!covers(entry) && !replaced.has(JSON.stringify(entry.path))),
 	);
 	const changes = [...kept, ...ops];
+	applyChanges(
+		anchorFile,
+		[...readChangeFiles(dir).filter((other) => other.name !== name), { name, changes }],
+		surfaceName,
+	);
 	if (changes.length === 0) rmSync(file, { force: true });
 	else {
 		mkdirSync(dir, { recursive: true });
 		writeJson(file, { changes });
 	}
 	return { file, changes: ops };
+}
+
+/** The subject an entry belongs to, as its guard and subject names. */
+export function labelOf(entry) {
+	const surface = surfaceOf(entry.surface);
+	return surface.label(entry.path.slice(0, surface.subjectDepth(entry.path)));
+}
+
+/** The commit a change is measured against: MARKLESS_ACCEPT_BASE_REF, else where this branch left origin/main. */
+export function mergeBaseRef(env = process.env) {
+	if (env.MARKLESS_ACCEPT_BASE_REF?.trim()) return env.MARKLESS_ACCEPT_BASE_REF.trim();
+	return execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], {
+		cwd: ROOT,
+		encoding: 'utf8',
+	}).trim();
+}
+
+/** A throwaway, installed checkout of the merge-base; `close()` removes it. */
+export function openMergeBaseCheckout({ rev = mergeBaseRef(), log = console.error } = {}) {
+	const root = mkdtempSync(join(realpathSync(tmpdir()), 'markless-merge-base-'));
+	const run = (command, args, cwd) =>
+		execFileSync(command, args, { cwd, stdio: ['ignore', 'ignore', 'inherit'] });
+	log(`[anchors] measuring the merge-base ${rev.slice(0, 10)} in ${root}`);
+	run('git', ['worktree', 'add', '--detach', root, rev], ROOT);
+	const close = () => {
+		run('git', ['worktree', 'remove', '--force', root], ROOT);
+		rmSync(root, { recursive: true, force: true });
+	};
+	try {
+		run('pnpm', ['install', '--frozen-lockfile', '--offline'], root);
+	} catch (error) {
+		close();
+		throw error;
+	}
+	return { root, rev, close };
 }
 
 /** Writes every change into its anchor file with a history line per changed anchor, and deletes the change files. */

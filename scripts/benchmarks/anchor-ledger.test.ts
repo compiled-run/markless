@@ -65,6 +65,15 @@ const measuredLoad = (load: Load) => (anchors: Anchors) => {
 	return next;
 };
 
+const MAIN = { executedChars: 11_371, jsGzipBytes: 89_152 };
+
+/** This tree and its merge-base, each measured the same way. */
+const measured = (head: Load, base: Load = MAIN) => ({
+	head: measuredLoad(head),
+	base: measuredLoad(base),
+	covers: () => true,
+});
+
 function mergeInto(
 	main: ReturnType<typeof checkout>,
 	branch: ReturnType<typeof checkout>,
@@ -85,14 +94,14 @@ describe('anchor change ledger', () => {
 		const prA = checkout(main.root);
 		const prB = checkout(main.root);
 		// Each branch measures its own tree on main and records only its own difference.
-		recordChange('perf-guards', measuredLoad({ executedChars: 11_371, jsGzipBytes: 89_170 }), {
+		recordChange('perf-guards', measured({ executedChars: 11_371, jsGzipBytes: 89_170 }), {
 			name: 'fix-same-page-link',
 			dir: prA.dir,
 			basePath: prA.basePath,
 			reason: 'an early return in the link handler, none of it executed at load',
 			date: '2026-11-03',
 		});
-		recordChange('perf-guards', measuredLoad({ executedChars: 11_400, jsGzipBytes: 89_159 }), {
+		recordChange('perf-guards', measured({ executedChars: 11_400, jsGzipBytes: 89_159 }), {
 			name: 'fix-try-row-click',
 			dir: prB.dir,
 			basePath: prB.basePath,
@@ -130,14 +139,14 @@ describe('anchor change ledger', () => {
 	test('accepting again after a rebase replaces the branch entries with the new measurement', () => {
 		const main = checkout();
 		const prA = checkout(main.root);
-		recordChange('perf-guards', measuredLoad({ executedChars: 11_371, jsGzipBytes: 89_170 }), {
+		recordChange('perf-guards', measured({ executedChars: 11_371, jsGzipBytes: 89_170 }), {
 			name: 'a',
 			dir: prA.dir,
 			basePath: prA.basePath,
 			reason: 'a',
 		});
 		const prB = checkout(main.root);
-		recordChange('perf-guards', measuredLoad({ executedChars: 11_371, jsGzipBytes: 89_159 }), {
+		recordChange('perf-guards', measured({ executedChars: 11_371, jsGzipBytes: 89_159 }), {
 			name: 'b',
 			dir: prB.dir,
 			basePath: prB.basePath,
@@ -146,21 +155,59 @@ describe('anchor change ledger', () => {
 		mergeInto(main, prA, 'a');
 		// gzip of the tree with both measured 2 B over the sum of their changes, so B accepts once more.
 		mergeInto(prB, main, 'a');
-		recordChange('perf-guards', measuredLoad({ executedChars: 11_371, jsGzipBytes: 89_179 }), {
-			name: 'b',
-			dir: prB.dir,
-			basePath: prB.basePath,
-			reason: 'b, measured on a tree with a',
-		});
+		recordChange(
+			'perf-guards',
+			measured(
+				{ executedChars: 11_371, jsGzipBytes: 89_179 },
+				{ executedChars: 11_371, jsGzipBytes: 89_170 },
+			),
+			{
+				name: 'b',
+				dir: prB.dir,
+				basePath: prB.basePath,
+				reason: 'b, measured on a tree with a',
+			},
+		);
 		expect(readChangeFiles(prB.dir).find((file) => file.name === 'b')!.changes).toEqual([
 			expect.objectContaining({ delta: 9, reason: 'b, measured on a tree with a' }),
 		]);
 		expect(prB.read().loadWeight['linux-x64']!['bench /'].jsGzipBytes).toBe(89_179);
 	});
 
+	test('drift on main that its budget allows is not charged to each open branch', () => {
+		const main = checkout();
+		const branches = ['a', 'b'].map((name) => {
+			const pr = checkout(main.root);
+			// main itself now runs 140 chars more than its anchor, inside the 256-char swing; each branch adds 20.
+			recordChange(
+				'perf-guards',
+				measured(
+					{ executedChars: 11_531, jsGzipBytes: 89_152 },
+					{ executedChars: 11_511, jsGzipBytes: 89_152 },
+				),
+				{ name, dir: pr.dir, basePath: pr.basePath, reason: name },
+			);
+			return [name, pr] as const;
+		});
+		for (const [name, pr] of branches) mergeInto(main, pr, name);
+		expect(main.read().loadWeight['linux-x64']!['bench /'].executedChars).toBe(11_411);
+	});
+
+	test('accepting again with nothing left of the change removes its entry', () => {
+		const pr = checkout();
+		const options = { name: 'x', dir: pr.dir, basePath: pr.basePath, reason: 'x' };
+		recordChange(
+			'perf-guards',
+			measured({ executedChars: 11_371, jsGzipBytes: 89_200 }),
+			options,
+		);
+		recordChange('perf-guards', measured(MAIN), options);
+		expect(readChangeFiles(pr.dir)).toEqual([]);
+	});
+
 	test('a win is recorded as a negative change in the same change set', () => {
 		const pr = checkout();
-		recordChange('perf-guards', measuredLoad({ executedChars: 10_000, jsGzipBytes: 88_000 }), {
+		recordChange('perf-guards', measured({ executedChars: 10_000, jsGzipBytes: 88_000 }), {
 			name: 'win',
 			dir: pr.dir,
 			basePath: pr.basePath,
@@ -214,7 +261,7 @@ describe('anchor change ledger', () => {
 	test('a change without a reason is rejected', () => {
 		const pr = checkout();
 		expect(() =>
-			recordChange('perf-guards', (anchors) => anchors, {
+			recordChange('perf-guards', measured(MAIN), {
 				name: 'x',
 				dir: pr.dir,
 				basePath: pr.basePath,
@@ -246,7 +293,7 @@ describe('anchor change ledger', () => {
 			] as const
 		).map(([name, load]) => {
 			const pr = checkout(main.root);
-			recordChange('perf-guards', measuredLoad(load), {
+			recordChange('perf-guards', measured(load), {
 				name,
 				dir: pr.dir,
 				basePath: pr.basePath,

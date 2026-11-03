@@ -2,13 +2,15 @@ import { execFile } from 'node:child_process';
 import { mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
-import { describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { openMergeBaseCheckout } from '../../../scripts/benchmarks/anchor-ledger.mjs';
 import { buildInternalFilesInPublicOutput } from '../../../scripts/test-utils/public-build-output.ts';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_SIZES } from '../src/build/chunking.ts';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
 import {
 	acceptFixtureRuntime,
+	acceptingFixtureRuntime,
 	assertRuntimeBudget,
 	fixtureRuntimeBudget,
 	fixtureRuntimeModules,
@@ -68,6 +70,12 @@ const fixtures = [
 ] as const;
 
 describe('fixture builds', () => {
+	let mergeBase: ReturnType<typeof openMergeBaseCheckout> | undefined;
+	beforeAll(() => {
+		if (acceptingFixtureRuntime()) mergeBase = openMergeBaseCheckout();
+	}, 240_000);
+	afterAll(() => mergeBase?.close());
+
 	// No root `pnpm build` here: fixtures resolve @markless deps through the dev
 	// exports maps (src .ts), so package dists are not inputs to these builds.
 	// Repacking the workspace from inside the suite wiped every packages/*/dist
@@ -109,12 +117,7 @@ describe('fixture builds', () => {
 			}
 
 			if ('runtimeBudget' in fixture) {
-				// The runtime walls price the library by its own chunks, which only an unpacked build keeps apart.
-				for (const output of fixture.outputs)
-					await rm(resolve(root, output), { force: true, recursive: true });
-				await execPnpm(['--filter', fixture.filter, 'build'], {
-					MARKLESS_FIXTURE_NATIVE_PACKING: '0',
-				});
+				await buildUnpacked(root, fixture.filter, fixture.runtimeBudget.dist);
 				await expectNoAppChunkStaticallyImportsInstrumentChunk(
 					resolve(root, fixture.runtimeBudget.dist),
 				);
@@ -126,11 +129,16 @@ describe('fixture builds', () => {
 				const runtimeModules = fixtureRuntimeModules(
 					resolve(root, fixture.runtimeBudget.dist),
 				);
-				const accepted = acceptFixtureRuntime(
-					fixture.filter,
-					runtimeModules,
-					emittedReport,
-				);
+				if (mergeBase)
+					acceptFixtureRuntime(
+						fixture.filter,
+						{ modules: runtimeModules, report: emittedReport },
+						await measureRuntime(
+							mergeBase.root,
+							fixture.filter,
+							fixture.runtimeBudget.dist,
+						),
+					);
 				const budget = fixtureRuntimeBudget(fixture.filter, {
 					forbidVitePreloadHelper: fixture.runtimeBudget.forbidVitePreloadHelper,
 				});
@@ -150,7 +158,7 @@ describe('fixture builds', () => {
 						),
 					);
 				}
-				if (!accepted)
+				if (!mergeBase)
 					expect(
 						runtimeModuleOverruns(
 							fixture.filter,
@@ -197,9 +205,27 @@ async function expectNoMachinePathInOutput(directory: string): Promise<void> {
 	expect(leaks, `build output must not carry ${fixturesDirectory}`).toEqual([]);
 }
 
-async function execPnpm(args: string[], env: Record<string, string> = {}) {
+// The runtime walls price the library by its own chunks, which only an unpacked build keeps apart.
+async function buildUnpacked(checkout: string, filter: string, dist: string) {
+	await rm(resolve(checkout, dist), { force: true, recursive: true });
+	await execPnpm(
+		['--filter', filter, 'build'],
+		{ MARKLESS_FIXTURE_NATIVE_PACKING: '0' },
+		checkout,
+	);
+}
+
+async function measureRuntime(checkout: string, filter: string, dist: string) {
+	await buildUnpacked(checkout, filter, dist);
+	return {
+		modules: fixtureRuntimeModules(resolve(checkout, dist)),
+		report: await runtimeSizeReport({ dist: resolve(checkout, dist) }),
+	};
+}
+
+async function execPnpm(args: string[], env: Record<string, string> = {}, cwd = root) {
 	try {
-		await exec('pnpm', args, { cwd: root, env: { ...process.env, ...env } });
+		await exec('pnpm', args, { cwd, env: { ...process.env, ...env } });
 	} catch (error) {
 		const next = error as Error & { stdout?: string; stderr?: string };
 		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));

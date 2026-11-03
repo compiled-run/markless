@@ -2,7 +2,14 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { formatChange, readAnchorsWithChanges, recordChange } from '../anchor-ledger.mjs';
+import { execFileSync } from 'node:child_process';
+import {
+	formatChange,
+	labelOf,
+	openMergeBaseCheckout,
+	readAnchorsWithChanges,
+	recordChange,
+} from '../anchor-ledger.mjs';
 import { evaluate, formatReport, isLean, LOAD_PLATFORM, routeKey } from './evaluate.mjs';
 import { measure } from './measure.mjs';
 
@@ -11,7 +18,8 @@ const GUARDS = ['runtime', 'construct', 'execution', 'lean', 'resume', 'load', '
 const USAGE = `usage:
   node scripts/benchmarks/perf-guards/cli.mjs check [--no-build] [--sites bench,docs] [--from <measurement.json>]
   node scripts/benchmarks/perf-guards/cli.mjs measure [--no-build] [--out <file>]
-  node scripts/benchmarks/perf-guards/cli.mjs accept <${GUARDS.join('|')}> <subject|*> --reason "<why>" [--from-last] [--no-build]`;
+  node scripts/benchmarks/perf-guards/cli.mjs accept <${GUARDS.join('|')}> <subject|*> --reason "<why>" [--from-last | --from <file>] [--base <file>] [--no-build]
+    accept records this tree's measurement minus its merge-base's; without --base it measures the merge-base in a throwaway checkout`;
 
 /** anchors.json with every pending change file in scripts/benchmarks/anchor-changes applied. */
 export function readAnchors() {
@@ -166,6 +174,28 @@ export function accept(
 	return next;
 }
 
+/** Measures the merge-base with its own guard code, the way the anchors on main were measured. */
+function measureMergeBase({ sites }) {
+	const checkout = openMergeBaseCheckout({ log: (message) => console.error(message) });
+	try {
+		const out = join(checkout.root, 'merge-base-measurement.json');
+		execFileSync(
+			'node',
+			[
+				'scripts/benchmarks/perf-guards/cli.mjs',
+				'measure',
+				'--out',
+				out,
+				...(sites ? ['--sites', sites.join(',')] : []),
+			],
+			{ cwd: checkout.root, stdio: ['ignore', 'ignore', 'inherit'] },
+		);
+		return JSON.parse(readFileSync(out, 'utf8'));
+	} finally {
+		checkout.close();
+	}
+}
+
 function flag(args, name) {
 	const i = args.indexOf(name);
 	if (i < 0) return undefined;
@@ -181,6 +211,7 @@ async function main(argv) {
 	const fromLast = args.includes('--from-last');
 	const from = flag(args, '--from');
 	const out = flag(args, '--out');
+	const baseFile = flag(args, '--base');
 	const reason = flag(args, '--reason');
 	const sites = flag(args, '--sites')?.split(',');
 	const positional = args.filter((a) => !a.startsWith('--'));
@@ -209,15 +240,36 @@ async function main(argv) {
 		if (!reason?.trim())
 			throw new Error('accept needs --reason "<one line: why this cost is intended>"');
 		const measurement = await load();
+		const base = baseFile
+			? JSON.parse(readFileSync(baseFile, 'utf8'))
+			: measureMergeBase({ sites });
+		const platform = measurement.platform ?? LOAD_PLATFORM;
+		if (base.platform && base.platform !== platform)
+			throw new Error(
+				`the merge-base was measured on ${base.platform} and this tree on ${platform}; measure both on one platform`,
+			);
 		const { file, changes } = recordChange(
 			'perf-guards',
-			(anchors) => accept(anchors, measurement, guard, subject, reason),
+			{
+				head: (anchors) => accept(anchors, measurement, guard, subject, reason),
+				base: (anchors) => accept(anchors, { ...base, platform }, guard, subject, reason),
+				covers: (entry) => {
+					const label = labelOf(entry);
+					if (guard !== 'all' && label.guard !== guard) return false;
+					return (
+						subject === '*' ||
+						guard === 'all' ||
+						label.subject === subject ||
+						label.subject.startsWith(`${subject} (`)
+					);
+				},
+			},
 			{ reason },
 		);
 		console.log(
 			changes.length
 				? `recorded in ${file}:\n${changes.map((entry) => `  ${formatChange(entry)}`).join('\n')}`
-				: `${guard} ${subject}: measured the same as the anchors without this branch's changes; nothing recorded`,
+				: `${guard} ${subject}: this tree measures the same as its merge-base; nothing recorded`,
 		);
 		return 0;
 	}

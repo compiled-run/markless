@@ -26,9 +26,14 @@ export function readAnchorsWithChanges(
 	surface: string,
 	options?: { readonly exclude?: string; readonly dir?: string; readonly base?: unknown },
 ): any;
+export function labelOf(entry: AnchorChange): { guard: string; subject: string };
 export function recordChange<T>(
 	surface: string,
-	accept: (anchors: T) => T,
+	measured: {
+		readonly head: (anchors: T) => T;
+		readonly base: (anchors: T) => T;
+		readonly covers: (entry: AnchorChange) => boolean;
+	},
 	options: {
 		readonly reason: string;
 		readonly name?: string;
@@ -37,6 +42,11 @@ export function recordChange<T>(
 		readonly date?: string;
 	},
 ): { file: string; changes: AnchorChange[] };
+export function mergeBaseRef(env?: Record<string, string | undefined>): string;
+export function openMergeBaseCheckout(options?: {
+	readonly rev?: string;
+	readonly log?: (message: string) => void;
+}): { root: string; rev: string; close: () => void };
 export function fold(options?: {
 	readonly dir?: string;
 	readonly surfaces?: Record<string, { readonly path: string }>;

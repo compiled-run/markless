@@ -129,39 +129,52 @@ export function readFixtureRuntimeAnchors(): FixtureRuntimeAnchors {
 	return readAnchorsWithChanges('fixture-runtime') as FixtureRuntimeAnchors;
 }
 
-/** With the accept variable set, records this fixture's measured modules and walls as this branch's change instead of checking them. */
+export type FixtureMeasurement = {
+	readonly modules: Record<string, number>;
+	readonly report: RuntimeSizeReport;
+};
+
+export const acceptingFixtureRuntime = () => process.env[ACCEPT_ENV] === '1';
+
+/**
+ * Records what this branch changes in one fixture's modules and walls: its tree measured against its
+ * merge-base, both built on this machine, so main's drift and the Mac-to-Linux offset stay out of it.
+ */
 export function acceptFixtureRuntime(
 	fixture: string,
-	measured: Record<string, number>,
-	report: RuntimeSizeReport,
-): boolean {
-	if (process.env[ACCEPT_ENV] !== '1') return false;
+	head: FixtureMeasurement,
+	base: FixtureMeasurement,
+): void {
 	const reason = process.env[REASON_ENV];
 	if (!reason?.trim())
 		throw new Error(
 			`${ACCEPT_ENV}=1 needs ${REASON_ENV}="<one line: what the bytes buy or which win this records>"`,
 		);
-	const walls = measuredWalls(report);
+	const anchoredTo = (measurement: FixtureMeasurement) => (anchors: FixtureRuntimeAnchors) => {
+		const next = structuredClone(anchors) as {
+			modules: RuntimeModuleAnchors;
+			walls: Record<string, Record<string, { measured: number; margin: number }>>;
+		};
+		const walls = measuredWalls(measurement.report);
+		next.modules[fixture] = { ...measurement.modules };
+		for (const [name, wall] of Object.entries(next.walls[fixture] ?? {}))
+			wall.measured = walls[name as keyof typeof walls];
+		return next;
+	};
 	const { file, changes } = recordChange(
 		'fixture-runtime',
-		(anchors: FixtureRuntimeAnchors) => {
-			const next = structuredClone(anchors) as {
-				modules: RuntimeModuleAnchors;
-				walls: Record<string, Record<string, { measured: number; margin: number }>>;
-			};
-			next.modules[fixture] = measured;
-			for (const [name, wall] of Object.entries(next.walls[fixture] ?? {}))
-				wall.measured = walls[name as keyof typeof walls];
-			return next;
+		{
+			head: anchoredTo(head),
+			base: anchoredTo(base),
+			covers: (entry) => entry.path[1] === fixture,
 		},
 		{ reason },
 	);
 	console.error(
 		changes.length
 			? `[fixture-runtime] ${fixture} recorded in ${file}:\n${changes.map((entry) => `  ${formatChange(entry)}`).join('\n')}`
-			: `[fixture-runtime] ${fixture}: measured the same as the anchors without this branch's changes`,
+			: `[fixture-runtime] ${fixture}: this branch measures the same as its merge-base; nothing recorded`,
 	);
-	return true;
 }
 
 export function pageFetchScriptsFromHtml(html: string): string[] {
