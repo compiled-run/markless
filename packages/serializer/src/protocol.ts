@@ -125,6 +125,8 @@ export type ProtocolEventRecord = {
 	readonly syncPolicy?: ProtocolSyncPolicy;
 	readonly symbolIds: ReadonlyArray<string>;
 	readonly action?: ProtocolEventAction;
+	/** The element sits in a child this record's component spread its props onto, so that component's instance is one edge above the host. */
+	readonly forwarded?: true;
 };
 
 export function protocolEventActionKind(
