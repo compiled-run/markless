@@ -336,3 +336,60 @@ test('a nested part binds on that path to deliver the callback its consumer pass
 	expect(row.captureSlots.map((slot) => slot.route.kind)).toContain('callback-route');
 	expect(row.captureSlots.map((slot) => slot.route.kind)).toContain('callback-slot-route');
 });
+
+// The root and the part both sit in a page-local component, so the root's
+// callback belongs to that component's instance on every path to it.
+test('a nested root answers its part with a callback spelled under its own component', async () => {
+	const family = await compileFamily(
+		FAMILY_SOURCE.replace(
+			'export function BoxTrigger({ children }) @{',
+			'export function BoxTrigger({ children, onPress }) @{',
+		).replace(
+			'<button onClick={() => box.toggle()}>{children}</button>',
+			'<button onClick={() => { box.toggle(); onPress?.(); }}>{children}</button>',
+		),
+	);
+	const handler = family.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const source = `import { state } from '@markless/core';
+	import { BoxRoot, BoxTrigger } from './box.tsrx';
+	function Field() @{
+		let seen = state('none');
+		<div>
+			<BoxRoot onChange={(next) => seen = 'changed:' + next}>
+				<BoxTrigger onPress={() => seen = 'pressed'}>A</BoxTrigger>
+			</BoxRoot>
+			<output>{seen}</output>
+		</div>
+	}
+	export function App() @{
+		<main><Field /></main>
+	}`;
+	const bare = await compileTsrxModule({ filename: 'src/App.tsrx', source, symbols: [] });
+	const trigger = bare.semanticGraph.componentEdges.find(
+		(edge) => edge.childComponentName === 'BoxTrigger',
+	)!;
+	const app = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source,
+		symbols: [
+			{
+				id: 'imported:box:trigger:0',
+				chunk: 'virtual:markless:symbol:box:0',
+				exportName: 'boxTrigger',
+				componentEdgeId: trigger.id,
+				claimKind: linkedImportedClaimKind(handler),
+				captureSymbol: handler,
+			},
+		],
+	});
+
+	const widget = app.captureAnalysis.extractedSymbols
+		.filter((symbol) => symbol.loaderSymbolId)
+		.flatMap((symbol) => symbol.captureSlots)
+		.find((slot) => slot.id.includes(':onChange:'))!;
+	const routes = widget.routes.filter((route) => route.kind === 'callback-route');
+	expect(routes).toHaveLength(1);
+	expect(routes[0]).toMatchObject({ composerPath: expect.stringMatching(/^c\d+:$/) });
+});

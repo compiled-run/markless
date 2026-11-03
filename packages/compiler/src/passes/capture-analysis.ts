@@ -618,19 +618,19 @@ function resolveWidgetCallbackRoute(
 	input: CaptureAnalysisInput,
 ): ReadonlyArray<CaptureSlotRoute> {
 	const rootEdge = enclosingWidgetRootEdge(edge, input.semanticGraph.componentEdges, route);
-	const resolved: CaptureSlotRoute = rootEdge
-		? widgetRootPropCaptureRoute(rootEdge, route, input)
-		: {
-				kind: 'callback-slot-route',
-				graphNodeId: sharedCallbackSlotGraphNodeId(
-					route.sharedDefinitionId,
-					route.slotName,
-				),
-				rootPropName: route.rootPropName,
-				rootComponentName: route.rootComponentName,
-			};
 	return edgePaths.map((path) => ({
-		...resolved,
+		// The root sits beside the part, so it is reached through the same ancestry.
+		...(rootEdge
+			? widgetRootPropCaptureRoute([...path.slice(0, -1), rootEdge], route, input)
+			: {
+					kind: 'callback-slot-route' as const,
+					graphNodeId: sharedCallbackSlotGraphNodeId(
+						route.sharedDefinitionId,
+						route.slotName,
+					),
+					rootPropName: route.rootPropName,
+					rootComponentName: route.rootComponentName,
+				}),
 		componentEdgeId: edge.id,
 		componentEdgePath: path.map((step) => step.id),
 	}));
@@ -646,12 +646,13 @@ function resolveWidgetCallbackRoute(
  * refuses the build instead of shipping a callback that silently reaches nobody.
  */
 function widgetRootPropCaptureRoute(
-	rootEdge: SemanticComponentEdge,
+	rootPath: ReadonlyArray<SemanticComponentEdge>,
 	route: Extract<CaptureSlotRoute, { readonly kind: 'widget-callback-route' }>,
 	input: CaptureAnalysisInput,
 ): CaptureSlotRoute {
+	const rootEdge = rootPath.at(-1)!;
 	return rootEdge.props.some((prop) => prop.name === route.rootPropName)
-		? propCaptureRoute([rootEdge], route.rootPropName, [], input, false)
+		? propCaptureRoute(rootPath, route.rootPropName, [], input, false)
 		: createCompilerKnownConstantCaptureRoute(rootEdge.id, [rootEdge.id], undefined);
 }
 

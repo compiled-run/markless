@@ -23,6 +23,7 @@ import { OptionsElsewhere } from './scenarios/options-elsewhere.tsrx';
 import { OptionsElsewhereMinted } from './scenarios/options-elsewhere-minted.tsrx';
 import { OptionsDeep } from './scenarios/options-deep.tsrx';
 import { OptionsHere } from './scenarios/options-here.tsrx';
+import { RootInChild } from './scenarios/root-in-child.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -1043,5 +1044,14 @@ for (const mode of MODES)
 		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(1);
 		(el(Rows).querySelector('[role="option"]') as HTMLElement).click();
 		await expect.poll(() => el(Picked).textContent).toBe('Banana');
+		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
+	});
+
+for (const mode of MODES)
+	test(`${mode}: the root's onChange runs in the component that renders the whole widget`, async () => {
+		if (mode === 'CSR') await render(RootInChild);
+		else await renderSSR(RootInChild);
+		el<HTMLElement>(Banana).click();
+		await expect.poll(() => el(Chosen).textContent).toBe('banana');
 		await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
 	});

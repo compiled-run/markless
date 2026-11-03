@@ -476,16 +476,23 @@ export function planBoundSymbolResolver(
 						: [];
 				});
 				if (captureSlots.length !== edgeDependentSlots.length) continue;
-				// A widget callback is answered through the graph on any path, so a part a nested component renders binds only to deliver its consumer's callback.
-				if (
-					componentEdgePath.length > 1 &&
-					edgeDependentSlots.some((slot) =>
+				// A widget callback is answered through the graph on any path, so a part a nested component renders binds only to deliver its consumer's own callback.
+				const widgetSlotIds = new Set(
+					edgeDependentSlots.flatMap((slot) =>
 						slot.routes.some(
 							(route) =>
 								route.kind === 'callback-slot-route' && route.componentEdgeId === undefined,
-						),
-					) &&
-					!captureSlots.some((slot) => slot.route.kind === 'callback-route')
+						)
+							? [slot.id]
+							: [],
+					),
+				);
+				if (
+					componentEdgePath.length > 1 &&
+					widgetSlotIds.size > 0 &&
+					!captureSlots.some(
+						(slot) => slot.route.kind === 'callback-route' && !widgetSlotIds.has(slot.slotId),
+					)
 				)
 					continue;
 				if (
