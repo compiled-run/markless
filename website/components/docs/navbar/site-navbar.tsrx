@@ -25,6 +25,34 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 				line-height: 1.5;
 				color: var(--ink);
 			}
+
+			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				border-radius: inherit;
+				pointer-events: none;
+			}
+
+			.nav-pill::before,
+			.nav-pill::after {
+				inset: -2px;
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
+				background-image: var(--grain-fiber);
+				mix-blend-mode: var(--grain-fiber-blend);
+				opacity: var(--grain-fiber-opacity);
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				background-image: var(--grain-speck);
+				mix-blend-mode: var(--grain-speck-blend);
+				opacity: var(--grain-speck-opacity);
+			}
 		</style>
 	</header>
 }
@@ -66,13 +94,11 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 			</div>
 			<div class="nav-box" aria-hidden="true">
 				<InkEdge name="panel" />
-				<Grain />
 			</div>
 			<div class="nav-tools">
 				<SearchButton />
 				<ThemeToggle />
 			</div>
-			<Grain />
 		</navbar.root>
 
 		<style>
@@ -368,7 +394,6 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 			<span class="card-note">{card.description}</span>
 		</span>
 		<InkEdge name={card.size === 'tall' ? 'tall' : 'card'} />
-		<Grain />
 
 		<style>
 			.card {
@@ -536,44 +561,6 @@ function SearchButton() @{
 	</navbar.trigger>
 }
 
-/** The page's paper grain, pinned to the surface it sits in: the page grain is drawn on the scrolling document, so a fixed surface would slide under it. */
-function Grain() @{
-	<span class="grain" aria-hidden="true">
-		<style>
-			.grain {
-				position: absolute;
-				inset: 0;
-				border-radius: inherit;
-				pointer-events: none;
-			}
-
-			.nav-pill > .grain {
-				inset: -2px;
-			}
-
-			.grain::before,
-			.grain::after {
-				content: '';
-				position: absolute;
-				inset: 0;
-				border-radius: inherit;
-			}
-
-			.grain::before {
-				background-image: var(--grain-fiber);
-				mix-blend-mode: var(--grain-fiber-blend);
-				opacity: var(--grain-fiber-opacity);
-			}
-
-			.grain::after {
-				background-image: var(--grain-speck);
-				mix-blend-mode: var(--grain-speck-blend);
-				opacity: var(--grain-speck-opacity);
-			}
-		</style>
-	</span>
-}
-
 /** A card's or panel's hand-inked edge, from the same sprite as the card drawings. */
 function InkEdge({ name }: { readonly name: string }) @{
 	<svg class="ink-edge" aria-hidden="true">
@@ -629,7 +616,6 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 						<lucide.menu class="bar-icon" aria-hidden="true" />
 					</modal.trigger>
 				</span>
-				<Grain />
 			</div>
 
 			<modal.backdrop class="menu-backdrop">
