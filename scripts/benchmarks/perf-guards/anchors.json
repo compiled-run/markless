@@ -3856,6 +3856,48 @@
 				"jsGzipBytes": 89170
 			},
 			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575504
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575505
+			},
+			"reason": "the same-page link early return (PR #441) measured on its rebased tree: CI run 41602532446 (linux), 19 B gzip on the docs pages rather than 18; none of it executed at load"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686513
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686514
+			},
+			"reason": "the same-page link early return (PR #441) measured on its rebased tree: CI run 41602532446 (linux), 19 B gzip on the docs pages rather than 18; none of it executed at load"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408852
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408871
+			},
+			"reason": "the same-page link early return (PR #441) measured on its rebased tree: CI run 41602532446 (linux), 19 B gzip on the docs pages rather than 18; none of it executed at load"
 		}
 	],
 	"runtimeModules": {
@@ -4062,15 +4104,15 @@
 			},
 			"docs /": {
 				"executedChars": 109992,
-				"jsGzipBytes": 1575504
+				"jsGzipBytes": 1575505
 			},
 			"docs /concepts/state": {
 				"executedChars": 119772,
-				"jsGzipBytes": 1686513
+				"jsGzipBytes": 1686514
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22830,
-				"jsGzipBytes": 408852
+				"jsGzipBytes": 408871
 			}
 		}
 	}
