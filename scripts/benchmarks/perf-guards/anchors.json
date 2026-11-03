@@ -3508,6 +3508,62 @@
 				"jsGzipBytes": 88704
 			},
 			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
+			},
+			"to": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -3699,19 +3755,19 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11362,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"bench /records": {
 				"executedChars": 11271,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"bench /settings": {
 				"executedChars": 11328,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"docs /": {
 				"executedChars": 109124,
-				"jsGzipBytes": 1571443
+				"jsGzipBytes": 1571608
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
