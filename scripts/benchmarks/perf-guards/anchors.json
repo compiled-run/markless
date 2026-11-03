@@ -3460,7 +3460,99 @@
 			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix); measured on CI run 41525857883 (linux), +191 B gzip downloaded, executed chars within budget"
 		},
 		{
-			"date": "2026-11-02",
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 20368,
+			"to": 21687,
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10882,
+				"jsGzipBytes": 88704
+			},
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88704
+			},
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88704
+			},
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
 			"guard": "load",
 			"subject": "docs / (linux-x64)",
 			"from": {
@@ -3468,10 +3560,24 @@
 				"jsGzipBytes": 1571443
 			},
 			"to": {
-				"executedChars": 110572,
-				"jsGzipBytes": 1596984
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
 			},
-			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41568664269 (PR #410 head 6d44ab6e9 on main with #432, linux-x64)"
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
+			},
+			"to": {
+				"executedChars": 110577,
+				"jsGzipBytes": 1597198
+			},
+			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41573354583 (PR #410 head 13c939aa6, merged with main 6b0c56c24, linux-x64)"
 		},
 		{
 			"date": "2026-11-02",
@@ -3483,9 +3589,9 @@
 			},
 			"to": {
 				"executedChars": 23306,
-				"jsGzipBytes": 420336
+				"jsGzipBytes": 420543
 			},
-			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41568664269 (PR #410 head 6d44ab6e9 on main with #432, linux-x64)"
+			"reason": "the site navbar is on every page now: the navbar and modal families and the navbar's own island load with it (its home link skips idle prefetch); measured on CI run 41573354583 (PR #410 head 13c939aa6, merged with main 6b0c56c24, linux-x64)"
 		}
 	],
 	"runtimeModules": {
@@ -3542,7 +3648,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 20368,
+		"web/fns/instance-scope": 21687,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
@@ -3650,16 +3756,16 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 10989,
-				"jsGzipBytes": 88506
+				"executedChars": 10882,
+				"jsGzipBytes": 88704
 			},
 			"bench /records": {
 				"executedChars": 10898,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"bench /settings": {
 				"executedChars": 10955,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3677,19 +3783,19 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11362,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"bench /records": {
 				"executedChars": 11271,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"bench /settings": {
 				"executedChars": 11328,
-				"jsGzipBytes": 88506
+				"jsGzipBytes": 88704
 			},
 			"docs /": {
-				"executedChars": 110572,
-				"jsGzipBytes": 1596984
+				"executedChars": 110577,
+				"jsGzipBytes": 1597198
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
@@ -3697,7 +3803,7 @@
 			},
 			"docs /ui/accordion": {
 				"executedChars": 23306,
-				"jsGzipBytes": 420336
+				"jsGzipBytes": 420543
 			}
 		}
 	}
