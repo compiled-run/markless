@@ -2,8 +2,9 @@ import { afterEach, expect, test } from 'vitest';
 import { commands } from 'vitest/browser';
 import { cleanup, render } from '../../src/index.ts';
 import LayeredPage from './abr-layer-host.tsrx';
+import NotesDrawer from './abr-notes.tsrx';
 
-// On a slow main thread a @try re-settle's commit can land before the old rows' repeat reorders them.
+// On a slow main thread an @if render, a @try catch-up settle and the settle notification all race.
 
 afterEach(cleanup);
 afterEach(() => commands.throttleCpu(1));
@@ -42,6 +43,28 @@ for (let run = 1; run <= 20; run++) {
 		await expect.poll(names).toEqual(['Cherry']);
 		type('');
 		await expect.poll(names).toEqual(['Apple', 'Apricot', 'Banana', 'Cherry']);
+		expect(errors).toEqual([]);
+	});
+}
+
+const summaryText = () =>
+	document.querySelector('[data-summary]')?.textContent ??
+	document.querySelector('[data-trouble]')?.textContent;
+
+// The catch-up settle and the notification after it both reach a plain @try; the one whose swap lands paints it.
+for (let run = 1; run <= 8; run++) {
+	test(`CSR: an @if/@else holding a @try settles each time it shows on a slow main thread (run ${run})`, async () => {
+		await commands.throttleCpu(6);
+		await render(NotesDrawer);
+		click('[data-toggle]');
+		await expect.poll(summaryText).toBe('alpha summary');
+		click('[data-toggle]');
+		await expect.poll(() => document.querySelector('[data-folded]')).not.toBeNull();
+		click('[data-next]');
+		click('[data-toggle]');
+		await expect.poll(summaryText).toBe('beta summary');
+		click('[data-next]');
+		await expect.poll(summaryText).toBe('No summary');
 		expect(errors).toEqual([]);
 	});
 }

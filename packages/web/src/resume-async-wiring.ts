@@ -373,7 +373,7 @@ export async function settleAsyncBoundaryRange(
 		asyncBoundary: boundary,
 	});
 	if (!isResumeBranchUpdate(update)) throw emptySettleRenderError(boundary.id);
-	if (runnerStatus() === 'pending' || claim?.() === false) return;
+	if (runnerStatus() === 'pending') return;
 	if (input.commitArm) {
 		const rawArmRecords = (update as { readonly armRecords?: unknown }).armRecords;
 		const plannedArmRecords = Array.isArray(boundary.armRecords)
@@ -385,6 +385,7 @@ export async function settleAsyncBoundaryRange(
 			boundaryArmRecordSet(rawArmRecords) ?? boundaryArmRecordSet(plannedArmRecords);
 		if (rawArmRecords !== undefined && !armRecords) throw emptySettleRenderError(boundary.id);
 		if (armRecords) {
+			if (claim?.() === false) return;
 			const { computed, cells } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'>;
 			await input.commitArm(boundary, {
 				...(computed && { computed }),
@@ -398,6 +399,7 @@ export async function settleAsyncBoundaryRange(
 		}
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
 		if (input.root.__marklessBranchArms?.has(boundary.id)) {
+			if (claim?.() === false) return;
 			await input.commitArm(boundary, {
 				html: update.html,
 				arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
