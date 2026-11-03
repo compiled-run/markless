@@ -15,6 +15,7 @@ import {
 } from './html.ts';
 import {
 	componentDeriveGraphNodeIds,
+	componentSeedCellIndexes,
 	computedDependencyEdges,
 	payloadServedComputedGraphNodeIds,
 	servedIfDurableGraphNodeIds,
@@ -277,7 +278,10 @@ export function emitPublicSsrRenderModule(
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
-		stateEntries(input, ownedNodes?.seedCellIndexes).join(',\n'),
+		stateEntries(
+			input,
+			ownedNodes && componentSeedCellIndexes(input, rootInfo.componentName, ownedNodes),
+		).join(',\n'),
 		']);',
 		// The optional render context is the per-request streaming channel
 		// (T107): renderToStream threads it through child renders and async

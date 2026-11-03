@@ -390,7 +390,7 @@ export async function renderPrerenderBranch(
 			propsOrLoadSymbol,
 			graph,
 			true,
-			servedPageProps(graph),
+			servedPageProps(graph, page, branchOwnerName(page, branchSiteId)),
 			{ branchSiteId, cellIds: freshCellIds },
 		);
 	} else {
@@ -560,8 +560,19 @@ type RosterResumeHost = {
 };
 
 // The page's props were served once, as its props cell; a render in the browser reads them back from there.
-function servedPageProps(graph: RuntimeGraph): Readonly<Record<string, unknown>> {
-	return asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID));
+// A composed owner's routed props are read live; `children` stays the projection markup a render is handed.
+function servedPageProps(
+	graph: RuntimeGraph,
+	surface?: PrerenderDataSurface,
+	owner?: string,
+): Readonly<Record<string, unknown>> {
+	const props = { ...asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID)) };
+	for (const component of owner ? Object.values(surface!.components) : [])
+		for (const edge of component.edges ?? [])
+			for (const prop of edge.childComponentName === owner ? edge.props : [])
+				if (prop.kind === 'graph-reference' && prop.name !== 'children')
+					props[prop.name] = graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID, [prop.name]);
+	return props;
 }
 
 function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
