@@ -54,6 +54,7 @@ import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defe
 import { prepareSsrResumeRecords } from './prerender/records.ts';
 import { CONTAINER_ATTRIBUTE, RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
 import {
+	hasLiveSharedDefinitions,
 	PROTOCOL_SHARED_INSTANCES_PROPERTY,
 	PROTOCOL_SHARED_INSTANCES_VERSION,
 } from '../../serializer/src/protocol-shared-instances.ts';
@@ -637,6 +638,8 @@ function renderModulePreloadLinks(
 function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
 	return (
 		(state.storage?.length ?? 0) > 0 ||
+		// A page that only reads a shared() instance still binds to its live value after a swap or another container's write.
+		hasLiveSharedDefinitions(state) ||
 		view.events.some(protocolEventDispatchesMarkless) ||
 		state.computed.some(
 			(computed) =>

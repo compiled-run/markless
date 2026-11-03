@@ -3554,6 +3554,56 @@
 				"jsGzipBytes": 408517
 			},
 			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/fns/shared-instances",
+			"from": 4598,
+			"to": 5300,
+			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 109814,
+				"jsGzipBytes": 1575140
+			},
+			"to": {
+				"executedChars": 109821,
+				"jsGzipBytes": 1575304
+			},
+			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds (+160 B gzip downloaded by the docs pages that use shared(), measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 119769,
+				"jsGzipBytes": 1686151
+			},
+			"to": {
+				"executedChars": 119768,
+				"jsGzipBytes": 1686314
+			},
+			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds (+160 B gzip downloaded by the docs pages that use shared(), measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 22686,
+				"jsGzipBytes": 408517
+			},
+			"to": {
+				"executedChars": 22685,
+				"jsGzipBytes": 408677
+			},
+			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds (+160 B gzip downloaded by the docs pages that use shared(), measured on this Mac)"
 		}
 	],
 	"runtimeModules": {
@@ -3621,7 +3671,7 @@
 		"web/fns/scalar-served": 4091,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 3988,
-		"web/fns/shared-instances": 4598,
+		"web/fns/shared-instances": 5300,
 		"web/fns/ssr": 31486,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
@@ -3733,16 +3783,16 @@
 				"jsGzipBytes": 88941
 			},
 			"docs /": {
-				"executedChars": 109814,
-				"jsGzipBytes": 1575140
+				"executedChars": 109821,
+				"jsGzipBytes": 1575304
 			},
 			"docs /concepts/state": {
-				"executedChars": 119769,
-				"jsGzipBytes": 1686151
+				"executedChars": 119768,
+				"jsGzipBytes": 1686314
 			},
 			"docs /ui/accordion": {
-				"executedChars": 22686,
-				"jsGzipBytes": 408517
+				"executedChars": 22685,
+				"jsGzipBytes": 408677
 			}
 		},
 		"linux-x64": {

@@ -223,7 +223,7 @@ function publish(
 		else if (url && other.querySelector(`script[type="${STATE_SCRIPT}"]`)?.textContent?.includes(id)) {
 			store!.dormant = store!.dormant!.filter((root) => root !== other);
 			other.__marklessDelegatedDispatch = true;
-			void (other.__mResume ||= import(/* @vite-ignore */ url) as Promise<ResumeModule>).then(
+			void (other.__mResume ||= import(/* @vite-ignore */ moduleHref(url)) as Promise<ResumeModule>).then(
 				(module) => wakeSharedContainer(other, module),
 				(error) => globalThis.reportError?.(error),
 			);
@@ -294,11 +294,28 @@ function shapeOf(value: unknown, seen = new Set<object>()): string {
 	return shape;
 }
 
-// Plain data compares by structure; any other object only by identity.
+// Plain data, dates, maps and sets compare by structure; any other object only by identity.
 export function sameValue(left: unknown, right: unknown, seen = new Map<object, object>()): boolean {
 	if (Object.is(left, right)) return true;
+	if (left instanceof Date || right instanceof Date)
+		return left instanceof Date && right instanceof Date && left.getTime() === right.getTime();
+	if (left instanceof Map || right instanceof Map)
+		return (
+			left instanceof Map &&
+			right instanceof Map &&
+			left.size === right.size &&
+			[...left].every(([key, value]) => right.has(key) && sameValue(value, right.get(key), seen))
+		);
+	if (left instanceof Set || right instanceof Set)
+		return (
+			left instanceof Set &&
+			right instanceof Set &&
+			left.size === right.size &&
+			[...left].every((value) => right.has(value))
+		);
 	if (!isPlain(left) || !isPlain(right) || Array.isArray(left) !== Array.isArray(right))
 		return false;
+	if (Array.isArray(left) && left.length !== (right as unknown[]).length) return false;
 	if (seen.get(left) === right) return true;
 	seen.set(left, right);
 	const leftKeys = Object.keys(left);
@@ -335,3 +352,7 @@ function placesOf(root: object): Places {
 	};
 }
 
+// Absolute, so a dev server's import rewriting leaves it alone and the container's own resumer module is reused.
+export function moduleHref(url: string): string {
+	return new URL(url, (globalThis as { readonly location?: { readonly href: string } }).location?.href).href;
+}

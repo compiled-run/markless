@@ -79,7 +79,12 @@ async function open(
 
 const origin = () => servers.region!.origin;
 
-type Frame = { readonly title?: string; readonly shown?: string; readonly mode?: string };
+type Frame = {
+	readonly title?: string;
+	readonly shown?: string;
+	readonly mode?: string;
+	readonly badge?: string;
+};
 
 const shown = (page: Page) =>
 	page.evaluate(() => document.querySelector('[data-shown]')?.textContent);
@@ -99,6 +104,7 @@ const recordFrames = (page: Page) =>
 		const tick = () => {
 			const mode = document.querySelector('[data-mode]');
 			host.__frames!.push({
+				badge: document.querySelector('[data-badge]')?.textContent ?? undefined,
 				title: document.querySelector('[data-title]')?.textContent ?? undefined,
 				shown: document.querySelector('[data-shown]')?.textContent ?? undefined,
 				mode: mode ? `${mode.getAttribute('data-mode')}/${mode.textContent}` : undefined,
@@ -135,6 +141,26 @@ test.each(['region', 'document'] as const)('a value set on one page is the value
 	expect(frames.length).toBeGreaterThan(0);
 	expect(frames.filter((frame) => frame.shown !== 'manual')).toEqual([]);
 	expect(frames.filter((frame) => frame.mode !== 'chosen/chosen')).toEqual([]);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a page that only reads the instance, and a widget seeded from it, show the live value in every frame', async () => {
+	const { page, errors } = await open('/');
+	await page.click('[data-manual]');
+	await expect.poll(() => shown(page)).toBe('manual');
+	await recordFrames(page);
+	await page.click('[data-go-plain]');
+	await title(page, 'Plain');
+	await settleFrames(page);
+	const frames = (await recordedFrames(page)).filter((frame) => frame.title === 'Plain');
+	expect(frames.length).toBeGreaterThan(0);
+	expect(
+		frames.filter(
+			(frame) =>
+				frame.shown !== 'manual' || frame.mode !== 'chosen/chosen' || frame.badge !== 'manual',
+		),
+	).toEqual([]);
 	expect(errors).toEqual([]);
 	await page.close();
 });

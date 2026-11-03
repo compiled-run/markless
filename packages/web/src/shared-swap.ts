@@ -4,7 +4,7 @@ import type { DomJournalResult } from '@markless/runtime';
 import { decodePayloadScriptsWithVersion } from '../../serializer/src/protocol-client.ts';
 import { applyDirectJournalEntries } from './dom-journal-direct.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
-import { bindDefinitions, cloneValue, sameValue } from './fns/shared-instances.ts';
+import { bindDefinitions, cloneValue, moduleHref, sameValue } from './fns/shared-instances.ts';
 import { readPayloadScriptsFromDocument } from './payload-document-common.ts';
 import {
 	decodeServedComputedValues,
@@ -56,7 +56,7 @@ export async function bindSharedSwap(input: {
 			]?.instances ?? {},
 		).some((instance) => instance.shape);
 	if (!url || !(bound(input.document) || bound(container))) return undefined;
-	const entry = (await import(/* @vite-ignore */ url)) as ResumeEntry;
+	const entry = (await import(/* @vite-ignore */ moduleHref(url))) as ResumeEntry;
 	const prepared = await prepareSharedSwap({
 		root,
 		document: input.document,
@@ -127,6 +127,7 @@ export async function prepareSharedSwap(input: {
 		graph,
 		computed: sync,
 		allComputed: state.computed,
+		sharedSeeds: state.sharedSeeds,
 		root,
 		loadSymbol,
 		elementHandles: { get: () => undefined, register() {}, deleteHost() {} },
@@ -181,12 +182,13 @@ function readOutsideValueSlots(
 	const affected = new Set(changed);
 	for (let grew = true; grew; ) {
 		grew = false;
-		for (const record of state.computed)
+		// A component's seed of a widget field re-runs over props that read a changed cell, as a sync computed does.
+		for (const record of [...state.computed, ...(state.sharedSeeds ?? [])])
 			if (
 				!affected.has(record.graphNodeId) &&
 				(record.dependencies ?? []).some((dependency) => affected.has(dependency.graphNodeId))
 			) {
-				if (record.async !== false) return true;
+				if ((record as { readonly async?: boolean }).async === true) return true;
 				affected.add(record.graphNodeId);
 				grew = true;
 			}

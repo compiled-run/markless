@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import { PROTOCOL_SHARED_INSTANCES_PROPERTY } from '../../serializer/src/protocol-shared-instances.ts';
 import type { ProtocolSharedInstances } from '../../serializer/src/protocol-shared-instances.ts';
 import { ChoicePanel } from './shared-instances/choice.tsrx';
+import { ChoiceReader } from './shared-instances/choice-reader.tsrx';
 import { OwnChoicePanel } from './shared-instances/own-choice.tsrx';
 
 // Containers on one document that resolve one shared() definition read and write one instance (spec 03).
@@ -31,6 +32,15 @@ test('SSR resume: two containers that share a key show each other’s writes', a
 	press(second, '[data-auto]');
 	await expect.poll(() => shown(first)).toBe('auto');
 	expect(shown(second)).toBe('auto');
+});
+
+test('SSR resume: a container that only reads the key shows the other container’s write', async () => {
+	const writer = (await renderSSR(ChoicePanel)).container;
+	const reader = (await renderSSR(ChoiceReader)).container;
+	expect(shown(reader)).toBe('cli');
+
+	press(writer, '[data-manual]');
+	await expect.poll(() => shown(reader)).toBe('manual');
 });
 
 test('CSR: two mounts that share a key show each other’s writes', async () => {

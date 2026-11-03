@@ -1,7 +1,7 @@
 import { createRuntimeGraph, type RuntimeGraph } from '@markless/runtime';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
 import { expect, test } from 'vitest';
-import { bindSharedCells, reconcileSharedCells } from '../src/fns/shared-instances.ts';
+import { bindSharedCells, reconcileSharedCells, sameValue } from '../src/fns/shared-instances.ts';
 
 // Two containers on one document bound to one shared() instance, without a DOM: the graph is the container.
 
@@ -70,4 +70,22 @@ test('a container mounted after a write starts from the live value', async () =>
 	first.write({ graphNodeId: cell, path: ['value'], value: 'manual' });
 	await settle(first);
 	expect(mount(document, { value: 'cli' }).read(cell, ['value'])).toBe('manual');
+});
+
+test('a date, map or set cell reaches the other container', async () => {
+	const document = {};
+	const first = mount(document, { at: new Date(0), tags: new Set(['a']), seen: new Map([['a', 1]]) });
+	const second = mount(document, { at: new Date(0), tags: new Set(['a']), seen: new Map([['a', 1]]) });
+	first.write({ graphNodeId: cell, path: ['at'], value: new Date(5) });
+	await settle(first, second);
+	expect((second.read(cell, ['at']) as Date).getTime()).toBe(5);
+	second.write({ graphNodeId: cell, path: ['tags'], value: new Set(['a', 'b']) });
+	await settle(first, second);
+	expect([...(first.read(cell, ['tags']) as Set<string>)]).toEqual(['a', 'b']);
+});
+
+test('arrays of different lengths are different values, holes included', () => {
+	expect(sameValue(Object.assign([1], { length: 3 }), [1])).toBe(false);
+	expect(sameValue(new Map([['a', 1]]), new Map([['a', 2]]))).toBe(false);
+	expect(sameValue(new Date(1), new Date(1))).toBe(true);
 });
