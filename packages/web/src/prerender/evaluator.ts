@@ -83,9 +83,7 @@ export type PrerenderDataDefinition = {
 	readonly stateCellIndexes?: ReadonlyArray<number>;
 	readonly stateComputedIndexes?: ReadonlyArray<number>;
 	readonly stateSharedSeedIndexes?: ReadonlyArray<number>;
-	// Positions into `state.computed` for the sync computeds a handler reads:
-	// their derived value travels with the payload so the first read, before any
-	// dependency write, answers with it.
+	// Positions into `state.computed` whose derived value travels with the payload, for resume's first read.
 	readonly servedComputedIndexes?: ReadonlyArray<number>;
 	readonly initialValues?: PrerenderRenderData['initialValues'];
 	readonly initialValueKinds?: Readonly<Record<string, string>>;

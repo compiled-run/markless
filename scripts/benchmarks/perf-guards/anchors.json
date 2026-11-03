@@ -17,9 +17,9 @@
 			"modules": 78
 		},
 		"search": {
-			"executedChars": 16156,
-			"functions": 207,
-			"modules": 3
+			"executedChars": 21434,
+			"functions": 265,
+			"modules": 0
 		},
 		"dialog": {
 			"executedChars": 109120,
@@ -4056,6 +4056,114 @@
 				"jsGzipBytes": 409157
 			},
 			"reason": "prerender/evaluator grew 372 B rendered (PR #443: the browser render of an @if starts from the component that holds it and hands the commit its nested @if blocks); the docs pages download it in a chunk they fetch at load but run none of it until such an @if flips; the +196/+196/+137 B gzip measured over main 6533cee36, carried onto the anchors of #442; measured on CI run 41630466455, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "execution",
+			"subject": "search",
+			"from": {
+				"executedChars": 16156,
+				"functions": 207,
+				"modules": 3
+			},
+			"to": {
+				"executedChars": 21434,
+				"functions": 265,
+				"modules": 0
+			},
+			"reason": "a keyed @for over a computed now resumes with the served value, so the focus click before typing (an unrelated wake) no longer runs the startup derive and its module; the search input that changes the list initializes that derive module instead. Measured on bench /records: focus click plus input together 363,757 -> 364,277 chars of executed function source (+0.1%), the input alone +33%"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "construct",
+			"subject": "keyed @for",
+			"from": 6879,
+			"to": 6906,
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so a CSR mount and a wake-channel rebuild keep its value instead of running the derive again; +27 B per keyed @for"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89275
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89285
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89275
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89285
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89275
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89285
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575850
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1576002
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686859
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1687007
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409157
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409162
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
 		}
 	],
 	"runtimeModules": {
@@ -4187,7 +4295,7 @@
 		"event handler": 3184,
 		"text binding": 4256,
 		"@if": 8056,
-		"keyed @for": 6879,
+		"keyed @for": 6906,
 		"async boundary": 10095
 	},
 	"resumeRows": {
@@ -4250,27 +4358,27 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11371,
-				"jsGzipBytes": 89275
+				"jsGzipBytes": 89285
 			},
 			"bench /records": {
 				"executedChars": 11387,
-				"jsGzipBytes": 89275
+				"jsGzipBytes": 89285
 			},
 			"bench /settings": {
 				"executedChars": 11444,
-				"jsGzipBytes": 89275
+				"jsGzipBytes": 89285
 			},
 			"docs /": {
 				"executedChars": 109992,
-				"jsGzipBytes": 1575850
+				"jsGzipBytes": 1576002
 			},
 			"docs /concepts/state": {
 				"executedChars": 119772,
-				"jsGzipBytes": 1686859
+				"jsGzipBytes": 1687007
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22830,
-				"jsGzipBytes": 409157
+				"jsGzipBytes": 409162
 			}
 		}
 	}

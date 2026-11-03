@@ -17,6 +17,7 @@ import {
 	componentDeriveGraphNodeIds,
 	computedDependencyEdges,
 	payloadServedComputedGraphNodeIds,
+	servedIfDurableGraphNodeIds,
 	foreignSharedComputedScope,
 	orderComputedDerives,
 	rowScopedEdgeIds,
@@ -1422,6 +1423,8 @@ function emitSsrDataLines(
 	const servedComputedIds = [...new Set(derivedComputedIds)].filter((graphNodeId) =>
 		servedComputedGraphNodeIds.has(graphNodeId),
 	);
+	const ifDurable = servedIfDurableGraphNodeIds(input);
+	const servedIfDurableIds = servedComputedIds.filter((graphNodeId) => ifDurable.has(graphNodeId));
 	return {
 		seedForward: seedForwardLines,
 		carriedSeed: unfoldedSeedLines,
@@ -1434,7 +1437,7 @@ function emitSsrDataLines(
 				: [
 						`	marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ${JSON.stringify(
 							servedComputedIds,
-						)});`,
+						)}${servedIfDurableIds.length ? `, ${JSON.stringify(servedIfDurableIds)}` : ''});`,
 					],
 		render: [
 		"marklessSsrRenderStateValues.set('prop:props',marklessSsrProps);",

@@ -79,22 +79,38 @@ function authoredHandlerReads(
 }
 
 /**
- * The graph nodes an authored handler reads. A resume re-derives a sync computed
- * only when a dependency is written, so a computed in this set is one whose value
- * has to travel in the payload for the handler's first read to answer.
+ * The graph nodes resume reads before any dependency is written: what a handler
+ * or callback prop reads, what a flipped arm reads, and every keyed `@for`
+ * collection. A sync computed in this set is served with its rendered value.
  */
-export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
-	return new Set([
+export function resumeReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
+	return new Set([...requiredResumeReads(input), ...keyedCollectionGraphNodeIds(input)]);
+}
+
+/**
+ * The resume reads only a keyed `@for` makes. Without a served value resume derives
+ * the collection at startup, which still works, so one the serializer refuses is not served.
+ */
+export function servedIfDurableGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
+	const required = new Set(requiredResumeReads(input));
+	return new Set(keyedCollectionGraphNodeIds(input).filter((id) => !required.has(id)));
+}
+
+function requiredResumeReads(input: PublicRenderModuleInput): ReadonlyArray<string> {
+	return [
 		...input.symbolResolver.symbols.flatMap(authoredHandlerReads),
 		...flippedArmReadGraphNodeIds(input),
-		// A lifted collection's row handler reads its item out of it, and its derive
-		// can read a constant prop no browser graph holds, so its value is served.
-		...input.semanticGraph.keyedRepeats.flatMap((repeat) =>
-			repeat.collectionGraphNodeId?.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX)
-				? [repeat.collectionGraphNodeId]
-				: [],
+		// A lifted collection's derive can read a constant prop no browser graph holds.
+		...keyedCollectionGraphNodeIds(input).filter((id) =>
+			id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX),
 		),
-	]);
+	];
+}
+
+function keyedCollectionGraphNodeIds(input: PublicRenderModuleInput): ReadonlyArray<string> {
+	return input.semanticGraph.keyedRepeats.flatMap((repeat) =>
+		repeat.collectionGraphNodeId ? [repeat.collectionGraphNodeId] : [],
+	);
 }
 
 // A flip after resume reads its arm's values off the resumed graph, just as a handler does.
@@ -141,7 +157,7 @@ function flippedArmReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlyArr
 }
 
 /**
- * The sync computeds this component has to serve: the ones a handler reads AND
+ * The sync computeds this component has to serve: the ones resume reads AND
  * whose payload record this component's own selection carries. A served value
  * can only be written into a record the payload holds, so a component that
  * derives a computed it does not own serves nothing at all, and the owner has to
@@ -153,7 +169,7 @@ export function payloadServedComputedGraphNodeIds(
 	input: PublicRenderModuleInput,
 	componentName: string,
 ): ReadonlySet<string> {
-	const handlerReads = handlerReadGraphNodeIds(input);
+	const resumeReads = resumeReadGraphNodeIds(input);
 	const rootComponentName = input.renderData.root?.componentName;
 	const owned =
 		rootComponentName === undefined
@@ -172,14 +188,14 @@ export function payloadServedComputedGraphNodeIds(
 	return new Set([
 		...input.protocolState.computed.flatMap((computed) =>
 			computed.async === false &&
-			handlerReads.has(computed.graphNodeId) &&
+			resumeReads.has(computed.graphNodeId) &&
 			(owned === undefined || owned.has(computed.graphNodeId))
 				? [computed.graphNodeId]
 				: [],
 		),
 		// A read the payload indexes no record for narrows to nothing: the serve is
 		// a no-op wherever it lands, and dropping it here would move served bytes.
-		...[...handlerReads].filter((graphNodeId) => !indexed.has(graphNodeId)),
+		...[...resumeReads].filter((graphNodeId) => !indexed.has(graphNodeId)),
 	]);
 }
 

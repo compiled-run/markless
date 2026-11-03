@@ -99,3 +99,85 @@ export function Thumb() @{
 		'marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ["shared:src/slider.tsrx#slider/computed:percent"]);',
 	);
 });
+
+// Resume keys the served rows off the collection, so without a served value it derived the computed at startup.
+test('a computed a keyed @for repeats is served, and a computed only markup reads is not', async () => {
+	const source = await ssr(`
+import { computed, state } from '@markless/core';
+
+export function Hits() @{
+	const search = state({ text: 'a', all: [{ id: 'x', title: 'ax' }, { id: 'y', title: 'by' }] });
+	const hits = computed(() => search.all.filter((hit) => hit.title.includes(search.text)));
+	const count = computed(() => hits.length);
+
+	<ul data-count={count}>
+		@for (const hit of hits; key hit.id) {
+			<li>{hit.title}</li>
+		}
+	</ul>
+}
+`);
+
+	// Served only for the @for, so a value the serializer refuses is left out rather than failing the render.
+	expect(source).toContain(
+		'marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ["computed:hits"], ["computed:hits"]);',
+	);
+});
+
+test('a keyed @for computed a handler also reads is served as a handler read', async () => {
+	const source = await ssr(`
+import { computed, state } from '@markless/core';
+
+export function Picks() @{
+	const picks = state({ min: 1, all: [{ id: 'p', n: 1 }, { id: 'q', n: 2 }] });
+	const kept = computed(() => picks.all.filter((pick) => pick.n >= picks.min));
+
+	<ul onClick={() => (picks.min = kept.length)}>
+		@for (const pick of kept; key pick.id) {
+			<li>{pick.n}</li>
+		}
+	</ul>
+}
+`);
+
+	expect(source).toContain(
+		'marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ["computed:kept"]);',
+	);
+});
+
+test('a CSR mount keeps the value of a computed a keyed @for repeats', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'src/rows.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function Rows() @{
+	const list = state({ rows: [{ id: 'a' }, { id: 'b' }], skip: 'b' });
+	const kept = computed(() => list.rows.filter((row) => row.id !== list.skip));
+	const label = computed(() => list.skip.toUpperCase());
+
+	<ol data-label={label}>
+		@for (const row of kept; key row.id) {
+			<li>{row.id}</li>
+		}
+	</ol>
+}
+`,
+		buildId: 'build',
+		resolverId: 'resolver',
+		symbols: [],
+	});
+	const definition = compiled.publicRenderModule.componentDefinitions.find(
+		(candidate) => candidate.name === 'Rows',
+	) as
+		| {
+				readonly servedComputedIndexes?: ReadonlyArray<number>;
+				readonly state: { readonly computed: ReadonlyArray<{ readonly graphNodeId: string }> };
+		  }
+		| undefined;
+	const served = (definition?.servedComputedIndexes ?? []).map(
+		(index) => definition?.state.computed[index]?.graphNodeId,
+	);
+
+	expect(served).toEqual(['computed:kept']);
+});
