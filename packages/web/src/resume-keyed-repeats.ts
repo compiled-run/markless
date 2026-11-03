@@ -233,7 +233,7 @@ export function wireKeyedRepeats(
 		}
 		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
 		const apply = (mint: RowMint | undefined): void => {
-			if (follow && !follow.showing()) return;
+			if (follow && !follow.showing(rowRootsByKey)) return;
 			applyKeyedRepeatRowOrder(
 				input.graph,
 				repeat,
