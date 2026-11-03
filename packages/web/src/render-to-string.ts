@@ -164,23 +164,15 @@ export function storageRenderContext(cookie: string | null | undefined): {
 	return cookie ? { [STORAGE_RENDER_CONTEXT_READER]: createStorageCookieReader(cookie) } : {};
 }
 
-// The render leaves out a keyed @for value the serializer refuses, so parity is checked without it.
-function withoutUnservedComputedValues<T extends { readonly state: ProtocolStatePayload }>(
+// A rebuilt value the serializer refuses is compared as absent: the request left it out too, or serves its own.
+function withoutUnserializableComputedValues<T extends { readonly state: ProtocolStatePayload }>(
 	baseline: T,
-	request: ProtocolStatePayload,
 ): T {
-	const served = new Set(
-		request.computed.flatMap((record) =>
-			record.value !== undefined || record.directValue !== undefined ? [record.graphNodeId] : [],
-		),
-	);
-	const unserved = (record: ProtocolStatePayload['computed'][number]) =>
-		record.directValue !== undefined &&
-		!served.has(record.graphNodeId) &&
-		!serializeGraphValue(record.directValue).ok;
-	if (!baseline.state.computed.some(unserved)) return baseline;
+	const unserializable = (record: ProtocolStatePayload['computed'][number]) =>
+		record.directValue !== undefined && !serializeGraphValue(record.directValue).ok;
+	if (!baseline.state.computed.some(unserializable)) return baseline;
 	const computed = baseline.state.computed.map((record) => {
-		if (!unserved(record)) return record;
+		if (!unserializable(record)) return record;
 		const { directValue: _, ...kept } = record;
 		return kept;
 	});
@@ -205,7 +197,7 @@ export async function assembleSsrContainer(
 	const wakeChannelEnabled =
 		hasPayload && browserTriggers && prerenderWakeModuleUrl !== undefined;
 	const baseline = wakeChannelEnabled
-		? withoutUnservedComputedValues(await derivePrerenderResumeRecords(component, options.props), state)
+		? withoutUnserializableComputedValues(await derivePrerenderResumeRecords(component, options.props))
 		: undefined;
 	const requestRecords = { state, view };
 	const classification = baseline
