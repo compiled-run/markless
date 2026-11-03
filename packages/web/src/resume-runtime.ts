@@ -2,7 +2,7 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalResult } from '@markless/runtime';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
-import { hasLiveSharedDefinitions } from './shared-live.ts';
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import type { ArmCommitUpdate, ArmRegistrationDeps } from './resume-commit-arm.ts';
 import type {
 	ResumeArmRange,

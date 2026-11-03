@@ -1,7 +1,7 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
 import { derivedReconcilePlane } from './reconcile-plane-slot.ts';
-import { hasLiveSharedDefinitions } from './shared-live.ts';
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
 
 type RuntimeModule = typeof import('@markless/runtime');

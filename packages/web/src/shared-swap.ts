@@ -10,7 +10,7 @@ import { decodeResumeCells } from './payload-graph-construct.ts';
 import { materializeDomLocators } from './resume-locators.ts';
 import { wireSyncComputedDemandRecordsWithoutLoadingCapability } from './resume-sync-demand.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume-types.ts';
-import { hasLiveSharedDefinitions } from './shared-live.ts';
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 
 export { wakeSharedContainer } from './fns/shared-instances.ts';
 

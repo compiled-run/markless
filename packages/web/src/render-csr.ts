@@ -1,4 +1,4 @@
-import { hasLiveSharedDefinitions } from './shared-live.ts';
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import { markupNodes } from './markup-nodes.ts';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
