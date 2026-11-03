@@ -188,6 +188,10 @@ URL itself answers the whole document.
   Nitro plugin rewrites the request URL before routing, so a guard on a page
   path also guards its fragment. `http.request.url` keeps the fragment path.
 - The address bar and history entries show the page URL, never the prefix.
+- A click on a link to the page already shown (the same path and query, and no
+  `#` in its `href`) keeps that page as it is: nothing is fetched or swapped, no
+  history entry is added, and scroll positions and page state stay. A link to
+  the same page with a `#anchor` is left to the browser, which scrolls to it.
 - A redirect off the fragment path answers with a whole document; the router
   then loads the destination as a document.
 - The prefix is root-relative; apps served under a non-root base path are not

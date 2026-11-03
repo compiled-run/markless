@@ -138,6 +138,26 @@ describe('fragment navigation edges (chromium)', () => {
 		await page.close();
 	});
 
+	test('a link to the page already shown keeps it: no fetch, no history entry, scroll and state kept', async () => {
+		const { page, errors, requests } = await open(browser);
+		await page.locator('[data-increment]').click();
+		await expect.poll(() => text(page, '[data-count]')).toBe('1');
+		const entries = await page.evaluate(() => history.length);
+		// Each link twice: the first click lands before the router code has woken, the second after.
+		for (const selector of ['[data-nav="home"]', '[data-plain-home]', '[data-nav="home"]', '[data-plain-home]']) {
+			await page.evaluate(() => scrollTo(0, 300));
+			await page.locator(selector).evaluate((link) => (link as HTMLElement).click());
+			await page.waitForTimeout(400);
+			expect(await page.evaluate(() => scrollY)).toBe(300);
+		}
+		expect(page.url()).toBe(`${origin}/`);
+		expect(await page.evaluate(() => history.length)).toBe(entries);
+		expect(await text(page, '[data-count]')).toBe('1');
+		expect(fragments(requests)).toEqual([]);
+		expect(errors).toEqual([]);
+		await page.close();
+	});
+
 	test('hovering, pressing or focusing a Link to a server endpoint never requests it', async () => {
 		const { page, requests } = await open(browser);
 		const before = await logouts();

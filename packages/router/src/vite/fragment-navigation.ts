@@ -218,8 +218,9 @@ export function startFragmentNavigation(
 		if (mouse.metaKey || mouse.altKey || mouse.ctrlKey || mouse.shiftKey) return;
 		const anchor = anchorOf(event)!;
 		const url = followed(anchor);
-		if (!url || url.hash.startsWith('#/') || (url.hash && here(url))) return;
+		if (!url || url.hash.startsWith('#/') || (url.href.includes('#') && here(url))) return;
 		event.preventDefault();
+		if (here(url)) return;
 		wake().then(
 			(api) => api.go(anchor) || w.location.assign(url.href),
 			() => w.location.assign(url.href),
@@ -788,9 +789,10 @@ export function runFragmentNavigation(
 	const go = (anchor: Element): boolean => {
 		const url = eligible(anchor, true);
 		if (!url) return false;
-		const current = new URL(location.href);
 		stopRest();
-		const replace = anchor.hasAttribute(config.replaceAttribute) || url.href === current.href;
+		// A link to the page already shown keeps it, scroll and state included, as client routers do.
+		if (pageKey(url) === pageKey(new URL(location.href))) return true;
+		const replace = anchor.hasAttribute(config.replaceAttribute);
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
 		const swap = (entry: FragmentEntryModule) =>
 			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset');
