@@ -109,10 +109,19 @@ export default box(
 			const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(String(error)));
+			// Printed if a step fails, so a red run says whether a module failed to load or a handler threw.
+			const trail: string[] = [];
+			page.on('requestfailed', (request) => trail.push(`request failed: ${request.url()} ${request.failure()?.errorText ?? ''}`));
+			page.on('console', (message) => message.type() === 'error' && trail.push(`console: ${message.text()}`));
 			await page.addInitScript(sampleThemeFrames);
 			await page.goto(url('/concepts/state'), { waitUntil: 'networkidle' });
 
-			await exerciseBar(page, 'first load');
+			try {
+				await exerciseBar(page, 'first load');
+			} catch (failure) {
+				console.log([...errors, ...trail].join('\n'));
+				throw failure;
+			}
 			const steps: [string, () => Promise<void>, string][] = [
 				['a Docs card', async () => { await page.locator('.nav-pill .nav-trigger', { hasText: 'Docs' }).hover(); await page.locator('.nav-panel:not([hidden]) .card', { hasText: 'Router' }).click(); }, '/router/pages'],
 				['a Migrate card', async () => { await page.locator('.nav-pill .nav-trigger', { hasText: 'Migrate' }).hover(); await page.locator('.nav-panel:not([hidden]) .card', { hasText: 'Migrate an app' }).click(); }, '/start/migrate'],
