@@ -3660,6 +3660,90 @@
 				"jsGzipBytes": 408850
 			},
 			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41574794000 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41574794000 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41574794000 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575486
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41574794000 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682502
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686495
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41574794000 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408852
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41574794000 (linux)"
 		}
 	],
 	"runtimeModules": {
@@ -3853,28 +3937,28 @@
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11362,
-				"jsGzipBytes": 88704
+				"executedChars": 11371,
+				"jsGzipBytes": 89152
 			},
 			"bench /records": {
-				"executedChars": 11271,
-				"jsGzipBytes": 88704
+				"executedChars": 11387,
+				"jsGzipBytes": 89152
 			},
 			"bench /settings": {
-				"executedChars": 11328,
-				"jsGzipBytes": 88704
+				"executedChars": 11444,
+				"jsGzipBytes": 89152
 			},
 			"docs /": {
-				"executedChars": 109124,
-				"jsGzipBytes": 1571608
+				"executedChars": 109992,
+				"jsGzipBytes": 1575486
 			},
 			"docs /concepts/state": {
-				"executedChars": 121827,
-				"jsGzipBytes": 1682502
+				"executedChars": 119772,
+				"jsGzipBytes": 1686495
 			},
 			"docs /ui/accordion": {
-				"executedChars": 22657,
-				"jsGzipBytes": 406069
+				"executedChars": 22830,
+				"jsGzipBytes": 408852
 			}
 		}
 	}
