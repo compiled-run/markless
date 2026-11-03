@@ -271,3 +271,26 @@ export function ${component}({ ${prop} }) @{
 			{ graphNodeId: 'prop:props', keys: [], scalarKeys: [prop] },
 		]);
 	});
+
+// An @if the browser renders again rebuilds the attributes inside it from the payload's prop cell.
+test('SSR seeds the prop an attribute inside an @if reads', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Shade.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function Shade({ tone }) @{
+	let open = state(false);
+	<div>
+		<button type="button" onClick={() => open = !open}>Open</button>
+		@if (open) {
+			<aside data-tone={tone}>Shown</aside>
+		}
+	</div>
+}
+`,
+		symbols: [],
+	});
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'marklessSsrProps, [{"graphNodeId":"prop:props","keys":["tone"]}])',
+	);
+});

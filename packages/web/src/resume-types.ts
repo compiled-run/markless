@@ -139,6 +139,8 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: ProtocolViewPayload['asyncBoundaries'][number]['composedGraphProps'];
+	// Set when the symbol prefix differs from the host prefix in the id.
+	readonly composedSymbolPrefix?: string;
 };
 // The range an arm commit addresses: boundaries and escalating branches alike.
 export type ResumeArmRange = Pick<ResumeAsyncBoundaryRecord, 'id' | 'startAnchor' | 'endAnchor'>;
@@ -247,14 +249,24 @@ export type ElementHandleQualifier = (
 	graph?: unknown,
 ) => string;
 
-type ComposedBoundary = Pick<ResumeAsyncBoundaryRecord, 'id' | 'composedInstancePath' | 'composedGraphProps'>;
+type ComposedBoundary = Pick<
+	ResumeAsyncBoundaryRecord,
+	'id' | 'composedInstancePath' | 'composedGraphProps' | 'composedSymbolPrefix'
+>;
 export type ComposedArmRecordQualifier = ((
 	boundary: ComposedBoundary,
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
+	symbolPrefix?: string,
 ) => ResumeArmRecordSet) & {
 	/** The graph a composed part's settle symbol reads, its routed props answered from the caller's nodes. */
 	readonly graph?: (graph: RuntimeGraph, boundary: ComposedBoundary) => RuntimeGraph;
+	/** An escalated @if render of a composed child, re-spelled in page space. */
+	readonly branchUpdate?: <U extends { readonly armRecords: ResumeArmRecordSet }>(
+		branch: ComposedBoundary & { readonly symbolId?: string },
+		update: U,
+		graph: RuntimeGraph | undefined,
+	) => U;
 };
 
 export type ResumeArmRecordSet = {

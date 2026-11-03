@@ -3466,10 +3466,10 @@
 		{
 			"date": "2026-11-03",
 			"guard": "runtime",
-			"subject": "*",
-			"from": null,
-			"to": "51 runtime modules re-anchored: router/route-dom, router/route-manifest, router/route-renderer, router/vite/entries/fragment-entry, router/vite/entries/resume-entry, router/vite/runtime/create-route-discovery, runtime/graph-computed, runtime/graph-reconcile, runtime/graph-scheduler, serializer/payload-scripts, serializer/protocol, serializer/protocol-client, serializer/protocol-event-names, serializer/protocol-record-keys, serializer/protocol-shared-instances, serializer/protocol-templated-lists, web/dom-journal, web/dom-journal-direct, web/fns/bound-symbol, web/fns/closure-action, web/fns/composition, web/fns/container-region, web/fns/roster-resume, web/fns/row-locals, web/fns/row-slot-mint, web/fns/scalar-served, web/fns/shared-instances, web/fns/visible-trigger, web/fns/write-scalar, web/inline/sync-policy-core, web/payload-document-common, web/payload-graph-construct, web/payload-resume, web/pending-timing, web/prerender/evaluator, web/render, web/render-csr, web/resume, web/resume-anchor-census, web/resume-arm-records, web/resume-behaviors, web/resume-branches, web/resume-census, web/resume-commit-arm, web/resume-events, web/resume-locators, web/resume-runtime, web/resume-sync-computed, web/shared-swap, web/ssr-data/branch-arm-idrefs, web/storage-plane",
-			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount)"
+			"subject": "web/fns/instance-scope",
+			"from": 20368,
+			"to": 21687,
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428)"
 		},
 		{
 			"date": "2026-11-03",
@@ -3480,10 +3480,10 @@
 				"jsGzipBytes": 88506
 			},
 			"to": {
-				"executedChars": 11000,
-				"jsGzipBytes": 88941
+				"executedChars": 10882,
+				"jsGzipBytes": 88704
 			},
-			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
 		},
 		{
 			"date": "2026-11-03",
@@ -3494,10 +3494,10 @@
 				"jsGzipBytes": 88506
 			},
 			"to": {
-				"executedChars": 11016,
-				"jsGzipBytes": 88941
+				"executedChars": 10898,
+				"jsGzipBytes": 88704
 			},
-			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
 		},
 		{
 			"date": "2026-11-03",
@@ -3508,102 +3508,10 @@
 				"jsGzipBytes": 88506
 			},
 			"to": {
-				"executedChars": 10966,
-				"jsGzipBytes": 88941
+				"executedChars": 10955,
+				"jsGzipBytes": 88704
 			},
-			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
-		},
-		{
-			"date": "2026-11-03",
-			"guard": "load",
-			"subject": "docs / (darwin-arm64)",
-			"from": {
-				"executedChars": 108937,
-				"jsGzipBytes": 1568228
-			},
-			"to": {
-				"executedChars": 109814,
-				"jsGzipBytes": 1575140
-			},
-			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, and bind when the runtime starts (measured on this Mac)"
-		},
-		{
-			"date": "2026-11-03",
-			"guard": "load",
-			"subject": "docs /concepts/state (darwin-arm64)",
-			"from": {
-				"executedChars": 119276,
-				"jsGzipBytes": 1679186
-			},
-			"to": {
-				"executedChars": 119769,
-				"jsGzipBytes": 1686151
-			},
-			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, and bind when the runtime starts (measured on this Mac)"
-		},
-		{
-			"date": "2026-11-03",
-			"guard": "load",
-			"subject": "docs /ui/accordion (darwin-arm64)",
-			"from": {
-				"executedChars": 22495,
-				"jsGzipBytes": 404051
-			},
-			"to": {
-				"executedChars": 22686,
-				"jsGzipBytes": 408517
-			},
-			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, and bind when the runtime starts (measured on this Mac)"
-		},
-		{
-			"date": "2026-11-03",
-			"guard": "runtime",
-			"subject": "web/fns/shared-instances",
-			"from": 4598,
-			"to": 5300,
-			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds"
-		},
-		{
-			"date": "2026-11-03",
-			"guard": "load",
-			"subject": "docs / (darwin-arm64)",
-			"from": {
-				"executedChars": 109814,
-				"jsGzipBytes": 1575140
-			},
-			"to": {
-				"executedChars": 109821,
-				"jsGzipBytes": 1575304
-			},
-			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds (+160 B gzip downloaded by the docs pages that use shared(), measured on this Mac)"
-		},
-		{
-			"date": "2026-11-03",
-			"guard": "load",
-			"subject": "docs /concepts/state (darwin-arm64)",
-			"from": {
-				"executedChars": 119769,
-				"jsGzipBytes": 1686151
-			},
-			"to": {
-				"executedChars": 119768,
-				"jsGzipBytes": 1686314
-			},
-			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds (+160 B gzip downloaded by the docs pages that use shared(), measured on this Mac)"
-		},
-		{
-			"date": "2026-11-03",
-			"guard": "load",
-			"subject": "docs /ui/accordion (darwin-arm64)",
-			"from": {
-				"executedChars": 22686,
-				"jsGzipBytes": 408517
-			},
-			"to": {
-				"executedChars": 22685,
-				"jsGzipBytes": 408677
-			},
-			"reason": "review fixes on the shared() binding: dates, maps and sets compare by value and arrays by length, a seed that reads a changed cell is updated before the swap, and a page that only reads a shared() instance ships its payload so it binds (+160 B gzip downloaded by the docs pages that use shared(), measured on this Mac)"
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
 		},
 		{
 			"date": "2026-11-03",
@@ -3614,10 +3522,10 @@
 				"jsGzipBytes": 88506
 			},
 			"to": {
-				"executedChars": 11480,
-				"jsGzipBytes": 88941
+				"executedChars": 11362,
+				"jsGzipBytes": 88704
 			},
-			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41567339239 (linux), executed chars within budget"
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
 		},
 		{
 			"date": "2026-11-03",
@@ -3628,10 +3536,10 @@
 				"jsGzipBytes": 88506
 			},
 			"to": {
-				"executedChars": 11389,
-				"jsGzipBytes": 88941
+				"executedChars": 11271,
+				"jsGzipBytes": 88704
 			},
-			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41567339239 (linux), executed chars within budget"
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
 		},
 		{
 			"date": "2026-11-03",
@@ -3642,10 +3550,10 @@
 				"jsGzipBytes": 88506
 			},
 			"to": {
-				"executedChars": 11446,
-				"jsGzipBytes": 88941
+				"executedChars": 11328,
+				"jsGzipBytes": 88704
 			},
-			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+435 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41567339239 (linux), executed chars within budget"
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
 		},
 		{
 			"date": "2026-11-03",
@@ -3656,38 +3564,102 @@
 				"jsGzipBytes": 1571443
 			},
 			"to": {
-				"executedChars": 109989,
-				"jsGzipBytes": 1575309
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
 			},
-			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41567339239 (linux)"
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "*",
+			"from": null,
+			"to": "51 runtime modules re-anchored: router/route-dom, router/route-manifest, router/route-renderer, router/vite/entries/fragment-entry, router/vite/entries/resume-entry, router/vite/runtime/create-route-discovery, runtime/graph-computed, runtime/graph-reconcile, runtime/graph-scheduler, serializer/payload-scripts, serializer/protocol, serializer/protocol-client, serializer/protocol-event-names, serializer/protocol-record-keys, serializer/protocol-shared-instances, serializer/protocol-templated-lists, web/dom-journal, web/dom-journal-direct, web/fns/bound-symbol, web/fns/closure-action, web/fns/composition, web/fns/container-region, web/fns/roster-resume, web/fns/row-locals, web/fns/row-slot-mint, web/fns/scalar-served, web/fns/shared-instances, web/fns/visible-trigger, web/fns/write-scalar, web/inline/sync-policy-core, web/payload-document-common, web/payload-graph-construct, web/payload-resume, web/pending-timing, web/prerender/evaluator, web/render, web/render-csr, web/resume, web/resume-anchor-census, web/resume-arm-records, web/resume-behaviors, web/resume-branches, web/resume-census, web/resume-commit-arm, web/resume-events, web/resume-locators, web/resume-runtime, web/resume-sync-computed, web/shared-swap, web/ssr-data/branch-arm-idrefs, web/storage-plane",
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount)"
 		},
 		{
 			"date": "2026-11-03",
 			"guard": "load",
-			"subject": "docs /concepts/state (linux-x64)",
+			"subject": "bench / (darwin-arm64)",
 			"from": {
-				"executedChars": 121827,
-				"jsGzipBytes": 1682502
+				"executedChars": 10882,
+				"jsGzipBytes": 88704
 			},
 			"to": {
-				"executedChars": 119936,
-				"jsGzipBytes": 1686318
+				"executedChars": 10998,
+				"jsGzipBytes": 89152
 			},
-			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41567339239 (linux)"
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
 		},
 		{
 			"date": "2026-11-03",
 			"guard": "load",
-			"subject": "docs /ui/accordion (linux-x64)",
+			"subject": "bench /records (darwin-arm64)",
 			"from": {
-				"executedChars": 22657,
-				"jsGzipBytes": 406069
+				"executedChars": 10898,
+				"jsGzipBytes": 88704
 			},
 			"to": {
-				"executedChars": 22864,
-				"jsGzipBytes": 408679
+				"executedChars": 11014,
+				"jsGzipBytes": 89152
 			},
-			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41567339239 (linux)"
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11071,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 108937,
+				"jsGzipBytes": 1568228
+			},
+			"to": {
+				"executedChars": 109825,
+				"jsGzipBytes": 1575481
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 119276,
+				"jsGzipBytes": 1679186
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686491
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 22495,
+				"jsGzipBytes": 404051
+			},
+			"to": {
+				"executedChars": 22685,
+				"jsGzipBytes": 408850
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts (measured on this Mac)"
 		}
 	],
 	"runtimeModules": {
@@ -3745,7 +3717,7 @@
 		"web/fns/container-region": 246,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 20368,
+		"web/fns/instance-scope": 21687,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5251,
@@ -3789,7 +3761,7 @@
 		"web/resume-arm-records-lazy": 219,
 		"web/resume-async-wiring": 10693,
 		"web/resume-behaviors": 8577,
-		"web/resume-branches": 14875,
+		"web/resume-branches": 14986,
 		"web/resume-census": 1454,
 		"web/resume-commit-arm": 12019,
 		"web/resume-events": 18056,
@@ -3809,7 +3781,7 @@
 		"web/resume-sync-computed": 7940,
 		"web/resume-sync-demand": 1530,
 		"web/runtime-error-reporting": 1876,
-		"web/shared-swap": 5165,
+		"web/shared-swap": 5243,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1859,
 		"web/ssr-data/renderer": 21060,
@@ -3855,54 +3827,54 @@
 	"loadWeight": {
 		"darwin-arm64": {
 			"bench /": {
-				"executedChars": 11000,
-				"jsGzipBytes": 88941
+				"executedChars": 10998,
+				"jsGzipBytes": 89152
 			},
 			"bench /records": {
-				"executedChars": 11016,
-				"jsGzipBytes": 88941
+				"executedChars": 11014,
+				"jsGzipBytes": 89152
 			},
 			"bench /settings": {
-				"executedChars": 10966,
-				"jsGzipBytes": 88941
+				"executedChars": 11071,
+				"jsGzipBytes": 89152
 			},
 			"docs /": {
-				"executedChars": 109821,
-				"jsGzipBytes": 1575304
+				"executedChars": 109825,
+				"jsGzipBytes": 1575481
 			},
 			"docs /concepts/state": {
-				"executedChars": 119768,
-				"jsGzipBytes": 1686314
+				"executedChars": 119772,
+				"jsGzipBytes": 1686491
 			},
 			"docs /ui/accordion": {
 				"executedChars": 22685,
-				"jsGzipBytes": 408677
+				"jsGzipBytes": 408850
 			}
 		},
 		"linux-x64": {
 			"bench /": {
-				"executedChars": 11480,
-				"jsGzipBytes": 88941
+				"executedChars": 11362,
+				"jsGzipBytes": 88704
 			},
 			"bench /records": {
-				"executedChars": 11389,
-				"jsGzipBytes": 88941
+				"executedChars": 11271,
+				"jsGzipBytes": 88704
 			},
 			"bench /settings": {
-				"executedChars": 11446,
-				"jsGzipBytes": 88941
+				"executedChars": 11328,
+				"jsGzipBytes": 88704
 			},
 			"docs /": {
-				"executedChars": 109989,
-				"jsGzipBytes": 1575309
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
 			},
 			"docs /concepts/state": {
-				"executedChars": 119936,
-				"jsGzipBytes": 1686318
+				"executedChars": 121827,
+				"jsGzipBytes": 1682502
 			},
 			"docs /ui/accordion": {
-				"executedChars": 22864,
-				"jsGzipBytes": 408679
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
 			}
 		}
 	}
