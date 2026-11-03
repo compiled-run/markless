@@ -212,6 +212,8 @@ export type SsrDataStructure = {
 	readonly elementCount: number;
 	/** Repeat slots walked by this render, including their id prefix. */
 	readonly repeatIds?: ReadonlyArray<string>;
+	/** Component edges this render placed a child through, including their id prefix. */
+	readonly componentEdgeIds?: ReadonlyArray<string>;
 };
 
 export type SsrDataCoordinates = {
@@ -461,6 +463,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					...materializeStructure(rendered.tokens),
 					repeatIds: anchors.flatMap((anchor) =>
 						anchor.kind === 'repeat' ? [anchor.id] : [],
+					),
+					componentEdgeIds: anchors.flatMap((anchor) =>
+						anchor.kind === 'child-component' ? [anchor.id] : [],
 					),
 				},
 				structureTokens: rendered.tokens,

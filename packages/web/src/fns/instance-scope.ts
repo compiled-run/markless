@@ -92,9 +92,12 @@ const EMPTY_ROW_SCOPE: MarklessRowScope = [];
 export function marklessRecordRowScope(
 	hostNodeId: string,
 	graph?: RuntimeGraph,
+	forwarded?: boolean,
 ): MarklessRowScope | undefined {
 	// An @if arm's host is `branch:<branch id>:arm:…`, and the branch id carries the instance.
-	const path = marklessInstancePath(hostNodeId.replace(/^branch:/, ''));
+	const hostPath = marklessInstancePath(hostNodeId.replace(/^branch:/, ''));
+	// A forwarded record's host ends in the edge segment of the child its component spread onto.
+	const path = forwarded ? marklessInstanceSegments(hostPath).slice(0, -1).join('') : hostPath;
 	// No row to thread, but a bound symbol still spells widget ids against its
 	// projection site rather than the root that owns them, so a page carrying any
 	// widget root gets the adapter with no pairs: widget resolution, nothing else.

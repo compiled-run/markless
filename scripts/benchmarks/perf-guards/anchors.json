@@ -3426,92 +3426,24 @@
 			"guard": "runtime",
 			"subject": "web/fns/instance-scope",
 			"from": 20104,
-			"to": 21487,
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428)"
+			"to": 20368,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the dispatch reads a forwarded event row one edge above its host; measured on CI run 41525857883 (linux), +264 B rendered"
 		},
 		{
 			"date": "2026-11-02",
-			"guard": "load",
-			"subject": "bench / (darwin-arm64)",
-			"from": {
-				"executedChars": 10989,
-				"jsGzipBytes": 88506
-			},
-			"to": {
-				"executedChars": 10989,
-				"jsGzipBytes": 88660
-			},
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); +154 B gzip downloaded on darwin-arm64"
+			"guard": "runtime",
+			"subject": "web/fns/ssr",
+			"from": 30833,
+			"to": 31486,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): composition drops forwarded records whose edge this render did not place; measured on CI run 41525857883 (linux), +653 B rendered"
 		},
 		{
 			"date": "2026-11-02",
-			"guard": "load",
-			"subject": "bench /records (darwin-arm64)",
-			"from": {
-				"executedChars": 10898,
-				"jsGzipBytes": 88506
-			},
-			"to": {
-				"executedChars": 10898,
-				"jsGzipBytes": 88660
-			},
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); +154 B gzip downloaded on darwin-arm64"
-		},
-		{
-			"date": "2026-11-02",
-			"guard": "load",
-			"subject": "bench /settings (darwin-arm64)",
-			"from": {
-				"executedChars": 10955,
-				"jsGzipBytes": 88506
-			},
-			"to": {
-				"executedChars": 10955,
-				"jsGzipBytes": 88660
-			},
-			"reason": "measured: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space (host, symbol and graph ids, created cells and computeds), and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); +154 B gzip downloaded on darwin-arm64"
-		},
-		{
-			"date": "2026-11-02",
-			"guard": "load",
-			"subject": "bench / (linux-x64)",
-			"from": {
-				"executedChars": 11362,
-				"jsGzipBytes": 88506
-			},
-			"to": {
-				"executedChars": 11362,
-				"jsGzipBytes": 88660
-			},
-			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41515772192, executed chars at load within budget and left as anchored"
-		},
-		{
-			"date": "2026-11-02",
-			"guard": "load",
-			"subject": "bench /records (linux-x64)",
-			"from": {
-				"executedChars": 11271,
-				"jsGzipBytes": 88506
-			},
-			"to": {
-				"executedChars": 11271,
-				"jsGzipBytes": 88660
-			},
-			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41515772192, executed chars at load within budget and left as anchored"
-		},
-		{
-			"date": "2026-11-02",
-			"guard": "load",
-			"subject": "bench /settings (linux-x64)",
-			"from": {
-				"executedChars": 11328,
-				"jsGzipBytes": 88506
-			},
-			"to": {
-				"executedChars": 11328,
-				"jsGzipBytes": 88660
-			},
-			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41515772192, executed chars at load within budget and left as anchored"
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 20878,
+			"to": 21060,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the render structure lists the component edges it placed; measured on CI run 41525857883 (linux), +182 B rendered"
 		},
 		{
 			"date": "2026-11-02",
@@ -3522,24 +3454,10 @@
 				"jsGzipBytes": 1571252
 			},
 			"to": {
-				"executedChars": 109103,
-				"jsGzipBytes": 1571417
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
 			},
-			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41515772192, executed chars at load within budget and left as anchored"
-		},
-		{
-			"date": "2026-11-02",
-			"guard": "load",
-			"subject": "docs / (linux-x64)",
-			"from": {
-				"executedChars": 109103,
-				"jsGzipBytes": 1571417
-			},
-			"to": {
-				"executedChars": 109103,
-				"jsGzipBytes": 1571419
-			},
-			"reason": "the same PR #428 tree built on main 4a528b9b7 (#429), measured on CI run 41537045785: +2 B gzip downloaded, executed chars within budget and left as anchored"
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix); measured on CI run 41525857883 (linux), +191 B gzip downloaded, executed chars within budget"
 		}
 	],
 	"runtimeModules": {
@@ -3596,7 +3514,7 @@
 		"web/fns/container-region": 279,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 21487,
+		"web/fns/instance-scope": 20368,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
 		"web/fns/roster-resume": 5123,
@@ -3606,7 +3524,7 @@
 		"web/fns/scalar-served": 3982,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 3988,
-		"web/fns/ssr": 30833,
+		"web/fns/ssr": 31486,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
 		"web/fns/visible-trigger": 791,
@@ -3661,7 +3579,7 @@
 		"web/runtime-error-reporting": 1876,
 		"web/ssr-data/awaitable": 856,
 		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20878,
+		"web/ssr-data/renderer": 21060,
 		"web/storage-plane": 1810
 	},
 	"constructGlue": {
@@ -3705,15 +3623,15 @@
 		"darwin-arm64": {
 			"bench /": {
 				"executedChars": 10989,
-				"jsGzipBytes": 88660
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
 				"executedChars": 10898,
-				"jsGzipBytes": 88660
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
 				"executedChars": 10955,
-				"jsGzipBytes": 88660
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
 				"executedChars": 108937,
@@ -3731,19 +3649,19 @@
 		"linux-x64": {
 			"bench /": {
 				"executedChars": 11362,
-				"jsGzipBytes": 88660
+				"jsGzipBytes": 88506
 			},
 			"bench /records": {
 				"executedChars": 11271,
-				"jsGzipBytes": 88660
+				"jsGzipBytes": 88506
 			},
 			"bench /settings": {
 				"executedChars": 11328,
-				"jsGzipBytes": 88660
+				"jsGzipBytes": 88506
 			},
 			"docs /": {
-				"executedChars": 109103,
-				"jsGzipBytes": 1571419
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
 			},
 			"docs /concepts/state": {
 				"executedChars": 121827,
