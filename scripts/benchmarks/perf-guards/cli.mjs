@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { ANCHORS_PATH } from './config.mjs';
+import { formatChange, readAnchorsWithChanges, recordChange } from '../anchor-ledger.mjs';
 import { evaluate, formatReport, isLean, LOAD_PLATFORM, routeKey } from './evaluate.mjs';
 import { measure } from './measure.mjs';
 
@@ -13,12 +13,9 @@ const USAGE = `usage:
   node scripts/benchmarks/perf-guards/cli.mjs measure [--no-build] [--out <file>]
   node scripts/benchmarks/perf-guards/cli.mjs accept <${GUARDS.join('|')}> <subject|*> --reason "<why>" [--from-last] [--no-build]`;
 
-export function readAnchors(path = ANCHORS_PATH) {
-	return JSON.parse(readFileSync(path, 'utf8'));
-}
-
-export function writeAnchors(anchors, path = ANCHORS_PATH) {
-	writeFileSync(path, `${JSON.stringify(anchors, null, '\t')}\n`);
+/** anchors.json with every pending change file in scripts/benchmarks/anchor-changes applied. */
+export function readAnchors() {
+	return readAnchorsWithChanges('perf-guards');
 }
 
 export function saveLastMeasurement(measurement) {
@@ -95,12 +92,13 @@ export function accept(
 				const key = routeKey(site, route);
 				if (!result.load || !pick(key)) continue;
 				next.loadWeight ??= {};
-				const anchors = (next.loadWeight[LOAD_PLATFORM] ??= {});
+				const platform = measurement.platform ?? LOAD_PLATFORM;
+				const anchors = (next.loadWeight[platform] ??= {});
 				const value = {
 					executedChars: result.load.executedChars,
 					jsGzipBytes: result.load.jsGzipBytes,
 				};
-				log('load', `${key} (${LOAD_PLATFORM})`, anchors[key], value);
+				log('load', `${key} (${platform})`, anchors[key], value);
 				anchors[key] = value;
 				matched++;
 			}
@@ -208,9 +206,19 @@ async function main(argv) {
 	if (command === 'accept') {
 		const [guard, subject] = positional;
 		if (!guard || !subject) throw new Error(USAGE);
-		const next = accept(readAnchors(), await load(), guard, subject, reason);
-		writeAnchors(next);
-		console.log(`anchors updated in ${ANCHORS_PATH}`);
+		if (!reason?.trim())
+			throw new Error('accept needs --reason "<one line: why this cost is intended>"');
+		const measurement = await load();
+		const { file, changes } = recordChange(
+			'perf-guards',
+			(anchors) => accept(anchors, measurement, guard, subject, reason),
+			{ reason },
+		);
+		console.log(
+			changes.length
+				? `recorded in ${file}:\n${changes.map((entry) => `  ${formatChange(entry)}`).join('\n')}`
+				: `${guard} ${subject}: measured the same as the anchors without this branch's changes; nothing recorded`,
+		);
 		return 0;
 	}
 	console.error(USAGE);

@@ -30,6 +30,7 @@ import {
 	undemandedRuntimeModules,
 } from './attribution.mjs';
 import { measureConstructGlue } from './construct-glue.mjs';
+import { LOAD_PLATFORM } from './evaluate.mjs';
 import { measureHiddenContent } from './hidden-content.mjs';
 import { measureRouteTable } from './route-table.mjs';
 import { measureServerStylesheets } from './server-stylesheets.mjs';
@@ -524,7 +525,7 @@ async function navigationRounds(browser, origin, nav, read) {
 
 export async function measure({ build = true, sites = ['bench', 'docs'], log = () => {} } = {}) {
 	const { chromium } = require('@playwright/test');
-	const result = { sites: {} };
+	const result = { platform: LOAD_PLATFORM, sites: {} };
 	for (const site of sites) {
 		if (build) await buildSite(site, log);
 		const publicDir = join(APP_DIRS[site], '.output/public');

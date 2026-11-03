@@ -58,19 +58,20 @@ Each failure message names the site, route or action, the measured value, the an
 
 ## Re-anchoring legitimately
 
-Anchors live in `anchors.json`. They are the values measured on the tree where they were last accepted, not limits to raise until the build passes.
+Anchors live in `anchors.json` as of the last fold, plus one change file per pull request in `scripts/benchmarks/anchor-changes/`. The guards check against `anchors.json` with every change file applied. They are the values measured on the tree where they were last accepted, not limits to raise until the build passes. Why change files: [docs/ci-process.md](../../../docs/ci-process.md), "Pull requests that move the same anchors at the same time".
 
 1. Only re-anchor when a change **intends** the cost (a feature that needs the bytes or the work) or **lands a win** (lower numbers). A win is locked in by re-anchoring in the same change set.
-2. Run one command. It re-measures, updates that one subject, and appends a dated `history` entry with your reason:
+2. Run one command. It re-measures and records the difference from the anchors (without this branch's own earlier changes) in `scripts/benchmarks/anchor-changes/<branch>.json`, with your reason:
     ```sh
     pnpm perf:guard:accept runtime "web/resume-branches" --reason "branches learn nested arms"
     pnpm perf:guard:accept construct "keyed @for" --reason "rows carry their key for reorder"
     pnpm perf:guard:accept execution dialog --reason "dialog now validates on open"
     pnpm perf:guard:accept lean "/" --reason "toggle reads an element handle, which lean dispatch cannot serve"
     pnpm perf:guard:accept resume "keyed rows" --reason "rows carry their sort key"
+    pnpm perf:guard:accept load "*" --from last-measurement.json --reason "..."   # Linux numbers from the CI run's perf-guards-measurement artifact
     ```
-    Guards: `runtime`, `construct`, `execution`, `lean`, `resume`, or `all`. Use `"*"` as the subject for every subject of that guard. `--from-last` reuses the measurement the last `pnpm perf:guard` run saved instead of measuring again.
-3. Commit `anchors.json` with the change that caused the move.
+    Guards: `runtime`, `construct`, `execution`, `lean`, `resume`, `load`, or `all`. Use `"*"` as the subject for every subject of that guard. `--from-last` reuses the measurement the last `pnpm perf:guard` run saved instead of measuring again; `--from <file>` reads one, and the platform it was taken on decides which `load` anchors it moves. Running accept again after a rebase replaces the branch's entries; it never adds to them. Set `MARKLESS_ANCHOR_CHANGE=<name>` when the branch name is not the change's name.
+3. Commit the change file with the change that caused the move. Never edit `anchors.json` by hand: `pnpm anchors:fold`, in its own pull request, writes every change file into it with a `history` line each and deletes them, and moves no limit.
 
 Never re-anchor to make an unexplained regression pass. Invariants (G1 rounds, G2, G5, G7, G8, G9, G11, G14, G15, G17) cannot be accepted. `knownViolations` holds only violations that already existed when a guard was introduced. Each entry carries its reason and is reported on every run. Remove it once the violation is fixed; the report says when that happens.
 
@@ -94,6 +95,7 @@ pnpm bench:interaction:guard --lock /private/tmp/mlbench-timing.lock   # later, 
 - `hidden-content.mjs`: builds `packages/router/test/fixtures/idle-hidden-panel-app` with its short and long help panel and counts what runs at load (G14).
 - `server-stylesheets.mjs`: builds `packages/router/test/fixtures/inline-css-app` for Cloudflare with a small and a large prerendered stylesheet and weighs the Worker (G17).
 - `cli.mjs`: `check`, `measure`, and `accept`.
+- `../anchor-ledger.mjs`: reads, records and folds the change files in `../anchor-changes/` (shared with the `fixture-builds` anchors and walls).
 - `evaluate.test.ts`: proves each guard fails with a clear message.
 - The shared browser helpers are `demos/interaction-benchmark/runner/lib/controls.mjs` (control discovery and first-use visits) and `coverage.mjs` (V8 coverage windows).
 - The vitest lane is `packages/bundler/test/perf-guards/`.

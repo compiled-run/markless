@@ -1,5 +1,9 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'pathe';
+import { readFileSync } from 'node:fs';
+import {
+	formatChange,
+	readAnchorsWithChanges,
+	recordChange,
+} from '../../../scripts/benchmarks/anchor-ledger.mjs';
 import { runtimeModuleSizes } from '../../../scripts/benchmarks/perf-guards/attribution.mjs';
 import { BUDGETS } from '../../../scripts/benchmarks/perf-guards/config.mjs';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
@@ -26,13 +30,7 @@ export function assertRuntimeBudget(input: {
 			(emittedReport.largestRuntimeChunk?.gzipBytes ?? 0) <= budget.maxRuntimeChunkGzipBytes,
 		`largest runtime chunk gzip budget exceeded: ${emittedReport.largestRuntimeChunk?.gzipBytes ?? 0} > ${budget.maxRuntimeChunkGzipBytes}\n${emittedReport.summary}`,
 	);
-	// Owner ruling 2026-07-05: no per-page fetch metric — fetched-but-unexecuted code is
-	// cheap under progressive execution; 'emitted = required' assertions arrive with the
-	// runtime-stdlib goal. The emitted wall + per-chunk caps guard bloat.
-	const emittedRuntimeGzipBytes = emittedReport.runtimeChunks.reduce(
-		(total, chunk) => total + chunk.gzipBytes,
-		0,
-	);
+	const { maxEmittedRuntimeGzipBytes: emittedRuntimeGzipBytes } = measuredWalls(emittedReport);
 	assert(
 		emittedRuntimeGzipBytes <= budget.maxEmittedRuntimeGzipBytes,
 		`emitted runtime gzip wall exceeded: ${emittedRuntimeGzipBytes} > ${budget.maxEmittedRuntimeGzipBytes}\n${emittedReport.summary}`,
@@ -49,10 +47,46 @@ export function assertRuntimeBudget(input: {
 }
 
 export type RuntimeModuleAnchors = Record<string, Record<string, number>>;
+type Wall = { readonly measured: number; readonly margin: number };
+export type FixtureRuntimeAnchors = {
+	readonly modules: RuntimeModuleAnchors;
+	readonly walls: Record<string, Record<string, Wall>>;
+};
 
-export const FIXTURE_RUNTIME_ANCHORS = resolve(import.meta.dirname, 'fixture-runtime-anchors.json');
 const ACCEPT_ENV = 'MARKLESS_ACCEPT_FIXTURE_RUNTIME';
-const ACCEPT_COMMAND = `${ACCEPT_ENV}=1 pnpm exec vp test --run packages/bundler/test/fixture-builds.test.ts`;
+const REASON_ENV = 'MARKLESS_ACCEPT_REASON';
+const ACCEPT_COMMAND = `${ACCEPT_ENV}=1 ${REASON_ENV}="<one line>" pnpm exec vp test --run packages/bundler/test/fixture-builds.test.ts`;
+
+/** Emitted runtime gzip bytes, the quantities the walls limit; neither is executed or downloaded bytes. */
+export function measuredWalls(report: RuntimeSizeReport) {
+	return {
+		maxEmittedRuntimeGzipBytes: report.runtimeChunks.reduce(
+			(total, chunk) => total + chunk.gzipBytes,
+			0,
+		),
+		maxRuntimeChunkGzipBytes: report.largestRuntimeChunk?.gzipBytes ?? 0,
+	};
+}
+
+/** Each wall is its last accepted measurement plus the margin recorded beside it. */
+export function fixtureRuntimeBudget(
+	fixture: string,
+	options: { readonly forbidVitePreloadHelper?: boolean } = {},
+): RuntimeBudget {
+	const walls = readFixtureRuntimeAnchors().walls[fixture];
+	if (!walls?.maxEmittedRuntimeGzipBytes)
+		throw new Error(
+			`${fixture}: no emitted runtime gzip wall recorded. Record it with ${ACCEPT_COMMAND}`,
+		);
+	const limit = (wall: Wall | undefined) => (wall ? wall.measured + wall.margin : undefined);
+	return {
+		maxEmittedRuntimeGzipBytes: limit(walls.maxEmittedRuntimeGzipBytes)!,
+		...(walls.maxRuntimeChunkGzipBytes
+			? { maxRuntimeChunkGzipBytes: limit(walls.maxRuntimeChunkGzipBytes) }
+			: {}),
+		...options,
+	};
+}
 
 /** Per-feature framework weight on a minimal fixture: each runtime module's rendered bytes against its anchor. */
 export function runtimeModuleOverruns(
@@ -90,21 +124,43 @@ export function fixtureRuntimeModules(dist: string): Record<string, number> {
 	);
 }
 
-export function readFixtureRuntimeAnchors(): RuntimeModuleAnchors {
-	return JSON.parse(readFileSync(FIXTURE_RUNTIME_ANCHORS, 'utf8')) as RuntimeModuleAnchors;
+/** fixture-runtime-anchors.json with every pending change file in scripts/benchmarks/anchor-changes applied. */
+export function readFixtureRuntimeAnchors(): FixtureRuntimeAnchors {
+	return readAnchorsWithChanges('fixture-runtime') as FixtureRuntimeAnchors;
 }
 
-/** With the accept variable set, records this fixture's measured sizes instead of checking them. */
-export function acceptFixtureRuntime(fixture: string, measured: Record<string, number>): boolean {
+/** With the accept variable set, records this fixture's measured modules and walls as this branch's change instead of checking them. */
+export function acceptFixtureRuntime(
+	fixture: string,
+	measured: Record<string, number>,
+	report: RuntimeSizeReport,
+): boolean {
 	if (process.env[ACCEPT_ENV] !== '1') return false;
-	const anchors = readFixtureRuntimeAnchors();
-	anchors[fixture] = measured;
-	const sorted = Object.fromEntries(
-		Object.keys(anchors)
-			.sort()
-			.map((key) => [key, anchors[key]!]),
+	const reason = process.env[REASON_ENV];
+	if (!reason?.trim())
+		throw new Error(
+			`${ACCEPT_ENV}=1 needs ${REASON_ENV}="<one line: what the bytes buy or which win this records>"`,
+		);
+	const walls = measuredWalls(report);
+	const { file, changes } = recordChange(
+		'fixture-runtime',
+		(anchors: FixtureRuntimeAnchors) => {
+			const next = structuredClone(anchors) as {
+				modules: RuntimeModuleAnchors;
+				walls: Record<string, Record<string, { measured: number; margin: number }>>;
+			};
+			next.modules[fixture] = measured;
+			for (const [name, wall] of Object.entries(next.walls[fixture] ?? {}))
+				wall.measured = walls[name as keyof typeof walls];
+			return next;
+		},
+		{ reason },
 	);
-	writeFileSync(FIXTURE_RUNTIME_ANCHORS, `${JSON.stringify(sorted, null, '\t')}\n`);
+	console.error(
+		changes.length
+			? `[fixture-runtime] ${fixture} recorded in ${file}:\n${changes.map((entry) => `  ${formatChange(entry)}`).join('\n')}`
+			: `[fixture-runtime] ${fixture}: measured the same as the anchors without this branch's changes`,
+	);
 	return true;
 }
 
