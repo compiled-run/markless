@@ -102,12 +102,28 @@ export default box(
 			page.on('requestfailed', (request) => trail.push(`request failed: ${request.url()} ${request.failure()?.errorText ?? ''}`));
 			page.on('console', (message) => message.type() === 'error' && trail.push(`console: ${message.text()}`));
 			await page.addInitScript(sampleThemeFrames);
+			await page.addInitScript(() => {
+				const log: string[] = [];
+				(window as unknown as { __navLog: string[] }).__navLog = log;
+				const t0 = performance.now();
+				for (const type of ['pointerover', 'pointerout', 'keydown'])
+					document.addEventListener(type, (event) => {
+						const target = event.target as Element;
+						if (type === 'keydown' || target.closest?.('.nav-pill'))
+							log.push(`${Math.round(performance.now() - t0)} ${type} ${String((target as HTMLElement).className ?? target.nodeName).slice(0, 24)}`);
+					}, true);
+			});
 			await page.goto(url('/concepts/state'), { waitUntil: 'networkidle' });
 
 			try {
 				await exerciseBar(page, 'first load');
 			} catch (failure) {
-				console.log([...errors, ...trail].join('\n'));
+				const state = await page.evaluate(() => ({
+					log: (window as unknown as { __navLog: string[] }).__navLog.slice(-30),
+					items: [...document.querySelectorAll('.nav-pill .nav-item')].map((item) => [...item.attributes].map((a) => `${a.name}=${a.value}`).join(' ')),
+					triggers: [...document.querySelectorAll('.nav-pill .nav-trigger')].map((t) => `${t.getAttribute('m:on')} ${t.getAttribute('aria-expanded')}`),
+				}));
+				console.log([...errors, ...trail, JSON.stringify(state, null, 1)].join('\n'));
 				throw failure;
 			}
 			const steps: [string, () => Promise<void>, string][] = [
