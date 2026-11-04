@@ -32,9 +32,9 @@ export default function InkButton({
 				position: relative;
 				display: inline-grid;
 				place-items: center;
-				width: 7rem;
+				min-width: 7rem;
 				height: 2.75rem;
-				padding: 0 0 0.3rem;
+				padding: 0 0.9rem 0.3rem;
 				border: 0;
 				background: none;
 				color: var(--screen-ink, var(--ink));
