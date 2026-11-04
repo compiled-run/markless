@@ -135,6 +135,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			if (!state.currentSharedDefinitionId) {
 				collectSharedInstance({
 					localName: name,
+					declaration: id,
 					init,
 					state,
 				});
