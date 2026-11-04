@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 302,
+	total: 303,
 	guided: 46,
 	groups: [
 		{
@@ -30,6 +30,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ARTIFACT_CHILD_RENDER_INVALID',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ASYNC_ARM_ORDER',
 					kind: 'compile error',
 					guided: false,
 				},
