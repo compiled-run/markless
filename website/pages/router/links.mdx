@@ -2,15 +2,16 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import LinkAnatomy from '../../components/figures/links/link-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
 # Links the build can check
 
-<PageMeta time="4 min" assumes="routes" />
+<PageMeta time="2 min" assumes="routes" />
 
-<Subtitle text="Link to a route pattern and pass its params. The build checks both, so a link with a typo stops the build instead of shipping a 404." />
+<Subtitle text="Link to a route pattern and pass its params. The build checks both, so a link with a typo never ships." />
 
 ```tsrx title="pages/index.tsrx"
 import { Link } from '@markless/router';
@@ -25,79 +26,43 @@ export default function Home() @{
 }
 ```
 
-`Link` renders a real `<a href>`. For the second link, the build writes `href="/blog/hello"`. A plain `<a>` with a pattern and `params` works the same way.
+`Link` renders a real `<a>`. The build writes the second one as `href="/blog/hello"`.
 
-## What the build checks
+## The build checks every pattern
 
-- `href="/blog/[slug]"` with `params={{ slug }}`: the build passes, and `href` becomes the real address.
 - A pattern that matches no file in `pages/` stops the build.
-- A pattern with no `params` stops the build, and names each missing param.
-- `<Link href="/abuot">` builds, and your editor flags the typo.
-
-A typo in a pattern stops the build with a message like this:
+- A pattern without its `params` stops the build and names them.
+- A plain address like `/about` isn't checked by the build; your editor flags its typos.
 
 ```txt
 Typed route error: /blog/[id] does not match any route in pages/.
 ```
 
-A plain address like `/about` has no brackets, so the build doesn't check it; your editor does. The router writes your route types to `.output/markless/router/types/routes.d.ts`, and `markless-router-env.d.ts` in your app root points TypeScript at them.
-
 ## A click swaps in only the page
 
-A click on a link to one of your pages keeps the page you're on. The router asks the server for the next page and swaps in only the page area. Plain `<a>` links to your pages do the same.
+Press the drawing to click the other link. Watch what changes, and when.
 
-- The address bar changes when the next page swaps in, not at the click.
-- Press Back before it arrives, and the router cancels it. Back then goes back from the page you're still on.
-- Back and Forward bring back each page and its scroll position.
-- A scrolled box, like a sidebar, keeps its scroll. If the next page moves it inside a different element, give it an `id`.
-- If `document.tsrx` reads a prop other than `children`, the router swaps the whole `<body>` instead.
+<LinkAnatomy />
+
+The router fetches the next page's middle and swaps it in. The address changes at that moment, not at the click. Back and Forward restore each page and its scroll, and Back before the page arrives cancels it.
 
 ## The next page is fetched early
 
-The router starts asking for a page a little before the click: when a pointer rests on its link, when the link gets focus, or when it is pressed. When the browser is idle, links on screen start too, on a fast connection with data saver off. Each early request carries the header `Purpose: prefetch`.
+A pointer resting on a link, a focus or a press starts the fetch before the click. That fetch is a real `GET`, so turn it off for links that do something, like logging out:
 
-An early request is a real `GET`, so it counts as a visit. A log-out link or a one-time token would run when the reader only looked at it. Put `prefetch={false}` on such a link:
-
-```tsrx title="header.tsrx"
-import { Link } from '@markless/router';
-
-export default function Header() @{
-	<nav>
-		<Link href="/settings">Settings</Link>
-		<Link href="/logout" prefetch={false}>Log out</Link>
-	</nav>
-}
+```tsrx
+<Link href="/logout" prefetch={false}>Log out</Link>
 ```
 
-The router never fetches these early:
-
-- another site's address
-- a path under `/api/`
-- a link with `download`, a `target` other than `_self`, or `rel="external"`
-- a link with `prefetch={false}`
-
-A page fetched early is shown for up to 30 seconds. A form submit, or a `fetch` to your own site that isn't a `GET`, `HEAD` or `OPTIONS`, drops every early page. So does a `Cache-Control: no-store` answer, and `max-age=N` keeps it for at most `N` seconds. To turn early requests off for every link, write `router({ prefetch: false })` in `vite.config.ts`.
-
-## Change how a click behaves
-
-| Prop on `Link` | What it does |
-| --- | --- |
-| `prefetch={false}` | nothing is requested before the click |
-| `replace` | replaces the current history entry instead of adding one |
-| `scroll={false}` | keeps the scroll position |
-
-`prefetch={false}` also works on a plain `<a>` and on a component that passes it on to one. Anywhere else, the build stops with `MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED`.
+The router never fetches other sites, `/api/` paths, or links with `download`, a `target` or `rel="external"`.
 
 ## Navigate from code
-
-To change pages from a handler, such as after an order is placed, call `navigate()`. It does what a click on a `Link` to that address does, and takes `replace` and `scroll` too.
 
 ```tsrx title="checkout.tsrx"
 import { navigate } from '@markless/router';
 
 export default function Checkout() @{
 	<button
-		type="button"
 		onClick={async () => {
 			await fetch('/api/orders', { method: 'POST' });
 			await navigate('/orders', { replace: true });
@@ -108,6 +73,12 @@ export default function Checkout() @{
 }
 ```
 
-`navigate()` resolves once the new page is in place. An address outside your app loads the normal way, and the promise never resolves, because the page is gone. It runs only in the browser, so call it from a handler.
+`navigate()` does what a click does, and resolves once the new page is in place.
+
+Keep in mind:
+
+- `replace` swaps the current history entry, and `scroll={false}` keeps the scroll position. Both work on `Link` and `navigate()`.
+- `prefetch={false}` works on `Link`, a plain `<a>`, or a component that passes it to one. Anywhere else stops the build with `MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED`.
+- `router({ prefetch: false })` in `vite.config.ts` turns early fetches off everywhere.
 
 Pages often need data from somewhere slow. [Load it in the page](/router/data).
