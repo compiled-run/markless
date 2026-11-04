@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1226,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; measured on CI run 41865683691 against main's merge-queue run 41843453862",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 24811,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; measured on CI run 41865683691 against main's merge-queue run 41843453862",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 2125,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; measured on CI run 41865683691 against main's merge-queue run 41843453862",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -50333,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; measured on CI run 41865683691 against main's merge-queue run 41843453862",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 420,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; measured on CI run 41865683691 against main's merge-queue run 41843453862",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 14570,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; measured on CI run 41865683691 against main's merge-queue run 41843453862",
+			"date": "2026-11-04"
+		}
+	]
+}
