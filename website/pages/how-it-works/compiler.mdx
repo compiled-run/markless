@@ -1,114 +1,87 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import CompilerPasses from '../../components/sketch/how/compiler-passes.tsrx';
+import PassList from '../../components/figures/compiler/pass-list.tsrx';
 
 <Sidebar />
 
-# What the compiler makes from a counter
+# What the compiler writes for the cart
 
-<PageMeta time="5 min" assumes="state, events" />
+<PageMeta time="3 min" assumes="state, events" />
 
 <ThemeToggle />
 
-Last page said the compiler decides the state, the updates and the event code before anything
-runs. This page shows the real output for the counter. I compiled it with `compileTsrxModule()`
-from `@markless/compiler`, in this repo, and copied what came out.
+<Subtitle text="The compiler turns one .tsrx file into small separate pieces: one function per event and per update, a record that ties them to elements, and two render modules." />
 
-```tsrx
+```tsrx title="cart.tsrx"
 import { state } from '@markless/core';
 
-export function Counter() @{
-	let count = state(0);
+export default function Cart() @{
+	let bags = state(0);
 
-	<button onClick={() => count++}>Count {count}</button>
+	<section>
+		<p>In your cart: {bags} bags</p>
+		<button onClick={() => bags++}>Add to cart</button>
+	</section>
 }
 ```
 
+Every excerpt on this page is the real output of `compileTsrxModule()` from `@markless/compiler` for this file. Each excerpt is a slice of one output, and only the line breaks in the JSON were added.
+
 ## A chain of passes
 
-The compiler is not one big walk over your code. It is a chain of _passes_: small steps, each with
-named inputs and named outputs. Each pass reads the outputs of earlier passes and adds its own.
+A *pass* is one small step with named inputs and named outputs. Each pass reads what earlier passes wrote and adds its own. Before any pass runs, the compiler checks the chain: a missing input, two passes writing the same output, or a cycle stops the compile with `MARKLESS_COMPILER_PASS_GRAPH_INVALID`.
 
-Before any pass runs, the compiler checks the chain itself. A missing input, two passes making the
-same output, or a cycle stops the compile with `MARKLESS_COMPILER_PASS_GRAPH_INVALID`.
+The first pass parses the file and runs the analyzer over it, then writes the *semantic graph*: every piece of state, element, read and write in the file, with what each one means. The chain, in the order it runs:
 
-The _semantic graph_ is the first pass's output. It lists every piece of state, element, read and
-write in the file, with what each one means. Every later pass works from it.
+<PassList />
 
-For the counter, the chain runs 16 passes, in this order:
-
-| Pass | What it does |
-| --- | --- |
-| `tsrx-semantic-graph` | Builds the semantic graph from the source |
-| `state-lowering` | Turns state reads and writes into graph reads and writes |
-| `payload-arena` | Plans the state and view records |
-| `symbol-resolver` | Plans the symbols |
-| `render-data` | Splits the elements into static HTML and dynamic slots |
-| `public-render-plan` | Collects scoped styles and flags elements the render modules cannot emit |
-| `capture-analysis` | Checks what each symbol reads |
-| `protocol-state` | Writes the state record |
-| `protocol-view` | Writes the view record, with symbol IDs on each entry |
-| `public-render-module` | Writes the browser and server render modules, and picks the direct module when it can |
-| `server-only-props` | Stops the compile if browser code reads a prop the server keeps to itself |
-| `payload-scripts` | Writes the `markless/state` and `markless/view` script tags |
-| `symbol-modules` | Writes one module source per symbol |
-| `runtime-demand-map` | Maps each symbol and record to the runtime code it needs |
-| `trigger-groups` | Groups each event with the state, records and symbols it touches |
-| `symbol-resolver-module` | Writes the module that imports symbols by ID |
-
-Step through the chain below. Each pass shows what it reads and what it writes.
-
-<CompilerPasses />
+Each file compiles on its own. The bundler then links the files: it joins each import to the component it renders and works out which code each page's first interactions need.
 
 ## The click became a symbol
 
-The click handler became `symbol:0`. Your `count++` is now an update to the graph node `state:count`:
+A *symbol* is one function with a stable ID, in a module of its own. The click became `symbol:0`, and `bags++` became an update to the graph node `state:bags`:
 
-```js
+```js title="symbol:0"
 import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
 /* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-  return marklessWriteScalar(context, { graphNodeId: "state:count", returnValue: "next", update(value) {
+  return marklessWriteScalar(context, { graphNodeId: "state:bags", returnValue: "next", update(value) {
     return Number(value) + 1;
   } });
 }
 ```
 
-A symbol is a module of its own. Its code runs only when something asks for `symbol:0` by ID, even
-if a production build fetched it earlier.
+The text became `symbol:1`. It returns one instruction, set the text of one element:
 
-## The text became a symbol too
-
-The text `Count {count}` became `symbol:1`. It returns one instruction: set the text of one node.
-
-```js
+```js title="symbol:1"
 export function symbol_1(context) {
-  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h0", value: "Count " + (context.value == null ? "" : String(context.value)) + "" };
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h1", value: "In your cart: " + (context.value == null ? "" : String(context.value)) + " bags" };
 }
 ```
 
-`h0` is a _host node ID_: the compiler's name for the button. A _locator_ is the record that finds
-that element again in a real page.
+`h1` is a *host node ID*, the compiler's name for the paragraph. A *locator* is the record that finds that element again in a real page.
 
 ## The view record ties them together
 
-The view record says which element does what. A click on `h0` runs `symbol:0`. A change to
-`state:count` runs `symbol:1` against `h0`. I added the line breaks.
+A click on `h2`, the button, runs `symbol:0`. A change to `state:bags` runs `symbol:1` against `h1`. The `section` gets no locator, because nothing on it changes or listens.
 
-```json
+```json title="view record"
 {
   "version": 1,
-  "locators": [{ "hostNodeId": "h0", "strategy": "dom-order", "index": 0, "tagName": "button" }],
-  "events": [{ "hostNodeId": "h0", "eventName": "click", "symbolIds": ["symbol:0"] }],
+  "locators": [
+    { "hostNodeId": "h1", "strategy": "dom-order", "index": 1, "tagName": "p" },
+    { "hostNodeId": "h2", "strategy": "dom-order", "index": 2, "tagName": "button" }
+  ],
+  "events": [{ "hostNodeId": "h2", "eventName": "click", "symbolIds": ["symbol:0"] }],
   "domUpdates": [
     {
-      "hostNodeId": "h0",
-      "source": "count",
-      "graphNodeId": "state:count",
+      "hostNodeId": "h1",
+      "source": "bags",
+      "graphNodeId": "state:bags",
       "path": [],
-      "target": { "kind": "text", "prefix": "Count " },
+      "target": { "kind": "text", "prefix": "In your cart: ", "suffix": " bags" },
       "symbolId": "symbol:1"
     }
   ],
@@ -120,57 +93,31 @@ The view record says which element does what. A click on `h0` runs `symbol:0`. A
 }
 ```
 
-The state record next to it holds one cell: `state:count`, a scalar, starting at `0`.
+The state record beside it holds one cell: `state:bags`, a scalar, starting at `0`.
 
 ## Two render modules
 
-The same compile writes a browser module and a server module.
+The server module defines `marklessRenderSsr`. It renders the cart to HTML and fills in both records. [The payload](/how-it-works/payload) shows what it sends.
 
-The server module defines `marklessRenderSsr`. It renders the counter to HTML and fills in the state
-and view records. [The payload](/how-it-works/payload) shows what it sends.
+For a component this simple, the browser module is a *direct module*. It never starts the full runtime:
 
-The browser module is the interesting one. For a simple component like this, the compiler writes a
-_direct browser module_. Here is the part that `render()` calls:
-
-```js
-export function Counter() {
+```js title="browser module"
+export function Cart() {
 	const graph = createMarklessPublicGraph();
 	const root = renderMarklessDirectChunk(graph, loadSymbol);
 	return { root, graph, runtime: { async dispatch() {} } };
 }
 ```
 
-`createMarklessPublicGraph()` is written into the same module. It holds the counter's state in a
-plain `Map`, seeded at compile time:
+`createMarklessPublicGraph()` sits in the same module and keeps the state in a plain `Map`, seeded at compile time: `new Map([["state:bags", 0]])`. `renderMarklessDirectChunk` clones the elements from a template, fills in the text, and puts a click listener on the button itself.
 
-```js
-const cells = new Map([["state:count", 0]]);
-```
+The compiler writes a direct module only when it can prove the simple path covers the whole component. Each of these, among others, sends a component down the general path:
 
-`renderMarklessDirectChunk` clones the button from a template, fills in the text, and puts a click
-listener on the button itself. It never starts the full runtime. [Resuming](/how-it-works/resuming)
-follows what happens on the first click.
-
-Not every component gets a direct module. The compiler writes one only when it can prove the
-simple path covers the whole component. Each of these, among others, sends a component down the
-general path instead:
-
-- props
-- child components
+- props, or a child component
 - a scoped `<style>`
-- a `computed()`
-- an element handle
+- a `computed()`, `shared()`, an element handle or an `attach={...}` behavior
 - an async block
 - more than one root element
 - a dynamic attribute other than `class`
-- `shared()` or an `attach={...}` behavior
 
-That general path is the fallback, and the next pages cover it.
-
-<Callout
-	sprite="cross"
-	title="Why did my handler fail to build?"
-	text="A symbol runs later, apart from the component body. So it can read only what the compiler can find again. That means state, element handles, props, imports and values it can write down. A handler that reads a local such as const seen = new WeakMap() fails with MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED. The message names the local: a local class instance value that cannot cross a resume boundary."
-/>
-
-Next: [the format a server writes into its HTML](/how-it-works/payload).
+[Resuming](/how-it-works/resuming) follows the first click down each path.

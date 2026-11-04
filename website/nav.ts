@@ -262,7 +262,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'balance',
 				number: '1',
 				description:
-					'The design choices behind Markless on one page, for contributors and agents who want to weigh how it works.',
+					'Markless decides every update at compile time for any environment and resumes the page on interaction: the design, what it costs, and how it compares.',
 			},
 			{
 				title: 'The big idea',
@@ -270,7 +270,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'bulb',
 				number: '2',
 				description:
-					'Markless reads a component at build time instead of running it, so the plan is written before anything renders, anywhere.',
+					'Markless reads a component while it builds, so one plan renders it in the browser, on a server and in tests.',
 			},
 			{
 				title: 'The compiler',
@@ -278,7 +278,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'gear',
 				number: '3',
 				description:
-					'The real output the compiler makes from a counter: its state, its updates and the code each event runs.',
+					'The real output the compiler writes for a small cart: its passes, its symbols, its view record and its two render modules.',
 			},
 			{
 				title: 'The payload',
@@ -294,7 +294,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'play',
 				number: '5',
 				description:
-					'Who hears the first click on each of the three paths a page can take: the browser with a direct module, the browser on the general path, or a server-rendered page.',
+					'Who hears the first click on each of the three paths a page can take: a direct browser module, the general browser path, or a server-rendered page.',
 			},
 			{
 				title: 'The state graph',
@@ -302,7 +302,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'graph',
 				number: '6',
 				description:
-					'The compiler writes down who reads what before the page exists, so one write touches one text node.',
+					'The compiler writes down who reads what before the page exists, so one write changes only the text that reads it.',
 			},
 			{
 				title: 'Lazy chunks',
@@ -310,7 +310,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'puzzle',
 				number: '7',
 				description:
-					'Where the small functions behind each handler and update live, and when the browser gets and runs them.',
+					'Click code downloads with the page and runs only on the first press: symbols, packing, and what a symbol can reach.',
 			},
 			{
 				title: 'Native targets',
@@ -318,7 +318,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'phone',
 				number: '8',
 				description:
-					'The same counter on a phone: the state graph and its functions are data, so a browser is not the only place they run.',
+					'Two hand-written proofs where a Markless component drives real iOS and macOS buttons. The compiler does not write native output yet.',
 			},
 		],
 	},

@@ -1,119 +1,74 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import StateGraphSketch from '../../components/sketch/how2/state-graph-sketch.tsrx';
 
 <Sidebar />
 
-# Why one write touches one text node
+# One write wakes only its readers
 
-<PageMeta time="5 min" assumes="state, computed, events" />
+<PageMeta time="3 min" assumes="state, computed, events" />
 
 <ThemeToggle />
 
-Last page, a click ran `count++`, and one number on the page changed. Who decided which number?
+<Subtitle text="The compiler writes down who reads what before the page exists, so a write changes only the text that reads it." />
 
-The compiler did, before the page existed. It wrote down who reads what.
-
-## The problem
-
-A write has to change the page. One common way is to run the component again and compare the result
-with the page. That reruns the whole component, even when one character changes.
-
-Markless skips that work. It needs a list that says which text, attributes and rows read each piece
-of state. That list is the _state graph_.
-
-## Three parts
-
-- A **node** holds one value. Each `state()` becomes a node with an ID like `state:count`. Each
-  `computed()` becomes one too.
-- A **subscription** is a reader. It names one node and one path into that node's value. When that
-  path changes, it runs a small function.
-- The **journal** is the list of DOM changes those functions return, such as "set this text".
-
-Think of plumbing, as an analogy. A write opens one tap, and water reaches only the pipes on that tap.
-
-Here is a counter with one computed value. Press **Next** a few times:
-
-<Code note="Add a third line that reads {count + 100}. Then add a second state() with its own button and line. Each button moves only the lines that read its state.">
-```tsrx title="state-computed.tsrx"
+<Code note="Press Add to cart and watch which lines change. Then add <p>{bags * 2} cups</p> and press again: the new line follows too.">
+```tsrx title="cart.tsrx"
 import { computed, state } from '@markless/core';
 
-export default function StateComputed() @{
-	let count = state(2);
-	const doubled = computed(() => count * 2);
+export default function Cart() @{
+	let bags = state(2);
+	const total = computed(() => bags * 14);
 
 	<section>
-		<button onClick={() => count++}>Next</button>
-		<p>count: {count}</p>
-		<p>doubled: {doubled}</p>
+		<p>House blend · 250 g</p>
+		<p>In your cart: {bags} bags</p>
+		<p>Total: ${total}</p>
+		<button onClick={() => bags++}>
+			Add to cart
+		</button>
 	</section>
 }
 ```
 </Code>
 
-Both lines move, because both read `count`, one of them through `doubled`. The button label never
-changes, because it reads nothing.
+A press changes two lines:
 
-<StateGraphSketch />
+- `In your cart` reads `state:bags` directly.
+- `Total` reads `computed:total`, which reads `state:bags`.
+- The product line reads nothing, so no press ever touches it.
+
+Nothing runs the component again to find out which lines those are.
+
+## Three parts make the state graph
+
+The *state graph* is the list of who reads what, kept while the page runs:
+
+- A **node** holds one value. `state()` makes one with an ID like `state:bags`, and `computed()` makes one like `computed:total`.
+- A **subscription** is one reader: a node, a path into its value, and a small function to run when that path changes.
+- The **journal** is the list of page changes those functions return, such as "set this text".
 
 ## One write, step by step
 
-The full graph lives in `@markless/runtime`. The general browser path builds it, and so does a
-server-rendered page that needs the full runtime. In that graph, a click that runs `count++` does
-this:
+The full graph lives in `@markless/runtime`. For `bags++` it does this:
 
-1. If the new value equals the old one, nothing happens.
-2. Otherwise the graph stores it and records the written path as dirty.
-3. The graph marks `doubled` as stale, because `doubled` depends on `count`.
-4. The graph schedules one flush as a _microtask_: a job that runs right after the current code
-   finishes.
-5. The flush runs each subscription whose path meets a dirty path. The `doubled` subscription reads
-   `doubled`, so it recomputes now.
-6. Each subscription returns a journal entry, such as `setText`. Markless applies the entries to the
-   DOM.
+1. If the new value equals the old one, it stops.
+2. Otherwise it stores the value and marks the written path as changed.
+3. It marks `computed:total` as stale, because `total` depends on `bags`.
+4. It schedules one flush as a *microtask*: a job that runs right after the current code finishes.
+5. The flush runs each subscription whose path meets a changed path. Reading `total` recomputes it now.
+6. Each subscription returns a journal entry, and Markless applies the entries to the page.
 
-Two writes in the same turn share one flush. If a handler writes `1` and then `2`, the journal gets
-one entry, with `2`.
-
-**Misconception: something compares the old page with the new page.** Nothing does. A subscription
-returns the exact change. There is no tree to compare.
+Two writes in the same turn share one flush. A handler that writes `3` and then `4` leaves one entry, showing `4`.
 
 ## Paths, not whole objects
 
-A subscription listens to a path inside a value, not to the whole value. Two paths meet when one is
-a prefix of the other.
+A subscription listens to a path inside a value. Two paths meet when one starts with the other. With `let order = state({ bags: 2, grind: 'whole' })`, a write to `order.grind` doesn't wake the reader of `order.bags`. Replacing `order` wakes both, because the empty path starts every path.
 
-```tsrx
-import { state } from '@markless/core';
+A computed node lists the paths it reads. A write to one of them marks it stale, and it recomputes on its next read, not before.
 
-export function Menu() @{
-	let menu = state({ open: true, title: 'Menu' });
-
-	<section>
-		<h2>{menu.title}</h2>
-		<button onClick={() => { menu.open = false; }}>Close</button>
-	</section>
-}
-```
-
-In the full runtime, a write to `menu.open` does not wake the reader of `menu.title`. A write that replaces `menu` wakes
-both, because the empty path is a prefix of every path.
-
-## Computed values
-
-A computed node lists the paths it depends on. A write to one of those paths marks it stale. It
-recomputes on its next read, not before. Chains work the same way: a computed that reads another
-computed goes stale with it.
-
-On a server-rendered page, the `markless/state` script carries each computed as a recipe. The
-recipe is its dependencies plus the ID of a derive symbol. The current value travels too, but only for a sync
-computed that a handler reads.
-
-## What a subscription can return
-
-The full runtime sends its DOM changes through the journal. These are the entry types:
+## What the journal holds
 
 | Entry | What it does |
 | --- | --- |
@@ -122,22 +77,11 @@ The full runtime sends its DOM changes through the journal. These are the entry 
 | `insertRange`, `removeRange`, `moveRange` | Inserts, removes or moves a run of nodes, such as an `@if` branch |
 | `runCleanup` | Runs a cleanup registered for one element |
 
-**Misconception: you need an effect to keep the page in sync.** `@markless/core` exports no effect
-function. Its authoring exports are `state`, `computed`, `shared`, `element` and `storage`. The
-compiler plans every subscription for you.
+Nothing compares an old page with a new one, and `@markless/core` has no effect function: the compiler plans every subscription.
 
-## The direct module keeps it smaller
+Where the graph is smaller or bends:
 
-Mount the counter from earlier pages with `render()`, and it takes the direct browser module instead. That
-module skips this machinery. Its graph is a `Map` of state values. After a handler runs, it reads
-each text slot again and writes only the ones whose value changed.
+- A component on the [direct module](/how-it-works/compiler) skips this machinery. Its graph is a `Map`, and after a handler it reads each text slot again.
+- An `@if` or `@switch` inside `@try` that holds a component re-renders the whole `@try` block when it toggles. The compiler warns with `MARKLESS_TRY_BLOCK_TOGGLE_RERENDER`; move the component outside the `@if`.
 
-Same result, fewer moving parts: only the text that reads the changed state changes.
-
-<Callout
-	sprite="cross"
-	title="Why did my @if run a component again?"
-	text="An @if or @switch inside @try can hold a component. Then a toggle re-renders the whole @try block and runs the component again. The compiler warns with MARKLESS_TRY_BLOCK_TOGGLE_RERENDER, and the fix it suggests is to move the component outside the @if."
-/>
-
-Next: [when click code downloads, and when it runs](/how-it-works/lazy-chunks).
+[Lazy chunks](/how-it-works/lazy-chunks) shows where the functions behind each subscription live.

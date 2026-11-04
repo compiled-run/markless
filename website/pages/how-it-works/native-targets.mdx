@@ -1,104 +1,74 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import NativeHostsSketch from '../../components/sketch/how2/native-hosts-sketch.tsrx';
 
 <Sidebar />
 
-# The same counter on a phone
+# The same component on a phone, as an early proof
 
-<PageMeta time="3 min" assumes="state, events" />
+<PageMeta time="2 min" assumes="state, events" />
 
 <ThemeToggle />
 
-The state graph and its symbols turned out to be data plus small functions. Does a browser have to
-run them?
+<Subtitle text="The state graph and its symbols are data plus small functions, so a browser is not the only thing that can run them." />
 
-The Markless README states the goal: one web-like component model for web and native apps. Today,
-two small proofs test that idea. Neither one is a product.
+Markless is built to compile one web-like component to any device. Today the web is what ships. iOS and macOS are two small hand-written proofs, Android, Windows and Linux are not started, and no Markless package writes native output yet. The [home page](/) draws one plan reaching each device.
 
-<Callout
-	sprite="cross"
-	title="Hand-written proofs, not a feature"
-	text="The proofs live in poc/fixtures/proofs/ in the Markless repo. Each one reads an artifact.json that is checked in by hand. No Markless package writes this format, the compiler has no native output, and @markless/web is the only rendering target package."
-/>
+## What the proofs test
 
-## The question
+A phone has no DOM. A native button needs its own control, its own event and its own way to set a title. So the question is narrow: can a graph-shaped description of a component drive real native controls, with the handler still written in JavaScript?
 
-The web path ends in DOM changes, such as `setText`. A phone has no DOM. A native button needs its
-own control, its own event and its own way to set a title.
+Both proofs start from this component. The macOS one differs only in its heading.
 
-So the question is narrow. Can a graph-shaped description of a counter drive real native controls,
-with the handler still written in JavaScript?
-
-As an analogy, think of sheet music. The score says which notes play and when. Each instrument plays
-the same score in its own way. Here the score is the artifact, and a small Swift runtime is the
-instrument.
-
-<NativeHostsSketch />
-
-## The proof
-
-The iOS proof starts from this component. The macOS proof differs only in its heading.
-
-```tsrx
+```tsrx title="App.tsrx"
 import { state } from '@markless/core';
 
 export function Counter() @{
-  let count = state(0);
+	let count = state(0);
 
-  <main>
-    <h1>Markless iOS Proof</h1>
-    <button onClick={() => count++}>Count {count}</button>
-  </main>
+	<main>
+		<h1>Markless iOS Proof</h1>
+		<button onClick={() => count++}>Count {count}</button>
+	</main>
 }
 ```
 
-The artifact lists state cells, host nodes, event records, text bindings and symbol bodies. Its
-event record maps the authored `onClick` to a semantic `activate` event, then names the host event:
+## The plan is written by hand
 
-```json
+Each proof reads an `artifact.json` checked in beside it. It lists the state cells, host nodes, events, text bindings and symbol bodies. The event maps the authored `onClick` to a device-neutral `activate`, then to the native event:
+
+```json title="artifact.json, the event"
 {
-  "node": "host:button",
-  "authoredEvent": "onClick",
-  "semanticEvent": "activate",
-  "nativeEvent": "touchUpInside",
-  "symbolId": "symbol:counter.increment"
+	"node": "host:button",
+	"authoredEvent": "onClick",
+	"semanticEvent": "activate",
+	"nativeEvent": "touchUpInside",
+	"symbolId": "symbol:counter.increment"
 }
 ```
 
-On iOS the host event is `touchUpInside`. On macOS it is `action`. The symbol body is the same in
-both, and it is also written by hand:
+On macOS the native event is `action`. The symbol body is the same in both, and it is also written by hand:
 
-```js
+```js title="symbol:counter.increment"
 graph["state:count"] = graph["state:count"] + 1;
 ```
 
 ## What the Swift runtime does
 
-1. It creates a `JSContext` from JavaScriptCore, and a plain `graph` object with `state:count` set to
-   `0`.
-2. It turns each host node into a control. On iOS, `main` becomes a `UIStackView` and `button`
-   becomes a `UIButton`.
+1. It creates a `JSContext` from JavaScriptCore, and a plain `graph` object with `state:count` at `0`.
+2. It turns each host node into a control: on iOS, `main` becomes a `UIStackView` and `button` becomes a `UIButton`.
 3. It connects the native event to the symbol ID.
 4. On a tap, it runs the symbol in JavaScriptCore.
-5. Then it reads every text binding again and sets the button title, such as `Count 1`.
+5. It reads every text binding again and sets the button title, such as `Count 1`.
 
-The macOS proof does the same with an `NSButton` and its `action` event. In both proofs, an XCTest
-checks that the title goes from `Count 0` to `Count 1`.
+The macOS proof does the same with an `NSButton`. In both, an XCTest checks that the title goes from `Count 0` to `Count 1`, and a check script makes sure no file names a web view.
 
-## What the proofs do not show
+## What the proofs don't show yet
 
-The proofs are narrow on purpose:
+- The compiler doesn't write `artifact.json`. Both live in `poc/fixtures/proofs/` in the Markless repo.
+- They don't use `@markless/runtime`. The graph is a plain object, and every text binding is read again after each tap.
+- They don't cover styling, lists, navigation or packaging an app.
+- Android, Windows and Linux have no proof.
 
-- They do not use `@markless/runtime`. The graph is a plain JavaScript object.
-- They update every text binding after each tap. They do not use path subscriptions.
-- They do not cover styling, Android, Windows, Linux or production packaging.
-- A check script in each proof makes sure that the files name no web view or cross-platform shell.
-
-**Misconception: Markless ships native apps today.** It does not. The proofs show that this artifact
-shape can drive native controls. The compiler does not produce that artifact yet.
-
-That is the whole engine, from the compiler's plan to the page. A hand-written proof shows that the
-same shape can drive a phone. For the API itself, go to [the reference](/reference).
+Want a device sooner? [Contributing](/contributing) shows where to start.
