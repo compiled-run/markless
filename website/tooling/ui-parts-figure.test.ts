@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parts } from '../components/docs/ui-parts/parts.data.ts';
-import { metaFamilies, metaFor } from '../components/docs/ui-meta/index.ts';
 import { decorate, partsFigureModule, planParts } from './ui-parts-figure.ts';
 import { readFileSync } from 'node:fs';
 
@@ -27,10 +26,5 @@ describe('parts figure', () => {
 		for (const fact of parts[family]!) expect(module).toContain(`<code>${family}.${fact.part}</code>`);
 		const plan = await planParts(family, readFileSync(demo(family), 'utf8'), demo(family), parts[family]!);
 		expect(plan.rings.some((ring) => parts[family]!.find((fact) => fact.part === ring.part)?.hidden)).toBe(false);
-	});
-
-	it.each(metaFamilies().filter((family) => metaFor(family).hooks))('lists exactly the ui-* attributes %s writes', (family) => {
-		const written = [...new Set(parts[family]!.flatMap((fact) => fact.hooks))].sort();
-		expect(Object.keys(metaFor(family).hooks!).sort()).toEqual(written);
 	});
 });

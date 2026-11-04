@@ -54,9 +54,6 @@ export const keys = {
 	mod: split('⌘', 'Command', 'Ctrl', 'Control'),
 	option: split('⌥', 'Option', 'Alt', 'Alt'),
 	control: split('⌃', 'Control', 'Ctrl', 'Control'),
-	letter: same('A–Z', 'A letter'),
-	digit: same('0–9', 'A digit'),
-	asterisk: same('*', 'Asterisk'),
 } as const satisfies Readonly<Record<string, KeyCap>>;
 
 export type KeyName = keyof typeof keys;

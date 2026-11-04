@@ -83,10 +83,5 @@ export type FamilyMeta = {
 	/** The named value sets the playground's Scenario select offers, first one first. */
 	readonly presets: readonly FamilyPreset[];
 	readonly keyboard: readonly KeyboardShortcut[];
-	/**
-	 * When each `ui-*` attribute the family writes is on, in the order the page lists them. Which parts
-	 * carry it is read from the package (components/docs/ui-parts), so only the sentence is written here.
-	 */
-	readonly hooks?: Readonly<Record<string, string>>;
 	readonly examples: readonly ExampleEntry[];
 };

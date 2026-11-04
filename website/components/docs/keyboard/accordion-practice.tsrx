@@ -77,8 +77,8 @@ export default function AccordionPractice({ platform }: { readonly platform: str
    .practice-stage[data-active] .practice-entry { visibility: hidden; }
    .practice-stage[data-active] .trick-announcement { visibility: visible; }
    .entry-title { display: block; font-size: var(--step-2); line-height: 1.15; }
-   .practice-entry .entry-prompt { margin: .65rem 0 0; color: var(--ink); font-size: var(--step--1); line-height: 1.5; }
-   .entry-key { display: grid; place-content: center; gap: .2rem; flex: none; width: 80px; height: 80px; border: 1px solid var(--ink); border-radius: 6px; background: var(--purple); color: var(--ink); box-shadow: 3px 3px 0 color-mix(in srgb, var(--ink) 18%, var(--paper)); cursor: pointer; }
+   .practice-entry .entry-prompt { margin: .65rem 0 0; color: var(--ink); line-height: 1.5; }
+   .entry-key { display: grid; place-content: center; gap: .2rem; flex: none; width: 80px; height: 80px; border: 1.5px solid var(--ink); border-radius: 10px 7px 11px 8px; background: color-mix(in srgb, var(--yellow) 75%, var(--paper)); color: var(--ink); box-shadow: 3px 3px 0 color-mix(in srgb, var(--ink) 18%, var(--paper)); cursor: pointer; }
    .entry-key kbd { font: 500 32px var(--font-mono); }
    .entry-key span { font: 14px 'Shantell Sans', system-ui, sans-serif; }
    .entry-key:focus-visible { outline: 2px solid var(--ink); outline-offset: 5px; }
@@ -86,15 +86,15 @@ export default function AccordionPractice({ platform }: { readonly platform: str
    .trick-task { display: flex; align-items: center; justify-content: flex-start; gap: .8rem; }
    .trick-copy { flex: 0 1 auto; min-width: 0; }
    .trick-title { display: block; font-size: var(--step-1); line-height: 1.15; }
-   .practice-guide .trick-prompt { margin: .35rem 0 0; font-size: var(--step--1); line-height: 1.4; color: var(--ink); }
-   .practice-guide .trick-command { flex: none; max-width: 45%; margin: 0; font: 12px var(--font-mono); line-height: 1.6; }
+   .practice-guide .trick-prompt { margin: .35rem 0 0; line-height: 1.5; color: var(--ink); }
+   .practice-guide .trick-command { flex: none; max-width: 45%; margin: 0; font: var(--step-0) 'Shantell Sans', system-ui, sans-serif; line-height: 1.6; }
    .trick-command kbd { display: inline-block; padding: .4rem .5rem; border: 1px solid var(--ink); border-radius: var(--keyboard-control-radius); background: var(--paper); box-shadow: 2px 2px 0 var(--purple); color: var(--ink); font: 600 12px var(--font-mono); white-space: nowrap; }
-   .practice-guide .trick-help { margin: .9rem 0 0; color: var(--muted-ink); font-size: 12px; line-height: 1.4; }
+   .practice-guide .trick-help { margin: .9rem 0 0; color: var(--muted-ink); }
    .trick-command [data-command-os] { display: none; }
    .practice-stage[data-layout='mac'] [data-command-os='mac'], html[data-keyboard-platform='mac'] .practice-stage[data-layout='auto'] [data-command-os='mac'],
    .practice-stage[data-layout='windows'] [data-command-os='windows'], html[data-keyboard-platform='windows'] .practice-stage[data-layout='auto'] [data-command-os='windows'],
    .practice-stage[data-layout='linux'] [data-command-os='linux'], html[data-keyboard-platform='linux'] .practice-stage[data-layout='auto'] [data-command-os='linux'] { display: inline-block; }
-   .phone-preview { grid-column: 2; grid-row: 2; position: relative; align-self: center; width: 100%; min-height: 390px; box-sizing: border-box; padding: 3rem .8rem 2.8rem; border: 1px solid var(--ink); border-radius: 28px; background: var(--paper); box-shadow: 4px 4px 0 var(--keyboard-preview-depth); }
+   .phone-preview { grid-column: 2; grid-row: 2; position: relative; align-self: center; width: 100%; min-height: 390px; box-sizing: border-box; padding: 3rem .8rem 2.8rem; border: 2px solid var(--ink); border-radius: 30px 26px 32px 27px; background: var(--paper); box-shadow: 3px 4px 0 var(--ink); }
    .phone-speaker { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 45px; height: 5px; border-radius: 9px; background: var(--ink); opacity: .7; }
    .phone-home { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); width: 65px; height: 3px; border-radius: 9px; background: var(--ink); opacity: .45; }
    .practice-accordion { display: grid; gap: .65rem; }

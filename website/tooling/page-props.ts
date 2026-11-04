@@ -5,7 +5,7 @@ import type { Plugin } from 'vite';
 // `<ApiTable family="accordion" />`, `scenario="basic"` as
 // `scenario="accordion/basic"`, and `<Sidebar />` and `<PageMeta />` get the page's pathname.
 const PAGES = '/pages/';
-const TAG = /<(ApiTable|AnatomyTable|KeyboardTable|KeyList|HooksTable|Sidebar|PageMeta)(\s[^>]*?)?\s*\/>/g;
+const TAG = /<(ApiTable|AnatomyTable|KeyboardTable|Sidebar|PageMeta)(\s[^>]*?)?\s*\/>/g;
 const BARE_SCENARIO = /\sscenario="([a-z0-9-]+)"/g;
 
 function routeOf(file: string): { pathname: string; stem: string } | undefined {
