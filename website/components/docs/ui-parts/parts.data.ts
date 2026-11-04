@@ -1637,7 +1637,9 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			"hidden": false,
 			"hooks": [
 				"ui-closed",
-				"ui-open"
+				"ui-from",
+				"ui-open",
+				"ui-to"
 			]
 		},
 		{
@@ -1649,6 +1651,14 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			"hooks": [
 				"ui-active"
 			]
+		},
+		{
+			"part": "trigger",
+			"role": "trigger",
+			"element": "button",
+			"ariaRole": "",
+			"hidden": false,
+			"hooks": []
 		}
 	],
 	"numberbox": [
