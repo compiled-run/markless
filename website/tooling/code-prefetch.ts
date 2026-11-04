@@ -1,4 +1,5 @@
 // What a <Code> block's boot loads, by built file, so the page can download it before the reader acts.
+import { dirname, join, normalize } from 'node:path';
 import type { CodePrefetchManifest } from '../components/docs/code/prefetch.ts';
 
 type BundleChunk = {
@@ -24,6 +25,10 @@ export type CodePrefetchInput = {
 	readonly frameFile: string;
 	/** Each block's runtime source files, by `codeBlockKey`. */
 	readonly blocks: Readonly<Record<string, readonly string[]>>;
+	/** The chunks a chunk imports a task after it runs, read from its code: the bundler's warm packs. */
+	readonly warmImports: (code: string) => readonly string[];
+	/** The import map the built pages carry, from bare chunk name to URL. */
+	readonly importMap: Readonly<Record<string, string>>;
 };
 
 export function codePrefetchManifest(bundle: PrefetchBundle, input: CodePrefetchInput): CodePrefetchManifest {
@@ -34,6 +39,12 @@ export function codePrefetchManifest(bundle: PrefetchBundle, input: CodePrefetch
 		const chunk = chunks.find((candidate) => candidate.facadeModuleId === file) ?? byModule.get(file);
 		if (!chunk) throw new Error(`no built chunk holds ${file}`);
 		return chunk;
+	};
+	const fileOf = (from: string, specifier: string): string => {
+		if (specifier.startsWith('.')) return normalize(join(dirname(from), specifier));
+		const url = input.importMap[specifier];
+		if (!url?.startsWith(input.base)) throw new Error(`${from} warms ${specifier}, which the import map does not name`);
+		return url.slice(input.base.length);
 	};
 	// The frame's runtime code loads pieces of itself lazily, so its closure follows `import()` too, except
 	// from the chunk holding the frame's table of every runtime module, which a block reaches only by its own imports.
@@ -46,6 +57,7 @@ export function codePrefetchManifest(bundle: PrefetchBundle, input: CodePrefetch
 			const output = bundle[fileName];
 			if (output?.type !== 'chunk') continue;
 			stack.push(...output.imports);
+			for (const specifier of input.warmImports(output.code)) stack.push(fileOf(fileName, specifier));
 			if (lazy && !output.moduleIds.includes(input.runtimeTable)) stack.push(...output.dynamicImports);
 		}
 		return into;

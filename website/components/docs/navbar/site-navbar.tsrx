@@ -4,6 +4,8 @@ import { asset } from '../../../site-base.ts';
 import { INK_MARKS } from '../ink-marks.ts';
 import { github, isCurrent, NAV_DECOR, type NavCard, type NavPanel, panels } from './sections.ts';
 import { art } from './theme-art.art.ts';
+import DocsSearch from '../search/docs-search.tsrx';
+import { openDocsSearch, warmDocsSearch } from '../search/open.ts';
 
 
 /** The site's header: a floating bar with two panels and the Migrate link on a wide screen, a top bar and a full-screen menu on a narrow one. */
@@ -11,6 +13,7 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 	<header class="site-navbar">
 		<MobileMenu pathname={pathname} />
 		<DesktopNav pathname={pathname} />
+		<DocsSearch />
 
 		<style>
 			.site-navbar {
@@ -507,15 +510,21 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 	</navbar.itemlink>
 }
 
-// The search dialog is another unit's; until it lands the button is in the walk and opens nothing.
 function SearchButton() @{
 	const drawing = art.magnifier;
 
 	<navbar.trigger
 		class="search-button"
-		aria-label="Search docs"
+		aria-label="Search the docs"
 		aria-keyshortcuts="Meta+K Control+K"
-		title="Search docs (⌘K or Ctrl K)"
+		title="Search the docs (⌘K or Ctrl K)"
+		aria-haspopup="dialog"
+		onClick={(event) => {
+			// Same guard as ThemeButton: a navbar.trigger's click can reach another trigger's handler.
+			if ((event.target as Element).closest('.search-button')) openDocsSearch();
+		}}
+		onPointerenter={() => warmDocsSearch()}
+		onFocus={() => warmDocsSearch()}
 	>
 		<svg class="search-icon" viewBox={'0 0 ' + drawing.width + ' ' + drawing.height} aria-hidden="true">
 			@for (const layer of drawing.layers; key layer.d) {

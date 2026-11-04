@@ -1,6 +1,8 @@
 import { box } from '@async/witness';
 import { chromium, expect, type Page } from '@playwright/test';
+import { SEARCH_INDEX_FILE } from '../components/docs/search/search-load.ts';
 import { pagerFor } from '../nav.ts';
+import { asset } from '../site-base.ts';
 
 const POLL = { timeout: 15_000 };
 
@@ -108,7 +110,7 @@ export default box(
 		// A page's first compile writes its code-block modules, and a new module file reloads open pages.
 		const nextFromHome = [pagerFor('/').nextHref];
 		while (nextFromHome.length < 4) nextFromHome.push(pagerFor(nextFromHome.at(-1)!).nextHref);
-		for (const path of ['/concepts/state', '/router/pages', '/start/migrate', '/how-it-works', '/', '/concepts/computed', '/how-it-works/native-targets', '/ui', ...nextFromHome])
+		for (const path of ['/concepts/state', '/router/pages', '/start/migrate', '/how-it-works', '/', '/concepts/computed', '/how-it-works/native-targets', '/ui', asset(SEARCH_INDEX_FILE), ...nextFromHome])
 			expect((await fetch(url(path))).status, `${path} renders before the browser opens`).toBe(200);
 		const browser = await chromium.launch({ headless: true });
 		try {
@@ -210,16 +212,19 @@ export default box(
 
 			// The arrow keys walk the bar in document order and wrap, as QDS's do.
 			await page.locator('.nav-pill .brand-link').focus();
-			for (const stop of ['Markless on GitHub', 'Docs', 'Migrate', 'Learn', 'Search docs', 'Switch to the dark theme', 'Markless home']) {
+			for (const stop of ['Markless on GitHub', 'Docs', 'Migrate', 'Learn', 'Search the docs', 'Switch to the dark theme', 'Markless home']) {
 				await page.keyboard.press('ArrowRight');
 				await expect.poll(() => focused(page), { ...POLL, message: `ArrowRight reaches ${stop}` }).toBe(stop);
 			}
 
-			// The search button opens nothing yet, and pressing it must not reach another button's handler.
+			// The search button opens the search, and pressing it must not reach another button's handler.
 			const themeBefore = await page.evaluate(() => document.documentElement.className);
-			await page.locator('.nav-pill button[aria-label="Search docs"]').click();
-			await page.waitForTimeout(300);
+			await page.locator('.nav-pill button[aria-label="Search the docs"]').click();
+			const search = page.getByRole('dialog', { name: 'Search the docs' });
+			await expect(search).toBeVisible({ timeout: 30_000 });
 			expect(await page.evaluate(() => document.documentElement.className)).toBe(themeBefore);
+			await page.keyboard.press('Escape');
+			await expect(search).toBeHidden();
 
 			// The toggle swaps its drawing in one frame: no frame shows the button for the theme already painted.
 			await wrongThemeFrames(page);

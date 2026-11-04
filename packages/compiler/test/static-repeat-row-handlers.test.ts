@@ -200,3 +200,44 @@ export function Queue({ seed }: { readonly seed: ReadonlyArray<{ readonly id: st
 		}),
 	]);
 });
+
+test('rows binding an element() handle put a constant collection on the graph', async () => {
+	const result = await compile(`import { element, state } from '@markless/core';
+const SHELVES = ['oak', 'pine'];
+export function Shelves() @{
+	const items = [{ id: 'a' }, { id: 'b' }];
+	let count = state(0);
+	const shelfEls = element<HTMLLIElement[]>();
+	const itemEls = element<HTMLSpanElement[]>();
+	<section>
+		<ul>
+			@for (const shelf of SHELVES; key shelf) {
+				<li el={shelfEls}>{shelf}</li>
+			}
+		</ul>
+		@for (const item of items; key item.id) {
+			<p><span el={itemEls}>{item.id}</span></p>
+		}
+		<button onClick={() => (count = shelfEls.length + itemEls.length)}>{count}</button>
+	</section>
+}
+`);
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	const repeats = result.protocolView.keyedRepeats ?? [];
+	expect(repeats).toHaveLength(2);
+	for (const repeat of repeats) expect(repeat.collectionGraphNodeId).toMatch(/^computed:/);
+});
+
+test('constant rows with no handler and no element() handle stay off the graph', async () => {
+	const result = await compile(`${preamble}
+const SHELVES = ['oak', 'pine'];
+export function Shelves() @{
+	<ul>
+		@for (const shelf of SHELVES; key shelf) {
+			<li>{shelf}</li>
+		}
+	</ul>
+}
+`);
+	expect(result.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toBeUndefined();
+});
