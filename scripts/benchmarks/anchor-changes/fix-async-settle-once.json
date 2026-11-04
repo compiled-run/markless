@@ -3,78 +3,6 @@
 		{
 			"surface": "perf-guards",
 			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 28,
-			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41727537193 against queue run 41720739647",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 28,
-			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41727537193 against queue run 41720739647",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 28,
-			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41727537193 against queue run 41720739647",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 72,
-			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41727537193 against queue run 41720739647",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 72,
-			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41727537193 against queue run 41720739647",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 72,
-			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41727537193 against queue run 41720739647",
-			"date": "2026-11-03"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
 				"runtimeModules",
 				"web/resume-repeat-branch-arm"
 			],
@@ -193,6 +121,78 @@
 			"delta": 298,
 			"reason": "a @try claims each settled value right before its arm commit, so a settle heard twice no longer replaces rows under a press: settle-time code",
 			"date": "2026-11-03"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 44,
+			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41741613076 against queue run 41720739647",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 44,
+			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41741613076 against queue run 41720739647",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 44,
+			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41741613076 against queue run 41720739647",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41741613076 against queue run 41720739647",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41741613076 against queue run 41720739647",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "a @try commits each settled value once and a row repeat leaves rows a re-commit replaced: web/resume-async-wiring and the branch-arm follow check are fetched at load and none of it runs until a @try settles; measured on CI run 41741613076 against queue run 41720739647",
+			"date": "2026-11-04"
 		}
 	]
 }
