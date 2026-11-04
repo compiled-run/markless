@@ -36,7 +36,8 @@ export function evaluate(measurement, anchors) {
 				checkLoadWeight(
 					subject,
 					result.load,
-					anchors.loadWeight?.[LOAD_PLATFORM]?.[subject],
+					measurement.platform ?? LOAD_PLATFORM,
+					anchors.loadWeight?.[measurement.platform ?? LOAD_PLATFORM]?.[subject],
 					fail,
 					note,
 				);
@@ -86,8 +87,8 @@ const breakdown = (attribution) =>
 // Linux CI's Chromium runs a few hundred chars more of one build at load than a Mac does, so each platform has its anchors.
 export const LOAD_PLATFORM = `${process.platform}-${process.arch}`;
 
-function checkLoadWeight(subject, load, anchor, fail, note) {
-	const line = `${subject} (${LOAD_PLATFORM}): runs ${load.executedChars} chars of JS source and downloads ${load.jsGzipBytes} B gzip in ${load.files.length} JS files at load`;
+function checkLoadWeight(subject, load, platform, anchor, fail, note) {
+	const line = `${subject} (${platform}): runs ${load.executedChars} chars of JS source and downloads ${load.jsGzipBytes} B gzip in ${load.files.length} JS files at load`;
 	if (!anchor) {
 		fail('G16', `${line}, with no anchor for this platform. ${acceptHint('load', subject)}`);
 		return;

@@ -15,8 +15,10 @@ import {
 } from './html.ts';
 import {
 	componentDeriveGraphNodeIds,
+	componentSeedCellIndexes,
 	computedDependencyEdges,
 	payloadServedComputedGraphNodeIds,
+	servedIfDurableGraphNodeIds,
 	foreignSharedComputedScope,
 	orderComputedDerives,
 	rowScopedEdgeIds,
@@ -276,7 +278,10 @@ export function emitPublicSsrRenderModule(
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
-		stateEntries(input, ownedNodes?.seedCellIndexes).join(',\n'),
+		stateEntries(
+			input,
+			ownedNodes && componentSeedCellIndexes(input, rootInfo.componentName, ownedNodes),
+		).join(',\n'),
 		']);',
 		// The optional render context is the per-request streaming channel
 		// (T107): renderToStream threads it through child renders and async
@@ -1422,6 +1427,8 @@ function emitSsrDataLines(
 	const servedComputedIds = [...new Set(derivedComputedIds)].filter((graphNodeId) =>
 		servedComputedGraphNodeIds.has(graphNodeId),
 	);
+	const ifDurable = servedIfDurableGraphNodeIds(input);
+	const servedIfDurableIds = servedComputedIds.filter((graphNodeId) => ifDurable.has(graphNodeId));
 	return {
 		seedForward: seedForwardLines,
 		carriedSeed: unfoldedSeedLines,
@@ -1434,7 +1441,7 @@ function emitSsrDataLines(
 				: [
 						`	marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ${JSON.stringify(
 							servedComputedIds,
-						)});`,
+						)}${servedIfDurableIds.length ? `, ${JSON.stringify(servedIfDurableIds)}` : ''});`,
 					],
 		render: [
 		"marklessSsrRenderStateValues.set('prop:props',marklessSsrProps);",

@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1227,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; the State page no longer loads the old theme toggle; measured on CI run 41874843504 against main's merge-queue run 41858827122",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 24813,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; the State page no longer loads the old theme toggle; measured on CI run 41874843504 against main's merge-queue run 41858827122",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 2293,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; the State page no longer loads the old theme toggle; measured on CI run 41874843504 against main's merge-queue run 41858827122",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -50331,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; the State page no longer loads the old theme toggle; measured on CI run 41874843504 against main's merge-queue run 41858827122",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 559,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; the State page no longer loads the old theme toggle; measured on CI run 41874843504 against main's merge-queue run 41858827122",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 14571,
+			"reason": "the site header becomes the ink navbar (PR #410): its hover panels, three ink panels and the sun and moon toggle download with every docs page and its panel and scroll-away handlers run at load; the State page no longer loads the old theme toggle; measured on CI run 41874843504 against main's merge-queue run 41858827122",
+			"date": "2026-11-04"
+		}
+	]
+}

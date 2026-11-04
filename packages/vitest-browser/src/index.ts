@@ -7,6 +7,7 @@ import {
 	type CsrRenderOutput,
 	type RenderTarget,
 } from '@markless/web';
+import { PROTOCOL_SHARED_INSTANCES_PROPERTY } from '@markless/web/fns/container-region';
 import { composeCsrIslands, type CsrIslandComponent } from './csr-islands.ts';
 import type { SsrFixtureRenderOptions } from './ssr-plugin.ts';
 
@@ -257,9 +258,12 @@ function globalDomDocument(): Document {
 export async function cleanup(): Promise<void> {
 	while (mountedContainers.size > 0) {
 		const mounted = mountedContainers.values().next().value;
-		if (!mounted) return;
+		if (!mounted) break;
 		destroyContainer(mounted);
 	}
+	// The next test starts as a freshly loaded document would: no live shared() instances.
+	if (typeof document !== 'undefined')
+		delete (document as unknown as Record<string, unknown>)[PROTOCOL_SHARED_INSTANCES_PROPERTY];
 }
 
 function setupContainer(options: BrowserRenderOptions): MountedContainer & {

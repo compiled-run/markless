@@ -1,5 +1,6 @@
 import { computed, element, shared, state } from '@markless/core';
-import { controlAt, controlsInside, panelAt, stepTo, topLevelControls } from './navbar-walk.ts';
+import { isHeadingDown, isInSafeZone, leaveSafeZone, takeSafeZoneExit, trackPointer, watchSafeZone } from './navbar-safe-zone.ts';
+import { controlAt, controlsInside, directionTo, panelAt, stepTo, topLevelControls } from './navbar-walk.ts';
 import type {
 	NavbarInstanceState,
 	NavbarItemContentProps,
@@ -8,6 +9,7 @@ import type {
 	NavbarItemProps,
 	NavbarItemTriggerProps,
 	NavbarRootProps,
+	NavbarTriggerProps,
 } from './navbar-types.ts';
 
 // A disclosure, not a menubar - see navbar-types.ts.
@@ -15,8 +17,8 @@ import type {
 // Walks start at `event.target`: a lazily loaded handler has no `currentTarget`.
 // The runtime hands an event to the nearest part that declared a handler and stops, so the root and the item each see only the pointer crossings that land on them.
 
-// A pointer that leaves the landmark gets this long to come back before the dropdown closes (Radix NavigationMenu).
-const LEAVE_GRACE = 150;
+// How long a pointer crossing a trigger on its way down into the open panel must rest before that trigger takes over.
+const BRUSH_HOLD = 120;
 
 // Which dropdown is showing lives on the root, named by value: an instance rooted by an item cannot reach its siblings.
 export const navbarState = shared(
@@ -25,9 +27,10 @@ export const navbarState = shared(
 			value: '',
 			hover: true,
 			delay: 200,
+			switchDelay: 0,
 			clickGrace: 300,
-			leaveTimer: 0,
-			leaveUntil: 0,
+			from: '',
+			previous: '',
 		});
 		const navEl = element<HTMLElement>();
 		// The array type argument makes a handle plural: bound on every trigger and
@@ -43,8 +46,11 @@ export const navbarState = shared(
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// `next = ''` rather than `next: string`: the inlined handler is re-parsed as plain JavaScript and an annotation throws (MARKLESS_CAPTURE_OPAQUE_PROP).
+			// A caller switching dropdowns writes `from` first; opening from closed or closing clears it.
 			show(next = '') {
 				if (navbar.value === next) return;
+				navbar.previous = navbar.value;
+				if (navbar.previous === '' || next === '') navbar.from = '';
 				navbar.value = next;
 				navbar.onChange?.(next);
 			},
@@ -52,11 +58,15 @@ export const navbarState = shared(
 			toggle(next = '') {
 				const to = navbar.value === next ? '' : next;
 				if (navbar.value === to) return;
+				navbar.previous = navbar.value;
+				if (navbar.previous === '' || to === '') navbar.from = '';
 				navbar.value = to;
 				navbar.onChange?.(to);
 			},
 			closeAll() {
 				if (navbar.value === '') return;
+				navbar.previous = navbar.value;
+				navbar.from = '';
 				navbar.value = '';
 				navbar.onChange?.('');
 			},
@@ -88,13 +98,12 @@ export function NavbarRoot({
 	value = '',
 	hover = true,
 	delay = 200,
+	switchDelay = 0,
 	clickGrace = 300,
 	onChange,
 	children,
 	onFocusout,
 	onKeydown,
-	onPointerover,
-	onPointerout,
 	...rest
 }: NavbarRootProps) @{
 	const navbar = navbarState();
@@ -102,6 +111,7 @@ export function NavbarRoot({
 	navbar.value = value;
 	navbar.hover = hover;
 	navbar.delay = delay;
+	navbar.switchDelay = switchDelay;
 	navbar.clickGrace = clickGrace;
 
 	// No default aria-label: an invented "Navigation" on both a primary and a footer nav is two landmarks a reader cannot tell apart.
@@ -119,37 +129,6 @@ export function NavbarRoot({
 			}
 			if (next === null || root.contains(next) !== true) navbar.closeAll();
 			onFocusout?.(event);
-		}}
-		onPointerover={(event) => {
-			window.clearTimeout(navbar.leaveTimer);
-			navbar.leaveTimer = 0;
-			navbar.leaveUntil = 0;
-			onPointerover?.(event);
-		}}
-		onPointerout={(event) => {
-			const root = navbar.navEl;
-			const went = event.relatedTarget as Node | null;
-			if (
-				navbar.hover !== true ||
-				root === undefined ||
-				(went !== null && root.contains(went) === true)
-			) {
-				onPointerout?.(event);
-				return;
-			}
-			// The timer re-delivers the leave here rather than closing: shared reads are rewritten only at the handler's top level, so `navbar.closeAll()` inside this closure is a ReferenceError.
-			const now = Date.now();
-			if (navbar.leaveUntil !== 0 && now >= navbar.leaveUntil) {
-				navbar.leaveTimer = 0;
-				navbar.leaveUntil = 0;
-				navbar.closeAll();
-			} else if (navbar.leaveUntil === 0) {
-				navbar.leaveUntil = now + LEAVE_GRACE;
-				navbar.leaveTimer = window.setTimeout(() => {
-					root.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
-				}, LEAVE_GRACE + 5);
-			}
-			onPointerout?.(event);
 		}}
 		onKeydown={(event) => {
 			if (
@@ -210,14 +189,13 @@ export function NavbarItem({
 		onPointerover={(event) => {
 			const box = item.boxEl;
 			const came = event.relatedTarget as Node | null;
-			window.clearTimeout(navbar.leaveTimer);
-			navbar.leaveTimer = 0;
-			navbar.leaveUntil = 0;
 			// pointerover fires again for every element inside the item; only a crossing from outside it is an enter.
+			// An item that holds only a link has no dropdown to open.
 			if (
 				navbar.hover !== true ||
 				navbar.value === item.value ||
 				box === undefined ||
+				item.contentEl === undefined ||
 				(came !== null && box.contains(came) === true)
 			) {
 				onPointerover?.(event);
@@ -225,19 +203,24 @@ export function NavbarItem({
 			}
 
 			const now = Date.now();
-			const isReadyToOpen =
-				navbar.value !== '' ||
-				navbar.delay <= 0 ||
-				(item.restingUntil !== 0 && now >= item.restingUntil);
+			trackPointer();
+			// Sliding along the bar switches after switchDelay; heading down across this trigger toward the open panel holds a moment longer, so a diagonal into the panel never swaps it.
+			const wait =
+				navbar.value === ''
+					? navbar.delay
+					: isHeadingDown()
+						? Math.max(navbar.switchDelay, BRUSH_HOLD)
+						: navbar.switchDelay;
+			const isReadyToOpen = wait <= 0 || (item.restingUntil !== 0 && now >= item.restingUntil);
 			if (isReadyToOpen) {
 				window.clearTimeout(item.openTimer);
 				item.openTimer = 0;
 				item.restingUntil = 0;
 				item.graceUntil = now + navbar.clickGrace;
+				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
 				navbar.show(item.value);
 			} else if (item.restingUntil === 0) {
 				// The timer re-delivers the crossing rather than opening: shared reads are rewritten only at the handler's top level, so `navbar.show()` inside this closure is a ReferenceError.
-				const wait = navbar.delay;
 				item.restingUntil = now + wait;
 				item.openTimer = window.setTimeout(() => {
 					box.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
@@ -247,24 +230,21 @@ export function NavbarItem({
 		}}
 		onPointerout={(event) => {
 			const box = item.boxEl;
-			const nav = navbar.navEl;
+			const trigger = item.triggerEl;
+			const panel = item.contentEl;
 			const went = event.relatedTarget as Node | null;
-			if (box !== undefined && (went === null || box.contains(went) !== true)) {
+			const isWatcherExit = box !== undefined && takeSafeZoneExit(box);
+			const isLeaving = box !== undefined && (went === null || box.contains(went) !== true);
+			if (isLeaving) {
 				window.clearTimeout(item.openTimer);
 				item.openTimer = 0;
 				item.restingUntil = 0;
 			}
-			// Leaving the landmark from inside an item starts the grace; the timer re-delivers the leave on the root, whose handler closes once it is up.
-			if (
-				navbar.hover === true &&
-				nav !== undefined &&
-				(went === null || nav.contains(went) !== true) &&
-				navbar.leaveUntil === 0
-			) {
-				navbar.leaveUntil = Date.now() + LEAVE_GRACE;
-				navbar.leaveTimer = window.setTimeout(() => {
-					nav.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
-				}, LEAVE_GRACE + 5);
+			// The safe zone decides, as QDS's does: the pointer is checked where it left, then followed until it is outside.
+			if (navbar.hover === true && navbar.value === item.value && box !== undefined && trigger !== undefined && panel !== undefined) {
+				if (isWatcherExit) navbar.closeAll();
+				else if (isLeaving && went !== null && !isInSafeZone(event.clientX, event.clientY, trigger, panel)) leaveSafeZone(box);
+				else if (isLeaving) watchSafeZone(box, trigger, panel);
 			}
 			onPointerout?.(event);
 		}}
@@ -292,7 +272,14 @@ export function NavbarItemTrigger({
 		ui-closed={isOpen !== true}
 		onClick={(event) => {
 			// A dropdown that just opened under the resting pointer must not be shut by the click that followed.
-			if (item.graceUntil <= Date.now()) navbar.toggle(item.value);
+			if (item.graceUntil <= Date.now()) {
+				// The click decides now, so the hover delay it interrupted must not re-open the dropdown later.
+				window.clearTimeout(item.openTimer);
+				item.openTimer = 0;
+				item.restingUntil = 0;
+				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
+				navbar.toggle(item.value);
+			}
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -310,6 +297,10 @@ export function NavbarItemTrigger({
 			const from = event.target as HTMLElement;
 
 			if (key === 'ArrowDown') {
+				window.clearTimeout(item.openTimer);
+				item.openTimer = 0;
+				item.restingUntil = 0;
+				navbar.from = directionTo(navbar.controlEls, item.triggerEl);
 				navbar.show(item.value);
 				// One call, no retry: the runtime commits the `hidden` write before this returns, so the link is focusable now.
 				controlsInside(navbar.controlEls, item.contentEl)[0]?.focus();
@@ -342,6 +333,13 @@ export function NavbarItemContent({
 	const navbar = navbarState();
 	const item = navbarItemState();
 	const isOpen = computed(() => navbar.value === item.value);
+	// Which side this panel slides in from, or out to, while the navbar switches between dropdowns.
+	const from = computed(() => (navbar.value === item.value && navbar.from !== '' ? navbar.from : undefined));
+	const to = computed(() =>
+		navbar.value !== item.value && navbar.value !== '' && navbar.previous === item.value && navbar.from !== ''
+			? navbar.from === 'end' ? 'start' : 'end'
+			: undefined,
+	);
 
 	// Closed hides the panel, never detaches it: the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
 	// `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses as `dismiss`, closing nothing and moving no focus itself.
@@ -352,6 +350,8 @@ export function NavbarItemContent({
 		hidden={isOpen !== true}
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
+		ui-from={from}
+		ui-to={to}
 		onDismiss={(event) => {
 			const box = item.boxEl;
 			const back = item.triggerEl;
@@ -360,6 +360,11 @@ export function NavbarItemContent({
 			// `contains` rather than `===`: a consumer may put an icon inside the trigger, and the press lands on that.
 			const pressed = event.detail.pressTarget;
 			const onOwnTrigger = pressed !== undefined && back !== undefined && back.contains(pressed);
+			// A press on the trigger of a dropdown that hover just opened is the click grace's to swallow, like the click that follows it.
+			if (onOwnTrigger && item.graceUntil > Date.now()) {
+				onDismiss?.(event);
+				return;
+			}
 			navbar.closeAll();
 			// Without this, pressing an open dropdown's trigger closes it on the press and re-opens it on the click; armed by identity, so a press elsewhere leaves the next click free.
 			if (onOwnTrigger) item.graceUntil = Date.now() + navbar.clickGrace;
@@ -405,6 +410,13 @@ export function NavbarItemContent({
 			onKeydown?.(event);
 		}}
 	>{children}</div>
+}
+
+export function NavbarTrigger({ children, ...rest }: NavbarTriggerProps) @{
+	const navbar = navbarState();
+
+	// The root's keydown walks it: binding the roster is the whole of joining the bar.
+	<button {...rest} el={navbar.controlEls} type="button">{children}</button>
 }
 
 export function NavbarItemLink({ current, children, onKeydown, ...rest }: NavbarItemLinkProps) @{

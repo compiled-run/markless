@@ -1,5 +1,7 @@
 import { box } from '@async/witness';
 import { chromium, expect, type Page } from '@playwright/test';
+import { SEARCH_INDEX_FILE } from '../components/docs/search/search-load.ts';
+import { asset } from '../site-base.ts';
 
 // The dialog's handlers, the families it is built from, and the index: none may load before the first open.
 const OPEN_COST = /search-index\.json|markless:symbol:[^?]*(?:components%2Fdocs%2Fsearch|modal%2Fmodal\.tsrx|combobox%2Fcombobox\.tsrx)/;
@@ -20,8 +22,9 @@ export default box(
 		const server = await pipeline.dev({
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
-		// A page's first compile writes its code-block modules, and a new module file reloads open pages.
-		for (const route of ['/concepts/state', '/build/shared']) await fetch(new URL(route, server.url));
+		// A page's first compile writes its code-block modules, and a new module file reloads open pages; the index renders every page.
+		for (const route of ['/concepts/state', '/build/shared', asset(SEARCH_INDEX_FILE)])
+			expect((await fetch(new URL(route, server.url))).status, `${route} answers before the browser opens`).toBe(200);
 		const browser = await chromium.launch({ headless: true });
 		try {
 			const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
@@ -72,7 +75,8 @@ export default box(
 			await page.keyboard.press('Escape');
 			await expect(dialog(page)).toBeHidden();
 
-			const fresh = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+			// The navbar's search button shows on the wide bar, from 80rem.
+			const fresh = await browser.newPage({ viewport: { width: 1300, height: 900 } });
 			const warmed: string[] = [];
 			fresh.on('request', (request) => warmed.push(request.url()));
 			await fresh.goto(new URL('/concepts/state', server.url).href, { waitUntil: 'networkidle' });

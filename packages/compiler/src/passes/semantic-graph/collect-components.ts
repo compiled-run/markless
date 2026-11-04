@@ -559,7 +559,7 @@ function componentImportSource(
 }
 
 // Maps a tag's local name (aliased import or barrel member path) to the component its module declares.
-function resolveImportedChildComponent(
+export function resolveImportedChildComponent(
 	localTarget: string,
 	state: WalkState,
 ): {

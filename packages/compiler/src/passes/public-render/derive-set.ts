@@ -1,5 +1,6 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
+import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
 import { moduleIdOf } from '../../module-id.ts';
 import {
 	carryForeignFactoryScope,
@@ -22,6 +23,7 @@ import {
 import {
 	componentEdgesFor,
 	componentOwnedStateNodes,
+	isPageSpaceGraphNodeId,
 	repeatCollectionGraphNodeIds,
 } from './shared.ts';
 
@@ -79,22 +81,65 @@ function authoredHandlerReads(
 }
 
 /**
- * The graph nodes an authored handler reads. A resume re-derives a sync computed
- * only when a dependency is written, so a computed in this set is one whose value
- * has to travel in the payload for the handler's first read to answer.
+ * The graph nodes resume reads before any dependency is written: what a handler
+ * or callback prop reads, what a flipped arm or a row slot reads, and every keyed
+ * `@for` collection. A sync computed in this set is served with its rendered value.
  */
-export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
-	return new Set([
+export function resumeReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
+	return new Set([...requiredResumeReads(input), ...keyedCollectionGraphNodeIds(input)]);
+}
+
+/**
+ * The resume reads only a keyed `@for` makes. Without a served value resume derives
+ * the collection at startup, which still works, so one the serializer refuses is not served.
+ */
+export function servedIfDurableGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
+	const required = new Set(requiredResumeReads(input));
+	return new Set(keyedCollectionGraphNodeIds(input).filter((id) => !required.has(id)));
+}
+
+function requiredResumeReads(input: PublicRenderModuleInput): ReadonlyArray<string> {
+	return [
 		...input.symbolResolver.symbols.flatMap(authoredHandlerReads),
 		...flippedArmReadGraphNodeIds(input),
-		// A lifted collection's row handler reads its item out of it, and its derive
-		// can read a constant prop no browser graph holds, so its value is served.
-		...input.semanticGraph.keyedRepeats.flatMap((repeat) =>
-			repeat.collectionGraphNodeId?.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX)
-				? [repeat.collectionGraphNodeId]
-				: [],
+		...rowSlotReadGraphNodeIds(input),
+		// A lifted collection's derive can read a constant prop no browser graph holds.
+		...keyedCollectionGraphNodeIds(input).filter((id) =>
+			id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX),
 		),
-	]);
+	];
+}
+
+function keyedCollectionGraphNodeIds(input: PublicRenderModuleInput): ReadonlyArray<string> {
+	return input.semanticGraph.keyedRepeats.flatMap((repeat) =>
+		repeat.collectionGraphNodeId ? [repeat.collectionGraphNodeId] : [],
+	);
+}
+
+// A row records the slot values it shows off the resumed graph, so a later write patches only what moved.
+function rowSlotReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlyArray<string> {
+	type Owner = {
+		readonly textSlots?: ReadonlyArray<ProtocolRowTemplateSlotValue>;
+		readonly attributeSlots?: ReadonlyArray<ProtocolRowTemplateSlotValue>;
+	};
+	const slotsOf = (owner: Owner) => [...(owner.textSlots ?? []), ...(owner.attributeSlots ?? [])];
+	return (input.protocolView.keyedRepeats ?? []).flatMap(({ rowTemplate, fixed }) =>
+		!rowTemplate || fixed
+			? []
+			: [
+					...slotsOf(rowTemplate),
+					...(rowTemplate.branchSlots ?? []).flatMap((branch) => [
+						branch,
+						...branch.arms.flatMap(slotsOf),
+					]),
+				].flatMap((slot: ProtocolRowTemplateSlotValue) =>
+					'graphNodeId' in slot
+						? [slot.graphNodeId]
+						: 'source' in slot
+							? (slot.reads ?? []).map((read) => read.graphNodeId)
+							: [],
+				),
+	);
 }
 
 // A flip after resume reads its arm's values off the resumed graph, just as a handler does.
@@ -141,7 +186,7 @@ function flippedArmReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlyArr
 }
 
 /**
- * The sync computeds this component has to serve: the ones a handler reads AND
+ * The sync computeds this component has to serve: the ones resume reads AND
  * whose payload record this component's own selection carries. A served value
  * can only be written into a record the payload holds, so a component that
  * derives a computed it does not own serves nothing at all, and the owner has to
@@ -153,7 +198,7 @@ export function payloadServedComputedGraphNodeIds(
 	input: PublicRenderModuleInput,
 	componentName: string,
 ): ReadonlySet<string> {
-	const handlerReads = handlerReadGraphNodeIds(input);
+	const resumeReads = resumeReadGraphNodeIds(input);
 	const rootComponentName = input.renderData.root?.componentName;
 	const owned =
 		rootComponentName === undefined
@@ -172,14 +217,14 @@ export function payloadServedComputedGraphNodeIds(
 	return new Set([
 		...input.protocolState.computed.flatMap((computed) =>
 			computed.async === false &&
-			handlerReads.has(computed.graphNodeId) &&
+			resumeReads.has(computed.graphNodeId) &&
 			(owned === undefined || owned.has(computed.graphNodeId))
 				? [computed.graphNodeId]
 				: [],
 		),
 		// A read the payload indexes no record for narrows to nothing: the serve is
 		// a no-op wherever it lands, and dropping it here would move served bytes.
-		...[...handlerReads].filter((graphNodeId) => !indexed.has(graphNodeId)),
+		...[...resumeReads].filter((graphNodeId) => !indexed.has(graphNodeId)),
 	]);
 }
 
@@ -280,6 +325,37 @@ function directDeriveRootGraphNodeIds(
 			].join('\n'),
 		),
 	]);
+}
+
+/**
+ * The cells one component's render seeds its state map from: the ones it owns,
+ * plus the page-space cells it reads through its own computeds or a shared
+ * instance local in an authored expression, which no graph-read residue names.
+ */
+export function componentSeedCellIndexes(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	owned: ReturnType<typeof componentOwnedStateNodes>,
+): ReadonlyArray<number> {
+	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
+	const reads = new Set([
+		...owned.computedIndexes.flatMap((index) =>
+			(input.protocolState.computed[index]?.dependencies ?? []).map(
+				(dependency) => dependency.graphNodeId,
+			),
+		),
+		...sharedInstanceReadGraphNodeIds(
+			input.semanticGraph,
+			componentName,
+			authoredResidueSources(chunks).join('\n'),
+		),
+	]);
+	return input.protocolState.cells.flatMap((cell, index) =>
+		owned.seedCellIndexes.includes(index) ||
+		(isPageSpaceGraphNodeId(cell.graphNodeId) && reads.has(cell.graphNodeId))
+			? [index]
+			: [],
+	);
 }
 
 /**

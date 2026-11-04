@@ -80,10 +80,19 @@ disclosure directly:
    research recommends a dev-mode diagnostic when neither `aria-label` nor
    `aria-labelledby` is present; that needs compiler or core work and is **not**
    in this family.
-6. **`switchDelay` is folded into the root's `value`.** QDS keeps a separate
-   300 ms skip window. While any dropdown is showing, the next one opens with no
-   delay at all — QDS's own better model, argued in its `hover-research.md`, and
-   it costs one fewer prop.
+6. **Switching is instant, guarded by direction rather than time.** QDS waits
+   137.5 ms before the next dropdown replaces an open one. Side by side, the
+   owner found that a noticeable lag, so `switchDelay` defaults to 0. What the
+   delay protected against, a pointer brushing the next trigger on its way down
+   into the open panel, is guarded by geometry instead: if the pointer's last
+   moves head down, the trigger it crosses waits 120 ms before taking over, and
+   leaving it on the way into the panel cancels that.
+6a. **`ui-from` and `ui-to` replace Radix's `data-motion`.** Radix NavigationMenu
+   portals every panel into one shared viewport and writes `data-motion` on it.
+   SPEC.md rules `viewport` out as a role, so the panels stay in their items and
+   the family writes only the direction: `ui-from="start|end"` on the panel
+   coming in and `ui-to` on the one going out. A consumer that wants the
+   shared-box look draws the box itself and slides the panels inside it.
 7. **No `orientation`.** QDS defers vertical navbars and so does this. A vertical
    top level needs `ArrowUp`/`ArrowDown`, which collides with
    `ArrowDown`-opens-the-dropdown.
@@ -518,13 +527,16 @@ The pointer's leaving route closes from somewhere else, which is why it is a
 separate pair of rows: the runtime hands a crossing to the nearest part that
 declared a handler and stops, so it is `NavbarItem`'s `onPointerout` that sees
 the pointer leave the landmark — a different component from the one that stored
-the callback. The root's own `onPointerout` never sees a crossing that started
-inside an item. Leaving does not close at once: the item writes a 150 ms
-deadline (Radix NavigationMenu's leave timer) and asks the browser to deliver a
-`pointerout` on the `<nav>` once it is up, the root's handler reads the deadline
-and closes, and any `pointerover` inside the landmark before then - on an item
-or on the root - clears both. The suite row counts `onChange` calls to tell a
-kept dropdown from one that closed and re-opened.
+the callback. Leaving is decided by QDS's safe zone (`navbar-safe-zone.ts`): the
+hull of the trigger and its panel. A pointer that leaves the item outside the
+zone closes the dropdown once the crossing has finished, so the item it went to
+still sees a dropdown open and waits only `switchDelay`. A pointer that leaves
+inside the zone is followed on `pointermove` until it is outside, and the watcher
+re-delivers a `pointerout` on the item for the item's handler to close with.
+The landmark plays no part: sliding along the bar to a plain link closes too, as
+in QDS. This replaced a 150 ms leave grace on the landmark (Radix
+NavigationMenu's), which lost a floating panel to a slow crossing of the gap
+under the bar and kept it open while the pointer wandered the rest of the bar.
 
 The five dismissal rows are what the overlay adoption is proved by:
 

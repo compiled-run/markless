@@ -685,6 +685,8 @@ const unserveableDiagnosticCodes: ReadonlySet<string> = new Set([
 	// body, so emitting would ship the word "else" and the arm's escaped source
 	// to the page — visible garbage rather than a branch.
 	'MARKLESS_BRANCH_ELSE_SPELLING',
+	// Same shape for an @pending after @catch: the word and the arm's source would ship as text.
+	'MARKLESS_ASYNC_ARM_ORDER',
 ]);
 
 function hasUnserveableDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {

@@ -1,0 +1,86 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 87,
+			"reason": "the router adds the history entry when the page swaps in and a cancelled navigation leaves the shown page's head (PR #452): the swap module defers head writes to the commit and waits for pagehide before a failure's document load, downloaded with the page and not run at load (executed chars at load unchanged but for a content-hash name); measured on CI run 41807009428 against merge-queue run 41762644786",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 87,
+			"reason": "the router adds the history entry when the page swaps in and a cancelled navigation leaves the shown page's head (PR #452): the swap module defers head writes to the commit and waits for pagehide before a failure's document load, downloaded with the page and not run at load (executed chars at load unchanged but for a content-hash name); measured on CI run 41807009428 against merge-queue run 41762644786",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 87,
+			"reason": "the router adds the history entry when the page swaps in and a cancelled navigation leaves the shown page's head (PR #452): the swap module defers head writes to the commit and waits for pagehide before a failure's document load, downloaded with the page and not run at load (executed chars at load unchanged but for a content-hash name); measured on CI run 41807009428 against merge-queue run 41762644786",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 87,
+			"reason": "the router adds the history entry when the page swaps in and a cancelled navigation leaves the shown page's head (PR #452): the swap module defers head writes to the commit and waits for pagehide before a failure's document load, downloaded with the page and not run at load (executed chars at load unchanged but for a content-hash name); measured on CI run 41807009428 against merge-queue run 41762644786",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 87,
+			"reason": "the router adds the history entry when the page swaps in and a cancelled navigation leaves the shown page's head (PR #452): the swap module defers head writes to the commit and waits for pagehide before a failure's document load, downloaded with the page and not run at load (executed chars at load unchanged but for a content-hash name); measured on CI run 41807009428 against merge-queue run 41762644786",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 87,
+			"reason": "the router adds the history entry when the page swaps in and a cancelled navigation leaves the shown page's head (PR #452): the swap module defers head writes to the commit and waits for pagehide before a failure's document load, downloaded with the page and not run at load (executed chars at load unchanged but for a content-hash name); measured on CI run 41807009428 against merge-queue run 41762644786",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 159,
+			"reason": "the swap module writes history at the commit, defers head writes to it and waits for pagehide before a failure's document load (PR #452); rendered bytes, not run at load; measured on CI run 41807009428 against merge-queue run 41762644786",
+			"date": "2026-11-04"
+		}
+	]
+}

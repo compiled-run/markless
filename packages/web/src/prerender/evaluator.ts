@@ -12,6 +12,7 @@ import {
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
 import type { ResumeArmRecordSet } from '../resume-types.ts';
 import type { RuntimeGraph } from '@markless/runtime';
+import type { ComposedBranchGraph } from '../resume-branches.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '../../../serializer/src/protocol-constants.ts';
@@ -30,6 +31,7 @@ import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
 	marklessRowSegment,
 } from '../fns/instance-scope.ts';
@@ -83,9 +85,7 @@ export type PrerenderDataDefinition = {
 	readonly stateCellIndexes?: ReadonlyArray<number>;
 	readonly stateComputedIndexes?: ReadonlyArray<number>;
 	readonly stateSharedSeedIndexes?: ReadonlyArray<number>;
-	// Positions into `state.computed` for the sync computeds a handler reads:
-	// their derived value travels with the payload so the first read, before any
-	// dependency write, answers with it.
+	// Positions into `state.computed` whose derived value travels with the payload, for resume's first read.
 	readonly servedComputedIndexes?: ReadonlyArray<number>;
 	readonly initialValues?: PrerenderRenderData['initialValues'];
 	readonly initialValueKinds?: Readonly<Record<string, string>>;
@@ -391,7 +391,7 @@ export async function renderPrerenderBranch(
 			propsOrLoadSymbol,
 			graph,
 			true,
-			servedPageProps(graph),
+			servedPageProps(graph, page, branchOwnerName(page, branchSiteId)),
 			{ branchSiteId, cellIds: freshCellIds },
 		);
 	} else {
@@ -415,10 +415,15 @@ export async function renderPrerenderBranch(
 	)?.find((branch) => branch.id === branchSiteId)?.servedArmRecords;
 	const range = records.view.branches?.find((candidate) => candidate.id === branchSiteId);
 	const nested = range ? boundariesInside(records.view, range) : [];
+	const flips = range ? branchesInside(records.view, range) : [];
 	const armRecords = served ?? arm.armRecords;
 	return {
 		...arm,
-		armRecords: nested.length > 0 ? { ...armRecords, asyncBoundaries: nested } : armRecords,
+		armRecords: {
+			...armRecords,
+			...(flips.length > 0 && { branches: [...(armRecords.branches ?? []), ...flips] }),
+			...(nested.length > 0 && { asyncBoundaries: nested }),
+		},
 		computed: records.state.computed,
 		cells: freshArmCells(output, freshCellIds),
 	};
@@ -451,6 +456,32 @@ function boundariesInside(
 		}));
 }
 
+// @if and @switch blocks inside a range, outside any @try in it (whose own records carry those);
+// their comment anchors resolve by text against the committed content.
+function branchesInside(
+	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
+	range: {
+		readonly id: string;
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	},
+): NonNullable<ResumeArmRecordSet['branches']> {
+	type Range = {
+		readonly startAnchor: { readonly index: number };
+		readonly endAnchor: { readonly index: number };
+	};
+	const within = (inner: Range, outer: Range) =>
+		inner.startAnchor.index > outer.startAnchor.index &&
+		inner.endAnchor.index < outer.endAnchor.index;
+	const boundaries = view.asyncBoundaries.filter((boundary) => within(boundary, range));
+	return (view.branches ?? []).filter(
+		(branch) =>
+			branch.id !== range.id &&
+			within(branch, range) &&
+			!boundaries.some((boundary) => within(branch, boundary)),
+	) as unknown as NonNullable<ResumeArmRecordSet['branches']>;
+}
+
 // Taken before serialization: nothing in the live graph answers for a component this render is creating.
 function freshArmCells(
 	output: SsrRenderOutput,
@@ -480,7 +511,7 @@ async function evaluatePrerenderDataSurface(
 	props: Readonly<Record<string, unknown>> = {},
 	fresh?: { readonly branchSiteId?: string; readonly cellIds: Set<string> },
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
-	const rootName = surface.rootComponentName;
+	const rootName = branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
@@ -512,13 +543,39 @@ async function evaluatePrerenderDataSurface(
 	);
 }
 
+// A flip's symbol runs as the instance of the component holding the branch, not always the module root.
+function branchOwnerName(
+	surface: PrerenderDataSurface,
+	branchSiteId: string | undefined,
+): string | undefined {
+	if (!branchSiteId) return undefined;
+	const holds = (name: string | null | undefined) =>
+		!!name &&
+		!!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId);
+	if (holds(surface.rootComponentName)) return undefined;
+	return Object.keys(surface.components).find(holds);
+}
+
 type RosterResumeHost = {
 	readonly __marklessRosterResume?: () => Promise<typeof import('../fns/roster-resume.ts')>;
 };
 
 // The page's props were served once, as its props cell; a render in the browser reads them back from there.
-function servedPageProps(graph: RuntimeGraph): Readonly<Record<string, unknown>> {
-	return asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID));
+// A composed owner's routed props are read live; `children` stays the projection markup a render is handed.
+function servedPageProps(
+	graph: ComposedBranchGraph,
+	surface?: PrerenderDataSurface,
+	owner?: string,
+): Readonly<Record<string, unknown>> {
+	const props = { ...asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID)) };
+	const routed = (graph.composedGraphProps ?? []).map((route) => route.name);
+	for (const component of owner ? Object.values(surface!.components) : [])
+		for (const edge of component.edges ?? [])
+			for (const prop of edge.childComponentName === owner ? edge.props : [])
+				if (prop.kind === 'graph-reference') routed.push(prop.name);
+	for (const name of routed)
+		if (name !== 'children') props[name] = graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID, [name]);
+	return props;
 }
 
 function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
@@ -826,14 +883,22 @@ export function evaluatePrerenderDataComponent(input: {
 			composer = outer.composer;
 		}
 		const scope = composer;
+		// A route spells another instance without rows; this derive's own place supplies the rows it sits in.
+		const rows =
+			boundSymbolId && scope?.module
+				? marklessRecordRowScope(input.symbolPrefix.slice(scope.module.rootPrefix.length))
+				: undefined;
 		// Slot routes name the composer's nodes bare and any other instance by its path in the module; a minted row knows only its composer.
 		const deriveRead: PrerenderRead =
 			boundSymbolId && scope
 				? (graphNodeId, path) => {
 						const at = marklessInstancePath(graphNodeId),
 							local = graphNodeId.slice(at.length),
+							placed =
+								rows?.find((pair) => !pair.rowBoundary && pair.rowFree === at)
+									?.withRows ?? at,
 							holder = at
-								? scope.module?.instanceReads.get(scope.module.rootPrefix + at)
+								? scope.module?.instanceReads.get(scope.module.rootPrefix + placed)
 								: scope.read;
 						if (holder) return holder(local, path);
 						const own = read(graphNodeId, path);
@@ -846,7 +911,10 @@ export function evaluatePrerenderDataComponent(input: {
 			linkedInitializer ??
 				(input.loadSymbol(
 					boundSymbolId
-						? (composer?.symbolPrefix ?? '') + boundSymbolId
+						? marklessRowFreeSymbolId(
+								(composer?.symbolPrefix ?? '') + boundSymbolId,
+								composer?.symbolPrefix ?? '',
+							)
 						: marklessRowFreeSymbolId(
 								input.symbolPrefix + symbolId,
 								input.symbolPrefix,

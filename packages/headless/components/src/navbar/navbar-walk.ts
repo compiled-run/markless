@@ -8,6 +8,8 @@
 type Parts = ReadonlyArray<HTMLElement> | undefined;
 
 function isWalkable(part: HTMLElement): boolean {
+	// A control hidden in its own right (`hidden`, `display: none`) cannot take focus; one inside a dropdown that is opening can.
+	if (getComputedStyle(part).display === 'none') return false;
 	if (part.tagName === 'A') return part.hasAttribute('href');
 	if (part.tagName !== 'BUTTON') return false;
 	return (part as HTMLButtonElement).disabled !== true;
@@ -78,4 +80,16 @@ export function stepTo(
 	if (raw < 0) return walk[last];
 	if (raw > last) return walk[0];
 	return walk[raw];
+}
+
+/**
+ * Which side a dropdown opening at `to` comes from while another is showing: `end` when `to` is
+ * after the open one in the bar, `start` when before, and the empty string when none is open.
+ */
+export function directionTo(controls: Parts, to: HTMLElement | undefined): 'start' | 'end' | '' {
+	if (to === undefined) return '';
+	let open: HTMLElement | undefined;
+	for (const control of controls ?? []) if (control !== to && control.getAttribute('aria-expanded') === 'true') open = control;
+	if (open === undefined) return '';
+	return open.compareDocumentPosition(to) & Node.DOCUMENT_POSITION_FOLLOWING ? 'end' : 'start';
 }

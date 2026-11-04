@@ -46,6 +46,10 @@ was unavailable):
   must come before the rendered output", with the fix as the suggestion.
 - A plain `} else {` after an `@if` body is a parse error (TSRX1009), which
   Markless reports as `MARKLESS_BRANCH_ELSE_SPELLING`.
+- An `@try`'s arms go in the order `@try`, `@pending`, `@catch`. An `@pending`
+  written after `@catch` is not part of the `@try`: TSRX ends the `@try` at its
+  `@catch` and reads `@pending` as text. Markless reports it as
+  `MARKLESS_ASYNC_ARM_ORDER`.
 - Among template children, `//` starts a line comment after whitespace, at the
   start of a line, or right after a tag, container or block, and `/*` starts a
   comment anywhere. `http://example.com` stays text. Comments are not children.
