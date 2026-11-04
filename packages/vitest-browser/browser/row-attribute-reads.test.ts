@@ -7,6 +7,9 @@ import RootComputed from './row-attribute-reads/root-computed.tsrx';
 import SharedChild from './row-attribute-reads/shared-child.tsrx';
 import SharedChildRead from './row-attribute-reads/shared-child-read.tsrx';
 import SharedRoot from './row-attribute-reads/shared-root.tsrx';
+import WidgetRows from './row-attribute-reads/widget-rows-page.tsrx';
+import WidgetPair from './row-attribute-reads/widget-pair-page.tsrx';
+import WidgetPart from './row-attribute-reads/widget-part-page.tsrx';
 
 // Every row repaints when the value its attribute reads changes, not only the clicked one.
 
@@ -95,4 +98,53 @@ test('CSR: child rows whose attribute reads a computed of shared() state', async
 test('SSR: child rows whose attribute reads a computed of shared() state', async () => {
 	await renderSSR(SharedChild);
 	await everyRowRepaints();
+});
+
+test('CSR: widget rows whose attribute reads widget-scoped shared() state', async () => {
+	await render(WidgetRows);
+	await everyRowRepaints();
+});
+
+test('SSR: widget rows whose attribute reads widget-scoped shared() state', async () => {
+	await renderSSR(WidgetRows);
+	await everyRowRepaints();
+});
+
+test('CSR: rows in a part projected into a widget root read the root\'s widget-scoped shared() state', async () => {
+	await render(WidgetPart);
+	await everyRowRepaints();
+	expect(document.querySelector('[data-deck]')!.getAttribute('data-face')).toBe('lyra');
+});
+
+test('SSR: rows in a part projected into a widget root read the root\'s widget-scoped shared() state', async () => {
+	await renderSSR(WidgetPart);
+	await everyRowRepaints();
+	expect(document.querySelector('[data-deck]')!.getAttribute('data-face')).toBe('lyra');
+});
+
+const checkedIn = (section: string) =>
+	[...document.querySelectorAll(`[${section}] [data-item]`)].map(
+		(row) => `${row.getAttribute('data-item')}:${row.getAttribute('data-checked')}`,
+	);
+
+// Each rendered widget holds its own shared() instance, so a pick in one leaves the other alone.
+async function widgetsRepaintApart() {
+	const rows = (on: string) => ['lyra', 'maia', 'nova'].map((name) => `${name}:${name === on}`);
+	expect([checkedIn('data-first'), checkedIn('data-second')]).toEqual([rows('maia'), rows('maia')]);
+	document.querySelector<HTMLElement>('[data-first] [data-item="nova"]')!.click();
+	await expect.poll(() => checkedIn('data-first')).toEqual(rows('nova'));
+	expect(checkedIn('data-second')).toEqual(rows('maia'));
+	document.querySelector<HTMLElement>('[data-second] [data-item="lyra"]')!.click();
+	await expect.poll(() => checkedIn('data-second')).toEqual(rows('lyra'));
+	expect(checkedIn('data-first')).toEqual(rows('nova'));
+}
+
+test('CSR: two widgets\' rows each follow their own widget-scoped shared() state', async () => {
+	await render(WidgetPair);
+	await widgetsRepaintApart();
+});
+
+test('SSR: two widgets\' rows each follow their own widget-scoped shared() state', async () => {
+	await renderSSR(WidgetPair);
+	await widgetsRepaintApart();
 });

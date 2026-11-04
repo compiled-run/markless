@@ -76,13 +76,13 @@ test('a row whose TEXT reads the widget shared state mints on the same terms', a
 	]);
 });
 
-// A value only rendering produces has no channel in the record, so the whole
-// template stays off and the diagnostic names the read.
+// Handing the whole widget object to a function reads members no record can name,
+// so the whole template stays off and the diagnostic names the read.
 test('a row whose widget read only rendering produces is refused, loudly', async () => {
-	const compiled = await compileRow(`<span>{shout(n.label)}{item.id}</span>`);
+	const compiled = await compileRow(`<span>{shout(n)}{item.id}</span>`);
 
 	expect(rowMintDiagnostics(compiled)).toEqual([
-		['warning', expect.stringContaining('shout(n.label)')],
+		['warning', expect.stringContaining('shout(n)')],
 	]);
 	expect(repeats(compiled)[0]?.rowTemplate).toBeUndefined();
 	expect(repeats(compiled)[0]?.rowComponent).toBeUndefined();
@@ -119,6 +119,18 @@ test('a row calling a method on the widget read mints from the lifted node', asy
 		},
 		{ path: [0, 1], itemPath: ['id'] },
 	]);
+});
+
+// The render-data reader answers a body-local call; the slot follows the widget member it reads.
+test('a row calling a body-local function on a widget member mints, reading that member', async () => {
+	const compiled = await compileRow(`<span>{shout(n.label)}{item.id}</span>`);
+
+	expect(rowMintDiagnostics(compiled)).toEqual([]);
+	expect(repeats(compiled)[0]?.rowTemplate?.textSlots?.[0]).toEqual({
+		path: [0, 0],
+		source: 'shout(n.label)',
+		reads: [{ graphNodeId: expect.stringContaining('#nest/'), path: ['label'] }],
+	});
 });
 
 test('the refusal is the widget read alone: the same row without it mints', async () => {
@@ -166,7 +178,7 @@ export function NestOwnedItems({ testid }) @{
 
 	<div data-testid={testid}>
 		@for (const item of n.items; key item.id) {
-			<span data-nest-owned-item data-nest-owner={shout(n.label)}>{item.id}</span>
+			<span data-nest-owned-item data-nest-owner={shout(n)}>{item.id}</span>
 		}
 	</div>
 }

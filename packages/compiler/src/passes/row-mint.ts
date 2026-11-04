@@ -478,14 +478,14 @@ export function expressionSlotValue(
 	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
 }
 
-// A page-space instance's members are graph nodes every instance path reads unprefixed; a widget's are per root.
+// A shared() instance's members are its definition's graph nodes; the row reader qualifies a widget's per root.
 function sharedInstanceMemberReads(
 	graph: SemanticGraphArtifact,
 	instance: SemanticGraphArtifact['sharedInstances'][number],
 	source: string,
 ): ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> | null {
 	const definition = graph.sharedDefinitions.find((candidate) => candidate.id === instance.definitionId);
-	if (!definition || definition.scope === 'widget') return null;
+	if (!definition) return null;
 	const members = memberReads(source, instance.localName);
 	if (!members) return null;
 	const reads: Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> = [];
