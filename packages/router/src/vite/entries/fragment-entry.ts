@@ -22,6 +22,8 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// How long a failed fetch or import waits for pagehide before loading its page as a document.
+	readonly leaveSettleMs: number;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;

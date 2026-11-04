@@ -21,7 +21,6 @@ export function startFragmentNavigation(
 	loadRun: () => Promise<FragmentNavigationRun>,
 	// What a press may start before the run half arrives; null when the app fetches nothing ahead of a click. A thunk, like the config.
 	intentOf: () => FragmentIntent | null,
-	leaveSettleMs: number,
 ): void {
 	const w = d.defaultView as (Window & typeof globalThis) | null;
 	if (!w) return;
@@ -163,23 +162,13 @@ export function startFragmentNavigation(
 	};
 	const wake = (event?: Event) => {
 		starting ??= loadRun().then((run) => {
-			return (running = run(d, routes, importModule, scrolled, arriving, pressed, settle));
+			return (running = run(d, routes, importModule, scrolled, arriving, pressed));
 		});
 		starting.then(
 			(api) => api.replay(event),
 			() => (starting = undefined),
 		);
 		return starting;
-	};
-	// A failure's fallback runs only if the document is not being left: the browser aborts its requests a few ms before pagehide.
-	const settle = (go: () => void) => {
-		let left = false;
-		const leave = () => (left = true);
-		w.addEventListener('pagehide', leave);
-		w.setTimeout(() => {
-			w.removeEventListener('pagehide', leave);
-			if (!left) go();
-		}, leaveSettleMs);
 	};
 	let rest = 0;
 	let at = '';
@@ -235,7 +224,7 @@ export function startFragmentNavigation(
 		if (here(url) && !starting) return;
 		wake().then(
 			(api) => api.go(anchor) || w.location.assign(url.href),
-			() => settle(() => w.location.assign(url.href)),
+			() => w.location.assign(url.href),
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
@@ -281,7 +270,6 @@ export type FragmentNavigationRun = (
 	scrolled: Set<Element>,
 	arriving: Map<string, Promise<unknown>>,
 	early: FragmentEarly | undefined,
-	settle: (go: () => void) => void,
 ) => FragmentNavigationApi;
 
 // Serialized into its own static bridge file, loaded on the first link intent or at idle: everything that happens before the swap.
@@ -293,9 +281,18 @@ export function runFragmentNavigation(
 	scrolled: Set<Element>,
 	arriving: Map<string, Promise<unknown>>,
 	early: FragmentEarly | undefined,
-	settle: (go: () => void) => void,
 ): FragmentNavigationApi {
 	const w = d.defaultView as Window & typeof globalThis;
+	// A failure's fallback runs only if the document is not being left: the browser aborts its requests a few ms before pagehide.
+	const settle = (go: () => void) => {
+		let left = false;
+		const leave = () => (left = true);
+		w.addEventListener('pagehide', leave);
+		w.setTimeout(() => {
+			w.removeEventListener('pagehide', leave);
+			if (!left) go();
+		}, config.leaveSettleMs);
+	};
 	const host = d as Document & {
 		__marklessFragmentNav?: FragmentNavigationState;
 		__marklessFragmentIdle?: Promise<boolean>;
