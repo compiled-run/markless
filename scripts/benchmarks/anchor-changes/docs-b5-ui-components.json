@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 8,
+			"reason": "the UI preview's binder skin and the inked keyboard add a few rules to the page's playground CSS: +8 B gzip downloaded at load, measured on the PR #460 CI run; no more JS is executed",
+			"date": "2026-11-04"
+		}
+	]
+}
