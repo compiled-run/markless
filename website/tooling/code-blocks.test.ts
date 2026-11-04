@@ -207,6 +207,7 @@ describe('the shared style.css tab', () => {
 		expect(module).toContain('import sheet0 from "./look.css?url";');
 	});
 
+	// Rewrites and highlights every page's blocks: over 5 s on a CI runner.
 	it('names every page block by the key the prefetch manifest lists it under', async () => {
 		const listed = new Set(corpus.map((block) => codeBlockKey(block.files)));
 		const pages = fileURLToPath(new URL('../pages/', import.meta.url));
@@ -218,7 +219,7 @@ describe('the shared style.css tab', () => {
 				if (path.endsWith('/block.tsrx') && !listed.has(codeBlockKey(filesOf(module)))) unlisted.push(path);
 		}
 		expect(unlisted).toEqual([]);
-	});
+	}, 30_000);
 
 	it('confines the in-page copy to the result box, reading body as that box', () => {
 		const scoped = scopedPageStyle('body {\n\tcolor: red;\n}\n\nh1,\nbody p {\n\tmargin: 0;\n}\n');
