@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import DrinkDemo from '../../components/figures/storage/drink-demo.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -14,27 +15,11 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 
 Pick a drink, then reload this page.
 
-<Code steps={[{ label: 'Press Coffee, then reload the page. Coffee is still your pick.', shows: 'Your usual: coffee' }, { label: "Add a `Cocoa` button that sets `drink = 'cocoa'`, and press it.", shows: 'Your usual: cocoa' }]}>
-```tsrx title="usual-drink.tsrx"
-import { storage } from '@markless/core';
+<DrinkDemo />
 
-export default function UsualDrink() @{
-	let drink = storage('usual-drink', 'tea');
-
-	<section>
-		<p>Your usual: {drink}</p>
-		<button onClick={() => (drink = 'tea')}>
-			Tea
-		</button>
-		<button onClick={() => (drink = 'coffee')}>
-			Coffee
-		</button>
-	</section>
-}
-```
-</Code>
-
-`drink` reads and writes like any variable. The browser keeps it, so a reload starts from the reader's pick, not from `'tea'`.
+- Your pick is still there after the reload, marked before the page shows.
+- One write saved it in three places: a cookie, `localStorage`, and the `data-docs-drink` attribute on `<html>`.
+- The mark is plain CSS that reads that attribute.
 
 ## Save it under a key
 

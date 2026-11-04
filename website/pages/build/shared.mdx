@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import BakeSaleDemo from '../../components/figures/shared/bake-sale-demo.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -56,10 +57,14 @@ The function you pass to `shared()` makes the state. It returns that state plus 
 
 The second argument says who shares a copy. Press each stall's **Sell one**, and watch which numbers move.
 
-<Code steps={[{ label: 'Press Sell one under Lemonade twice. The day total and Lemonade move, and Cookies stays at 0.', shows: 'Sold today: 2' }, { label: "In `stall`, change `'widget'` to `'page'`. Press Sell one under Lemonade, and Cookies moves too.", shows: 'Cookies: 1 sold' }]}>
-```tsrx title="bake-sale.tsrx"
-import { shared, state } from '@markless/core';
+<BakeSaleDemo />
 
+- The day total moves on every press. `day` says `'page'`, so the whole page shares one copy.
+- Each stall's count moves only for its own stall. `stall` says `'widget'`, so each `Stall` gets its own copy.
+
+The two definitions differ only in their scope:
+
+```tsrx title="bake-sale.tsrx"
 const day = shared(
 	() => {
 		const box = state({ sold: 0 });
@@ -75,38 +80,7 @@ const stall = shared(
 	},
 	{ scope: 'widget' },
 );
-
-function Stall({ name }: { name: string }) @{
-	const s = stall();
-	const d = day();
-
-	<p>
-		<span>{name}: {s.sold} sold</span>
-		<button
-			onClick={() => {
-				s.sold++;
-				d.sold++;
-			}}
-		>
-			Sell one
-		</button>
-	</p>
-}
-
-export default function BakeSale() @{
-	const d = day();
-
-	<section>
-		<h2>Sold today: {d.sold}</h2>
-		<Stall name="Lemonade" />
-		<Stall name="Cookies" />
-	</section>
-}
 ```
-</Code>
-
-- The day total moves on every press. `day` says `'page'`, so the whole page shares one copy.
-- Each stall's count moves only for its own stall. `stall` says `'widget'`, so each `Stall` gets its own copy.
 
 | Scope | Who shares one copy |
 | --- | --- |

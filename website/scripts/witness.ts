@@ -2289,18 +2289,20 @@ try {
 
 		// A storage() pick survives a reload, and is on <html> before the page shows.
 		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
-		const drinkLine = () => liveBlock(0).locator('p').first();
-		const drinkAttr = () => page.evaluate(() => document.documentElement.getAttribute('data-usual-drink'));
-		await drinkLine().waitFor();
-		check(((await drinkLine().textContent()) ?? '').trim() === 'Your usual: tea', 'the drink block serves its starting value');
-		await liveBlock(0).getByRole('button', { name: 'Coffee' }).click();
-		await settleText(drinkLine(), (text) => text === 'Your usual: coffee', 'picking a drink shows it');
+		const drinkFigure = () => page.locator('.margin-notes').first();
+		const drinkHeading = () => drinkFigure().locator('.heading');
+		const drinkAttr = () => page.evaluate(() => document.documentElement.getAttribute('data-docs-drink'));
+		await drinkHeading().waitFor();
+		check((await drinkAttr()) === 'tea', 'the drink figure starts at tea on <html>', String(await drinkAttr()));
+		await drinkFigure().getByRole('button', { name: 'Coffee' }).click();
+		await settleInner(drinkHeading(), (text) => text.includes('Your usual: coffee'), 'picking a drink shows it');
 		check((await drinkAttr()) === 'coffee', 'picking a drink writes it onto <html>', String(await drinkAttr()));
 		await page.reload({ waitUntil: 'load' });
-		await settleText(drinkLine(), (text) => text === 'Your usual: coffee', 'the pick survives a reload');
+		check((await drinkAttr()) === 'coffee', 'the pick is on <html> again after a reload', String(await drinkAttr()));
+		await settleInner(drinkHeading(), (text) => text.includes('Your usual: coffee'), 'the pick survives a reload');
 		await page.screenshot({ path: `${shotsDir}/T006-storage-after.png`, fullPage: true });
 		await page.evaluate(() => localStorage.clear());
-		await page.context().clearCookies({ name: 'markless-usual-drink' });
+		await page.context().clearCookies({ name: 'markless-docs-drink' });
 
 		// shared() reaches a component with no prop, and its scope picks who shares a copy.
 		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
@@ -2309,10 +2311,11 @@ try {
 		check(((await bagLine.textContent()) ?? '').trim() === 'Bags in the cart: 0', 'the shared badge serves 0');
 		await liveBlock(0).getByRole('button', { name: 'Add to cart' }).click();
 		await settleText(bagLine, (text) => text === 'Bags in the cart: 1', 'a click in one component moves the badge in another');
-		const saleBlock = liveBlock(1);
-		await saleBlock.getByRole('button', { name: 'Sell one' }).first().click();
-		await settleText(saleBlock.locator('h2'), (text) => text === 'Sold today: 1', "the 'page' total moves on a stall's press");
-		const stallCounts = async () => (await saleBlock.locator('p span').allTextContents()).map((text) => text.trim()).join();
+		const saleFigure = page.locator('.margin-notes').first();
+		await saleFigure.getByRole('button', { name: 'Sell one' }).first().click();
+		await settleInner(saleFigure.locator('.total'), (text) => text.includes('Sold today: 1'), "the 'page' total moves on a stall's press");
+		const stallCounts = async () =>
+			(await saleFigure.locator('.count span').allTextContents()).map((text) => text.trim()).join();
 		check(
 			(await stallCounts()) === 'Lemonade: 1 sold,Cookies: 0 sold',
 			"each 'widget' stall keeps its own count",
