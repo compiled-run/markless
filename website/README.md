@@ -221,7 +221,11 @@ Pages use only the visuals the Start here pages use: a `<Code>` block with `step
 column (a live demo on an `InkScreen` sheet with numbered margin notes beside it), an ink figure
 drawn with the `markless-anatomy` skill, `<Commands>`, plain fenced blocks and tables.
 `pages/contributing/improve-the-docs.mdx` lists which one fits which idea. A figure is a `.tsrx`
-component in `components/figures/<page>/`, with its CSS in its own `<style>`.
+component in `components/figures/<page>/`, with its CSS in its own `<style>`. A textbook column
+composes `components/figures/ink/margin-notes.tsrx` and `ring.tsrx`. Never put `Ring` or any other
+imported component inside an `@if` arm or `@for` row: draw the ring inline from `art.ring.ink`, as
+`figures/reading/blocks-demo.tsrx` does, or the arm renders in the browser and its code joins the
+page's prefetch.
 
 `components/docs/preview-card.tsrx` and the `<Playground>` generator are being retired. Don't use
 them on a new or rewritten page; the pages that still import them move off them batch by batch.

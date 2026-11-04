@@ -1,4 +1,5 @@
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import TypoNotes from '../../components/figures/docs-guide/typo-notes.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
@@ -9,7 +10,7 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Improve the docs
 
-<PageMeta time="5 min" assumes="nothing" />
+<PageMeta time="6 min" assumes="nothing" />
 
 <Subtitle text="This site is a Markless app in website/, so a framework change and the page that explains it can land in one pull request." />
 
@@ -94,7 +95,36 @@ For a single suggestion, use `note="..."` instead of `steps`.
 
 Not in a block: icon tags like `<lucide.plus />`, which need the `ui()` build plugin, and routes, API routes or anything else that needs a server.
 
-## Facts come from the code
+## A textbook column
+
+Use one when the reader must see which spots change and which don't. Press **Fixed one** a few times:
+
+<TypoNotes />
+
+Ring 1 changes on every press, and the tally counts the handler. Nothing else on the sheet moves. Here is the figure's markup, trimmed to one spot:
+
+```tsrx
+<MarginNotes said={said}>
+	<InkScreen url="docs.app/typos" label="Live preview of the typo tally">
+		<p><Ring n={1} /> Typos fixed: {fixed}</p>
+		<InkButton onClick={() => fixed++}>Fixed one</InkButton>
+	</InkScreen>
+	<Notes>
+		<NoteTitle>2 spots on this sheet</NoteTitle>
+		<Spots>
+			<Spot n={1} code={'{fixed}'}>the count, rewritten on each press</Spot>
+		</Spots>
+		<Tally>The handler ran <strong>{fixed}</strong> times.</Tally>
+	</Notes>
+</MarginNotes>
+```
+
+- `MarginNotes` and its parts come from `components/figures/ink/margin-notes.tsrx`, and `Ring` from `ring.tsrx` beside it.
+- Each `Spot` number matches a `Ring` on the sheet.
+- `said` is one plain sentence a screen reader hears after each change.
+- Never put `Ring`, or any other imported component, inside an `@if` arm or an `@for` row. Draw the ring inline from `art.ring.ink` instead, as `figures/reading/blocks-demo.tsrx` does. A component there makes the browser render the arm, and pulls its code into every page's prefetch.
+
+## Check the facts, then the page
 
 Check every API name, import path, flag and command against the Markless source before you write it: package code, tests, fixtures and the CLI templates.
 
@@ -109,7 +139,7 @@ Check every API name, import path, flag and command against the Markless source 
 	text="Scoping keeps your selectors inside the component. It doesn't keep global selectors out. global.css can still style your class name, and a prose rule like .prose h3 can reach your element. Reset what they set in your own style block."
 />
 
-## Check your work
+Then run the checks:
 
 ```bash
 pnpm --dir website run typecheck   # the .tsrx-aware checker over pages and components

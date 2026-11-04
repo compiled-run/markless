@@ -8,7 +8,8 @@ not in `styles/global.css`. Reach for `global.css` only for what one component
 cannot own: tokens on `:root` or `html`, typography for MDX prose, markup emitted
 by tooling, and classes several components share.
 
-A live demo on a page is a textbook column or an ink figure in
+A live demo on a page is a textbook column (built on
+`components/figures/ink/margin-notes.tsrx`) or an ink figure in
 `components/figures/<page>/` (see README "Visuals"). `PreviewCard` is being
 retired, so don't copy it. Global tokens (`var(--ink)`, `var(--step--1)`, the
 space scale) resolve inside scoped styles as usual.
