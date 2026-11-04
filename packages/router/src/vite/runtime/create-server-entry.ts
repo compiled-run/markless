@@ -62,7 +62,6 @@ import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-re
 import {
 	FRAGMENT_APPEND_END,
 	FRAGMENT_HOVER_DWELL_MS,
-	FRAGMENT_LEAVE_SETTLE_MS,
 	FRAGMENT_IDLE_BYTES_PER_SECOND,
 	FRAGMENT_IDLE_FRAGMENTS,
 	FRAGMENT_IDLE_MEASURED_BYTES,
@@ -1306,7 +1305,6 @@ function fragmentConfig(
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
 		streamOpenProperty: PROTOCOL_STREAM_OPEN_PROPERTY,
 		pendingDeadlineMs: MARKLESS_NAV_SETTLE_DEADLINE_MS,
-		leaveSettleMs: FRAGMENT_LEAVE_SETTLE_MS,
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,

@@ -283,16 +283,6 @@ export function runFragmentNavigation(
 	early: FragmentEarly | undefined,
 ): FragmentNavigationApi {
 	const w = d.defaultView as Window & typeof globalThis;
-	// A failure's fallback runs only if the document is not being left: the browser aborts its requests a few ms before pagehide.
-	const settle = (go: () => void) => {
-		let left = false;
-		const leave = () => (left = true);
-		w.addEventListener('pagehide', leave);
-		w.setTimeout(() => {
-			w.removeEventListener('pagehide', leave);
-			if (!left) go();
-		}, config.leaveSettleMs);
-	};
 	const host = d as Document & {
 		__marklessFragmentNav?: FragmentNavigationState;
 		__marklessFragmentIdle?: Promise<boolean>;
@@ -710,8 +700,6 @@ export function runFragmentNavigation(
 				? connection.effectiveType === '4g' && connection.saveData !== true
 				: config.idleWithoutConnectionInfo),
 		rescan,
-		stops: 0,
-		settle,
 		scrolled,
 		arriving,
 	};
@@ -805,7 +793,7 @@ export function runFragmentNavigation(
 		stopRest();
 		// A link to the page already shown keeps it, scroll and state included, as client routers do.
 		if (pageKey(url) === pageKey(new URL(location.href))) {
-			state.stops++;
+			state.stops = (state.stops ?? 0) + 1;
 			return true;
 		}
 		const replace = anchor.hasAttribute(config.replaceAttribute);
@@ -815,9 +803,16 @@ export function runFragmentNavigation(
 			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset', stops);
 		if (loaded) void swap(loaded);
 		else
-			load().then(swap, () =>
-				settle(() => stops === state.stops && location.assign(url.href)),
-			);
+			load().then(swap, () => {
+				// Leaving the document aborts the import a few ms before pagehide; loading the page then would cancel that navigation.
+				let left = false;
+				const leave = () => (left = true);
+				w.addEventListener('pagehide', leave);
+				w.setTimeout(() => {
+					w.removeEventListener('pagehide', leave);
+					if (!left && stops === state.stops) location.assign(url.href);
+				}, config.pendingDeadlineMs);
+			});
 		return true;
 	};
 	const follow = (routedPhase: boolean) => (event: Event) => {
@@ -832,7 +827,7 @@ export function runFragmentNavigation(
 	d.addEventListener('click', follow(false));
 	rescan();
 	const traverse = (event: PopStateEvent) => {
-		state.stops++;
+		state.stops = (state.stops ?? 0) + 1;
 		const url = new URL(location.href);
 		if (url.hash.startsWith('#/') || pageKey(url) === state.shown) return;
 		const saved = (
@@ -876,8 +871,6 @@ export function fragmentPageUrl(url: URL): URL | undefined {
 export const FRAGMENT_REGION_END = '<!--markless:region-end-->';
 export const FRAGMENT_APPEND_END = '<!--markless:append-end-->';
 export const FRAGMENT_HOVER_DWELL_MS = 20;
-// A fetch or import the browser aborts because the document is being left fails a few ms before pagehide.
-export const FRAGMENT_LEAVE_SETTLE_MS = 200;
 export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
 // Unused prefetches still streaming their @pending pieces; older ones are cancelled past this.
 export const FRAGMENT_PREFETCH_CONNECTIONS = 2;
