@@ -4,6 +4,7 @@ import InkButton from '../ink/ink-button.tsrx';
 import InkScreen from '../ink/ink-screen.tsrx';
 import MarginNotes, { Notes, NoteTitle, Spot, Spots, Tally } from '../ink/margin-notes.tsrx';
 import Ring from '../ink/ring.tsrx';
+import { art as ink } from '../ink/screen.art.ts';
 import { describeBlocks, nextGuest } from './model.ts';
 
 export default function BlocksDemo() @{
@@ -26,7 +27,7 @@ export default function BlocksDemo() @{
 					@if (guests.length === 0) {
 						<p class="empty">
 							No one yet
-							<Ring n={2} />
+							<svg class="arm-ring" viewBox="0 0 26 26" aria-hidden="true"><path d={ink.ring.ink} /><text x="13" y="17.5">2</text></svg>
 						</p>
 					}
 				</div>
@@ -106,6 +107,18 @@ export default function BlocksDemo() @{
 					.others {
 						margin: 0.6rem 0 0;
 						padding-inline-start: 1.1rem;
+					}
+					.arm-ring {
+						flex: none;
+						width: 1.6rem;
+						height: 1.6rem;
+						overflow: visible;
+						fill: var(--ring);
+					}
+
+					.arm-ring text {
+						font: 700 13px 'Shantell Sans', system-ui, sans-serif;
+						text-anchor: middle;
 					}
 				</style>
 			</div>

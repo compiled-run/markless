@@ -1,4 +1,5 @@
 // A hand-drawn numbered ring: marks a spot on an ink sheet and the margin note that explains it.
+// Inside an @if arm or @for row, draw the ring inline from `art.ring.ink`: a component there makes the browser render the arm.
 import { art } from './screen.art.ts';
 
 export default function Ring({
