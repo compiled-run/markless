@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 697,
-			"reason": "a module-constant @for goes on the graph when a row's child reads the row item in a handler (PR #451): the docs playground compile worker carries the new handler-props analysis, downloaded at load and not executed then; measured on CI run 41761619066 against queue run 41759593106",
+			"delta": 772,
+			"reason": "a module-constant @for goes on the graph when a row's child reads the row item in a handler (PR #451): the docs playground compile worker carries the new handler-props analysis, downloaded at load and not executed then; measured on CI run 41765419765 against queue run 41762644786",
 			"date": "2026-11-04"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 697,
-			"reason": "a module-constant @for goes on the graph when a row's child reads the row item in a handler (PR #451): the docs playground compile worker carries the new handler-props analysis, downloaded at load and not executed then; measured on CI run 41761619066 against queue run 41759593106",
+			"delta": 772,
+			"reason": "a module-constant @for goes on the graph when a row's child reads the row item in a handler (PR #451): the docs playground compile worker carries the new handler-props analysis, downloaded at load and not executed then; measured on CI run 41765419765 against queue run 41762644786",
 			"date": "2026-11-04"
 		}
 	]
