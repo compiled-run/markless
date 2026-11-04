@@ -1,16 +1,15 @@
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # Improve the docs
 
 <PageMeta time="5 min" assumes="nothing" />
-
-<ThemeToggle />
 
 <Subtitle text="This site is a Markless app in website/, so a framework change and the page that explains it can land in one pull request." />
 
@@ -33,7 +32,7 @@ Run these from the repo root, after `pnpm install`. To see a page the way reader
 
 ## The shape of a page
 
-Each page is an `.mdx` file. It opens with these, in order, and nothing else:
+Each page is an `.mdx` file. After its imports, `<SiteNavbar />` and `<Sidebar />`, it opens with these, in order, and nothing else:
 
 1. A `#` title that makes a claim or names a task: "Create an app", not "Overview".
 2. `<PageMeta time assumes />`. `time` comes from the formula in `website/README.md`, so recompute it when you rewrite a page. `assumes` lists keys from the `concepts` map in `nav.ts`.

@@ -39,7 +39,7 @@ export default box(
 		);
 		await page.click('[data-theme-toggle="dark"]', WAIT);
 		await expect.page.exists(page, 'html.dark', WAIT);
-		await expect.page.exists(page, '.site-header', WAIT);
+		await expect.page.exists(page, '.site-navbar', WAIT);
 		for (let click = 0; click < 6; click++) {
 			await page.click('.mode-select-trigger', WAIT);
 			await expect.page.exists(
@@ -48,15 +48,15 @@ export default box(
 				WAIT,
 			);
 		}
-		await page.click('.site-header .crumb-home', WAIT);
+		await page.click('.mobile-bar .bar-brand', WAIT);
 		await expect.page.text(page, 'h1', HOME_HEADING, WAIT);
 		if (
 			(await page.networkRequests()).filter((request) => request.resourceType === 'Document')
 				.length !== 1
 		) {
-			throw new Error('The header home link reloaded the document.');
+			throw new Error('The navbar home link reloaded the document.');
 		}
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
-		await receipt.capture('sidebar page link and header home link preserve the document');
+		await receipt.capture('sidebar page link and navbar home link preserve the document');
 	},
 );

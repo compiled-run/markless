@@ -1,13 +1,12 @@
 import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # navbar
-
-<ThemeToggle />
 
 <Playground scenario="basic" />
 
@@ -27,10 +26,17 @@ A screen reader hears plain links and buttons, which is what site navigation is.
   `aria-expanded` and `aria-controls`.
 - `navbar.itemcontent` is the dropdown. It carries `hidden` while it is closed.
 - `navbar.itemlink` is an `<a>`. It works at the top level and inside a dropdown.
+- `navbar.trigger` is a `<button>` that opens no dropdown, such as a theme switch or a search
+  button. The arrow keys stop on it like any other control in the bar. What it does is up to your
+  `onClick`.
 
 The root, the item, the trigger and the dropdown write `ui-open` while a dropdown shows. They write
 `ui-closed` while it does not. `navbar.item` writes `ui-active` when you set `active` on it.
 `navbar.itemlink` writes `ui-active` and `aria-current="page"` when you set `current` on it.
+When one dropdown replaces another, the dropdown coming in writes `ui-from="end"` if its trigger is
+after the old one in the bar, or `ui-from="start"` if it is before. The one going out writes
+`ui-to` with the opposite side. Use them to slide the panels the way the pointer moved. Opening from
+closed, or closing, writes neither.
 
 Set `current` on the one link for the page a person is on. Set `active` on the item for the section
 that page sits in. Only `current` reaches a screen reader.
@@ -43,7 +49,7 @@ that page sits in. Only `current` reaches a screen reader.
 | Left arrow or Right arrow | Moves between top-level controls, and wraps at the ends. It skips dropdown links. |
 | Home or End               | Jumps to the first or last top-level control.                                     |
 | Down arrow on a trigger   | Opens the dropdown and moves focus to its first link.                             |
-| Arrows inside a dropdown  | Move between that dropdown's links, and wrap at the ends.                         |
+| Arrows inside a dropdown  | Move between that dropdown's links and buttons, and wrap at the ends.             |
 | Home or End in a dropdown | Jumps to the dropdown's first or last link.                                       |
 | Escape                    | Closes the dropdown. If focus was inside it, focus goes back to the trigger.      |
 | Tab                       | Moves on as normal. When focus leaves the landmark, the open dropdown closes.     |
@@ -53,10 +59,12 @@ A press outside the open dropdown closes it too.
 ## Hover
 
 By default a dropdown opens when the pointer rests on its item. The first one waits for `delay`.
-Once one shows, the next item opens as soon as the pointer reaches it.
+Once one shows, moving along the bar to the next item opens it at once (`switchDelay`, 0 by
+default). A pointer heading down across a trigger on its way into the open panel is held back, so
+the panel never swaps under it.
 
-When the pointer leaves the landmark, the dropdown closes after a short grace period. If the pointer
-comes back in time, the dropdown stays.
+A dropdown stays open while the pointer is on its trigger, on its panel, or on the way between the
+two. As soon as the pointer is anywhere else, even elsewhere in the navbar, the dropdown closes.
 
 <Callout
 	sprite="speech-bubble"
@@ -80,6 +88,7 @@ stylesheet.
 | `value`      | `string`          | The `value` of the item whose dropdown shows. Omit it, or pass `''`, and every dropdown closes. |
 | `hover`      | `boolean`         | Opens a dropdown when the pointer rests on its item. Omit it and hover is on.                   |
 | `delay`      | `number`          | How long the pointer rests before the first dropdown opens, in ms. Omit it and it is 200.       |
+| `switchDelay` | `number`         | How long the pointer rests before the next dropdown replaces an open one, in ms. The default is 0. |
 | `clickGrace` | `number`          | How long a click on the trigger is ignored after a hover opened it, in ms. The default is 300.  |
 | `onChange`   | `(value) => void` | Gets the `value` now showing, or `''` when everything closed.                                   |
 

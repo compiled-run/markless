@@ -1,16 +1,15 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import CompilerPasses from '../../components/sketch/how/compiler-passes.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # What the compiler makes from a counter
 
 <PageMeta time="5 min" assumes="state, events" />
-
-<ThemeToggle />
 
 Last page said the compiler decides the state, the updates and the event code before anything
 runs. This page shows the real output for the counter. I compiled it with `compileTsrxModule()`
