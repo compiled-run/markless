@@ -2,6 +2,8 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import LayerPage from './row-attribute-reads/if-layer-props-computed.tsrx';
 import Page from './row-attribute-reads/if-prop-computed.tsrx';
+import SkyPage from './row-attribute-reads/if-imported-prop-computed.tsrx';
+import ChartPage from './row-attribute-reads/if-imported-layer-props.tsrx';
 
 afterEach(cleanup);
 
@@ -26,18 +28,21 @@ async function reopen() {
 	await expect.poll(list).not.toBeNull();
 }
 
-async function rowsReadThePropAfterReopening() {
-	expect(checked()).toEqual(['lyra:false', 'maia:true', 'nova:false']);
+async function rowsReadThePropAfterReopening([first, second, third] = ['lyra', 'maia', 'nova']) {
+	const rows = (on: string) => [first, second, third].map((name) => `${name}:${name === on}`);
+	expect(checked()).toEqual(rows(second));
 	await reopen();
-	expect(checked()).toEqual(['lyra:false', 'maia:true', 'nova:false']);
-	click('[data-item="nova"]');
-	await expect.poll(checked).toEqual(['lyra:false', 'maia:false', 'nova:true']);
+	expect(checked()).toEqual(rows(second));
+	click(`[data-item="${third}"]`);
+	await expect.poll(checked).toEqual(rows(third));
 	await reopen();
-	expect(checked()).toEqual(['lyra:false', 'maia:false', 'nova:true']);
-	click('[data-item="lyra"]');
-	await expect.poll(checked).toEqual(['lyra:true', 'maia:false', 'nova:false']);
+	expect(checked()).toEqual(rows(third));
+	click(`[data-item="${first}"]`);
+	await expect.poll(checked).toEqual(rows(first));
 	expect(errors).toEqual([]);
 }
+
+const STARS = ['vega', 'rigel', 'deneb'];
 
 test('CSR: an @if in a same-file child renders rows that read a prop through a computed', async () => {
 	await render(Page);
@@ -57,4 +62,24 @@ test('CSR: the same rows inside a same-file layer, reading the whole props objec
 test('SSR: the same rows inside a same-file layer, reading the whole props object', async () => {
 	await renderSSR(LayerPage);
 	await rowsReadThePropAfterReopening();
+});
+
+test('CSR: an @if in a child imported from another file renders rows that read a prop through a computed', async () => {
+	await render(SkyPage);
+	await rowsReadThePropAfterReopening(STARS);
+});
+
+test('SSR: an @if in a child imported from another file renders rows that read a prop through a computed', async () => {
+	await renderSSR(SkyPage);
+	await rowsReadThePropAfterReopening(STARS);
+});
+
+test('CSR: an imported child inside a layer, reading the whole props object', async () => {
+	await render(ChartPage);
+	await rowsReadThePropAfterReopening(STARS);
+});
+
+test('SSR: an imported child inside a layer, reading the whole props object', async () => {
+	await renderSSR(ChartPage);
+	await rowsReadThePropAfterReopening(STARS);
 });

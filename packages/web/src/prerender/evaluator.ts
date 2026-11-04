@@ -12,6 +12,7 @@ import {
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
 import type { ResumeArmRecordSet } from '../resume-types.ts';
 import type { RuntimeGraph } from '@markless/runtime';
+import type { ComposedBranchGraph } from '../resume-branches.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '../../../serializer/src/protocol-constants.ts';
@@ -562,16 +563,18 @@ type RosterResumeHost = {
 // The page's props were served once, as its props cell; a render in the browser reads them back from there.
 // A composed owner's routed props are read live; `children` stays the projection markup a render is handed.
 function servedPageProps(
-	graph: RuntimeGraph,
+	graph: ComposedBranchGraph,
 	surface?: PrerenderDataSurface,
 	owner?: string,
 ): Readonly<Record<string, unknown>> {
 	const props = { ...asPropsRecord(graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID)) };
+	const routed = (graph.composedGraphProps ?? []).map((route) => route.name);
 	for (const component of owner ? Object.values(surface!.components) : [])
 		for (const edge of component.edges ?? [])
 			for (const prop of edge.childComponentName === owner ? edge.props : [])
-				if (prop.kind === 'graph-reference' && prop.name !== 'children')
-					props[prop.name] = graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID, [prop.name]);
+				if (prop.kind === 'graph-reference') routed.push(prop.name);
+	for (const name of routed)
+		if (name !== 'children') props[name] = graph.read(PROTOCOL_PROPS_GRAPH_NODE_ID, [name]);
 	return props;
 }
 
