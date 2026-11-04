@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import Store from './arg-try-rows-host.tsrx';
+import CachedPicker from './arg-cached-rows.tsrx';
 import Picker from './arg-try-rows.tsrx';
 
 afterEach(cleanup);
@@ -28,25 +29,25 @@ function clickWhenPainted(name: string) {
 	});
 }
 
-async function firstClickOnFreshRowsLands() {
+async function firstClickOnFreshRowsLands([first, second, third] = ['Fig', 'Guava', 'Kiwi']) {
 	const type = (value: string) => {
 		const query = document.querySelector<HTMLInputElement>('[data-query]')!;
 		query.value = value;
 		query.dispatchEvent(new Event('input', { bubbles: true }));
 	};
 	const picked = () => document.querySelector('[data-picked]')?.textContent;
-	const fig = clickWhenPainted('Fig');
+	const opened = clickWhenPainted(first);
 	document.querySelector<HTMLElement>('[data-open]')!.click();
-	await fig;
-	await expect.poll(picked).toBe('Fig');
-	const guava = clickWhenPainted('Guava');
-	type('gu');
-	await guava;
-	await expect.poll(picked).toBe('Guava');
-	const kiwi = clickWhenPainted('Kiwi');
-	type('k');
-	await kiwi;
-	await expect.poll(picked).toBe('Kiwi');
+	await opened;
+	await expect.poll(picked).toBe(first);
+	const narrowed = clickWhenPainted(second);
+	type(second.slice(0, 2).toLowerCase());
+	await narrowed;
+	await expect.poll(picked).toBe(second);
+	const changed = clickWhenPainted(third);
+	type(third.slice(0, 1).toLowerCase());
+	await changed;
+	await expect.poll(picked).toBe(third);
 	expect(errors).toEqual([]);
 }
 
@@ -68,4 +69,15 @@ test('CSR: a click on rows a @try just painted two components down is never lost
 test('SSR: a click on rows a @try just painted two components down is never lost', async () => {
 	await renderSSR(Store);
 	await firstClickOnFreshRowsLands();
+});
+
+// The lookup settles in the task that started it, so the @try hears its settled value twice.
+test('CSR: a click on rows a @try painted from a same-task settle is never lost', async () => {
+	await render(CachedPicker);
+	await firstClickOnFreshRowsLands(['Pear', 'Plum', 'Lime']);
+});
+
+test('SSR: a click on rows a @try painted from a same-task settle is never lost', async () => {
+	await renderSSR(CachedPicker);
+	await firstClickOnFreshRowsLands(['Pear', 'Plum', 'Lime']);
 });
