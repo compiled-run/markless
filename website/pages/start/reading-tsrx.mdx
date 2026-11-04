@@ -72,8 +72,8 @@ export default function Rsvp() @{
 
 <Callout
 	sprite="cross"
-	title="Why can't I call my own function in { }?"
-	text="Braces show plain reads, maths and method calls, like {guests.length} or {name.toUpperCase()}. A function you wrote, as in {format(guest)}, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Work it out with computed() and show that instead."
+	title="Which functions can I call in { }?"
+	text="Braces show plain reads, maths, method calls and your own functions, like {guests.length}, {name.toUpperCase()} or {format(guest)}. A function held in a let, which could be swapped for another, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Declare it with const or function instead."
 />
 
 ## `@{ }` holds instructions, run top to bottom

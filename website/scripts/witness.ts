@@ -1824,15 +1824,11 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T013-mug-label-after.png`, fullPage: true });
 
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
-		const conditionalsTitles = await page
-			.locator('.callout-title')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-		check(
-			conditionalsTitles.includes("Why can't I put an @if inside another @if?"),
-			'/concepts/conditionals answers the nested @if question',
-			conditionalsTitles.join(' | '),
-		);
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
+		check(
+			conditionalsText.includes("can't sit inside another") && conditionalsText.includes('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED'),
+			'/concepts/conditionals answers the nested @if question',
+		);
 		check(
 			conditionalsText.includes('MARKLESS_STATE_CREATION_SITE_UNSTABLE'),
 			'/concepts/conditionals names the error the build stops with',
@@ -1914,63 +1910,43 @@ try {
 			await watchText(pourCard),
 		);
 
+		// --- textbook columns: each demo's notes report what the reader's action did ---
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
-		const basketCard = page.locator('section[data-preview="computed-basket"]');
-		const basketSlot = () => basketCard.locator('.slot:not([hidden])');
-		await basketSlot().getByRole('button', { name: 'One more coaster' }).waitFor();
-		await basketSlot().getByRole('button', { name: 'One more coaster' }).click();
-		await settleWatch(basketCard, (text) => text.includes('total is now 15'), 'computed preview: the recipe reruns for a coaster');
+		const basket = page.locator('.margin-notes');
+		await basket.getByRole('button', { name: 'Add a coaster' }).click();
+		await settleText(basket.locator('.total strong'), (text) => text === '$15', 'computed demo: a coaster moves the total');
 		check(
-			(await ledgerText(basketCard)).includes('ran again, because it reads coasters'),
-			'computed preview: the recipe row says it ran again',
-			await ledgerText(basketCard),
-		);
-		await basketCard.getByRole('switch', { name: 'Recipe reads coasters' }).click();
-		await basketSlot().getByRole('button', { name: 'One more coaster' }).click();
-		await settleWatch(basketCard, (text) => text.includes('stayed 12'), 'computed preview: a recipe that skips coasters leaves the total');
-		check(
-			(await basketSlot().locator('p').nth(2).textContent())?.trim() === 'Total: 12',
-			'computed preview: the mugs-only total really stayed 12',
+			(await basket.locator('.tally').innerText()).includes('ran 2 times'),
+			'computed demo: the tally counts the recipe runs',
+			await basket.locator('.tally').innerText(),
 		);
 
 		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
-		const eventsCard = page.locator('section[data-preview="events-mug"]');
-		const mugField = eventsCard.getByLabel('Name for the mug');
-		await mugField.waitFor();
-		await mugField.focus();
-		await page.keyboard.type('Ada', { delay: 40 });
-		await settleWatch(eventsCard, (text) => text.includes('set name to "Ada"'), 'events preview: onInput reports the value it got');
+		const labelDemo = page.locator('.margin-notes');
+		const labelField = labelDemo.getByLabel('Name for the mug');
+		await labelField.click();
+		await labelField.pressSequentially('Ada', { delay: 40 });
+		await settleText(labelDemo.locator('.tally'), (text) => text.includes('the field now reads "Ada"'), 'events demo: onInput reports the value it got');
 		const eventsUrl = page.url();
-		await page.keyboard.press('Enter');
-		await settleWatch(eventsCard, (text) => text.includes('did not reload'), 'events preview: Enter runs onSubmit with preventDefault');
-		check(page.url() === eventsUrl, 'events preview: the submit does not navigate');
-		check(
-			(await ledgerText(eventsCard)).includes('set printed = "Ada"'),
-			'events preview: the onSubmit row shows what it printed',
-			await ledgerText(eventsCard),
-		);
-		await page.keyboard.press('Escape');
-		await settleWatch(eventsCard, (text) => text.startsWith('Escape fired keydown'), 'events preview: Escape runs onKeyDown');
-		check((await mugField.inputValue()) === '', 'events preview: Escape cleared the field', await mugField.inputValue());
+		await labelField.press('Enter');
+		await settleText(labelDemo.locator('.tally'), (text) => text.includes('preventDefault() kept the page'), 'events demo: Enter runs onSubmit');
+		check(page.url() === eventsUrl, 'events demo: the submit does not navigate');
+		await labelField.press('Escape');
+		await settleText(labelDemo.locator('.tally'), (text) => text.includes('"Escape"'), 'events demo: Escape runs onKeyDown');
+		check((await labelField.inputValue()) === '', 'events demo: Escape cleared the field', await labelField.inputValue());
 
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
-		const branchCard = page.locator('section[data-preview="conditionals-note"]');
-		const branchToggle = branchCard.getByRole('button', { name: 'Show or hide' });
-		await branchToggle.waitFor();
-		await branchToggle.focus();
-		await page.keyboard.press('Enter');
-		await branchCard.getByLabel('Note').waitFor();
-		await branchCard.getByLabel('Note').fill('buy milk');
-		await branchToggle.click();
-		await settleWatch(branchCard, (text) => text.includes('note still holds "buy milk"'), 'conditionals preview: the note outlives the branch');
-		check((await branchCard.getByLabel('Note').count()) === 0, 'conditionals preview: closing removes the field');
-		await branchToggle.click();
-		await settleWatch(branchCard, (text) => text.includes('built field number 2'), 'conditionals preview: reopening builds a new field');
-		check(
-			(await branchCard.getByLabel('Note').inputValue()) === 'buy milk',
-			'conditionals preview: the new field is filled from note',
-		);
-		await branchCard.screenshot({ path: `${shotsDir}/concepts-conditionals-preview.png` });
+		const panel = page.locator('.margin-notes');
+		const panelToggle = panel.getByRole('button', { name: 'Note', exact: true });
+		const panelField = panel.getByLabel('Note for the barista');
+		await panelField.fill('Oat milk');
+		await panelToggle.click();
+		await settleText(panel.locator('.sr'), (text) => text.includes('The note still holds "Oat milk"'), 'conditionals demo: the note outlives the branch');
+		check((await panelField.count()) === 0, 'conditionals demo: closing removes the field');
+		await panelToggle.click();
+		await settleText(panel.locator('.tally'), (text) => text.includes('built 2 times'), 'conditionals demo: reopening builds a new field');
+		check((await panelField.inputValue()) === 'Oat milk', 'conditionals demo: the new field is filled from note');
+		await panel.screenshot({ path: `${shotsDir}/concepts-conditionals-demo.png` });
 
 		// --- widget: the shopping list on the lists page --------------------------
 		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
@@ -2114,95 +2090,28 @@ try {
 			'a Code block with several files switches to the file tab the reader clicks',
 		);
 
-		// --- previews: lists, async and styling concept cards --------------------
-		// Each card reads the live component, so these checks drive the card and read what it reports.
-		const watchSays = async (card: Locator, wanted: (text: string) => boolean, label: string) => {
-			const read = async () => (await card.locator('.pv-watch-text').innerText()).replace(/\s+/g, ' ').trim();
-			for (let attempt = 0; attempt < 40; attempt += 1) {
-				if (wanted(await read())) break;
-				await new Promise((done) => setTimeout(done, 100));
-			}
-			const text = await read();
-			check(wanted(text), label, text);
-			return text;
-		};
-
 		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
-		const rowsCard = page.locator('section[data-preview="lists"]');
-		const rowNames = async () =>
-			(await rowsCard.locator('li.row').allTextContents()).map((text) => text.trim()).join('|');
-		await rowsCard.getByRole('checkbox', { name: 'Pears' }).check();
-		await watchSays(rowsCard, (text) => text.includes('Pears on row'), 'the lists card numbers the rows on the first tick');
-		const pearsRow = await rowsCard.locator('li.row', { hasText: 'Pears' }).getAttribute('data-row');
-		await rowsCard.getByRole('button', { name: 'Reverse' }).click();
-		await watchSays(
-			rowsCard,
-			(text) => text.startsWith('Reverse: 2 moved, 0 made, 0 thrown away. The tick rode along with Pears.'),
-			'Reverse moves the keyed rows, makes none, and the tick rides with Pears',
-		);
-		check((await rowNames()) === 'Milk|Coffee|Pears', 'Reverse reorders the rows', await rowNames());
+		const listDemo = page.locator('.margin-notes');
+		await listDemo.getByRole('checkbox', { name: 'Pears' }).check();
+		await listDemo.getByRole('button', { name: 'Sort A to Z' }).click();
+		await settleText(listDemo.locator('.tally'), (text) => text.includes('3 rows'), 'lists demo: sorting moves all three rows');
+		const listNames = (await listDemo.locator('li').allTextContents()).map((text) => text.replace(/\d/g, '').trim()).join('|');
 		check(
-			(await rowsCard.locator('li.row', { hasText: 'Pears' }).getAttribute('data-row')) === pearsRow &&
-				(await rowsCard.getByRole('checkbox', { name: 'Pears' }).isChecked()),
-			'the Pears element keeps its number and its tick through the reverse',
+			listNames === 'Coffee|Milk|Pears' && (await listDemo.getByRole('checkbox', { name: 'Pears' }).isChecked()),
+			'lists demo: the tick rides with Pears through the sort',
+			listNames,
 		);
-		for (let left = 2; left >= 0; left -= 1) {
-			await rowsCard.getByRole('button', { name: 'Remove top' }).click();
-			await watchSays(rowsCard, (text) => text.startsWith('Remove top: 0 moved, 0 made, 1 thrown away.'), `Remove top throws one row away (${left} left)`);
-		}
-		check(
-			((await rowsCard.locator('li.none').textContent()) ?? '').trim() === 'Nothing left to buy.',
-			'the empty list shows its @empty block',
-		);
-		await rowsCard.getByRole('button', { name: 'Reset' }).click();
-		await watchSays(rowsCard, (text) => text.startsWith('Reset: 0 moved, 3 made, 0 thrown away.'), 'Reset makes three new rows');
-
-		await page.goto(`${origin}/concepts/async`, { waitUntil: 'load' });
-		const blocksCard = page.locator('section[data-preview="async"]');
-		const onPage = () => blocksCard.locator('li.block[data-on="true"], li.block[data-on="held"]').innerText();
-		await blocksCard.getByRole('radio', { name: 'tall', exact: true }).check({ force: true });
-		await watchSays(blocksCard, (text) => text.startsWith('The tall answer is ready'), 'the async card swaps in the tall answer');
-		await blocksCard.getByRole('radio', { name: 'small', exact: true }).check({ force: true });
-		await watchSays(blocksCard, (text) => text.startsWith('Looking up the small mug.'), 'the async card reports the new lookup');
-		check(
-			((await blocksCard.locator('.answer').textContent()) ?? '').trim() === 'The tall mug holds a big coffee.' &&
-				(await blocksCard.locator('li.block[data-on="held"]').count()) === 1,
-			'while small is looked up, the tall answer stays and @try is marked as still showing',
-		);
-		await watchSays(blocksCard, (text) => text.startsWith('The small answer is ready'), 'the small answer replaces the tall one');
-		await blocksCard.getByRole('radio', { name: 'cracked', exact: true }).check({ force: true });
-		await watchSays(blocksCard, (text) => text.startsWith('The lookup failed'), 'the cracked mug lands in @catch');
-		check((await onPage()).includes('@catch'), 'the async card marks @catch as on the page', await onPage());
 
 		await page.goto(`${origin}/concepts/styling`, { waitUntil: 'load' });
-		const scopeCard = page.locator('section[data-preview="styling"]');
-		const groundOf = (index: number) =>
-			scopeCard.locator('.card').nth(index).evaluate((node) => getComputedStyle(node).backgroundColor);
-		const paperAtRest = await groundOf(0);
-		const chalkAtRest = await groundOf(1);
-		check(paperAtRest !== chalkAtRest, 'two files style .card, and the two cards look different', `${paperAtRest} vs ${chalkAtRest}`);
-		await scopeCard.getByRole('switch', { name: 'Chalk card lit' }).click();
-		await watchSays(scopeCard, (text) => text.startsWith("The chalk card's class is now card lit."), 'the lit switch reports the new class');
-		check(
-			(await scopeCard.locator('.card').nth(1).getAttribute('class'))?.split(/\s+/).includes('lit') === true &&
-				(await groundOf(1)) !== chalkAtRest &&
-				(await groundOf(0)) === paperAtRest,
-			'lighting the chalk card restyles it and leaves the paper card alone',
-		);
-		await scopeCard.getByRole('radio', { name: 'big', exact: true }).check({ force: true });
-		await watchSays(scopeCard, (text) => text.includes('data-size is now big'), 'the size choice reports the new attribute');
-		check(
-			(await scopeCard.locator('.card').first().getAttribute('data-size')) === 'big',
-			'the paper card carries data-size="big"',
-		);
-		await scopeCard.getByRole('switch', { name: 'Show page classes' }).click();
-		const scopes = await watchSays(scopeCard, (text) => /mk-\w+ and mk-\w+/.test(text), 'the card reads each file class from the page');
-		const [paperScope, chalkScope] = scopes.match(/mk-\w+/g) ?? [];
+		const cardsDemo = page.locator('.margin-notes');
+		await cardsDemo.getByRole('button', { name: 'Show classes' }).click();
+		const demoSaid = await settleText(cardsDemo.locator('.sr'), (text) => /mk-\w+.*mk-\w+/.test(text), 'styling demo: the notes read each card class from the page');
+		const [paperScope, chalkScope] = demoSaid.match(/mk-\w+/g) ?? [];
 		check(
 			paperScope !== chalkScope &&
-				(await scopeCard.locator('.card').first().getAttribute('class'))?.includes(paperScope ?? '?') === true &&
-				(await scopeCard.locator('.card').nth(1).getAttribute('class'))?.includes(chalkScope ?? '?') === true,
-			'each card carries a different file class, the one the card reports',
+				(await cardsDemo.locator('article').first().getAttribute('class'))?.includes(paperScope ?? '?') === true &&
+				(await cardsDemo.locator('article').nth(1).getAttribute('class'))?.includes(chalkScope ?? '?') === true,
+			'styling demo: each card carries a different file class, the one the notes show',
 			`${paperScope} vs ${chalkScope}`,
 		);
 
@@ -3029,9 +2938,9 @@ try {
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const comparison = page
 			.locator('.collapsible')
-			.filter({ has: page.getByRole('button', { name: 'Coming from another framework?' }) });
+			.filter({ has: page.getByRole('button', { name: 'How do existing tools handle this?' }) });
 		const comparisonTrigger = comparison.getByRole('button', {
-			name: 'Coming from another framework?',
+			name: 'How do existing tools handle this?',
 		});
 		const comparisonText = comparison.locator('p');
 		check(

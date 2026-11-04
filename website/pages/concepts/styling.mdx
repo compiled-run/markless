@@ -1,7 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import StylingSketch from '../../components/sketch/concepts/styling-sketch.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import CardsDemo from '../../components/figures/styling/cards-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -13,22 +13,41 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <ThemeToggle />
 
-A plain stylesheet is a shared room. You call something `.card`. Someone two folders away also calls
-something `.card`. One of you loses, and it is whoever finds out last.
+<Subtitle text="Put a style block inside a component, and its rules reach that file's elements and nothing else." terms="elements" />
 
-**Put a `<style>` block inside a component, and its rules reach that file's elements and nothing
-else.**
+A plain stylesheet is a shared room. You call something `.card`, someone two folders away does
+too, and one of you loses.
+
+```tsrx title="paper-card.tsrx"
+export default function PaperCard() @{
+	<article class="card">
+		<style>
+			.card {
+				background: lightyellow;
+			}
+		</style>
+		<p>Paper card</p>
+	</article>
+}
+```
+
+The `<style>` block sits inside the component's elements. Its `.card` rule reaches this file's
+`<article>`, and no other file's.
 
 ## Two cards, one class name
 
-<StylingSketch />
+Both cards below write `class="card"`, in two different files. Press **Show classes** to read the
+class each one really got.
 
-In the card above, switch on Show page classes. Each card carries one more class, and it comes from its own file.
+<CardsDemo />
 
-Both cards in the code below use the class `card`. Both files say what `.card` looks like, and they
-disagree. Press **Light it up** on the second card.
+- Markless gives each file with a `<style>` block its own extra class, starting `mk-`.
+- It adds that class to every selector in the block and to every element the file renders.
+- So `.card` from one file becomes `.card.mk-…`, and can't match the other file's card.
 
-<Code note="In paper-card.tsrx, change the background to lightblue. Only the paper card turns blue, though chalk-card.tsrx also styles .card. Then press Light it up on the chalk card.">
+## Style both cards
+
+<Code steps={[{ label: 'In `paper-card.tsrx`, change the background to `lightblue`. Only the paper card turns blue.', source: 'background: lightblue' }, { label: 'Press Light it up on the chalk card. Its scoped `.lit` rule takes over.', rewrites: 1 }]}>
 ```tsrx title="two-cards.tsrx"
 import PaperCard from './paper-card.tsrx';
 import ChalkCard from './chalk-card.tsrx';
@@ -85,53 +104,35 @@ export default function ChalkCard() @{
 ```
 </Code>
 
-Each card keeps its own look. Neither card file mentions the other, and the order of the imports
-does not matter. The button swaps the second card's class, and the scoped `.lit` rule takes over.
+Neither card file mentions the other, and the order of the imports doesn't matter.
 
-## The extra class
+## The rules you can rely on
 
-When Markless builds your app, it gives each file with a `<style>` block its own class, such as
-`mk-1qak359`. The class comes from the file's path. Markless adds it to every selector in the block
-and to every element the file renders.
-
-So `.card` in the first file becomes `.card.mk-1qak359` in the stylesheet, and the article goes out
-as `class="card mk-1qak359"`. The second file gets a different class. Its `.card` rule cannot match
-the first file's article.
-
-Rules inside `@media` get the class too. `@keyframes` names stay as you wrote them.
-
-In a built app, the rules end up in an ordinary stylesheet that the page links to. No script runs to apply them.
+- The extra class is worked out from the file's path.
+- Rules inside `@media` get the class too. `@keyframes` names stay as you wrote them.
+- In a built app the rules ship as plain CSS in the page. No script runs to apply them.
+- The class belongs to the file, not the component. Two components in one `.tsrx` file share it.
+  To give a component its own scope, move it to its own file.
+- For rules that cover the whole site, import an ordinary stylesheet.
 
 ## A class is a string
 
-`class` takes a string. Any expression that makes one works, such as a `? :` or a template string.
-The second card uses `lit ? 'card lit' : 'card'`, and the page updates the class when `lit` changes.
+`class` takes a string. Any expression that makes one works, like `lit ? 'card lit' : 'card'`, and
+the page updates the class when `lit` changes.
 
-<Callout
-	sprite="cross"
-	title="Why does my class say [object Object]?"
-	text="An object or an array is not a class string. Write class={{ lit: on }} and the page renders class='[object Object]'. An array such as ['card', on && 'lit'] renders as 'card,false'. Either way the build stops with MARKLESS_ATTRIBUTE_OBJECT_VALUE, or with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED when the value reads state. Build the string with a ? : instead."
-/>
+Not yet:
 
-## One file, one class
+- An object or an array, as in `class={{ lit: on }}`, stops the build with
+  `MARKLESS_ATTRIBUTE_OBJECT_VALUE`. Build the string with `? :` instead.
+- A `<style>` block outside a component's elements never reaches the page, so the build stops
+  with `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`.
 
-The class belongs to the file, not to the component. Two components in one `.tsrx` file share one
-class and one stylesheet. To give a component its own scope, move it to its own file.
+<Collapsible sprite="thought-bubble" summary="How do existing tools handle this?">
 
-A `<style>` block outside a function's elements never reaches the page, so the build stops with
-`MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`. For rules that cover the whole site, import an
-ordinary stylesheet.
+Scoped styles in single-file components work much the same way. You write the plain class name,
+and the build adds one class per file to selectors and elements. In the inspector you see your
+own class name next to the added one.
 
-<Collapsible
-	sprite="thought-bubble"
-	summary="Coming from another framework?"
-	text="This is close to scoped styles in single-file components. You write the plain class name. When Markless builds your app, it adds one class per file to selectors and elements. What you see in the inspector is your own class name next to the added one."
-/>
+</Collapsible>
 
-## Try this
-
-Open your browser's inspector on one of the cards. Find your own `card` class and the `mk-` class
-beside it. In `chalk-card.tsrx`, make its `.card` rule match the paper card's, then change one colour. Each
-card keeps its own look.
-
-Next: [splitting a page into components](/build/components).
+[Components](/build/components) shows how to split a page into components.

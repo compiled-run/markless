@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import EventsSketch from '../../components/sketch/concepts/events-sketch.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import LabelDemo from '../../components/figures/events/label-demo.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -12,33 +12,28 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <ThemeToggle />
 
-You have written this in a plain script, with no framework anywhere near it:
-
-```ts
-input.addEventListener('input', (event) => {
-	name = event.currentTarget.value;
-});
-```
-
-Everything in that line still holds here. Same event names, same event object, same properties.
-
-**An event prop is `on` plus the event name. Your handler gets the browser's own event.**
+<Subtitle text="An event prop is on plus the event name, and your handler gets the browser's own event." terms="events" />
 
 ```tsrx
 <input onInput={(event) => (name = event.currentTarget.value)} />
 ```
 
-`event.key`, `event.target` and `event.preventDefault()` are the real ones. The docs you read
-when you learned the DOM still apply.
+That is `addEventListener('input', ...)` written on the element. `event.key`, `event.target` and
+`event.preventDefault()` are the real ones, so the DOM docs you already know still apply.
 
-## Print a mug
+## Type, press Enter, press Escape
 
-Type a name into the field. Press Enter. Then press Escape. Each row shows what one handler got from
-the browser and what it changed.
+Type a name, press Enter, then press Escape. The notes say what each handler got from the browser.
 
-<EventsSketch />
+<LabelDemo />
 
-<Code note="Add a paragraph under the preview that shows {name.length}, and type a name. Then change onInput to onChange and type again: the preview waits until you leave the field.">
+- Every key fires `input`, and the preview follows `name`.
+- Enter submits the form. `event.preventDefault()` keeps the page from reloading.
+- Your component ran once, to set up the page. A handler's code runs only when its event fires.
+
+## Write your own
+
+<Code steps={[{ label: 'Under the preview, add `<p>{name.length} letters</p>` and type a name.', source: '{name.length}' }, { label: 'Change `onInput` to `onChange` and type again. The preview now waits until you leave the field.', source: 'onChange=' }]}>
 ```tsrx title="mug-label.tsrx"
 import { state } from '@markless/core';
 
@@ -72,90 +67,45 @@ export default function MugLabel() @{
 ```
 </Code>
 
-The preview follows every key, because `onInput` changes `name`. Enter copies the name to the
-printed line, and the page stays put. Escape clears the field.
+## Naming the prop
 
-The submit handler calls `event.preventDefault()`, the same as in a script tag. That is why Enter
-does not reload the page.
+- Write `on` and the event name: `onClick`, `onInput`, `onKeyDown`.
+- The case after `on` doesn't matter, so `onKeydown` works too.
+- Pass an array to run two handlers in order: `onClick={[save, countSave]}`.
 
-## The code for a click runs when someone clicks
+## Run code when the page is idle or in view
 
-Your component runs once, to set up the page. A handler is different. Its code runs only when its
-event fires. This holds whether the page renders in the browser alone or on a server.
+Some code belongs on the page but no click asks for it, like an analytics tag. Put `onIdle` on the
+element it belongs to:
 
-## Code that waits until the page is idle
-
-Some code belongs on the page but should never slow it down: an analytics tag, a chat widget, any
-third-party script. No click asks for it.
-
-**`onIdle` runs its handler once, after the page has loaded and the browser has nothing better to
-do.** Put it on the element the code belongs to.
-
-```tsrx
+```tsrx title="footer.tsrx"
 export default function Footer() @{
 	<footer
 		onIdle={async () => {
-			const analytics =
-				await import('./analytics.ts');
+			const analytics = await import('./analytics.ts');
 			analytics.start();
 		}}
 	>
-		Made by Example Co.
+		Made by Beanshop
 	</footer>
 }
 ```
 
-Like any handler, its code downloads only when it runs. The `import()` inside it does the same for
-the analytics script, so neither one is part of the page load.
-
-It runs once per element. An element inside an `@if` or `@for` runs it after the element appears
-and the page is idle again. An element that is gone by then never runs it.
-
-## Naming the prop
-
-Write `on` and then the event name. `click` becomes `onClick`, `input` becomes `onInput`, and
-`keydown` becomes `onKeyDown`. The case after `on` does not matter, so `onKeydown` works too.
-
-To run two handlers for one event, pass an array. They run in the order you wrote them.
-
-```tsrx
-import { state } from '@markless/core';
-
-export default function SaveButton() @{
-	let note = state('nothing saved');
-	let saves = state(0);
-
-	const save = () => (note = 'saved');
-	const countSave = () => saves++;
-
-	<button onClick={[save, countSave]}>{note}, {saves} times</button>
-}
-```
+- `onIdle` runs once per element, after the page loads and the browser is idle.
+- `onVisible` runs once, the first time the element scrolls into view.
+- An element inside an `@if` or `@for` runs it after it appears. One that's gone by then never
+  does.
+- A handler's code downloads only when it runs, and so does the `import()` inside it.
 
 ## What a handler can read
 
-A handler can read state, props, imports, and `const` values built from those. It can also call a
-function you declared in the component body, with `function` or `const`, and pass it arguments:
-`onClick={() => add(2)}` runs `add` with the state and props it reads, including other body
-functions it calls. A `const` built with `new Map(...)`, `new Set(...)`, `new Date(...)` or another
-built-in, or any other body `const`, is built again for each click, so it is read-only there: a
-handler that changes it, as in `list.push(3)` or `box.count = 1`, stops the build with
-`MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`. It cannot read other variables from the component body. Those exist only while the
-component sets up the page, and the click comes later. The build stops with
-`MARKLESS_HANDLER_READS_RENDER_LOCAL`, or with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` for an
-instance of your own class, and names the variable.
+- State, props, imports, and `const` values built from those.
+- A function you declared in the component body, with arguments: `onClick={() => add(2)}`.
+- Not a plain `let` from the component body: `MARKLESS_HANDLER_READS_RENDER_LOCAL`.
+- A body `const` is built again for each event, so changing it, as in `list.push(3)`, stops the
+  build with `MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`.
+- `event.preventDefault()` inside an `if` runs the moment the event fires, so the test may read
+  only state, props, constants or an event field compared with a fixed value, like
+  `event.key === 'Enter'`. Anything else stops the build with `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`.
 
-<Callout
-	sprite="cross"
-	title="Why does preventDefault() inside an if stop the build?"
-	text="The browser decides about its default action the moment the event fires. So Markless runs your preventDefault() decision right then, before the rest of the handler. That only works if the if test reads state, props or constants. It can also compare one field of the event with a fixed value, such as event.key === 'Enter'. A test that reads anything else stops the build with MARKLESS_SYNC_POLICY_UNEXTRACTABLE."
-/>
-
-## Try this
-
-Add a line that shows `{name.length}` under the preview. The handler does not change.
-
-Then swap `onInput` for `onChange` and type again. The preview now waits until you leave the field.
-That is the browser's own `change` event, unchanged.
-
-Next: [parts of the page that come and go](/concepts/conditionals).
+[Conditionals](/concepts/conditionals) shows parts of the page that come and go.

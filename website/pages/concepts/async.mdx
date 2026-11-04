@@ -1,5 +1,5 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import AsyncSketch from '../../components/sketch/concepts/async-sketch.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -14,24 +14,40 @@ import WaitAnatomy from '../../components/figures/async/wait-anatomy.tsrx';
 
 <ThemeToggle />
 
-Count the variables a loading spinner usually needs. The data. A flag for "still loading". An error,
-in case the data never comes. Then a rule in your head about which one wins when two are set.
+<Subtitle text="Give computed() an async recipe, then write three blocks: the answer, the wait and the failure." />
 
-Only the data is what the page is about. You can drop the other three.
+A loading spinner usually needs four variables: the data, a "still loading" flag, an error, and a
+rule in your head about which one wins. Only the data is what the page is about.
 
-**Give `computed()` an `async` recipe. Then write three blocks: one for the answer, one for the
-wait, and one for a failure.**
+```tsrx
+@try {
+	<p>{fact.text}</p>
+} @pending {
+	<p>Looking it up...</p>
+} @catch {
+	<p>That mug is not on the shelf.</p>
+}
+```
+
+- `@try` holds what you show once the value is ready. Read it directly, as in `fact.text`.
+- `@pending` holds what you show before the first answer arrives.
+- `@catch` holds what you show when the recipe throws or its promise rejects.
+
+Write them in that order. An `@pending` after `@catch` stops the build with
+`MARKLESS_ASYNC_ARM_ORDER`.
+
+## Watch a spot wait
+
+The parcel is `arrives`, a value still on its way. Until it lands, the `@pending` words hold its spot in pencil, and the rest of the page is already there. When the answer comes back down the wire, only that spot is inked in.
+
+<WaitAnatomy />
 
 ## Pick a mug
 
-<AsyncSketch />
+`loadMugFact`, in the `mug-facts.ts` tab, stands in for a `fetch`. It waits 1.5 seconds, and fails
+for a mug it doesn't know.
 
-In the card above, pick a mug, then another. The old answer stays on the page until the new one is ready.
-
-In the code below, press **Tall mug** and wait a moment. Press **Small mug**. Then press **Cracked
-mug**.
-
-<Code note="Delete the @catch block and pick the cracked mug. Then change the return line to return { text: (await loadMugFact(mug)) + mug }; and pick again.">
+<Code steps={[{ label: 'Press Tall mug, wait, then press Cracked mug. The `@catch` block takes over.', shows: 'That mug is not on the shelf.' }, { label: 'Change the return line to `return { text: (await loadMugFact(mug)) + mug };`. Reading `mug` after the `await` works too.', source: '(await loadMugFact(mug)) + mug' }]}>
 ```tsrx title="mug-facts.tsrx"
 import { computed, state } from '@markless/core';
 import { loadMugFact } from './mug-facts.ts';
@@ -89,59 +105,35 @@ export function loadMugFact(
 ```
 </Code>
 
-Each pick runs the recipe again. When the answer is ready, it swaps in. The cracked mug fails, and
-the `@catch` block takes its place. Pick another mug and the page recovers.
-
-`loadMugFact`, in the `mug-facts.ts` tab, stands in for a `fetch`. It answers "Pick a mug." straight
-away, waits before it answers anything else, and fails for a mug it does not know.
-
-## The three blocks
-
-`@try` holds what you show once the value is ready. Inside it, read the value directly, as in
-`fact.text`. There is no `.data` to reach through and no status to check.
-
-`@catch` holds what you show when the recipe throws or its promise rejects.
-
-`@pending` holds what you show while there is no answer yet. That is the first load: once an answer
-is on the page, picking again keeps it there while the next answer loads.
+Each pick runs the recipe again, and the answer swaps in when it's ready. Pick another mug after
+the cracked one, and the page recovers.
 
 <MugSpot mood="brew" />
+
+## While a new answer loads
+
+- The old answer stays on the page. `@pending` comes back only if the newest request has waited
+  more than 5 seconds, so fast typing never brings it back.
+- Markless puts `aria-busy="true"` on the element around the block, so you can style it:
+  `[aria-busy='true'] { opacity: 0.5; }`. If the block shares that element with other content,
+  each element inside the block gets the attribute instead.
+- To tell screen reader users something changed, use a status element outside the block, such as
+  `<p role="status">`. Some screen readers, NVDA in Firefox for one, stay silent about live regions
+  inside a busy element.
 
 <Callout
 	sprite="cross"
 	title="Why does the build fail when I show my async value?"
-	text="Every read of an async value in the elements needs a @try around it. A read outside one stops the build with MARKLESS_ASYNC_BOUNDARY_REQUIRED. The block is what tells Markless what to show before the value exists."
+	text="Every read of an async value in the markup needs a @try around it. A read outside one stops the build with MARKLESS_ASYNC_BOUNDARY_REQUIRED. The block tells Markless what to show before the value exists."
 />
-
-## Watch a spot wait
-
-The parcel is `arrives`, a value still on its way. Until it lands, the `@pending` words hold its spot in pencil, and the rest of the page is already there. When the answer comes back down the wire, only that spot is inked in.
-
-<WaitAnatomy />
-
-## While a new answer loads
-
-While the next answer loads, Markless puts `aria-busy="true"` on the element around the block, so you can style
-it, for example `[aria-busy='true'] { opacity: 0.5; }`. The attribute goes away when the new answer,
-or the `@catch` block, is on the page. If the block shares its element with other content, each
-element inside the block gets the attribute instead.
-
-`@pending` only comes back if the newest request has been waiting for more than 5 seconds. Each new
-pick starts that wait over, so fast typing never brings it back.
-
-To tell screen reader users something changed, put the message in a status element outside the
-block, such as `<p role="status">`. Some screen readers, NVDA in Firefox for one, stay silent about
-live regions inside a busy element.
 
 ## Read state before or after an await
 
-A recipe can read state anywhere, before or after an `await`. Markless reads every state the recipe
-names when the recipe starts, and runs it again when any of them changes, even while it is still
-waiting for an answer.
+A recipe can read state anywhere, before or after an `await`. Markless runs it again when any of
+that state changes, even while it's still waiting.
 
 One read stops the build with `MARKLESS_ASYNC_POST_AWAIT_READ`: a lookup whose key is the answer
-itself, like `shelf[(await loadPick()).id]`. Markless cannot know which entry that is until the
-answer arrives. Return the answer from the recipe, and do the lookup in a second, plain
-`computed()`.
+itself, like `shelf[(await loadPick()).id]`. Return the answer from the recipe, and do the lookup
+in a second, plain `computed()`.
 
-Next: [two components that both call something .card](/concepts/styling).
+[Styling](/concepts/styling) shows how two components can both call something `.card`.
