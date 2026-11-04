@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 303,
-			"reason": "the new MARKLESS_ASYNC_ARM_ORDER diagnostic ships in the docs playground's in-browser compiler (PR #456): the compile-worker chunk the page prefetches grows, nothing more runs at load; measured on CI run 41825698211 against main's anchors (main's merge-queue run 41817187314 reused its perf-guards lane, so no merge-base measurement exists)",
+			"delta": 340,
+			"reason": "the new MARKLESS_ASYNC_ARM_ORDER diagnostic ships in the docs playground's in-browser compiler (PR #456): the compile-worker chunk the page prefetches grows (and the link map that names it), nothing more runs at load; measured on merge-queue run 41845098619 against main's merge-queue run 41843453862",
 			"date": "2026-11-04"
 		},
 		{
@@ -20,8 +20,20 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 303,
-			"reason": "the new MARKLESS_ASYNC_ARM_ORDER diagnostic ships in the docs playground's in-browser compiler (PR #456): the compile-worker chunk the page prefetches grows, nothing more runs at load; measured on CI run 41825698211 against main's anchors (main's merge-queue run 41817187314 reused its perf-guards lane, so no merge-base measurement exists)",
+			"delta": 340,
+			"reason": "the new MARKLESS_ASYNC_ARM_ORDER diagnostic ships in the docs playground's in-browser compiler (PR #456): the compile-worker chunk the page prefetches grows (and the link map that names it), nothing more runs at load; measured on merge-queue run 41845098619 against main's merge-queue run 41843453862",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "the new MARKLESS_ASYNC_ARM_ORDER diagnostic ships in the docs playground's in-browser compiler (PR #456): the compile-worker chunk the page prefetches grows (and the link map that names it), nothing more runs at load; measured on merge-queue run 41845098619 against main's merge-queue run 41843453862",
 			"date": "2026-11-04"
 		}
 	]
