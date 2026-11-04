@@ -80,25 +80,55 @@ const watchViews = (page: Page) =>
 const views = (page: Page) =>
 	page.evaluate(() => (window as unknown as { __views: string[] }).__views);
 
-// Clicks `first`, and the moment the address shows its navigation started, runs `then` in the same page.
-const raceFrom = (page: Page, first: string, search: string, then: string) =>
+// Clicks `first`, and the moment its page fetch has started, runs `then` (Back, or a click on a selector) in the same page.
+const raceFrom = (page: Page, first: string, fetched: string, then: string) =>
 	page.evaluate(
-		([first, search, then]) =>
+		([first, fetched, then]) =>
 			new Promise<void>((done) => {
+				const requested: string[] = [];
+				const send = window.fetch;
+				window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+					requested.push(new URL(String(input instanceof Request ? input.url : input), location.href).href);
+					return send.call(window, input, init);
+				} as typeof fetch;
 				const link = document.querySelector(first) as HTMLElement;
 				link.focus();
 				document.activeElement?.setAttribute('data-focused', '');
 				link.click();
 				const started = () => {
-					if (location.search !== search) return void setTimeout(started);
+					if (!requested.some((href) => href.endsWith(fetched))) return void setTimeout(started);
 					if (then === 'back') history.back();
 					else (document.querySelector(then) as HTMLElement | null)?.click();
 					done();
 				};
 				started();
 			}),
-		[first, search, then] as const,
+		[first, fetched, then] as const,
 	);
+
+// Every distinct (page, address) pair the document shows, read every frame and after every DOM change.
+const watchAddress = (page: Page) =>
+	page.evaluate(() => {
+		const seen: string[] = [];
+		(window as unknown as { __addresses: string[] }).__addresses = seen;
+		const read = () => {
+			const view = `${document.querySelector('main')?.getAttribute('data-page')} ${location.pathname}${location.search}`;
+			if (seen.at(-1) !== view) seen.push(view);
+		};
+		new MutationObserver(read).observe(document, {
+			subtree: true,
+			childList: true,
+			attributes: true,
+		});
+		const tick = () => {
+			read();
+			requestAnimationFrame(tick);
+		};
+		tick();
+	});
+
+const addresses = (page: Page) =>
+	page.evaluate(() => (window as unknown as { __addresses: string[] }).__addresses);
 
 const serverRuns = (tag: string) =>
 	server!
@@ -152,7 +182,7 @@ for (const [name, browserType] of [
 		test('a navigation superseded before its page settled never shows, and the newest one lands', async () => {
 			const { page, errors } = await open(browser, '/');
 			await watchViews(page);
-			await raceFrom(page, '[data-to-recipe]', '?u=2', '[data-to-other-recipe]');
+			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', '[data-to-other-recipe]');
 			await landedOn(page, 'recipe');
 			await page.locator('[data-answer]').waitFor();
 			expect(await page.locator('[data-answer]').textContent()).toBe('loaded u=3 (server)');
@@ -180,16 +210,133 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('Back pressed before the page arrived leaves the page and the focus where they were', async () => {
+		test('the address and its history entry change in the task that swaps the page in, never at the click', async () => {
 			const { page, errors } = await open(browser, '/');
+			const before = await page.evaluate(() => history.length);
+			await watchAddress(page);
+			await page.locator('[data-to-recipe]').evaluate((link) => (link as HTMLElement).click());
+			await landedOn(page, 'recipe');
+			await page.locator('[data-answer]').waitFor();
+			expect(await addresses(page)).toEqual(['start /', 'recipe /recipe?u=2']);
+			expect(await page.evaluate(() => history.length)).toBe(before + 1);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('Back pressed before the page arrived cancels it and goes back from the page still shown', async () => {
+			const { page, errors } = await open(browser, '/');
+			await page.locator('[data-to-quick]').click();
+			await landedOn(page, 'quick');
+			const before = await page.evaluate(() => history.length);
 			await watchViews(page);
-			await raceFrom(page, '[data-to-recipe]', '?u=2', 'back');
+			await raceFrom(page, '[data-to-recipe]', '/recipe?u=4', 'back');
+			await landedOn(page, 'start');
+			await page.waitForTimeout(1200);
+			expect(new URL(page.url()).pathname).toBe('/');
+			expect((await views(page)).some((view) => view.startsWith('recipe'))).toBe(false);
+			expect(await page.evaluate(() => history.length)).toBe(before);
+			await page.goForward();
+			await landedOn(page, 'quick');
+			expect(new URL(page.url()).pathname).toBe('/quick');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('Back pressed before the page arrived on the landing page leaves the document, and Forward returns to the page it left', async () => {
+			const { page, errors } = await open(browser, '/');
+			// Back leaves this document, so the page script that pressed it may not get to answer.
+			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', 'back').catch(() => {});
+			await page.waitForURL('about:blank');
+			await page.goForward();
+			await landedOn(page, 'start');
+			await page.waitForTimeout(1200);
+			expect(await page.locator('main').getAttribute('data-page')).toBe('start');
+			expect(new URL(page.url()).pathname).toBe('/');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a second click before arrival wins with one history entry', async () => {
+			const { page, errors } = await open(browser, '/');
+			const before = await page.evaluate(() => history.length);
+			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', '[data-to-quick]');
+			await landedOn(page, 'quick');
+			await page.waitForTimeout(1200);
+			expect(await page.locator('main').getAttribute('data-page')).toBe('quick');
+			expect(new URL(page.url()).pathname).toBe('/quick');
+			expect(await page.evaluate(() => history.length)).toBe(before + 1);
+			await page.goBack();
+			await landedOn(page, 'start');
+			expect(new URL(page.url()).pathname).toBe('/');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a click on the page already shown, before another page arrived, cancels that page and keeps this one', async () => {
+			const { page, errors } = await open(browser, '/');
+			const before = await page.evaluate(() => history.length);
+			await watchViews(page);
+			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', '[data-to-start]');
 			await page.waitForTimeout(1200);
 			expect(await views(page)).toEqual(['start:']);
 			expect(new URL(page.url()).pathname).toBe('/');
-			expect(
-				await page.evaluate(() => document.activeElement?.hasAttribute('data-focused')),
-			).toBe(true);
+			expect(await page.evaluate(() => history.length)).toBe(before);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a hash link on this page clicked before another page arrived wins over it', async () => {
+			const { page, errors } = await open(browser, '/');
+			await watchViews(page);
+			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', '[data-to-spot]');
+			await page.waitForTimeout(1200);
+			expect(await views(page)).toEqual(['start:']);
+			expect(new URL(page.url()).hash).toBe('#spot');
+			expect(new URL(page.url()).pathname).toBe('/');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a link to another page with a hash lands on that page at its target, and Back returns', async () => {
+			const { page, errors } = await open(browser, '/');
+			await page.locator('[data-to-quick]').click();
+			await landedOn(page, 'quick');
+			await page.locator('[data-to-spot]').evaluate((link) => (link as HTMLElement).click());
+			await landedOn(page, 'start');
+			expect(new URL(page.url()).hash).toBe('#spot');
+			await expect
+				.poll(() =>
+					page.evaluate(() =>
+						Math.abs(Math.round(document.getElementById('spot')!.getBoundingClientRect().top)),
+					),
+				)
+				.toBe(0);
+			await page.goBack();
+			await landedOn(page, 'quick');
+			expect(new URL(page.url()).pathname).toBe('/quick');
+			await page.goForward();
+			await landedOn(page, 'start');
+			expect(new URL(page.url()).hash).toBe('#spot');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('Back after arrival restores the scroll offset the page had when it was left, not at the click', async () => {
+			const { page, errors } = await open(browser, '/');
+			await page.evaluate(() => window.scrollTo(0, 400));
+			await page.waitForTimeout(100);
+			await page.locator('[data-to-recipe]').evaluate((link) => {
+				(link as HTMLElement).click();
+				window.scrollTo(0, 900);
+			});
+			await landedOn(page, 'recipe');
+			await page.locator('[data-answer]').waitFor();
+			await page.goBack();
+			await landedOn(page, 'start');
+			await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(900);
+			await page.goForward();
+			await landedOn(page, 'recipe');
+			expect(new URL(page.url()).search).toBe('?u=2');
 			expect(errors).toEqual([]);
 			await page.close();
 		});

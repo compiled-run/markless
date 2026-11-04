@@ -94,6 +94,8 @@ export type FragmentNavigationState = {
 	readonly idleDownloads: boolean;
 	// Schedules the idle tier: at idle, fetch a few page fragments of the links in view; their code waits for intent.
 	readonly rescan: () => void;
+	// Bumped by Back, Forward, a hash link and a click on the page shown: each cancels a navigation whose page has not swapped in.
+	stops: number;
 	readonly scrolled: Set<Element>;
 	// Code the intent started preloading, by absolute href, settling once each file has arrived.
 	readonly arriving: Map<string, Promise<unknown>>;
@@ -110,6 +112,8 @@ export type FragmentEntryModule = {
 		url: URL,
 		mode: 'push' | 'replace' | 'traverse',
 		scroll: FragmentScroll,
+		// The state's stops when the navigation was asked for: any since cancel it.
+		stops?: number,
 	) => Promise<void>;
 };
 
@@ -119,8 +123,6 @@ type Session = {
 	streaming?: AbortController;
 	// The history entry on screen, and the last scroll offset seen for every entry this tab visited.
 	current?: string;
-	// An entry a navigation pushed whose page has not swapped in yet: the next navigation replaces it.
-	unshown?: string;
 	readonly positions: Map<string, { readonly x: number; readonly y: number }>;
 };
 
@@ -142,6 +144,7 @@ function sessionFor(d: Document): Session {
 		{ passive: true },
 	);
 	w.addEventListener('pagehide', () => {
+		created.navigation++;
 		if (created.current) saveScroll(w, created.current);
 		w.history.scrollRestoration = 'auto';
 	});
@@ -1024,6 +1027,7 @@ export async function navigate(
 	url: URL,
 	mode: 'push' | 'replace' | 'traverse',
 	scroll: FragmentScroll,
+	stops = (d as FragmentHost).__marklessFragmentNav?.stops,
 ): Promise<void> {
 	const state = (d as FragmentHost).__marklessFragmentNav;
 	const w = d.defaultView;
@@ -1031,29 +1035,13 @@ export async function navigate(
 	containerAttribute = state.config.containerAttributes[0];
 	const session = sessionFor(d);
 	const id = ++session.navigation;
-	// The address follows the click at once, so Back before the page arrives returns to the page still shown.
-	const entryNow = () =>
-		(w.history.state as { __marklessFragment?: { id?: string } } | null)?.__marklessFragment
-			?.id;
-	let entered: string | undefined;
-	if (mode !== 'traverse') {
-		const unshown = session.unshown !== undefined && session.unshown === entryNow();
-		if (!unshown)
-			session.positions.set(session.current ?? entryNow() ?? LANDING_ENTRY, {
-				x: w.scrollX,
-				y: w.scrollY,
-			});
-		w.history.scrollRestoration = 'manual';
-		session.unshown = entered = entryId();
-		const entry = { __marklessFragment: { id: entered, x: 0, y: 0 } };
-		if (mode === 'push' && !unshown) w.history.pushState(entry, '', url.href);
-		else w.history.replaceState(entry, '', url.href);
-	}
-	const left = () => entered !== undefined && entryNow() !== entered;
-	const stale = () => id !== session.navigation || left();
+	// The address and history entry change only when the page swaps in, so Back before then goes back from the page still shown.
+	const stale = () => id !== session.navigation || (mode !== 'traverse' && stops !== state.stops);
+	if (stale()) return;
 	const fallback = (href: string) => {
 		if (mode === 'traverse') w.location.reload();
-		else w.location.replace(href);
+		else if (mode === 'replace') w.location.replace(href);
+		else w.location.assign(href);
 	};
 	const started = w.performance.now();
 	const taken = take(state, url, mode === 'traverse', started);
@@ -1070,10 +1058,7 @@ export async function navigate(
 		? import('@markless/web/shared-swap')
 		: undefined;
 	sharedSwap?.catch(() => {});
-	const abandon = () => {
-		if (session.unshown === entered) session.unshown = undefined;
-		taken.abort();
-	};
+	const abandon = () => taken.abort();
 	let fetched: FragmentFetched;
 	try {
 		fetched = await taken.result;
@@ -1131,22 +1116,26 @@ export async function navigate(
 		if (stale()) return abandon();
 	}
 	let restore = scroll;
-	if (mode === 'traverse') {
-		const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
-		const saved = session.positions.get(key);
-		if (saved) restore = saved;
-		session.current = key;
-	} else {
-		session.current = entered;
-		session.unshown = undefined;
-		if (landed.href !== w.location.href)
-			w.history.replaceState(w.history.state, '', landed.href);
-	}
 	let region!: Element;
 	let end!: Comment;
 	let scripts: Element[] = [];
 	const commit = (): boolean => {
-		if (id !== session.navigation) return false;
+		if (stale()) return false;
+		if (mode === 'traverse') {
+			const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
+			const saved = session.positions.get(key);
+			if (saved) restore = saved;
+			session.current = key;
+		} else {
+			const leaving =
+				(w.history.state as { __marklessFragment?: { id?: string } } | null)
+					?.__marklessFragment?.id ?? LANDING_ENTRY;
+			session.positions.set(session.current ?? leaving, { x: w.scrollX, y: w.scrollY });
+			w.history.scrollRestoration = 'manual';
+			const entry = { __marklessFragment: { id: (session.current = entryId()), x: 0, y: 0 } };
+			if (mode === 'push') w.history.pushState(entry, '', landed.href);
+			else w.history.replaceState(entry, '', landed.href);
+		}
 		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
 		session.streaming?.abort();
 		const settle = withoutTransitions(d);

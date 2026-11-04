@@ -220,7 +220,8 @@ export function startFragmentNavigation(
 		const url = followed(anchor);
 		if (!url || url.hash.startsWith('#/') || (url.href.includes('#') && here(url))) return;
 		event.preventDefault();
-		if (here(url)) return;
+		// A click on the page shown keeps it; once a navigation was woken, the run half also cancels that one.
+		if (here(url) && !starting) return;
 		wake().then(
 			(api) => api.go(anchor) || w.location.assign(url.href),
 			() => w.location.assign(url.href),
@@ -699,6 +700,7 @@ export function runFragmentNavigation(
 				? connection.effectiveType === '4g' && connection.saveData !== true
 				: config.idleWithoutConnectionInfo),
 		rescan,
+		stops: 0,
 		scrolled,
 		arriving,
 	};
@@ -791,11 +793,15 @@ export function runFragmentNavigation(
 		if (!url) return false;
 		stopRest();
 		// A link to the page already shown keeps it, scroll and state included, as client routers do.
-		if (pageKey(url) === pageKey(new URL(location.href))) return true;
+		if (pageKey(url) === pageKey(new URL(location.href))) {
+			state.stops++;
+			return true;
+		}
 		const replace = anchor.hasAttribute(config.replaceAttribute);
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
+		const stops = state.stops;
 		const swap = (entry: FragmentEntryModule) =>
-			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset');
+			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset', stops);
 		if (loaded) void swap(loaded);
 		else load().then(swap, () => location.assign(url.href));
 		return true;
@@ -812,6 +818,7 @@ export function runFragmentNavigation(
 	d.addEventListener('click', follow(false));
 	rescan();
 	const traverse = (event: PopStateEvent) => {
+		state.stops++;
 		const url = new URL(location.href);
 		if (url.hash.startsWith('#/') || pageKey(url) === state.shown) return;
 		const saved = (
