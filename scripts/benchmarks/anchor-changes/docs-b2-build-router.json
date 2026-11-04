@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 8,
+			"reason": "the Building an app and Router docs pages swap their preview cards for live <Code> blocks, so the bundler re-splits shared docs chunks: 18 of the 53 files the accordion page downloads at load get new content-hash names and the same count, executed chars at load fall 22864 to 22725, and only the downloaded total moves (+8 B gzip); measured on PR run 41884134872 against main's run 41879749389",
+			"date": "2026-11-04"
+		}
+	]
+}

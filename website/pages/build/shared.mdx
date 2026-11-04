@@ -13,7 +13,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <Subtitle text="shared() gives state a name. Every component that calls the name gets the same value, with no props in between." />
 
-<Code steps={[{ label: 'Press Add to cart. The click runs in Shop, and the badge in CartBadge changes.', shows: 'Bags in the cart: 1' }, { label: 'Add a `removeBag()` method that runs `box.bags--`, and a button in `Shop` that calls it.', source: 'box.bags--' }]}>
+<Code steps={[{ label: 'Press Add to cart. The click runs in Shop, and the badge in CartBadge changes.', shows: 'Bags in the cart: 1' }, { label: 'Add a `remove()` method that runs `box.bags--`, and a button in `Shop` that calls it.', source: 'box.bags--' }]}>
 ```tsrx title="cart.tsrx"
 import { shared, state } from '@markless/core';
 
@@ -22,7 +22,7 @@ export const cart = shared(
 		const box = state({ bags: 0 });
 		return {
 			...box,
-			addBag() {
+			add() {
 				box.bags++;
 			},
 		};
@@ -41,7 +41,7 @@ export default function Shop() @{
 
 	<section>
 		<CartBadge />
-		<button onClick={() => c.addBag()}>
+		<button onClick={() => c.add()}>
 			Add to cart
 		</button>
 	</section>
@@ -51,7 +51,7 @@ export default function Shop() @{
 
 No prop connects `Shop` and `CartBadge`. Both call `cart()`, and both get the same `bags`.
 
-The function you pass to `shared()` makes the state. It returns that state plus any methods you want, like `addBag()`.
+The function you pass to `shared()` makes the state. It returns that state plus any methods you want, like `add()`.
 
 ## Pick who shares one copy
 
@@ -135,6 +135,6 @@ The value must also have the same shape in both: the same field names and types.
 Not yet:
 
 - Two components in one file calling a definition with no scope get the warning `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`. Write `{ scope: 'widget' }` for a copy per widget, or `{ scope: 'page' }` to say you meant to share.
-- Keep the definition and the components that call its methods in one file. From another file, `c.addBag()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`; change the field instead, `c.bags++`.
+- Keep the definition and the components that call its methods in one file. From another file, `c.add()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`; change the field instead, `c.bags++`.
 
 Use `state()` when one component owns a value, and `shared()` when several need it. Next, [turn files into pages](/router/pages).
