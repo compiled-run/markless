@@ -50,7 +50,7 @@ let parser: ParseModule | undefined;
  * is reached through the package that owns it — the same route
  * `packages/headless/components/api-extract/analyzer.ts` takes.
  */
-async function houseParser(): Promise<ParseModule> {
+export async function houseParser(): Promise<ParseModule> {
 	if (parser) return parser;
 	const fromHere = createRequire(import.meta.url);
 	const compiler = createRequire(fromHere.resolve('@markless/core')).resolve(
@@ -1776,14 +1776,20 @@ ${presetTable(controls, presets)}
 export default function ${componentName(demo.family, demo.stem)}() @{
 ${cells.join('\n')}
 ${prelude === '' ? '' : `\n${prelude}\n`}
-	<section class="pg" data-family="${demo.family}">${band}${log}
+	<section class="pg" data-family="${demo.family}">
+		<header class="pg-head">
+			<span class="pg-title">Playground</span>
+${scenarioBar(emit, presets)}
+		</header>
 		<div class="pg-stage">
 			${stageMarkup(demo, emit)}
 		</div>
-
+${log}
 		<div class="pg-code">
-${codePanelChrome({ scenario: `${demo.family}/${demo.stem}`, panes, bar: scenarioBar(emit, presets), indent: '\t\t\t' })}
-		</div>
+${codePanelChrome({ scenario: `${demo.family}/${demo.stem}`, panes, indent: '\t\t\t' })}
+		</div>${band === '' ? '' : `
+		<div class="pg-try">
+			<span class="pg-try-title">Change a prop</span>${band}		</div>`}
 ${docsMarkup('\t\t')}
 
 		<style>

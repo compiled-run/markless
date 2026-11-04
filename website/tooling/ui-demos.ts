@@ -27,11 +27,14 @@ import {
 	playgroundModule,
 } from './ui-playground.ts';
 import { metaFor } from '../components/docs/ui-meta/index.ts';
+import { parts as partFacts } from '../components/docs/ui-parts/parts.data.ts';
+import { partsFigureModule, partsFigureName } from './ui-parts-figure.ts';
 
 const PREFIX = 'ui-demos:';
 const VIRTUAL = '\0ui-demos:';
 const DEMOS_DIR = 'components/demos/ui';
 const FAMILY = /^[a-z][a-z0-9-]*$/;
+const GENERATED_PARTS = 'components/docs/playground/generated';
 
 /** `basic` -> `Basic`, `until-found` -> `UntilFound`. */
 function exportName(stem: string): string {
@@ -290,7 +293,23 @@ async function injectScenarioTags(
 		watch(demo.file);
 		let file: string;
 		let local: string;
-		if (tag === 'Playground') {
+		if (tag === 'PartsFigure') {
+			file = join(root, GENERATED_PARTS, `parts__${family}__${stem}.tsrx`);
+			local = partsFigureName(family, stem);
+			const facts = partFacts[family];
+			if (!facts) throw new Error(`ui-demos: components/docs/ui-parts/parts.data.ts has no '${family}'. Refresh it with tooling/ui-parts.test.ts -u.`);
+			writeGenerated(
+				file,
+				await partsFigureModule({
+					family,
+					stem,
+					file: demo.file,
+					facts,
+					inkScreen: specifierFrom(file, join(root, 'components/figures/ink/ink-screen.tsrx')),
+					inkArt: specifierFrom(file, join(root, 'components/figures/ink/screen.art.ts')),
+				}),
+			);
+		} else if (tag === 'Playground') {
 			file = generatedPath(root, family, stem);
 			local = componentName(family, stem);
 			writeGenerated(file, await playgroundSource(root, family, stem, watch));

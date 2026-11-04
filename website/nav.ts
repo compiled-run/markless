@@ -531,6 +531,8 @@ export const concepts: Readonly<Record<string, NavEntry>> = {
 	routes: { title: 'routes are files', href: '/router/pages' },
 	links: { title: 'links', href: '/router/links' },
 	data: { title: 'page data', href: '/router/data' },
+	ui: { title: 'UI families', href: '/ui' },
+	'ui-styling': { title: 'styling parts', href: '/ui/styling' },
 };
 
 export type AssumesItem = {
