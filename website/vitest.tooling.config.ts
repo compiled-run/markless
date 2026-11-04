@@ -9,6 +9,7 @@ export default {
 			'components/docs/code/worker-sources.test.ts',
 			'components/docs/navbar/*.test.ts',
 			'components/docs/search/*.test.ts',
+			'components/docs/ink-card/*.test.ts',
 		],
 	},
 };

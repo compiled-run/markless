@@ -2391,7 +2391,7 @@ try {
 			'the command box shows the preset variable',
 		);
 
-		// --- preview cards on the home, start, tooling, contributing and UI pages ----
+		// --- preview cards on the home, start and UI pages ----
 		// Each card is driven the way its page tells the reader to drive it.
 		const card = (name: string) => page.locator(`section[data-preview="${name}"]`);
 		const watchOf = (name: string) => card(name).locator('.pv-watch-text');
@@ -2419,87 +2419,6 @@ try {
 			'renaming the button ticks the first step and only that one',
 			JSON.stringify(await doneSteps()),
 		);
-
-		await page.goto(`${origin}/tooling/editor-setup`, { waitUntil: 'load' });
-		const editorCard = card('editor');
-		check(
-			!(await editorCard.locator('.problem').isVisible()),
-			'with the plugin off there is no error under the code',
-		);
-		await editorCard.getByRole('switch').nth(1).click();
-		await editorCard.locator('.problem').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-		check(
-			await editorCard.locator('.problem').isVisible(),
-			'turning the plugin on shows the onClik error',
-		);
-		await editorCard.getByRole('switch').first().click();
-		await settleInner(
-			watchOf('editor'),
-			(text) => text.startsWith('Colours from the extension'),
-			'with both on, the card says which piece made what',
-		);
-
-		await page.goto(`${origin}/tooling/testing`, { waitUntil: 'load' });
-		const testCard = card('test-paths');
-		await testCard.getByRole('button', { name: 'Next', exact: true }).click();
-		await settleInner(
-			watchOf('test-paths'),
-			(text) => text.startsWith('The test clicks the button'),
-			'Next steps the test to its click',
-		);
-		check(
-			(await testCard.locator('.count-button').innerText()) === 'Count 1',
-			'after the click step the counter reads Count 1',
-		);
-		await testCard.getByRole('radio', { name: 'renderSSR' }).check();
-		await settleInner(
-			watchOf('test-paths'),
-			(text) => text.startsWith('The test server renders Counter to HTML'),
-			'renderSSR changes only the first step',
-		);
-
-		await page.goto(`${origin}/tooling/type-checking`, { waitUntil: 'load' });
-		const typeCard = card('typecheck');
-		await typeCard.getByRole('button', { name: 'Check', exact: true }).click();
-		await typeCard.locator('.error').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-		check(
-			(await typeCard.locator('.error').innerText()).includes('TS2322'),
-			'Check puts the TS2322 error under line 4 of App.tsrx',
-		);
-		await typeCard.getByRole('radio', { name: '"Home"' }).check();
-		await typeCard.getByRole('button', { name: 'Check', exact: true }).click();
-		await settleInner(
-			watchOf('typecheck'),
-			(text) => text.startsWith('No errors'),
-			'a string label checks clean',
-		);
-
-		await page.goto(`${origin}/contributing`, { waitUntil: 'load' });
-		await card('repo-map').getByRole('button', { name: 'web', exact: true }).click();
-		await settleInner(
-			watchOf('repo-map'),
-			(text) => text.startsWith('@markless/web') && text.includes('Imported by: bundler, core, router, vitest-browser'),
-			'picking web names its job and the packages that import it',
-		);
-
-		await page.goto(`${origin}/contributing/ci`, { waitUntil: 'load' });
-		await card('ci-modes').getByRole('radio', { name: '--full' }).check();
-		await settleInner(
-			card('ci-modes').locator('.job.full .state'),
-			(text) => text === 'Runs',
-			'--full moves the eight full jobs to Runs',
-		);
-
-		await page.goto(`${origin}/contributing/improve-the-docs`, { waitUntil: 'load' });
-		const typoCard = card('typo-count');
-		check((await typoCard.locator('.part:visible').count()) === 0, 'part names start hidden');
-		await typoCard.getByRole('switch').click();
-		await settleInner(
-			typoCard.locator('.pg-controls'),
-			(text) => text.includes('<Controls>'),
-			'Part names labels each band with the part that draws it',
-		);
-		check((await typoCard.locator('.part:visible').count()) === 4, 'all four part names show');
 
 		await page.goto(`${origin}/ui`, { waitUntil: 'load' });
 		const addressCard = card('edit-address');

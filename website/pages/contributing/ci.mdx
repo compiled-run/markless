@@ -1,5 +1,5 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import CiModes from '../../components/demos/contributing/ci-modes.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -12,88 +12,83 @@ import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <PageMeta time="4 min" assumes="nothing" />
 
-Last page, you ran `pnpm ci:local --fast` before you pushed. So what does that command run?
+<Subtitle text="pnpm ci:local reads .github/workflows/ci.yml each time it runs, so your machine runs the same commands CI does." />
 
-`scripts/ci/local.mjs` reads `.github/workflows/ci.yml` each time it runs. It runs each job's own `run:` steps, so your machine and CI run the same commands.
+```bash
+pnpm ci:local --fast
+```
 
-Pick a mode and see which jobs run.
-
-<CiModes />
-
-`--full` adds eight jobs to the three fast ones. The two benchmark jobs never run on your machine.
+That runs the four fast jobs. The pre-commit hook runs them too. Everything heavier runs on GitHub, where the pull request's green run is the proof.
 
 ## How it sorts the steps
 
+`scripts/ci/local.mjs` reads every job's steps and puts each one in a group:
+
 - **check**: a `run:` step that tests something. It runs.
 - **setup**: `pnpm install`, `corepack enable` and the Playwright installs. They run only with `--install`.
-- **skip**: `uses:` actions, lane cache markers, and steps that read GitHub context. These are CI plumbing.
+- **skip**: `uses:` actions, lane cache markers, and steps that read GitHub's own context. That's CI plumbing.
 
-The script owns one small table that puts each job in a mode. A new job with check steps but no entry makes the script exit with an error that names the job.
+The script keeps one small table that puts each job in a mode. A new job with check steps but no entry makes it stop with an error naming the job.
 
 ## The jobs
 
-- `agent-files` (fast): `pnpm dlx @intellectronica/ruler@0.3.44 apply`, then fails on drift.
-- `typecheck` (fast): `node scripts/ci/check-workflow.mjs .github/workflows/ci.yml`, `pnpm typecheck`, `pnpm exec vp check --no-fmt`.
-- `typecheck-ts7` (fast): `pnpm typecheck:ts7`. The same type check on TypeScript 7.1, over the root `tsconfig.json` and `website/`. It runs next to `typecheck` until TypeScript 7.1 is stable and the two checks have agreed for a while. See [How TypeScript checks a `.tsrx` file](/tooling/type-checking).
-- `unit` (fast): `pnpm exec vp test --project node`.
-- `browser` (full): `pnpm exec vp test --project browser`, `pnpm exec vp test --project ui`.
-- `completion-matrix` (full): `pnpm --dir packages/typescript-plugin test:completion-matrix`.
-- `boxes-bundler` (full): `pnpm --dir packages/bundler test:boxes`.
-- `boxes-router` (full): `pnpm --dir packages/router test:boxes`.
-- `boxes-music-player` (full): `test:analyzer` and `test:boxes` in `demos/music-player`.
-- `boxes-music-player-ssr` (full): `test:analyzer` and `test:boxes` in `demos/music-player-ssr`.
-- `test` (full): the gate, then the analyzer receipt set with `pnpm receipts:generate` and `pnpm receipts:check`.
-- `package-manager-matrix` (full): `pnpm exec vp test run packages/cli/test/workspace-matrix.test.ts --project node`.
-- `benchmark`, `benchmark-guard` (CI only): JS Framework Benchmark runs against a baseline, then a compare.
+| Job | Mode | What it runs |
+| --- | --- | --- |
+| `agent-files` | fast | `ruler apply`, then fails if the agent files changed |
+| `typecheck` | fast | `check-workflow.mjs` on `ci.yml`, `pnpm typecheck`, `pnpm exec vp check --no-fmt` |
+| `typecheck-ts7` | fast | `pnpm typecheck:ts7`: the same check on TypeScript 7.1 |
+| `unit` | fast | `pnpm exec vp test --project node` |
+| `browser` | full | the `browser` and `ui` test projects, and the `@markless/ui` API manifest check |
+| `completion-matrix` | full | the packaged editor plugin's completions |
+| `boxes-bundler`, `boxes-router` | full | each package's `test:boxes` |
+| `boxes-music-player`, `boxes-music-player-ssr` | full | each demo's `test:analyzer` and `test:boxes` |
+| `website-boxes` | full | this site's tooling tests and `test:boxes` |
+| `demo-boxes` | full | the `live-feed`, `same-module-branch` and `executed-at-load` demos |
+| `perf-guards` | full | `pnpm perf:guard`: page weight and interaction budgets |
+| `build-scale`, `build-warnings` | full | build budgets at two app sizes; no new build warnings |
+| `package-manager-matrix` | full | the CLI's workspace detection under npm, pnpm, Yarn and Bun |
+| `test` | full | the gate: fails unless every lane passed or hit its cache, then checks the analyzer receipts |
+| `benchmark`, `benchmark-guard` | CI only | js-framework-benchmark against the base commit, then a compare |
 
-`lanes`, `prepare-playwright`, `save-lane-markers` and `changes` route work and have no checks. `test` is the gate. It fails unless every test lane passed or hit its cache, then checks the receipt set.
+`lanes`, `prepare-playwright`, `carry-queue-markers`, `save-lane-markers` and `changes` only route work. The required checks are `test`, `typecheck` and `agent-files`.
 
 ## Run it at home
 
 ```bash
 pnpm ci:local --list                            # every job and step, and its mode
-pnpm ci:local --fast                            # agent-files, typecheck, typecheck-ts7, unit (the default)
-pnpm ci:local --full                            # every job this machine can run
+pnpm ci:local --fast                            # the four fast jobs (the default)
 pnpm ci:local --job browser --job boxes-router  # only these jobs
 pnpm ci:local --fast --clean                    # in a throwaway worktree of HEAD
-pnpm ci:local --linux                           # each job in its own Linux container
 pnpm ci:local --dry-run                         # print the commands, run nothing
 ```
 
-`--list` only prints. It runs nothing.
-
-`--clean` uses the committed tree, so an untracked file cannot make a check pass.
-
-`--linux` also uses the committed tree. It starts one `node:24-bookworm` container per job, and each container installs only that job's own setup. It needs `docker` or a compatible command line. Without one, the script exits with code 2. `docs/ci-process.md` says nobody has run this path yet, so treat it as untested.
-
-<Callout
-	sprite="cross"
-	title="Why did CI fail when my local run passed?"
-	text="Your machine has browsers and files that the runner does not have. docs/ci-process.md records one unit run that passed on a Mac and failed on CI, because that job installed no browsers. --clean catches untracked files, not tools your machine already has. --linux catches both, but it needs docker. Without docker, open a PR and let CI run."
-/>
+- `--list` only prints.
+- `--clean` uses the committed tree, so an untracked file can't make a check pass.
+- `--full` runs every job this machine can run. Use it to debug, not as proof.
+- `--linux` runs each job in its own `node:24-bookworm` container. It needs `docker`, and without it the script exits with code 2. `docs/ci-process.md` says this path hasn't been run yet.
 
 ## Two more workflows
 
-- `screen-reader.yml` runs for changes under `packages/headless/`. It has a `virtual` lane, an `nvda` lane on Windows and a `voiceover` lane on macOS.
-- `release.yml` runs only by hand. It has a `dry-run` mode and a `publish` mode, and it never bumps versions.
+- `screen-reader.yml` runs a `virtual` lane on pull requests that change `packages/headless/`, `runtime`, `web` or the compiler's markup passes. Its `nvda` (Windows) and `voiceover` (macOS) lanes run nightly or by hand.
+- `release.yml` runs only by hand. `cut` bumps the next minor version and ships it end to end, and `cut-dry-run` rehearses that. `publish` publishes a version that's already committed, and `dry-run` rehearses that.
 
 ## Never weaken a check
 
 When a check fails, sort the failure first: environment drift, your regression, an older failure, or a flaky test. Then fix the cause.
 
-- Do not skip, delete or loosen a test to make it pass.
-- Do not add retries to Vitest, Playwright or the workflow.
+- Don't skip, delete or loosen a test to make it pass.
+- Don't add retries to Vitest, Playwright or the workflow.
 - Raise a timeout only with a measured reason.
-- Change a perf guard anchor only with `pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"`. The command fails without `--reason`.
+- Move a perf guard's anchor only with `pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"`. It fails without `--reason`.
 
 <MugSpot mood="angry" />
 
 <Callout
-	sprite="thought-bubble"
-	title="Can I rerun a red CI run?"
-	text="Yes, once, by hand. Write a note in the PR that names the test and says why you think it is noise."
+	sprite="cross"
+	title="Why did CI fail when my local run passed?"
+	text="Your machine has browsers and files the runner doesn't. --clean catches untracked files, not tools you already have installed. Open the pull request and let CI run. You may rerun a red run once, by hand, with a note naming the test and why you think it's noise."
 />
 
-A flaky test fails and passes on the same code. Fix its cause, such as a fixed port or a fixed poll window. If you cannot fix it now, `docs/ci-process.md` describes a quarantine with an owner and an expiry date.
+A flaky test fails and passes on the same code. Fix its cause, like a fixed port or a fixed poll window. If you can't fix it now, `docs/ci-process.md` describes a quarantine with an owner and an expiry date.
 
-Next: [specs, rules and skills](/contributing/specs-and-rules).
+[Specs and rules](/contributing/specs-and-rules) covers what the code must do in the first place.
