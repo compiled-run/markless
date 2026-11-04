@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import ResumeAnatomy from '../../components/figures/resuming/resume-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -10,49 +11,29 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="4 min" assumes="state, events" />
 
-<Subtitle text="Your components never run a second time in the browser. The page carries on from what was already built, and code loads only when someone uses it." />
+<Subtitle text="A server-rendered page arrives already wired, so the first press runs without your components running again." />
 
-The [cart](/how-it-works/compiler) is on the screen, and no click code has run yet. Who hears the first press of **Add to cart** depends on where the page came from:
+<ResumeAnatomy />
+
+Press **Add to cart** on the drawing. The wires come from the server's view record and were there before any code ran. The press runs down them, and only the cart line changes.
+
+## Three ways in
 
 | | Browser, direct module | Browser, general path | Server-rendered page |
 | --- | --- | --- | --- |
-| Who builds the elements? | The compiled module, once | Markless, from the compiled output, once | The server |
-| Who listens? | A listener on each element with an event | One listener per event name, on the container | The inline resumer, one listener per event name, on the container |
-| What starts on the first click? | That click's symbol | That click's symbols, the state graph and the full runtime | The resume module, then only what it needs |
-| Inline script in the HTML? | No | No | Yes, if the page can react |
+| Who builds the elements? | The compiled module | Markless, from the compiled output | The server |
+| Who listens? | Each element with an event | The container, one listener per event name | The inline resumer, on the container |
+| What starts on the first click? | That click's symbol | Its symbols, the state graph and the full runtime | The resume module, then only what it needs |
 
-On every path, the click runs the handler and updates the text that reads `bags`. The component itself does not run again.
+## On a server-rendered page
 
-## The direct module
+- Each element with a handler carries an `m:on` attribute. The inline resumer reads it off the pressed element and imports no app code until then.
+- The press loads the page's *resume module*. If the compiler replaced the page's event and text-update records with specialized code, as for the cart, the full runtime never starts.
+- A press during loading is replayed in order. A pointer or focus landing on a handler imports the module early, once.
 
-This is the cart's path when you call `render()` in a browser. At mount, the [direct module](/how-it-works/compiler):
+## In the browser alone
 
-1. clones the elements from a template and fills in `In your cart: 0 bags`
-2. puts `state:bags` in a small `Map`
-3. adds a click listener to the button itself
-
-On the first click, the listener loads `symbol:0` by ID and keeps it. The symbol runs `bags++` against the `Map`. Then the module reads each text slot again and writes only the ones whose value changed. The full runtime never starts.
-
-## The general path
-
-A component with props, child components, a scoped `<style>` or a `computed()` still renders with the same `render()`, on this path. At mount, Markless builds the elements and keeps the same state and view records a server would write, in memory. Then it adds one capture-phase listener per event name to the container. This is *event delegation*: one listener on an ancestor handles events from everything inside it.
-
-On a press, the listener walks up from the pressed element to a record for that event. Then Markless builds the state graph, starts the full runtime and loads the record's symbols. A pointer moving onto a press handler, or focus on a key or input handler, fetches its symbols early, without running them.
-
-## A server-rendered page
-
-Here the server ran the component, and the browser never runs it. When a server renders the page, its HTML arrives already wired: the [payload](/how-it-works/payload) holds the records, and each element with a handler carries an `m:on` attribute.
-
-At load, the inline resumer adds one capture-phase listener per event name to the container, and imports no app code. On a press, it walks up to the first `m:on` that names the event. Then it imports the page's *resume module*, which the bundler writes from your component file. The module runs events in the order they fired, in one of two ways:
-
-- If the compiler replaced every event and text-update record with specialized code, it runs that code, and the full runtime never starts. The cart takes this way.
-- Otherwise it loads the full runtime and builds the state graph from the `markless/state` script.
-
-What else the resumer does:
-
-- A press during loading is not lost. A small script before the container records it, and the resumer replays it in order.
-- A pointer crossing onto a press handler, or focus on a key or input handler, imports the resume module before the press lands, once.
-- After load, when the browser is idle, it counts the container's elements against `data-markless-paths`, so a node another script added can't shift what each locator finds.
-- An `onVisible` handler gets an `IntersectionObserver` instead of a listener. That code ships only on pages that use `onVisible`.
+- The [direct module](/how-it-works/compiler) puts a listener on the button and keeps state in a `Map`. After the handler, it rewrites only the text that changed.
+- The general path, for props, child components, a scoped `<style>` or a `computed()`, listens on the container and starts the full runtime on the first matching event.
 
 [The state graph](/how-it-works/state-graph) shows how one write finds the text that reads it.
