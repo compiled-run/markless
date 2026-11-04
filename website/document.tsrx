@@ -7,6 +7,9 @@ import Pager from './components/docs/pager.tsrx';
 import SiteHeader from './components/docs/site-header.tsrx';
 import stylesheet from './styles/global.css?url';
 import brandStylesheet from './styles/brand.css?url';
+import joyEliaRegular from './styles/fonts/JoyElia-Regular.woff2?url';
+import joyEliaBold from './styles/fonts/JoyElia-Bold.woff2?url';
+import shantellSans from './styles/fonts/ShantellSans-latin-variable.woff2?url';
 
 export default function Document({
 	url,
@@ -39,6 +42,9 @@ export default function Document({
 			<meta name="twitter:card" content="summary" />
 			<link rel="icon" href={asset('favicon-mug.svg')} type="image/svg+xml" />
 			<link rel="apple-touch-icon" href={asset('markless-mug-icon.png')} />
+			<link rel="preload" href={joyEliaRegular} as="font" type="font/woff2" crossorigin="anonymous" />
+			<link rel="preload" href={joyEliaBold} as="font" type="font/woff2" crossorigin="anonymous" />
+			<link rel="preload" href={shantellSans} as="font" type="font/woff2" crossorigin="anonymous" />
 			<link rel="stylesheet" href={stylesheet} />
 			<link rel="stylesheet" href={brandStylesheet} />
 			<script src={asset('theme.js')}></script>
