@@ -141,8 +141,15 @@ function importedHandlerProps(
 function propBindings(component: AnyNode, semantic: ModuleSemantics): ReadonlyMap<number, string> {
 	const bindings = new Map<number, string>();
 	const parameter = asNodes(component.params)[0];
-	const bind = (node: AnyNode | undefined, prop: string) => {
+	// A local destructured out of a prop holds part of that prop.
+	const bind = (node: AnyNode | undefined, prop: string): void => {
 		const local = node?.type === 'AssignmentPattern' ? (node.left as AnyNode) : node;
+		if (local?.type === 'ObjectPattern')
+			for (const property of asNodes(local.properties))
+				bind((property.type === 'RestElement' ? property.argument : property.value) as AnyNode, prop);
+		else if (local?.type === 'ArrayPattern')
+			for (const element of asNodes(local.elements)) bind(element, prop);
+		else if (local?.type === 'RestElement') bind(local.argument as AnyNode, prop);
 		const binding = local?.type === 'Identifier' ? semantic.bindingOf(local as never) : null;
 		if (binding) bindings.set(binding.id, prop);
 	};
@@ -168,29 +175,53 @@ function visitMarkup(node: AnyNode | undefined, visit: (element: AnyNode) => voi
 // The function an `on*` attribute runs: written inline, or a local the body declares once.
 function handlerFunction(value: AnyNode, semantic: ModuleSemantics): AnyNode | null {
 	if (isFunction(value)) return value;
-	if (value.type !== 'Identifier') return null;
-	const binding = semantic.bindingOf(value as never);
-	if (!binding || binding.declarations.length !== 1) return null;
-	const declared = binding.declarations[0] as unknown as AnyNode;
-	const parent = semantic.parentOf(declared as never) as unknown as AnyNode | null;
-	if (parent?.type === 'FunctionDeclaration') return parent;
-	const init = parent?.type === 'VariableDeclarator' ? (parent.init as AnyNode | undefined) : undefined;
-	return init && isFunction(init) ? init : null;
+	const binding = value.type === 'Identifier' ? semantic.bindingOf(value as never) : null;
+	const definition = binding ? localDefinition(binding, semantic) : null;
+	return definition && (isFunction(definition) || definition.type === 'FunctionDeclaration')
+		? definition
+		: null;
 }
 
 function capturedProps(
 	handler: AnyNode,
 	props: ReadonlyMap<number, string>,
 	semantic: ModuleSemantics,
+	seen = new Set<AnyNode>(),
 ): Set<string> {
 	const names = new Set<string>();
+	seen.add(handler);
 	for (const capture of semantic.capturesOf(handler as never)) {
 		const prop = props.get(capture.binding.id);
-		if (prop === undefined) continue;
-		for (const reference of capture.references)
-			names.add(prop === EVERY_PROP ? memberRead(reference.node as unknown as AnyNode, semantic) : prop);
+		if (prop !== undefined) {
+			for (const reference of capture.references)
+				names.add(prop === EVERY_PROP ? memberRead(reference.node as unknown as AnyNode, semantic) : prop);
+			continue;
+		}
+		// A body local the handler calls or reads carries the props its own definition reads.
+		const definition = localDefinition(capture.binding, semantic);
+		if (!definition || seen.has(definition)) continue;
+		seen.add(definition);
+		const reads = isFunction(definition) || definition.type === 'FunctionDeclaration'
+			? capturedProps(definition, props, semantic, seen)
+			: propReadsIn(definition, props, semantic);
+		for (const name of reads) names.add(name);
 	}
 	return names;
+}
+
+// The function or initializer a once-declared, never-reassigned local stands for.
+function localDefinition(
+	binding: ModuleSemantics['bindings'][number],
+	semantic: ModuleSemantics,
+): AnyNode | null {
+	if (binding.declarations.length !== 1 || binding.references.some((reference) => reference.isWrite))
+		return null;
+	const declared = binding.declarations[0] as unknown as AnyNode;
+	const parent = semantic.parentOf(declared as never) as unknown as AnyNode | null;
+	if (parent?.type === 'FunctionDeclaration' && parent.id === declared) return parent;
+	return parent?.type === 'VariableDeclarator' && parent.id === declared
+		? ((parent.init as AnyNode | undefined) ?? null)
+		: null;
 }
 
 // The props an expression a parent hands its child reads.

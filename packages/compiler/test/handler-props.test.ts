@@ -152,3 +152,25 @@ test('a row spreading its item into a child whose handlers read a prop lifts its
 	);
 	expect(collections(compiled)).toEqual([expect.stringContaining('templateExpression')]);
 });
+
+test('a local destructured out of a prop is a read of that prop', async () => {
+	const compiled = await compile(`import { state } from '@markless/core';
+export function Pair({ item: { name }, pair: [first] }) @{
+	const seen = state({ text: '' });
+	<button onClick={() => { seen.text = name + first; }}>pick</button>
+}
+`);
+	expect(handlerProps(compiled)).toEqual({ Pair: ['item', 'pair'] });
+});
+
+test('a handler reaching a prop through a body local it calls or reads still reads that prop', async () => {
+	const compiled = await compile(`import { state } from '@markless/core';
+export function Through({ label, tone, size }) @{
+	const seen = state({ text: '' });
+	const loud = label.toUpperCase();
+	function record() { seen.text = loud + tone; }
+	<button onClick={() => record()}>{size}</button>
+}
+`);
+	expect(handlerProps(compiled)).toEqual({ Through: ['label', 'tone'] });
+});
