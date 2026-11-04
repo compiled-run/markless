@@ -3,7 +3,15 @@ import { CODE_PREFETCH_FILE, type CodePrefetchManifest } from '../components/doc
 import { CODE_FRAME_FILE, codeClient, codeFrameHtml, dropSitePreloads } from './code-client.ts';
 
 it('keeps the frame its own preloads and drops the site-wide list the bundler injects', () => {
-	const html = codeFrameHtml('/build/frame.js', ['/build/runtime.js']);
+	const html = codeFrameHtml(
+		'/build/frame.js',
+		{
+			'ShantellSans-latin-variable.woff2': '/assets/shantell-1.woff2',
+			'JoyElia-Regular.woff2': '/assets/joy-2.woff2',
+			'JoyElia-Bold.woff2': '/assets/joy-bold-3.woff2',
+		},
+		['/build/runtime.js'],
+	);
 	const injected = html.replace(
 		'</head>',
 		'<link rel=modulepreload href=/build/a.js crossorigin fetchpriority=high><link rel=modulepreload href=/build/b.js crossorigin></head>',
@@ -14,6 +22,8 @@ it('keeps the frame its own preloads and drops the site-wide list the bundler in
 	expect(kept).not.toContain('/build/a.js');
 	expect(kept).not.toContain('/build/b.js');
 	expect(kept).toContain('<body class="code-stage" data-code-frame>');
+	for (const font of ['/assets/shantell-1.woff2', '/assets/joy-2.woff2', '/assets/joy-bold-3.woff2'])
+		expect(kept).toContain(`url('${font}')`);
 });
 
 it('answers the prefetch list in dev with the entries the dev server serves', async () => {

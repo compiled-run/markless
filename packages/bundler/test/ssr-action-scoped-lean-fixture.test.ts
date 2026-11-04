@@ -8,6 +8,7 @@ import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
 import { dispatchesSettled, trackDispatches } from './helpers/dispatch-settled.ts';
+import { executedByFirstClick } from './helpers/executed-at-load.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -116,6 +117,29 @@ test.each([false, true])(
 			await expect.poll(() => lean.page.locator('[data-shown]').count()).toBe(0);
 			expect(await text(lean.page, '[data-taps]')).toBe('4');
 			expect(lean.errors).toEqual([]);
+
+			// A parenthesized constant write runs no more code on its first click than an increment.
+			const constant = await open();
+			await constant.page.locator('[data-ready]').click();
+			await expect.poll(() => text(constant.page, '[data-status]')).toBe('Status: Ready');
+			await dispatchesSettled(constant.page);
+			expect(await constant.fullRuntime()).toBe(false);
+			expect(await constant.fullStarted()).toBe(false);
+			expect(constant.errors).toEqual([]);
+			const settledOn = (selector: string, value: string) => (page: Page) =>
+				expect.poll(() => text(page, selector)).toBe(value);
+			const url = `http://127.0.0.1:${port}/`;
+			const increment = await executedByFirstClick(
+				url,
+				'[data-tap]',
+				settledOn('[data-taps]', '1'),
+			);
+			const assignment = await executedByFirstClick(
+				url,
+				'[data-ready]',
+				settledOn('[data-status]', 'Status: Ready'),
+			);
+			expect(assignment).toBeLessThanOrEqual(increment);
 
 			// Keyboard activation and focus on the lean control stay lean.
 			const keyboard = await open();
