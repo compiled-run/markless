@@ -1,6 +1,6 @@
 import { Link } from '@markless/core/router';
 import Sidebar from '../sidebar.tsrx';
-import ThemeToggle from '../theme-toggle.tsrx';
+import SiteNavbar from '../navbar/site-navbar.tsrx';
 import BrowserFrame from '../browser-frame.tsrx';
 import Sprite from '../../sprite.tsrx';
 import { asset } from '../../../site-base.ts';
@@ -23,8 +23,8 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 	const roles = app?.signIn ?? false;
 
 	<div class="app-page">
+		<SiteNavbar pathname="/start/migrate" />
 		<Sidebar pathname="/start/migrate" />
-		<ThemeToggle />
 		@if (view && app) {
 			<>
 				<p class="crumb">

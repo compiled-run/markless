@@ -1,6 +1,6 @@
 import { Link } from '@markless/core/router';
 import Sidebar from '../sidebar.tsrx';
-import ThemeToggle from '../theme-toggle.tsrx';
+import SiteNavbar from '../navbar/site-navbar.tsrx';
 import Sprite from '../../sprite.tsrx';
 import CodeLines from './code-lines.tsrx';
 import Segments from './segments.tsrx';
@@ -38,8 +38,8 @@ export default function ErrorPage({ code }: { readonly code: string }) @{
 		.map((text, index, all) => ({ id: 'w' + index, text: index < all.length - 1 ? text + '_' : text }));
 
 	<div class="error-page">
+		<SiteNavbar pathname="/errors" />
 		<Sidebar pathname="/errors" />
-		<ThemeToggle />
 		@if (entry) {
 			<>
 				<p class="crumb">

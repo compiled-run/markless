@@ -73,10 +73,17 @@
 	--shadow-grow: 0.02em;
 	--shadow-color: transparent;
 
-	/* The sticky header's own height, so the sidebar and the right rail can sit
-	   below it without either one guessing. */
-	--header-height: 3.1rem;
+	/* The navbar's fixed top bar, which the sidebar and the right rail sit below.
+	   A wide screen floats the navbar over the prose instead, so the rails start
+	   at the top and only the prose leaves room for it. */
+	--header-height: 4rem;
+	--navbar-clear: var(--header-height);
 	--theme-toggle-size: 1.9rem;
+
+	@media (min-width: 80rem) and (min-height: 37.5rem) {
+		--header-height: 0rem;
+		--navbar-clear: 6.5rem;
+	}
 
 	/* The hover card every tooltip on the site draws: defined terms, code hovers, playground hints. */
 	--tip-border: 1.5px solid var(--ink);
@@ -284,31 +291,11 @@ body::after,
 	opacity: var(--grain-speck-opacity);
 }
 
-/* A phone has room for the mug, the page's own name and the two controls that
-   are not text; the section step of the trail and the search field are what get
-   dropped, in that order, before anything can push the document sideways. */
-
 .ico {
 	width: 1em;
 	height: 1em;
 	color: currentColor;
 	flex: none;
-}
-
-.theme-toggle {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	inline-size: var(--theme-toggle-size);
-	block-size: var(--theme-toggle-size);
-	padding: 0;
-	font-size: 1em;
-	line-height: 1;
-	color: var(--ink);
-	background: none;
-	border: 0;
-	border-radius: 999px;
-	cursor: pointer;
 }
 
 /* The outline markup is emitted by tooling/highlight-mdx.ts. */
@@ -388,7 +375,7 @@ markless-outline { display: contents; }
 .on-this-page-link[aria-current='location']::before { width: 1.5rem; opacity: 1; }
 .on-this-page-link:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 
-.prose :is(h2, h3)[id] { scroll-margin-top: calc(var(--header-height) + var(--space-s)); }
+.prose :is(h2, h3)[id] { scroll-margin-top: calc(var(--navbar-clear) + var(--space-s)); }
 
 /* The rail is always open beside the article; the fold only collapses on narrower screens. */
 @media (min-width: 70.01rem) {
