@@ -1,4 +1,3 @@
-// A margin note on a paper card: the border wobbles through an SVG displacement filter, so the ink holds at any size.
 import type { Children } from '@markless/core';
 
 export default function Collapsible({
@@ -15,28 +14,8 @@ export default function Collapsible({
 	readonly children?: Children;
 }) @{
 	const mark = sprite === 'star-badge' ? 'star-badge' : 'thought-bubble';
-	const wobble = 'collapsible-wobble-' + summary.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-	// The intrinsic SVG types do not list filter-primitive attributes yet, so they ride in through spreads.
-	const turbulence = { type: 'fractalNoise', baseFrequency: '0.035', numOctaves: '2', seed: '7' };
-	const displacement = { in: 'SourceGraphic', scale: '3.2' };
 
-	<div class="collapsible">
-		<svg class="collapsible-card" aria-hidden="true">
-			<filter id={wobble} x="-2%" y="-10%" width="104%" height="120%">
-				<feTurbulence {...turbulence} />
-				<feDisplacementMap {...displacement} />
-			</filter>
-			<g style={'filter:url(#' + wobble + ')'}>
-				<rect class="collapsible-shadow" x="5" y="5" width="100%" height="100%" rx="9" />
-				<rect class="collapsible-paper" x="1" y="1" width="100%" height="100%" rx="9" />
-				<rect class="collapsible-trace" x="0" y="2" width="100%" height="100%" rx="11" />
-			</g>
-		</svg>
-		<svg class="collapsible-fold" viewBox="0 0 30 30" aria-hidden="true">
-			<path class="collapsible-cut" d="M-0.1 -2H33V30.6Z" />
-			<path class="collapsible-flap" d="M2.2 0.3C1.4 7.6 2.6 15.4 2.9 21.5C10.4 22.3 17.2 21.9 24.4 22.1Z" />
-			<path class="collapsible-crease" d="M2.2 0.3C9.3 7.1 16.8 15 24.4 22.1M2.4 1.2C1.6 8.4 2.7 15.6 3 21.4C10.3 22.2 17 21.8 24 22" />
-		</svg>
+	<div class="collapsible ink-card">
 		<details class="collapsible-note">
 			<summary class="collapsible-summary">
 				<svg class="collapsible-arrow" viewBox="0 0 24 24" aria-hidden="true">
@@ -68,63 +47,7 @@ export default function Collapsible({
 		</details>
 		<style>
 			.collapsible {
-				position: relative;
-				isolation: isolate;
-				margin-block: var(--space-m);
-				margin-inline-end: 6px;
-			}
-
-			.collapsible-card {
-				position: absolute;
-				inset: 0 2px 2px 0;
-				z-index: -1;
-				width: calc(100% - 2px);
-				height: calc(100% - 2px);
-				overflow: visible;
-			}
-
-			.collapsible-shadow {
-				fill: color-mix(in srgb, var(--pink) 45%, var(--paper));
-			}
-
-			.collapsible-paper {
-				fill: var(--raised);
-				stroke: var(--ink);
-				stroke-width: 1.6;
-			}
-
-			.collapsible-trace {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 0.7;
-				opacity: 0.45;
-			}
-
-			.collapsible-fold {
-				position: absolute;
-				top: 0;
-				right: -6px;
-				z-index: -1;
-				width: 30px;
-				height: 30px;
-				overflow: visible;
-				pointer-events: none;
-			}
-
-			.collapsible-cut {
-				fill: var(--paper);
-			}
-
-			.collapsible-flap {
-				fill: color-mix(in oklch, var(--raised) 82%, var(--ink));
-			}
-
-			.collapsible-crease {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 1.3;
-				stroke-linecap: round;
-				stroke-linejoin: round;
+				padding: 0;
 			}
 
 			.collapsible-summary {
@@ -165,7 +88,7 @@ export default function Collapsible({
 				width: 1.1em;
 				height: 1.1em;
 				stroke-width: 2.2;
-				transition: transform 220ms cubic-bezier(0.3, 1.4, 0.5, 1);
+				transition: transform var(--spring-hover-ms) var(--spring-hover);
 			}
 
 			.collapsible-mark {
@@ -191,22 +114,30 @@ export default function Collapsible({
 				transform: rotate(90deg);
 			}
 
+			/* The rows grow from 0fr, which every engine interpolates. Hidden by visibility, not the UA's content-visibility, which WebKit drops at once on close. */
 			.collapsible-note {
-				interpolate-size: allow-keywords;
+				display: grid;
+				grid-template-rows: auto 0fr;
+				transition: grid-template-rows var(--spring-slide-ms) var(--spring-slide);
+			}
+
+			.collapsible-note[open] {
+				grid-template-rows: auto 1fr;
 			}
 
 			.collapsible-note::details-content {
-				block-size: 0;
+				min-block-size: 0;
 				overflow: clip;
+				content-visibility: visible;
+				visibility: hidden;
 				opacity: 0;
 				transition:
-					block-size 260ms ease,
-					opacity 200ms ease,
-					content-visibility 260ms allow-discrete;
+					visibility var(--spring-slide-ms),
+					opacity var(--spring-slide-ms) ease;
 			}
 
 			.collapsible-note[open]::details-content {
-				block-size: auto;
+				visibility: visible;
 				opacity: 1;
 			}
 
@@ -224,6 +155,7 @@ export default function Collapsible({
 
 			@media (prefers-reduced-motion: reduce) {
 				.collapsible-arrow,
+				.collapsible-note,
 				.collapsible-note::details-content {
 					transition: none;
 				}

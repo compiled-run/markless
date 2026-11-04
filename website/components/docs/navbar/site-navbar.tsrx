@@ -16,12 +16,7 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 		<DocsSearch />
 
 		<style>
-			/* From springs.ts, each spring sampled into a linear() easing over the time it takes to settle; springs.test.ts keeps these in step. */
 			.site-navbar {
-				--spring-slide: linear(0, 0.003 0.8%, 0.01 1.7%, 0.021 2.5%, 0.053 4.2%, 0.096 5.8%, 0.173 8.3%, 0.403 15%, 0.485 17.5%, 0.585 20.8%, 0.673 24.2%, 0.747 27.5%, 0.808 30.8%, 0.857 34.2%, 0.896 37.5%, 0.933 41.7%, 0.958 45.8%, 0.979 50.8%, 0.993 56.7%, 0.999 62.5%, 1.003 70%, 1);
-				--spring-slide-ms: 426ms;
-				--spring-hover: linear(0, 0.008 0.8%, 0.03 1.7%, 0.065 2.5%, 0.111 3.3%, 0.165 4.2%, 0.227 5%, 0.294 5.8%, 0.657 10%, 0.794 11.7%, 0.856 12.5%, 0.915 13.3%, 0.968 14.2%, 1.016 15%, 1.059 15.8%, 1.097 16.7%, 1.129 17.5%, 1.155 18.3%, 1.177 19.2%, 1.193 20%, 1.205 20.8%, 1.212 21.7%, 1.215 23.3%, 1.211 24.2%, 1.195 25.8%, 1.158 28.3%, 1.064 33.3%, 1.011 36.7%, 0.991 38.3%, 0.975 40%, 0.964 41.7%, 0.957 43.3%, 0.954 45.8%, 0.957 48.3%, 0.997 59.2%, 1.009 65.8%, 1.009 70.8%, 0.998 86.7%, 1);
-				--spring-hover-ms: 748ms;
 				position: relative;
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: 1rem;
@@ -255,6 +250,8 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				color: var(--ink);
 				font: inherit;
 				cursor: pointer;
+				user-select: none;
+				-webkit-user-select: none;
 				transition: color 200ms ease;
 			}
 
