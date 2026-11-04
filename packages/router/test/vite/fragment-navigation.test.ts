@@ -2,7 +2,14 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
-import { chromium, webkit, type Browser, type BrowserType, type Page } from '@playwright/test';
+import {
+	chromium,
+	webkit,
+	type Browser,
+	type BrowserType,
+	type Page,
+	type Route,
+} from '@playwright/test';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
@@ -12,6 +19,8 @@ import {
 	fragmentPageUrl,
 	fragmentRequestUrl,
 } from '../../src/vite/fragment-navigation.ts';
+import { isLinkBridgeModulePath } from '../../src/vite/runtime/link-bridge-module.ts';
+import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../src/navigation-timing.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { urlKeyedCache } from '../support/url-keyed-cache.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -376,6 +385,75 @@ for (const [name, browserType] of [
 			await page.locator('[data-tap]').click();
 			await expect.poll(() => text(page, '[data-taps]')).toBe('1');
 			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		// Lands after another document, holds the run half's file, and clicks a link before it arrives.
+		const clickBeforeRunHalf = async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			const errors: string[] = [];
+			const documents: string[] = [];
+			page.on('pageerror', (error) => errors.push(String(error)));
+			page.on('request', (request) => {
+				if (request.resourceType() === 'document') documents.push(request.url());
+			});
+			await page.addInitScript(() => {
+				(window as { requestIdleCallback?: unknown }).requestIdleCallback = () => 0;
+			});
+			const away = productionOrigin + '/away-document';
+			const awayAnswers: Array<() => Promise<void>> = [];
+			let holdAway = false;
+			await page.route(away, (route) => {
+				const answer = () =>
+					route.fulfill({ contentType: 'text/html', body: '<!doctype html><p>away' });
+				if (holdAway) awayAnswers.push(answer);
+				else return answer();
+			});
+			await page.goto(away);
+			await page.goto(productionOrigin + '/');
+			let run: Route | undefined;
+			await page.route(
+				(url) => isLinkBridgeModulePath(url.pathname),
+				(route) => void (run = route),
+			);
+			await page.evaluate(() =>
+				(document.querySelector('[data-nav="other"]') as HTMLElement).click(),
+			);
+			await expect.poll(() => run !== undefined).toBe(true);
+			const holdBack = () => (holdAway = true);
+			return { page, errors, documents, away, awayAnswers, holdBack, run: run! };
+		};
+
+		test('Back to another document while the run half is still loading goes back, and never loads the clicked page', async () => {
+			const { page, errors, documents, away, awayAnswers, holdBack, run } =
+				await clickBeforeRunHalf();
+			const landing = documents.length;
+			// The fallback's deadline never passes here, so only pagehide can decide it.
+			await page.evaluate((deadline) => {
+				const later = window.setTimeout;
+				window.setTimeout = ((callback: () => void, ms?: number) =>
+					ms === deadline ? 0 : later.call(window, callback, ms)) as typeof window.setTimeout;
+			}, MARKLESS_NAV_SETTLE_DEADLINE_MS);
+			const failed = page.waitForEvent('requestfailed', (request) => request === run.request());
+			holdBack();
+			await page.evaluate(() => history.back());
+			await expect.poll(() => awayAnswers.length, { timeout: 10_000 }).toBe(1);
+			// As WebKit does on leaving: the import in flight fails while the document is still shown.
+			void run.abort('aborted').catch(() => {});
+			await failed;
+			await awayAnswers[0]!();
+			await expect.poll(() => page.url()).toBe(away);
+			expect(documents.slice(landing)).toEqual([away]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a run half that fails to load while the page stays loads the clicked page as a document', async () => {
+			const { page, documents, run } = await clickBeforeRunHalf();
+			const landing = documents.length;
+			await run.abort('failed');
+			await landedOn(page, 'other');
+			expect(documents.slice(landing)).toEqual([productionOrigin + '/other']);
 			await page.close();
 		});
 
