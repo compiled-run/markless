@@ -174,3 +174,38 @@ export function Through({ label, tone, size }) @{
 `);
 	expect(handlerProps(compiled)).toEqual({ Through: ['label', 'tone'] });
 });
+
+test('a computed destructuring key counts as reading every prop', async () => {
+	const compiled = await compile(`import { state } from '@markless/core';
+const KEY = 'label';
+export function Keyed({ [KEY]: picked }) @{
+	const seen = state({ text: '' });
+	<button onClick={() => { seen.text = picked; }}>pick</button>
+}
+`);
+	expect(handlerProps(compiled)).toEqual({ Keyed: ['*'] });
+});
+
+test('a prop handed on through a body-local alias still reaches the child it is forwarded to', async () => {
+	const compiled = await compile(`import { state } from '@markless/core';
+function Leaf({ label }) @{
+	const seen = state({ text: '' });
+	<button onClick={() => { seen.text = label; }}>go</button>
+}
+export function Wrapper({ heading }) @{
+	const text = heading;
+	<Leaf label={text} />
+}
+`);
+	expect(handlerProps(compiled)).toEqual({ Leaf: ['label'], Wrapper: ['heading'] });
+});
+
+test('a handler reading state a prop seeded reads the served state, not the prop', async () => {
+	const compiled = await compile(`import { state } from '@markless/core';
+export function Seeded({ value }) @{
+	const day = state({ value });
+	<button onClick={() => { day.value = day.value + '!'; }}>{day.value}</button>
+}
+`);
+	expect(handlerProps(compiled)).toEqual({ Seeded: [] });
+});

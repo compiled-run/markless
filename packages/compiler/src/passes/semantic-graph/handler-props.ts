@@ -15,6 +15,12 @@ import type { WalkState } from './types.ts';
 /** Every prop: a handler that reads the props object whole, or hands it on, reads them all. */
 export const EVERY_PROP = '*';
 
+// A component's prop locals, and the framework names its module imports.
+type PropScope = {
+	readonly bindings: ReadonlyMap<number, string>;
+	readonly framework: WalkState['frameworkApiImports'];
+};
+
 type Forward = {
 	readonly childComponentName: string;
 	readonly importSource?: string;
@@ -40,7 +46,10 @@ export function moduleHandlerProps(state: WalkState): ReadonlyMap<string, Readon
 	for (const statement of asNodes(semantic.ast.body as unknown)) {
 		const component = getComponentFunction(statement);
 		if (!component) continue;
-		const props = propBindings(component.node, semantic);
+		const props: PropScope = {
+			bindings: propBindings(component.node, semantic),
+			framework: state.frameworkApiImports,
+		};
 		const reads = new Set<string>();
 		const passed: Forward[] = [];
 		visitMarkup(component.node.body as AnyNode | undefined, (element) => {
@@ -159,8 +168,11 @@ function propBindings(component: AnyNode, semantic: ModuleSemantics): ReadonlyMa
 	}
 	for (const property of asNodes(parameter.properties)) {
 		if (property.type === 'RestElement') bind(property.argument as AnyNode, EVERY_PROP);
-		else if (property.computed !== true)
-			bind(property.value as AnyNode, getIdentifierName(property.key as AnyNode) ?? EVERY_PROP);
+		else
+			bind(
+				property.value as AnyNode,
+				(property.computed !== true && getIdentifierName(property.key as AnyNode)) || EVERY_PROP,
+			);
 	}
 	return bindings;
 }
@@ -184,29 +196,46 @@ function handlerFunction(value: AnyNode, semantic: ModuleSemantics): AnyNode | n
 
 function capturedProps(
 	handler: AnyNode,
-	props: ReadonlyMap<number, string>,
+	props: PropScope,
 	semantic: ModuleSemantics,
 	seen = new Set<AnyNode>(),
 ): Set<string> {
 	const names = new Set<string>();
 	seen.add(handler);
 	for (const capture of semantic.capturesOf(handler as never)) {
-		const prop = props.get(capture.binding.id);
+		const prop = props.bindings.get(capture.binding.id);
 		if (prop !== undefined) {
 			for (const reference of capture.references)
 				names.add(prop === EVERY_PROP ? memberRead(reference.node as unknown as AnyNode, semantic) : prop);
 			continue;
 		}
-		// A body local the handler calls or reads carries the props its own definition reads.
-		const definition = localDefinition(capture.binding, semantic);
-		if (!definition || seen.has(definition)) continue;
-		seen.add(definition);
-		const reads = isFunction(definition) || definition.type === 'FunctionDeclaration'
-			? capturedProps(definition, props, semantic, seen)
-			: propReadsIn(definition, props, semantic);
-		for (const name of reads) names.add(name);
+		for (const name of definitionReads(capture.binding, props, semantic, seen)) names.add(name);
 	}
 	return names;
+}
+
+// A body local carries the props its own definition reads, whether a handler calls it or a child is handed it.
+function definitionReads(
+	binding: ModuleSemantics['bindings'][number],
+	props: PropScope,
+	semantic: ModuleSemantics,
+	seen: Set<AnyNode>,
+): ReadonlySet<string> {
+	const definition = localDefinition(binding, semantic);
+	if (!definition || seen.has(definition) || graphCreation(definition, props, semantic)) return new Set();
+	seen.add(definition);
+	return isFunction(definition) || definition.type === 'FunctionDeclaration'
+		? capturedProps(definition, props, semantic, seen)
+		: propReadsIn(definition, props, semantic, seen);
+}
+
+// A state(), computed() or other framework call makes a graph node, which the page serves on its own.
+function graphCreation(definition: AnyNode, props: PropScope, semantic: ModuleSemantics): boolean {
+	const callee = definition.type === 'CallExpression' ? (definition.callee as AnyNode) : undefined;
+	const name = callee?.type === 'Identifier' ? getIdentifierName(callee) : null;
+	if (!name || !props.framework.has(name)) return false;
+	const declared = semantic.referenceOf(callee as never)?.binding?.declarations[0];
+	return !!declared && (semantic.parentOf(declared) as unknown as AnyNode | null)?.type === 'ImportSpecifier';
 }
 
 // The function or initializer a once-declared, never-reassigned local stands for.
@@ -227,15 +256,17 @@ function localDefinition(
 // The props an expression a parent hands its child reads.
 function propReadsIn(
 	value: AnyNode,
-	props: ReadonlyMap<number, string>,
+	props: PropScope,
 	semantic: ModuleSemantics,
+	seen = new Set<AnyNode>(),
 ): Set<string> {
 	const names = new Set<string>();
 	const visit = (node: AnyNode): void => {
-		if (node.type === 'Identifier') {
-			const binding = semantic.referenceOf(node as never)?.binding;
-			const prop = binding ? props.get(binding.id) : undefined;
+		const binding = node.type === 'Identifier' ? semantic.referenceOf(node as never)?.binding : null;
+		if (binding) {
+			const prop = props.bindings.get(binding.id);
 			if (prop !== undefined) names.add(prop === EVERY_PROP ? memberRead(node, semantic) : prop);
+			else for (const name of definitionReads(binding, props, semantic, seen)) names.add(name);
 		}
 		for (const child of childNodes(node)) visit(child);
 	};
