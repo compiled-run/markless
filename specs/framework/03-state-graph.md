@@ -824,11 +824,15 @@ inside one `.tsrx` module:
   body resolves a shared instance read the same way; the server render body
   rebuilds the instance from the factory's graph nodes before the derive runs,
   so nothing closes over the factory's own local.
-- **Methods lower to graph writes.** A returned method that takes no parameters
-  is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
-  writes the method body performs. A method that takes parameters is not
-  inlined: binding call-site arguments the graph cannot see is outside this
-  lowering.
+- **Methods lower to graph writes.** A returned method is inlined at its call
+  site, so `onClick={() => s.login()}` becomes the graph writes the method body
+  performs. A method that takes parameters is inlined as an arrow carrying the
+  method's own parameter list, called with the call-site arguments in order, so
+  `s.typed(text, now)` binds both. Any parameter shape works: several
+  parameters, defaults, destructuring, and function-typed parameters. A method
+  whose name is also a collection method (`add`, `delete`, `set`, `push`,
+  `clear`) is still a call to that method, because the factory's returned
+  methods decide it, not the name.
 - **A method body may hold locals and several statements.** Every read in the
   body is rewritten to its graph node, not only the read on the right of an
   assignment, so `toggle() { const next = s.checked !== true; s.checked = next; }`
