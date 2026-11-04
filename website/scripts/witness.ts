@@ -2739,16 +2739,14 @@ try {
 		};
 
 		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
-		const graphStage = page.locator('.code-block [data-code-stage]').first();
-		const graphLines = graphStage.locator('p');
+		const cartSheet = page.locator('.margin-notes .ink-screen').first();
+		const graphLines = cartSheet.locator('p.product, p.line > span');
 		await graphLines.first().waitFor();
-		const graphText = async () => (await graphLines.allTextContents()).join(' | ');
-		check(
-			(await graphText()) === 'House blend · 250 g | In your cart: 2 bags | Total: $28',
-			'the state graph cart serves 2 bags and a $28 total',
-			await graphText(),
-		);
-		await graphStage.getByRole('button', { name: 'Add to cart', exact: true }).click();
+		const graphText = async () =>
+			(await graphLines.allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()).join(' | ');
+		const served = 'House blend · 250 g | In your cart: 2 bags | Total: $28';
+		check((await graphText()) === served, 'the state graph cart serves 2 bags and a $28 total', await graphText());
+		await cartSheet.getByRole('button', { name: 'Add to cart', exact: true }).click();
 		const pressed = 'House blend · 250 g | In your cart: 3 bags | Total: $42';
 		for (let attempt = 0; attempt < 40 && (await graphText()) !== pressed; attempt += 1)
 			await new Promise((done) => setTimeout(done, 100));
@@ -2756,6 +2754,11 @@ try {
 			(await graphText()) === pressed,
 			'one write moves the bags line and the total that reads it, and leaves the product line',
 			await graphText(),
+		);
+		await see(
+			page.locator('.margin-notes .tally').first(),
+			(text) => text.includes('ran once') && text.includes('got 2 setText'),
+			'the state graph notes count one click and two journal entries',
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
 
