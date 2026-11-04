@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import ArmPage from './fixtures/aeh-arm.tsrx';
+import ConstRowsPage from './fixtures/aeh-const-rows.tsrx';
 import RowsPage from './fixtures/aeh-rows.tsrx';
 import StaticPage from './fixtures/aeh-static-page.tsrx';
 import TwoPage from './fixtures/aeh-two-page.tsrx';
@@ -185,4 +186,25 @@ test('SSR resume: the arm member joins and leaves the set after resume', async (
 	await expect.poll(() => container.querySelectorAll('[data-aeh-option]').length).toBe(3);
 	probe(container).click();
 	await expect.poll(() => host.getAttribute('data-order')).toBe('first|middle|last');
+});
+
+// A plain `const` list is not graph state, but the rows it renders are still elements the handle names.
+async function constRowsReadEveryRow(container: HTMLElement) {
+	button(container, 'data-aeh-module-probe').click();
+	await expect
+		.poll(() => page(container, '[data-aeh-module-const]').getAttribute('data-order'))
+		.toBe('oak|pine|elm:3');
+
+	button(container, 'data-aeh-local-probe').click();
+	await expect
+		.poll(() => page(container, '[data-aeh-local-const]').getAttribute('data-order'))
+		.toBe('alpha|beta|gamma');
+}
+
+test('CSR: a handle bound on rows of an @for over a constant array reads every row', async () => {
+	await constRowsReadEveryRow((await render(ConstRowsPage)).container as HTMLElement);
+});
+
+test('SSR resume: a handle bound on rows of an @for over a constant array reads every row', async () => {
+	await constRowsReadEveryRow((await renderSSR(ConstRowsPage)).container as HTMLElement);
 });

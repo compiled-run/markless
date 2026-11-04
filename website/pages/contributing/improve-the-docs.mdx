@@ -1,5 +1,6 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import TypoNotes from '../../components/figures/docs-guide/typo-notes.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import TypoCountDemo from '../../components/demos/contributing/typo-count-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -9,15 +10,9 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Improve the docs
 
-<PageMeta time="7 min" assumes="nothing" />
+<PageMeta time="6 min" assumes="nothing" />
 
-Last page covered the rules for the framework code. This site lives in the same repo, in `website/`, and it has a short list of its own.
-
-The site is a Markless app. The packages it describes build every page you read here. So a framework change and the docs that explain it can land in one PR.
-
-## Run the site
-
-From the repo root, after `pnpm install`:
+<Subtitle text="This site is a Markless app in website/, so a framework change and the page that explains it can land in one pull request." />
 
 ```bash
 pnpm docs:dev       # dev server
@@ -25,163 +20,138 @@ pnpm docs:build     # production build into website/.output/
 pnpm docs:preview   # serve the production build
 ```
 
-To see a page the way readers get it, build the site and serve the output:
-
-```bash
-pnpm docs:build
-PORT=4310 node website/.output/server/index.mjs
-```
+Run these from the repo root, after `pnpm install`. To see a page the way readers get it, build it, then run `PORT=4310 node website/.output/server/index.mjs`.
 
 ## Where things live
 
-- `website/pages/` holds the pages. A file's path is its URL: `pages/concepts/state.mdx` is `/concepts/state`. An `index.mdx` is its folder's own page.
-- `website/nav.ts` is the one list of pages. The sidebar, the pager and the document head all read it. A new page needs an entry there with a title, an `href` and a one-sentence `description`.
-- `website/components/demos/<section>/` holds the live demos, one folder per docs section.
-- `website/components/docs/` holds the page chrome: `Callout`, `Collapsible`, `Subtitle`, the sidebar and the pager.
+- `website/pages/` holds the pages. A file's path is its URL: `pages/concepts/state.mdx` is `/concepts/state`.
+- `website/nav.ts` is the one list of pages. The sidebar, the pager and the document head all read it. A new page needs an entry with a `title`, an `href`, an `icon` and a one-sentence `description`.
+- `website/components/figures/<page>/` holds the drawings and live demos, one folder per figure.
+- `website/components/docs/` holds the page parts: `Code`, `Callout`, `Collapsible`, `Subtitle`, `PageMeta` and the sidebar.
 - `website/styles/global.css` holds the tokens, the type scale and the site-wide rules.
-- `website/AGENTS.md` holds the styling and code panel rules. Read it before you touch a component.
+- `website/AGENTS.md` and `website/README.md` hold the styling and layout rules. Read them before you touch a component.
 
 ## The shape of a page
 
-Each page is an `.mdx` file. The top imports the components it uses. Then come the navbar, the sidebar, one `H1` and the meta line. The prose follows.
+Each page is an `.mdx` file. After its imports, `<SiteNavbar />` and `<Sidebar />`, it opens with these, in order, and nothing else:
 
-```txt
-import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
-import Sidebar from '../../components/docs/sidebar.tsrx';
+1. A `#` title that makes a claim or names a task: "Create an app", not "Overview".
+2. `<PageMeta time assumes />`. `time` comes from the formula in `website/README.md`, so recompute it when you rewrite a page. `assumes` lists keys from the `concepts` map in `nav.ts`.
+3. `<Subtitle text />`: one sentence that states the whole idea.
+4. One small, real example: a code block or a figure.
 
-<SiteNavbar />
-<Sidebar />
+Then come 3 to 6 `##` sections, each one idea, named as an instruction or a claim. Limits go last, as a "Not yet:" list. The page ends with one link to the next step.
 
-# One title per page
+Write for a reader who has never used a UI framework. Use short sentences, "you", and everyday examples like a guest list or an order ticket. Define each term where it first appears.
 
-<PageMeta time="3 min" assumes="state,events" />
+## Pick one visual per idea
 
-Prose, demos and callouts go here.
-```
+| The idea | Use |
+| --- | --- |
+| "Try it and change it" | A `<Code>` block with `steps` |
+| "Press this and watch which spots change" | A textbook column: a live demo with numbered notes beside it |
+| The one thing the page must make the reader believe | An ink figure, drawn with the `markless-anatomy` skill |
+| A command to run | `<Commands kind>` or `<CommandStrip command>` |
+| Read-only code or config | A plain fenced block with a `title` |
+| Facts to look up | A markdown table |
+| A trap the reader will hit | One `<Callout>`, at most one per page |
+| Background for someone who knows another tool | A closed `<Collapsible>` |
 
-`PageMeta` takes two props. `assumes` lists keys from the `concepts` map in `nav.ts`. `time` comes from a formula, not a guess. The ink mark beside the title is the page's `icon` in `nav.ts`, the same one the sidebar shows. `website/README.md` has it, so recompute it when you rewrite a page.
-
-Code fences in `tsrx`, `ts`, `tsx`, `js`, `json`, `css`, `sh`, `bash` and `html` get highlighted at build time. In a `tsrx` fence, readers can point at `state` or `@if` and get a one-sentence explanation.
-
-## Demos and honest code panels
-
-A reader learns faster from code they can poke at. So a concept page shows the real component running, then the file that made it.
-
-Click the button. Then turn on **Part names**.
-
-<TypoCountDemo />
-
-A demo is two files in `components/demos/<section>/`. `typo-count.tsrx` is the component the page shows. `typo-count-demo.tsrx` puts it in a `PreviewCard`, which draws the card. Each band of the card is one part: `Controls`, `Stage`, `Watch` and `Code`. `website/README.md` lists every part and its props, under "Previews". The page imports the wrapper, because a page places each component as its own top-level block.
-
-The code you show must be the smallest honest version of the file. Every line shown must do what it says. You can leave out the demo's own `<style>` block, because the panel teaches the feature, not the cosmetics.
+Most sections need no picture at all. Never put two visuals in a row: say what to do before one, and what to notice after it.
 
 ## Code the reader can edit
 
-When the lesson is "change this and watch", give the reader a `Code` block. Wrap one or more titled fences in `<Code>`. The page needs no import, because the build adds it.
+Wrap one or more titled fences in `<Code>`. The page needs no import, because the build adds it.
 
 ````txt
-<Code note="Change the label, then add a second line that also shows {fixed}.">
-```tsrx title="typo-count.tsrx"
+<Code steps={[{ label: 'Rename the button to `Done`.', shows: 'Done' }, { label: 'Start at `3` instead of `0`.', source: 'state(3)' }]}>
+```tsrx title="tally.tsrx"
 import { state } from '@markless/core';
-import { label } from './label.ts';
 
-export default function TypoCount() @{
+export default function Tally() @{
 	let fixed = state(0);
 
-	<button onClick={() => fixed++}>
-		{label}: {fixed}
-	</button>
+	<button onClick={() => fixed++}>Typos fixed: {fixed}</button>
 }
-```
-
-```ts title="label.ts"
-export const label = 'Typos fixed';
 ```
 </Code>
 ````
 
-Here is that block, live on this page:
+Each step ticks itself once the reader has done it:
 
-<Code note="Change the label, then add a second line that also shows {fixed}.">
-```tsrx title="typo-count.tsrx"
-import { state } from '@markless/core';
-import { label } from './label.ts';
+| Field | The step ticks when |
+| --- | --- |
+| `shows` | an element in the result shows exactly this text |
+| `source` | the code contains this text, spaces ignored |
+| `rewrites` | one update rewrites at least this many places to the same text |
 
-export default function TypoCount() @{
-	let fixed = state(0);
+For a single suggestion, use `note="..."` instead of `steps`.
 
-	<button onClick={() => fixed++}>
-		{label}: {fixed}
-	</button>
-}
+- Put `<Code>` and `</Code>` on their own lines, with only titled fences and blank lines between them.
+- The first `.tsrx` fence is the entry: its default export is what the result shows. To pick another, write `<Code entry="page.tsrx">`.
+- The starter must build. A broken starter stops the site build.
+- Files import each other by relative path, and can import `@markless/core` and `@markless/ui`.
+- Leave a demo's cosmetic `<style>` out of the shown code. Every line you do show must do what it says.
+
+Not in a block: icon tags like `<lucide.plus />`, which need the `ui()` build plugin, and routes, API routes or anything else that needs a server.
+
+## A textbook column
+
+Use one when the reader must see which spots change and which don't. Press **Fixed one** a few times:
+
+<TypoNotes />
+
+Ring 1 changes on every press, and the tally counts the handler. Nothing else on the sheet moves. Here is the figure's markup, trimmed to one spot:
+
+```tsrx
+<MarginNotes said={said}>
+	<InkScreen url="docs.app/typos" label="Live preview of the typo tally">
+		<p><Ring n={1} /> Typos fixed: {fixed}</p>
+		<InkButton onClick={() => fixed++}>Fixed one</InkButton>
+	</InkScreen>
+	<Notes>
+		<NoteTitle>2 spots on this sheet</NoteTitle>
+		<Spots>
+			<Spot n={1} code={'{fixed}'}>the count, rewritten on each press</Spot>
+		</Spots>
+		<Tally>The handler ran <strong>{fixed}</strong> times.</Tally>
+	</Notes>
+</MarginNotes>
 ```
 
-```ts title="label.ts"
-export const label = 'Typos fixed';
-```
-</Code>
+- `MarginNotes` and its parts come from `components/figures/ink/margin-notes.tsrx`, and `Ring` from `ring.tsrx` beside it.
+- Each `Spot` number matches a `Ring` on the sheet.
+- `said` is one plain sentence a screen reader hears after each change.
+- Never put `Ring`, or any other imported component, inside an `@if` arm or an `@for` row. Draw the ring inline from `art.ring.ink` instead, as `figures/reading/blocks-demo.tsrx` does. A component there makes the browser render the arm, and pulls its code into every page's prefetch.
 
-- Put `<Code>` and `</Code>` on their own lines. Only titled fences and blank lines go between them.
-- Give at least one fence a `.tsrx` title. The first `.tsrx` fence is the entry: its default export is what the Result pane shows. To run a different one, name it with `entry`, as in `<Code entry="page.tsrx">`. Other fences hold more components, or helpers titled `.ts` or `.css`.
-- `note` is optional. It prints under the block as a "Try this" suggestion.
-- The starter must build. The site builds it like any other component. It shows in the Result pane before any editor script loads. A broken starter stops the site build.
+## Check the facts, then the page
 
-The code is plain text in the page, highlighted at build time. The editor, the result frame and the compiler load when the reader first points at, focuses or touches the block. Nothing extra loads before that. Each edit compiles in the reader's browser, in a background worker. The result runs in a separate frame at `/_code-frame.html`, so the reader's code cannot break the page around it. A build error marks the line it names and is listed under the result. The header bar holds three buttons. **Reset** puts the starter back. When the block is wide, a second button stacks the code above the result. The third is full screen. Add `title="..."` to `<Code>` to name the block in its header. Otherwise it reads **Playground**.
+Check every API name, import path, flag and command against the Markless source before you write it: package code, tests, fixtures and the CLI templates.
 
-A block's files import each other by relative path, such as `import Card from './card.tsrx'`, and they can import `@markless/core` and `@markless/ui`. Each `.tsrx` file keeps its own scoped `<style>` block, as it does in an app. Import a UI family by name from the package root, such as `import { accordion } from '@markless/ui'`. The compiler rejects a family path such as `@markless/ui/accordion` with `MARKLESS_UI_IMPORT_SHAPE`, in a block as in an app.
-
-Some things do not run in a block:
-
-- Icon tags, such as `<lucide.plus />`. They need the `ui()` build plugin, which the browser compiler does not run.
-- `storage()`. A block that calls it stops the site build, because of an open bundler issue.
-- Routes, API routes and anything else that needs a server. A block runs one component tree in the browser.
-
-## Styles belong to their component
-
-Write a component's styles in a `<style>` block inside its `.tsrx` file. Markless scopes those selectors to that component, so short names like `.photo` stay safe. Use the global tokens, such as `var(--ink)`, `var(--paper)` and `var(--step--1)`.
-
-Put a rule in `global.css` only if no single component owns it. Tokens, prose type and shared classes go there.
+- Treat specs as pointers, not proof.
+- If you can't check a fact, leave it out.
+- Read versions and protocol facts from the package that owns them. Never type them by hand.
+- Give byte figures a label: downloaded at load, downloaded on demand, or executed at load.
 
 <Callout
 	sprite="cross"
 	title="Why does my scoped class pick up a global rule?"
-	text="Scoping keeps your selectors inside the component. It does not keep global selectors out. The global.css file can style your class name, and a prose rule such as .prose h3 can reach your element. Reset what they set in your own style block."
+	text="Scoping keeps your selectors inside the component. It doesn't keep global selectors out. global.css can still style your class name, and a prose rule like .prose h3 can reach your element. Reset what they set in your own style block."
 />
 
-## Facts come from the code
-
-Check every API name, import path and command against the Markless source before you write it. Good sources are package code, tests, fixtures, demos and the CLI templates.
-
-- Treat specs as pointers, not proof.
-- If you cannot check a fact, leave it out.
-- Do not write sizes or timings. They change every release.
-
-Keep a claim list while you write. Give each fact one line: the claim, the file and line that proves it, and your check. A reviewer can then check each line against the code.
-
-```txt
-| Claim                     | Source                               | Checked by |
-| pnpm is pinned to 10.33.2 | package.json, packageManager field   | read       |
-| --list runs nothing       | node scripts/ci/local.mjs --list     | ran        |
-```
-
-<Callout
-	sprite="thought-bubble"
-	title="Does Markless need a server?"
-	text="No. So the docs never say it does. Lead with what Markless works out before your app runs. Then show the same component in any environment: a browser, a server, a build step or a test. The server is one option, never the default story."
-/>
-
-## Check your work
-
-CI does not build this site. Run these yourself before you open the PR:
+Then run the checks:
 
 ```bash
-pnpm --filter website typecheck   # the .tsrx-aware checker over pages and components
-pnpm --filter website test run    # the site's own tooling tests
-pnpm docs:build                   # the production build
+pnpm --dir website run typecheck   # the .tsrx-aware checker over pages and components
+pnpm run typecheck                 # the rest of the repo
+pnpm ci:local --fast               # CI's fast jobs
 ```
 
-Then serve the build and open each page you changed. Look at it in the light and the dark theme, on a wide window and on a phone-sized one. Click every demo.
+On a pull request that touches `website/`, CI runs two more jobs:
 
-Next: [every Markless package](/reference).
+- `website-boxes` runs the site's tooling tests, then its browser checks against the dev server.
+- `build-warnings` builds the whole site and fails on any warning the build prints.
+
+Before you ask for review, open each page you changed in the light and dark theme, on a wide window and a phone-sized one.
+
+[Every Markless package](/reference) lists what each package does.
