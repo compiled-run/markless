@@ -1,16 +1,15 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import PassList from '../../components/figures/compiler/pass-list.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # What the compiler writes for the cart
 
 <PageMeta time="3 min" assumes="state, events" />
-
-<ThemeToggle />
 
 <Subtitle text="The compiler turns one .tsrx file into small separate pieces: one function per event and per update, a record that ties them to elements, and two render modules." />
 

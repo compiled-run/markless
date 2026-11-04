@@ -489,6 +489,7 @@ declare namespace __MarklessTypeService {
 													: Tag extends 'link'
 														? AnchorAttributes & {
 																as?: string;
+																crossorigin?: '' | 'anonymous' | 'use-credentials';
 																disabled?: boolean;
 																sizes?: string;
 															}
