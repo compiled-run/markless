@@ -22,8 +22,6 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
-	// How long a failed fetch or import waits for pagehide before loading its page as a document.
-	readonly leaveSettleMs: number;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
@@ -98,6 +96,8 @@ export type FragmentNavigationState = {
 	readonly rescan: () => void;
 	// Bumped by Back, Forward, a hash link and a click on the page shown: each cancels a navigation whose page has not swapped in.
 	stops: number;
+	// Runs a failure's fallback unless the document is being left.
+	readonly settle: (go: () => void) => void;
 	readonly scrolled: Set<Element>;
 	// Code the intent started preloading, by absolute href, settling once each file has arrived.
 	readonly arriving: Map<string, Promise<unknown>>;
@@ -1078,8 +1078,7 @@ export async function navigate(
 	try {
 		fetched = await taken.result;
 	} catch {
-		// Leaving the document aborts the fetch just before pagehide, which makes this navigation stale.
-		w.setTimeout(() => stale() || fallback(url.href), state.config.leaveSettleMs);
+		state.settle(() => stale() || fallback(url.href));
 		return;
 	}
 	if (stale()) return abandon();

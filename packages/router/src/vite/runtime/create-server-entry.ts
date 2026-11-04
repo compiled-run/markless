@@ -1306,7 +1306,6 @@ function fragmentConfig(
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
 		streamOpenProperty: PROTOCOL_STREAM_OPEN_PROPERTY,
 		pendingDeadlineMs: MARKLESS_NAV_SETTLE_DEADLINE_MS,
-		leaveSettleMs: FRAGMENT_LEAVE_SETTLE_MS,
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,
