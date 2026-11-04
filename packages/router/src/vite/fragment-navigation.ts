@@ -21,6 +21,7 @@ export function startFragmentNavigation(
 	loadRun: () => Promise<FragmentNavigationRun>,
 	// What a press may start before the run half arrives; null when the app fetches nothing ahead of a click. A thunk, like the config.
 	intentOf: () => FragmentIntent | null,
+	leaveSettleMs: number,
 ): void {
 	const w = d.defaultView as (Window & typeof globalThis) | null;
 	if (!w) return;
@@ -224,7 +225,16 @@ export function startFragmentNavigation(
 		if (here(url) && !starting) return;
 		wake().then(
 			(api) => api.go(anchor) || w.location.assign(url.href),
-			() => w.location.assign(url.href),
+			() => {
+				// Leaving the document aborts the import just before pagehide; following the link then would cancel that navigation.
+				let left = false;
+				const leave = () => (left = true);
+				w.addEventListener('pagehide', leave);
+				w.setTimeout(() => {
+					w.removeEventListener('pagehide', leave);
+					if (!left) w.location.assign(url.href);
+				}, leaveSettleMs);
+			},
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
@@ -803,7 +813,17 @@ export function runFragmentNavigation(
 		const swap = (entry: FragmentEntryModule) =>
 			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset', stops);
 		if (loaded) void swap(loaded);
-		else load().then(swap, () => location.assign(url.href));
+		else
+			load().then(swap, () => {
+				// Leaving the document aborts the import just before pagehide; following the link then would cancel that navigation.
+				let left = false;
+				const leave = () => (left = true);
+				w.addEventListener('pagehide', leave);
+				w.setTimeout(() => {
+					w.removeEventListener('pagehide', leave);
+					if (!left && stops === state.stops) location.assign(url.href);
+				}, config.leaveSettleMs);
+			});
 		return true;
 	};
 	const follow = (routedPhase: boolean) => (event: Event) => {
@@ -862,6 +882,8 @@ export function fragmentPageUrl(url: URL): URL | undefined {
 export const FRAGMENT_REGION_END = '<!--markless:region-end-->';
 export const FRAGMENT_APPEND_END = '<!--markless:append-end-->';
 export const FRAGMENT_HOVER_DWELL_MS = 20;
+// A fetch or import the browser aborts because the document is being left fails a few ms before pagehide.
+export const FRAGMENT_LEAVE_SETTLE_MS = 200;
 export const FRAGMENT_PREFETCH_TTL_MS = 30_000;
 // Unused prefetches still streaming their @pending pieces; older ones are cancelled past this.
 export const FRAGMENT_PREFETCH_CONNECTIONS = 2;

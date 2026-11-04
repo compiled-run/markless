@@ -22,6 +22,8 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// How long a failed fetch or import waits for pagehide before loading its page as a document.
+	readonly leaveSettleMs: number;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
@@ -418,36 +420,49 @@ export async function mergeHead(d: Document, next: Document, stylesheetKey: stri
 	const stylesheets: HTMLLinkElement[] = [];
 	const hidden: [Element, string | null][] = [];
 	const scripts: HTMLScriptElement[] = [];
+	// Only stylesheets (unapplied) and preloads go in ahead of the swap, so they load; the rest of the head changes with the page.
+	const later: [Element, Element | null][] = [];
 	let cursor: Element | null = null;
+	let placed: Element | null = null;
 	for (const element of Array.from(next.head.children)) {
 		const reused = current.get(key(element))?.shift();
 		const node = reused ?? d.adoptNode(element);
 		if (reused && servedMedia.has(reused)) hidden.push([reused, servedMedia.get(reused)!]);
 		if (!reused) {
 			// An arriving stylesheet applies only with its page: applied before, it restyles the leaving page for nothing.
+			const rel = node.localName === 'link' ? (node as HTMLLinkElement).rel : '';
 			if (isStyleNode(node)) {
 				hidden.push([node, node.getAttribute('media')]);
 				servedMedia.set(node, node.getAttribute('media'));
 				node.setAttribute('media', 'not all');
 			}
-			if (cursor) cursor.after(node);
-			else d.head.prepend(node);
+			if (isStyleNode(node) || rel === 'modulepreload' || rel === 'preload') {
+				if (placed) placed.after(node);
+				else d.head.prepend(node);
+				placed = node;
+			} else later.push([node, cursor]);
 			if (node.localName === 'link' && (node as HTMLLinkElement).rel === 'stylesheet')
 				stylesheets.push(node as HTMLLinkElement);
 			// A kept head script already ran on this document; only one the destination adds runs.
 			if (node.localName === 'script') scripts.push(node as HTMLScriptElement);
-		}
+		} else placed = node;
 		cursor = node;
 	}
 	const stale: Element[] = [];
+	const leaving: Element[] = [];
 	for (const element of [...current.values()].flat()) {
 		const rel = element.localName === 'link' ? (element as HTMLLinkElement).rel : '';
 		if (rel === 'modulepreload' || rel === 'preload') continue;
 		if (rel === 'stylesheet' || element.localName === 'style') stale.push(element);
-		else if ((element as HTMLScriptElement).type !== 'importmap') element.remove();
+		else if ((element as HTMLScriptElement).type !== 'importmap') leaving.push(element);
 	}
 	await loaded(d.defaultView!, stylesheets);
 	const show = () => {
+		for (const element of leaving) element.remove();
+		for (const [node, after] of later) {
+			if (after) after.after(node);
+			else d.head.prepend(node);
+		}
 		for (const [node, media] of hidden) {
 			servedMedia.delete(node);
 			if (media === null) node.removeAttribute('media');
@@ -1063,7 +1078,8 @@ export async function navigate(
 	try {
 		fetched = await taken.result;
 	} catch {
-		if (!stale()) fallback(url.href);
+		// Leaving the document aborts the fetch just before pagehide, which makes this navigation stale.
+		w.setTimeout(() => stale() || fallback(url.href), state.config.leaveSettleMs);
 		return;
 	}
 	if (stale()) return abandon();

@@ -244,9 +244,15 @@ for (const [name, browserType] of [
 
 		test('Back pressed before the page arrived on the landing page leaves the document, and Forward returns to the page it left', async () => {
 			const { page, errors } = await open(browser, '/');
-			// Back leaves this document, so the page script that pressed it may not get to answer.
+			const loads: string[] = [];
+			page.on('framenavigated', (frame) => {
+				if (frame === page.mainFrame()) loads.push(frame.url());
+			});
+			// Back leaves this document (the page script may not get to answer), and WebKit aborts the swap module's import as it does.
 			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', 'back').catch(() => {});
 			await page.waitForURL('about:blank');
+			await page.waitForTimeout(600);
+			expect(loads).toEqual(['about:blank']);
 			await page.goForward();
 			await landedOn(page, 'start');
 			await page.waitForTimeout(1200);
