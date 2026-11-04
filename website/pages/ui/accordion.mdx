@@ -1,10 +1,10 @@
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import KeyboardTable from '../../components/docs/keyboard-table.tsrx';
 import ApiTable from '../../components/docs/api-table.tsrx';
-import AccordionPreviewCards from '../../components/demos/ui/accordion/examples/preview-cards.tsrx';
+import AccordionExamples from '../../components/figures/ui/accordion-examples.tsrx';
+import AccordionAnatomy from '../../components/figures/ui/accordion-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -25,11 +25,11 @@ section that is open. Opening another section closes the first one. Add `multipl
 
 ## Examples
 
-<AccordionPreviewCards />
+<AccordionExamples />
 
 ## Anatomy
 
-<PartsFigure scenario="basic" />
+<AccordionAnatomy />
 
 `accordion.itemlabel` renders an `<h3>`, and the trigger goes inside it. That heading also names
 the panel: the panel is a `role="region"` whose `aria-labelledby` points at it. If you leave the
@@ -69,18 +69,6 @@ The family ships no CSS. It writes these attributes for your selectors:
 	border-color: rebeccapurple;
 }
 ```
-
-<Callout
-	sprite="bolt"
-	title="Why will my open section not close?"
-	text="collapsible is on by default. If you set collapsible={false}, the open section stays open when its trigger is pressed. Another section can still replace it. The trigger says so to screen readers with aria-disabled='true'."
-/>
-
-<Callout
-	sprite="speech-bubble"
-	title="Can I pick the heading level?"
-	text="Not yet. accordion.itemlabel is always an h3. If the accordion sits under an h3, it needs h4 headings, and today it cannot have them."
-/>
 
 When the last open section closes, `onChange` gets an empty string. With `multiple` it gets an
 empty list. Your own `onClick` on a trigger runs after the section has changed, so it reads the
