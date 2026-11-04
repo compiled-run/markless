@@ -1810,18 +1810,6 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T013-note-panel-after.png`, fullPage: true });
 
 		// --- concept previews: each one reports what the reader's action really did ---
-		const ledgerText = async (card: Locator) =>
-			((await card.getByRole('list').innerText()) ?? '').replace(/\s+/g, ' ').trim();
-		const watchText = async (card: Locator) =>
-			((await card.locator('.pv-watch-text').innerText()) ?? '').replace(/\s+/g, ' ').trim();
-		const settleWatch = async (card: Locator, wanted: (text: string) => boolean, label: string) => {
-			for (let attempt = 0; attempt < 40; attempt += 1) {
-				if (wanted(await watchText(card))) return;
-				await new Promise((done) => setTimeout(done, 100));
-			}
-			check(false, label, `never settled, last read "${await watchText(card)}"`);
-		};
-
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
 		const settings = page.locator('.margin-notes').first();
 		await settings.getByRole('button', { name: 'Dark' }).focus();
