@@ -1,123 +1,112 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import NamePickerDemo from '../../components/demos/build/name-picker-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <Sidebar />
 
 # Props pass values down, and callbacks talk back
 
-<PageMeta time="5 min" assumes="state, events" />
+<PageMeta time="3 min" assumes="state, events" />
 
 <ThemeToggle />
 
-Your page works, and the file keeps growing. One piece of it wants to be its own component. Now two
-components need to share a number.
+<Subtitle text="A component is a function, and its props are its parameter. A prop is a live read of the parent's value, not a copy." />
 
-They share it through props. A component's parameter is its props, like the parameter of any other
-function.
+Press **Add a bag** a few times.
 
-Here is the part that surprised me. **A prop is a live read of the parent's value, not a copy.**
-When the parent's `count` changes, the text inside the child changes too. The child does not run
-again.
-
-Click **Add one** a few times.
-
-<Code note="Add a second Badge with value={count * 2}, then click Add one. Both bold numbers follow count, and each Badge keeps the number it drew.">
-```tsrx title="badge-counter.tsrx"
+<Code steps={[{ label: 'Press Add a bag three times. The bag count goes up, and the ticket number stays.', shows: '3' }, { label: 'Under the badge, add `<CartBadge bags={bags * 2} />`. Press again, and both badges follow `bags`.', source: 'bags={bags * 2}' }]}>
+```tsrx title="cart.tsrx"
 import { state } from '@markless/core';
 
-function Badge({ value }: { value: number }) @{
-	const drawn =
+function CartBadge({ bags }: { bags: number }) @{
+	const ticket =
 		Math.floor(Math.random() * 900) + 100;
 
 	<p>
-		<strong>{value}</strong> clicks so far. Badge
-		drew {drawn} when it ran.
+		<strong>{bags}</strong> bags in the cart.
+		Badge #{ticket}
 	</p>
 }
 
-export default function BadgeCounter() @{
-	let count = state(0);
+export default function Cart() @{
+	let bags = state(0);
 
 	<section>
-		<Badge value={count} />
-		<button onClick={() => count++}>
-			Add one
+		<CartBadge bags={bags} />
+		<button onClick={() => bags++}>
+			Add a bag
 		</button>
 	</section>
 }
 ```
 </Code>
 
-The count goes up. The number Badge drew stays the same. Badge drew it once, when it ran, and it
-never ran again.
+`CartBadge` takes `{ bags }`, and the parent writes `bags={bags}`. That is the whole connection.
 
-`Badge` takes `{ value }`, and the parent writes `value={count}`. That is the whole connection. A
-click changes `count`, and Markless updates the text inside `<strong>`. Nothing else on the page
-moves.
+`CartBadge` picks its ticket number once, when it runs to set up the page. A click changes `bags`, and only the text inside `<strong>` changes. The child never runs again.
 
 ## Talk back with a callback
 
-The child can't change the parent's `count` itself. Instead, the parent hands the child a function,
-and the child calls it.
+A child can't change the parent's state itself. The parent hands it a function, and the child calls that function.
 
-Pick a name.
+<Code steps={[{ label: 'Press Grace.', shows: 'Host: Grace' }, { label: 'Add a third guest, `<Guest name="Linus" onPick={choose} />`, and press it.', shows: 'Host: Linus' }]}>
+```tsrx title="host-pick.tsrx"
+import { state } from '@markless/core';
 
-<NamePickerDemo />
+type GuestProps = {
+	name: string;
+	onPick: (name: string) => void;
+};
 
-Each `Picker` gets its own `name` and the same `onPick`. The click runs `onPick(name)` in the child.
-The parent's function sets `picked`, and the paragraph changes.
+function Guest({ name, onPick }: GuestProps) @{
+	<button onClick={() => onPick(name)}>
+		{name}
+	</button>
+}
 
-<Callout
-	sprite="cross"
-	title="Why does my callback with two parameters fail?"
-	text="A callback prop takes zero parameters or one. Two or more stop the build with MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED. To send more than one value, pass one object, like onPick({ first, last })."
-/>
+export default function HostPick() @{
+	let host = state('nobody');
+	const choose = (name: string) => (host = name);
+
+	<section>
+		<p>Host: {host}</p>
+		<Guest name="Ada" onPick={choose} />
+		<Guest name="Grace" onPick={choose} />
+	</section>
+}
+```
+</Code>
+
+Each `Guest` gets its own `name` and the same `onPick`, the parent's `choose`. The click runs `onPick(name)` in the child, and `choose` sets `host`.
 
 ## Put children where you want them
 
-Elements between a component's tags arrive as the `children` prop. Write `{children}` where it goes.
-Its type is `Children` from `@markless/core`.
+Elements between a component's tags arrive as its `children` prop. Write `{children}` where they go. The type is `Children` from `@markless/core`.
 
-```tsrx
+```tsrx title="welcome.tsrx"
 import type { Children } from '@markless/core';
 
-export default function Card({ title, children }: { title: string; children?: Children }) @{
+function Card({ title, children }: { title: string; children?: Children }) @{
 	<section class="card">
 		<h2>{title}</h2>
 		{children}
 	</section>
 }
-```
-
-And this is how a page uses it:
-
-```tsrx
-import Card from './card.tsrx';
 
 export default function Welcome() @{
 	<Card title="Welcome">
-		<p>Anything between the tags lands where Card puts children.</p>
+		<p>This paragraph lands where Card writes children.</p>
 	</Card>
 }
 ```
 
-<Callout
-	sprite="cross"
-	title="Why can't I map over children?"
-	text="You can place children, wrap it in more elements, or pass it to another component. You can't look inside it. Mapping, counting or indexing children stops the build with MARKLESS_CHILDREN_OPAQUE."
-/>
+## Work out a default with `computed()`
 
-## Defaults for props
+A default in the parameter, like `{ text = 'none' }`, stops the build when your elements show that prop. The error is `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`. Work out the fallback in a computed value instead:
 
-A default like `{ text = 'none' }` looks natural, but Markless refuses it when your elements show the
-prop. The build stops with `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`. Work out the fallback
-in a computed value instead:
-
-```tsrx
+```tsrx title="label.tsrx"
 import { computed } from '@markless/core';
 
 export default function Label({ text }: { text?: string }) @{
@@ -127,15 +116,15 @@ export default function Label({ text }: { text?: string }) @{
 }
 ```
 
+Not yet:
+
+- A callback prop takes zero parameters or one. Two stop the build with `MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED`, so pass one object, like `onPick({ first, last })`.
+- You can place `children`, wrap it, or pass it on, but not map, count or index it. That stops the build with `MARKLESS_CHILDREN_OPAQUE`.
+
 <Collapsible
 	sprite="star-badge"
 	summary="Coming from another framework?"
 	text="In some frameworks, a new prop value calls the child function again. Here the child function runs once, to set up its part of the page. After that, Markless writes each new value into the one place that shows it."
 />
 
-## Try it yourself
-
-In the first code block, give `Badge` a second prop, a `label` string, and show it next to the number. Pass a different label
-from the parent. Then click, and check that the drawn number still holds still.
-
-Next: [reach a real element](/build/elements).
+When a handler needs the real `<input>` itself, [reach a real element](/build/elements).

@@ -1,9 +1,8 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import FeedSteps from '../../components/demos/router/feed-steps.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <Sidebar />
 
@@ -13,78 +12,56 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <ThemeToggle />
 
-A page needs data from somewhere slow, like a database. You don't want the whole page to wait for
-it. You also don't want the browser to make a second trip to fetch it.
+<Subtitle text="A page loads its data with an async computed() inside @try. The fast part of the page shows first, and the data follows in the same response." />
 
-There is no special loader function for this. A page loads data the way any component does: with an
-async `computed()` inside `@try`.
-
-Think of a restaurant that brings the bread first. The main dish comes later, to the same table.
-That is an analogy. In the router, the bread is everything fast, and the main dish is the `@try`
-content.
-
-Press **Next** to see the second part of one page response. Then pick **quick** data.
-
-<FeedSteps />
-
-With slow data, the reader sees the heading and **Loading...** first. The data comes later, in the
-same response. The browser never asks a second time.
-
-## The code
-
-```tsrx
+```tsrx title="pages/shops/[shop].tsrx"
 import { computed } from '@markless/core';
 import type { PageProps } from '@markless/router';
-import { slowGreeting } from '../lib/slow.ts';
+import { recentOrders } from '../../src/orders.ts';
 
-export default function Feed({ url }: PageProps) @{
-	const data = computed(async () => slowGreeting(url.pathname));
+export default function Orders({ params }: PageProps<{ shop: string }>) @{
+	const orders = computed(async () => recentOrders(params.shop));
 
 	<main>
-		<h1>Feed</h1>
+		<h1>Recent orders</h1>
 		@try {
-			<p>{data.text}</p>
+			<p>{orders.length} orders today</p>
 		} @pending {
-			<p>Loading...</p>
+			<p>Loading orders…</p>
 		} @catch {
-			<p>Failed</p>
+			<p>Couldn't load the orders.</p>
 		}
 	</main>
 }
 ```
 
-`slowGreeting` stands for any slow call that returns `{ text }`. If it is slow, one response comes in
-two parts:
+There is no special loader function. A page loads data the way any component does, as an [async value](/concepts/async).
 
-1. The heading and the `@pending` content come first.
-2. When the data is ready, the same response adds the `@try` content. The page puts it in place, and
-   the response ends.
+## One response, in two parts
 
-If the data is ready quickly, it goes in the first part, and the server never sends `Loading...`. You turn
-nothing on. For the rules of async values, see [async](/concepts/async).
+If `recentOrders` is slow, the server answers in two parts of one response:
 
-The call can use the page's props before or after an `await`. Here the page reads the address's
-`tag` after the slow call returns. Markless tracks both reads, the one before the `await` and the one
-after it:
+1. The heading and the `@pending` text go out first, so the reader sees **Loading orders…** straight away.
+2. When the data is ready, the same response adds the `@try` content. The page puts it in place, and the response ends.
+
+The browser never makes a second trip for the data. If it is ready quickly, it goes out in the first part, and **Loading orders…** is never sent. You turn nothing on.
+
+## Read props before or after `await`
+
+The call can use the page's props on either side of an `await`, and Markless tracks both reads:
 
 ```tsrx
-const data = computed(async () => {
-	const greeting = await slowGreeting(url.pathname);
-	return { text: greeting.text + ' ' + (url.searchParams.get('tag') ?? '') };
+const orders = computed(async () => {
+	const list = await recentOrders(params.shop);
+	const status = new URLSearchParams(url.search).get('status');
+	return status ? list.filter((order) => order.status === status) : list;
 });
 ```
 
-<Callout
-	sprite="cross"
-	title="Why does fetch fail on the server?"
-	text="On the server, fetch needs a full address with a host. A path like /api/feed is not enough. Build the full address from the url.href prop, for example new URL('/api/feed', url.href)."
-/>
+Keep in mind:
 
-<Callout
-	sprite="speech-bubble"
-	title="Can the server wait for all the data first?"
-	text="Not with router(). It has no option for that. A slow @try always sends its @pending content first."
-/>
+- On the server, `fetch` needs a full address with a host. Build it from the `url` prop: `new URL('/api/orders', url.href)`.
+- The router can't wait for all the data before it sends the page. A slow `@try` always sends its `@pending` content first.
 
 <Collapsible
 	sprite="star-badge"
@@ -92,9 +69,4 @@ const data = computed(async () => {
 	text="The router has no loader or action export. A page gets only params, url, status and http as props. Data comes from async values inside the page, and slow parts arrive later in the same response."
 />
 
-## Try it yourself
-
-Give the feed page a second `@try` block with its own slow call. Make one call slower than the
-other, and watch which part shows up first.
-
-Next: [answer requests with API routes](/router/api-routes).
+Some requests want JSON, not a page. [Answer them with API routes](/router/api-routes).

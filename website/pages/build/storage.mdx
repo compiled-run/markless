@@ -1,9 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import DrinkPick from '../../components/demos/build/drink-pick.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <Sidebar />
 
@@ -13,93 +11,84 @@ import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <ThemeToggle />
 
-Some values belong to the reader, like a theme or a favourite drink. Reload the page, and `state()`
-starts over from its first value. The reader's choice is gone.
+<Subtitle text="storage() is a string variable the browser keeps for the reader. Reload the page, and it still holds their choice." />
 
-`storage()` is string state that saves itself in the browser's `localStorage`. You read it and
-change it like any other variable. Each change also sets a `data-` attribute on `<html>`, so your
-CSS can follow the value.
+Pick a drink, then reload this page.
 
-Pick a drink.
+<Code steps={[{ label: 'Press Coffee, then reload the page. Coffee is still your pick.', shows: 'Your usual: coffee' }, { label: "Add a `Cocoa` button that sets `drink = 'cocoa'`, and press it.", shows: 'Your usual: cocoa' }]}>
+```tsrx title="usual-drink.tsrx"
+import { storage } from '@markless/core';
 
-<DrinkPick />
+export default function UsualDrink() @{
+	let drink = storage('usual-drink', 'tea');
 
-One click changed three things: the highlighted button, the saved value in `localStorage`, and the
-`data-docs-drink` attribute on `<html>`. The Watch line shows the attribute. Now click **Reload
-page**. Your pick keeps its highlight.
-
-The first argument is the `localStorage` key. The second is the starting value, for a reader who
-has not picked yet. With the key `docs-drink`, `<html>` gets `data-docs-drink`.
-
-The highlight is plain CSS that reads that attribute. The demo uses a rule like this one for each
-drink:
-
-<MugSpot mood="wink" />
-
-```css
-html[data-docs-drink='coffee'] .coffee {
-	background: gold;
+	<section>
+		<p>Your usual: {drink}</p>
+		<button onClick={() => (drink = 'tea')}>
+			Tea
+		</button>
+		<button onClick={() => (drink = 'coffee')}>
+			Coffee
+		</button>
+	</section>
 }
 ```
+</Code>
 
-## Style from the attribute
+`drink` reads and writes like any variable. The browser keeps it, so a reload starts from the reader's pick, not from `'tea'`.
 
-The attribute is the part to style from. A dark theme works the same way:
+## Save it under a key
 
-```tsrx
+```tsrx title="theme-switch.tsrx"
 import { storage } from '@markless/core';
 
 let theme = storage('theme', 'light');
 
-export default function ThemeToggle() @{
-	<button onClick={() => (theme = theme === 'light' ? 'dark' : 'light')}>Switch theme</button>
+export default function ThemeSwitch() @{
+	<button
+		onClick={() => {
+			theme = theme === 'light' ? 'dark' : 'light';
+		}}
+	>
+		Theme: {theme}
+	</button>
 }
 ```
 
-```css
-[data-theme='dark'] body {
+The first argument is the key the browser saves it under. The second is the starting value, for a reader who hasn't picked yet. You can call `storage()` at the top of a file, as here, or inside a component.
+
+Each write saves the value in three places:
+
+- a cookie named `markless-theme`, so the server renders the saved value in the very first byte
+- `localStorage`, under the key `theme`
+- the attribute `data-theme` on `<html>`, for your CSS
+
+A page that shows a `storage()` value answers with `Cache-Control: private` and `Vary: cookie`. So a shared cache never hands one reader's page to another.
+
+## Style from the attribute
+
+```css title="style.css"
+html[data-theme='dark'] body {
 	background: #222;
 	color: #eee;
 }
 ```
 
-You can call `storage()` at the top of a file, as here. You can also call it inside a component,
-as the drink demo does.
-
-When a server renders the page, Markless adds one small script before the page content. It
-reads the saved value and sets the `<html>` attribute first. So CSS that uses `data-theme` is right
-from the first paint.
-
-The early script covers `storage()` in the page file. On an `.mdx` page, it also covers the
-components the page imports directly.
+A prerendered page has no cookie to read, so a small script runs before the page content. It reads the saved value and sets the `<html>` attribute first, so this CSS is right from the first paint. It covers `storage()` in the page file and, on an `.mdx` page, in the components the page imports directly.
 
 ## One argument or two
 
-| Call | `localStorage` key | Attribute on `<html>` |
+| Call | Saved under | Attribute on `<html>` |
 | --- | --- | --- |
 | `let theme = storage('theme', 'light')` | `theme` | `data-theme` |
 | `let theme = storage('light')` | `markless:theme` | `data-markless-theme` |
 
-With one argument, that argument is the starting value. Markless builds the key from the variable
-name.
+With one argument, that argument is the starting value, and Markless builds the key from the variable name. Rename `theme` to `mode`, and every reader's saved choice is left behind under the old key. For anything you ship, pass the key yourself.
 
-<Callout
-	sprite="cross"
-	title="Renaming the variable loses saved values"
-	text="With one argument, the key follows the variable name. Rename theme to mode, and every reader's saved choice is left behind under the old key. For anything you ship, pass the key yourself."
-/>
+Not yet:
 
-<Callout
-	sprite="cross"
-	title="Why does storage() reject my key?"
-	text="The key and the starting value must be written as plain strings, like 'theme'. A key built from other values stops the build with MARKLESS_STORAGE_KEY_STATIC. The value itself is always a string."
-/>
+- The key and the starting value must be plain strings, like `'theme'`. Anything built from other values stops the build with `MARKLESS_STORAGE_KEY_STATIC`.
+- The value is always a string. To keep a number, save its text and convert it when you read it.
+- A `const` storage value is read-only. Assigning to it stops the build with `MARKLESS_STATE_CONST_REASSIGNMENT`.
 
-Declare it with `let` so you can change it. You can't assign to a `const` storage value.
-
-## Try it yourself
-
-Copy the `DrinkPick` code into your own app. Add a **Water** button with the class `water` and a
-highlight rule of its own. Pick water, then reload the page.
-
-Next: [share state between components](/build/shared).
+When several components need one value, [share it with `shared()`](/build/shared).

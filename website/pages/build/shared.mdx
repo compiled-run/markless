@@ -1,107 +1,140 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import TalliesDemo from '../../components/demos/build/tallies-demo.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <Sidebar />
 
 # Share one piece of state with `shared()`
 
-<PageMeta time="3 min" assumes="state, components" />
+<PageMeta time="4 min" assumes="state, components" />
 
 <ThemeToggle />
 
-A badge and a button live in two components. Both need the same `count`. You can pass it down as a
-prop, and pass a callback back up. That works, until five components want it.
+<Subtitle text="shared() gives state a name. Every component that calls the name gets the same value, with no props in between." />
 
-`shared()` gives the state a name instead. You define it once. Each component that calls the
-definition gets the same `count`, and a change from one shows up in the other.
-
-Click **Add one**.
-
-<Code note="Add a decrement() method next to increment(), and a second button that calls it. Then add a third component that shows c.count * 2, and put it in the section.">
-```tsrx title="shared-counter.tsrx"
+<Code steps={[{ label: 'Press Add to cart. The click runs in Shop, and the badge in CartBadge changes.', shows: 'Bags in the cart: 1' }, { label: 'Add a `removeBag()` method that runs `box.bags--`, and a button in `Shop` that calls it.', source: 'box.bags--' }]}>
+```tsrx title="cart.tsrx"
 import { shared, state } from '@markless/core';
 
-export const counter = shared(
+export const cart = shared(
 	() => {
-		const box = state({ count: 0 });
+		const box = state({ bags: 0 });
 		return {
 			...box,
-			increment() {
-				box.count++;
+			addBag() {
+				box.bags++;
 			},
 		};
 	},
 	{ scope: 'page' },
 );
 
-function Badge() @{
-	const c = counter();
+function CartBadge() @{
+	const c = cart();
 
-	<output>{c.count}</output>
+	<p>Bags in the cart: {c.bags}</p>
 }
 
-export default function SharedCounter() @{
-	const c = counter();
+export default function Shop() @{
+	const c = cart();
 
 	<section>
-		<p>Badge shows: <Badge /></p>
-		<button onClick={() => c.increment()}>
-			Add one
+		<CartBadge />
+		<button onClick={() => c.addBag()}>
+			Add to cart
 		</button>
 	</section>
 }
 ```
 </Code>
 
-The click runs in `SharedCounter`, but the number changes inside `Badge`. No prop connects them.
+No prop connects `Shop` and `CartBadge`. Both call `cart()`, and both get the same `bags`.
 
-The function you pass to `shared()` creates the state. It returns the state plus any methods you
-want, like `increment()`. Each component calls `counter()` to get it.
+The function you pass to `shared()` makes the state. It returns that state plus any methods you want, like `addBag()`.
 
-## Who gets the same copy
+## Pick who shares one copy
 
-The second argument picks who shares one copy. Two of the choices matter here.
+The second argument says who shares a copy. Press each stall's **Sell one**, and watch which numbers move.
+
+<Code steps={[{ label: 'Press Sell one under Lemonade twice. The day total and Lemonade move, and Cookies stays at 0.', shows: 'Sold today: 2' }, { label: "In `stall`, change `'widget'` to `'page'`. Press Sell one under Lemonade, and Cookies moves too.", shows: 'Cookies: 1 sold' }]}>
+```tsrx title="bake-sale.tsrx"
+import { shared, state } from '@markless/core';
+
+const day = shared(
+	() => {
+		const box = state({ sold: 0 });
+		return { ...box };
+	},
+	{ scope: 'page' },
+);
+
+const stall = shared(
+	() => {
+		const box = state({ sold: 0 });
+		return { ...box };
+	},
+	{ scope: 'widget' },
+);
+
+function Stall({ name }: { name: string }) @{
+	const s = stall();
+	const d = day();
+
+	<p>
+		<span>{name}: {s.sold} sold</span>
+		<button
+			onClick={() => {
+				s.sold++;
+				d.sold++;
+			}}
+		>
+			Sell one
+		</button>
+	</p>
+}
+
+export default function BakeSale() @{
+	const d = day();
+
+	<section>
+		<h2>Sold today: {d.sold}</h2>
+		<Stall name="Lemonade" />
+		<Stall name="Cookies" />
+	</section>
+}
+```
+</Code>
+
+- The day total moves on every press. `day` says `'page'`, so the whole page shares one copy.
+- Each stall's count moves only for its own stall. `stall` says `'widget'`, so each `Stall` gets its own copy.
 
 | Scope | Who shares one copy |
 | --- | --- |
-| `{ scope: 'page' }` | every component on the page that calls the definition |
-| `{ scope: 'widget' }` | the pieces inside one rendered widget, like one menu |
+| `'page'`, the default | every component on the page |
+| `'request'` | the same as `'page'` in the browser |
+| `'container'` | one Markless app on the page, not the others |
+| `'widget'` | the pieces of one rendered widget, like one menu |
 
-A widget is the first component that calls the definition, plus everything you put inside it. Here
-are two tallies, each a `Tally` with a `Badge` inside. With `'page'`, they share one copy. Click
-either button:
+A widget is the first component that calls the definition, plus everything inside it. The [UI components](/ui) use `'widget'`, so two menus on one page open and close on their own.
 
-<TalliesDemo />
+## It lasts while the reader browses
 
-Both numbers move together. Now set **Scope** to `widget` and click again. Each tally keeps its own
-number. Inside one tally, the button and the badge still share.
+- **On the server**, every request starts from the starting values. One visitor never sees another's writes.
+- **In the browser**, one copy lives as long as the document. A link to another of your pages keeps it, and so do Back and Forward. The next page shows the live value from its first frame.
+- **A reload** starts again from the starting values.
 
-The card's code has two files. `tally.tsrx` holds the definition and both components.
-`tallies.tsrx` puts two tallies on the page. Only the `scope` line differs between the two settings.
+## Two apps on one page share by name
 
-The [UI components](/ui) use `'widget'`. That is how two menus on one page each stay open or closed
-on their own.
+Some pages hold more than one Markless app, built and shipped separately. Each such app is called a *micro-frontend*. When two of them call the same definition, they read and write one copy.
 
-<Callout
-	sprite="speech-bubble"
-	title="Why do I get a missing-scope warning?"
-	text="If two components in one file call the same definition and you gave no scope, Markless warns with MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT. With no scope, the copy is shared across the page. Write { scope: 'widget' } for one copy per widget, or { scope: 'page' } to say you meant it."
-/>
+The name is the file the definition lives in plus its export name, such as `lib/cart.tsrx#cart`. For a definition from a package, the file is its path under `node_modules/`. So both apps must import the definition from the same place.
 
-<Callout
-	sprite="cross"
-	title="Can I call a method from another file?"
-	text="Keep the definition and the components that call its methods in one file, as these examples do. From another file, a call like c.increment() can stop the build with MARKLESS_SHARED_METHOD_CROSS_MODULE. In that file, change the field directly instead: c.count++."
-/>
+The value must also have the same shape in both: the same field names and types. An app whose shape differs keeps its own copy and logs `MARKLESS_SHARED_SHAPE_MISMATCH` once.
 
-Use `state()` when one component owns the value. Use `shared()` when several components need it.
+Not yet:
 
-## Try it yourself
+- Two components in one file calling a definition with no scope get the warning `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`. Write `{ scope: 'widget' }` for a copy per widget, or `{ scope: 'page' }` to say you meant to share.
+- Keep the definition and the components that call its methods in one file. From another file, `c.addBag()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`; change the field instead, `c.bags++`.
 
-Copy both files from the card into your own app. Add a third tally with the label `Middle`, and try each scope. Before you
-click, predict which numbers will move.
-
-Next: [files become pages](/router/pages).
+Use `state()` when one component owns a value, and `shared()` when several need it. Next, [turn files into pages](/router/pages).

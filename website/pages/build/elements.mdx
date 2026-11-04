@@ -1,7 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <Sidebar />
 
@@ -11,49 +11,44 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <ThemeToggle />
 
-A click handler can change `count`. Sometimes it also needs the real `<input>`, to put the cursor in
-it or to measure it.
+<Subtitle text="A handle is a name for one real element. A handler can use it once that element is on the page." />
 
-An element is not state. Your component runs once to set up the page, and at that moment the
-`<input>` does not exist yet. So Markless gives you a handle: a name that points at one element once
-that element is on the page.
+Type a name, then press **Add guest**.
 
-Click **Add one and focus**.
-
-<Code note="Add a Select button whose click runs field?.select(). Click it, and the number in the field is selected. Then add a second input with its own handle, and a button that focuses it.">
-```tsrx title="focus-counter.tsrx"
+<Code steps={[{ label: 'Press Add guest. The count goes up, and the cursor lands back in the field.', shows: 'Guests added: 1' }, { label: "Empty the field on each press: above `field?.focus()`, add `if (field) field.value = '';`.", source: "field.value = ''" }]}>
+```tsrx title="guest-form.tsrx"
 import { element, state } from '@markless/core';
 
-export default function FocusCounter() @{
-	let count = state(0);
+export default function GuestForm() @{
+	let added = state(0);
 	const field = element<HTMLInputElement>();
 
 	<section>
-		<label for={field}>Count</label>
-		<input el={field} value={count} />
+		<label for={field}>Guest name</label>
+		<input el={field} />
 		<button
 			onClick={() => {
-				count++;
+				added++;
 				field?.focus();
 			}}
 		>
-			Add one and focus
+			Add guest
 		</button>
+		<p>Guests added: {added}</p>
 	</section>
 }
 ```
 </Code>
 
-The number goes up, and the cursor lands in the field. Click the word **Count** too. The cursor goes
-to the field, because the label points at it. Nobody wrote an id.
+`el={field}` binds the handle to the `<input>`. Inside a handler, `field` is that element, or `undefined` if it isn't on the page. That is why the code writes `field?.focus()`.
 
-`el={field}` links the handle to the `<input>`. Inside a handler, `field` is the element itself. If
-the element is not on the page, `field` is `undefined`. That is why the code writes `field?.focus()`.
+Your component runs once, before the `<input>` exists, so an element can't be state. A handle is how you reach it later.
 
-## Links without ids
+## Point a label at a field without an id
 
-Look at `for={field}` again. You pass the handle, and Markless makes one id and puts it on both
-elements. A handle works this way in five attributes:
+Press the words **Guest name**. The cursor goes to the field, because `for={field}` points the label at it. Markless makes one id and writes it on both elements.
+
+A handle works this way in five attributes:
 
 | Attribute | What it points at |
 | --- | --- |
@@ -63,78 +58,73 @@ elements. A handle works this way in five attributes:
 | `aria-controls` | the element this one opens or changes |
 | `popovertarget` | the popover this button opens |
 
-## Run setup code with `attach`
+## Reach every row with an array handle
 
-Some code needs the element itself, like an observer or a library from outside. `attach` hands the
-element to your function. If your function returns a cleanup function, Markless calls it when the
-element leaves the page.
+Give `element()` an array type, and the handle collects every element you bind it to, in page order. It is never `undefined`, just empty before anything is on the page.
 
-```tsrx
-import { state } from '@markless/core';
+<Code steps={[{ label: 'Press Count rows.', shows: 'Rows on the page: 3' }, { label: "Add `'Linus'` to the list in `state()`, and press again.", shows: 'Rows on the page: 4' }]}>
+```tsrx title="guest-list.tsrx"
+import { element, state } from '@markless/core';
 
-export default function Watched() @{
+export default function GuestList() @{
+	let guests = state(['Ada', 'Grace', 'Kim']);
+	const rows = element<HTMLLIElement[]>();
 	let count = state(0);
 
-	<button
-		attach={(button) => {
-			const observer = new ResizeObserver(() => {});
-			observer.observe(button);
-			return () => observer.disconnect();
-		}}
-		onClick={() => count++}
-	>
-		{count}
-	</button>
+	<section>
+		<ul>
+			@for (const guest of guests; key guest) {
+				<li el={rows}>{guest}</li>
+			}
+		</ul>
+		<button onClick={() => (count = rows.length)}>
+			Count rows
+		</button>
+		<p>Rows on the page: {count}</p>
+	</section>
+}
+```
+</Code>
+
+## Run setup code with `attach`
+
+Some code needs the element itself, like an observer or a library from outside. `attach` hands the element to your function. If the function returns another function, Markless calls that one when the element leaves the page.
+
+```tsrx title="note-box.tsrx"
+import { state } from '@markless/core';
+
+export default function NoteBox() @{
+	let edits = state(0);
+
+	<section>
+		<textarea
+			attach={(box) => {
+				const observer = new ResizeObserver(() => {});
+				observer.observe(box);
+				return () => observer.disconnect();
+			}}
+			onInput={() => edits++}
+		/>
+		<p>Edits: {edits}</p>
+	</section>
 }
 ```
 
-`attach` goes on page elements like `<button>`, not on components. On a component, the build stops
-with `MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`.
-
-### When `attach` runs
-
-A page the server renders loads no code until something on it asks for some. `attach` waits the same
-way. It starts at the first of these:
+On a page the server renders, `attach` waits, like every other piece of code. It starts at the first of these:
 
 | What is on the element | When `attach` starts |
 | --- | --- |
-| an event handler like `onClick`, on the element or on anything inside it | the first time that handler runs, just before it |
+| a handler like `onInput`, on the element or inside it | just before that handler first runs |
 | `onVisible` | when the element scrolls into view |
 | `onIdle` | once the page has loaded and the browser is idle |
 
-In the example above, the observer starts on the first click. A click somewhere else on the page
-does not start it.
+So the observer above starts on the first keystroke. To start it as soon as the element is on screen, add `onVisible={() => {}}` to it. An element the browser creates, like the inside of an `@if` that opens, runs `attach` straight away.
 
-To start it as soon as the element is on screen, add `onVisible` to the same element. The handler can
-be empty:
+Not yet:
 
-```tsrx
-<canvas attach={(canvas) => drawChart(canvas)} onVisible={() => {}} />
-```
+- `attach` goes on page elements like `<textarea>`, not on components (`MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`).
+- An `attach` with none of the three starters stops the build with [`MARKLESS_ATTACH_NO_START_TRIGGER`](/errors/MARKLESS_ATTACH_NO_START_TRIGGER), because it would never run.
+- A handle can't be shown in the elements. `{field.value}` stops the build with `MARKLESS_ELEMENT_HANDLE_RENDER_READ`; keep that text in `state()`.
+- A single handle binds one element. A second `el={field}` stops the build with `MARKLESS_ELEMENT_HANDLE_DUPLICATE`, so make a second handle or use an array one.
 
-If an element has `attach` and none of these, the build fails with
-[`MARKLESS_ATTACH_NO_START_TRIGGER`](/errors/MARKLESS_ATTACH_NO_START_TRIGGER), because the function
-would never run on a server-rendered page.
-
-An element created in the browser does not wait. On a page rendered in the browser, or for an element
-that appears after a state change, like the inside of an `@if` that opens, `attach` runs as soon as
-the element is on the page.
-
-<Callout
-	sprite="cross"
-	title="Why can't I show a handle in the elements?"
-	text="Elements set up the page before the element exists, so there is nothing to read yet. Writing {field.value} in the elements stops the build with MARKLESS_ELEMENT_HANDLE_RENDER_READ. Read handles in handlers and in attach. If you want the text on screen, keep it in state()."
-/>
-
-<Callout
-	sprite="check"
-	title="One handle, one element"
-	text="A handle points at one element. A second el={field} stops the build with MARKLESS_ELEMENT_HANDLE_DUPLICATE. Make a second handle instead."
-/>
-
-## Try it yourself
-
-Add a **Clear** button to the code block at the top of this page. Its handler sets `count` to `0` and puts the cursor back in
-the field.
-
-Next: [keep a value across reloads](/build/storage).
+Some values should outlive a reload. [Keep them with `storage()`](/build/storage).

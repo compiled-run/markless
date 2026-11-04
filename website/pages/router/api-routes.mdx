@@ -1,8 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import ApiAnswers from '../../components/demos/router/api-answers.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <Sidebar />
 
@@ -12,24 +11,9 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <ThemeToggle />
 
-Pages answer with HTML. Sometimes you want JSON, a webhook, or a health check for your host. For
-those, you want a plain function that takes a request and returns a response.
+<Subtitle text="A file in api/ is an endpoint: a function that takes a request and returns a response, for JSON, webhooks or a health check." />
 
-Put that function in a file in `api/`, at the root of your app. The `api/` folder is a second street
-map next to `pages/`, with the same address rules. One extra rule: the file name can also say which
-HTTP method it answers.
-
-Pick a method and an address.
-
-<ApiAnswers />
-
-Try **POST** with `/api/users/42`. The answer is 404, because the file name says `get`.
-
-## One file, one endpoint
-
-Save this as `api/users/[id].get.ts`:
-
-```ts
+```ts title="api/users/[id].get.ts"
 import type { EndpointHttpContext } from '@markless/router';
 
 export const cache = { maxAge: 60 };
@@ -39,9 +23,11 @@ export default function user({ params }: EndpointHttpContext<{ id: string }>) {
 }
 ```
 
-`GET /api/users/42` now answers `{"id":"42"}`, with the header
-`cache-control: public, max-age=60, s-maxage=60`. The only cache form the router reads is
-`export const cache = { maxAge: <seconds> }`.
+`GET /api/users/42` now answers `{"id":"42"}`. `export const cache = { maxAge: 60 }` lets the answer be cached for 60 seconds; leave it out to answer fresh every time.
+
+## The path is the address, the name is the method
+
+`api/` sits at the root of your app, next to `pages/`, and follows the same address rules. The file name can also end with the one HTTP method it answers.
 
 | File in `api/` | What it answers |
 | --- | --- |
@@ -50,41 +36,30 @@ export default function user({ params }: EndpointHttpContext<{ id: string }>) {
 | `users/[id].get.ts` | only `GET` on `/api/users/` plus one part |
 | `files/[...path].ts` | `/api/files/` plus one part or more |
 
-The method names a file can end with are `get`, `post`, `put`, `patch`, `delete`, `head`, `options`,
-`connect` and `trace`.
+A `POST` to `/api/users/42` finds no endpoint, because the file name says `get`. The method names a file can end with are `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `connect` and `trace`.
 
-Your function gets one object with `request`, `url`, `params`, `locals` and `response`. Set headers
-on `response.headers`, or return your own `Response`.
+## One function gets the whole request
 
-<Callout
-	sprite="cross"
-	title="Why does my endpoint answer 500?"
-	text="Check the exports. Each file in api/ must have one export default function. The method comes from the file name, so don't export a function called GET or POST. A file with only export function GET still builds, but every request to it fails with status 500."
-/>
+The function gets one object with `request`, `url`, `params`, `locals` and `response`. Return a `Response`, or set headers on `response.headers`.
+
+- Each file has one `export default` function.
+- Don't export a function called `GET` or `POST`. The method comes from the file name, and only the default export answers.
 
 ## Run code on every request with middleware
 
-A file in `middleware/` runs for each request to your pages and endpoints. The full-stack starter
-ships this one as `middleware/request.ts`:
+A file in `middleware/` runs for every request to your pages and endpoints. The full-stack starter ships this one:
 
-```ts
+```ts title="middleware/request.ts"
 export default function request(http: import('@markless/router').MiddlewareHttpContext) {
 	http.response.headers.set('x-markless-router', '1');
 }
 ```
 
-That header shows up on your pages and on your `/api/` answers. A middleware file follows the same
-rule as an endpoint: one `export default` function.
+That header shows up on your pages and on your `/api/` answers. A middleware file follows the endpoint rule: one `export default` function.
 
-<Callout
-	sprite="speech-bubble"
-	title="Can I write these files in .tsrx?"
-	text="No. Files in api/ and middleware/ end in .ts. Keep both folders at the app root, not inside pages/. A .tsrx or .mdx file in pages/api/ is a page, so a reference page can live at /api/ beside your endpoints."
-/>
+Keep in mind:
 
-## Try it yourself
+- Files in `api/` and `middleware/` end in `.ts`. A `.tsrx` file there is not an endpoint.
+- Keep both folders at the app root, not inside `pages/`. A page in `pages/api/` is a page, so a reference page can live at `/api/` beside your endpoints.
 
-Add `api/time.ts` that returns `Response.json({ now: new Date().toISOString() })`. Visit
-`/api/time`. Then rename it to `time.post.ts` and visit it again.
-
-Next: [build and deploy your app](/router/deploying).
+Ready to put it online? [Build and deploy your app](/router/deploying).

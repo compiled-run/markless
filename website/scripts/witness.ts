@@ -2248,55 +2248,40 @@ try {
 			});
 		}
 
-		// --- widgets: the badge and the picker on the components page -------------
+		// --- the live blocks on the Building an app pages ---------------------------
+		// Each check does what the page's steps tell the reader to do.
+		const liveBlock = (index: number) => page.locator('.code-block [data-code-stage]').nth(index);
+
 		// A prop is a live read of the parent's value, and the child body runs once.
 		await page.goto(`${origin}/build/components`, { waitUntil: 'load' });
-		const badgeDemo = page
-			.locator('.code-block [data-code-stage]')
-			.filter({ has: page.getByRole('button', { name: 'Add one' }) });
-		const badgeLine = badgeDemo.locator('p').first();
+		const cartBlock = liveBlock(0);
+		const badgeLine = cartBlock.locator('p').first();
 		await badgeLine.waitFor();
-		const badgeDrawn = async () =>
-			((await badgeLine.textContent()) ?? '').match(/drew (\d+)/)?.[1] ?? '';
-		const drewAtRest = await badgeDrawn();
+		const ticketOf = async () => ((await badgeLine.textContent()) ?? '').match(/Badge #(\d+)/)?.[1] ?? '';
+		const ticketAtRest = await ticketOf();
 		check(
-			((await badgeLine.locator('strong').textContent()) ?? '').trim() === '0' &&
-				drewAtRest !== '',
-			'the badge serves 0 clicks and the number it drew',
+			((await badgeLine.locator('strong').textContent()) ?? '').trim() === '0' && ticketAtRest !== '',
+			'the badge serves 0 bags and its ticket number',
 			((await badgeLine.textContent()) ?? '').trim(),
 		);
-		await badgeDemo.getByRole('button', { name: 'Add one' }).click();
-		await settleText(
-			badgeLine.locator('strong'),
-			(text) => text === '1',
-			'the badge reads the parent count live',
-		);
+		await cartBlock.getByRole('button', { name: 'Add a bag' }).click();
+		await settleText(badgeLine.locator('strong'), (text) => text === '1', 'the badge reads the parent bags live');
 		check(
-			(await badgeDrawn()) === drewAtRest,
-			'the badge body did not run again, so its drawn number stayed',
-			`${drewAtRest} then ${await badgeDrawn()}`,
+			(await ticketOf()) === ticketAtRest,
+			'the badge body did not run again, so its ticket number stayed',
+			`${ticketAtRest} then ${await ticketOf()}`,
 		);
-		const pickerDemo = page.locator('section[data-preview="name-picker"]');
-		const pickedLine = pickerDemo.locator('.pg-stage p').first();
-		check(
-			((await pickedLine.textContent()) ?? '').trim() === 'Picked: nobody',
-			'the picker serves nobody picked',
-			((await pickedLine.textContent()) ?? '').trim(),
-		);
-		await pickerDemo.getByRole('button', { name: 'Pick Grace' }).click();
-		await settleText(
-			pickedLine,
-			(text) => text === 'Picked: Grace',
-			'a callback prop talks back to the parent',
-		);
+		const hostBlock = liveBlock(1);
+		const hostLine = hostBlock.locator('p').first();
+		check(((await hostLine.textContent()) ?? '').trim() === 'Host: nobody', 'the host picker serves nobody');
+		await hostBlock.getByRole('button', { name: 'Grace' }).click();
+		await settleText(hostLine, (text) => text === 'Host: Grace', 'a callback prop talks back to the parent');
 		await page.screenshot({ path: `${shotsDir}/T006-components-after.png`, fullPage: true });
 
-		// --- widget: the focus counter on the elements page -----------------------
-		// The claim is that the handle is the real node, so what is checked is the
-		// browser's own idea of which element has the caret.
+		// The handle is the real node, so the check reads the browser's own focused element.
 		await page.goto(`${origin}/build/elements`, { waitUntil: 'load' });
-		const focusButton = page.getByRole('button', { name: 'Add one and focus' });
-		await focusButton.waitFor();
+		const guestButton = page.getByRole('button', { name: 'Add guest' });
+		await guestButton.waitFor();
 		const activeIsField = () =>
 			page.evaluate(() => {
 				const field = document.querySelector('.code-block [data-code-stage] input');
@@ -2309,127 +2294,49 @@ try {
 			}
 		};
 		check(!(await activeIsField()), 'the field does not start out focused');
-		await focusButton.click();
+		await guestButton.click();
 		await settleFocus();
-		check(await activeIsField(), 'clicking the button puts the caret in the field');
-		check(
-			(await page.locator('.code-block [data-code-stage] input').inputValue()) === '1',
-			'the same click adds one to the count in the field',
-			await page.locator('.code-block [data-code-stage] input').inputValue(),
-		);
-		await focusButton.focus();
-		await page.locator('.code-block [data-code-stage] label').click();
+		check(await activeIsField(), 'pressing Add guest puts the caret in the field');
+		await settleText(liveBlock(0).locator('p').first(), (text) => text === 'Guests added: 1', 'the same press counts the guest');
+		await guestButton.focus();
+		await liveBlock(0).locator('label').click();
 		await settleFocus();
-		check(
-			await activeIsField(),
-			'clicking the label focuses the field, because for={field} names it',
-		);
-		await page.screenshot({ path: `${shotsDir}/T006-focus-counter-after.png`, fullPage: true });
+		check(await activeIsField(), 'clicking the label focuses the field, because for={field} names it');
+		const rowsBlock = liveBlock(1);
+		await rowsBlock.getByRole('button', { name: 'Count rows' }).click();
+		await settleText(rowsBlock.locator('p').first(), (text) => text === 'Rows on the page: 3', 'an array handle reads every row');
+		await page.screenshot({ path: `${shotsDir}/T006-elements-after.png`, fullPage: true });
 
-		// --- widget: the drink pick on the storage page ----------------------------
+		// A storage() pick survives a reload, and is on <html> before the page shows.
 		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
-		const drinkAttr = () =>
-			page.evaluate(() => document.documentElement.getAttribute('data-docs-drink'));
-		const drinkCard = page.locator('section[data-preview="drink-pick"]');
-		const watchedDrink = () =>
-			drinkCard.locator('.pv-watch mark:visible').allTextContents();
-		check(
-			(await watchedDrink()).join() === 'tea,tea',
-			'the drink card watches the starting value on <html>',
-			(await watchedDrink()).join(),
-		);
-		await drinkCard.locator('button.coffee').click();
-		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if ((await drinkAttr()) === 'coffee') break;
-			await new Promise((done) => setTimeout(done, 100));
-		}
-		check(
-			(await drinkAttr()) === 'coffee',
-			'picking a drink writes it onto <html>',
-			String(await drinkAttr()),
-		);
-		check(
-			(await watchedDrink()).join() === 'coffee,coffee',
-			'the Watch line follows the pick',
-			(await watchedDrink()).join(),
-		);
-		await Promise.all([
-			page.waitForEvent('load'),
-			drinkCard.getByRole('button', { name: 'Reload page' }).click(),
-		]);
-		check(
-			(await drinkAttr()) === 'coffee',
-			'the pick survives the card\'s Reload page, applied before the page is shown',
-			String(await drinkAttr()),
-		);
-		check(
-			(await watchedDrink()).join() === 'coffee,coffee',
-			'after the reload the Watch line still shows the saved pick',
-			(await watchedDrink()).join(),
-		);
-		await page.screenshot({ path: `${shotsDir}/T006-drink-pick-after.png`, fullPage: true });
+		const drinkLine = () => liveBlock(0).locator('p').first();
+		const drinkAttr = () => page.evaluate(() => document.documentElement.getAttribute('data-usual-drink'));
+		await drinkLine().waitFor();
+		check(((await drinkLine().textContent()) ?? '').trim() === 'Your usual: tea', 'the drink block serves its starting value');
+		await liveBlock(0).getByRole('button', { name: 'Coffee' }).click();
+		await settleText(drinkLine(), (text) => text === 'Your usual: coffee', 'picking a drink shows it');
+		check((await drinkAttr()) === 'coffee', 'picking a drink writes it onto <html>', String(await drinkAttr()));
+		await page.reload({ waitUntil: 'load' });
+		await settleText(drinkLine(), (text) => text === 'Your usual: coffee', 'the pick survives a reload');
+		await page.screenshot({ path: `${shotsDir}/T006-storage-after.png`, fullPage: true });
 		await page.evaluate(() => localStorage.clear());
+		await page.context().clearCookies({ name: 'markless-usual-drink' });
 
-		// --- widget: the shared counter on the shared page --------------------------
+		// shared() reaches a component with no prop, and its scope picks who shares a copy.
 		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
-		const sharedDemo = page.locator('.code-block [data-code-stage]').first();
-		const sharedBadge = sharedDemo.locator('output').first();
-		await sharedBadge.waitFor();
+		const bagLine = liveBlock(0).locator('p').first();
+		await bagLine.waitFor();
+		check(((await bagLine.textContent()) ?? '').trim() === 'Bags in the cart: 0', 'the shared badge serves 0');
+		await liveBlock(0).getByRole('button', { name: 'Add to cart' }).click();
+		await settleText(bagLine, (text) => text === 'Bags in the cart: 1', 'a click in one component moves the badge in another');
+		const saleBlock = liveBlock(1);
+		await saleBlock.getByRole('button', { name: 'Sell one' }).first().click();
+		await settleText(saleBlock.locator('h2'), (text) => text === 'Sold today: 1', "the 'page' total moves on a stall's press");
+		const stallCounts = async () => (await saleBlock.locator('p span').allTextContents()).map((text) => text.trim()).join();
 		check(
-			((await sharedBadge.textContent()) ?? '').trim() === '0',
-			'the shared badge serves 0',
-			((await sharedBadge.textContent()) ?? '').trim(),
-		);
-		await sharedDemo.getByRole('button', { name: 'Add one' }).click();
-		await settleText(
-			sharedBadge,
-			(text) => text === '1',
-			'a click in one component moves the badge in another through shared()',
-		);
-		const talliesCard = page.locator('section[data-preview="tallies"]');
-		const tallyCounts = async () =>
-			(await talliesCard.locator('.pg-stage output:visible').allTextContents())
-				.map((text) => text.trim())
-				.join();
-		check((await tallyCounts()) === '0,0', 'the tallies start at 0 and 0', await tallyCounts());
-		await talliesCard.locator('.pg-stage button:visible', { hasText: 'Add one' }).first().click();
-		await settleText(
-			talliesCard.locator('.pg-stage output:visible').last(),
-			(text) => text === '1',
-			"with { scope: 'page' }, a click on Left moves Right too",
-		);
-		await talliesCard.getByRole('radio', { name: 'widget' }).check();
-		check(
-			(await tallyCounts()) === '0,0',
-			"the 'widget' tallies start with their own copies",
-			await tallyCounts(),
-		);
-		await talliesCard.locator('.pg-stage button:visible', { hasText: 'Add one' }).first().click();
-		await settleText(
-			talliesCard.locator('.pg-stage output:visible').first(),
-			(text) => text === '1',
-			"with { scope: 'widget' }, a click on Left moves Left",
-		);
-		check(
-			(await tallyCounts()) === '1,0',
-			"with { scope: 'widget' }, Right keeps its own number",
-			await tallyCounts(),
-		);
-		await talliesCard.getByRole('radio', { name: 'page' }).check();
-		check(
-			(await talliesCard.locator('.pv-watch-text span:visible').innerText()).includes("'page'"),
-			'switching Scope back shows the page-scope Watch line',
-		);
-		const talliesTab = talliesCard.locator('.pg-tab:visible', { hasText: 'tallies.tsrx' });
-		await talliesTab.click();
-		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if ((await talliesTab.getAttribute('aria-selected')) === 'true') break;
-			await new Promise((done) => setTimeout(done, 100));
-		}
-		check(
-			(await talliesTab.getAttribute('aria-selected')) === 'true' &&
-				(await talliesCard.locator('.pg-pane:visible').innerText()).includes('<tally.Tally'),
-			"the tallies card's code switches to the file tab the reader clicks",
+			(await stallCounts()) === 'Lemonade: 1 sold,Cookies: 0 sold',
+			"each 'widget' stall keeps its own count",
+			await stallCounts(),
 		);
 		await page.screenshot({ path: `${shotsDir}/T006-shared-after.png`, fullPage: true });
 
@@ -2456,128 +2363,6 @@ try {
 				fullPage: true,
 			});
 		}
-
-		// --- widget: the URL picker on the pages page -----------------------------
-		await page.goto(`${origin}/router/pages`, { waitUntil: 'load' });
-		const urlCard = page.locator('section[data-preview="url-picker"]');
-		const routeWatch = urlCard.locator('.pv-watch-text');
-		await routeWatch.waitFor();
-		check(
-			(await routeWatch.innerText()).startsWith('pages/blog/[slug].tsrx answers.') &&
-				(await urlCard.locator('.file.slug .param').innerText()) === 'slug = "hello"',
-			'the URL picker opens on the bracketed file and its parameter',
-			await routeWatch.innerText(),
-		);
-		await urlCard.getByRole('button', { name: '/docs/guide/intro' }).click();
-		await settleInner(
-			routeWatch,
-			(text) => text.startsWith('pages/docs/[...slug].mdx answers.'),
-			'the URL picker answers with the catch-all file',
-		);
-		check(
-			(await urlCard.locator('.file.rest .param').innerText()) === 'slug = "guide/intro"',
-			'the catch-all file row shows the whole rest of the path as one param',
-		);
-		await urlCard.getByRole('button', { name: '/docs', exact: true }).click();
-		await settleInner(
-			routeWatch,
-			(text) => text.startsWith('pages/404.tsrx answers.') && text.includes('at least one more part'),
-			'a catch-all with nothing to catch falls through to the 404 page, and the card says why',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-url-picker-after.png`, fullPage: true });
-
-		// --- widget: the link check on the links page -----------------------------
-		await page.goto(`${origin}/router/links`, { waitUntil: 'load' });
-		const linkCard = page.locator('section[data-preview="link-check"]');
-		const linkResult = linkCard.locator('.result');
-		await linkResult.waitFor();
-		check(
-			(await linkResult.innerText()).startsWith('The build passes'),
-			'the link card opens on the link that builds',
-			await linkResult.innerText(),
-		);
-		await linkCard.getByRole('radio', { name: 'renamed' }).check();
-		await settleInner(
-			linkResult,
-			(text) => text.startsWith('The build stops') && text.includes('does not match any route'),
-			'the link card stops the build after the rename, with the error',
-		);
-		check(
-			(await linkCard.locator('.wide .code').innerText()).includes('/blogs/[slug]'),
-			'the code line carries the renamed route',
-		);
-		await linkCard.getByRole('radio', { name: 'no params' }).check();
-		await settleInner(
-			linkResult,
-			(text) => text.includes('requires params'),
-			'the link card names the missing params',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-link-check-after.png`, fullPage: true });
-
-		// --- widget: the streamed feed on the data page ---------------------------
-		await page.goto(`${origin}/router/data`, { waitUntil: 'load' });
-		const feedCard = page.locator('section[data-preview="feed-steps"]');
-		const feedBody = feedCard.locator('.screen .text');
-		await feedBody.waitFor();
-		check(
-			(await feedBody.innerText()) === 'Loading...' &&
-				(await feedCard.locator('.end').innerText()) === 'The response stays open.',
-			'the first part of the response carries the @pending content and leaves it open',
-			await feedBody.innerText(),
-		);
-		await feedCard.getByRole('button', { name: 'Next', exact: true }).click();
-		await settleInner(
-			feedBody,
-			(text) => text === 'Loaded for /feed',
-			'the same response then sends the @try content',
-		);
-		check(
-			(await feedCard.locator('.end').innerText()) === 'The response ends.',
-			'after the second part the response ends',
-		);
-		await feedCard.getByRole('radio', { name: 'quick' }).check();
-		await settleInner(
-			feedCard.locator('.part.one'),
-			(text) => text.includes('Loaded for /feed') && !text.includes('Loading...'),
-			'quick data goes out in the first part, and Loading... is never sent',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-feed-steps-after.png`, fullPage: true });
-
-		// --- widget: the endpoint picker on the API routes page ---------------------
-		await page.goto(`${origin}/router/api-routes`, { waitUntil: 'load' });
-		const apiCard = page.locator('section[data-preview="api-answers"]');
-		const apiWatch = apiCard.locator('.pv-watch-text');
-		await apiWatch.waitFor();
-		check(
-			(await apiWatch.innerText()).startsWith('users/[id].get.ts answers') &&
-				(await apiCard.locator('.reply .body').innerText()) === '200 {"id":"42"}',
-			'a GET to the users endpoint answers with its params',
-			await apiWatch.innerText(),
-		);
-		await apiCard.getByRole('radio', { name: 'POST', exact: true }).check();
-		await settleInner(
-			apiWatch,
-			(text) => text.startsWith('The file name says get, so a POST'),
-			'a POST finds no endpoint, because the file name says get',
-		);
-		check(
-			(await apiCard.locator('.reply .body').innerText()) === '404 Not found',
-			'the response box answers the POST with 404',
-		);
-
-		// --- widget: the build targets on the deploying page ------------------------
-		await page.goto(`${origin}/router/deploying`, { waitUntil: 'load' });
-		const buildCard = page.locator('section[data-preview="build-targets"]');
-		await buildCard.getByRole('radio', { name: 'vercel' }).check();
-		await settleInner(
-			buildCard.locator('.pv-watch-text'),
-			(text) => text.includes('.vercel/output/'),
-			'the vercel preset writes .vercel/output/ from the same app folder',
-		);
-		check(
-			(await buildCard.locator('.command').innerText()).includes('NITRO_PRESET=vercel npm run build'),
-			'the command box shows the preset variable',
-		);
 
 		// --- preview cards on the home, start, tooling, contributing and UI pages ----
 		// Each card is driven the way its page tells the reader to drive it.

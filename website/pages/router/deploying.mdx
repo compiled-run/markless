@@ -1,41 +1,29 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import BuildTargets from '../../components/sketch/router/build-targets.tsrx';
-import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import Collapsible from '../../components/docs/collapsible.tsrx';
 
 <Sidebar />
 
 # Write once, then pick where it runs
 
-<PageMeta time="2 min" assumes="routes" />
+<PageMeta time="4 min" assumes="routes" />
 
 <ThemeToggle />
 
-You have pages, endpoints and maybe some middleware. Now they need to run somewhere other than your
-laptop.
-
-The router builds on [Nitro](https://nitro.build). Nitro turns one app into output for many hosts,
-and a preset picks the host. Your files stay the same. Only the output folder changes.
-
-<BuildTargets />
-
-## The default: a Node server
-
-<MugSpot mood="cheers" />
+<Subtitle text="One build turns your pages, endpoints and middleware into a Node server. A preset turns the same files into output for another host." />
 
 ```bash
 npm run build
 PORT=3000 node .output/server/index.mjs
 ```
 
-The build runs three steps: the browser build, the server build, then Nitro. By default, Nitro
-builds a Node server. The server reads the port from the `PORT` variable.
+That is the default: a Node server that reads its port from `PORT`. To try the build on your own machine first, run `npm run preview`.
 
-To try the build on your own machine, run `npm run preview`.
+The router builds on [Nitro](https://nitro.build), a server toolkit that writes output for many hosts. A *preset* names the host. Your files stay the same, and only the output changes.
 
-## What is in `.output/`
+## What the build writes
 
 | Path | What it holds |
 | --- | --- |
@@ -44,114 +32,59 @@ To try the build on your own machine, run `npm run preview`.
 | `.output/markless/router/types/` | the route types your editor uses to check links |
 | `.output/nitro.json` | Nitro's notes about this build |
 
-<Callout
-	sprite="cross"
-	title="Is .output/ in my .gitignore?"
-	text="Not in the starter. Its .gitignore lists dist/ and .markless/, but not .output/. Add it yourself before your first commit."
-/>
+The starter's `.gitignore` already leaves `.output/` out of git.
 
-## Other hosts
+## Pick another host with a preset
 
-Nitro reads the preset from the `NITRO_PRESET` variable. This build writes output for Vercel:
+Nitro reads the preset from the `NITRO_PRESET` variable when you build:
+
+| Host | `NITRO_PRESET` | Output |
+| --- | --- | --- |
+| Node | none, the default | `.output/` |
+| Vercel | `vercel` | `.vercel/output/` |
+| Cloudflare Workers | `cloudflare-module` | `.output/` |
 
 ```bash
 NITRO_PRESET=vercel npm run build
 ```
 
-The output goes to `.vercel/output/`, with a `static/` folder and a `functions/` folder. This
-website deploys the same way.
+For Cloudflare, build with `NITRO_PRESET=cloudflare-module`, then deploy with `npx wrangler deploy --config .output/server/wrangler.json`.
 
-## Cloudflare Workers
+These three are tested with Markless. Nitro has presets for many other hosts. Treat those as untested for now, and try a preview deploy first.
 
-This build writes output for a Cloudflare Worker with static assets:
+## Serve prerendered pages free on Cloudflare
 
-```bash
-NITRO_PRESET=cloudflare-module npm run build
-npx wrangler deploy --config .output/server/wrangler.json
-```
+Cloudflare answers a request for a file in `.output/public/` without running your Worker, and those requests are free. So a page you prerender costs nothing to serve:
 
-Cloudflare answers a request for a file in `.output/public/` without running your Worker, and those
-requests are free. So everything you prerender costs nothing to serve: give a page
-`prerender: true` in its route rule, and give its `/_markless/fragment/...` path the same rule, so
-links to it are served from files too. The router writes `/guide` as `guide.html` and `/guide/` as
-`guide/index.html`, the names Cloudflare serves at exactly those URLs without a redirect.
+- Give the page `prerender: true` in its route rule, and give its `/_markless/fragment/...` path the same rule. Then a click on a link to it is served from a file too.
+- `/guide` is written as `guide.html` and `/guide/` as `guide/index.html`, the names Cloudflare serves at those URLs with no redirect.
+- Pages that aren't prerendered render in the Worker and stream, so `@pending` content still shows first.
+- Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`. Nitro merges it into the one it writes.
 
-Pages that are not prerendered render in the Worker and stream, so a `@pending` arm still shows
-before its data is ready. A Worker can be at most 64 MiB, so the router leaves out of it the code of
-every page whose page and fragment URLs were both prerendered: those requests never reach it.
+## Caches keep the page and its fragment apart
 
-Browser code under `/build/` is static too, kept by browsers for a year. Cloudflare compresses it at
-its edge, so the router writes no `.gz` or `.br` copies for this preset.
+When a link swaps in the next page, the router asks for just the page area, under its own path: `/_markless/fragment/docs` for `/docs`. A request for `/docs` itself gets the whole page. The two never share an address, so a CDN or a Vercel ISR cache keeps them apart, even one that ignores the query string. Your middleware and route rules see `/docs` for both.
 
-Some packages ship a Node build and a default build, and no build for Workers or browsers. Their
-default build is for runtimes without Node's APIs and can miss functions the Node build has. A Worker
-with `nodejs_compat` (Nitro's default) has those APIs, so the router bundles the Node build of such a
-package into the Worker, the code a Node server would run. A package with its own Worker or browser
-build keeps that one.
-CommonJS code bundled into the Worker can still read `__filename` and `__dirname`, which a Worker never
-defines, so a Worker build defines them as `/index.mjs` and `/`.
+## Keep shared data out of memory
 
-The Worker also leaves out Nitro's list of every uploaded file, which Cloudflare never needs because
-it serves those files before the Worker runs. On a large site that list is megabytes of code an
-isolate would parse every time it starts. A `run_worker_first` in your `wrangler.json` keeps it.
+A host runs your server as many copies, called *instances*, and starts or stops them as traffic changes. Each instance has its own memory, and no host shares it. A value in a variable is gone on the next instance, and the next visitor may land there.
 
-Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`; Nitro merges that file
-into the one it writes.
-
-Nitro has presets for many other hosts. We have tested three of them with Markless: the default Node
-server, Vercel and Cloudflare Workers. Treat the others as untested for now, and try a preview
-deploy first.
-
-## Caches in front of your server
-
-When a link swaps in the next page, the router asks for that page under its own path, such as
-`/_markless/fragment/docs` for `/docs`, and the server answers with just the page area. Every
-request for `/docs` itself gets the whole page. Because the two never share an address, a CDN or a
-Vercel ISR cache keeps them apart, even one that ignores the query string. With an ISR rule for
-`/**`, Vercel caches the page areas too; with a narrower rule, they render fresh on each click.
-
-Your middleware and route rules see the page path, `/docs`, for both requests.
-
-## Memory is not shared
-
-A host runs your server as many copies, called instances, and starts or stops them as traffic
-changes. Each instance has its own memory. No host shares it between instances: not Vercel, not
-Netlify, not Cloudflare. A value you keep in a variable is gone on the next instance, and the
-next visitor may land there.
-
-A variable at the top of a module exists once per instance. It can also exist more than once inside
-one instance, because Nitro may load the same module into more than one bundle. To keep exactly one
-copy per instance, put it on `globalThis`:
+- Put counters, sessions and carts in a database or a key-value store.
+- A variable at the top of a module can exist more than once in one instance, because Nitro may load a module into more than one bundle. For one copy per instance, such as a database pool, put it on `globalThis`:
 
 ```ts
 const pool = (globalThis.dbPool ??= createPool(process.env.DATABASE_URL));
 ```
 
-This is the right place for a database pool or a client: make it once per instance, then reuse it.
+## Builds reuse what they compiled
 
-State that must outlive a request, or that every visitor must see, belongs in a database or a
-key-value store. Counters, sessions and carts all go there, not in memory.
+A build keeps each `.tsrx` file's compiled result in `node_modules/.vite/markless-compile/`. The next build reuses a result while the file, everything it was compiled against, and the compiler are unchanged. The cache holds at most 1 GB, and deleting it is always safe. To compile everything every time, pass `markless({ compileCache: false })`.
 
-<Callout
-	sprite="cross"
-	title="Does each route get its own function on Vercel?"
-	text="It looks that way, but Nitro's per-route Vercel functions are links to one shared bundle. Nitro keeps them so each route shows up on its own in Vercel's logs and metrics. A compatibilityDate.vercel earlier than 2025-07-15 turns them off. To get functions that are truly separate, with their own copy of the bundle, use vercel.functionRules."
-/>
+<Collapsible summary="Nitro settings in vite.config.ts">
 
-## The compile cache
+Put Nitro settings under a top-level `nitro` key, and the router merges them into the Nitro setup it makes. This app serves from a sub-path:
 
-A build keeps each `.tsrx` file's compiled result in `node_modules/.vite/markless-compile/`. The next build
-reads a result back instead of compiling again, as long as the file, everything it was compiled against, and
-the Markless compiler itself are unchanged, so it builds the same output. The cache holds at most 1 GB and
-drops the results no recent build used. To compile everything every time, pass `markless({ compileCache:
-false })`. Deleting the folder is always safe.
-
-## Nitro configuration
-
-Put Nitro configuration under a top-level `nitro` key in `vite.config.ts`. The router merges it into
-the Nitro setup it makes for you. This is how an app serves from a sub-path:
-
-```ts
+```ts title="vite.config.ts"
 import { markless } from '@markless/core/vite';
 import { router } from '@markless/router/vite';
 import { defineConfig } from 'vite-plus';
@@ -163,15 +96,8 @@ export default defineConfig({
 });
 ```
 
-<Callout
-	sprite="cross"
-	title="Why does my build say Remove nitro()?"
-	text="The router adds Nitro for you. If you also add nitro() to the plugins in vite.config.ts, the build stops and asks you to remove it. Keep plugins: [markless(), router()], and put Nitro settings under the nitro key."
-/>
+Don't add `nitro()` to `plugins` yourself. The build stops with `Remove nitro() from vite.config.ts and keep plugins: [markless(), router()].`
 
-## Try it yourself
-
-Build your app twice: once with no preset, once with `NITRO_PRESET=vercel`. Compare `.output/` with
-`.vercel/output/`. Your own files did not change between the two builds.
+</Collapsible>
 
 Back to the start of this section: [make a file, get a URL](/router/pages).
