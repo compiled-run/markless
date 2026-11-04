@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 3045,
-			"reason": "app code, not framework: the docs home prefetches the rewritten How it works pages, whose live cart blocks, PassList and the State graph page's MarginNotes column are new page modules; JS executed at load stayed within its anchor and only downloaded bytes failed; +3045 B gzip downloaded on PR #463 run 41916706848 over main 3650b2f99",
+			"delta": 3048,
+			"reason": "app code, not framework: the docs home prefetches the rewritten How it works pages, whose live cart blocks, PassList and the State graph page's MarginNotes column are new page modules; JS executed at load stayed within its anchor and only downloaded bytes failed; +3045 B gzip downloaded on PR #463 run 41916706848 over main 3650b2f99, and +3048 on run 41919848836 over a newer main",
 			"date": "2026-11-04"
 		}
 	]
