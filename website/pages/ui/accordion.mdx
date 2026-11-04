@@ -2,7 +2,6 @@ import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import AnatomyTable from '../../components/docs/anatomy-table.tsrx';
 import KeyboardTable from '../../components/docs/keyboard-table.tsrx';
 import ApiTable from '../../components/docs/api-table.tsrx';
 import AccordionPreviewCards from '../../components/demos/ui/accordion/examples/preview-cards.tsrx';
@@ -31,7 +30,7 @@ section that is open. Opening another section closes the first one. Add `multipl
 
 ## Anatomy
 
-<AnatomyTable />
+<PartsFigure scenario="basic" />
 
 `accordion.itemlabel` renders an `<h3>`, and the trigger goes inside it. That heading also names
 the panel: the panel is a `role="region"` whose `aria-labelledby` points at it. If you leave the
