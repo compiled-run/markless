@@ -5,11 +5,23 @@
 			"path": [
 				"loadWeight",
 				"linux-x64",
-				"docs /ui/accordion",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 284,
+			"reason": "the nine Building an app and Router pages drop their preview cards and Callouts and take Subtitle, so the bundler regroups the shared docs components: the home's load set gains one file (61 to 62; 26 of them get new content-hash names) and the chunk carrying subtitle.tsrx and term.tsrx is now shared with those pages, so the home runs 284 more chars and downloads 690 B gzip more at load than its anchor (274 chars and 709 B more than the #410 merge-queue run 41903352996); no new code is authored for the home; measured on PR run 41912179385",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 8,
-			"reason": "the Building an app and Router docs pages swap their preview cards for live <Code> blocks, so the bundler re-splits shared docs chunks: 18 of the 53 files the accordion page downloads at load get new content-hash names and the same count, executed chars at load fall 22864 to 22725, and only the downloaded total moves (+8 B gzip); measured on PR run 41884134872 against main's run 41879749389",
+			"delta": 690,
+			"reason": "the nine Building an app and Router pages drop their preview cards and Callouts and take Subtitle, so the bundler regroups the shared docs components: the home's load set gains one file (61 to 62; 26 of them get new content-hash names) and the chunk carrying subtitle.tsrx and term.tsrx is now shared with those pages, so the home runs 284 more chars and downloads 690 B gzip more at load than its anchor (274 chars and 709 B more than the #410 merge-queue run 41903352996); no new code is authored for the home; measured on PR run 41912179385",
 			"date": "2026-11-04"
 		}
 	]
