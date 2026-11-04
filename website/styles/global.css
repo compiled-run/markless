@@ -127,8 +127,8 @@
 	font-weight: 400;
 	font-display: swap;
 	src:
-		url('/fonts/JoyElia-Regular.woff2') format('woff2'),
-		url('/fonts/JoyElia-Regular.woff') format('woff');
+		url('./fonts/JoyElia-Regular.woff2') format('woff2'),
+		url('./fonts/JoyElia-Regular.woff') format('woff');
 }
 
 @font-face {
@@ -137,8 +137,8 @@
 	font-weight: 700;
 	font-display: swap;
 	src:
-		url('/fonts/JoyElia-Bold.woff2') format('woff2'),
-		url('/fonts/JoyElia-Bold.woff') format('woff');
+		url('./fonts/JoyElia-Bold.woff2') format('woff2'),
+		url('./fonts/JoyElia-Bold.woff') format('woff');
 }
 
 /* Shantell Sans — self-hosted, SIL Open Font License. The body face: a marker
@@ -149,7 +149,7 @@
 	font-style: normal;
 	font-weight: 400 700;
 	font-display: swap;
-	src: url('/fonts/ShantellSans-latin-variable.woff2') format('woff2');
+	src: url('./fonts/ShantellSans-latin-variable.woff2') format('woff2');
 }
 
 /* Recursive, self-hosted, SIL Open Font License. The code face: its MONO axis
@@ -159,11 +159,42 @@
 	font-style: oblique 0deg 15deg;
 	font-weight: 300 1000;
 	font-display: swap;
-	src: url('/fonts/Recursive-variable.woff2') format('woff2');
+	src: url('./fonts/Recursive-variable.woff2') format('woff2');
+}
+
+/* Arial scaled to the brand faces' width and line box, measured in Chromium, so a first visit's swap barely moves text. */
+@font-face {
+	font-family: 'Joy Elia fallback';
+	font-weight: 400;
+	src: local('Arial'), local('ArialMT');
+	size-adjust: 104.2%;
+	ascent-override: 93.1%;
+	descent-override: 23%;
+	line-gap-override: 0%;
+}
+
+@font-face {
+	font-family: 'Joy Elia fallback';
+	font-weight: 700;
+	src: local('Arial Bold'), local('Arial-BoldMT');
+	size-adjust: 105%;
+	ascent-override: 92.4%;
+	descent-override: 22.9%;
+	line-gap-override: 0%;
+}
+
+@font-face {
+	font-family: 'Shantell Sans fallback';
+	font-weight: 400 700;
+	src: local('Arial'), local('ArialMT');
+	size-adjust: 109.8%;
+	ascent-override: 92.9%;
+	descent-override: 29.1%;
+	line-gap-override: 0%;
 }
 
 *:where(:not(.code-stage *)) {
-	font-family: 'Joy Elia';
+	font-family: 'Joy Elia', 'Joy Elia fallback', sans-serif;
 	/* Only Recursive has these axes, so every other face ignores them. */
 	font-variation-settings: 'MONO' 1, 'CASL' 1;
 }
@@ -173,7 +204,7 @@
    children are matched explicitly. Bold maps to the real 600 weight. */
 .prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary):where(:not(.code-stage *)),
 .prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary) :is(a, strong, em, b, i, mark, small, span):where(:not(.code-stage *)) {
-	font-family: 'Shantell Sans', system-ui, sans-serif;
+	font-family: 'Shantell Sans', 'Shantell Sans fallback', system-ui, sans-serif;
 }
 
 .prose :is(p, li, blockquote) :is(strong, b):where(:not(.code-stage *)) {
@@ -727,8 +758,10 @@ body {
 	overscroll-behavior: none;
 }
 
+/* The browser paints the top of a long page before the rest arrives; a reserved gutter keeps the late scrollbar from moving the layout. */
 html {
 	background: var(--paper);
+	scrollbar-gutter: stable;
 }
 
 /* ---------------------------------------------------------------------------

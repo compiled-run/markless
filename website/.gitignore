@@ -3,6 +3,7 @@ dist/
 .vite/
 .output/
 .vercel/
+.wrangler/
 .env*
 *.log
 .DS_Store
