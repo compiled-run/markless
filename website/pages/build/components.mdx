@@ -1,16 +1,15 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # Props pass values down, and callbacks talk back
 
 <PageMeta time="3 min" assumes="state, events" />
-
-<ThemeToggle />
 
 <Subtitle text="A component is a function, and its props are its parameter. A prop is a live read of the parent's value, not a copy." />
 

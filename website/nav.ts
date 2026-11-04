@@ -425,23 +425,6 @@ export const nav: readonly NavSection[] = [
 /** Every entry in reading order, which is what the prev/next pager walks. */
 export const flatNav: readonly NavEntry[] = nav.flatMap((section) => section.entries);
 
-export type Crumb = { readonly section: string; readonly page: string };
-
-/**
- * The header's trail for one pathname: the section it belongs to and its own
- * title. An unknown path (a 404, say) gets two empty strings rather than a
- * throw, and the header renders the mug on its own.
- */
-export function breadcrumbFor(pathname: string): Crumb {
-	for (const section of allNav)
-		for (const entry of section.entries)
-			if (entry.href === pathname) return { section: section.title, page: entry.title };
-	for (const section of allNav)
-		for (const entry of section.entries)
-			if (entry.href !== '/' && pathname.startsWith(entry.href + '/')) return { section: section.title, page: entry.title };
-	return { section: '', page: '' };
-}
-
 export const siteDescription =
 	'The Markless documentation: build for any device, the web way. Elements and events in TypeScript, with an API designed to compile to any device.';
 
@@ -577,7 +560,7 @@ export function assumesFor(assumes: string): readonly AssumesItem[] {
    The UI section. `@markless/ui` is a second set of pages under /ui,
    and the switch at the top of the sidebar moves a reader between the two. What
    follows is the same shape as the framework nav above, so one file still
-   decides the sidebar, the breadcrumb, the pager and the document head.
+   decides the sidebar, the pager and the document head.
    --------------------------------------------------------------------------- */
 
 export type ModeKey = 'framework' | 'ui';
@@ -859,7 +842,6 @@ export const uiNav: readonly NavSection[] = [
 export const flatUiNav: readonly NavEntry[] = uiNav.flatMap((section) => section.entries);
 
 /** Both sections, for the lookups that only need to find a page by its href. */
-const allNav: readonly NavSection[] = [...nav, ...uiNav];
 const allFlat: readonly NavEntry[] = [...flatNav, ...flatUiNav];
 
 /** The ink mark of the page at a pathname, if it is a docs page. */
