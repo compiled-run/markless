@@ -93,9 +93,14 @@ render of a `#/` route.
   a browser does while a document is still loading: Back goes to the entry
   before that page, which may be another document. A click on a link to the
   page shown, or to a `#anchor` on it, cancels it and keeps the page.
+- The next page's head changes in the swap as well: before it, only its
+  stylesheets (not applied) and preloads are added, so a cancelled navigation
+  leaves the head of the page shown.
 - Back to a page restores the scroll offset it had when it was swapped out, not
-  the one at the click. A navigation whose fetch fails loads the page as a
-  document, adding its entry as a link would (`replace` replaces it).
+  the one at the click. A navigation whose fetch or code fails to load loads the
+  page as a document, adding its entry as a link would (`replace` replaces it),
+  unless the document is being left: a browser aborts those requests when the
+  user goes elsewhere, and loading the page then would cancel that navigation.
 - A page swapped in while its response still streams resumes its `@pending`
   boundaries from the arms the server streams, as a landing does: the browser
   never runs their async work again.
