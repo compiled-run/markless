@@ -1,0 +1,11 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 2890,
+			"reason": "app code, not framework: the docs home prefetches Reading a .tsrx file, whose guest list demo now imports the shared MarginNotes and Ring modules (website/components/figures/ink); JS executed at load is unchanged at 110176 chars and the same 66 files load; measured on PR #458 run 41890877284 against the main anchor 1579268",
+			"date": "2026-11-04"
+		}
+	]
+}
