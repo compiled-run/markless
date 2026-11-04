@@ -33,6 +33,7 @@ import type {
 } from '../../artifacts.ts';
 import { resolveSharedInstanceGraphPath, sharedInstanceVisibleFrom } from './collect-shared.ts';
 import {
+	asyncArmOrderDiagnostic,
 	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
@@ -1032,6 +1033,11 @@ function emitNodes(
 				branchElseSpellingDiagnostic({ node, filename: context.filename }),
 			);
 		}
+		if (isPendingAfterCatch(previous, node)) {
+			context.graph.diagnostics.push(
+				asyncArmOrderDiagnostic({ node, filename: context.filename }),
+			);
+		}
 		previous = node;
 		childIndex += emitNode(node, [...prefix, childIndex], builder, context, repeat);
 	}
@@ -1055,6 +1061,11 @@ const PLAIN_ELSE_TEXT = /^else$|^else\s+if\s*\(/;
 function isPlainElseSpelling(previous: AnyNode | null, node: AnyNode): boolean {
 	if (!previous || previous.type !== 'JSXIfExpression') return false;
 	return isStaticTextNode(node) && PLAIN_ELSE_TEXT.test(staticTextValue(node).trim());
+}
+
+function isPendingAfterCatch(previous: AnyNode | null, node: AnyNode): boolean {
+	if (!previous || previous.type !== 'JSXTryExpression' || !previous.handler) return false;
+	return isStaticTextNode(node) && staticTextValue(node).trim() === '@pending';
 }
 
 function emitAsyncArm(
