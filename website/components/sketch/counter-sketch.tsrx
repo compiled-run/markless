@@ -102,7 +102,7 @@ export default function CounterSketch() @{
 			.sketch {
 				--sweep-delay: 320ms;
 				container-type: inline-size;
-				margin: var(--space-l) 0;
+				margin: var(--flow-block) 0;
 				padding: 0;
 			}
 
