@@ -20,11 +20,43 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 				--spring-hover: linear(0, 0.008 0.8%, 0.03 1.7%, 0.065 2.5%, 0.111 3.3%, 0.165 4.2%, 0.227 5%, 0.294 5.8%, 0.657 10%, 0.794 11.7%, 0.856 12.5%, 0.915 13.3%, 0.968 14.2%, 1.016 15%, 1.059 15.8%, 1.097 16.7%, 1.129 17.5%, 1.155 18.3%, 1.177 19.2%, 1.193 20%, 1.205 20.8%, 1.212 21.7%, 1.215 23.3%, 1.211 24.2%, 1.195 25.8%, 1.158 28.3%, 1.064 33.3%, 1.011 36.7%, 0.991 38.3%, 0.975 40%, 0.964 41.7%, 0.957 43.3%, 0.954 45.8%, 0.957 48.3%, 0.997 59.2%, 1.009 65.8%, 1.009 70.8%, 0.998 86.7%, 1);
 				--spring-hover-ms: 748ms;
 				position: relative;
-				z-index: 60;
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: 1rem;
 				line-height: 1.5;
 				color: var(--ink);
+			}
+
+			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				border-radius: inherit;
+				pointer-events: none;
+			}
+
+			.nav-pill::before,
+			.nav-pill::after {
+				inset: -2px;
+			}
+
+			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
+			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
+				visibility: hidden;
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
+				background-image: var(--grain-fiber);
+				mix-blend-mode: var(--grain-fiber-blend);
+				opacity: var(--grain-fiber-opacity);
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				background-image: var(--grain-speck);
+				mix-blend-mode: var(--grain-speck-blend);
+				opacity: var(--grain-speck-opacity);
 			}
 		</style>
 	</header>
@@ -110,7 +142,6 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				position: fixed;
 				top: 1.5rem;
 				left: 50%;
-				z-index: 60;
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
@@ -124,6 +155,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				background: var(--raised);
 				box-shadow: 6px 6px 0 var(--muted-ink);
 				translate: -50% 0;
+				z-index: calc(var(--grain-z) + 1);
 				transition:
 					translate 300ms ease,
 					opacity 300ms ease;
@@ -662,7 +694,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				position: fixed;
 				inset-block-start: 0;
 				inset-inline: 0;
-				z-index: 60;
+				z-index: calc(var(--grain-z) + 1);
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
@@ -675,6 +707,11 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 			.menu-bar {
 				position: relative;
 				flex: none;
+			}
+
+			/* The open menu repeats the bar in the same spot; it stays under the page grain, since it is translucent and the page is locked behind it. */
+			.mobile-menu[ui-open] > .mobile-bar {
+				visibility: hidden;
 			}
 
 			.bar-button {
