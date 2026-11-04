@@ -43,6 +43,8 @@ export type ArmCommitUpdate = {
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 	/** The async boundary arm this commit paints; rows written straight into it follow it. */
 	readonly arm?: number;
+	/** Keep the shown content and paint this arm after it, replacing only a previous `after` commit. */
+	readonly after?: boolean;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -125,11 +127,18 @@ export function createArmCommitter(
 	installEventType: (eventType: string) => void,
 ) {
 	return async function commitArm(
-		boundary: ResumeArmRange,
+		target: ResumeArmRange,
 		update: ArmCommitUpdate,
 	): Promise<void> {
 		if (!update.nodes && (!deps.renderHtml || update.html === undefined))
-			throw armCommitRendererMissingError(boundary);
+			throw armCommitRendererMissingError(target);
+		const end = target.endAnchor as CommitAnchor;
+		let anchor = afterAnchors.get(end);
+		if (update.after && (anchor as CommitAnchor | undefined)?.parentNode !== end.parentNode)
+			afterAnchors.set(end, (anchor = openAfterAnchor(end)));
+		const boundary = update.after
+			? { id: `${target.id}:after`, startAnchor: anchor!, endAnchor: target.endAnchor }
+			: target;
 		const fresh =
 			update.nodes ??
 			deps.renderHtml!(
@@ -155,7 +164,10 @@ export function createArmCommitter(
 		const settled = registering.catch(() => undefined);
 		pending.add(settled);
 		const materialized = await registering.finally(() => pending.delete(settled));
-		const shown = update.arm === undefined ? undefined : deps.root.__marklessBranchArms?.get(boundary.id);
+		const shown =
+			update.arm === undefined || update.after
+				? undefined
+				: deps.root.__marklessBranchArms?.get(boundary.id);
 		if (shown) {
 			Object.assign(shown, { arm: update.arm, start: boundary.startAnchor, end: boundary.endAnchor });
 			for (const paint of shown.listeners) paint();
@@ -322,6 +334,16 @@ function registerArmDomUpdates(
 
 function armRecordHostMissingError(hostNodeId: string, kind: string): Error {
 	return new Error(`Markless async arm ${kind} record expected live host ${hostNodeId}.`);
+}
+
+// Keyed by the boundary's end anchor, so every committer of one page finds the same range; a full commit removes it.
+const afterAnchors = new WeakMap<object, ResumeDomComment>();
+
+// The arm-branch prefix keeps page-level comment walks from counting it.
+function openAfterAnchor(end: CommitAnchor): ResumeDomComment {
+	const anchor = (end as unknown as ChildNode).ownerDocument!.createComment('markless:arm-branch:after');
+	(end as unknown as ChildNode).before(anchor);
+	return anchor as unknown as ResumeDomComment;
 }
 
 // Both anchors must be live siblings under one parent BEFORE anything is

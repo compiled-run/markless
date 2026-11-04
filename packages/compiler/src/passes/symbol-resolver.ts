@@ -81,6 +81,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	// authored order is the order they run, and `order` is where the view payload
 	// files each symbol inside that record's single `symbolIds` list.
 	const eventHandlerOrder = new Map<string, number>();
+	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	for (const event of input.payloadArena.view.events) {
 		if (event.handlerSource === undefined) continue;
 
@@ -125,6 +126,16 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			]),
 			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
 			elementHandleReads: handleReadsOf(reads),
+			...(event.handlerCatchResets?.length
+				? {
+						catchResets: event.handlerCatchResets.map((reset) => ({
+							name: reset.name,
+							graphNodeIds: (boundaryRunners.get(reset.boundaryId)?.reads ?? []).map(
+								(read) => read.graphNodeId,
+							),
+						})),
+					}
+				: {}),
 		});
 	}
 
@@ -311,7 +322,6 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	// Boundary settle symbols (gate-blind; protocol-view wires only boundaries
 	// with a plan arms entry).
-	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	for (const boundary of input.payloadArena.view.asyncBoundaries) {
 		const graphNodeId = boundaryRunners.get(boundary.id)?.runnerGraphNodeId;
 		if (!graphNodeId) continue;

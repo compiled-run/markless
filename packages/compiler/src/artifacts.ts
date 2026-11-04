@@ -789,6 +789,8 @@ export type SemanticEvent = {
 	readonly handlerSpan?: SourceSpan;
 	// Body-local definitions spliced into `handlerSource`; their reads are the handler's too.
 	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
+	// `@catch (error, reset)` reset names the handler calls, with the boundary each resets.
+	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
@@ -870,6 +872,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
 		| 'MARKLESS_ASYNC_ARM_ORDER'
+		| 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY'
 		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
@@ -1410,6 +1413,9 @@ export type SemanticGraphArtifact = {
 		readonly id: string;
 		readonly anchorOrder: number;
 		readonly parentBoundaryId?: string;
+		readonly componentName?: string;
+		/** The name `@catch (name)` binds the rejection to. */
+		readonly errorName?: string;
 	}>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
 	readonly markup: SemanticMarkupArtifact;
@@ -1835,6 +1841,11 @@ export type PlannedSymbol =
 				readonly endOffset: number;
 			}>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+			// `@catch (error, reset)` names the handler calls, with the async values each re-runs.
+			readonly catchResets?: ReadonlyArray<{
+				readonly name: string;
+				readonly graphNodeIds: ReadonlyArray<string>;
+			}>;
 	  }
 	| {
 			readonly id: string;

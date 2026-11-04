@@ -1,3 +1,4 @@
+import { componentCatchErrorNames } from './boundary-runner.ts';
 import { parseModule } from '../../js-ast.ts';
 import { createResidueDependencyReader, residueReferences } from './residue-dependencies.ts';
 import { COUNT_VALUE_PARAMETER } from '../semantic-graph/roster-count.ts';
@@ -753,9 +754,10 @@ export function emitClientResidueReader(
 			.map((binding) => shadowedRowNameSource(repeats, binding, CONTEXT, binding.name))
 			.join(',')})`;
 	};
-	if (reads('error') && !bound.has('error')) {
-		bound.add('error');
-		lines.push(`const error=${CONTEXT}.asyncError;`);
+	for (const errorName of componentCatchErrorNames(input.semanticGraph, componentName)) {
+		if (!reads(errorName) || bound.has(errorName)) continue;
+		bound.add(errorName);
+		lines.push(`const ${errorName}=${CONTEXT}.asyncError;`);
 	}
 	for (const binding of input.semanticGraph.graphBindings) {
 		const owned =

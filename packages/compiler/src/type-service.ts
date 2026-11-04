@@ -535,9 +535,11 @@ function emitTryExpression(node: TsrxAstNode, source: string): string {
 	let catchBlock: string;
 	if (handler) {
 		const catchKeyword = emitKeywordAt(handler.start, '@catch', 'catch', source);
-		const declaration = isNode(handler.param)
-			? `const ${emitValue(handler.param, source)}: any = __caught;\n`
-			: '';
+		const declaration =
+			(isNode(handler.param) ? `const ${emitValue(handler.param, source)}: any = __caught;\n` : '') +
+			(isNode(handler.resetParam)
+				? `const ${emitValue(handler.resetParam, source)} = (): void => {};\n`
+				: '');
 		const arm = emitArmParts(handler.body, source);
 		catchBlock = `${catchKeyword} (__caught) {\n${declaration}${arm.statements.join('\n')}\nreturn <>${arm.render}</>;\n}`;
 	} else {

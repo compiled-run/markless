@@ -34,6 +34,7 @@ import type {
 import { resolveSharedInstanceGraphPath, sharedInstanceVisibleFrom } from './collect-shared.ts';
 import {
 	asyncArmOrderDiagnostic,
+	asyncCatchWithoutTryDiagnostic,
 	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
@@ -1026,8 +1027,13 @@ function emitNodes(
 	const startIndex = startPath[startPath.length - 1] ?? 0;
 	let childIndex = startIndex;
 	let previous: AnyNode | null = null;
-	for (const node of nodes) {
+	for (const [at, node] of nodes.entries()) {
 		if (isIgnorableStaticTextNode(node)) continue;
+		if (isCatchWithoutTry(node, nodes[at + 1])) {
+			context.graph.diagnostics.push(
+				asyncCatchWithoutTryDiagnostic({ node, filename: context.filename }),
+			);
+		}
 		if (isPlainElseSpelling(previous, node)) {
 			context.graph.diagnostics.push(
 				branchElseSpellingDiagnostic({ node, filename: context.filename }),
@@ -1066,6 +1072,17 @@ function isPlainElseSpelling(previous: AnyNode | null, node: AnyNode): boolean {
 function isPendingAfterCatch(previous: AnyNode | null, node: AnyNode): boolean {
 	if (!previous || previous.type !== 'JSXTryExpression' || !previous.handler) return false;
 	return isStaticTextNode(node) && staticTextValue(node).trim() === '@pending';
+}
+
+// A `@catch` not attached to an @try parses as this text, and its block as the expression after it.
+const CATCH_AS_TEXT = /^@catch(?:\s*\([^)]*\))?$/;
+
+function isCatchWithoutTry(node: AnyNode, next: AnyNode | undefined): boolean {
+	return (
+		next?.type === 'JSXExpressionContainer' &&
+		isStaticTextNode(node) &&
+		CATCH_AS_TEXT.test(staticTextValue(node).trim())
+	);
 }
 
 function emitAsyncArm(

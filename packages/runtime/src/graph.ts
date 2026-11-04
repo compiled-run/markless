@@ -15,6 +15,7 @@ import {
 	createRuntimeAsyncComputedNodes,
 	demandAsyncComputed as demandRuntimeAsyncComputed,
 	invalidateAsyncComputed as invalidateRuntimeAsyncComputed,
+	retryAsyncComputed as retryRuntimeAsyncComputed,
 	readAsyncComputedNode,
 	type RuntimeAsyncComputedNode,
 } from './graph-async.ts';
@@ -84,6 +85,8 @@ export type RuntimeGraphAsyncSnapshot =
 			// answering with it until the new snapshot commits (spec D8: "the
 			// prior value is always addressable"; Solid 2 `latest` semantics).
 			readonly value?: unknown;
+			/** The key `value` was fetched for; present only when a settled value exists. */
+			readonly valueKey?: unknown;
 	  }
 	| {
 			readonly status: 'fulfilled';
@@ -96,6 +99,9 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly version: number;
 			readonly key: unknown;
 			readonly error: unknown;
+			/** A failed refresh keeps the last good value, fetched for `valueKey`. */
+			readonly value?: unknown;
+			readonly valueKey?: unknown;
 	  };
 
 export type RuntimeGraphAsyncComputed = {
@@ -296,6 +302,11 @@ export type RuntimeGraph = {
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
 	/**
+	 * Re-runs the rejected async values `graphNodeId` reads (itself, or the nearest
+	 * rejected ones it derives from) with the keys they already have.
+	 */
+	readonly retry?: (graphNodeId: string) => boolean;
+	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
 	 */
@@ -493,6 +504,19 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
 		invalidateRuntimeAsyncComputed({ node, ...asyncComputedInput() });
 
+	const retry = (graphNodeId: string, seen: Set<string>): boolean => {
+		if (seen.has(graphNodeId)) return false;
+		seen.add(graphNodeId);
+		const asyncNode = asyncComputedNodes.get(graphNodeId);
+		let retried = false;
+		for (const dependency of (asyncNode ?? computedNodes.get(graphNodeId))?.dependencies ?? [])
+			retried = retry(dependency.graphNodeId, seen) || retried;
+		// A retried input re-runs this value itself once it answers.
+		if (retried || asyncNode?.snapshot.status !== 'rejected') return retried;
+		retryRuntimeAsyncComputed({ node: asyncNode, ...asyncComputedInput() });
+		return true;
+	};
+
 	const sharedGraph = createSharedGraphPlane({
 		cells,
 		sharedDefinitionsInput: input.sharedDefinitions,
@@ -658,6 +682,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return outcome.result;
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
+		retry: (graphNodeId) => retry(graphNodeId, new Set()),
 		defineAsyncComputed(asyncComputed) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncComputedNodes.has(id) || cells.has(id)) return false;

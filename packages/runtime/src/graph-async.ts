@@ -91,6 +91,21 @@ export function invalidateAsyncComputed(input: AsyncReconcile & {
 	advanceAsyncComputed(input);
 }
 
+// A reset re-runs a rejected value even though its key has not changed.
+export function retryAsyncComputed(input: Parameters<typeof advanceAsyncComputed>[0]): void {
+	input.node.gate = 1;
+	advanceAsyncComputed(input);
+}
+
+// The most recent fulfilled value and the key it was fetched for, carried through re-runs and failures.
+function lastGood(
+	snapshot: RuntimeGraphAsyncSnapshot,
+): { readonly value: unknown; readonly valueKey: unknown } | undefined {
+	if (snapshot.status === 'fulfilled') return { value: snapshot.value, valueKey: snapshot.key };
+	if (snapshot.status !== 'idle' && 'valueKey' in snapshot)
+		return { value: snapshot.value, valueKey: snapshot.valueKey };
+}
+
 function advanceAsyncComputed(input: AsyncReconcile & {
 	readonly node: RuntimeAsyncComputedNode;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
@@ -163,6 +178,7 @@ function commitDependencyBlock(
 	input.node.gate = 2;
 	const version = ++input.node.version;
 	const key = (input.node.snapshot as { readonly key?: unknown }).key;
+	const kept = lastGood(input.node.snapshot);
 	publish(
 		input,
 		status === 'pending'
@@ -171,13 +187,9 @@ function commitDependencyBlock(
 					version,
 					key,
 					value: (input.node.snapshot as { readonly value?: unknown }).value,
+					...(kept && { valueKey: kept.valueKey }),
 				}
-			: {
-					status,
-					version,
-					key,
-					error,
-				},
+			: { status, version, key, error, ...kept },
 	);
 }
 
@@ -194,16 +206,15 @@ function startAsyncComputed(input: AsyncReconcile & {
 	const controller = new AbortController();
 	const version = ++input.node.version;
 	input.node.controller = controller;
-	// A re-run keeps the prior settled value addressable while pending (spec
-	// D8 / Solid 2 `latest`): reads through the computed answer with it until
-	// the new snapshot commits. Consecutive re-runs carry it forward; a first
-	// run or a rejected prior carries undefined (reads answer undefined). The
-	// literal reads the prior snapshot before the assignment replaces it.
+	// A re-run keeps the last good value addressable while pending and after a
+	// failure (spec D8 / Solid 2 `latest`); a first run has none, so reads answer undefined.
+	const kept = lastGood(input.node.snapshot);
 	publish(input, {
 		status: 'pending',
 		version,
 		key: input.key,
 		value: (input.node.snapshot as { readonly value?: unknown }).value,
+		...(kept && { valueKey: kept.valueKey }),
 	});
 
 	const commit = (snapshot: RuntimeGraphAsyncSnapshot): void => {
@@ -212,7 +223,7 @@ function startAsyncComputed(input: AsyncReconcile & {
 		publish(input, snapshot);
 	};
 	const commitRejected = (error: unknown): void =>
-		commit({ status: 'rejected', version, key: input.key, error });
+		commit({ status: 'rejected', version, key: input.key, error, ...kept });
 
 	try {
 		Promise.resolve(

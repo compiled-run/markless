@@ -44,7 +44,7 @@ import {
 	type ArmChildProp,
 	type ArmImportedInterfaces,
 } from './arm-child-content.ts';
-import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
+import { asNodes, getIdentifierName, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { asyncComputedReadPath } from '../artifact-helpers/graph-paths.ts';
 import { moduleIdOf } from '../module-id.ts';
@@ -6123,6 +6123,15 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
+			...(referenced.has(CATCH_RESET_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: CATCH_RESET_FN,
+							source: '@markless/web/fns/catch-reset',
+						}),
+					]
+				: []),
 			...imports.map((moduleImport) =>
 				moduleImportNode({
 					kind: moduleImport.kind,
@@ -6540,6 +6549,12 @@ function eventHandlerAuthoredStatements(
 		];
 	}
 
+	const directReset =
+		symbol.kind === 'event-handler'
+			? symbol.catchResets?.find((reset) => reset.name === trimmed)
+			: undefined;
+	if (directReset) return [returnStatementNode(catchResetCall(directReset))];
+
 	const directReferenceRead = (symbol.reads ?? []).find((read) => read.source.trim() === trimmed);
 	if (directReferenceRead && VALUE_IDENTIFIER_PATTERN.test(trimmed)) {
 		return [
@@ -6774,6 +6789,9 @@ function rewriteEventHandlerNode(
 
 	const handleCall = elementHandleCallNode(node, text, rewrite);
 	if (handleCall) return carryEventHandlerComments(node, handleCall);
+
+	const reset = catchResetNode(node, rewrite);
+	if (reset) return carryEventHandlerComments(node, reset);
 
 	const read = eventReadNode(node, parent, text, rewrite);
 	if (read) return carryEventHandlerComments(node, read);
@@ -7499,6 +7517,31 @@ const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
 const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
 const CHANGED_FN = 'marklessChanged';
+const CATCH_RESET_FN = 'marklessCatchReset';
+
+function catchResetCall(reset: { readonly graphNodeIds: ReadonlyArray<string> }): EmissionNode {
+	return callNode(identifierNode(CATCH_RESET_FN), [
+		memberChainNode('context.graph'),
+		stringArrayNode(reset.graphNodeIds),
+	]);
+}
+
+// A `@catch (error, reset)` reset the handler names, unless one of its own bindings shadows it.
+function catchResetNamed(node: AnyNode, rewrite: EventHandlerRewrite) {
+	if (node.type !== 'Identifier' || rewrite.symbol.kind !== 'event-handler') return undefined;
+	const name = getIdentifierName(node);
+	if (!name || rewrite.boundHandleNames.has(name)) return undefined;
+	return rewrite.symbol.catchResets?.find((reset) => reset.name === name);
+}
+
+function catchResetNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	if (node.type === 'CallExpression' && isNode(node.callee)) {
+		const reset = catchResetNamed(node.callee, rewrite);
+		return reset ? catchResetCall(reset) : null;
+	}
+	const reset = catchResetNamed(node, rewrite);
+	return reset ? arrowFunctionNode([], catchResetCall(reset)) : null;
+}
 
 // The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
 function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {

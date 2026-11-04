@@ -61,7 +61,8 @@ async function searchFailsThenRetries(page: Page, errors: ReadonlyArray<string>)
 	await expect.poll(() => items(page)).toHaveLength(7);
 	await page.locator('input').pressSequentially('berry!', { delay: 100 });
 	await expect.poll(() => page.locator('main p').allInnerTexts()).toEqual(['Search is down']);
-	expect(await page.locator('ul').count()).toBe(0);
+	// A failed refresh keeps the last list and shows the @catch content after it.
+	expect(await page.locator('ul ~ p').count()).toBe(1);
 	await expect.poll(() => page.locator('[aria-busy="true"]').count()).toBe(0);
 	await page.getByText('Try again').click();
 	await expect.poll(() => items(page)).toEqual(['blueberry']);

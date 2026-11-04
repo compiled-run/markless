@@ -1993,6 +1993,31 @@ export function asyncArmOrderDiagnostic(input: {
 	};
 }
 
+export function asyncCatchWithoutTryDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'An `@catch` is written without an `@try` before it',
+		message:
+			'This `@catch` follows an element, not an @try block, so it is not read as a catch arm. TSRX parses it as literal text, and the block after it as a separate expression, so the page would show the words "@catch" and render the block as ordinary content.',
+		why: 'An `@catch` arm belongs to the `@try` block written directly before it. Without one there is no block for it to catch errors from, and building it anyway would ship visible text instead of failing.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Wrap the content that can fail in an @try and put the arm after it: `@try { ... } @catch (error) { ... }`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+	};
+}
+
 // A braced plain `else` after an @if arm stops the parser (TSRX1009), so it is named at the parse.
 export function branchElseSpellingParseDiagnostic(input: {
 	readonly span: SourceSpan | undefined;

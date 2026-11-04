@@ -82,6 +82,9 @@ export type MutableSemanticGraphArtifact = {
 		readonly id: string;
 		readonly anchorOrder: number;
 		readonly parentBoundaryId?: string;
+		readonly componentName?: string;
+		/** The name `@catch (name)` binds the rejection to. */
+		readonly errorName?: string;
 	}>;
 	branchSites: SemanticBranchSite[];
 	markup: SemanticMarkupArtifact;
@@ -192,6 +195,8 @@ export type WalkState = {
 	nextHostId: number;
 	nextEventId: number;
 	nextBoundaryId: number;
+	/** The boundary each `@catch (error, reset)` reset binding resets, by the binding's declaration offset. */
+	catchResetBoundaries: Map<number, string>;
 	nextBranchSiteId: number;
 	nextAnchorOrder: number;
 };
@@ -321,6 +326,7 @@ export function createWalkState(input: {
 		nextHostId: 0,
 		nextEventId: 0,
 		nextBoundaryId: 0,
+		catchResetBoundaries: new Map(),
 		nextBranchSiteId: 0,
 		nextAnchorOrder: 0,
 	};

@@ -687,6 +687,7 @@ const unserveableDiagnosticCodes: ReadonlySet<string> = new Set([
 	'MARKLESS_BRANCH_ELSE_SPELLING',
 	// Same shape for an @pending after @catch: the word and the arm's source would ship as text.
 	'MARKLESS_ASYNC_ARM_ORDER',
+	'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
 ]);
 
 function hasUnserveableDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {

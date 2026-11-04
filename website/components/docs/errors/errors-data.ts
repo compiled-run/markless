@@ -566,6 +566,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'An `@catch` is written without an `@try` before it: a Markless build error.',
+		printed: [
+			'MARKLESS_ASYNC_CATCH_WITHOUT_TRY: This `@catch` follows an element, not an @try block, so it is not read as a catch arm. TSRX parses it as literal text, and the block after it as a separate expression, so the page would show the words "@catch" and render the block as ordinary content.',
+			'An `@catch` arm belongs to the `@try` block written directly before it. Without one there is no block for it to catch errors from, and building it anyway would ship visible text instead of failing.',
+			'Wrap the content that can fail in an @try and put the arm after it: `@try { ... } @catch (error) { ... }`.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/compiler/src/compile-module.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/compile-module.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -1644,6 +1671,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/capture-analysis.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/capture-analysis.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_CATCH_RESET_GRAPH_MISSING: This @catch reset ran without a graph that can re-run async values.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/catch-reset.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/catch-reset.ts',
 			},
 		],
 		moreSources: 0,

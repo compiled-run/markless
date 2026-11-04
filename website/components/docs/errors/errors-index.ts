@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 303,
+	total: 305,
 	guided: 46,
 	groups: [
 		{
@@ -47,6 +47,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED',
 					kind: 'compile error',
 					guided: true,
+				},
+				{
+					code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+					kind: 'compile error',
+					guided: false,
 				},
 				{
 					code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
@@ -1130,6 +1135,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_CANONICAL_SYMBOL_MISSING',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					kind: 'runtime error',
 					guided: false,
 				},

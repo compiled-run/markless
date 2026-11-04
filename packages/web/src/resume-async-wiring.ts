@@ -23,7 +23,10 @@ import type {
 //   racing settle commit always waits it out — one ordering mechanism.
 export type AsyncBoundarySettleTracker = {
 	readonly hasSettledContent: (boundaryId: string) => boolean;
-	readonly markSettled: (boundaryId: string) => void;
+	readonly markSettled: (boundaryId: string, arm?: number) => void;
+	/** Which arm the boundary's range shows, as far as the settle path committed it. */
+	readonly shownArm: (boundaryId: string) => number | undefined;
+	readonly markShown: (boundaryId: string, arm: number) => void;
 	readonly track: (boundary: ResumeAsyncBoundaryRecord) => void;
 	readonly forget: (boundaryId: string) => void;
 	readonly whenAllSettled: () => Promise<void>;
@@ -51,12 +54,15 @@ export function createAsyncBoundarySettleTracker(input: {
 }): AsyncBoundarySettleTracker {
 	const now = input.clock?.now ?? Date.now;
 	const settledById = new Map<string, boolean>();
-	const track = (boundary: ResumeAsyncBoundaryRecord) =>
-		void settledById.set(
+	const shownArmById = new Map<string, number>();
+	const track = (boundary: ResumeAsyncBoundaryRecord) => {
+		settledById.set(
 			boundary.id,
 			boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.try ||
 				boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.catch,
 		);
+		shownArmById.set(boundary.id, boundary.initiallyServedArm);
+	};
 	for (const boundary of input.boundaries) track(boundary);
 	let commitFloor = 0;
 	let allSettled: Promise<void> | undefined;
@@ -69,7 +75,10 @@ export function createAsyncBoundarySettleTracker(input: {
 	};
 	return {
 		hasSettledContent: (boundaryId) => settledById.get(boundaryId) === true,
-		markSettled(boundaryId) {
+		shownArm: (boundaryId) => shownArmById.get(boundaryId),
+		markShown: (boundaryId, arm) => void shownArmById.set(boundaryId, arm),
+		markSettled(boundaryId, arm) {
+			if (arm !== undefined) shownArmById.set(boundaryId, arm);
 			if (settledById.get(boundaryId) !== false) return;
 			settledById.set(boundaryId, true);
 			announceIfAllSettled();
@@ -77,6 +86,7 @@ export function createAsyncBoundarySettleTracker(input: {
 		track,
 		forget(boundaryId) {
 			settledById.delete(boundaryId);
+			shownArmById.delete(boundaryId);
 			announceIfAllSettled();
 		},
 		whenAllSettled() {
@@ -347,6 +357,15 @@ export async function settleAsyncBoundaryRange(
 	// A newer run that started while this settle waited or rendered owns the boundary: its own settle commits, and the hold keeps what is shown.
 	if ((await input.settleTracker?.waitOutCommitHold()) === true && runnerStatus() !== status) return;
 	const source = resolveBoundarySettleSource(input, boundary);
+	const arm = status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try;
+	const commit = async (update: Omit<ArmCommitUpdate, 'arm' | 'after'>) => {
+		// A failed refresh over shown @try content keeps it and renders the @catch arm after it.
+		const after =
+			arm === ASYNC_BOUNDARY_ARM.catch &&
+			input.settleTracker?.shownArm(boundary.id) === ASYNC_BOUNDARY_ARM.try;
+		await input.commitArm!(boundary, { ...update, arm, ...(after && { after }) });
+		input.settleTracker?.markSettled(boundary.id, after ? ASYNC_BOUNDARY_ARM.try : arm);
+	};
 	// A composed child's arm records are minted in the child's own id space; the
 	// qualifier that re-spells them in page space is installed only by pages the
 	// bundler gave component edges (fns/composed-arm-records).
@@ -355,13 +374,11 @@ export async function settleAsyncBoundaryRange(
 		if (runnerStatus() === 'pending' || claim?.() === false) return;
 		const armRecords = boundaryArmRecordSet(rendered.armRecords);
 		if (!armRecords) throw emptySettleRenderError(boundary.id);
-		await input.commitArm!(boundary, {
+		await commit({
 			...rendered,
 			html: rendered.html,
-			arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
 			armRecords: (composedArmRecordQualifier()?.(boundary, armRecords, input.graph) ?? armRecords),
 		});
-		input.settleTracker?.markSettled(boundary.id);
 		return;
 	}
 	const symbol = await input.loadSymbol(source.symbolId);
@@ -377,9 +394,7 @@ export async function settleAsyncBoundaryRange(
 	if (input.commitArm) {
 		const rawArmRecords = (update as { readonly armRecords?: unknown }).armRecords;
 		const plannedArmRecords = Array.isArray(boundary.armRecords)
-			? boundary.armRecords[
-					status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try
-				]
+			? boundary.armRecords[arm]
 			: undefined;
 		const armRecords =
 			boundaryArmRecordSet(rawArmRecords) ?? boundaryArmRecordSet(plannedArmRecords);
@@ -387,31 +402,27 @@ export async function settleAsyncBoundaryRange(
 		if (armRecords) {
 			if (claim?.() === false) return;
 			const { computed, cells } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'>;
-			await input.commitArm(boundary, {
+			await commit({
 				...(computed && { computed }),
 				...(cells && { cells }),
 				html: update.html,
-				arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
 				armRecords: (composedArmRecordQualifier()?.(boundary, armRecords, input.graph) ?? armRecords),
 			});
-			input.settleTracker?.markSettled(boundary.id);
 			return;
 		}
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
 		if (input.root.__marklessBranchArms?.has(boundary.id)) {
 			if (claim?.() === false) return;
-			await input.commitArm(boundary, {
+			await commit({
 				html: update.html,
-				arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
 				armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
 			});
-			input.settleTracker?.markSettled(boundary.id);
 			return;
 		}
 	}
 	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-	input.settleTracker?.markSettled(boundary.id);
+	input.settleTracker?.markSettled(boundary.id, arm);
 	return boundaryRangeJournal(boundary.id, fragment);
 }
 

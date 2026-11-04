@@ -153,6 +153,28 @@ across all three cases:
   requires seeded content to stay visible. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
+- Failed refresh (2026-11-04, async-error-states): a refresh that rejects
+  keeps the last good value. The rejected snapshot carries the previous
+  settled `value` and the `valueKey` it was fetched for; a first-load failure
+  has neither. A boundary showing `@try` content does not replace it: the
+  content stays, its busy mark clears, and the `@catch` arm renders right
+  after it, inside the same boundary, in a range opened by a runtime comment
+  anchor that page-level comment walks skip. A later refresh that fulfills
+  commits the `@try` arm over the whole boundary, which removes the `@catch`
+  content; one that rejects again replaces only that range. On the first load
+  `@catch` is still the only content. Every boundary follows this rule, nested
+  or not; a nested boundary's failure is handled by that boundary and never
+  reaches an outer `@catch`, because the outer boundary does not read the
+  inner one's async values.
+- Reset: `@catch (error, reset)` binds `reset` to a function an event handler
+  in that arm may name or call (`onClick={reset}`, `() => reset()`). The
+  compiler lowers it to a call that retries the boundary's async reads with
+  their current keys (`graph.retry`): a rejected value re-runs, or, when it
+  is rejected because an async input is, that input re-runs instead. It is
+  not a closure over the body, so it survives server render and resume.
+  While the retry runs the shown content is held busy under the same rule as
+  any refresh. Handlers outside a DOM event (callback props) still refuse it
+  as a body local.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). Deadline,

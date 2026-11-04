@@ -1064,7 +1064,7 @@ function collectAttribute(
 				);
 			}
 			const inlined = handler
-				? inlineHandlerRenderLocals(handler.node, state, attributeName)
+				? inlineHandlerRenderLocals(handler.node, state, attributeName, true)
 				: null;
 			state.graph.events.push({
 				id: `event:${state.nextEventId++}`,
@@ -1078,6 +1078,14 @@ function collectAttribute(
 					: {}),
 				...(inlined?.definitionSpans.length
 					? { handlerDefinitionSpans: inlined.definitionSpans }
+					: {}),
+				...(inlined?.catchResets.size
+					? {
+							handlerCatchResets: [...inlined.catchResets].map(([name, boundaryId]) => ({
+								name,
+								boundaryId,
+							})),
+						}
 					: {}),
 				handlerParameters: handler ? handlerParameterNames(handler.node) : [],
 				hasSyncPolicyCandidate,

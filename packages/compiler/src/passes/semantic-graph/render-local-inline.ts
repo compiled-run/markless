@@ -49,6 +49,8 @@ export type RenderLocalInline =
 			// The defining expressions spliced in; their graph reads are the expression's too.
 			readonly definitions: ReadonlyArray<AnyNode>;
 			readonly names: ReadonlySet<string>;
+			// `@catch (error, reset)` reset bindings left free, with the boundary each resets.
+			readonly catchResets: ReadonlyMap<string, string>;
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
 	| { readonly kind: 'render-local'; readonly name: string }
@@ -76,14 +78,15 @@ export function inlineRenderLocals(
 ): RenderLocalInline {
 	const definitions: AnyNode[] = [];
 	const names = new Set<string>();
-	const result = inlineWithin(node, state, definitions, names, new Set(), {
+	const catchResets = new Map<string, string>();
+	const result = inlineWithin(node, state, definitions, names, catchResets, new Set(), {
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
 		inlineFunctions: options.inlineFunctions === true,
 		inlineOnly: options.inlineOnly,
 	});
 	return 'source' in result
-		? { kind: 'inlined', source: result.source, definitions, names }
+		? { kind: 'inlined', source: result.source, definitions, names, catchResets }
 		: result;
 }
 
@@ -92,6 +95,7 @@ function inlineWithin(
 	state: WalkState,
 	definitions: AnyNode[],
 	names: Set<string>,
+	catchResets: Map<string, string>,
 	inlining: Set<number>,
 	options: {
 		readonly leaveCaptureOwned: boolean;
@@ -126,6 +130,17 @@ function inlineWithin(
 					semantic.scopes[scopeId]!.node.end <= region.end
 				) {
 					boundInside.add(name);
+				} else if (
+					options.inlineFunctions &&
+					state.catchResetBoundaries.has(declarationStartOf(semantic, symbolId))
+				) {
+					const boundaryId = state.catchResetBoundaries.get(declarationStartOf(semantic, symbolId))!;
+					const known = catchResets.get(name);
+					if (known !== undefined && known !== boundaryId) refusal = { kind: 'render-local', name };
+					else {
+						catchResets.set(name, boundaryId);
+						freeNames.add(name);
+					}
 				} else if (repeatRowBindsName(name, state)) {
 					if (options.leaveRowItems) freeNames.add(name);
 					else refusal = { kind: 'row-item', name };
@@ -178,6 +193,7 @@ function inlineWithin(
 							state,
 							definitions,
 							names,
+							catchResets,
 							new Set([...inlining, symbolId]),
 							options,
 						);
@@ -227,6 +243,10 @@ function inlineWithin(
 			replacement.text +
 			text.slice(replacement.end - region.start);
 	return { source: text, freeNames };
+}
+
+function declarationStartOf(semantic: ReturnType<WalkState['semantic']>, symbolId: number): number {
+	return semantic.bindings[symbolId]!.declarations[0]?.start ?? -1;
 }
 
 // A row, an arm and a nested `@{ ... }` have no body of their own in the render, so a slot
@@ -287,7 +307,13 @@ export function inlineHandlerRenderLocals(
 	node: AnyNode,
 	state: WalkState,
 	handlerLabel: string,
-): { readonly source: string; readonly definitionSpans: ReadonlyArray<SourceSpan> } | null {
+	// Only a DOM event handler runs where the boundary's reset can be lowered.
+	allowCatchReset = false,
+): {
+	readonly source: string;
+	readonly definitionSpans: ReadonlyArray<SourceSpan>;
+	readonly catchResets: ReadonlyMap<string, string>;
+} | null {
 	if (state.currentSharedDefinitionId) return null;
 	const inlined = inlineRenderLocals(node, state, {
 		leaveCaptureOwned: true,
@@ -307,11 +333,13 @@ export function inlineHandlerRenderLocals(
 		);
 		return null;
 	}
-	if (inlined.kind !== 'inlined') {
+	const refusedReset =
+		inlined.kind === 'inlined' && !allowCatchReset ? [...inlined.catchResets.keys()][0] : undefined;
+	if (inlined.kind !== 'inlined' || refusedReset !== undefined) {
 		state.graph.diagnostics.push(
 			handlerReadsRenderLocalDiagnostic({
 				handlerLabel,
-				localName: inlined.name,
+				localName: refusedReset ?? (inlined as { readonly name: string }).name,
 				handler: node,
 				filename: state.filename,
 			}),
@@ -324,6 +352,7 @@ export function inlineHandlerRenderLocals(
 		definitionSpans: inlined.definitions.flatMap(
 			(definition) => sourceSpan(definition, state.filename) ?? [],
 		),
+		catchResets: inlined.catchResets,
 	};
 }
 

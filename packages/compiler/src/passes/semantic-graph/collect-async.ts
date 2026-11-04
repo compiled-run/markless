@@ -50,12 +50,21 @@ export function collectAsyncBoundary(
 		[node.handler, 2],
 	]);
 
+	const handler = node.handler as AnyNode | null | undefined;
+	const errorParam = handler?.param as AnyNode | null | undefined;
 	state.graph.asyncBoundaries.push({
 		id: boundaryId,
 		anchorOrder: state.nextAnchorOrder++,
 		...(previousBoundaryId ? { parentBoundaryId: previousBoundaryId } : {}),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+		...(errorParam?.type === 'Identifier' && typeof errorParam.name === 'string'
+			? { errorName: errorParam.name }
+			: {}),
 	});
 	state.currentAsyncBoundaryId = boundaryId;
+	const resetParam = handler?.resetParam as AnyNode | null | undefined;
+	if (resetParam?.type === 'Identifier' && typeof resetParam.start === 'number')
+		state.catchResetBoundaries.set(resetParam.start, boundaryId);
 
 	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;

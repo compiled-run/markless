@@ -143,3 +143,18 @@ export function resolveBoundaryRunners(
 		}),
 	);
 }
+
+// The names a component's `@catch (name)` arms bind the rejection to; `error` stays bound as before.
+export function componentCatchErrorNames(
+	semanticGraph: SemanticGraphArtifact,
+	componentName: string,
+): ReadonlyArray<string> {
+	return [
+		...new Set([
+			'error',
+			...semanticGraph.asyncBoundaries.flatMap((boundary) =>
+				boundary.componentName === componentName && boundary.errorName ? [boundary.errorName] : [],
+			),
+		]),
+	];
+}

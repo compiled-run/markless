@@ -1,3 +1,4 @@
+import { componentCatchErrorNames } from './boundary-runner.ts';
 import { parseModule } from '../../js-ast.ts';
 import { stripAuthoredExpression, stripAuthoredStatements } from './authored-strip.ts';
 import {
@@ -724,16 +725,18 @@ function emitSsrDataLines(
 	const preludeText = [
 		...new Set([...residueSources, ...renderDecisionSources(input, componentName)]),
 	].join('\n');
-	// A row variable named `error` takes the name, as the client residue reader already decides.
-	const rowNamesError = rowNames.some((binding) => binding.name === 'error');
+	// A row variable named like the rejection takes the name, as the client residue reader already decides.
+	const errorNames = componentCatchErrorNames(input.semanticGraph, componentName).filter(
+		(name) => !rowNames.some((binding) => binding.name === name),
+	);
 	const localLines = [
 		...repeatLocalLines(input, componentName, repeats, rowNames),
-		...(rowNamesError ? [] : ['const error=marklessSsrDataContext.asyncError;']),
+		...errorNames.map((name) => `const ${name}=marklessSsrDataContext.asyncError;`),
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
 			componentName,
 			preludeText,
-			new Set([...rowNames.map((binding) => binding.name), 'error']),
+			new Set([...rowNames.map((binding) => binding.name), ...errorNames]),
 			(graphNodeId, path) =>
 				`marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(
 					graphNodeId,

@@ -49,7 +49,9 @@ was unavailable):
 - An `@try`'s arms go in the order `@try`, `@pending`, `@catch`. An `@pending`
   written after `@catch` is not part of the `@try`: TSRX ends the `@try` at its
   `@catch` and reads `@pending` as text. Markless reports it as
-  `MARKLESS_ASYNC_ARM_ORDER`.
+  `MARKLESS_ASYNC_ARM_ORDER`. An `@catch` written after an element rather than
+  after an `@try` block is text followed by an ordinary expression; Markless
+  reports it as `MARKLESS_ASYNC_CATCH_WITHOUT_TRY`.
 - Among template children, `//` starts a line comment after whitespace, at the
   start of a line, or right after a tag, container or block, and `/*` starts a
   comment anywhere. `http://example.com` stays text. Comments are not children.

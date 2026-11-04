@@ -1,0 +1,128 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 584,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-async"
+			],
+			"delta": 547,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 250,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 546,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 121,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 584,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-async"
+			],
+			"delta": 547,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 250,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 546,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 127,
+			"reason": "failed refresh keeps the last good value, @catch renders after kept content, and @catch reset retries (graph.retry)",
+			"date": "2026-11-04"
+		}
+	]
+}

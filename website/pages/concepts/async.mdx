@@ -88,8 +88,9 @@ export function loadMugFact(
 ```
 </Code>
 
-Each pick runs the recipe again. When the answer is ready, it swaps in. The cracked mug fails, and
-the `@catch` block takes its place. Pick another mug and the page recovers.
+Each pick runs the recipe again. When the answer is ready, it swaps in. The cracked mug fails: the
+last answer stays on the page, and the `@catch` block shows up right after it. Pick another mug and
+the `@catch` block goes away.
 
 `loadMugFact`, in the `mug-facts.ts` tab, stands in for a `fetch`. It answers "Pick a mug." straight
 away, waits before it answers anything else, and fails for a mug it does not know.
@@ -99,7 +100,8 @@ away, waits before it answers anything else, and fails for a mug it does not kno
 `@try` holds what you show once the value is ready. Inside it, read the value directly, as in
 `fact.text`. There is no `.data` to reach through and no status to check.
 
-`@catch` holds what you show when the recipe throws or its promise rejects.
+`@catch` holds what you show when the recipe throws or its promise rejects. On the first load it is
+the only thing shown. After that, the last answer stays and `@catch` shows right after it.
 
 `@pending` holds what you show while there is no answer yet. That is the first load: once an answer
 is on the page, picking again keeps it there while the next answer loads.
@@ -131,6 +133,42 @@ pick starts that wait over, so fast typing never brings it back.
 To tell screen reader users something changed, put the message in a status element outside the
 block, such as `<p role="status">`. Some screen readers, NVDA in Firefox for one, stay silent about
 live regions inside a busy element.
+
+## Try again
+
+Name a second value in `@catch` and you get a function that runs the failed recipes of that block
+again, with the same inputs. Hand it to a button:
+
+```tsrx
+import { computed } from '@markless/core';
+import { loadMugFact } from './mug-facts.ts';
+
+export default function MugFact() @{
+	const fact = computed(async () => {
+		return { text: await loadMugFact('cracked') };
+	});
+
+	<section>
+		@try {
+			<p>{fact.text}</p>
+		} @catch (error, reset) {
+			<>
+				<p>{error.message}</p>
+				<button onClick={reset}>Try again</button>
+			</>
+		}
+	</section>
+}
+```
+
+While it runs again, the `@catch` block stays on the page, marked busy. When an answer comes back,
+the `@try` block takes its place.
+
+A block inside another block catches its own failures. If only the inner one fails, its `@catch`
+shows inside it, and the outer block keeps showing what it had.
+
+Write `@catch` right after a `@try` block. Written after an element, it is just text on the page, so
+the build stops with `MARKLESS_ASYNC_CATCH_WITHOUT_TRY`.
 
 ## Read state before or after an await
 

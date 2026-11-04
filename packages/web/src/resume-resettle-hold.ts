@@ -58,6 +58,7 @@ export function createResettleHold(deps: {
 			stall.fallback = true;
 			// A commit failure rejects unhandled: a broken anchor census must fail loudly (D2).
 			await deps.commitPendingArm(boundary);
+			deps.tracker.markShown(boundary.id, ASYNC_BOUNDARY_ARM.pending);
 			if (stalls.get(boundary.id) === stall) setBusy(boundary, true);
 		})();
 	};
