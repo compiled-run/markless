@@ -2,16 +2,15 @@ import PageMeta from '../../components/page-meta.tsrx';
 import NamePickerDemo from '../../components/demos/build/name-picker-demo.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # Props pass values down, and callbacks talk back
 
 <PageMeta time="5 min" assumes="state, events" />
-
-<ThemeToggle />
 
 Your page works, and the file keeps growing. One piece of it wants to be its own component. Now two
 components need to share a number.

@@ -2494,14 +2494,21 @@
 						"type": "boolean",
 						"required": false,
 						"default": "true",
-						"doc": "Dropdowns open when the pointer rests on an item, and close once the pointer\nhas been out of the landmark for a moment. Omit it and they do."
+						"doc": "Dropdowns open when the pointer rests on an item, and close once the pointer\nleaves the item's trigger and panel, allowing for the way between the two.\nOmit it and they do."
 					},
 					{
 						"name": "delay",
 						"type": "number",
 						"required": false,
 						"default": "200",
-						"doc": "How long the pointer must rest on an item before its dropdown opens, in\nmilliseconds. Omit it and it is 200. It applies to the first dropdown only:\nonce one is showing, moving to another opens it at once."
+						"doc": "How long the pointer must rest on an item before its dropdown opens, in\nmilliseconds, while no dropdown is showing. Omit it and it is 200."
+					},
+					{
+						"name": "switchDelay",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "How long the pointer must rest on an item before its dropdown replaces the\none already showing, in milliseconds. Omit it and it is 0: sliding along the\nbar switches at once. A pointer heading down across a trigger toward the\nopen panel is held back regardless, so it never swaps the panel under it."
 					},
 					{
 						"name": "clickGrace",
@@ -2517,6 +2524,12 @@
 						"doc": "Called with the value of the item now showing its dropdown, or the empty\nstring when everything closed. Omit it and the navbar still opens and\ncloses; the call site simply does nothing."
 					}
 				]
+			},
+			{
+				"part": "trigger",
+				"component": "NavbarTrigger",
+				"doc": "A button in the bar that opens no dropdown: a theme switch, a search opener,\nthe button that shows a mobile menu. It is a stop in the bar's arrow walk in\ndocument order, or in its dropdown's walk when it sits inside one, and it\nwrites no `aria-expanded`: what it does is the consumer's `onClick`. Outside\nevery navbar it is a plain button.",
+				"props": []
 			}
 		]
 	},
