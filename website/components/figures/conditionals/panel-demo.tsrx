@@ -4,6 +4,7 @@ import InkButton from '../ink/ink-button.tsrx';
 import InkScreen from '../ink/ink-screen.tsrx';
 import MarginNotes, { Notes, NoteTitle, Spot, Spots, Tally } from '../ink/margin-notes.tsrx';
 import Ring from '../ink/ring.tsrx';
+import { art as ink } from '../ink/screen.art.ts';
 import { describePanel, times } from './model.ts';
 
 export default function PanelDemo() @{
@@ -32,7 +33,7 @@ export default function PanelDemo() @{
 						<span>Note for the barista</span>
 						<span class="row">
 							<input value={note} onInput={(event) => (note = event.currentTarget.value)} />
-							<Ring n={1} />
+							<svg class="arm-ring" viewBox="0 0 26 26" aria-hidden="true"><path d={ink.ring.ink} /><text x="13" y="17.5">1</text></svg>
 						</span>
 					</label>
 				}
@@ -75,6 +76,18 @@ export default function PanelDemo() @{
 						gap: 0.35rem;
 						margin: 0;
 						font-size: 1.1rem;
+					}
+					.arm-ring {
+						flex: none;
+						width: 1.6rem;
+						height: 1.6rem;
+						overflow: visible;
+						fill: var(--ring);
+					}
+
+					.arm-ring text {
+						font: 700 13px 'Shantell Sans', system-ui, sans-serif;
+						text-anchor: middle;
 					}
 				</style>
 			</div>

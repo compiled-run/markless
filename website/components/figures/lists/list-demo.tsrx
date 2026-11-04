@@ -3,7 +3,7 @@ import { computed, state } from '@markless/core';
 import InkButton from '../ink/ink-button.tsrx';
 import InkScreen from '../ink/ink-screen.tsrx';
 import MarginNotes, { Notes, NoteTitle, Tally } from '../ink/margin-notes.tsrx';
-import Ring from '../ink/ring.tsrx';
+import { art as ink } from '../ink/screen.art.ts';
 import { describeOrder, movedBy, reverse, rowsWord, sortByName, START } from './model.ts';
 
 export default function ListDemo() @{
@@ -19,7 +19,7 @@ export default function ListDemo() @{
 				<ul class="rows">
 					@for (const item of items; key item.id) {
 						<li class="row">
-							<Ring n={item.n} />
+							<svg class="arm-ring" viewBox="0 0 26 26" aria-hidden="true"><path d={ink.ring.ink} /><text x="13" y="17.5">{item.n}</text></svg>
 							<label>
 								<input type="checkbox" checked={item.done} onChange={() => (item.done = !item.done)} />
 								{item.name}
@@ -96,6 +96,18 @@ export default function ListDemo() @{
 					.say {
 						margin: 0;
 						line-height: 1.3;
+					}
+					.arm-ring {
+						flex: none;
+						width: 1.6rem;
+						height: 1.6rem;
+						overflow: visible;
+						fill: var(--ring);
+					}
+
+					.arm-ring text {
+						font: 700 13px 'Shantell Sans', system-ui, sans-serif;
+						text-anchor: middle;
 					}
 				</style>
 			</div>
