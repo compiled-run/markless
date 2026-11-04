@@ -18,7 +18,7 @@ export default function MarginNotes({
 			.margin-notes {
 				--ring: oklch(55% 0.17 30);
 				container: margin-notes / inline-size;
-				margin: var(--space-m) 0;
+				margin: var(--flow-block, var(--space-m)) 0;
 
 				html.dark & {
 					--ring: oklch(72% 0.14 35);

@@ -27,7 +27,7 @@ export default box(
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(String(error)));
 			await page.goto(new URL('/concepts/state', server.url).href, { waitUntil: 'networkidle' });
-			const demo = page.locator('.settings-demo').first();
+			const demo = page.locator('.margin-notes').first();
 			await demo.scrollIntoViewIfNeeded();
 
 			for (const name of ['Dark', 'Light', 'Dark'] as const) {
@@ -41,7 +41,7 @@ export default box(
 							text: style('.heading', 'color'),
 							paper: getComputedStyle(shown).fill,
 							url: style('[data-tone] .url', 'color'),
-							key: style('.ring.corner .ring-ink', 'fill'),
+							key: style('.corner .ring-ink', 'fill'),
 							face: getComputedStyle(pressed.querySelector('path:nth-of-type(2)')!).fill,
 							wash: getComputedStyle(pressed.querySelector('path:nth-of-type(3)')!).opacity,
 						};
