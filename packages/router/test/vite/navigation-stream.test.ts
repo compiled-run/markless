@@ -1,7 +1,7 @@
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { chromium, webkit, type Browser, type BrowserType, type Page } from '@playwright/test';
+import { chromium, webkit, type Browser, type BrowserType, type Page, type Route } from '@playwright/test';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
@@ -278,9 +278,15 @@ for (const [name, browserType] of [
 			page.on('framenavigated', (frame) => {
 				if (frame === page.mainFrame()) loads.push(frame.url());
 			});
+			// The page's answer is held until Back has left, so it cannot arrive first.
+			const held: Route[] = [];
+			const recipe = (url: URL) => url.pathname === '/recipe' && url.search === '?u=2';
+			await page.route(recipe, (route) => void held.push(route));
 			// Back leaves this document (the page script may not get to answer), and WebKit aborts the swap module's import as it does.
 			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', 'back').catch(() => {});
 			await page.waitForURL('about:blank');
+			await page.unroute(recipe);
+			for (const route of held) await route.continue().catch(() => {});
 			await page.waitForTimeout(600);
 			expect(loads).toEqual(['about:blank']);
 			await page.goForward();
