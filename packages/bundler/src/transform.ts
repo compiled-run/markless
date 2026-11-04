@@ -33,6 +33,7 @@ import {
 	jsonSourceWithNonFiniteNumbers,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
+	hasLiveSharedDefinitions,
 } from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
@@ -885,6 +886,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
+					hasLiveSharedState: hasLiveSharedDefinitions(compiled.payloadScripts.state),
 					hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,

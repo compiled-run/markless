@@ -14,6 +14,9 @@ export interface FragmentNavigationConfig {
 	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
 	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
+	// Where the document (or a container element) holds its live shared() instances, which the swap keeps,
+	// and the resumer script attribute naming the module that binds the next page to them.
+	readonly sharedInstances: readonly [property: string, resumeModuleAttribute: string];
 	readonly streamExecutorGlobal: string;
 	readonly streamedArmSelector: string;
 	readonly streamOpenProperty: string;
@@ -91,6 +94,8 @@ export type FragmentNavigationState = {
 	readonly idleDownloads: boolean;
 	// Schedules the idle tier: at idle, fetch a few page fragments of the links in view; their code waits for intent.
 	readonly rescan: () => void;
+	// Bumped by Back, Forward, a hash link and a click on the page shown: each cancels a navigation whose page has not swapped in.
+	stops?: number;
 	readonly scrolled: Set<Element>;
 	// Code the intent started preloading, by absolute href, settling once each file has arrived.
 	readonly arriving: Map<string, Promise<unknown>>;
@@ -107,6 +112,8 @@ export type FragmentEntryModule = {
 		url: URL,
 		mode: 'push' | 'replace' | 'traverse',
 		scroll: FragmentScroll,
+		// The state's stops when the navigation was asked for: any since cancel it.
+		stops?: number,
 	) => Promise<void>;
 };
 
@@ -116,8 +123,6 @@ type Session = {
 	streaming?: AbortController;
 	// The history entry on screen, and the last scroll offset seen for every entry this tab visited.
 	current?: string;
-	// An entry a navigation pushed whose page has not swapped in yet: the next navigation replaces it.
-	unshown?: string;
 	readonly positions: Map<string, { readonly x: number; readonly y: number }>;
 };
 
@@ -139,6 +144,7 @@ function sessionFor(d: Document): Session {
 		{ passive: true },
 	);
 	w.addEventListener('pagehide', () => {
+		created.navigation++;
 		if (created.current) saveScroll(w, created.current);
 		w.history.scrollRestoration = 'auto';
 	});
@@ -412,36 +418,49 @@ export async function mergeHead(d: Document, next: Document, stylesheetKey: stri
 	const stylesheets: HTMLLinkElement[] = [];
 	const hidden: [Element, string | null][] = [];
 	const scripts: HTMLScriptElement[] = [];
+	// Only stylesheets (unapplied) and preloads go in ahead of the swap, so they load; the rest of the head changes with the page.
+	const later: [Element, Element | null][] = [];
 	let cursor: Element | null = null;
+	let placed: Element | null = null;
 	for (const element of Array.from(next.head.children)) {
 		const reused = current.get(key(element))?.shift();
 		const node = reused ?? d.adoptNode(element);
 		if (reused && servedMedia.has(reused)) hidden.push([reused, servedMedia.get(reused)!]);
 		if (!reused) {
 			// An arriving stylesheet applies only with its page: applied before, it restyles the leaving page for nothing.
+			const rel = node.localName === 'link' ? (node as HTMLLinkElement).rel : '';
 			if (isStyleNode(node)) {
 				hidden.push([node, node.getAttribute('media')]);
 				servedMedia.set(node, node.getAttribute('media'));
 				node.setAttribute('media', 'not all');
 			}
-			if (cursor) cursor.after(node);
-			else d.head.prepend(node);
+			if (isStyleNode(node) || rel === 'modulepreload' || rel === 'preload') {
+				if (placed) placed.after(node);
+				else d.head.prepend(node);
+				placed = node;
+			} else later.push([node, cursor]);
 			if (node.localName === 'link' && (node as HTMLLinkElement).rel === 'stylesheet')
 				stylesheets.push(node as HTMLLinkElement);
 			// A kept head script already ran on this document; only one the destination adds runs.
 			if (node.localName === 'script') scripts.push(node as HTMLScriptElement);
-		}
+		} else placed = node;
 		cursor = node;
 	}
 	const stale: Element[] = [];
+	const leaving: Element[] = [];
 	for (const element of [...current.values()].flat()) {
 		const rel = element.localName === 'link' ? (element as HTMLLinkElement).rel : '';
 		if (rel === 'modulepreload' || rel === 'preload') continue;
 		if (rel === 'stylesheet' || element.localName === 'style') stale.push(element);
-		else if ((element as HTMLScriptElement).type !== 'importmap') element.remove();
+		else if ((element as HTMLScriptElement).type !== 'importmap') leaving.push(element);
 	}
 	await loaded(d.defaultView!, stylesheets);
 	const show = () => {
+		for (const element of leaving) element.remove();
+		for (const [node, after] of later) {
+			if (after) after.after(node);
+			else d.head.prepend(node);
+		}
 		for (const [node, media] of hidden) {
 			servedMedia.delete(node);
 			if (media === null) node.removeAttribute('media');
@@ -866,10 +885,11 @@ function withoutTransitions(d: Document): () => void {
 }
 
 // Drops the leaving page's runtime state (the framework names its own `__m*`) and gives each container a new page lifetime.
-function forgetRuntimeState(root: Element): void {
+function forgetRuntimeState(root: Element, kept: string): void {
 	const forget = (node: Node) => {
 		for (const key of Object.keys(node))
-			if (key.startsWith('__m')) delete (node as unknown as Record<string, unknown>)[key];
+			if (key.startsWith('__m') && key !== kept)
+				delete (node as unknown as Record<string, unknown>)[key];
 		if (isContainer(node)) (node as unknown as Record<string, unknown>).__mL = {};
 	};
 	forget(root);
@@ -1020,6 +1040,7 @@ export async function navigate(
 	url: URL,
 	mode: 'push' | 'replace' | 'traverse',
 	scroll: FragmentScroll,
+	stops?: number,
 ): Promise<void> {
 	const state = (d as FragmentHost).__marklessFragmentNav;
 	const w = d.defaultView;
@@ -1027,41 +1048,36 @@ export async function navigate(
 	containerAttribute = state.config.containerAttributes[0];
 	const session = sessionFor(d);
 	const id = ++session.navigation;
-	// The address follows the click at once, so Back before the page arrives returns to the page still shown.
-	const entryNow = () =>
-		(w.history.state as { __marklessFragment?: { id?: string } } | null)?.__marklessFragment
-			?.id;
-	let entered: string | undefined;
-	if (mode !== 'traverse') {
-		const unshown = session.unshown !== undefined && session.unshown === entryNow();
-		if (!unshown)
-			session.positions.set(session.current ?? entryNow() ?? LANDING_ENTRY, {
-				x: w.scrollX,
-				y: w.scrollY,
-			});
-		w.history.scrollRestoration = 'manual';
-		session.unshown = entered = entryId();
-		const entry = { __marklessFragment: { id: entered, x: 0, y: 0 } };
-		if (mode === 'push' && !unshown) w.history.pushState(entry, '', url.href);
-		else w.history.replaceState(entry, '', url.href);
-	}
-	const left = () => entered !== undefined && entryNow() !== entered;
-	const stale = () => id !== session.navigation || left();
+	// The address and history entry change only when the page swaps in, so Back before then goes back from the page still shown.
+	const stale = () => id !== session.navigation || (mode !== 'traverse' && stops !== state.stops);
+	if (stale()) return;
 	const fallback = (href: string) => {
 		if (mode === 'traverse') w.location.reload();
-		else w.location.replace(href);
+		else if (mode === 'replace') w.location.replace(href);
+		else w.location.assign(href);
 	};
 	const started = w.performance.now();
 	const taken = take(state, url, mode === 'traverse', started);
-	const abandon = () => {
-		if (session.unshown === entered) session.unshown = undefined;
-		taken.abort();
-	};
+	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
+	// live values before it is shown. A document whose instances hold no values swaps in this task.
+	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
+	const sharedSwap = [d, d.querySelector(`[${containerAttribute}]`)].some((place) =>
+		Object.values(
+			(place as { [key: string]: { instances?: Record<string, { shape?: string }> } } | null)?.[
+				sharedProperty
+			]?.instances ?? {},
+		).some((instance) => instance.shape),
+	)
+		? import('@markless/web/shared-swap')
+		: undefined;
+	sharedSwap?.catch(() => {});
+	const abandon = () => taken.abort();
 	let fetched: FragmentFetched;
 	try {
 		fetched = await taken.result;
 	} catch {
-		if (!stale()) fallback(url.href);
+		// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
+		w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
 		return;
 	}
 	if (stale()) return abandon();
@@ -1102,23 +1118,38 @@ export async function navigate(
 	const head = await mergeHead(d, next, state.config.stylesheetKeyAttribute);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (stale()) return abandon();
-	let restore = scroll;
-	if (mode === 'traverse') {
-		const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
-		const saved = session.positions.get(key);
-		if (saved) restore = saved;
-		session.current = key;
-	} else {
-		session.current = entered;
-		session.unshown = undefined;
-		if (landed.href !== w.location.href)
-			w.history.replaceState(w.history.state, '', landed.href);
+	let wakeShared: (() => void) | undefined;
+	if (sharedSwap) {
+		try {
+			wakeShared = await (
+				await sharedSwap
+			).bindSharedSwap({ document: d, outgoing, incoming, containerAttribute, resumeAttribute });
+		} catch (error) {
+			reportAsync(error);
+		}
+		if (stale()) return abandon();
 	}
+	let restore = scroll;
 	let region!: Element;
 	let end!: Comment;
 	let scripts: Element[] = [];
 	const commit = (): boolean => {
-		if (id !== session.navigation) return false;
+		if (stale()) return false;
+		if (mode === 'traverse') {
+			const key = (typeof scroll === 'object' ? scroll.id : undefined) ?? LANDING_ENTRY;
+			const saved = session.positions.get(key);
+			if (saved) restore = saved;
+			session.current = key;
+		} else {
+			const leaving =
+				(w.history.state as { __marklessFragment?: { id?: string } } | null)
+					?.__marklessFragment?.id ?? LANDING_ENTRY;
+			session.positions.set(session.current ?? leaving, { x: w.scrollX, y: w.scrollY });
+			w.history.scrollRestoration = 'manual';
+			const entry = { __marklessFragment: { id: (session.current = entryId()), x: 0, y: 0 } };
+			if (mode === 'push') w.history.pushState(entry, '', landed.href);
+			else w.history.replaceState(entry, '', landed.href);
+		}
 		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
 		session.streaming?.abort();
 		const settle = withoutTransitions(d);
@@ -1138,7 +1169,7 @@ export async function navigate(
 		}
 		state.scrolled.clear();
 		retire(state, outgoing);
-		forgetRuntimeState(outgoing);
+		forgetRuntimeState(outgoing, sharedProperty);
 		(w as unknown as Record<string, unknown>)[state.config.streamExecutorGlobal] = undefined;
 		for (const element of d.querySelectorAll(state.config.streamedArmSelector))
 			element.remove();
@@ -1243,6 +1274,7 @@ export async function navigate(
 		ranFiles,
 		() => id === session.navigation,
 	);
+	wakeShared?.();
 	const active = d.activeElement as HTMLElement | null;
 	if (active && active !== d.body && !region.contains(active)) active.blur?.();
 	(region.querySelector('[autofocus]') as HTMLElement | null)?.focus();

@@ -275,6 +275,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_ARM_ORDER',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'An `@pending` arm is written after `@catch`: a Markless build error.',
+		printed: [
+			'MARKLESS_ASYNC_ARM_ORDER: This `@pending` follows the @catch arm of an @try. The arms of an @try go in the order @try, @pending, @catch, so the @try ends at its @catch and this `@pending` is read as literal text, with the block after it as a separate expression.',
+			'TSRX defines the order of the arms, and the parser has no @try left to attach a later `@pending` to. Building it anyway would put the word "@pending" and the arm\'s source on the page, with no waiting state.',
+			'Move the `@pending { ... }` arm before `@catch`: `@try { ... } @pending { ... } @catch (error) { ... }`.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_ARM_ORDER',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/compiler/src/compile-module.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/compile-module.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -8867,6 +8894,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/state-lowering.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_SHARED_SHAPE_MISMATCH',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_SHARED_SHAPE_MISMATCH: shared() definition "<id>" is already live in this document with a different shape, so this container keeps its own instance. Live: <live>. This container: <own>.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/shared-instances.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/shared-instances.ts',
 			},
 		],
 		moreSources: 0,

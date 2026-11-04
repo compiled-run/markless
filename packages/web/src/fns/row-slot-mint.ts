@@ -1,3 +1,4 @@
+import type { RuntimeGraph } from '@markless/runtime';
 import type { ResumeKeyedRepeatRecord, ResumeRenderDataThunk } from '../resume-types.ts';
 import { marklessOwningSurface } from '../prerender/owning-surface.ts';
 import { marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
@@ -5,7 +6,7 @@ import {
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP,
 	PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS,
 } from '../../../serializer/src/protocol-constants.ts';
-import { marklessComposedGraphNodeId } from './instance-scope.ts';
+import { marklessComposedGraphNodeId, marklessGraphWidgetRegistry } from './instance-scope.ts';
 import * as rowMint from './row-mint.ts';
 
 export type RowSlotReader = (source: string, item: unknown, index: number) => unknown;
@@ -34,8 +35,9 @@ export function marklessRowSlotReader(
 		if (!read) throw rowSlotReaderMissing(repeat, componentName);
 		const instancePath = repeat.instancePath ?? '';
 		const routes = repeat.propRoutes;
+		const widgets = marklessGraphWidgetRegistry(graph as RuntimeGraph);
 		const own = (graphNodeId: string, path: ReadonlyArray<string>) =>
-			graph.read(marklessComposedGraphNodeId(graphNodeId, instancePath), path);
+			graph.read(marklessComposedGraphNodeId(graphNodeId, instancePath, widgets), path);
 		// A prop the row reads follows the parent node composition routed it to.
 		const graphRead = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
 			const whole = graphNodeId === PROPS;

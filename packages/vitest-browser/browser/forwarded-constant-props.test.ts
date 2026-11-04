@@ -1,5 +1,8 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
+import ConstBins from './forwarded-constant-props/const-groups-imported-handler.tsrx';
+import ConstGroups from './forwarded-constant-props/const-groups.tsrx';
+import ConstShelves from './forwarded-constant-props/const-groups-handler.tsrx';
 import Direct from './forwarded-constant-props/direct.tsrx';
 import Iterated from './forwarded-constant-props/iterated.tsrx';
 import Live from './forwarded-constant-props/live.tsrx';
@@ -109,4 +112,37 @@ test('CSR: a constant list iterated and forwarded to a child computed stays whol
 });
 test('SSR resume: a constant list iterated and forwarded to a child computed stays whole', async () => {
 	await iteratedAndForwardedListStaysWhole((await renderSSR(Iterated)).container as HTMLElement);
+});
+
+// Rows of a @for over a module constant, where only the child the row renders has a handler reading the prop.
+test('CSR: a module-constant @for hands each row its prop, read by a handler two files down', async () => {
+	const container = (await render(ConstGroups)).container as HTMLElement;
+	await forwardedPropReachesReaders(container, 'north');
+	await forwardedPropReachesReaders(container, 'south');
+});
+test('SSR resume: a module-constant @for hands each row its prop, read by a handler two files down', async () => {
+	const container = (await renderSSR(ConstGroups)).container as HTMLElement;
+	await forwardedPropReachesReaders(container, 'north');
+	await forwardedPropReachesReaders(container, 'south');
+});
+
+async function rowHandlersReadTheirProp(container: HTMLElement, names: ReadonlyArray<string>) {
+	const out = (name: string) => container.querySelector(`[data-shelf-out="${name}"]`)?.textContent;
+	for (const name of names) {
+		container.querySelector<HTMLElement>(`[data-shelf="${name}"]`)!.click();
+		await expect.poll(() => out(name)).toBe(`took ${name}`);
+	}
+}
+
+test('CSR: a module-constant @for row component in the same file reads its prop in a handler', async () => {
+	await rowHandlersReadTheirProp((await render(ConstShelves)).container as HTMLElement, ['east', 'west']);
+});
+test('SSR resume: a module-constant @for row component in the same file reads its prop in a handler', async () => {
+	await rowHandlersReadTheirProp((await renderSSR(ConstShelves)).container as HTMLElement, ['east', 'west']);
+});
+test('CSR: a module-constant @for row component from another file reads its prop in a handler', async () => {
+	await rowHandlersReadTheirProp((await render(ConstBins)).container as HTMLElement, ['glass', 'paper']);
+});
+test('SSR resume: a module-constant @for row component from another file reads its prop in a handler', async () => {
+	await rowHandlersReadTheirProp((await renderSSR(ConstBins)).container as HTMLElement, ['glass', 'paper']);
 });

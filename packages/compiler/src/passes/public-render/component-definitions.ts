@@ -12,7 +12,7 @@ import {
 	emitClientResidueReader,
 	emitClientResidueReaderPrelude,
 } from './residue-reader.ts';
-import { handlerReadGraphNodeIds } from './derive-set.ts';
+import { resumeReadGraphNodeIds } from './derive-set.ts';
 import {
 	adoptedWidgetDefinitionIds,
 	componentBoundElementHandles,
@@ -59,12 +59,11 @@ export function collectPublicRenderComponentDefinitions(
 	});
 
 	const residueReaderPrelude = emitClientResidueReaderPrelude(input, [...componentNames]);
-	// A CSR mount derives these for the render and then drops the value, leaving a
-	// handler's first read undefined the way a resumed page's is.
-	const handlerReads = handlerReadGraphNodeIds(input);
-	const handlerReadComputedIds = new Set(
+	// A CSR mount derives these for the render and then drops the value, so they are served as on a resumed page.
+	const resumeReads = resumeReadGraphNodeIds(input);
+	const resumeReadComputedIds = new Set(
 		input.protocolState.computed.flatMap((computed) =>
-			computed.async === false && handlerReads.has(computed.graphNodeId)
+			computed.async === false && resumeReads.has(computed.graphNodeId)
 				? [computed.graphNodeId]
 				: [],
 		),
@@ -279,7 +278,7 @@ export function collectPublicRenderComponentDefinitions(
 			);
 		const servedComputedIndexes = ownedComputedIndexes.filter((index) => {
 			const computed = input.protocolState.computed[index];
-			return !!computed && handlerReadComputedIds.has(computed.graphNodeId);
+			return !!computed && resumeReadComputedIds.has(computed.graphNodeId);
 		});
 		return [
 			{

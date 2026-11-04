@@ -359,11 +359,22 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
+			 * Props this component's event handlers read, directly or through a child
+			 * it hands them to; `*` when a handler reads the props object whole. A
+			 * module rendering it in the rows of a module constant puts that list on
+			 * the graph, so each row's handler reads its own row's value.
+			 */
+			readonly handlerProps?: ReadonlyArray<string>;
+			/**
 			 * Props this component's tree re-derives from after resume, served only
 			 * while they arrive as a constant. A module forwarding one of its own
 			 * props here serves that prop itself. Absent when there are none.
 			 */
 			readonly derivedProps?: ReadonlyArray<string>;
+			/** The paths below each derived prop its derives read, for a prop they do not read whole. */
+			readonly derivedPropPaths?: Readonly<
+				Record<string, ReadonlyArray<ReadonlyArray<string>>>
+			>;
 			/**
 			 * Present when a keyed repeat sits at this component's top level, so its
 			 * rows need the container as their parent.
@@ -858,6 +869,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_ROWS_FROZEN'
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
+		| 'MARKLESS_ASYNC_ARM_ORDER'
 		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'

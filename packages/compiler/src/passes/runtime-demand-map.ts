@@ -29,6 +29,7 @@ import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	PROTOCOL_VISIBLE_EVENT_NAME,
+	hasLiveSharedDefinitions,
 	protocolEventActionKind,
 	type ProtocolArmBranchRecord,
 	type ProtocolArmRecordSet,
@@ -89,10 +90,15 @@ const ASYNC_BOUNDARY = [
 	'web/resume-stream-patches',
 ];
 const BEHAVIOR = ['web/resume-behaviors'];
+// A shared() instance that outlives the page: its binding at wake.
+const SHARED_INSTANCES = ['web/fns/shared-instances'];
+// The router's swap binder: no record demands it, so it stays off every page until a navigation imports it.
+const SHARED_SWAP = ['web/shared-swap'];
 // Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,
 	...ASYNC_BOUNDARY,
+	...SHARED_INSTANCES,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
 // all: no module the runtime always loads may write the `import()` specifier, or
@@ -269,7 +275,11 @@ export function createRuntimeDemandMap(
 			closurePlans,
 		),
 		armActions: armActionDemandRecords(scope, dispatchCore),
-		capabilityModuleIds: capabilityModuleIds(input.symbolResolver, input.protocolView),
+		capabilityModuleIds: capabilityModuleIds(
+			input.symbolResolver,
+			input.protocolView,
+			input.protocolState,
+		),
 		...nestedRecordDemand(
 			input.protocolView,
 			closedSymbolDemand,
@@ -289,6 +299,8 @@ export function createRuntimeDemandMap(
 			...BRANCH,
 			...ASYNC_BOUNDARY,
 			...BEHAVIOR,
+			...SHARED_INSTANCES,
+			...SHARED_SWAP,
 			// Conditional, unlike the kinds above: the overlay behaviour is only
 			// reachable in an app that compiled a mark, so listing it unconditionally
 			// would let the execution oracle excuse it everywhere.
@@ -386,6 +398,7 @@ function closureEventPlans(
 function capabilityModuleIds(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
 ): ReadonlyArray<string> {
 	const symbols = resolver.symbols;
 	const behavior =
@@ -401,7 +414,11 @@ function capabilityModuleIds(
 			(symbol) =>
 				symbol.kind === 'async-computed-runner' || symbol.kind === 'async-boundary-update',
 		);
-	return [...(behavior ? BEHAVIOR : []), ...(asyncBoundary ? ASYNC_BOUNDARY : [])];
+	return [
+		...(behavior ? BEHAVIOR : []),
+		...(asyncBoundary ? ASYNC_BOUNDARY : []),
+		...(hasLiveSharedDefinitions(state) ? SHARED_INSTANCES : []),
+	];
 }
 
 // Records served inside arms and rows ride outside the flat payload streams. Every one the compiler

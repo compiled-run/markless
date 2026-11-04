@@ -1202,6 +1202,16 @@ jobs:
             - name: Run the performance guards
               run: pnpm perf:guard
 
+            # A Linux anchor is accepted from this file: pnpm perf:guard:accept <guard> <subject> --from last-measurement.json
+            - name: Upload the perf-guards measurement
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: perf-guards-measurement
+                  path: /tmp/markless-perf-guards/last-measurement.json
+                  if-no-files-found: ignore
+                  retention-days: 7
+
             - name: Mark the perf-guards lane complete
               run: echo ok > perf-guards-completed.txt
 

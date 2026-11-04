@@ -1,5 +1,6 @@
 import { box } from '@async/witness';
 import { chromium, expect, type Page } from '@playwright/test';
+import { pagerFor } from '../nav.ts';
 
 const POLL = { timeout: 15_000 };
 
@@ -104,6 +105,11 @@ export default box(
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
 		const url = (path: string) => new URL(path, server.url).href;
+		// A page's first compile writes its code-block modules, and a new module file reloads open pages.
+		const nextFromHome = [pagerFor('/').nextHref];
+		while (nextFromHome.length < 4) nextFromHome.push(pagerFor(nextFromHome.at(-1)!).nextHref);
+		for (const path of ['/concepts/state', '/router/pages', '/start/migrate', '/how-it-works', '/', '/concepts/computed', '/how-it-works/native-targets', '/ui', ...nextFromHome])
+			expect((await fetch(url(path))).status, `${path} renders before the browser opens`).toBe(200);
 		const browser = await chromium.launch({ headless: true });
 		try {
 			const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });

@@ -36,7 +36,7 @@ import {
 } from './instance-scope.ts';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
-import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM, serializeGraphValue, valueAlongPaths } from '@markless/serializer';
 import type { ProtocolBranchIdrefSite, ProtocolComposedGraphProp } from '@markless/serializer';
 
 // SSR composition works on DRAFT payload records: the shapes the protocol
@@ -856,9 +856,11 @@ export function marklessSsrCallbackSymbol(
 }
 // An arm rebuild and a resume-time derive read their props back out of the
 // graph, which a CSR mount seeds and a served page must carry; `keys` narrows
-// the bag, null means a lone prop. A `scalarKeys` property is one only a derive
-// reads, carried only when its value is a scalar: a structured prop is projected
-// markup or data the composer routes from its graph, so a copy ships it twice.
+// the bag, null means a lone prop. A `deriveKeys` property is one only a derive
+// reads, carried when the serializer encodes it, with only the `derivePaths` its
+// derives read; `scalarKeys` is projected children, whose markup the served HTML
+// already holds. Either is dropped when the composer routes it from its own
+// graph, so a copy never ships it twice.
 export function marklessSsrSeedPropCells(
 	state: ComposeStateDraft,
 	props: Readonly<Record<string, unknown>> | undefined,
@@ -866,19 +868,41 @@ export function marklessSsrSeedPropCells(
 		readonly graphNodeId: string;
 		readonly keys: ReadonlyArray<string> | null;
 		readonly scalarKeys?: ReadonlyArray<string>;
+		readonly deriveKeys?: ReadonlyArray<string>;
+		readonly derivePaths?: Readonly<Record<string, ReadonlyArray<ReadonlyArray<string>>>>;
 		readonly rowKeys?: ReadonlyArray<string>;
 	}>,
+	renderContext?: Pick<SsrRenderContext, 'prerenderSettle'>,
 ) {
 	const seeded = cells.flatMap((cell) => {
 		const name = cell.graphNodeId.slice('prop:'.length);
+		const derived = new Map<string, unknown>();
+		for (const key of cell.deriveKeys ?? []) {
+			const raw = props?.[key];
+			const paths =
+				cell.derivePaths && Object.hasOwn(cell.derivePaths, key)
+					? cell.derivePaths[key]
+					: undefined;
+			const value = paths ? valueAlongPaths(raw, paths) : raw;
+			// A forced-arm probe hands structured props over as placeholders, not data.
+			if (
+				marklessIsScalarProp(raw) ||
+				(raw !== undefined &&
+					!renderContext?.prerenderSettle &&
+					serializeGraphValue(value).ok)
+			)
+				derived.set(key, value);
+		}
+		const valueOf = (key: string) => (derived.has(key) ? derived.get(key) : props?.[key]);
 		const present = [
 			...(cell.keys ?? []).filter((key) => props?.[key] !== undefined),
 			...(cell.scalarKeys ?? []).filter((key) => marklessIsScalarProp(props?.[key])),
+			...derived.keys(),
 			...(cell.rowKeys ?? []).filter((key) => props?.[key] !== undefined),
 		];
 		if (cell.keys ? present.length === 0 : props?.[name] === undefined) return [];
 		const value = cell.keys
-			? Object.fromEntries(present.map((key) => [key, props?.[key]]))
+			? Object.fromEntries(present.map((key) => [key, valueOf(key)]))
 			: props?.[name];
 		const seededCell = {
 			graphNodeId: cell.graphNodeId,
@@ -886,13 +910,17 @@ export function marklessSsrSeedPropCells(
 			valueKind: marklessSsrValueKind(value),
 			value: marklessSerializeGraphValue(value, { graphNodeId: cell.graphNodeId, name }),
 		};
-		if (cell.keys && (cell.scalarKeys || cell.rowKeys) && cell.graphNodeId === 'prop:props')
+		if (
+			cell.keys &&
+			(cell.scalarKeys || cell.deriveKeys || cell.rowKeys) &&
+			cell.graphNodeId === 'prop:props'
+		)
 			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
 				const kept = Object.fromEntries(
 					present.flatMap((key) =>
 						cell.keys?.includes(key) ||
 						!marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
-							? [[key, props?.[key]]]
+							? [[key, valueOf(key)]]
 							: [],
 					),
 				);
