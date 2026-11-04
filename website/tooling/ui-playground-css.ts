@@ -915,8 +915,27 @@ export const NOTEBOOK_CSS = `			.pg {
 			}
 
 			.pg-shiki {
-				padding: 0.85rem 0.4rem;
+				counter-reset: pg-line;
+				padding: 0.85rem 0.1rem 0.85rem 0;
 				font-size: clamp(0.78rem, 2cqi, 1.15rem);
+				overflow-x: visible;
+			}
+
+			.pg-shiki .pg-line {
+				position: relative;
+				padding-inline-start: 2.9rem;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				counter-increment: pg-line;
+			}
+
+			.pg-shiki .pg-line::before {
+				position: absolute;
+				inset-inline-start: 0;
+				width: 2rem;
+				color: var(--muted-ink);
+				text-align: end;
+				content: counter(pg-line);
 			}
 
 			.pg-fade,
