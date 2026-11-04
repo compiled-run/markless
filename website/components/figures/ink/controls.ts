@@ -27,7 +27,7 @@ export function toggle(width: number, height: number, seed: number) {
 /** A select box with a hand-drawn caret at its right end. */
 export function pick(width: number, height: number, seed: number) {
 	const box = jitter(roundRect(1.5, 1.5, width - 1.5, height - 1.5, 5, 4), seed, 0.7);
-	const cx = width - 14;
+	const cx = width - 10;
 	const cy = height / 2;
 	return {
 		width,
@@ -55,8 +55,8 @@ export function slip(width: number, height: number, seed: number) {
 		width,
 		height,
 		paper: pathOf(corners, true),
-		shadow: { wash: pathOf(shadow, true), hatch: hatch(shadow, 0.9, 2.1, seed + 3, { cluster: 5, skip: 0.1 }) },
-		ink: outline(corners, { w: 1.8, heavy: 1.4, centre: [width / 2, height / 2], seed: seed + 1 }),
+		shadow: { wash: pathOf(shadow, true), hatch: hatch(shadow, 0.9, 2.6, seed + 3, { cluster: 5, skip: 0.2 }) },
+		ink: outline(corners, { w: 1.2, heavy: 1, centre: [width / 2, height / 2], seed: seed + 1 }),
 		pencil: pencil([[-10, -5], [width * 0.6, -3]], seed + 20) + pencil([[width + 5, height * 0.3], [width + 3, height + 12]], seed + 21),
 	};
 }
@@ -64,7 +64,7 @@ export function slip(width: number, height: number, seed: number) {
 export function art() {
 	return {
 		toggle: toggle(46, 26, 900),
-		pick: pick(150, 34, 920),
-		slip: { wide: slip(560, 300, 940), narrow: slip(340, 420, 960) },
+		pick: pick(96, 24, 920),
+		slip: { wide: slip(280, 150, 940), narrow: slip(170, 210, 960) },
 	};
 }

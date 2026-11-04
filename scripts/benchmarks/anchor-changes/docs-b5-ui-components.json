@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "The UI playground is drawn in ink: the demo on an InkScreen sheet, hand-drawn switch and select art, the code on a paper slip. Its frozen SVG paths are downloaded at load (+8.4 KB gzip on darwin); no more JS is executed at load",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 8380,
+			"reason": "The UI playground is drawn in ink: the demo on an InkScreen sheet, hand-drawn switch and select art, the code on a paper slip. Its frozen SVG paths are downloaded at load (+8.4 KB gzip on darwin); no more JS is executed at load",
+			"date": "2026-11-04"
+		}
+	]
+}
