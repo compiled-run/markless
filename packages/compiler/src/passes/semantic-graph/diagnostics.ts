@@ -1967,6 +1967,32 @@ export function branchElseSpellingDiagnostic(input: {
 	};
 }
 
+// TSRX reads arms in the order @try, @pending, @catch: an @pending after @catch ends the @try and parses as text plus a stray block.
+export function asyncArmOrderDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_ARM_ORDER',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'An `@pending` arm is written after `@catch`',
+		message:
+			'This `@pending` follows the @catch arm of an @try. The arms of an @try go in the order @try, @pending, @catch, so the @try ends at its @catch and this `@pending` is read as literal text, with the block after it as a separate expression.',
+		why: 'TSRX defines the order of the arms, and the parser has no @try left to attach a later `@pending` to. Building it anyway would put the word "@pending" and the arm\'s source on the page, with no waiting state.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Move the `@pending { ... }` arm before `@catch`: `@try { ... } @pending { ... } @catch (error) { ... }`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARM_ORDER',
+	};
+}
+
 // A braced plain `else` after an @if arm stops the parser (TSRX1009), so it is named at the parse.
 export function branchElseSpellingParseDiagnostic(input: {
 	readonly span: SourceSpan | undefined;

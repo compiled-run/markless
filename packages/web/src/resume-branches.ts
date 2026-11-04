@@ -1,5 +1,6 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
 import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
+import { composedArmRecordQualifier } from './resume-handle-qualifier.ts';
 import type {
 	ResumeBehaviorRecord,
 	ResumeBranchRecord,
@@ -171,7 +172,12 @@ function createBranchRegistration(
 			paintArm(update.arm);
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
-			if (update.armRecords) return input.commitArm(branch, { ...update, html });
+			// A composed child's escalated render spells its ids in the child's own space.
+			if (update.armRecords)
+				return input.commitArm(branch, {
+					...(composedArmRecordQualifier()?.branchUpdate?.(branch, update as never, input.graph) ?? update),
+					html,
+				});
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
 						html,
@@ -276,13 +282,18 @@ function createBranchRegistration(
 	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
 }
 
+export type ComposedBranchGraph = RuntimeGraph & {
+	readonly composedGraphProps?: ResumeBranchRecord['composedGraphProps'];
+};
+
 // Read local prop IDs without importing the composition runtime into resume.
-export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
+export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): ComposedBranchGraph {
 	const routes = branch.composedGraphProps;
 	if (!routes?.length) return graph;
 	const scope = branch.composedInstancePath ?? '';
 	return {
 		...graph,
+		composedGraphProps: routes,
 		read(id: string, path: ReadonlyArray<string> = []) {
 			// Resume scoped this symbol, so the id arrives carrying the instance
 			// path; `prop:` is not page space, so taking it back off is exact.

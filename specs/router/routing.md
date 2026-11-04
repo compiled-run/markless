@@ -80,14 +80,27 @@ render of a `#/` route.
   scripts are always fresh nodes and run again, `<template>` elements are always
   replaced, a custom element is replaced unless it is unchanged, and a form
   control shows the value the server rendered for the next page.
-- The address changes when the navigation starts, as a history entry the
-  swap later fills; a newer navigation replaces that entry while its page has
-  not swapped in. The leaving page stays on screen and interactive until the
-  next page's response has ended or the navigation deadline
-  (`MARKLESS_NAV_SETTLE_DEADLINE_MS`) has passed since the click; past it the
-  page swaps in showing its `@pending` arms. A newer navigation, or Back,
-  before the swap cancels it: the cancelled page never shows, and the page and
-  focus stay as they were.
+- The address and its history entry change when the navigation commits: in
+  the task that swaps the next page in, never at the click, so the address bar
+  never names a page that is not on screen. `replace` replaces the current
+  entry at that moment instead of adding one. The leaving page stays on screen
+  and interactive until the next page's response has ended or the navigation
+  deadline (`MARKLESS_NAV_SETTLE_DEADLINE_MS`) has passed since the click; past
+  it the page swaps in showing its `@pending` arms.
+- Until the swap the navigation can be cancelled, and a cancelled page never
+  shows. A newer navigation cancels it, so only the last one swaps in and adds
+  one entry. Back or Forward cancels it and moves from the page still shown, as
+  a browser does while a document is still loading: Back goes to the entry
+  before that page, which may be another document. A click on a link to the
+  page shown, or to a `#anchor` on it, cancels it and keeps the page.
+- The next page's head changes in the swap as well: before it, only its
+  stylesheets (not applied) and preloads are added, so a cancelled navigation
+  leaves the head of the page shown.
+- Back to a page restores the scroll offset it had when it was swapped out, not
+  the one at the click. A navigation whose fetch or code fails to load loads the
+  page as a document, adding its entry as a link would (`replace` replaces it),
+  unless the document is being left: a browser aborts those requests when the
+  user goes elsewhere, and loading the page then would cancel that navigation.
 - A page swapped in while its response still streams resumes its `@pending`
   boundaries from the arms the server streams, as a landing does: the browser
   never runs their async work again.
@@ -188,10 +201,19 @@ URL itself answers the whole document.
   Nitro plugin rewrites the request URL before routing, so a guard on a page
   path also guards its fragment. `http.request.url` keeps the fragment path.
 - The address bar and history entries show the page URL, never the prefix.
+- A click on a link to the page already shown (the same path and query, and no
+  `#` in its `href`) keeps that page as it is: nothing is fetched or swapped, no
+  history entry is added, and scroll positions and page state stay; a
+  navigation still waiting for its page is cancelled. A link to
+  the same page with a `#anchor` is left to the browser, which scrolls to it.
 - A redirect off the fragment path answers with a whole document; the router
   then loads the destination as a document.
 - The prefix is root-relative; apps served under a non-root base path are not
   covered yet.
+- A `shared()` instance outlives the swap: the next page is served with its
+  defaults, and before it is shown the router binds its reads to the live
+  value, so the first frame already shows it. See "Where an instance lives" in
+  `specs/framework/03-state-graph.md`.
 
 ### Kept parts
 

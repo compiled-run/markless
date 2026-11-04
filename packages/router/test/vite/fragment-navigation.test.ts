@@ -533,16 +533,16 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('page-scoped shared state starts from the server on the new page', async () => {
+		test('page-scoped shared state keeps its live value on the new page', async () => {
 			const { page, errors } = await open(browser);
 			await page.locator('[data-hit]').click();
 			await page.locator('[data-hit]').click();
 			await expect.poll(() => text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
-			expect(await text(page, '[data-hits]')).toBe('0');
+			expect(await text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-hit]').click();
-			await expect.poll(() => text(page, '[data-hits]')).toBe('1');
+			await expect.poll(() => text(page, '[data-hits]')).toBe('3');
 			expect(errors).toEqual([]);
 			await page.close();
 		});
@@ -1039,6 +1039,45 @@ for (const [name, browserType] of [
 					() => (window as unknown as Record<string, unknown>).__sameDocument,
 				),
 			).toBe(true);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a navigation cancelled while its stylesheet loads leaves the head of the page shown', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			await page.evaluate(() => {
+				// The arriving page's stylesheet goes into the head, unapplied, ahead of the swap: cancel right then.
+				new MutationObserver((records, observer) => {
+					const added = records.flatMap((record) => [...record.addedNodes]);
+					if (!added.some((node) => (node as HTMLLinkElement).rel === 'stylesheet')) return;
+					observer.disconnect();
+					(document.querySelector('[data-crumb-home]') as HTMLElement).click();
+				}).observe(document.head, { childList: true });
+				(document.querySelector('[data-pager-next]') as HTMLElement).click();
+			});
+			await page.waitForTimeout(1000);
+			expect(new URL(page.url()).pathname).toBe('/');
+			expect(await page.title()).toBe('Guide home');
+			const head = () =>
+				page.evaluate(() =>
+					[...document.head.querySelectorAll('title, meta[name], link[rel="canonical"]')].map(
+						(element) =>
+							element.localName === 'title'
+								? element.textContent
+								: (element.getAttribute('content') ?? element.getAttribute('href')),
+					),
+				);
+			expect(await head()).toEqual(['Guide home', 'About Guide home', 'https://guide.test/']);
+			expect(
+				await page.evaluate(() =>
+					[...document.head.querySelectorAll('link[rel="stylesheet"]')].map((link) =>
+						link.getAttribute('media'),
+					),
+				),
+			).toEqual(['not all']);
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'alpha');
+			expect(await head()).toEqual(['Alpha guide', 'About Alpha guide', 'https://guide.test/alpha']);
 			expect(errors).toEqual([]);
 			await page.close();
 		});

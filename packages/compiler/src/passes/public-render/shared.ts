@@ -699,7 +699,7 @@ export function isFragmentNode(node: AnyNode | undefined): boolean {
 
 // A shared() graph and a persisted storage slot are page-space by design: they
 // belong to the page, never to one composed component instance.
-function isPageSpaceGraphNodeId(graphNodeId: string): boolean {
+export function isPageSpaceGraphNodeId(graphNodeId: string): boolean {
 	return graphNodeId.startsWith('shared:') || graphNodeId.startsWith('storage:');
 }
 
