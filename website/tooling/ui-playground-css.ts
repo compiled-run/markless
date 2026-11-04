@@ -762,55 +762,183 @@ export function docRules(keys: readonly string[], root: string): string {
 }
 
 
-/** The playground drawn in ink: the demo on an inked sheet, hand-drawn controls beside it, the code on a paper slip below. */
-export const INK_CSS = `			.pg {
-				container: pg / inline-size;
-				width: 100%;
-				margin: var(--space-m) 0 var(--space-l);
+/** The playground on the docs' notebook: the same binder frame, bands, tabs and type as the `<Code>` block. */
+export const NOTEBOOK_CSS = `			.pg {
+				--pg-band: color-mix(in oklch, var(--ink) 70%, transparent);
+				--pg-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
+				--pg-tab-h: 2.7rem;
+				--pg-bleed: min(4.6rem, 2 * var(--space-s-l));
+				--pg-tab-left: calc(var(--pg-bleed) / 2 - 2px);
+				--pg-inset: 1.1rem;
+				container-type: inline-size;
+				position: relative;
+				display: flex;
+				flex-direction: column;
+				box-sizing: border-box;
+				width: calc(100% + var(--pg-bleed));
+				margin: calc(var(--space-s) + var(--pg-tab-h)) 0 var(--space-l) calc(var(--pg-bleed) / -2);
+				padding: 0.25rem var(--pg-inset) 0.4rem 2.6rem;
+				border: 2px solid transparent;
+				border-image: url('/notebook/frame.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
+				border-radius: 0;
+				background: var(--paper);
+				box-shadow: none;
 				color: var(--ink);
-				font-family: var(--pg-font);
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step--1);
+				line-height: 1.5;
 			}
 
-			.pg-scene {
-				display: grid;
-				grid-template-columns: minmax(0, 1fr);
-				gap: var(--space-s);
+			html.dark .pg {
+				--paper: var(--raised);
+				--pg-tab-back: color-mix(in oklch, var(--ink) 12%, var(--paper));
+				border-image-source: url('/notebook/frame-dark.png');
 			}
 
-			@container pg (min-width: 860px) {
-				.pg-scene {
-					grid-template-columns: minmax(0, 1fr) 15rem;
-					align-items: center;
-				}
+			.pg-head {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.4rem 1rem;
+				align-items: center;
+				justify-content: space-between;
+				padding: 0.35rem 0 0.35rem 0.4rem;
+				border-bottom: 2px dashed var(--pg-band);
+			}
 
-				.pg-quick,
-				.pg-rest {
-					flex-direction: column;
-					align-items: flex-start;
-				}
+			.pg-title {
+				font-size: var(--step-1);
+				line-height: 1.2;
+			}
+
+			.pg-body {
+				display: flex;
+				flex-direction: column;
+			}
+
+			.pg-code {
+				min-width: 0;
+				border-bottom: 2px dashed var(--pg-band);
+			}
+
+			.pg-split {
+				display: none;
 			}
 
 			.pg-stage {
-				--ink: var(--screen-ink);
-				--paper: var(--screen-paper);
 				display: grid;
 				place-items: center;
-				min-height: 12rem;
-				padding: 1.4rem 1.2rem 1.6rem;
+				min-width: 0;
+				min-height: 0;
+				padding: 1.2rem 0 1.2rem 1.1rem;
+			}
+
+			@container (min-width: 36rem) {
+				.pg-body {
+					display: grid;
+					grid-template-columns: minmax(0, 56fr) 0.8rem minmax(0, 44fr);
+					min-height: 22rem;
+				}
+
+				.pg-code {
+					border-bottom: 0;
+				}
+
+				.pg-split {
+					position: relative;
+					display: block;
+				}
+
+				.pg-split::before {
+					position: absolute;
+					inset-block: 0;
+					inset-inline-start: calc(50% - 1px);
+					border-inline-start: 2px dashed var(--pg-band);
+					content: '';
+				}
+			}
+
+			.pg-panel-outer {
+				display: block;
+			}
+
+			.pg-strip {
+				position: absolute;
+				top: calc(-1 * var(--pg-tab-h));
+				left: var(--pg-tab-left);
+				z-index: 2;
+				display: flex;
+				align-items: end;
+				height: var(--pg-tab-h);
+				margin: 0;
+			}
+
+			.pg-tab {
+				position: relative;
+				margin-block-end: -2px;
+				padding: 0.25em 1.3em;
+				border: 2px solid var(--ink);
+				border-block-end: 0;
+				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
+				background: var(--pg-tab-back);
+				color: color-mix(in oklch, var(--ink) 82%, var(--paper));
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: var(--step-0);
+				line-height: 1.35;
+				white-space: nowrap;
+			}
+
+			.pg-tab:hover {
+				background: var(--pg-tab-back);
+				color: var(--ink);
+			}
+
+			.pg-tab[ui-selected] {
+				z-index: 1;
+				padding: 0.25em 1.25em 0.3em;
+				background: var(--paper);
+				color: var(--ink);
+				font-size: var(--step-1);
+			}
+
+			.pg-tab + .pg-tab {
+				margin-inline-start: -0.3rem;
+			}
+
+			.pg-clamp {
+				border: 0;
+				border-radius: 0;
+			}
+
+			.pg-code-body {
+				max-height: 22rem;
+				overflow: auto;
+			}
+
+			.pg-shiki {
+				padding: 0.85rem 0.4rem;
+				font-size: clamp(0.78rem, 2cqi, 1.15rem);
+			}
+
+			.pg-fade,
+			.pg-expand {
+				display: none;
+			}
+
+			.pg-clamp[ui-closed] .pg-source-context {
+				display: revert;
 			}
 
 			.pg-try {
-				display: grid;
-				gap: 0.8rem;
-				justify-items: start;
-				padding-inline: 0.4rem;
+				padding: 0.7rem 0 0.55rem 0.4rem;
+				border-top: 2px dashed var(--pg-band);
 			}
 
 			.pg-try-title {
-				margin: 0;
+				display: block;
+				margin-block-end: 0.3rem;
 				font-family: 'Joy Elia', system-ui, sans-serif;
-				letter-spacing: 0.12em;
-				text-transform: uppercase;
+				font-size: var(--step-1);
+				font-weight: 700;
 			}
 
 			.pg .pg-controls {
@@ -820,227 +948,67 @@ export const INK_CSS = `			.pg {
 
 			.pg-quick,
 			.pg-rest {
-				flex-direction: row;
-				flex-wrap: wrap;
-				align-items: center;
-				gap: 0.7em 1.8em;
+				gap: 0.5em 1.6em;
 			}
 
 			.pg-rest {
-				padding-block-start: 0.6em;
-				border-block-start: 1.5px dashed color-mix(in oklch, var(--ink) 40%, transparent);
-			}
-
-			.pg-ctl {
-				flex-direction: row-reverse;
-				justify-content: flex-end;
-			}
-
-			.pg-art {
-				position: absolute;
-				inset: 0;
-				width: 100%;
-				height: 100%;
-				overflow: visible;
-				pointer-events: none;
-			}
-
-			.pg-art-face {
-				fill: var(--paper);
-			}
-
-			.pg-art-ink {
-				fill: var(--ink);
-			}
-
-			.pg-art-shade {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 0.6;
-				stroke-linecap: round;
-				opacity: 0.6;
-			}
-
-			.pg-art-wash {
-				fill: var(--yellow);
-				opacity: 0;
-				transition: opacity 140ms ease;
+				border-block-start: 0;
 			}
 
 			.pg-switch {
-				position: relative;
-				width: 46px;
-				height: 26px;
-				padding: 0;
-				border: 0;
-				border-radius: 999px;
-				background: none;
+				height: 1.5em;
+				border: 2px solid var(--ink);
+				border-radius: 14px 18px 12px 16px;
+				background: transparent;
 			}
 
 			.pg-switch[ui-checked] {
-				background: none;
-			}
-
-			.pg-switch[ui-checked] .pg-art-wash {
-				opacity: 0.9;
+				background: var(--mark);
 			}
 
 			.pg-knob {
-				position: relative;
-				width: 26px;
-				height: 26px;
-				margin: 0;
-				border: 0;
-				border-radius: 50%;
-				background: none;
+				width: 1.15em;
+				height: 1.15em;
+				margin: 0 0 0 0.1em;
+				border: 2px solid var(--ink);
+				border-radius: 50% 45% 55% 48%;
 				box-shadow: none;
 			}
 
 			.pg-switch[ui-checked] .pg-knob {
-				margin-inline-start: 20px;
+				margin-inline-start: calc(100% - 1.3em);
 			}
 
 			.pg-pick-trigger,
-			.pg-pick-trigger[ui-open] {
-				position: relative;
-				z-index: 0;
-				min-width: 8em;
-				border: 0;
-				background: none;
-			}
-
-			.pg-pick-trigger .pg-art {
-				z-index: -1;
+			.pg-field {
+				border: 2px solid var(--ink);
+				border-radius: 10px 6px 12px 8px;
+				background: transparent;
 			}
 
 			.pg-pick-list {
-				border: 1.5px solid var(--ink);
+				border: 2px solid var(--ink);
 				border-radius: 10px 6px 12px 8px;
 				box-shadow: 2px 3px 0 var(--ink);
 			}
 
-			.pg-try .pg-bar-pick {
+			.pg-head .pg-bar-pick {
 				grid-area: auto;
-				order: 1;
-				justify-self: start;
 				margin: 0;
-				padding: 0.6em 0 0;
-				border-block-start: 1.5px dashed color-mix(in oklch, var(--ink) 40%, transparent);
+				padding: 0;
 			}
 
 			.pg-log {
-				margin: 0;
+				margin: 0.4rem 0 0 0.4rem;
 			}
 
-			.pg-code {
-				position: relative;
-				margin-block-start: var(--space-s);
-				padding: 0.8rem 1.1rem 0.5rem;
-			}
-
-			.pg-slip {
-				position: absolute;
-				inset: 0;
-				width: 100%;
-				height: 100%;
-				overflow: visible;
-				pointer-events: none;
-			}
-
-			.pg-slip[data-fit='narrow'] {
-				display: none;
-			}
-
-			@container pg (max-width: 420px) {
-				.pg-slip[data-fit='wide'] {
-					display: none;
+			@media (max-width: 600px) {
+				.pg {
+					--pg-bleed: calc(2 * var(--space-s-l));
+					--pg-tab-left: calc(var(--space-s-l) + 0.4rem);
+					--pg-inset: 0.6rem;
+					padding-left: 1.5rem;
 				}
-
-				.pg-slip[data-fit='narrow'] {
-					display: block;
-				}
-			}
-
-			.pg-slip-paper {
-				fill: var(--paper);
-			}
-
-			.pg-slip-ink {
-				fill: var(--ink);
-			}
-
-			.pg-slip-shade {
-				fill: color-mix(in oklch, var(--ink) 18%, transparent);
-			}
-
-			.pg-slip-hatch {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 0.6;
-				stroke-linecap: round;
-				opacity: 0.6;
-			}
-
-			.pg-slip-pencil {
-				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
-				stroke-width: 0.7;
-				opacity: 0.45;
-			}
-
-			.pg-panel-outer {
-				position: relative;
-			}
-
-			.pg-clamp {
-				border: 0;
-				border-radius: 0;
-			}
-
-			.pg-strip {
-				margin: 0;
-			}
-
-			.pg-tab {
-				margin-block-end: -1.5px;
-				padding: 0.1em 0.9em;
-				border: 1.5px solid var(--ink);
-				border-block-end: 0;
-				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
-				background: color-mix(in oklch, var(--ink) 9%, var(--paper));
-				color: color-mix(in oklch, var(--ink) 82%, var(--paper));
-			}
-
-			.pg-tab:hover {
-				background: color-mix(in oklch, var(--ink) 9%, var(--paper));
-				color: var(--ink);
-			}
-
-			.pg-tab[ui-selected] {
-				background: var(--paper);
-				color: var(--ink);
-				font-weight: 700;
-			}
-
-			.pg-tab + .pg-tab {
-				margin-inline-start: -0.3rem;
-			}
-
-			.pg-code .pg-clamp {
-				border-block-start: 1.5px solid var(--ink);
-			}
-
-			.pg-shiki {
-				padding-inline: 0.3rem;
-			}
-
-			.pg-pick-trigger,
-			.pg-pick-item,
-			.pg-field,
-			.pg-tab,
-			.pg-name,
-			.pg-try-title {
-				font-size: var(--step-0);
 			}`;
 
 export const CHROME_CSS = `${CONTROLS_CSS}
@@ -1049,7 +1017,7 @@ ${STAGE_CSS}
 
 ${CODE_CSS}
 
-${INK_CSS}
+${NOTEBOOK_CSS}
 
 ${docCss('.pg')}`;
 
