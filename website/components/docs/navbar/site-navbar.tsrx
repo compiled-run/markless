@@ -4,6 +4,8 @@ import { asset } from '../../../site-base.ts';
 import { INK_MARKS } from '../ink-marks.ts';
 import { github, isCurrent, NAV_DECOR, type NavCard, type NavPanel, panels } from './sections.ts';
 import { art } from './theme-art.art.ts';
+import DocsSearch from '../search/docs-search.tsrx';
+import { openDocsSearch, warmDocsSearch } from '../search/open.ts';
 
 
 /** The site's header: a floating bar with two panels and the Migrate link on a wide screen, a top bar and a full-screen menu on a narrow one. */
@@ -11,20 +13,48 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 	<header class="site-navbar">
 		<MobileMenu pathname={pathname} />
 		<DesktopNav pathname={pathname} />
+		<DocsSearch />
 
 		<style>
-			/* From springs.ts, each spring sampled into a linear() easing over the time it takes to settle; springs.test.ts keeps these in step. */
 			.site-navbar {
-				--spring-slide: linear(0, 0.003 0.8%, 0.01 1.7%, 0.021 2.5%, 0.053 4.2%, 0.096 5.8%, 0.173 8.3%, 0.403 15%, 0.485 17.5%, 0.585 20.8%, 0.673 24.2%, 0.747 27.5%, 0.808 30.8%, 0.857 34.2%, 0.896 37.5%, 0.933 41.7%, 0.958 45.8%, 0.979 50.8%, 0.993 56.7%, 0.999 62.5%, 1.003 70%, 1);
-				--spring-slide-ms: 426ms;
-				--spring-hover: linear(0, 0.008 0.8%, 0.03 1.7%, 0.065 2.5%, 0.111 3.3%, 0.165 4.2%, 0.227 5%, 0.294 5.8%, 0.657 10%, 0.794 11.7%, 0.856 12.5%, 0.915 13.3%, 0.968 14.2%, 1.016 15%, 1.059 15.8%, 1.097 16.7%, 1.129 17.5%, 1.155 18.3%, 1.177 19.2%, 1.193 20%, 1.205 20.8%, 1.212 21.7%, 1.215 23.3%, 1.211 24.2%, 1.195 25.8%, 1.158 28.3%, 1.064 33.3%, 1.011 36.7%, 0.991 38.3%, 0.975 40%, 0.964 41.7%, 0.957 43.3%, 0.954 45.8%, 0.957 48.3%, 0.997 59.2%, 1.009 65.8%, 1.009 70.8%, 0.998 86.7%, 1);
-				--spring-hover-ms: 748ms;
 				position: relative;
-				z-index: 60;
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: 1rem;
 				line-height: 1.5;
 				color: var(--ink);
+			}
+
+			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				border-radius: inherit;
+				pointer-events: none;
+			}
+
+			.nav-pill::before,
+			.nav-pill::after {
+				inset: -2px;
+			}
+
+			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
+			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
+				visibility: hidden;
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
+				background-image: var(--grain-fiber);
+				mix-blend-mode: var(--grain-fiber-blend);
+				opacity: var(--grain-fiber-opacity);
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				background-image: var(--grain-speck);
+				mix-blend-mode: var(--grain-speck-blend);
+				opacity: var(--grain-speck-opacity);
 			}
 		</style>
 	</header>
@@ -110,7 +140,6 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				position: fixed;
 				top: 1.5rem;
 				left: 50%;
-				z-index: 60;
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
@@ -124,6 +153,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				background: var(--raised);
 				box-shadow: 6px 6px 0 var(--muted-ink);
 				translate: -50% 0;
+				z-index: calc(var(--grain-z) + 1);
 				transition:
 					translate 300ms ease,
 					opacity 300ms ease;
@@ -220,6 +250,8 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				color: var(--ink);
 				font: inherit;
 				cursor: pointer;
+				user-select: none;
+				-webkit-user-select: none;
 				transition: color 200ms ease;
 			}
 
@@ -478,15 +510,21 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 	</navbar.itemlink>
 }
 
-// The search dialog is another unit's; until it lands the button is in the walk and opens nothing.
 function SearchButton() @{
 	const drawing = art.magnifier;
 
 	<navbar.trigger
 		class="search-button"
-		aria-label="Search docs"
+		aria-label="Search the docs"
 		aria-keyshortcuts="Meta+K Control+K"
-		title="Search docs (⌘K or Ctrl K)"
+		title="Search the docs (⌘K or Ctrl K)"
+		aria-haspopup="dialog"
+		onClick={(event) => {
+			// Same guard as ThemeButton: a navbar.trigger's click can reach another trigger's handler.
+			if ((event.target as Element).closest('.search-button')) openDocsSearch();
+		}}
+		onPointerenter={() => warmDocsSearch()}
+		onFocus={() => warmDocsSearch()}
 	>
 		<svg class="search-icon" viewBox={'0 0 ' + drawing.width + ' ' + drawing.height} aria-hidden="true">
 			@for (const layer of drawing.layers; key layer.d) {
@@ -662,7 +700,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				position: fixed;
 				inset-block-start: 0;
 				inset-inline: 0;
-				z-index: 60;
+				z-index: calc(var(--grain-z) + 1);
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
@@ -675,6 +713,11 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 			.menu-bar {
 				position: relative;
 				flex: none;
+			}
+
+			/* The open menu repeats the bar in the same spot; it stays under the page grain, since it is translucent and the page is locked behind it. */
+			.mobile-menu[ui-open] > .mobile-bar {
+				visibility: hidden;
 			}
 
 			.bar-button {

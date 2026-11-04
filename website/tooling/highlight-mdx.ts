@@ -7,8 +7,8 @@ import { countElements, elementTags, highlightFences } from './highlight-code.ts
 
 type MdxRoutePart = RouterMdxRoutePart & { readonly html: string };
 
-const PARTS_LINE = /^const marklessMdxParts = (\[.*\]);$/m;
-const SOLO_HTML = /return \{ html: ("(?:[^"\\]|\\.)*") \};/;
+export const PARTS_LINE = /^const marklessMdxParts = (\[.*\]);$/m;
+export const SOLO_HTML = /return \{ html: ("(?:[^"\\]|\\.)*") \};/;
 const FENCE_MARKER = '<pre><code class=';
 const HEADING_MARKER = '<h2';
 

@@ -1,5 +1,5 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -10,18 +10,7 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="2 min" assumes="nothing" />
 
-Last page, you saw the stack of packages. Now get all of them to build on your machine.
-
-One `pnpm install` sets up every package. It also turns on the git hooks, so your first commit runs CI's fast checks.
-
-## What you need
-
-- **Node 24.** The repo does not pin a Node version. Every CI job that installs Node installs 24, so use 24 too.
-- **pnpm 10.33.2.** The root `package.json` pins it in `packageManager`.
-- **git.** The hooks are shell scripts in `.githooks/`.
-- **The `gh` command line**, if you push to `main`. The `pre-push` hook uses it.
-
-## Clone and install
+<Subtitle text="One pnpm install sets up every package and turns on the git hooks, so your first commit already runs CI's fast checks." />
 
 ```bash
 git clone https://github.com/compiled-run/markless.git
@@ -30,39 +19,51 @@ corepack enable
 pnpm install
 ```
 
-`pnpm install` runs the root `prepare` script. That script runs `git config core.hooksPath .githooks`.
+`pnpm install` runs the root `prepare` script, which points git at the hooks in `.githooks/`.
 
-Some tests start real browsers. CI installs them with this command:
+## What you need
+
+- **Node 24.** The repo doesn't pin a Node version, but every CI job that installs Node installs 24.
+- **pnpm 10.33.2.** The root `package.json` pins it in `packageManager`, and `corepack enable` picks it up.
+- **git.** The hooks are shell scripts.
+- **The `gh` command line**, if you ever push to `main`. The `pre-push` hook uses it.
+
+Some tests start real browsers. Install the ones CI uses:
 
 ```bash
 pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 ```
 
-You can also run `pnpm ci:local --install`. It runs each job's setup steps before its checks, and the Playwright install is one of them.
+Or run `pnpm ci:local --install`, which runs each job's setup steps, the browser installs among them, before its checks.
 
-## The scripts you will use
+## The scripts you'll use
 
-- `pnpm run typecheck`: runs the `.tsrx`-aware checker, `packages/typescript-plugin/src/tsc.ts`, on the root `tsconfig.json`.
-- `pnpm ci:local --fast`: runs CI's fast jobs with the exact commands from `ci.yml`.
-- `pnpm exec vp test <file>`: runs one test file.
-- `pnpm test:compiler`: runs `packages/compiler/test/*.test.ts`.
-- `pnpm test:headless`: runs the `ui` test project, the `@markless/ui` browser tests.
-- `pnpm lint`: runs `vp lint`.
-- `pnpm check`: runs `vp check`.
-- `pnpm fmt`: runs `vp fmt`.
-- `pnpm build`: packs the packages with `vp pack`, plus CommonJS builds of `router` and `typescript-plugin`.
-- `pnpm test`: runs the long local suite: completion matrix, every test project, benchmark guard, box tests, perf guards.
-- `pnpm rules`: regenerates the agent files from `.ruler/`.
-- `pnpm docs:dev`: starts this website's dev server.
+| Script | What it runs |
+| --- | --- |
+| `pnpm run typecheck` | The `.tsrx`-aware checker, `packages/typescript-plugin/src/tsc.ts`, on the root `tsconfig.json`. |
+| `pnpm ci:local --fast` | CI's fast jobs, with the exact commands from `ci.yml`. |
+| `pnpm exec vp test <file>` | One test file. |
+| `pnpm test:compiler` | `packages/compiler/test/*.test.ts`. |
+| `pnpm test:headless` | The `ui` test project: the `@markless/ui` browser tests. |
+| `pnpm lint`, `pnpm check`, `pnpm fmt` | `vp lint`, `vp check` and `vp fmt`. |
+| `pnpm build` | Packs the packages with `vp pack`, plus CommonJS builds of `router` and `typescript-plugin`. |
+| `pnpm rules` | Regenerates the agent files from `.ruler/`. |
+| `pnpm docs:dev` | This website's dev server. |
 
-`vp` is the Vite+ command line. The repo installs it as the `vite-plus` dev dependency.
+`vp` is the Vite+ command line, installed as the `vite-plus` dev dependency. The root `vite.config.ts` defines three test projects, `node`, `browser` and `ui`. Pass `--project <name>` to run one.
 
-The root `vite.config.ts` defines three test projects: `node`, `browser` and `ui`. Pass `--project <name>` to run one.
+## Type-check the whole repo
 
-<Callout
-	sprite="cross"
-	title="Is pnpm test the same as CI?"
-	text="No. pnpm test runs a different set of commands from ci.yml. Use pnpm ci:local to run what CI runs."
-/>
+Plain `tsc` can't read `.tsrx` files. `pnpm run typecheck` wraps it, so `-p`, `--watch` and every other `tsc` flag still work. An error in a `.tsrx` file shows the file, the line and the column, and a file that doesn't parse fails the run too:
 
-Next: [your first pull request](/contributing/first-pr).
+```text
+broken.tsrx(4,1): error TS91001: Markless TSRX parse error: Unexpected token '}'
+app.tsrx(4,7): error TS2322: Type 'number' is not assignable to type 'string'.
+Found 1 Markless TSRX compile error.
+```
+
+`pnpm typecheck:ts7` runs the same check on the TypeScript 7.1 beta, over the repo and this site. CI runs both, and both must pass. On TypeScript 7.1, a file that doesn't parse reports `TSRX771000` instead of `TS91001`, and while any file fails to parse, it skips the type errors.
+
+- `pnpm test` is not CI. It runs a different, longer set of commands. Use `pnpm ci:local` to run what CI runs.
+
+[Your first pull request](/contributing/first-pr) puts these commands to work on a real change.

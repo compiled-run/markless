@@ -74,7 +74,13 @@ export function liftRowHandlerCollection(
 	const handlerName =
 		firstRowHandlerName(forNode.body as AnyNode | undefined) ??
 		rowChildHandlerName(forNode, itemName, state);
-	if (!handlerName) return { kind: 'no-row-handlers' };
+	if (!handlerName) {
+		// A row-bound element() handle walks the repeat's rows, so the rows need a graph collection too.
+		if (!bindsRowElementHandle(forNode.body as AnyNode | undefined))
+			return { kind: 'no-row-handlers' };
+		const lifted = liftStaticCollection(forNode, collectionNode, itemName, state);
+		return lifted.kind === 'lifted' ? lifted : { kind: 'no-row-handlers' };
+	}
 	const lifted = liftStaticCollection(forNode, collectionNode, itemName, state);
 	return lifted.kind === 'unliftable' ? { ...lifted, handlerName } : lifted;
 }
@@ -159,6 +165,26 @@ function firstRowHandlerName(node: AnyNode | undefined): string | null {
 		if (found) return found;
 	}
 	return null;
+}
+
+function bindsRowElementHandle(node: AnyNode | undefined): boolean {
+	if (!node) return false;
+	if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') return false;
+	if (node.type === 'Element' || node.type === 'JSXElement') {
+		const tagName = getElementTagName(node);
+		if (
+			tagName &&
+			isHostTagName(tagName) &&
+			getElementAttributes(node).some(
+				(attribute) =>
+					getIdentifierName(attribute.name as AnyNode | undefined) === 'el' &&
+					unwrapExpressionContainer(attribute.value as AnyNode | undefined),
+			)
+		)
+			return true;
+		return asNodes(node.children).some(bindsRowElementHandle);
+	}
+	return childNodes(node).some(bindsRowElementHandle);
 }
 
 function writesName(node: AnyNode | undefined, name: string): boolean {
