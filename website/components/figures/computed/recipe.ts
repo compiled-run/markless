@@ -1,8 +1,8 @@
-// The shop page with the `cart` box and the `total` recipe on the desk: one press feeds the cart, and the recipe works the total out by itself.
-import { bezier, createScene, type Crate, ellipse, type P, type Point3, roundRect, sheetAt } from '../ink/scene.ts';
-import { add3 } from '../kit/lathe.ts';
-import { hatch, outline, pathOf, r1, seeded, wash } from '../ink/ink.ts';
-import { CART_NEW, CART_SLOT, TOTAL_NEW, TOTAL_SLOT } from './recipe-model.ts';
+// The shop page with its recipe card on the desk: the card works the total out line by line from the cart, and the page shows the last line.
+import { createScene, ellipse, type P, roundRect, sheetAt } from '../ink/scene.ts';
+import { jitter } from '../ink/desk.ts';
+import { deskPlane, pencil } from '../ink/plane.ts';
+import { hatch, hull, line, outline, pathOf, pool, r1, resample, wash } from '../ink/ink.ts';
 
 export const WIDTH = 680;
 export const HEIGHT = 420;
@@ -10,23 +10,22 @@ export const HEIGHT = 420;
 export const CART_ROW = { u: 1.4, v: 11.3 };
 export const TOTAL_ROW = { u: 1.4, v: 13.3 };
 const BUTTON = { u0: 5, v0: 8.45, u1: 10.9, v1: 9.75 };
-const CART: Crate = { u: 24.4, v: -1.8, w: 4.8, d: 3.8, h: 3.2 };
-const RECIPE: Crate = { u: 25.2, v: 8.2, w: 3.6, d: 2.8, h: 2.2 };
-
-export const CART_CLIP = { rear: [18.4, 9.9] as P, tip: [15.6, 11.0] as P };
-export const TOTAL_CLIP = { rear: [17.2, 13.9] as P, tip: [14.2, 13.05] as P };
+const CARD = { c: [28.4, -4.6] as P, w: 12.4, h: 8.4, turn: -0.06 };
+/** The card's lines, in card units from its top left: the title, then the recipe's three steps. */
+export const CARD_LINES = [1.5, 3.4, 5.0, 6.7] as const;
 
 const scene = createScene({
 	width: WIDTH,
 	height: HEIGHT,
 	extra: [
-		[CART.u + CART.w - 1.6 + 0.6, CART.v - 8.8, 0],
-		[CART.u + CART.w - 1.6, CART.v - 8.8, CART.h + 2.4],
-		[RECIPE.u + RECIPE.w - 1.6 + 1.4, RECIPE.v + RECIPE.d - 8.8, 0],
+		[CARD.c[0] + CARD.w / 2 + 1, CARD.c[1] - CARD.h / 2 - 0.6, 0],
+		[CARD.c[0] + CARD.w / 2 + 1, CARD.c[1] + CARD.h / 2 + 1, 0],
+		[CARD.c[0] - CARD.w / 2, CARD.c[1] - CARD.h / 2 - 0.6, 0],
 	],
-	target: [11.6, -1.6, 0.6],
+	target: [14.4, -2.6, 0.4],
 });
-const { proj, onSheet, sheetMatrix, cord, alongSheet, crocodile } = scene;
+const { proj, onSheet, sheetMatrix } = scene;
+const plane = deskPlane(proj, CARD.c, CARD.w, CARD.h, CARD.turn, 0.02);
 
 /** The Add to cart button: a raised pink tab on the page that sinks when pressed. */
 function buttonArt() {
@@ -46,96 +45,30 @@ function buttonArt() {
 	};
 }
 
-/** The `cart` box: a kraft box of bags with its count stamped on the front. */
-function cartArt() {
-	const box = scene.crate(CART, 3100);
-	const { w, d, h } = CART;
-	const face = (pts: [number, number][]) => box.poly(pts.map(([x, z]) => [x, d, z] as [number, number, number]));
-	const label = face([[0.5, h * 0.82], [w - 0.5, h * 0.82], [w - 0.5, h * 0.2], [0.5, h * 0.2]]);
-	const knot = box.world(w - 0.02, d - 0.02, h * 0.82);
-	return {
-		cast: box.cast,
-		paper: box.paper,
-		kraft: wash(face([[0, 0], [w, 0], [w, h], [0, h]]), 3120, 0.8, 2) + wash(box.poly([[0, 0, h], [w, 0, h], [w, d, h], [0, d, h]]), 3121, 0.6, 2),
-		shade: box.shade,
-		ink: box.ink,
-		label: pathOf(label, true),
-		labelInk: outline(label, { w: 0.8, seed: 3125 }),
-		countMatrix: box.frontMatrix(w / 2, h * 0.36),
-		pencil: box.pencil,
-		tag: scene.tag(knot, [0.55, 1, 0], 3140),
+/** The recipe card lying on the desk: ruled, a pink margin rule, a dog-eared corner, and its shadow. */
+function cardArt() {
+	const { w, h } = CARD;
+	const edgePts: P[] = jitter(resample([[0, 0], [w, 0], [w, h - 0.9], [w - 0.9, h], [0, h]], 0.3, true), 5100, 0.04);
+	const edge = plane.on(edgePts);
+	const ear = plane.on([[w, h - 0.9], [w - 0.75, h - 0.75], [w - 0.9, h]]);
+	const shadow = hull([...edge.map(([x, y]) => [x + 5, y + 6] as P), ...edge]);
+	const rules = CARD_LINES.slice(1).map((v, i) => line(plane.on([[0.4, v + 0.25], [w - 0.4, v + 0.25]]), { w: 0.45, seed: 5110 + i, over: 0 })).join('');
+	const margin = plane.on([[1.3, 0.2], [1.3, h - 0.2]]);
+	const spot = (v: number, seed: number) => {
+		const poly = plane.on(ellipse(w - 1.35, v - 0.35, 1.2, 0.6, 26));
+		return { wash: wash(poly, seed, 1, 3), pool: wash(pool(poly, poly[0]!, 0.55), seed + 1, 0.5, 2) };
 	};
-}
-
-/** The `total` recipe: a small box that takes bags in and gives dollars out, its rule lettered on the front. */
-function recipeArt() {
-	const box = scene.crate(RECIPE, 3200);
-	const { w, d, h } = RECIPE;
-	const face = (pts: [number, number][]) => box.poly(pts.map(([x, z]) => [x, d, z] as [number, number, number]));
-	const plate = face([[0.35, h * 0.8], [w - 0.35, h * 0.8], [w - 0.35, h * 0.22], [0.35, h * 0.22]]);
-	const knot = box.world(w - 0.02, d - 0.02, h * 0.82);
 	return {
-		cast: box.cast,
-		paper: box.paper,
-		shade: box.shade,
-		ink: box.ink,
-		plate: pathOf(plate, true),
-		plateInk: outline(plate, { w: 0.8, seed: 3225 }),
-		ruleMatrix: box.frontMatrix(w / 2, h * 0.38),
-		pencil: box.pencil,
-		tag: scene.tag(knot, [0.55, 1, 0], 3240),
-	};
-}
-
-/** A loose pen line through an old number, in the text's own units. */
-function scratch(x0: number, x1: number, seed: number) {
-	const rnd = seeded(seed);
-	const pts: P[] = [
-		[x0 - 2, -3 + rnd()],
-		[(x0 + x1) / 2, -4.6 + rnd()],
-		[x1 + 2, -6.2 + rnd()],
-	];
-	const length = Math.hypot(pts[1]![0] - pts[0]![0], pts[1]![1] - pts[0]![1]) + Math.hypot(pts[2]![0] - pts[1]![0], pts[2]![1] - pts[1]![1]) + 1;
-	return { d: `M${r1(pts[0]![0])} ${r1(pts[0]![1])}Q${r1(pts[1]![0])} ${r1(pts[1]![1])} ${r1(pts[2]![0])} ${r1(pts[2]![1])}`, length: r1(length) };
-}
-
-function wires() {
-	const r = 0.24;
-	const t = 0.13;
-	const thin = cord(
-		alongSheet(
-			[
-				[BUTTON.u1 + 0.1, (BUTTON.v0 + BUTTON.v1) / 2],
-				[12.4, 8.2],
-				[17.6, 6.4],
-				[21.6, 3.2],
-				[23.4, 0.9],
-				[CART.u + 0.1, CART.v + 1.6],
-			],
-			t - 0.02,
-		),
-		t,
-		3300,
-	);
-	const socket = onSheet(ellipse(CART.u + 0.1, CART.v + 1.6, 0.3, 0.26, 14), 0.4);
-	const fromBox = (c: Crate, du: number, desk: P[], seed: number) => {
-		const start: Point3 = sheetAt(c.u + du, c.v + c.d + 0.05, 0.6);
-		const path = alongSheet(desk, r - 0.02);
-		return cord([...bezier(start, add3(start, [0, 0.6, 0]), add3(path[0]!, [0, -0.3, 0.2]), path[0]!, 8), ...path.slice(1)], r, seed);
-	};
-	const cartRear = CART_CLIP.rear;
-	const totalRear = TOTAL_CLIP.rear;
-	const cartOut = fromBox(CART, 0.9, [[CART.u + 0.6, CART.v + CART.d + 1.2], [23.6, 4.6], [21.2, 7.2], [cartRear[0] + 0.7, cartRear[1] - 0.2], cartRear], 3400);
-	const link = fromBox(CART, CART.w - 1.1, [[CART.u + CART.w - 1.1, CART.v + CART.d + 1], [CART.u + CART.w - 0.6, 5.2], [RECIPE.u + 2.2, RECIPE.v - 0.6], [RECIPE.u + 2.0, RECIPE.v + 0.05]], 3500);
-	const totalOut = fromBox(RECIPE, 0.8, [[RECIPE.u + 0.4, RECIPE.v + RECIPE.d + 1.0], [22.6, 13.6], [19.4, 14.6], [totalRear[0] + 0.7, totalRear[1] + 0.1], totalRear], 3600);
-	return {
-		thin,
-		cartOut,
-		link,
-		totalOut,
-		socket: { paper: pathOf(socket, true), ink: outline(socket, { w: 0.8, seed: 3610 }) },
-		cartClip: crocodile(CART_CLIP.rear, CART_CLIP.tip, 3700),
-		totalClip: crocodile(TOTAL_CLIP.rear, TOTAL_CLIP.tip, 3800),
+		paper: pathOf(edge, true),
+		shadow: { wash: wash(shadow, 5120, 1.2, 3), hatch: hatch(shadow, -0.5, 2.6, 5121, { cluster: 5, skip: 0.25 }) },
+		ink: outline(edge, { w: 1.3, heavy: 1.1, seed: 5122 }) + outline(ear, { w: 0.8, seed: 5123 }),
+		ear: hatch(ear, 0.6, 1.2, 5124, { cluster: 2 }),
+		rules,
+		margin: pathOf(margin),
+		pencil: pencil(plane.on([[-0.8, 0], [w + 1, 0]]), 5130) + pencil(plane.on([[0, -0.6], [0, h + 0.8]]), 5131),
+		lines: CARD_LINES.map((v) => plane.matrix(0.5, v, 0.1)),
+		values: CARD_LINES.map((v) => plane.matrix(w - 2.4, v, 0.1)),
+		spots: CARD_LINES.slice(1).map((v, i) => spot(v, 5140 + i * 3)),
 	};
 }
 
@@ -149,15 +82,11 @@ export function drawing() {
 			...scene.shopArt(),
 			cartMatrix: sheetMatrix(CART_ROW.u, CART_ROW.v),
 			totalMatrix: sheetMatrix(TOTAL_ROW.u, TOTAL_ROW.v),
-			cartSpot: scene.spot(CART_ROW.u + CART_NEW / 10 + 0.55, CART_ROW.v - 0.62, 1.2, 0.85, 3900),
-			totalSpot: scene.spot(TOTAL_ROW.u + TOTAL_NEW / 10 + 2, TOTAL_ROW.v - 0.62, 2.6, 0.9, 3910),
+			cartSpot: scene.spot(CART_ROW.u + 10.15, CART_ROW.v - 0.62, 1.2, 0.85, 3900),
+			totalSpot: scene.spot(TOTAL_ROW.u + 7, TOTAL_ROW.v - 0.62, 2.2, 0.9, 3910),
 			button: buttonArt(),
 		},
-		cartStrike: scratch(CART_SLOT, CART_SLOT + 7, 3950),
-		totalStrike: scratch(TOTAL_SLOT, TOTAL_SLOT + 22, 3960),
-		cart: cartArt(),
-		recipe: recipeArt(),
-		wires: wires(),
-		note: scene.note(proj(sheetAt(20.4, 4.3, 0.3)), 3970),
+		card: cardArt(),
+		note: scene.note(plane.on([[0.6, 0.6]])[0]!, 3970),
 	};
 }

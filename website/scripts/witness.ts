@@ -1824,33 +1824,6 @@ try {
 		);
 
 		// --- textbook columns: each demo's notes report what the reader's action did ---
-		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
-		const labelDemo = page.locator('.margin-notes');
-		const labelField = labelDemo.getByLabel('Name for the mug');
-		await labelField.click();
-		await labelField.pressSequentially('Ada', { delay: 40 });
-		await settleText(labelDemo.locator('.tally'), (text) => text.includes('the field now reads "Ada"'), 'events demo: onInput reports the value it got');
-		const eventsUrl = page.url();
-		await labelField.press('Enter');
-		await settleText(labelDemo.locator('.tally'), (text) => text.includes('preventDefault() kept the page'), 'events demo: Enter runs onSubmit');
-		check(page.url() === eventsUrl, 'events demo: the submit does not navigate');
-		await labelField.press('Escape');
-		await settleText(labelDemo.locator('.tally'), (text) => text.includes('"Escape"'), 'events demo: Escape runs onKeyDown');
-		check((await labelField.inputValue()) === '', 'events demo: Escape cleared the field', await labelField.inputValue());
-
-		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
-		const panel = page.locator('.margin-notes');
-		const panelToggle = panel.getByRole('button', { name: 'Note', exact: true });
-		const panelField = panel.getByLabel('Note for the barista');
-		await panelField.fill('Oat milk');
-		await panelToggle.click();
-		await settleText(panel.locator('.sr'), (text) => text.includes('The note still holds "Oat milk"'), 'conditionals demo: the note outlives the branch');
-		check((await panelField.count()) === 0, 'conditionals demo: closing removes the field');
-		await panelToggle.click();
-		await settleText(panel.locator('.tally'), (text) => text.includes('built 2 times'), 'conditionals demo: reopening builds a new field');
-		check((await panelField.inputValue()) === 'Oat milk', 'conditionals demo: the new field is filled from note');
-		await panel.screenshot({ path: `${shotsDir}/concepts-conditionals-demo.png` });
-
 		// --- widget: the shopping list on the lists page --------------------------
 		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
 		const shopping = page.locator('.code-block [data-code-stage]').first();

@@ -1,9 +1,8 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import PanelDemo from '../../components/figures/conditionals/panel-demo.tsrx';
+import BranchAnatomy from '../../components/figures/conditionals/branch-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -14,47 +13,21 @@ import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Subtitle text="@if puts real elements on the page and takes them off again. A value outlives the branch only if you declare it above the branch." terms="elements" />
 
-You type half a note into a panel, close it by accident, and open it again. The note is gone.
-
-```tsrx title="note-field.tsrx"
-import { state } from '@markless/core';
-
-export default function NoteField() @{
-	let open = state(true);
-	let note = state('');
-
-	<section>
-		<button onClick={() => (open = !open)}>Note</button>
-		@if (open) {
-			<input
-				value={note}
-				onInput={(event) => (note = event.currentTarget.value)}
-			/>
-		}
-	</section>
+```tsrx
+@if (cart >= 3) {
+	<p>Free shipping</p>
 }
 ```
 
-The field lives inside the `@if`. The note lives above it, in the component body, so it survives.
+## Watch the line come and go
 
-## Close the field, open it again
+Press **Add to cart** until the cart holds three bags, then keep going.
 
-Type in the field, press **Note** to close it, then press **Note** again.
+<BranchAnatomy />
 
-<MugSpot mood="sad" from="left" />
+At three bags the line is built. When the cart starts over at one, it's gone, with nothing left behind.
 
-<PanelDemo />
-
-- Closing removes the field from the page. It isn't covered up.
-- Opening builds a new field, and it shows `note` again.
-- `note` was made once, above the `@if`, so it kept every letter.
-
-## Where you declare a value decides how long it lives
-
-- The component body lasts as long as the component.
-- A branch lasts as long as its test is true.
-- Put `let note = state('')` inside the `@if`, and the build stops with
-  `MARKLESS_STATE_CREATION_SITE_UNSTABLE`: a note made there would leave with the branch.
+## Keep the value above the branch
 
 <Code steps={[{ label: 'Press Show or hide the note, and type a note longer than 20 letters. The line under it changes.', shows: 'That is a long note.' }, { label: 'Change `20` to `5`, and type six letters.', source: 'note.length > 5' }]}>
 ```tsrx title="note-panel.tsrx"
@@ -90,39 +63,15 @@ export default function NotePanel() @{
 ```
 </Code>
 
+The field inside the `@if` is rebuilt each time. `note` lives above it, so your text survives. Inside the `@if`, `state()` stops the build with `MARKLESS_STATE_CREATION_SITE_UNSTABLE`.
+
 ## `@else` and `@switch`
 
-`@else` covers the other side of the same test. For three or more cases, `@switch` shows the one
-`@case` that matches, and `@default` catches the rest:
-
-```tsrx title="order-status.tsrx"
-import { state } from '@markless/core';
-
-export default function OrderStatus() @{
-	let status = state('brewing');
-
-	<section>
-		<button onClick={() => (status = 'ready')}>Mark ready</button>
-		@switch (status) {
-			@case 'brewing': {
-				<p>Brewing your coffee.</p>
-			}
-			@case 'ready': {
-				<p>Ready for pickup.</p>
-			}
-			@default: {
-				<p>Queued.</p>
-			}
-		}
-	</section>
-}
-```
+- `@else` covers the other side. A plain `else` stops the build with `MARKLESS_BRANCH_ELSE_SPELLING`.
+- `@switch (status) { @case 'ready': { … } @default: { … } }` picks one case.
 
 Not yet:
 
-- A plain `else` stops the build with `MARKLESS_BRANCH_ELSE_SPELLING`. Write `@else`.
-- An `@if` or `@switch` can't sit inside another `@if`, and `@else if` chains don't work. Both
-  stop the build with `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`. Put the branches side by side, or
-  use `@switch`.
+- An `@if` or `@switch` can't sit inside another `@if`, and `@else if` doesn't work: `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`. Put branches side by side, or use `@switch`.
 
 [Lists](/concepts/lists) shows rows that keep their own state when the list moves.

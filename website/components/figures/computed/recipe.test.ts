@@ -1,37 +1,36 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { add, describeRecipe, flip, RECIPE_TOUR, START, totalOf } from './recipe-model.ts';
+import { add, describeRecipe, flip, RECIPE_TOUR, shippingOf, START, subtotalOf, totalOf } from './recipe-model.ts';
 import { drawing } from './recipe.ts';
 
 const recipeArt = drawing();
 const page = readFileSync(new URL('../../../pages/concepts/computed.mdx', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./recipe-anatomy.tsrx', import.meta.url), 'utf8');
 
-describe('the cart box and the total recipe', () => {
-	it('works the total out from the cart, and says so', () => {
+describe('the recipe card', () => {
+	it('works the total out from the cart, step by step', () => {
 		expect(START).toBe(2);
-		expect(add(2)).toBe(3);
-		expect(add(9)).toBe(1);
-		expect(totalOf(3)).toBe(42);
-		expect(describeRecipe(3, true)).toBe('Added a bag. The cart line now shows 3, and the recipe worked the total out again: $42. No one set the total.');
+		expect(add(4)).toBe(1);
+		expect([subtotalOf(2), shippingOf(2), totalOf(2)]).toEqual([28, 5, 33]);
+		expect([subtotalOf(3), shippingOf(3), totalOf(3)]).toEqual([42, 0, 42]);
+		expect(describeRecipe(3, true)).toBe('Added a bag. The recipe card worked itself out again, line by line: 3 bags × $14 is $42, shipping is $0, so the total is $42. No one wrote the total.');
 		expect(RECIPE_TOUR[0]).toBe('add');
 		expect(flip('odd')).toBe('even');
 	});
 
-	it('wires the cart line and the total, and nothing else; the press never touches the total', () => {
-		expect(piece.match(/class="pulse to-cart-line"/g)).toHaveLength(1);
-		expect(piece.match(/class="pulse to-total-line"/g)).toHaveLength(1);
+	it('re-inks the card top to bottom and then the page total; the press never writes the total', () => {
+		for (const step of ['step-0', 'step-1', 'step-2', 'step-3', 'step-4']) expect(piece.match(new RegExp(`live ${step}`, 'g'))).toHaveLength(1);
 		const start = piece.indexOf('class="once"');
 		const once = piece.slice(start, piece.indexOf('</g>', start));
 		expect(once).toContain('{SHOP}');
 		expect(once).not.toMatch(/cart|total|beat/);
 		const press = piece.slice(piece.indexOf('onClick='), piece.indexOf('onKeyDown='));
 		expect(press).not.toMatch(/total/);
+		expect(piece).not.toMatch(/class="cord"|art\.wires/);
 	});
 
 	it('has one margin note, no motion under reduced motion, and a tour that stops on touch', () => {
 		expect(piece.match(/class="hand/g)).toHaveLength(1);
-		expect(piece).toContain('WIRED BEFORE THE PAGE RAN');
 		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
 		expect(piece).toContain('if (!seen || touched) return;');
 		expect(piece).toContain("event.key === 'Escape'");
@@ -39,9 +38,8 @@ describe('the cart box and the total recipe', () => {
 	});
 
 	it('inks every part fully and draws the same scene every time', () => {
-		expect(recipeArt.cart.ink.length).toBeGreaterThan(300);
-		expect(recipeArt.recipe.ink.length).toBeGreaterThan(300);
-		for (const wire of [recipeArt.wires.thin, recipeArt.wires.cartOut, recipeArt.wires.link, recipeArt.wires.totalOut]) expect(wire.length).toBeGreaterThan(20);
+		expect(recipeArt.card.ink.length).toBeGreaterThan(300);
+		expect(recipeArt.card.spots).toHaveLength(3);
 		expect(JSON.stringify(drawing())).toBe(JSON.stringify(recipeArt));
 	});
 

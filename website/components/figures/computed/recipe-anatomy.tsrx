@@ -1,16 +1,16 @@
-// The shop page on the desk with the `cart` box and the `total` recipe: Add to cart feeds the box, and the recipe works the total out down its own wire.
+// The shop page on the desk with its recipe card: Add to cart changes the cart, and the card works the total out again, one line after another.
 import { computed, state } from '@markless/core';
-import { add, CART_NEW, CART_SLOT, CART_UNIT, describeRecipe, flip, PRICE, PRODUCT, RECIPE_TOUR, SHOP, START, TOTAL_NEW, TOTAL_SLOT, totalOf } from './recipe-model.ts';
+import { add, bags, describeRecipe, flip, FREE_OVER, money, PRICE, PRODUCT, RECIPE_TOUR, SHOP, shippingOf, START, subtotalOf, totalOf } from './recipe-model.ts';
 import { art } from './recipe.art.ts';
 
 export default function RecipeAnatomy() @{
 	let cart = state(START);
-	let prev = state(START);
 	let beat = state('rest');
 	let touched = state(false);
-	const total = computed(() => '$' + totalOf(cart));
-	const prevTotal = computed(() => '$' + totalOf(prev));
-	const unit = computed(() => (cart === 1 ? 'bag' : 'bags'));
+	const unit = computed(() => bags(cart));
+	const subtotal = computed(() => money(subtotalOf(cart)));
+	const shipping = computed(() => money(shippingOf(cart)));
+	const total = computed(() => money(totalOf(cart)));
 	const said = computed(() => describeRecipe(cart, beat !== 'rest'));
 
 	<figure
@@ -29,13 +29,8 @@ export default function RecipeAnatomy() @{
 				const next = RECIPE_TOUR[step % RECIPE_TOUR.length];
 				step++;
 				if (next === 'add') {
-					prev = cart;
 					cart = add(cart);
 					beat = flip(beat);
-				} else if (next === 'reset') {
-					prev = START;
-					cart = START;
-					beat = 'rest';
 				}
 			}, 3400);
 			return () => {
@@ -50,14 +45,12 @@ export default function RecipeAnatomy() @{
 			aria-label="Add to cart"
 			onClick={() => {
 				touched = true;
-				prev = cart;
 				cart = add(cart);
 				beat = flip(beat);
 			}}
 			onKeyDown={(event) => {
 				if (event.key === 'Escape') {
 					touched = true;
-					prev = START;
 					cart = START;
 					beat = 'rest';
 				}
@@ -65,17 +58,14 @@ export default function RecipeAnatomy() @{
 		>
 			<svg class="scene" data-beat={beat} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="pencil" d={art.sheet.pencil} />
-				<path class="pencil" d={art.cart.pencil} />
-				<path class="pencil" d={art.recipe.pencil} />
+				<path class="pencil" d={art.card.pencil} />
 				<path class="shadow-wash" d={art.sheet.curl.shadow} />
 				<path class="hatch deep" d={art.sheet.curl.hatch} />
 				<path class="shadow-wash light" d={art.sheet.contactWash} />
 				<path class="hatch deep" d={art.sheet.contact} />
 				<path class="hatch deep light" d={art.sheet.desk} />
-				<path class="shadow-wash" d={art.cart.cast.wash} />
-				<path class="hatch deep light" d={art.cart.cast.hatch} />
-				<path class="shadow-wash" d={art.recipe.cast.wash} />
-				<path class="hatch deep light" d={art.recipe.cast.hatch} />
+				<path class="shadow-wash" d={art.card.shadow.wash} />
+				<path class="hatch deep light" d={art.card.shadow.hatch} />
 
 				<g class="sheet">
 					<path class="sheet-paper" d={art.sheet.paper} />
@@ -108,114 +98,52 @@ export default function RecipeAnatomy() @{
 					<path class="sheet-ink" d={art.page.button.ink} />
 					<text class="button-label" transform={art.page.button.matrix}>Add to cart</text>
 				</g>
-				<g class="cart-spot">
-					<path class="wash yellow" d={art.page.cartSpot.wash} />
-					<path class="wash yellow pool" d={art.page.cartSpot.pool} />
-					<path class="wash-edge" d={art.page.cartSpot.edge} />
-				</g>
-				<g class="total-spot">
-					<path class="wash yellow" d={art.page.totalSpot.wash} />
-					<path class="wash yellow pool" d={art.page.totalSpot.pool} />
-					<path class="wash-edge" d={art.page.totalSpot.edge} />
-				</g>
+				<path class="wash yellow" d={art.page.cartSpot.wash} />
+				<path class="wash yellow pool" d={art.page.cartSpot.pool} />
+				<path class="wash yellow" d={art.page.totalSpot.wash} />
+				<path class="wash yellow pool" d={art.page.totalSpot.pool} />
 				<g transform={art.page.cartMatrix}>
 					<text class="page-text label">In your cart:</text>
-					<g class="old cart-old">
-						<text class="page-text small" x={CART_SLOT}>{prev}</text>
-						<path class="strike" d={art.cartStrike.d} style={'--l:' + art.cartStrike.length} />
-					</g>
-					<text class="digit cart-now" x={CART_NEW}>{cart}</text>
-					<text class="page-text label" x={CART_UNIT}>{unit}</text>
+					<text class="digit live step-0" x="96">{cart}</text>
+					<text class="page-text label" x="112">{unit}</text>
 				</g>
 				<g transform={art.page.totalMatrix}>
 					<text class="page-text label">Total:</text>
-					<g class="old total-old">
-						<text class="page-text small" x={TOTAL_SLOT}>{prevTotal}</text>
-						<path class="strike" d={art.totalStrike.d} style={'--l:' + art.totalStrike.length} />
-					</g>
-					<text class="digit total-now" x={TOTAL_NEW}>{total}</text>
+					<text class="digit live step-4" x="54">{total}</text>
 				</g>
 
-				<path class="shadow-ink" d={art.wires.thin.shadow} />
-				<path class="hatch deep" d={art.wires.thin.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.cartOut.shadow} />
-				<path class="hatch deep" d={art.wires.cartOut.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.link.shadow} />
-				<path class="hatch deep" d={art.wires.link.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.totalOut.shadow} />
-				<path class="hatch deep" d={art.wires.totalOut.shadowHatch} />
-				<path class="shadow-wash" d={art.wires.cartClip.cast} />
-				<path class="shadow-wash" d={art.wires.totalClip.cast} />
-
-				<path class="box-paper" d={art.cart.paper} />
-				<path class="wash kraft-wash" d={art.cart.kraft} />
-				<path class="hatch" d={art.cart.shade} />
-				<path class="tag-paper" d={art.cart.label} />
-				<path class="tag-ink" d={art.cart.labelInk} />
-				<path class="jar-ink" d={art.cart.ink} />
-				<text class="count stamp-count" transform={art.cart.countMatrix}>{cart}</text>
-				<path class="jar-ink" d={art.cart.tag.string} />
-				<path class="tag-paper" d={art.cart.tag.paper} />
-				<path class="tag-hatch" d={art.cart.tag.shade} />
-				<path class="tag-ink" d={art.cart.tag.ink} />
-				<text class="tag-text" transform={art.cart.tag.matrix}>cart</text>
-
-				<path class="box-paper" d={art.recipe.paper} />
-				<path class="hatch" d={art.recipe.shade} />
-				<path class="tag-paper" d={art.recipe.plate} />
-				<path class="tag-ink" d={art.recipe.plateInk} />
-				<path class="jar-ink" d={art.recipe.ink} />
-				<text class="rule-text" transform={art.recipe.ruleMatrix}>× ${PRICE}</text>
-				<path class="jar-ink" d={art.recipe.tag.string} />
-				<path class="tag-paper" d={art.recipe.tag.paper} />
-				<path class="tag-hatch" d={art.recipe.tag.shade} />
-				<path class="tag-ink" d={art.recipe.tag.ink} />
-				<text class="tag-text" transform={art.recipe.tag.matrix}>total</text>
-
-				<path class="cord" d={art.wires.thin.paper} />
-				<path class="jar-ink" d={art.wires.thin.tone} />
-				<path class="jar-ink" d={art.wires.thin.ink} />
-				<path class="boot" d={art.wires.socket.paper} />
-				<path class="jar-ink" d={art.wires.socket.ink} />
-				<path class="cord" d={art.wires.link.paper} />
-				<path class="jar-ink" d={art.wires.link.tone} />
-				<path class="jar-ink" d={art.wires.link.ink} />
-				<path class="cord" d={art.wires.cartOut.paper} />
-				<path class="jar-ink" d={art.wires.cartOut.tone} />
-				<path class="jar-ink" d={art.wires.cartOut.ink} />
-				<path class="cord" d={art.wires.totalOut.paper} />
-				<path class="jar-ink" d={art.wires.totalOut.tone} />
-				<path class="jar-ink" d={art.wires.totalOut.ink} />
-				<path class="boot" d={art.wires.cartClip.boot} />
-				<path class="hatch" d={art.wires.cartClip.bootTone} />
-				<path class="brass" d={art.wires.cartClip.paper} />
-				<path class="wash brass-wash" d={art.wires.cartClip.wash} />
-				<path class="hatch" d={art.wires.cartClip.side} />
-				<path class="jar-ink" d={art.wires.cartClip.ink} />
-				<path class="boot" d={art.wires.totalClip.boot} />
-				<path class="hatch" d={art.wires.totalClip.bootTone} />
-				<path class="brass" d={art.wires.totalClip.paper} />
-				<path class="wash brass-wash" d={art.wires.totalClip.wash} />
-				<path class="hatch" d={art.wires.totalClip.side} />
-				<path class="jar-ink" d={art.wires.totalClip.ink} />
-
-				<path class="pulse to-cart" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
-				<path class="pulse to-cart-line" d={art.wires.cartOut.centre} style={'--len:' + art.wires.cartOut.length} />
-				<path class="pulse to-recipe" d={art.wires.link.centre} style={'--len:' + art.wires.link.length} />
-				<path class="pulse to-total-line" d={art.wires.totalOut.centre} style={'--len:' + art.wires.totalOut.length} />
+				<path class="card-paper" d={art.card.paper} />
+				<path class="card-margin" d={art.card.margin} />
+				<path class="jar-ink thin" d={art.card.rules} />
+				<path class="hatch light" d={art.card.ear} />
+				<path class="jar-ink" d={art.card.ink} />
+				@for (const spot of art.card.spots; key spot.wash) {
+					<g>
+						<path class="wash yellow" d={spot.wash} />
+						<path class="wash yellow pool" d={spot.pool} />
+					</g>
+				}
+				<text class="card-title" transform={art.card.lines[0]}>Recipe for total</text>
+				<g transform={art.card.lines[1]}>
+					<text class="card-hand">{cart} {unit} × ${PRICE}</text>
+				</g>
+				<text class="card-value live step-1" transform={art.card.values[1]}>{subtotal}</text>
+				<text class="card-hand" transform={art.card.lines[2]}>shipping, free over ${FREE_OVER}</text>
+				<text class="card-value live step-2" transform={art.card.values[2]}>{shipping}</text>
+				<text class="card-hand strong" transform={art.card.lines[3]}>total</text>
+				<text class="card-value live step-3" transform={art.card.values[3]}>{total}</text>
 
 				<path class="jar-ink" d={art.note.arrow} />
-				<text class="hand" x={art.note.x} y={art.note.y}>WIRED BEFORE THE PAGE RAN</text>
+				<text class="hand" x={art.note.x} y={art.note.y}>NOBODY WRITES THE TOTAL</text>
 			</svg>
 		</button>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a desk. A sheet of paper on it is drawn as a shop page at beanshop.dev: the shop name {SHOP}, a bag of
-			coffee sold as {PRODUCT} for ${PRICE}, a pink Add to cart button, and two lines, "In your cart: {cart} {unit}" and "Total: {total}",
-			each with its number in a yellow wash. Beside the sheet stand two boxes. One is tagged cart and has the count stamped on it. The
-			other is tagged total and lettered "× ${PRICE}": it is the recipe. A thin wire runs from the button into the cart box. One wire runs
-			from the cart box to the cart line, and another to the total box, which has its own wire to the total line. Nothing else on the
-			page is wired. Press the drawing, or Enter or Space, to add a bag: the press runs into the cart box, the count goes up, and the new
-			count runs to the cart line and into the recipe, which sends the new total to the total line. Escape resets.
+			coffee sold as {PRODUCT} for ${PRICE}, a pink Add to cart button, the line "In your cart: {cart} {unit}" and the line "Total:
+			{total}". Beside the sheet lies a ruled recipe card titled "Recipe for total" with three lines: "{cart} {unit} × ${PRICE}"
+			worked out to {subtotal}, "shipping, free over ${FREE_OVER}" worked out to {shipping}, and "total" worked out to {total}. Press
+			the drawing, or Enter or Space, to add a bag: the cart line changes, then each line of the card is inked in again from the top,
+			and the page's total shows the card's last line. Escape resets.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -534,116 +462,106 @@ export default function RecipeAnatomy() @{
 				transform-origin: center;
 			}
 
-			.small {
-				font-size: 12px;
-				font-weight: 600;
-			}
-
-			.button-label,
-			.stamp-count,
-			.rule-text {
-				font-family: 'Shantell Sans', system-ui, sans-serif;
-				font-weight: 800;
-			}
-
 			.button-label {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: 8px;
+				font-weight: 800;
 				fill: var(--sheet-ink);
 			}
 
-			.stamp-count {
-				font-size: 13px;
-				text-anchor: middle;
-				fill: var(--ink);
+			.card-paper {
+				fill: color-mix(in oklch, var(--paper) 70%, white);
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--paper) 88%, var(--ink));
+				}
 			}
 
-			.rule-text {
+			.card-margin {
+				fill: none;
+				stroke: var(--pink);
+				stroke-width: 1;
+				opacity: 0.8;
+			}
+
+			.card-title,
+			.card-hand,
+			.card-value {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				fill: oklch(32% 0.02 60);
+			}
+
+			.card-title {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 9px;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+			}
+
+			.card-hand {
 				font-size: 7.5px;
-				text-anchor: middle;
-				fill: var(--ink);
+				font-style: italic;
+			}
+
+			.strong {
+				font-weight: 800;
+			}
+
+			.card-value {
+				font-size: 10px;
+				font-weight: 800;
+			}
+
+			.live {
+				stroke: currentColor;
+				stroke-width: 0.25;
+				stroke-dasharray: 60;
+			}
+
+			.digit.live {
+				stroke: var(--sheet-ink);
+			}
+
+			.card-value.live {
+				stroke: oklch(32% 0.02 60);
 			}
 
 			.scene[data-beat='odd'] {
 				--sink: sink-a;
-				--travel: travel-a;
-				--strike: strike-a;
-				--come-cart: come-cart-a;
-				--come-total: come-total-a;
-				--wash-cart: wash-cart-a;
-				--wash-total: wash-total-a;
-				--count: count-a;
-				--old: old-a;
+				--ink-in: ink-in-a;
 			}
 
 			.scene[data-beat='even'] {
 				--sink: sink-b;
-				--travel: travel-b;
-				--strike: strike-b;
-				--come-cart: come-cart-b;
-				--come-total: come-total-b;
-				--wash-cart: wash-cart-b;
-				--wash-total: wash-total-b;
-				--count: count-b;
-				--old: old-b;
+				--ink-in: ink-in-b;
 			}
 
 			.press {
 				animation: var(--sink) 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}
 
-			.to-cart {
-				animation: var(--travel) 700ms 300ms ease-in-out both;
+			.scene:not([data-beat='rest']) .live {
+				animation: var(--ink-in) 650ms both;
 			}
 
-			.to-cart-line,
-			.to-recipe {
-				animation: var(--travel) 650ms 1150ms ease-in-out both;
+			.scene:not([data-beat='rest']) .step-0 {
+				animation-delay: 350ms;
 			}
 
-			.to-total-line {
-				animation: var(--travel) 600ms 1850ms ease-in-out both;
+			.scene:not([data-beat='rest']) .step-1 {
+				animation-delay: 1000ms;
 			}
 
-			.count {
-				animation: var(--count) 3300ms linear both;
+			.scene:not([data-beat='rest']) .step-2 {
+				animation-delay: 1550ms;
 			}
 
-			.old {
-				opacity: 0;
+			.scene:not([data-beat='rest']) .step-3 {
+				animation-delay: 2100ms;
 			}
 
-			.scene:not([data-beat='rest']) .old {
-				animation: var(--old) 3300ms linear both;
-			}
-
-			.cart-old .strike {
-				animation: var(--strike) 260ms 1800ms ease-out both;
-			}
-
-			.total-old .strike {
-				animation: var(--strike) 260ms 2450ms ease-out both;
-			}
-
-			.cart-now {
-				stroke: var(--sheet-ink);
-				stroke-width: 0.3;
-				stroke-dasharray: 60;
-				animation: var(--come-cart) 3300ms linear both;
-			}
-
-			.total-now {
-				stroke: var(--sheet-ink);
-				stroke-width: 0.3;
-				stroke-dasharray: 60;
-				animation: var(--come-total) 3300ms linear both;
-			}
-
-			.cart-spot {
-				animation: var(--wash-cart) 3300ms linear both;
-			}
-
-			.total-spot {
-				animation: var(--wash-total) 3300ms linear both;
+			.scene:not([data-beat='rest']) .step-4 {
+				animation-delay: 2650ms;
 			}
 
 			@keyframes sink-a {
@@ -658,75 +576,15 @@ export default function RecipeAnatomy() @{
 				}
 			}
 
-			@keyframes travel-a {
+			@keyframes ink-in-a {
 				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes travel-b {
-				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes strike-a {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes strike-b {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes come-cart-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				57% {
 					opacity: 0;
 					stroke-dashoffset: 60;
 					fill-opacity: 0;
 				}
 
-				58% {
+				30% {
 					opacity: 1;
-				}
-
-				66% {
 					fill-opacity: 0;
 				}
 
@@ -736,179 +594,21 @@ export default function RecipeAnatomy() @{
 				}
 			}
 
-			@keyframes come-cart-b {
+			@keyframes ink-in-b {
 				0% {
-					opacity: 1;
-				}
-
-				5%,
-				57% {
 					opacity: 0;
 					stroke-dashoffset: 60;
 					fill-opacity: 0;
 				}
 
-				58% {
+				30% {
 					opacity: 1;
-				}
-
-				66% {
 					fill-opacity: 0;
 				}
 
 				100% {
 					stroke-dashoffset: 0;
 					fill-opacity: 1;
-				}
-			}
-
-			@keyframes come-total-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				76% {
-					opacity: 0;
-					stroke-dashoffset: 60;
-					fill-opacity: 0;
-				}
-
-				77% {
-					opacity: 1;
-				}
-
-				86% {
-					fill-opacity: 0;
-				}
-
-				100% {
-					stroke-dashoffset: 0;
-					fill-opacity: 1;
-				}
-			}
-
-			@keyframes come-total-b {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				76% {
-					opacity: 0;
-					stroke-dashoffset: 60;
-					fill-opacity: 0;
-				}
-
-				77% {
-					opacity: 1;
-				}
-
-				86% {
-					fill-opacity: 0;
-				}
-
-				100% {
-					stroke-dashoffset: 0;
-					fill-opacity: 1;
-				}
-			}
-
-			@keyframes wash-cart-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				60% {
-					opacity: 0;
-				}
-			}
-
-			@keyframes wash-cart-b {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				60% {
-					opacity: 0;
-				}
-			}
-
-			@keyframes wash-total-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				80% {
-					opacity: 0;
-				}
-			}
-
-			@keyframes wash-total-b {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				80% {
-					opacity: 0;
-				}
-			}
-
-			@keyframes count-a {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				28% {
-					opacity: 0;
-				}
-
-				36% {
-					opacity: 1;
-				}
-			}
-
-			@keyframes count-b {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				28% {
-					opacity: 0;
-				}
-
-				36% {
-					opacity: 1;
-				}
-			}
-
-			@keyframes old-a {
-				0%,
-				4% {
-					opacity: 0;
-				}
-
-				8%,
-				100% {
-					opacity: 0.55;
-				}
-			}
-
-			@keyframes old-b {
-				0%,
-				4% {
-					opacity: 0;
-				}
-
-				8%,
-				100% {
-					opacity: 0.55;
 				}
 			}
 
