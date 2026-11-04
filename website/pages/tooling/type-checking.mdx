@@ -2,6 +2,8 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import CopyCheckFigure from '../../components/figures/type-checking/copy-check-figure.tsrx';
+import WhereItRunsFigure from '../../components/figures/type-checking/where-it-runs-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -12,21 +14,11 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <Subtitle text="Markless hands TypeScript a TSX copy of each .tsrx file. TypeScript checks the copy, and every error points back to the line you wrote." />
 
-```tsrx title="app.tsrx"
-import { Nav } from './nav.tsrx';
+`Nav` takes `label: string`, and `app.tsrx` passes it `42`. Press the drawing, and follow the file to the checker and back:
 
-export function App() @{
-	<Nav label={42} />
-}
-```
+<CopyCheckFigure />
 
-`Nav` takes `label: string`, so the checker reports the wrong type at `label`, on line 4, column 7:
-
-```text
-app.tsrx(4,7): error TS2322: Type 'number' is not assignable to type 'string'.
-```
-
-TSX is the file type TypeScript already understands: TypeScript with HTML-like tags. The copy exists only for the checker. Your own file stays exactly as you wrote it.
+The error lands on `label`, line 4, column 7 of your file. TSX is the file type TypeScript already understands: TypeScript with HTML-like tags. The copy exists only for the checker, and your own file stays exactly as you wrote it.
 
 ## What gets checked
 
@@ -38,6 +30,10 @@ The copy keeps your real types, so a mistake shows at the exact spot:
 - a handler whose code doesn't type-check
 
 ## Where the check runs today
+
+Press the drawing to mark the three places you might expect a check:
+
+<WhereItRunsFigure />
 
 - **In your editor**, on every file you open. [Editor setup](/tooling/editor-setup) turns it on.
 - **Not in the build.** `npm run build` stops on Markless errors, but a wrong prop still builds. `npm run check` doesn't check `.tsrx` types either.

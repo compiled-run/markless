@@ -3,6 +3,8 @@ import MarkedList from '../../components/docs/marked-list.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import CreateCommandFigure from '../../components/figures/cli/create-command-figure.tsrx';
+import ScriptsFigure from '../../components/figures/cli/scripts-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -13,11 +15,11 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <Subtitle text="create-markless makes a new app in one command. It asks a few questions, or takes flags instead." />
 
-```bash
-npm create markless@latest my-app -- --yes --starter app --no-git
-```
+This command makes the `app` starter in `my-app/`, installs its packages, and skips `git init`. Press the drawing to name each part:
 
-That makes the `app` starter in `my-app/`, installs its packages, and skips `git init`. With npm, put the flags after `--`. Without it, npm reads `--yes` as its own option and stops on flags it doesn't know. pnpm, Yarn and Bun pass flags through without `--`.
+<CreateCommandFigure />
+
+With npm, the flags go after `--`, or npm reads `--yes` as its own option. pnpm, Yarn and Bun pass flags through without it.
 
 ## Flags
 
@@ -55,7 +57,7 @@ With `--yes` you must name the folder, and it takes these defaults:
 
 ## Starters
 
-All four starters are apps with pages, built on `@markless/router` and Nitro. That's a choice of the starters: Markless itself needs no server, and `render()` from `@markless/core` mounts an app in the browser alone.
+All four starters are apps with pages, built on `@markless/router` and Nitro. Markless itself needs no server: `render()` from `@markless/core` mounts an app in the browser alone.
 
 | `--starter` | The question's label | What you get |
 | --- | --- | --- |
@@ -64,17 +66,21 @@ All four starters are apps with pages, built on `@markless/router` and Nitro. Th
 | `docs` | Write docs | An MDX docs site with a layout and sidebar components. |
 | `full-stack` | Full-stack app | The `app` files plus `api/` and `middleware/` folders. |
 
-Every starter also writes `package.json`, `tsconfig.json`, `vite.config.ts`, `README.md`, `.gitignore`, `public/` and `scripts/markless-doctor.mjs`. `--editor vscode` adds `.vscode/`, `--editor zed` adds `.zed/`, and `--editor none` adds neither.
+Every starter also writes `package.json`, `tsconfig.json`, `vite.config.ts`, `README.md`, `.gitignore`, `public/` and `scripts/markless-doctor.mjs`. `--editor vscode` adds `.vscode/`, and `--editor zed` adds `.zed/`.
 
 ## Coding agent skills
 
-The CLI can give your coding agent a Markless skill file. It goes into the agent's folder in your home folder, like `~/.claude/skills/markless/SKILL.md`. It works for:
+The CLI can put a Markless skill file in your coding agent's folder, like `~/.claude/skills/markless/SKILL.md`. It works for:
 
 <MarkedList items="claude:Claude Code|codex:Codex|gemini:Gemini CLI|copilot:GitHub Copilot" />
 
-Add or remove the file later with `create-markless agents <add|remove> [--agents <list|none>]`. Cursor shows in the list, but you can't pick it: its rules apply to every project, so the CLI doesn't write one.
+Add or remove it later with `create-markless agents <add|remove> [--agents <list|none>]`. Cursor's rules apply to every project, so the CLI doesn't write one.
 
 ## Scripts in a new app
+
+Two scripts do most of the work. Press the drawing to see where each one lands:
+
+<ScriptsFigure />
 
 | Script | Runs | What it does |
 | --- | --- | --- |
@@ -86,8 +92,7 @@ Add or remove the file later with `create-markless agents <add|remove> [--agents
 | `npm run fmt` | `vp fmt` | Formats the code. |
 | `npm run test` | `vp test` | Runs Vitest. |
 
-`vp` is the Vite+ command line. Run Vite commands through it, as `vp build -c other.config.ts`, not `vite build`. The app's `vite` is an alias for `@voidzero-dev/vite-plus-core`, so plugins that ask for `vite` get Vite+, and that package has no `vite` command.
-
-To run the built server without Vite, use `node .output/server/index.mjs`. It reads the `PORT` variable.
+- `vp` is the Vite+ command line. Run Vite commands through it, as `vp build -c other.config.ts`, not `vite build`: the app's `vite` is `@voidzero-dev/vite-plus-core`, which has no `vite` command.
+- `node .output/server/index.mjs` runs the built server without Vite. It reads the `PORT` variable.
 
 When the build stops on a Markless error, [error codes](/errors) has a page for each one.

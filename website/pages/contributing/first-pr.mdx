@@ -4,6 +4,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import StepsFigure from '../../components/figures/first-pr/steps-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -18,48 +19,44 @@ import MugSpot from '../../components/mascot/mug-spot.tsrx';
 git switch -c fix/counter-text
 ```
 
-Every change starts on its own branch. Then follow these steps in order.
+Every change starts on its own branch. Press the drawing to walk it through the six steps, in order:
+
+<StepsFigure />
+
+The test fails before your change and passes after it. Nothing reaches `main` except through the merge queue.
 
 ## 1. Read the rules for your area
 
-Read `AGENTS.md` first. Then read `specs/framework-design.md` and the one spec in `specs/framework/` that covers your change. For a UI component, also read `packages/headless/components/SPEC.md`.
+Read `AGENTS.md`, then `specs/framework-design.md` and the one spec in `specs/framework/` for your change. For a UI component, also read `packages/headless/components/SPEC.md`.
 
-## 2. Write the failing test first
+## 2. Write the failing test, then the smallest change
 
-Add or update the closest focused test. Run it, and check that it fails for the reason you expect:
+Add or update the closest focused test, and check that it fails for the reason you expect:
 
 ```bash
 pnpm exec vp test packages/compiler/test/semantic-graph.test.ts
 ```
 
-Compiler tests check pass artifacts and diagnostics where they can. Component and browser behavior gets a Vitest browser-mode test.
+Compiler tests check pass artifacts and diagnostics where they can. Component and browser behavior gets a Vitest browser-mode test. Then change only what the test needs.
 
-## 3. Make the smallest change
-
-Change only what the test needs, and run the test again until it passes.
-
-## 4. Run the two checks
+## 3. Run the two checks
 
 ```bash
 pnpm run typecheck
 pnpm ci:local --fast
 ```
 
-The first reads `.tsrx` files, which plain `tsc` can't. The second runs CI's fast jobs, `agent-files`, `typecheck`, `typecheck-ts7` and `unit`, with the commands from `ci.yml`. If you touched the bundler, router, web, runtime, compiler or demos, run the matching jobs too, like `pnpm ci:local --job browser --job boxes-router`.
+The first reads `.tsrx` files, which plain `tsc` can't. The second runs CI's fast jobs with the commands from `ci.yml`. If you touched the bundler, router, web, runtime, compiler or demos, run the matching jobs too, like `pnpm ci:local --job browser --job boxes-router`.
 
-## 5. Commit, and let the hook run
+## 4. Commit, and let the hook run
 
-The `pre-commit` hook runs `vp lint --deny-warnings`, then the fast jobs with `--bail`. If you staged a file in `.ruler/`, it also checks that the generated agent files match. When lint fails, it prints the fix: `pnpm exec vp lint --fix --fix-suggestions --fix-dangerously`.
+The `pre-commit` hook runs `vp lint --deny-warnings`, then the fast jobs with `--bail`. When lint fails, it prints the fix: `pnpm exec vp lint --fix --fix-suggestions --fix-dangerously`.
 
-## 6. Open the pull request and answer every finding
+## 5. Answer every finding
 
-Push your own branch and open a pull request. In it, say which `ci:local` mode you ran, on which commit, and the result line it printed.
+Open the pull request from your own branch, and say which `ci:local` mode you ran, on which commit, and the result line it printed. Then read every finding, from people and from the CodeRabbit bot. Fix the ones that are right, and reply with your reason on the ones that are stale or wrong.
 
-- Read every finding, from people and from the CodeRabbit bot.
-- Fix the ones that are right.
-- Reply with your reason on the ones that are stale or wrong.
-
-`main` takes changes only through its merge queue, once the required checks `test`, `typecheck` and `agent-files` pass. A merge or a push to a branch other people share needs the owner's go-ahead for that one change set.
+`main` takes changes only through its merge queue, once `test`, `typecheck` and `agent-files` pass. A merge or a push to a shared branch needs the owner's go-ahead for that one change set.
 
 <MugSpot mood="bow" at="perch" from="left" />
 

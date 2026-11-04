@@ -280,6 +280,10 @@ export default function DeskFigure({
 				letter-spacing: 0.06em;
 			}
 
+			.desk-text {
+				fill: var(--ink);
+			}
+
 			.num-ring {
 				font-size: 10px;
 			}
@@ -425,8 +429,11 @@ export default function DeskFigure({
 
 			@keyframes run-a {
 				from {
-					opacity: 1;
+					opacity: 0;
 					stroke-dashoffset: 0;
+				}
+				2% {
+					opacity: 1;
 				}
 				90% {
 					opacity: 1;
@@ -439,8 +446,11 @@ export default function DeskFigure({
 
 			@keyframes run-b {
 				from {
-					opacity: 1;
+					opacity: 0;
 					stroke-dashoffset: 0;
+				}
+				2% {
+					opacity: 1;
 				}
 				90% {
 					opacity: 1;

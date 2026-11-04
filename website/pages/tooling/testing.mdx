@@ -2,6 +2,8 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import ClickTestFigure from '../../components/figures/testing/click-test-figure.tsrx';
+import TwoWaysFigure from '../../components/figures/testing/two-ways-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -12,31 +14,19 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <Subtitle text="@markless/vitest-browser puts your component in a real browser, and your test clicks it, the way a visitor would." />
 
-```ts title="counter.browser.ts"
-import { render } from '@markless/vitest-browser';
-import { expect, test } from 'vite-plus/test';
-import Counter from './Counter.tsrx';
+A type check never clicks a button. Press the drawing, and watch this test do it:
 
-test('a click counts', async () => {
-	await render(Counter);
-	const button = document.querySelector('button')!;
-	button.click();
-	await expect.poll(() => button.textContent).toBe('Count 1');
-});
-```
+<ClickTestFigure />
 
-A type check never clicks a button. This test does: it shows `Counter`, clicks it, and waits for the new text.
+The test shows `Counter`, clicks it, and waits for the new text.
 
 ## Two ways in
 
 A component can start in the browser, or arrive as HTML from a server. A bug can hide in one way and not the other, so the package gives you both:
 
-| Helper | What it does |
-| --- | --- |
-| `render(Counter)` | Mounts `Counter` in the browser, the way an app with no server does. |
-| `renderSSR(Counter)` | Renders `Counter` to HTML on the test server, then puts that HTML in the page. |
+<TwoWaysFigure />
 
-Only the first step differs. After it, your test clicks the same button and reads the same text.
+`render(Counter)` mounts `Counter` in the browser, the way an app with no server does. `renderSSR(Counter)` renders it to HTML on the test server, then puts that HTML in the page. After that first step, both tests click the same button and read the same text.
 
 ## Set it up
 

@@ -3,6 +3,7 @@ import ReleaseVersion from '../../components/docs/release-version.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import PackagesFigure from '../../components/figures/reference/packages-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -17,7 +18,11 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 ## Packages you install
 
-A new app from `npm create markless` lists `core` and `router`, with `typescript-plugin` and `analyzer` as dev dependencies.
+A new app from `npm create markless` installs four Markless packages. Press the drawing to see what they bring along:
+
+<PackagesFigure />
+
+You install the packages in this table yourself. The ones in the next table come along with them.
 
 | Package | What it gives you |
 | --- | --- |
@@ -29,8 +34,6 @@ A new app from `npm create markless` lists `core` and `router`, with `typescript
 | `create-markless` | Creates a new app. See [CLI](/reference/cli). |
 
 ## Packages the others use
-
-You don't import these yourself. The packages above depend on them.
 
 | Package | What it does |
 | --- | --- |
@@ -45,7 +48,5 @@ You don't import these yourself. The packages above depend on them.
 - **`@markless/ui`**: headless, accessible UI components. See [UI components](/ui). It waits on the two packages below. npm still holds an old `0.4.0` from before these pages.
 - **`@markless/icons`**: icon packs as `<pack.icon />` tags, inlined at build time.
 - **`@markless/ui-tools`**: the build tools behind `@markless/ui`.
-
-The repo also holds `markless-sr-app`, which serves the app for the screen-reader tests. It's private and never goes to npm.
 
 [The glossary](/reference/glossary) gives one meaning for each word these packages use.

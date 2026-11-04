@@ -1,6 +1,6 @@
 // Flat sheets on the desk (a terminal, an editor, a browser, a slip, a folder) with printed rows and the pen marks a reader would add, frozen into one list of layers for DeskFigure.
 import { centreOf, createCamera, ellipse, jitter, matrixOf, type P, type Point3, roundRect, shadowOnDesk } from './desk.ts';
-import { hatch, hull, lengthOf, line, outline, pathOf, pool, r1, resample, seeded, stroke, wash } from './ink.ts';
+import { hatch, hull, lengthOf, line, outline, pathOf, pool, r1, resample, stroke, wash } from './ink.ts';
 import { pencil } from './plane.ts';
 
 export type { P, Point3 };
@@ -404,5 +404,17 @@ export function desk(width: number, specs: readonly SheetSpec[], extra: Point3[]
 		};
 	}
 
-	return { lay, next, print, row, col, swipe, wavy, ring, strike, bracket, tick, number, arrow, button, box, hand, pulse, note, build, seeded };
+	/** Raw access for a figure's own shapes: add a path with its classes and motion style, or a text at a sheet point. */
+	const raw = {
+		path,
+		text: (key: string, u: number, v: number, text: string, cls: string, m: Motion = '', at?: At) => layer.texts.push({ text, cls: [cls, m].filter(Boolean).join(' '), style: motion(m, at), matrix: matrixAt(get(key), u, v) }),
+		motion,
+		on: (key: string, pts: P[], lift = 0) => on(get(key), pts, lift),
+		at: (key: string, u: number, v: number, lift = 0) => get(key).at(u, v, lift),
+		proj,
+		projAll,
+		matrixAt: (key: string, u: number, v: number) => matrixAt(get(key), u, v),
+	};
+
+	return { lay, next, print, row, col, swipe, wavy, ring, strike, bracket, tick, number, arrow, button, box, hand, pulse, note, build, raw };
 }
