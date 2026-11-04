@@ -1,7 +1,7 @@
 // The <Code> block corpus and the edit sequence the incremental-compile tests replay over it.
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findCodeBlocks } from '../../../tooling/code-blocks.ts';
+import { findCodeBlocks, PAGE_STYLE_SOURCE, withPageStyle } from '../../../tooling/code-blocks.ts';
 import type { CodeFile, CompileOutcome } from './protocol.ts';
 
 // One build id for both sides: it is written into resolver modules, and a block keeps one for its whole life.
@@ -9,6 +9,7 @@ export const BUILD_ID = 'code-incremental';
 // Not imported, so a test that mocks node:fs for the bundler still reads the real pages.
 const { readdirSync, readFileSync } = process.getBuiltinModule('node:fs');
 const pages = fileURLToPath(new URL('../../../pages', import.meta.url));
+const pageStyle = readFileSync(PAGE_STYLE_SOURCE, 'utf8');
 
 function mdxFiles(directory: string): string[] {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -24,7 +25,7 @@ export type Block = { readonly name: string; readonly files: readonly CodeFile[]
 export const corpus: Block[] = mdxFiles(pages)
 	.toSorted()
 	.flatMap((file) =>
-		findCodeBlocks(readFileSync(file, 'utf8'), file).map((block) => ({
+		findCodeBlocks(readFileSync(file, 'utf8'), file).map((found) => withPageStyle(found, pageStyle)).map((block) => ({
 			name: `${relative(pages, file)}:${block.startLine + 1}`,
 			files: [
 				...block.files.filter((code) => code.name === block.entry),

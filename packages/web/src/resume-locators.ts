@@ -110,7 +110,7 @@ export function materializeElementHandles(
 	}
 	function register(
 		hostNodeId: string,
-		handle: { readonly handleId: string; readonly name: string },
+		handle: { readonly handleId: string; readonly name: string; readonly plural?: boolean },
 		element: ResumeDomElement,
 		// The record that filed this handle, when its id is what names the rendered
 		// widget: an arm's handles reach resume in module space, so the qualified key
@@ -134,7 +134,7 @@ export function materializeElementHandles(
 		const keys = [...new Set([handleId, bare, handle.name, scope + handleId])];
 		// An array handle declares its plural-ness on the record, never on the key,
 		// so a key minted here inherits it from the id it was minted from.
-		if (pluralKeys.has(handle.handleId)) for (const key of keys) pluralKeys.add(key);
+		if (handle.plural || pluralKeys.has(handle.handleId)) for (const key of keys) pluralKeys.add(key);
 		for (const key of keys) {
 			const filed = byKey.get(key);
 			if (filed) filed.push(element);
