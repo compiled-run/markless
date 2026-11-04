@@ -3,13 +3,15 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import ReadErrorFigure from '../../components/figures/diagnostics/read-error-figure.tsrx';
+import AllowFigure from '../../components/figures/diagnostics/allow-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
 # Read a Markless error in four lines
 
-<PageMeta time="4 min" assumes="lists" />
+<PageMeta time="2 min" assumes="lists" />
 
 <Subtitle text="When Markless can't make a piece of code work, it stops the build and tells you what broke, why, how to fix it, and where to read more." />
 
@@ -40,52 +42,23 @@ export default function List() @{
 ```
 </Code>
 
-The fix fits on one line, and the error suggested it.
+## Read the error line by line
 
-## What the build prints
+An **error** stops the build. A **warning** shows as a wavy line in your editor, and the build goes on. Press the drawing to read what `npm run build` prints for the list with no key:
 
-Markless runs its own rules each time it reads a `.tsrx` file. An **error** stops the build. A **warning** shows as a wavy line in your editor, and the build goes on. Here is what `npm run build` prints for that list with no key (the path is shortened):
+<ReadErrorFigure />
+
+The first line counts the errors in the file. Each error then gets four lines, and the location in line 1 takes you to the code. The fix fits on one line, and line 3 suggested it.
 
 <MugSpot mood="scared" react="duck" />
 
-```text
-MARKLESS_COMPILE_BLOCKED: pages/list.tsrx has 1 compiler error(s).
-
-MARKLESS_REPEAT_KEY_REQUIRED: @for (const item of items) repeats reactive state without a key. When items changes, the rows of this list have no identity to update, reorder, or resume by. (pages/list.tsrx:8:4)
-A keyed loop item keeps its state, events, and DOM attached to the same logical item across reorder, insert, and delete; without a key there is no stable identity root.
-Add a stable domain key such as `@for (const item of items; key item.id)`, or key by position with `index i; key i` when state should follow the slot.
-https://markless.dev/errors/MARKLESS_REPEAT_KEY_REQUIRED
-   6 | 	<section>
-   7 | 		<ul>
->  8 | 			@for (const item of items) {
-     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   9 | 				<li>{item}</li>
-  10 | 			}
-```
-
-The first line counts the errors in the file. Then each error gets four lines:
-
-1. The code, what broke, and the file, line and column.
-2. Why Markless can't build it.
-3. The first fix to try.
-4. The [page for that code](/errors/MARKLESS_REPEAT_KEY_REQUIRED). Every code has one.
-
-Under them, the build prints the lines around the spot and marks the broken part.
-
-## Silence a warning
+## Silence a warning, with a reason
 
 If you accept a warning on purpose, write `// markless-allow CODE: reason` on the line above it, or on the same line:
 
-```tsrx
-<section>
-	// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: a fixed list, its order never changes
-	@for (const record of records; index slot; key slot) {
-		<p>{record.label}</p>
-	}
-</section>
-```
+<AllowFigure />
 
-The comment has three rules. Break one, and Markless raises a warning of its own, named here without its `MARKLESS_` start:
+Break one of the comment's rules, and Markless raises a warning of its own:
 
 | Code it raises | Rule |
 | --- | --- |
@@ -107,7 +80,5 @@ Every code starts with `MARKLESS_`, so the table leaves that out.
 | [`REPEAT_KEY_IS_INDEX`](/errors/MARKLESS_REPEAT_KEY_IS_INDEX) | warning | Key by a field that stays with the item. Keep `key i` only if row state belongs to the position. |
 | [`ASYNC_BOUNDARY_REQUIRED`](/errors/MARKLESS_ASYNC_BOUNDARY_REQUIRED) | error | Wrap the async read in `@try` with `@pending` and `@catch`. |
 | [`STATE_WRITE_IN_COMPUTED`](/errors/MARKLESS_STATE_WRITE_IN_COMPUTED) | error | Move the write into an event handler. |
-| [`EVENT_HANDLER_EMIT_UNSUPPORTED`](/errors/MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED) | error | The handler reads a local the browser can't get, like a DOM node. Use `element()` for an element, `state()` for data, and `function` or `const` for a function. |
-| [`FRAMEWORK_API_RUNTIME_CALL`](/errors/MARKLESS_FRAMEWORK_API_RUNTIME_CALL) | error while running | Call `state()` and the other Markless functions only in `.tsrx` files. |
 
 [All error codes](/errors) lists every one, grouped by the package that raises it.
