@@ -123,9 +123,12 @@ export async function planParts(
 	return { rings, hidden, absent, rowMarks, prelude, render: { start: render.start, end: render.end }, imports };
 }
 
+// Nested parts often share a corner, so each nesting depth rings a different corner.
+const CORNERS = ['start-top', 'end-top', 'start-bottom', 'end-bottom'] as const;
+
 function ringMarkup(ring: Ring): string {
 	const classes = ['pf-ring', ring.after ? 'pf-after' : '', ring.row ? 'pf-in-row' : ''].filter(Boolean).join(' ');
-	return `<span class="${classes}" data-n="${ring.number}" style="--pf-depth: ${ring.depth}" aria-hidden="true"><svg viewBox="0 0 26 26"><path class="pf-ring-ink" d={ink.ring.ink} /><text x="13" y="17.5">${ring.number}</text></svg></span>`;
+	return `<span class="${classes}" data-n="${ring.number}" data-corner="${CORNERS[ring.depth % CORNERS.length]}" aria-hidden="true"><svg viewBox="0 0 26 26"><path class="pf-ring-ink" d={ink.ring.ink} /><text x="13" y="17.5">${ring.number}</text></svg></span>`;
 }
 
 /** The demo's render with every ring and row mark written in, offsets taken from the parse. */
@@ -241,9 +244,9 @@ ${items}
 				gap: var(--space-s);
 			}
 
-			@container parts-figure (min-width: 600px) {
+			@container parts-figure (min-width: 860px) {
 				.layout {
-					grid-template-columns: minmax(0, 1fr) 15rem;
+					grid-template-columns: minmax(0, 1fr) 18rem;
 					align-items: center;
 				}
 			}
@@ -269,16 +272,34 @@ ${items}
 			.pf-ring {
 				position: absolute;
 				z-index: 3;
-				inset-block-start: -0.72rem;
-				inset-inline-start: min(calc(-0.72rem + var(--pf-depth) * 1.55rem), calc(100% - 0.72rem));
-				width: 1.45rem;
-				height: 1.45rem;
+				width: 1.6rem;
+				height: 1.6rem;
 				pointer-events: none;
+			}
+
+			.pf-ring[data-corner='start-top'] {
+				inset-block-start: -0.8rem;
+				inset-inline-start: -0.8rem;
+			}
+
+			.pf-ring[data-corner='end-top'] {
+				inset-block-start: -0.8rem;
+				inset-inline-end: -0.8rem;
+			}
+
+			.pf-ring[data-corner='start-bottom'] {
+				inset-block-end: -0.8rem;
+				inset-inline-start: 0.6rem;
+			}
+
+			.pf-ring[data-corner='end-bottom'] {
+				inset-block-end: -0.8rem;
+				inset-inline-end: 0.6rem;
 			}
 
 			.pf-after {
 				inset: auto;
-				margin: -0.72rem 0 0 -0.3rem;
+				margin: -0.8rem 0 0 -0.3rem;
 			}
 
 			[data-pf-row] ~ [data-pf-row] .pf-in-row,
@@ -300,8 +321,8 @@ ${items}
 			}
 
 			.note-ring {
-				width: 1.35rem;
-				height: 1.35rem;
+				width: 1.6rem;
+				height: 1.6rem;
 			}
 
 			.pf-ring-ink {
@@ -318,12 +339,10 @@ ${hover}
 
 			.notes {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
-				font-size: var(--step--1);
-				line-height: 1.45;
 			}
 
 			.note-title {
-				margin: 0 0 0.3rem;
+				margin: 0 0 0.6rem;
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				letter-spacing: 0.12em;
 				text-transform: uppercase;
@@ -331,7 +350,8 @@ ${hover}
 
 			.spots {
 				display: grid;
-				gap: 0.5rem;
+				grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+				gap: 0.8rem 1.4rem;
 				margin: 0;
 				padding: 0;
 				list-style: none;
@@ -350,7 +370,6 @@ ${hover}
 
 			.what {
 				grid-column: 2;
-				line-height: 1.2;
 			}
 
 			.tally {

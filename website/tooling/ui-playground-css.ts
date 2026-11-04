@@ -769,8 +769,6 @@ export const INK_CSS = `			.pg {
 				margin: var(--space-m) 0 var(--space-l);
 				color: var(--ink);
 				font-family: var(--pg-font);
-				font-size: var(--step--1);
-				line-height: 1.5;
 			}
 
 			.pg-scene {
@@ -779,10 +777,16 @@ export const INK_CSS = `			.pg {
 				gap: var(--space-s);
 			}
 
-			@container pg (min-width: 600px) {
+			@container pg (min-width: 860px) {
 				.pg-scene {
-					grid-template-columns: minmax(0, 1fr) 13rem;
+					grid-template-columns: minmax(0, 1fr) 15rem;
 					align-items: center;
+				}
+
+				.pg-quick,
+				.pg-rest {
+					flex-direction: column;
+					align-items: flex-start;
 				}
 			}
 
@@ -797,8 +801,9 @@ export const INK_CSS = `			.pg {
 
 			.pg-try {
 				display: grid;
-				gap: 0.6rem;
+				gap: 0.8rem;
 				justify-items: start;
+				padding-inline: 0.4rem;
 			}
 
 			.pg-try-title {
@@ -815,9 +820,10 @@ export const INK_CSS = `			.pg {
 
 			.pg-quick,
 			.pg-rest {
-				flex-direction: column;
-				align-items: flex-start;
-				gap: 0.55em;
+				flex-direction: row;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 0.7em 1.8em;
 			}
 
 			.pg-rest {
@@ -1026,6 +1032,15 @@ export const INK_CSS = `			.pg {
 
 			.pg-shiki {
 				padding-inline: 0.3rem;
+			}
+
+			.pg-pick-trigger,
+			.pg-pick-item,
+			.pg-field,
+			.pg-tab,
+			.pg-name,
+			.pg-try-title {
+				font-size: var(--step-0);
 			}`;
 
 export const CHROME_CSS = `${CONTROLS_CSS}
