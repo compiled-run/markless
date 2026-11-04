@@ -26,8 +26,6 @@ export default function AccordionBasic() @{
 					<accordion.itemtrigger class="trigger">
 						<lucide.chevronright class="trigger-icon" aria-hidden="true" />
 						{q.question}
-						<lucide.plus class="trigger-plus" aria-hidden="true" />
-						<lucide.minus class="trigger-minus" aria-hidden="true" />
 					</accordion.itemtrigger>
 				</accordion.itemlabel>
 				<accordion.itemcontent class="panel">{q.answer}</accordion.itemcontent>
@@ -73,9 +71,7 @@ export default function AccordionBasic() @{
 				cursor: pointer;
 			}
 
-			.trigger-icon,
-			.trigger-plus,
-			.trigger-minus {
+			.trigger-icon {
 				display: inline-flex;
 				width: 1em;
 				height: 1em;
@@ -85,20 +81,6 @@ export default function AccordionBasic() @{
 
 			.trigger[ui-open] .trigger-icon {
 				transform: rotate(90deg);
-			}
-
-			.trigger-plus,
-			.trigger-minus {
-				margin-inline-start: auto;
-			}
-
-			.trigger-minus,
-			.trigger[ui-open] .trigger-plus {
-				display: none;
-			}
-
-			.trigger[ui-open] .trigger-minus {
-				display: inline-flex;
 			}
 
 			.trigger[ui-open] {

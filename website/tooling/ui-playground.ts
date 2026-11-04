@@ -1776,22 +1776,14 @@ ${presetTable(controls, presets)}
 export default function ${componentName(demo.family, demo.stem)}() @{
 ${cells.join('\n')}
 ${prelude === '' ? '' : `\n${prelude}\n`}
-	<section class="pg" data-family="${demo.family}">
-		<header class="pg-head">
-			<span class="pg-title">Playground</span>
-${scenarioBar(emit, presets)}
-		</header>
-		<div class="pg-body">
-			<div class="pg-code">
-${codePanelChrome({ scenario: `${demo.family}/${demo.stem}`, panes, indent: '\t\t\t' })}
-			</div>
-			<span class="pg-split" aria-hidden="true"></span>
-			<div class="pg-stage">
-				${stageMarkup(demo, emit)}
-			</div>
-		</div>${log}${band === '' ? '' : `
-		<div class="pg-try">
-			<span class="pg-try-title">Change a prop</span>${band}		</div>`}
+	<section class="pg" data-family="${demo.family}">${band}${log}
+		<div class="pg-stage">
+			${stageMarkup(demo, emit)}
+		</div>
+
+		<div class="pg-code">
+${codePanelChrome({ scenario: `${demo.family}/${demo.stem}`, panes, bar: scenarioBar(emit, presets), indent: '\t\t\t' })}
+		</div>
 ${docsMarkup('\t\t')}
 
 		<style>

@@ -212,7 +212,7 @@ const FOCUS_CSS = `			.pg-switch:focus-visible,
 				outline-offset: 4px;
 			}`;
 
-export const CONTROLS_CSS = `${accent('.pg')}
+export const CONTROLS_CSS = `${sticker('.pg')}
 
 			.pg {
 				--pg-shadow: var(--muted-ink);
@@ -762,273 +762,68 @@ export function docRules(keys: readonly string[], root: string): string {
 }
 
 
-/** The playground on the docs' notebook: the same binder frame, bands, tabs and type as the `<Code>` block. */
-export const NOTEBOOK_CSS = `			.pg {
+/** The preview's skin: the `<Code>` block's binder frame and paper, with dashed rules between its bands. */
+function binder(card: string): string {
+	return `			${card} {
 				--pg-band: color-mix(in oklch, var(--ink) 70%, transparent);
-				--pg-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
-				--pg-tab-h: 2.7rem;
-				--pg-bleed: min(4.6rem, 2 * var(--space-s-l));
-				--pg-tab-left: calc(var(--pg-bleed) / 2 - 2px);
-				--pg-inset: 1.1rem;
-				container-type: inline-size;
-				position: relative;
-				display: flex;
-				flex-direction: column;
-				box-sizing: border-box;
-				width: calc(100% + var(--pg-bleed));
-				margin: calc(var(--space-s) + var(--pg-tab-h)) 0 var(--space-l) calc(var(--pg-bleed) / -2);
-				padding: 0.25rem var(--pg-inset) 0.4rem 2.6rem;
 				border: 2px solid transparent;
 				border-image: url('/notebook/frame.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
 				border-radius: 0;
-				background: var(--paper);
 				box-shadow: none;
-				color: var(--ink);
-				font-family: 'Shantell Sans', system-ui, sans-serif;
-				font-size: var(--step--1);
-				line-height: 1.5;
+				background: var(--paper);
+				padding: 0.25rem 1.1rem 0.4rem 2.6rem;
 			}
 
-			html.dark .pg {
+			html.dark ${card} {
 				--paper: var(--raised);
-				--pg-tab-back: color-mix(in oklch, var(--ink) 12%, var(--paper));
 				border-image-source: url('/notebook/frame-dark.png');
 			}
 
-			.pg-head {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.4rem 1rem;
-				align-items: center;
-				justify-content: space-between;
-				padding: 0.35rem 0 0.35rem 0.4rem;
-				border-bottom: 2px dashed var(--pg-band);
-			}
-
-			.pg-title {
-				font-size: var(--step-1);
-				line-height: 1.2;
-			}
-
-			.pg-body {
-				display: flex;
-				flex-direction: column;
-			}
-
-			.pg-code {
-				min-width: 0;
-				border-bottom: 2px dashed var(--pg-band);
-			}
-
-			.pg-split {
-				display: none;
-			}
-
-			.pg-stage {
-				display: grid;
-				place-items: center;
-				min-width: 0;
-				min-height: 0;
-				padding: 1.2rem 0 1.2rem 1.1rem;
-			}
-
-			@container (min-width: 36rem) {
-				.pg-body {
-					display: grid;
-					grid-template-columns: minmax(0, 56fr) 0.8rem minmax(0, 44fr);
-					min-height: 22rem;
-				}
-
-				.pg-code {
-					border-bottom: 0;
-				}
-
-				.pg-split {
-					position: relative;
-					display: block;
-				}
-
-				.pg-split::before {
-					position: absolute;
-					inset-block: 0;
-					inset-inline-start: calc(50% - 1px);
-					border-inline-start: 2px dashed var(--pg-band);
-					content: '';
+			@media (max-width: 600px) {
+				${card} {
+					border-radius: 0;
+					box-shadow: none;
+					padding-left: 1.5rem;
 				}
 			}
 
-			.pg-panel-outer {
-				display: block;
+			${card} .pg-controls {
+				border-block-end: 2px dashed var(--pg-band);
 			}
 
-			.pg-strip {
-				position: absolute;
-				top: calc(-1 * var(--pg-tab-h));
-				left: var(--pg-tab-left);
-				z-index: 2;
-				display: flex;
-				align-items: end;
-				height: var(--pg-tab-h);
-				margin: 0;
+			${card} .pg-rest {
+				border-block-start: 2px dashed var(--pg-band);
 			}
 
-			.pg-tab {
-				position: relative;
-				margin-block-end: -2px;
-				padding: 0.25em 1.3em;
-				border: 2px solid var(--ink);
-				border-block-end: 0;
-				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
-				background: var(--pg-tab-back);
-				color: color-mix(in oklch, var(--ink) 82%, var(--paper));
-				font-family: 'Shantell Sans', system-ui, sans-serif;
-				font-size: var(--step-0);
-				line-height: 1.35;
-				white-space: nowrap;
-			}
-
-			.pg-tab:hover {
-				background: var(--pg-tab-back);
-				color: var(--ink);
-			}
-
-			.pg-tab[ui-selected] {
-				z-index: 1;
-				padding: 0.25em 1.25em 0.3em;
-				background: var(--paper);
-				color: var(--ink);
-				font-size: var(--step-1);
-			}
-
-			.pg-tab + .pg-tab {
-				margin-inline-start: -0.3rem;
-			}
-
-			.pg-clamp {
-				border: 0;
+			${card} .pg-clamp {
+				border-block-start: 2px dashed var(--pg-band);
 				border-radius: 0;
 			}
 
-			.pg-code-body {
-				max-height: 22rem;
-				overflow: auto;
+			${card} .pg-tab {
+				border: 2px solid var(--ink);
+				border-block-end: 0;
+				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
+				background: color-mix(in oklch, var(--ink) 9%, var(--paper));
 			}
 
-			.pg-shiki {
-				counter-reset: pg-line;
-				padding: 0.85rem 0.1rem 0.85rem 0;
-				font-size: clamp(0.78rem, 2cqi, 1.15rem);
-				overflow-x: visible;
-			}
-
-			.pg-shiki .pg-line {
-				position: relative;
-				padding-inline-start: 2.9rem;
-				white-space: pre-wrap;
-				overflow-wrap: anywhere;
-				counter-increment: pg-line;
-			}
-
-			.pg-shiki .pg-line::before {
-				position: absolute;
-				inset-inline-start: 0;
-				width: 2rem;
-				color: var(--muted-ink);
-				text-align: end;
-				content: counter(pg-line);
-			}
-
-			.pg-fade,
-			.pg-expand {
-				display: none;
-			}
-
-			.pg-clamp[ui-closed] .pg-source-context {
-				display: revert;
-			}
-
-			.pg-try {
-				padding: 0.7rem 0 0.55rem 0.4rem;
-				border-top: 2px dashed var(--pg-band);
-			}
-
-			.pg-try-title {
-				display: block;
-				margin-block-end: 0.3rem;
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: var(--step-1);
+			${card} .pg-tab[ui-selected] {
+				background: var(--paper);
 				font-weight: 700;
 			}
 
-			.pg .pg-controls {
-				padding: 0;
-				border: 0;
+			${card} .pg-tab + .pg-tab {
+				margin-inline-start: -0.3rem;
 			}
 
-			.pg-quick,
-			.pg-rest {
-				gap: 0.5em 1.6em;
+			${card} .pg-fade {
+				background: linear-gradient(to bottom, transparent, var(--paper) 80%);
 			}
 
-			.pg-rest {
-				border-block-start: 0;
-			}
-
-			.pg-switch {
-				height: 1.5em;
-				border: 2px solid var(--ink);
-				border-radius: 14px 18px 12px 16px;
-				background: transparent;
-			}
-
-			.pg-switch[ui-checked] {
-				background: var(--mark);
-			}
-
-			.pg-knob {
-				width: 1.15em;
-				height: 1.15em;
-				margin: 0 0 0 0.1em;
-				border: 2px solid var(--ink);
-				border-radius: 50% 45% 55% 48%;
-				box-shadow: none;
-			}
-
-			.pg-switch[ui-checked] .pg-knob {
-				margin-inline-start: calc(100% - 1.3em);
-			}
-
-			.pg-pick-trigger,
-			.pg-field {
-				border: 2px solid var(--ink);
-				border-radius: 10px 6px 12px 8px;
-				background: transparent;
-			}
-
-			.pg-pick-list {
-				border: 2px solid var(--ink);
-				border-radius: 10px 6px 12px 8px;
-				box-shadow: 2px 3px 0 var(--ink);
-			}
-
-			.pg-head .pg-bar-pick {
-				grid-area: auto;
-				margin: 0;
-				padding: 0;
-			}
-
-			.pg-log {
-				margin: 0.4rem 0 0 0.4rem;
-			}
-
-			@media (max-width: 600px) {
-				.pg {
-					--pg-bleed: calc(2 * var(--space-s-l));
-					--pg-tab-left: calc(var(--space-s-l) + 0.4rem);
-					--pg-inset: 0.6rem;
-					padding-left: 1.5rem;
-				}
+			${card} .pg-expand {
+				background: var(--paper);
 			}`;
+}
 
 export const CHROME_CSS = `${CONTROLS_CSS}
 
@@ -1036,7 +831,7 @@ ${STAGE_CSS}
 
 ${CODE_CSS}
 
-${NOTEBOOK_CSS}
+${binder('.pg')}
 
 ${docCss('.pg')}`;
 
