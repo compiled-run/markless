@@ -1,6 +1,22 @@
-// The shop page on the desk with the next-page parcel: a click sends for the next page's middle, and only that part and the address change, together.
+// The shop as a magazine on the desk: a click keeps the cover, swaps the centre spread, and changes the spine label once the new spread is in.
 import { computed, state } from '@markless/core';
-import { ABOUT_LINES, ABOUT_TITLE, ABOUT_URL, describeLink, flip, HOME_URL, LINK_TOUR, other, type Place, PRICE, PRODUCT, SHOP } from './model.ts';
+import {
+	ABOUT_CAPTION,
+	ABOUT_LINES,
+	ABOUT_TITLE,
+	ABOUT_URL,
+	describeLink,
+	flip,
+	HOME_LINES,
+	HOME_URL,
+	ISSUE,
+	LINK_TOUR,
+	other,
+	type Place,
+	PRICE,
+	PRODUCT,
+	SHOP,
+} from './model.ts';
 import { art } from './links.art.ts';
 
 export default function LinkAnatomy() @{
@@ -52,127 +68,110 @@ export default function LinkAnatomy() @{
 				}
 			}}
 		>
-			<svg class="scene" data-at={at} data-beat={beat} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+			<svg class="scene" data-at={at} data-beat={beat} style={art.travel} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="pencil" d={art.sheet.pencil} />
-				<path class="pencil" d={art.parcel.pencil} />
 				<path class="shadow-wash" d={art.sheet.curl.shadow} />
 				<path class="hatch deep" d={art.sheet.curl.hatch} />
 				<path class="shadow-wash light" d={art.sheet.contactWash} />
 				<path class="hatch deep" d={art.sheet.contact} />
 				<path class="hatch deep light" d={art.sheet.desk} />
-				<path class="shadow-wash" d={art.parcel.cast.wash} />
-				<path class="hatch deep light" d={art.parcel.cast.hatch} />
 
-				<g class="sheet">
+				<g class="cover once">
 					<path class="sheet-paper" d={art.sheet.paper} />
-					<path class="sheet-hatch light" d={art.page.bar.tone} />
-					<path class="sheet-ink" d={art.page.bar.rule} />
-					<path class="sheet-ink" d={art.page.bar.dots} />
-					<path class="sheet-ink" d={art.page.bar.url} />
-					<g class="once">
-						<text class="shop" transform={art.page.shopMatrix}>{SHOP}</text>
-						<path class="pencil" d={art.page.area.pencil} />
-					</g>
+					<path class="spine-paper" d={art.spine.paper} />
+					<path class="sheet-hatch light" d={art.spine.tone} />
+					<path class="sheet-ink" d={art.spine.ink} />
+					<path class="sheet-paper" d={art.spine.label} />
+					<path class="sheet-ink" d={art.spine.labelInk} />
+					<text class="shop" transform={art.masthead.shopMatrix}>{SHOP}</text>
+					<text class="issue" transform={art.masthead.issueMatrix}>{ISSUE}</text>
+					<path class="sheet-ink" d={art.masthead.rule} />
 					<path class="sheet-ink" d={art.sheet.curl.ink} />
 					<path class="sheet-ink" d={art.sheet.ink} />
 				</g>
 
-				<g class="spot url-spot">
-					<path class="wash yellow" d={art.page.urlSpot.wash} />
-					<path class="wash-edge" d={art.page.urlSpot.edge} />
+				<g class="spine-spot">
+					<path class="wash yellow" d={art.spine.spot.wash} />
+					<path class="wash-edge" d={art.spine.spot.edge} />
 				</g>
-				<text class="url home" transform={art.page.bar.urlMatrix}>{HOME_URL}</text>
-				<text class="url about" transform={art.page.bar.urlMatrix}>{ABOUT_URL}</text>
+				<text class="spine-text home" transform={art.spine.labelMatrix}>{HOME_URL}</text>
+				<text class="spine-text about" transform={art.spine.labelMatrix}>{ABOUT_URL}</text>
 
-				<g class="spot area-spot">
-					<path class="wash yellow" d={art.page.areaSpot.wash} />
-					<path class="wash yellow pool" d={art.page.areaSpot.pool} />
-					<path class="wash-edge" d={art.page.areaSpot.edge} />
+				<g class="spread home">
+					<path class="hatch deep" d={art.spread.shadow} />
+					<path class="sheet-paper" d={art.spread.paper} />
+					<path class="sheet-hatch light" d={art.spread.gutter} />
+					<g class="spread-spot">
+						<path class="wash yellow" d={art.spread.spot.wash} />
+						<path class="wash yellow pool" d={art.spread.spot.pool} />
+					</g>
+					<path class="kraft" d={art.home.bag.paper} />
+					<path class="wash kraft-wash" d={art.home.bag.wash} />
+					<path class="sheet-hatch" d={art.home.bag.shade} />
+					<path class="sheet-paper" d={art.home.bag.label} />
+					<path class="bean-fill" d={art.home.bag.bean} />
+					<path class="sheet-ink" d={art.home.bag.ink} />
+					<path class="sheet-ink" d={art.home.bag.labelInk} />
+					<text class="page-text" transform={art.home.productMatrix}>{PRODUCT}</text>
+					<text class="price" transform={art.home.priceMatrix}>{PRICE}</text>
+					<text class="page-text" transform={art.home.rightMatrices[0]}>{HOME_LINES[0]}</text>
+					<text class="page-text" transform={art.home.rightMatrices[1]}>{HOME_LINES[1]}</text>
+					<text class="page-text" transform={art.home.rightMatrices[2]}>{HOME_LINES[2]}</text>
+					<path class="sheet-paper" d={art.spread.tab} />
+					<path class="sheet-ink" d={art.spread.tabInk} />
+					<path class="sheet-ink" d={art.spread.ink} />
 				</g>
-				<g class="area home">
-					<path class="kraft" d={art.page.bag.paper} />
-					<path class="wash kraft-wash" d={art.page.bag.wash} />
-					<path class="sheet-hatch" d={art.page.bag.shade} />
-					<path class="sheet-paper" d={art.page.bag.label} />
-					<path class="bean-fill" d={art.page.bag.bean} />
-					<path class="sheet-ink" d={art.page.bag.ink} />
-					<path class="sheet-ink" d={art.page.bag.labelInk} />
-					<text class="page-text" transform={art.page.productMatrix}>{PRODUCT}</text>
-					<text class="price" transform={art.page.priceMatrix}>{PRICE}</text>
-				</g>
-				<g class="area about">
-					<text class="title" transform={art.page.aboutMatrices[0]}>{ABOUT_TITLE}</text>
-					<text class="page-text" transform={art.page.aboutMatrices[1]}>{ABOUT_LINES[0]}</text>
-					<text class="page-text" transform={art.page.aboutMatrices[2]}>{ABOUT_LINES[1]}</text>
+
+				<g class="spread about">
+					<path class="hatch deep" d={art.spread.shadow} />
+					<path class="sheet-paper" d={art.spread.paper} />
+					<path class="sheet-hatch light" d={art.spread.gutter} />
+					<g class="spread-spot">
+						<path class="wash yellow" d={art.spread.spot.wash} />
+						<path class="wash yellow pool" d={art.spread.spot.pool} />
+					</g>
+					<text class="title" transform={art.about.titleMatrix}>{ABOUT_TITLE}</text>
+					<text class="page-text" transform={art.about.lineMatrices[0]}>{ABOUT_LINES[0]}</text>
+					<text class="page-text" transform={art.about.lineMatrices[1]}>{ABOUT_LINES[1]}</text>
+					<text class="page-text" transform={art.about.lineMatrices[2]}>{ABOUT_LINES[2]}</text>
+					<path class="sheet-paper" d={art.about.cup.paper} />
+					<path class="sheet-hatch" d={art.about.cup.shade} />
+					<path class="sheet-ink" d={art.about.cup.ink} />
+					<text class="page-text" transform={art.about.captionMatrix}>{ABOUT_CAPTION}</text>
+					<path class="sheet-paper" d={art.spread.tab} />
+					<path class="sheet-ink" d={art.spread.tabInk} />
+					<path class="sheet-ink" d={art.spread.ink} />
 				</g>
 
 				<g class="tab to-shop">
-					<path class="sheet-ink" d={art.page.nav.shop.side} />
-					<g class="press" style={art.page.nav.shop.sink}>
-						<path class="sheet-paper" d={art.page.nav.shop.paper} />
-						<path class="wash pink" d={art.page.nav.shop.wash} />
-						<path class="sheet-ink" d={art.page.nav.shop.ink} />
-						<text class="button-text" transform={art.page.nav.shop.matrix}>Shop</text>
+					<path class="sheet-ink" d={art.nav.shop.side} />
+					<g class="press" style={art.nav.shop.sink}>
+						<path class="sheet-paper" d={art.nav.shop.paper} />
+						<path class="wash pink" d={art.nav.shop.wash} />
+						<path class="sheet-ink" d={art.nav.shop.ink} />
+						<text class="button-text" transform={art.nav.shop.matrix}>Shop</text>
 					</g>
 				</g>
 				<g class="tab to-about">
-					<path class="sheet-ink" d={art.page.nav.about.side} />
-					<g class="press" style={art.page.nav.about.sink}>
-						<path class="sheet-paper" d={art.page.nav.about.paper} />
-						<path class="wash pink" d={art.page.nav.about.wash} />
-						<path class="sheet-ink" d={art.page.nav.about.ink} />
-						<text class="button-text" transform={art.page.nav.about.matrix}>About</text>
+					<path class="sheet-ink" d={art.nav.about.side} />
+					<g class="press" style={art.nav.about.sink}>
+						<path class="sheet-paper" d={art.nav.about.paper} />
+						<path class="wash pink" d={art.nav.about.wash} />
+						<path class="sheet-ink" d={art.nav.about.ink} />
+						<text class="button-text" transform={art.nav.about.matrix}>About</text>
 					</g>
 				</g>
 
-				<path class="shadow-ink" d={art.wires.thin.shadow} />
-				<path class="hatch deep" d={art.wires.thin.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.main.shadow} />
-				<path class="hatch deep" d={art.wires.main.shadowHatch} />
-				<path class="shadow-wash" d={art.wires.clip.cast} />
-
-				<path class="box-paper" d={art.parcel.paper} />
-				<path class="hatch" d={art.parcel.shade} />
-				<path class="tape" d={art.parcel.tape} />
-				<path class="hatch light" d={art.parcel.tapeHatch} />
-				<path class="tag-paper" d={art.parcel.label} />
-				<path class="tag-ink" d={art.parcel.labelInk} />
-				<path class="jar-ink" d={art.parcel.ink} />
-				<path class="jar-ink" d={art.parcel.tag.string} />
-				<path class="tag-paper" d={art.parcel.tag.paper} />
-				<path class="tag-hatch" d={art.parcel.tag.shade} />
-				<path class="tag-ink" d={art.parcel.tag.ink} />
-				<text class="tag-text" transform={art.parcel.tag.matrix}>next page</text>
-
-				<path class="cord" d={art.wires.thin.paper} />
-				<path class="jar-ink" d={art.wires.thin.tone} />
-				<path class="jar-ink" d={art.wires.thin.ink} />
-				<path class="boot" d={art.wires.socket.paper} />
-				<path class="jar-ink" d={art.wires.socket.ink} />
-				<path class="cord" d={art.wires.main.paper} />
-				<path class="jar-ink" d={art.wires.main.tone} />
-				<path class="jar-ink" d={art.wires.main.ink} />
-				<path class="boot" d={art.wires.clip.boot} />
-				<path class="hatch" d={art.wires.clip.bootTone} />
-				<path class="brass" d={art.wires.clip.paper} />
-				<path class="wash brass-wash" d={art.wires.clip.wash} />
-				<path class="hatch" d={art.wires.clip.side} />
-				<path class="jar-ink" d={art.wires.clip.ink} />
-
-				<path class="pulse to-parcel" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
-				<path class="pulse to-page" d={art.wires.main.centre} style={'--len:' + art.wires.main.length} />
-
 				<path class="jar-ink" d={art.note.arrow} />
-				<text class="hand" x={art.note.x} y={art.note.y}>THE PAGE YOU'RE ON STAYS</text>
+				<text class="hand" x={art.note.x} y={art.note.y}>THE COVER STAYS</text>
 			</svg>
 		</button>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a desk. A sheet of paper on it is drawn as a shop page at {HOME_URL}: the shop name {SHOP}, two nav
-			links, Shop and About, and in the middle a bag of coffee sold as {PRODUCT} for {PRICE}, ringed in pencil. Beside the sheet sits a
-			parcel tagged next page. A thin wire runs from the nav to the parcel, and a wire runs from the parcel to a clip on the middle of the
-			page. Press the drawing, or Enter or Space, to click the other link: the link sinks, the request runs to the parcel, the next page's
-			middle runs back down the wire, and only then do the middle of the page and the address change, together. The shop name, the nav and
-			the rest of the sheet stay as they are. Escape goes back to the shop.
+			A pen-and-ink drawing of the shop as a magazine lying on a desk. The cover carries the masthead {SHOP}, two nav links, Shop and
+			About, and a spine whose label reads {HOME_URL}. Inside sits a loose centre spread: a bag of coffee sold as {PRODUCT} for {PRICE}.
+			Press the drawing, or Enter or Space, to click the other link: the link sinks, the shop spread slides out onto the desk, the About
+			spread slides in, and only once it is in does the spine label change to {ABOUT_URL}. The cover and masthead never move. Escape
+			goes back to the shop.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -207,7 +206,6 @@ export default function LinkAnatomy() @{
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
 				--shade-ink: var(--ink);
 				--bean: oklch(44% 0.08 50);
-				--swap: 2400ms;
 
 				html.dark & {
 					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
@@ -218,18 +216,19 @@ export default function LinkAnatomy() @{
 				}
 			}
 
-			.sheet-paper,
-			.tag-paper {
+			.sheet-paper {
 				fill: var(--sheet);
 			}
 
-			.sheet-ink,
-			.tag-ink {
+			.spine-paper {
+				fill: color-mix(in oklch, var(--sheet) 78%, var(--pink));
+			}
+
+			.sheet-ink {
 				fill: var(--sheet-ink);
 			}
 
-			.sheet-hatch,
-			.tag-hatch {
+			.sheet-hatch {
 				fill: none;
 				stroke: var(--sheet-ink);
 				stroke-width: 0.6;
@@ -258,17 +257,6 @@ export default function LinkAnatomy() @{
 
 			.shadow-wash {
 				fill: var(--shade);
-			}
-
-			.shadow-ink {
-				fill: var(--shade);
-				opacity: 0.9;
-			}
-
-			.cord,
-			.box-paper,
-			.brass {
-				fill: var(--paper);
 			}
 
 			.bean-fill {
@@ -306,45 +294,42 @@ export default function LinkAnatomy() @{
 				mix-blend-mode: multiply;
 			}
 
-			.brass-wash {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(60% 0.12 70));
-				stroke: none;
-				opacity: 0.8;
-
-				html.dark & {
-					mix-blend-mode: normal;
-				}
-			}
-
 			.page-text,
 			.shop,
+			.issue,
 			.title,
 			.price,
 			.button-text,
-			.url,
-			.tag-text {
+			.spine-text {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				fill: var(--sheet-ink);
 			}
 
 			.page-text {
-				font-size: 10px;
+				font-size: 6.2px;
 				font-weight: 600;
 			}
 
 			.shop {
-				font-size: 14px;
+				font-size: 17px;
 				font-weight: 800;
 			}
 
-			.title {
-				font-size: 15px;
-				font-weight: 800;
+			.issue {
+				font-size: 5.5px;
+				font-style: italic;
+				opacity: 0.8;
 			}
 
+			.title,
 			.price {
-				font-size: 15px;
+				font-size: 11px;
 				font-weight: 800;
+			}
+
+			.spine-text {
+				font-size: 7.5px;
+				font-weight: 700;
 			}
 
 			.kraft {
@@ -357,32 +342,10 @@ export default function LinkAnatomy() @{
 				opacity: 0.35;
 			}
 
-			.boot {
-				fill: oklch(48% 0.15 25);
-
-				html.dark & {
-					fill: oklch(52% 0.15 25);
-				}
-			}
-
-			.url {
-				font-size: 6.5px;
-				opacity: 0.85;
-			}
-
 			.button-text {
 				font-size: 8.4px;
 				font-weight: 700;
 				text-anchor: middle;
-			}
-
-			.tag-text {
-				font-size: 6px;
-				font-weight: 700;
-			}
-
-			.tape {
-				fill: color-mix(in oklch, var(--paper) 70%, oklch(80% 0.05 80));
 			}
 
 			.hand {
@@ -404,49 +367,47 @@ export default function LinkAnatomy() @{
 				}
 			}
 
-			.pulse {
-				fill: none;
-				stroke: var(--ink);
-				stroke-width: 7;
-				stroke-linecap: round;
-				stroke-dasharray: 3 100000;
-				opacity: 0;
-			}
-
-			.area,
-			.url,
-			.spot,
+			.spine-text,
+			.spine-spot,
+			.spread-spot,
 			.tab .wash {
-				transition: opacity 320ms ease var(--swap);
+				transition: opacity 260ms ease;
 			}
 
-			.area.about,
-			.url.about,
-			.scene[data-at='about'] .area.home,
-			.scene[data-at='about'] .url.home,
+			.spine-text.about,
+			.spread.about,
+			.scene[data-at='about'] .spine-text.home,
+			.scene[data-at='about'] .spread.home,
 			.scene[data-at='about'] .to-about .wash,
 			.scene[data-at='home'] .to-shop .wash {
 				opacity: 0;
 			}
 
-			.scene[data-at='about'] .area.about,
-			.scene[data-at='about'] .url.about {
+			.scene[data-at='about'] .spine-text.about,
+			.scene[data-at='about'] .spread.about {
 				opacity: 1;
 			}
 
-			.scene[data-beat='rest'] .spot {
-				opacity: 0.35;
+			.scene:not([data-beat='rest']) .spine-text {
+				transition-delay: 1900ms;
+			}
+
+			.spine-spot,
+			.spread-spot {
+				opacity: 0;
 			}
 
 			.scene[data-beat='odd'] {
 				--sink: sink-a;
-				--travel: travel-a;
+				--out: out-a;
+				--in: in-a;
 				--glow: glow-a;
 			}
 
 			.scene[data-beat='even'] {
 				--sink: sink-b;
-				--travel: travel-b;
+				--out: out-b;
+				--in: in-b;
 				--glow: glow-b;
 			}
 
@@ -455,16 +416,23 @@ export default function LinkAnatomy() @{
 				animation: var(--sink) 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}
 
-			.to-parcel {
-				animation: var(--travel) 800ms 300ms ease-in-out both;
+			.scene[data-at='about'] .spread.home,
+			.scene[data-at='home'] .spread.about {
+				animation: var(--out) 800ms 300ms ease-in both;
 			}
 
-			.to-page {
-				animation: var(--travel) 800ms 1500ms ease-in-out both;
+			.scene[data-at='about'] .spread.about,
+			.scene[data-at='home'] .spread.home {
+				animation: var(--in) 800ms 1100ms ease-out both;
 			}
 
-			.spot {
-				animation: var(--glow) 1400ms var(--swap) ease-out both;
+			.scene[data-beat='rest'] .spread {
+				animation: none;
+			}
+
+			.scene:not([data-beat='rest']) .spine-spot,
+			.scene:not([data-beat='rest']) .spread-spot {
+				animation: var(--glow) 1600ms 1900ms ease-out both;
 			}
 
 			@keyframes sink-a {
@@ -479,55 +447,77 @@ export default function LinkAnatomy() @{
 				}
 			}
 
-			@keyframes travel-a {
-				0% {
+			@keyframes out-a {
+				from {
 					opacity: 1;
-					stroke-dashoffset: 0;
+					transform: none;
 				}
-				90% {
-					opacity: 1;
-				}
-				100% {
+				to {
 					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1);
+					transform: translate(var(--away-x), var(--away-y));
 				}
 			}
 
-			@keyframes travel-b {
-				0% {
+			@keyframes out-b {
+				from {
 					opacity: 1;
-					stroke-dashoffset: 0;
+					transform: none;
 				}
-				90% {
-					opacity: 1;
-				}
-				100% {
+				to {
 					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1);
+					transform: translate(var(--away-x), var(--away-y));
+				}
+			}
+
+			@keyframes in-a {
+				from {
+					opacity: 0;
+					transform: translate(var(--away-x), var(--away-y));
+				}
+				20% {
+					opacity: 1;
+				}
+				to {
+					opacity: 1;
+					transform: none;
+				}
+			}
+
+			@keyframes in-b {
+				from {
+					opacity: 0;
+					transform: translate(var(--away-x), var(--away-y));
+				}
+				20% {
+					opacity: 1;
+				}
+				to {
+					opacity: 1;
+					transform: none;
 				}
 			}
 
 			@keyframes glow-a {
 				0% {
-					opacity: 0.35;
+					opacity: 0;
 				}
-				30% {
+				25% {
 					opacity: 1;
 				}
 				100% {
-					opacity: 0.6;
+					opacity: 0.55;
 				}
 			}
 
 			@keyframes glow-b {
 				0% {
-					opacity: 0.35;
+					opacity: 0;
 				}
-				30% {
+				25% {
 					opacity: 1;
 				}
 				100% {
-					opacity: 0.6;
+					opacity: 0.55;
 				}
 			}
 

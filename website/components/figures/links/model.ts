@@ -1,9 +1,12 @@
-// The values the link figure shows, its tour and the sentence its live region speaks.
+// The values the magazine figure shows, its tour and the sentence its live region speaks.
 export const SHOP = 'Beanshop';
+export const ISSUE = 'Fresh beans, weekly';
 export const PRODUCT = 'House blend · 250 g';
 export const PRICE = '$14';
+export const HOME_LINES = ['Roasted on Mondays', 'Free returns for 30 days', 'Ships in two days'] as const;
 export const ABOUT_TITLE = 'About us';
-export const ABOUT_LINES = ['Roasted on Mondays,', 'in small batches.'] as const;
+export const ABOUT_LINES = ['A small roastery', 'by the harbour,', 'since 2019.'] as const;
+export const ABOUT_CAPTION = 'Come say hello';
 export const HOME_URL = 'beanshop.dev';
 export const ABOUT_URL = 'beanshop.dev/about';
 /** Each press flips the beat, so the press animations restart. */
@@ -16,6 +19,6 @@ export const other = (at: Place): Place => (at === 'home' ? 'about' : 'home');
 export function describeLink(at: Place, pressed: boolean): string {
 	if (!pressed) return '';
 	return at === 'about'
-		? 'Clicked About. The page stayed. The About part arrived from the server, and only the middle of the page and the address changed, together.'
-		: 'Clicked Shop. The page stayed. The shop part arrived from the server, and only the middle of the page and the address changed, together.';
+		? 'Clicked About. The cover stayed. The shop spread slid out, the About spread slid in, and only then did the spine change to beanshop.dev/about.'
+		: 'Clicked Shop. The cover stayed. The About spread slid out, the shop spread slid in, and only then did the spine change to beanshop.dev.';
 }
