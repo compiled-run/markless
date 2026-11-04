@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import BasketDemo from '../../components/figures/computed/basket-demo.tsrx';
+import RecipeAnatomy from '../../components/figures/computed/recipe-anatomy.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -10,30 +10,23 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # A value you work out is never out of date
 
-<PageMeta time="3 min" assumes="state" />
+<PageMeta time="2 min" assumes="state" />
 
 <Subtitle text="If you can work a value out from other values, don't store it. Write the recipe once with computed()." />
 
-You have seen this bug in a shop: the basket says three items, and the total says the price of two.
-Someone stored the total in its own variable, and a new button forgot to update it.
-
 ```tsrx
-const total = computed(() => mugs * 12 + coasters * 3);
+const total = computed(() => cart * 14);
 ```
 
-A *recipe* is the function you give `computed()`. You read `total` like any other variable. You
-never call it, and you never list what it depends on: Markless reads the recipe and finds `mugs`
-and `coasters` in it.
+The function you pass is the *recipe*. Markless finds `cart` in it, so you never list what it reads.
 
-## Press a button, watch the total follow
+## Follow the recipe
 
-Press **Add a mug**, then **Add a coaster**, and watch the total.
+The big box is `cart`. The small one is `total`, wired after it. Press **Add to cart**.
 
-<BasketDemo />
+<RecipeAnatomy />
 
-- Each button changes one count, and the total follows.
-- The recipe runs again only when `mugs` or `coasters` changes.
-- No handler mentions `total`, so there is nothing to forget.
+The press only changes `cart`. The recipe works out `total` again, and no handler touches it.
 
 ## Change the recipe
 
@@ -66,27 +59,18 @@ export default function MugOrder() @{
 ## What a recipe can read
 
 - State, props, imports, other computed values, and `const` values built from those.
-- A function you declared with `function` or `const`, in the file or in the component body. The
-  same holds in the markup: `{label(count)}` updates when `count` changes.
-- Not a plain `let` from the component body. It exists only while the component sets up the
-  page, and the recipe runs long after that. The build stops with
-  `MARKLESS_COMPUTED_READS_RENDER_LOCAL` and names the variable.
+- Functions you declared with `function` or `const`.
+- Not a plain `let` in the component body: `MARKLESS_COMPUTED_READS_RENDER_LOCAL`.
 
 ## A computed is read-only
 
-- Assigning to one, as in `total = 0`, stops the build with `MARKLESS_STATE_READ_ONLY_WRITE`.
-  Change its inputs instead.
-- A recipe can't change state. A write inside one stops the build with
-  `MARKLESS_STATE_WRITE_IN_COMPUTED`.
-- Side work, like saving or logging, goes in the event handler that causes the change. There is
-  no effect function that runs when a value changes.
+- `total = 0` stops the build with `MARKLESS_STATE_READ_ONLY_WRITE`. Change its inputs instead.
+- A recipe can't change state: `MARKLESS_STATE_WRITE_IN_COMPUTED`. Saving or logging goes in the handler.
 
 <Collapsible sprite="star-badge" summary="How do existing tools handle this?">
 
-Many tools ask you to list a derived value's inputs in a dependency array, and to run side work
-in an effect hook when a value changes. Markless reads the recipe and finds its inputs before
-your app runs, and side work stays in the handler where the change starts.
+Many tools ask you to list a derived value's inputs in a dependency array, and to run side work in an effect hook. Markless finds the inputs before your app runs, and side work stays in the handler.
 
 </Collapsible>
 
-[Events](/concepts/events) shows where every change starts: a handler.
+[Events](/concepts/events) shows where every change starts.

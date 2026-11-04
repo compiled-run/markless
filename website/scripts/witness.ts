@@ -1824,16 +1824,6 @@ try {
 		);
 
 		// --- textbook columns: each demo's notes report what the reader's action did ---
-		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
-		const basket = page.locator('.margin-notes');
-		await basket.getByRole('button', { name: 'Add a coaster' }).click();
-		await settleText(basket.locator('.total strong'), (text) => text === '$15', 'computed demo: a coaster moves the total');
-		check(
-			(await basket.locator('.tally').innerText()).includes('ran 2 times'),
-			'computed demo: the tally counts the recipe runs',
-			await basket.locator('.tally').innerText(),
-		);
-
 		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
 		const labelDemo = page.locator('.margin-notes');
 		const labelField = labelDemo.getByLabel('Name for the mug');
