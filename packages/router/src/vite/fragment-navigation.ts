@@ -21,6 +21,8 @@ export function startFragmentNavigation(
 	loadRun: () => Promise<FragmentNavigationRun>,
 	// What a press may start before the run half arrives; null when the app fetches nothing ahead of a click. A thunk, like the config.
 	intentOf: () => FragmentIntent | null,
+	// How long a failed run-half load waits for pagehide before it loads the clicked page as a document.
+	leaveDeadlineMs: number,
 ): void {
 	const w = d.defaultView as (Window & typeof globalThis) | null;
 	if (!w) return;
@@ -224,7 +226,16 @@ export function startFragmentNavigation(
 		if (here(url) && !starting) return;
 		wake().then(
 			(api) => api.go(anchor) || w.location.assign(url.href),
-			() => w.location.assign(url.href),
+			() => {
+				// Leaving the document aborts the import a few ms before pagehide; loading the page then would cancel that navigation.
+				let left = false;
+				const leave = () => (left = true);
+				w.addEventListener('pagehide', leave);
+				w.setTimeout(() => {
+					w.removeEventListener('pagehide', leave);
+					if (!left) w.location.assign(url.href);
+				}, leaveDeadlineMs);
+			},
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
