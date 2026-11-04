@@ -282,13 +282,18 @@ function createBranchRegistration(
 	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
 }
 
+export type ComposedBranchGraph = RuntimeGraph & {
+	readonly composedGraphProps?: ResumeBranchRecord['composedGraphProps'];
+};
+
 // Read local prop IDs without importing the composition runtime into resume.
-export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
+export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): ComposedBranchGraph {
 	const routes = branch.composedGraphProps;
 	if (!routes?.length) return graph;
 	const scope = branch.composedInstancePath ?? '';
 	return {
 		...graph,
+		composedGraphProps: routes,
 		read(id: string, path: ReadonlyArray<string> = []) {
 			// Resume scoped this symbol, so the id arrives carrying the instance
 			// path; `prop:` is not page space, so taking it back off is exact.

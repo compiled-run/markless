@@ -144,6 +144,7 @@ const buildOrder: PackUserConfig[] = [
 			resume: './src/payload-full.ts',
 			...webFnsEntries,
 			'resume-storage-free': './src/payload-full-storage-free.ts',
+			'shared-swap': './src/shared-swap.ts',
 		},
 	}),
 	marklessPack({

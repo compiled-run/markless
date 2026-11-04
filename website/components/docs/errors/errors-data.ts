@@ -8872,6 +8872,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_SHARED_SHAPE_MISMATCH',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_SHARED_SHAPE_MISMATCH: shared() definition "<id>" is already live in this document with a different shape, so this container keeps its own instance. Live: <live>. This container: <own>.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/shared-instances.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/shared-instances.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED',
 		packageName: '@markless/compiler',
 		stage: 'compile',

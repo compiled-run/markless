@@ -508,7 +508,14 @@ async function registerNestedAsyncBoundaries(
 			),
 		);
 	}
-	for (const nested of boundaries) wiring.add(nested);
+	const shown = new Map(
+		(computed ?? []).flatMap(({ async, graphNodeId, snapshot }) =>
+			async === true && (snapshot?.status === 'fulfilled' || snapshot?.status === 'rejected')
+				? [[graphNodeId, snapshot.version] as const]
+				: [],
+		),
+	);
+	for (const nested of boundaries) wiring.add(nested, shown);
 }
 
 // The page comment census restricted to the range, so indexes count from the arm start.

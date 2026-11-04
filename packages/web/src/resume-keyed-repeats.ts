@@ -233,7 +233,7 @@ export function wireKeyedRepeats(
 		}
 		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
 		const apply = (mint: RowMint | undefined): void => {
-			if (follow && !follow.showing()) return;
+			if (follow && !follow.showing(rowRootsByKey)) return;
 			applyKeyedRepeatRowOrder(
 				input.graph,
 				repeat,
@@ -268,7 +268,16 @@ export function wireKeyedRepeats(
 		const startLoading = (): void => {
 			if (!builds || loading) return;
 			loading = readyMint();
-			void loading?.then((mint) => apply(mint)).catch(() => undefined);
+			// Rows adopted from these very items: a reconcile would only undo the browser's own edit, as in a contenteditable.
+			void loading
+				?.then(
+					(mint) =>
+						(items.length &&
+							served.size === items.length &&
+							readKeyedRepeatCollection(input.graph, repeat) === items) ||
+						apply(mint),
+				)
+				.catch(() => undefined);
 		};
 		// No gesture changes a fixed prop list, so none waits for its row code: it loads when idle.
 		const propCollection = !rowsChange && isProp(repeat.collectionGraphNodeId);

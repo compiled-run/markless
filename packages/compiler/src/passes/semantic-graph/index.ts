@@ -72,6 +72,7 @@ import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { childContainerRepeatDiagnostics, containerRepeatComponents } from './container-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
+import { moduleHandlerProps } from './handler-props.ts';
 import {
 	createMutableSemanticGraphArtifact,
 	createWalkState,
@@ -241,6 +242,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	// the count is a placeholder until the page composes, and only this module
 	// knows what its own components do with the value once it lands.
 	const propSpends = collectComponentPropSpends(state);
+	const handlerProps = moduleHandlerProps(state);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -300,6 +302,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							: {}),
 						...(propSpends.get(component.name)?.length
 							? { propSpends: propSpends.get(component.name)! }
+							: {}),
+						...(handlerProps.get(component.name)?.size
+							? { handlerProps: [...handlerProps.get(component.name)!].sort() }
 							: {}),
 					},
 				];

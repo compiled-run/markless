@@ -297,6 +297,16 @@ export function createInlineResumerStorageWakeSource(
 	return `;(${runInlineResumerStorageWake.toString()})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE},${inlineDeferSource()}));`;
 }
 
+// Appended only to a page whose state declares a page- or request-scoped shared() definition: the
+// container joins the document's dormant list, so another container's write can wake it.
+export function createInlineResumerSharedWakeSource(
+	instancesProperty: string,
+	instancesVersion: number,
+	containerAttribute: string,
+): string {
+	return `;((document[${JSON.stringify(instancesProperty)}]||={version:${instancesVersion},instances:{}}).dormant||=[]).push(document.currentScript.closest(${JSON.stringify(`[${containerAttribute}]`)}));`;
+}
+
 function runInlineResumerStorageWake(
 	slotSymbolKey: string,
 	rendered: ReadonlyArray<readonly [slotKey: string, value: string]>,

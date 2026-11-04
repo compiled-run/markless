@@ -1364,10 +1364,11 @@ function armPartReadPath(
 type ArmRefusal = {
 	readonly detail: string;
 	readonly span?: SourceSpan;
-	// A component that has to run, or a @try block that has to settle: what a
+	// A component that has to run, or content a flip cannot rebuild: what a
 	// re-render of the page through the prerender evaluator can answer.
 	readonly escalatable?: boolean;
-	readonly tryBlock?: boolean;
+	// What the browser runs instead, in the author's words: "the @try block it holds".
+	readonly runs?: string;
 };
 
 type ArmPartsContext = {
@@ -1554,7 +1555,7 @@ function branchArmRendersInBrowserDiagnostic(
 	const names = [
 		...new Set(refusals.flatMap((refusal) => /^<([^>]+)>/.exec(refusal.detail)?.[1] ?? [])),
 	].map((name) => `<${name}>`);
-	if (refusals.some((refusal) => refusal.tryBlock)) names.push('the @try block it holds');
+	names.push(...new Set(refusals.flatMap((refusal) => refusal.runs ?? [])));
 	const shown = names.length > 0 ? names.join(', ') : 'its components';
 	return {
 		code: BRANCH_ARM_RENDERS_IN_BROWSER_CODE,
@@ -1653,6 +1654,12 @@ function renderChunkParts(
 			// An imported child renders in its own module when the browser runs it.
 			...(escalatable || child?.imported ? { escalatable: true } : {}),
 		});
+		return null;
+	};
+	// This module's own render answers it; an imported child's content keeps refuse()'s answer.
+	const renderedHere = (detail: string, runs: string) => {
+		if (!context.inline || child?.imported) return refuse(detail);
+		context.refusals?.push({ detail, escalatable: true, runs });
 		return null;
 	};
 	const chunk = (child?.chunks ?? renderData.chunks).find(
@@ -1778,8 +1785,11 @@ function renderChunkParts(
 							continue;
 						}
 						if (rowSlot.kind !== 'text')
-							return refuse(
-								`a repeated row inside it holds a ${rowSlot.kind} binding`,
+							return renderedHere(
+								`a repeated row inside it holds ${rowSlot.kind === 'attribute' ? 'an' : 'a'} ${
+									rowSlot.kind
+								} binding`,
+								'the @for block it holds',
 							);
 						if (rowSlot.residue.kind === 'repeat-item')
 							rowParts.push({ itemPath: rowSlot.residue.path });
@@ -1795,8 +1805,9 @@ function renderChunkParts(
 								},
 							});
 						else
-							return refuse(
+							return renderedHere(
 								'a repeated row inside it reads a value that cannot be recomputed',
+								'the @for block it holds',
 							);
 					}
 				}
@@ -1900,9 +1911,18 @@ function renderChunkParts(
 				context.refusals?.push({
 					detail: armSlotRefusalDetail(slot),
 					escalatable: true,
-					tryBlock: true,
+					runs: 'the @try block it holds',
 				});
 				return null;
+			}
+			if (slot.kind === 'branch') {
+				const nested = renderData.branches?.find(
+					(candidate) => candidate.branchSiteId === slot.branchSiteId,
+				);
+				return renderedHere(
+					armSlotRefusalDetail(slot),
+					`the ${nested?.kind === 'switch' ? '@switch' : '@if'} it holds`,
+				);
 			}
 			return refuse(armSlotRefusalDetail(slot));
 		}

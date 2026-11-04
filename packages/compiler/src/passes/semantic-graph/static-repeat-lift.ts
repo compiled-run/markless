@@ -15,6 +15,7 @@ import { mintTemplateExpressionComputed, pureCompositeReadSources } from './comp
 import { collectGraphDependencies } from './collect-async.ts';
 import { inlineRenderLocals } from './render-local-inline.ts';
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
+import { rowChildHandlerName } from './handler-props.ts';
 import type { SemanticKeyedRepeat } from '../../artifacts.ts';
 import type { WalkState } from './types.ts';
 
@@ -70,7 +71,9 @@ export function liftRowHandlerCollection(
 	itemName: string,
 	state: WalkState,
 ): RowHandlerCollection {
-	const handlerName = firstRowHandlerName(forNode.body as AnyNode | undefined);
+	const handlerName =
+		firstRowHandlerName(forNode.body as AnyNode | undefined) ??
+		rowChildHandlerName(forNode, itemName, state);
 	if (!handlerName) return { kind: 'no-row-handlers' };
 	const lifted = liftStaticCollection(forNode, collectionNode, itemName, state);
 	return lifted.kind === 'unliftable' ? { ...lifted, handlerName } : lifted;

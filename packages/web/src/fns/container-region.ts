@@ -5,5 +5,8 @@ export {
 	PROTOCOL_CONTAINER_START_COMMENT,
 } from '../../../serializer/src/protocol-page-markers.ts';
 export { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-stream-open.ts';
+export { PROTOCOL_SHARED_INSTANCES_PROPERTY } from '../../../serializer/src/protocol-shared-instances.ts';
 
 export const CONTAINER_ATTRIBUTE = 'data-async-container';
+// On the container's inline resumer script: the module whose resumeContainerEvent wakes it.
+export const RESUME_MODULE_ATTRIBUTE = 'data-markless-resume-module';
