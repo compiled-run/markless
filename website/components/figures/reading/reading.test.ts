@@ -133,7 +133,7 @@ describe('the @ blocks demo', () => {
 		expect(blocksDemo).toContain('@if (guests.length === 0) {');
 		expect(blocksDemo).toContain("import InkScreen from '../ink/ink-screen.tsrx';");
 		for (const word of ['@for', '@if', '@switch', '@try']) expect(blocksDemo).toContain(`<code>{'${word}`);
-		expect(blocksDemo).toContain('aria-live="polite"');
+		expect(blocksDemo).toContain('<MarginNotes said={said}>');
 	});
 });
 

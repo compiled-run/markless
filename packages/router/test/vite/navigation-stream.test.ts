@@ -1,11 +1,12 @@
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { chromium, webkit, type Browser, type BrowserType, type Page, type Route } from '@playwright/test';
+import { chromium, webkit, type Browser, type BrowserType, type Page } from '@playwright/test';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { MARKLESS_ROUTER_RENDERED_EVENT } from '../../src/route-state.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -106,6 +107,23 @@ const raceFrom = (page: Page, first: string, fetched: string, then: string) =>
 			}),
 		[first, fetched, then] as const,
 	);
+
+// history.back() only queues the traversal; WebKit on Linux runs page tasks for up to ~80 ms first, so the page's fetch is held until `release`.
+const holdArrival = async (page: Page, pageKey: string) => {
+	let release!: () => void;
+	const released = new Promise<void>((done) => (release = done));
+	await page.route(
+		(url) => {
+			const target = fragmentPageUrl(url);
+			return target?.pathname + (target?.search ?? '') === pageKey;
+		},
+		async (route) => {
+			await released;
+			await route.continue().catch(() => {});
+		},
+	);
+	return release;
+};
 
 // Every distinct (page, address) pair the document shows, read every frame and after every DOM change.
 const watchAddress = (page: Page) =>
@@ -230,8 +248,10 @@ for (const [name, browserType] of [
 			await landedOn(page, 'quick');
 			const before = await page.evaluate(() => history.length);
 			await watchViews(page);
+			const release = await holdArrival(page, '/recipe?u=4');
 			await raceFrom(page, '[data-to-recipe]', '/recipe?u=4', 'back');
 			await landedOn(page, 'start');
+			release();
 			await page.waitForTimeout(1200);
 			expect(new URL(page.url()).pathname).toBe('/');
 			expect((await views(page)).some((view) => view.startsWith('recipe'))).toBe(false);
@@ -259,8 +279,10 @@ for (const [name, browserType] of [
 			const events = () => page.evaluate(() => (window as unknown as { __events: string[] }).__events);
 			await page.locator('[data-to-quick]').click();
 			await landedOn(page, 'quick');
+			const release = await holdArrival(page, '/recipe?u=4');
 			await raceFrom(page, '[data-to-recipe]', '/recipe?u=4', 'back');
 			await landedOn(page, 'start');
+			release();
 			await page.waitForTimeout(1200);
 			expect(await events()).toEqual(['rendered /quick', 'popstate /', 'rendered /']);
 			expect(await page.evaluate(() => sessionStorage.getItem('shown'))).toBe('/');
@@ -278,15 +300,11 @@ for (const [name, browserType] of [
 			page.on('framenavigated', (frame) => {
 				if (frame === page.mainFrame()) loads.push(frame.url());
 			});
-			// The page's answer is held until Back has left, so it cannot arrive first.
-			const held: Route[] = [];
-			const recipe = (url: URL) => url.pathname === '/recipe' && url.search === '?u=2';
-			await page.route(recipe, (route) => void held.push(route));
+			const release = await holdArrival(page, '/recipe?u=2');
 			// Back leaves this document (the page script may not get to answer), and WebKit aborts the swap module's import as it does.
 			await raceFrom(page, '[data-to-recipe]', '/recipe?u=2', 'back').catch(() => {});
 			await page.waitForURL('about:blank');
-			await page.unroute(recipe);
-			for (const route of held) await route.continue().catch(() => {});
+			release();
 			await page.waitForTimeout(600);
 			expect(loads).toEqual(['about:blank']);
 			await page.goForward();

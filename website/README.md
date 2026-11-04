@@ -123,7 +123,9 @@ screenshots into the markless repo's goal notes.
   `ui/<family>/` with `basic.tsrx` as the hero and one file per further example. In a section folder
   `counter.tsrx` is the teaching component shown verbatim on the page and `counter-demo.tsrx` wraps
   it in the playground frame, because a page places each component as its own top-level block. `callout.tsrx` and
-  `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`.
+  `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`. Both sit on the
+  `.ink-card` paper card that every MDX `>` blockquote also gets; its inked edge and the callout's
+  `info`, `warning` and `tip` marks are drawn in `components/docs/ink-card/card-ink.ts`.
 - `components/docs/sidebar.tsrx`, `document.tsrx`, `nav.ts` — the chrome. `nav.ts` is the single
   source for the page list: the sidebar loops it, and the pager and the witness read it. Adding a page means adding an entry there and nothing else. `document.tsrx` renders a plain
   `<html>` root.
@@ -151,7 +153,7 @@ screenshots into the markless repo's goal notes.
   `tooling/cut-sprites.ts` is what cut them and is not part of the build. Sprites are the flat
   crayon doodles and ship twice, once as drawn and once lifted to chalk for the dark ground.
   Stickers are die-cut, with their own white border and shadow, so they carry depth and one file
-  reads on both grounds; they are the larger accents — the landing hero, a callout corner, the
+  reads on both grounds; they are the larger accents — the landing hero and the
   footer strip — while sprites stay small and inline.
 - `components/mascot/mug-spot.tsrx`: the mug hiding on a few pages, peeking over the top edge of
   the code block, callout, figure or pager that follows it, with a face or pose that fits the text
@@ -215,34 +217,23 @@ Pages teach with `<Code>` blocks the reader can edit.
 the browser. `pages/contributing/improve-the-docs.mdx`, served at `/contributing/improve-the-docs`,
 explains how to write one.
 
-## Previews
+## Visuals
 
-A UI family preview comes from the generator: `<Playground scenario="family/demo" />`. Every other
-interactive figure composes `components/docs/preview-card.tsrx`, which draws the same card with the
-same CSS (`components/docs/preview-card.test.ts` keeps it equal to `tooling/ui-playground-css.ts`).
+Pages use only the visuals the Start here pages use: a `<Code>` block with `steps`, a textbook
+column (a live demo on an `InkScreen` sheet with numbered margin notes beside it), an ink figure
+drawn with the `markless-anatomy` skill, `<Commands>`, plain fenced blocks and tables.
+`pages/contributing/improve-the-docs.mdx` lists which one fits which idea. A figure is a `.tsrx`
+component in `components/figures/<page>/`, with its CSS in its own `<style>`. A textbook column
+composes `components/figures/ink/margin-notes.tsrx` and `ring.tsrx`. Never put `Ring` or any other
+imported component inside an `@if` arm or `@for` row: draw the ring inline from `art.ring.ink`, as
+`figures/reading/blocks-demo.tsrx` does, or the arm renders in the browser and its code joins the
+page's prefetch.
 
-An `.mdx` page cannot wrap a component in another, so write a small `.tsrx` wrapper and render it
-from the page:
+`components/docs/preview-card.tsrx` and the `<Playground>` generator are being retired. Don't use
+them on a new or rewritten page; the pages that still import them move off them batch by batch.
 
-```tsrx
-import PreviewCard, { Action, Choice, Controls, Mono, Stage, Switch, Watch } from '../../docs/preview-card.tsrx';
-import Code from '../../docs/preview-card/code.tsrx';
-```
-
-| Part | Props | Draws |
-| --- | --- | --- |
-| `PreviewCard` (default) | `name` (`data-preview`, for tests), `label` (accessible name) | the card |
-| `Controls` | `title` | top band: title on the left, then the controls inside it |
-| `Switch` | `label`, `hint`, `checked`, `disabled`, `onChange(checked)` | on/off switch |
-| `Choice` | `label` (unique on the page), `hint`, `options` (2-4), `value`, `onChange(value)` | segmented one-of-few |
-| `Action` | `end`, `disabled`, `onClick()` | text button: Reset, Reload, Back, Next |
-| `Stage` | children | centred demo band |
-| `Watch` | children | yellow strip saying what the mechanism did |
-| `Mono` | children | code or an identifier inside Watch, without the prose chip |
-| `Code` | `files` (1-3 `CodePane`s from `codePane()` in `tooling/code-blocks.ts`) | file tabs, clamp, Expand code |
-
-The build demos keep their highlighted files in `components/demos/build/code-panes.ts`, written by
-`code-panes.test.ts` from the demo files; run `vp test -u` after editing a demo. Each part carries
-its own `<style>`, because the compiler stamps a module's scope class only on components that
-declare one. Option lists are fixed slots, not `@for`: an item built by a repeat loses its value
-or its handler when the page resumes.
+An `.mdx` page cannot wrap a component in another, so a figure that composes parts is its own
+`.tsrx` file that the page renders as a top-level block. Each part carries its own `<style>`,
+because the compiler stamps a module's scope class only on components that declare one. Option
+lists are fixed slots, not `@for`: an item built by a repeat loses its value or its handler when
+the page resumes.

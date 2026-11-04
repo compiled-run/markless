@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "app code, not framework: the docs home prefetches the rewritten Tooling, Reference and Contributing pages, whose text and Code panes ship as page data, and Improve the docs now runs a live MarginNotes example (TypoNotes); JS executed at load is unchanged; +5273 B gzip on PR #459 run 41915907744 over main b28c70088 (merge-queue run 41913031696)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 5274,
+			"reason": "app code, not framework: the docs home prefetches the rewritten Tooling, Reference and Contributing pages, whose text and Code panes ship as page data, and Improve the docs now runs a live MarginNotes example (TypoNotes); JS executed at load is unchanged; +5273 B gzip on PR #459 run 41915907744 over main b28c70088 (merge-queue run 41913031696)",
+			"date": "2026-11-04"
+		}
+	]
+}
