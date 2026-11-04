@@ -1,6 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import StateAnatomy from '../../components/figures/state/state-anatomy.tsrx';
 import SettingsDemo from '../../components/figures/state/settings-demo.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -10,7 +11,9 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # State is a variable the page watches
 
-<PageMeta time="4 min" assumes="reading-tsrx" />
+<PageMeta time="3 min" assumes="reading-tsrx" />
+
+<Subtitle text="Wrap a starting value in state(), and every spot on the page that shows it keeps up." />
 
 Say you work at Beanshop, a coffee brand. Customers press **Add to cart** on your shop page, and
 the page needs to keep track of how many bags they have added.
@@ -95,9 +98,13 @@ export default function Settings() @{
 
 ## Any assignment counts
 
-`theme = 'dark'`, `count++` and `count += 2` all change state. Objects change field by field:
+Change state the way you change any variable:
 
-```tsrx
+- `theme = 'dark'`, `count++` and `count += 2` all count.
+- Objects change field by field. `user.visits++` changes the text that shows `user.visits`, and the
+  text that shows `user.name` stays as it is.
+
+```tsrx title="visitor.tsrx"
 import { state } from '@markless/core';
 
 export default function Visitor() @{
@@ -110,15 +117,15 @@ export default function Visitor() @{
 }
 ```
 
-A click changes the text that shows `user.visits`. The text that shows `user.name` stays as it is.
+## Make state in the component body
 
-## Where state can live
+Write `state()` directly in the component body, next to your other variables. Anywhere else, the
+build stops and names the line:
 
-Make `state()` directly in the component body, next to your other variables. Anywhere else, the
-build stops and the error points at the line:
-
-- not outside the component
-- not inside an `@if`, a handler or a loop
-- not changed inside the markup, like `{count++}`
+- outside the component: `MARKLESS_STATE_MODULE_SCOPE`
+- inside an `@if`, an event handler or a `for` loop: `MARKLESS_STATE_CREATION_SITE_UNSTABLE`
+- changed inside the markup, as in `{count++}`: `MARKLESS_STATE_WRITE_IN_TEMPLATE`
 
 `state()` only works in `.tsrx` files. In a plain `.ts` file it throws as soon as it runs.
+
+[Computed](/concepts/computed) works out a value from your state, so it can never go stale.
