@@ -1811,7 +1811,7 @@ try {
 
 		// --- concept previews: each one reports what the reader's action really did ---
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const settings = page.locator('.margin-notes').first();
+		const settings = page.locator('.settings-demo').first();
 		await settings.getByRole('button', { name: 'Dark' }).focus();
 		await page.keyboard.press('Enter');
 		await settleText(settings.locator('.heading span'), (text) => text === 'Theme: dark', 'state preview turns dark by key');
