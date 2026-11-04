@@ -1,5 +1,6 @@
 import { box } from '@async/witness';
 import { chromium, expect, type Page } from '@playwright/test';
+import { pagerFor } from '../nav.ts';
 
 const POLL = { timeout: 15_000 };
 
@@ -92,15 +93,45 @@ export default box(
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
 		const url = (path: string) => new URL(path, server.url).href;
+		// A page's first compile writes its code-block modules, and a new module file reloads open pages.
+		const nextFromHome = [pagerFor('/').nextHref];
+		while (nextFromHome.length < 4) nextFromHome.push(pagerFor(nextFromHome.at(-1)!).nextHref);
+		for (const path of ['/concepts/state', '/router/pages', '/start/migrate', '/how-it-works', '/', '/concepts/computed', '/how-it-works/native-targets', '/ui', ...nextFromHome])
+			expect((await fetch(url(path))).status, `${path} renders before the browser opens`).toBe(200);
 		const browser = await chromium.launch({ headless: true });
 		try {
 			const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(String(error)));
+			// Printed if a step fails, so a red run says whether a module failed to load or a handler threw.
+			const trail: string[] = [];
+			page.on('requestfailed', (request) => trail.push(`request failed: ${request.url()} ${request.failure()?.errorText ?? ''}`));
+			page.on('console', (message) => message.type() === 'error' && trail.push(`console: ${message.text()}`));
 			await page.addInitScript(sampleThemeFrames);
+			await page.addInitScript(() => {
+				const log: string[] = [];
+				(window as unknown as { __navLog: string[] }).__navLog = log;
+				const t0 = performance.now();
+				for (const type of ['pointerover', 'pointerout', 'keydown'])
+					document.addEventListener(type, (event) => {
+						const target = event.target as Element;
+						if (type === 'keydown' || target.closest?.('.nav-pill'))
+							log.push(`${Math.round(performance.now() - t0)} ${type} ${String((target as HTMLElement).className ?? target.nodeName).slice(0, 24)}`);
+					}, true);
+			});
 			await page.goto(url('/concepts/state'), { waitUntil: 'networkidle' });
 
-			await exerciseBar(page, 'first load');
+			try {
+				await exerciseBar(page, 'first load');
+			} catch (failure) {
+				const state = await page.evaluate(() => ({
+					log: (window as unknown as { __navLog: string[] }).__navLog.slice(-30),
+					items: [...document.querySelectorAll('.nav-pill .nav-item')].map((item) => [...item.attributes].map((a) => `${a.name}=${a.value}`).join(' ')),
+					triggers: [...document.querySelectorAll('.nav-pill .nav-trigger')].map((t) => `${t.getAttribute('m:on')} ${t.getAttribute('aria-expanded')}`),
+				}));
+				console.log([...errors, ...trail, JSON.stringify(state, null, 1)].join('\n'));
+				throw failure;
+			}
 			const steps: [string, () => Promise<void>, string][] = [
 				['a Docs card', async () => { await page.locator('.nav-pill .nav-trigger', { hasText: 'Docs' }).hover(); await page.locator('.nav-panel:not([hidden]) .card', { hasText: 'Router' }).click(); }, '/router/pages'],
 				['a Migrate card', async () => { await page.locator('.nav-pill .nav-trigger', { hasText: 'Migrate' }).hover(); await page.locator('.nav-panel:not([hidden]) .card', { hasText: 'Migrate an app' }).click(); }, '/start/migrate'],
