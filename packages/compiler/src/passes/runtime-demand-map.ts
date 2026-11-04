@@ -238,7 +238,12 @@ export function createRuntimeDemandMap(
 	const scalarRows =
 		classRouting.scalarRows &&
 		!storageRequiresFullResume &&
-		isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
+		isScalarOnlyKeyedRepeatModule(
+			input.symbolResolver,
+			input.protocolView,
+			input.protocolState,
+			input.componentEdges,
+		);
 	const payloadRecords = payloadDemandRecords(
 		input.protocolView,
 		closedSymbolDemand,
@@ -587,6 +592,8 @@ function referencesValue(value: unknown, id: string): boolean {
 function isScalarOnlyKeyedRepeatModule(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
+	componentEdges: unknown,
 ): boolean {
 	if ((view.keyedRepeats?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0)
 		return false;
@@ -620,6 +627,12 @@ function isScalarOnlyKeyedRepeatModule(
 		);
 		if (writes.length === 0) return false;
 		if (writesDemandNonTextRuntime(writes, view)) return false;
+		if (
+			writes.some((write) =>
+				cellReadOutsideTextUpdates(write.graphNodeId, view, state, componentEdges),
+			)
+		)
+			return false;
 		const domUpdateSymbolIds = textDomUpdatesForWrites(writes, view).map(
 			(update) => update.symbolId,
 		);
@@ -705,7 +718,6 @@ function eventHandlerBodyAllowsScalarLeaf(
 		Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']
 	>[number],
 ): boolean {
-	const authoredWrite = authoredWriteSource(write);
 	const prefix = 'const __marklessHandler = ';
 	const wrapped = `${prefix}${symbol.source};`;
 	let program: AnyNode;
@@ -716,7 +728,7 @@ function eventHandlerBodyAllowsScalarLeaf(
 	}
 	const declarator = asNodes(asNodes(program.body)[0]?.declarations)[0];
 	const fn = declarator?.init as AnyNode | undefined;
-	if (!authoredWrite || !fn || !isNode(fn.body)) return false;
+	if (!fn || !isNode(fn.body)) return false;
 	const body = fn.body as AnyNode;
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
 	const parameters = new Set(
@@ -735,8 +747,7 @@ function eventHandlerBodyAllowsScalarLeaf(
 						? undefined
 						: statement;
 		if (!expression) return false;
-		if (!wrote && wrapped.slice(expression.start, expression.end) === authoredWrite)
-			return (wrote = true);
+		if (!wrote && isAuthoredWrite(expression, write)) return (wrote = true);
 		return parameterCancel(expression, parameters);
 	});
 }
@@ -755,24 +766,36 @@ function parameterCancel(node: AnyNode, parameters: ReadonlySet<string>): boolea
 	);
 }
 
-function authoredWriteSource(
+// The handler's one recorded write, as the assignment or update node itself: the semantic pass already proved its target is the state cell.
+function isAuthoredWrite(
+	node: AnyNode,
 	write: NonNullable<
 		Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']
 	>[number],
-): string | null {
+): boolean {
+	let current = node;
+	while (current.type === 'ParenthesizedExpression' && isNode(current.expression))
+		current = current.expression as AnyNode;
 	if (write.operation === 'assign') {
-		const operator = write.assignmentOperator ?? '=';
-		if (!write.valueSource) return null;
-		return `${write.source} ${operator} ${write.valueSource}`;
+		return (
+			current.type === 'AssignmentExpression' &&
+			current.operator === (write.assignmentOperator ?? '=') &&
+			isIdentifierNamed(current.left, write.source)
+		);
 	}
+	return (
+		write.operation === 'update' &&
+		current.type === 'UpdateExpression' &&
+		current.operator === write.updateOperator &&
+		current.prefix === (write.prefix === true) &&
+		isIdentifierNamed(current.argument, write.source)
+	);
+}
 
-	if (write.operation === 'update' && write.updateOperator) {
-		return write.prefix
-			? `${write.updateOperator}${write.source}`
-			: `${write.source}${write.updateOperator}`;
-	}
-
-	return null;
+function isIdentifierNamed(node: unknown, name: string): boolean {
+	return (
+		isNode(node) && (node as AnyNode).type === 'Identifier' && (node as AnyNode).name === name
+	);
 }
 
 function literalValueSource(source: string | undefined): string | null {
