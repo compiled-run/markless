@@ -6,6 +6,7 @@ import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
+import { MARKLESS_ROUTER_RENDERED_EVENT } from '../../src/route-state.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
@@ -238,6 +239,35 @@ for (const [name, browserType] of [
 			await page.goForward();
 			await landedOn(page, 'quick');
 			expect(new URL(page.url()).pathname).toBe('/quick');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('Back before arrival fires popstate and one rendered event, for the page it goes back to, and nothing for the cancelled page', async () => {
+			const { page, errors } = await open(browser, '/');
+			// As a site part does: on each rendered page, store what it shows (the shadcn sidebar's docs-sidebar-scroll).
+			await page.evaluate((rendered) => {
+				const events: string[] = [];
+				(window as unknown as { __events: string[] }).__events = events;
+				const at = () => location.pathname + location.search;
+				addEventListener('popstate', () => events.push(`popstate ${at()}`));
+				document.addEventListener(rendered, () => {
+					events.push(`rendered ${at()}`);
+					sessionStorage.setItem('shown', at());
+				});
+			}, MARKLESS_ROUTER_RENDERED_EVENT);
+			const events = () => page.evaluate(() => (window as unknown as { __events: string[] }).__events);
+			await page.locator('[data-to-quick]').click();
+			await landedOn(page, 'quick');
+			await raceFrom(page, '[data-to-recipe]', '/recipe?u=4', 'back');
+			await landedOn(page, 'start');
+			await page.waitForTimeout(1200);
+			expect(await events()).toEqual(['rendered /quick', 'popstate /', 'rendered /']);
+			expect(await page.evaluate(() => sessionStorage.getItem('shown'))).toBe('/');
+			await page.locator('[data-to-recipe]').evaluate((link) => (link as HTMLElement).click());
+			await landedOn(page, 'recipe');
+			expect((await events()).slice(3)).toEqual(['rendered /recipe?u=2']);
+			expect(await page.evaluate(() => sessionStorage.getItem('shown'))).toBe('/recipe?u=2');
 			expect(errors).toEqual([]);
 			await page.close();
 		});
