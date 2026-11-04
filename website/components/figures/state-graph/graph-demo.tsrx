@@ -66,7 +66,7 @@ export default function GraphDemo() @{
 				<Spot n={2} code={'{total}'}>reads <code>computed:total</code>, which reads <code>state:bags</code></Spot>
 			</Spots>
 			<Tally>
-				The click ran <strong>{ran}</strong>, and the journal got <strong>{entries}</strong> <code>setText</code> entries.
+				The click ran <strong>{ran}</strong>. For the cart code above, that is <strong>{entries}</strong> <code>setText</code> entries in the journal.
 				<br />
 				The product line subscribes to nothing, so it was written <strong>0 times</strong>.
 			</Tally>

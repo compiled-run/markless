@@ -2757,7 +2757,7 @@ try {
 		);
 		await see(
 			page.locator('.margin-notes .tally').first(),
-			(text) => text.includes('ran once') && text.includes('got 2 setText'),
+			(text) => text.includes('ran once') && text.includes('that is 2 setText'),
 			'the state graph notes count one click and two journal entries',
 		);
 		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
