@@ -380,7 +380,7 @@ export const nav: readonly NavSection[] = [
 				href: '/reference',
 				icon: 'parcel',
 				number: '1',
-				description: 'Every Markless package, what it does, and its npm version.',
+				description: 'Every Markless package, what it does, and whether it is on npm.',
 			},
 			{
 				title: 'Glossary',

@@ -1,5 +1,5 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import EditorDemo from '../../components/demos/tooling/editor-demo.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -8,29 +8,22 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Make your editor read `.tsrx` files
 
-<PageMeta time="2 min" assumes="reading-tsrx" />
+<PageMeta time="3 min" assumes="reading-tsrx" />
 
 <ThemeToggle />
 
-Open a `.tsrx` file in a fresh editor and you get plain grey text. No suggestions, no red lines, no
-help.
+<Subtitle text="Two pieces make your editor understand a .tsrx file: an extension adds the colours, and a TypeScript plugin adds everything else." />
 
-Two pieces fix that. An editor extension knows the TSRX syntax, so it adds the colours. A
-TypeScript plugin, named in `tsconfig.json`, knows Markless. It adds everything else.
+- **The TSRX extension** colours the syntax. It knows `@if` and `@{ }`, but nothing about Markless.
+- **The Markless TypeScript plugin** adds suggestions, hints and red lines under mistakes, like `onClik` for `onClick`.
 
-Turn each piece on, and watch what changes.
-
-<EditorDemo />
-
-Only the colours come from the extension. The hint after `<widget.trigger`, the wavy line under
-`onClik`, and the menu after `@` all come from the plugin. Any editor that runs TypeScript's own
-language server can load the plugin.
+An app from `npm create markless` sets up both. This page shows where they live, so you can check them.
 
 ## Check `tsconfig.json`
 
-An app from `npm create markless` already has these lines:
+The plugin is named in your app's `tsconfig.json`. A new app already has these lines:
 
-```json
+```json title="tsconfig.json"
 {
 	"tsrx": {
 		"compiler": "@markless/typescript-plugin/volar"
@@ -45,76 +38,49 @@ An app from `npm create markless` already has these lines:
 }
 ```
 
-| Line                                 | What it does                                                 |
-| ------------------------------------ | ------------------------------------------------------------ |
-| `tsrx.compiler`                      | Tells the TSRX tools to read `.tsrx` files the Markless way. |
-| `@markless/typescript-plugin`        | Adds Markless suggestions, part hints, and `.tsrx` imports.  |
-| `@markless/router/typescript-plugin` | Suggests your page addresses inside `href`.                  |
+| Line | What it does |
+| --- | --- |
+| `tsrx.compiler` | Tells the TSRX tools to read `.tsrx` files the Markless way. |
+| `@markless/typescript-plugin` | Adds Markless suggestions, hints, errors and `.tsrx` imports. |
+| `@markless/router/typescript-plugin` | Suggests your page addresses inside `href`. |
+
+Not sure a line is right? Run `npm run doctor -- --no-build`. It checks the `tsrx.compiler` line and prints the line to add if it's missing.
 
 ## Pick your editor
 
-**VS Code.** Install the TSRX extension. The starter's `.vscode/extensions.json` recommends it, so VS
-Code offers it when you open the app.
+- **VS Code, Cursor or Windsurf.** Install the TSRX extension. The app's `.vscode/extensions.json` recommends it, so the editor offers it when you open the folder.
+- **Zed.** Nothing to install. The app's `.zed/settings.json` opens `.tsrx` files as TSX and loads the plugin into Zed's TypeScript server.
+- **Any other editor** that runs TypeScript's own language server, such as WebStorm, reads the same `tsconfig.json` lines.
 
 ```bash
 code --install-extension ripple-ts.ripple-ts-vscode-plugin
 ```
 
-Markless no longer ships its own extension. If you installed an old build by hand, remove it.
-Otherwise two extensions fight over `.tsrx` files.
+That installs the TSRX extension from a terminal. If you once installed the old `markless.markless` extension by hand, remove it with `code --uninstall-extension markless.markless`, or the two fight over `.tsrx` files.
 
-```bash
-code --uninstall-extension markless.markless
+## What the plugin adds
+
+- Type `@` in a component body, and the editor offers `@if`, `@for` and `@try`.
+- After a tag whose props come from one HTML element, a small hint names that element. `<tabs.trigger` shows `: button`.
+- A wrong prop, a misspelt handler or an unknown attribute gets a red line, with TypeScript's own message.
+
+To turn the element hints off, add `"partHints": false` to the plugin's entry:
+
+```json title="tsconfig.json"
+{ "name": "@markless/typescript-plugin", "partHints": false }
 ```
 
-**Zed.** The starter writes `.zed/settings.json` for you. It opens `.tsrx` files as TSX and loads
-the Markless plugin into Zed's TypeScript server. You have nothing to install.
+## TypeScript 7.1 is experimental
 
-**Other editors.** WebStorm and other editors built on TypeScript's language server read the same
-`tsconfig.json` lines.
+The plugin runs on TypeScript 5.9. TypeScript 7 can't load plugins, so it reads `.tsrx` files through [`@tsrx/content-mapper`](https://github.com/tsrx-org/tsrx/tree/main/packages/vscode-plugin#native-backend-setup) instead. Hover, go to definition, suggestions for members and props, and type errors all work there.
 
-## What you get
+Not yet, on TypeScript 7.1:
 
-Type `@` in a component body, and the editor offers blocks like `@if`, `@for`, and `@try`. After a
-UI component part like `<widget.trigger>`, a small hint names the HTML element it renders.
+- `@` block suggestions and element hints.
+- An auto-import that adds a new `import` line ([microsoft/TypeScript#64119](https://github.com/microsoft/TypeScript/issues/64119)).
+- Rename, where the TSX copy spells a name differently ([microsoft/TypeScript#63879](https://github.com/microsoft/TypeScript/issues/63879)).
+- Suggestions straight after a fresh `.`, Find File References and Go to Source Definition.
 
-```tsrx
-<widget.trigger value="go">Go</widget.trigger>
-```
+Stay on TypeScript 5.9 for daily work. [tsrx-org/tsrx#136](https://github.com/tsrx-org/tsrx/issues/136) tracks every known gap.
 
-Here the editor shows `: button` right after `<widget.trigger`. To turn these hints off, add
-`"partHints": false` to the plugin's entry in `tsconfig.json`.
-
-<Callout
-	sprite="check"
-	title="Is my setup right?"
-	text="In a Node or Bun app, run node scripts/markless-doctor.mjs --no-build. One of its checks makes sure that tsconfig.json has the tsrx.compiler line. If the line is missing, it tells you the line to add."
-/>
-
-## TypeScript 7.1 (experimental)
-
-The Markless plugin runs on TypeScript 5.9. TypeScript 7 cannot load plugins, so it reads `.tsrx`
-files through a content mapper instead: a separate program, named in `tsconfig.json`, that hands it
-the TSX copy. An editor on the TypeScript 7.1 beta can use `@tsrx/content-mapper`, which follows
-the `tsrx.compiler` line above. The [TSRX VS Code setup](https://github.com/tsrx-org/tsrx/tree/main/packages/vscode-plugin#native-backend-setup)
-shows the settings.
-
-```json
-{
-	"contentMappers": [{ "package": "@tsrx/content-mapper", "extensions": [".tsrx"] }]
-}
-```
-
-Hover, go to definition, member and prop suggestions, and type errors work. These do not, yet:
-
-- the `@` block suggestions, part hints, and the Markless order of tag suggestions
-- an auto-import that adds a new `import` line ([microsoft/TypeScript#64119](https://github.com/microsoft/TypeScript/issues/64119))
-- rename where the TSX copy spells a name differently ([microsoft/TypeScript#63879](https://github.com/microsoft/TypeScript/issues/63879))
-- suggestions right after a fresh `.`; a half-typed file can also show errors in code the editor
-  filled in to keep reading it
-- Find File References and Go to Source Definition
-
-[tsrx-org/tsrx#136](https://github.com/tsrx-org/tsrx/issues/136) tracks every known gap. Stay on
-TypeScript 5.9 for daily work.
-
-Next: [check every file at once](/tooling/type-checking).
+Your editor checks the file you have open. [Type checking](/tooling/type-checking) shows how TypeScript checks a `.tsrx` file at all.

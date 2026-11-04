@@ -1,3 +1,4 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -5,13 +6,13 @@ import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <Sidebar />
 
-# Glossary
+# One meaning for every word
 
 <PageMeta time="4 min" assumes="nothing" />
 
 <ThemeToggle />
 
-The package list named a lot of parts. This page pins down the words around them. Each word has one meaning across the site.
+<Subtitle text="Each word on this site has one meaning. Look it up here." />
 
 ## Writing components
 
@@ -29,7 +30,7 @@ The package list named a lot of parts. This page pins down the words around them
 
 ## Where a component renders
 
-Markless does its planning before your app runs. The compiled component then renders wherever you need it. The model is the same in every place.
+Markless plans a component while it builds your app. The same plan then renders in each of these places.
 
 | Term | Meaning |
 | --- | --- |
@@ -64,8 +65,8 @@ Markless does its planning before your app runs. The compiled component then ren
 | --- | --- |
 | diagnostic | A compiler message with a code, a title, a reason, suggested fixes and a docs link. |
 | `markless-allow` | A comment that silences one warning, with a reason: `// markless-allow CODE: reason`. It cannot silence an error. |
-| `TS91001` | The error code that `pnpm typecheck` and the editor use for a `.tsrx` file that does not parse. |
-
-Next: [the CLI](/reference/cli).
+| `TS91001` | The error code your editor shows for a `.tsrx` file that doesn't parse. |
 
 <MugSpot mood="sleep" at="bottom" />
+
+[The CLI page](/reference/cli) lists every `create-markless` flag.
