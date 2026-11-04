@@ -1256,7 +1256,8 @@ ${writes(emit.slots, control, 'next', '\t\t\t\t\t\t\t')}${extra}${follow}
 						<toggle.label class="pg-name">${control.label ?? control.local?.label ?? control.prop.charAt(0).toUpperCase() + control.prop.slice(1)}</toggle.label>
 ${hintFor(control)}
 						<toggle.trigger class="pg-switch">
-							<toggle.thumb class="pg-knob" />
+							<svg class="pg-art" viewBox={'0 0 ' + controlArt.toggle.width + ' ' + controlArt.toggle.height} preserveAspectRatio="none" aria-hidden="true"><path class="pg-art-face" d={controlArt.toggle.face} /><path class="pg-art-wash" d={controlArt.toggle.wash} /><path class="pg-art-ink" d={controlArt.toggle.ink} /></svg>
+							<toggle.thumb class="pg-knob"><svg class="pg-art" viewBox={'0 0 ' + controlArt.toggle.knob.size + ' ' + controlArt.toggle.knob.size} aria-hidden="true"><path class="pg-art-face" d={controlArt.toggle.knob.face} /><path class="pg-art-shade" d={controlArt.toggle.knob.shade} /><path class="pg-art-ink" d={controlArt.toggle.knob.ink} /></svg></toggle.thumb>
 						</toggle.trigger>
 					</toggle.root>
 				</div>`;
@@ -1294,6 +1295,7 @@ ${writes(emit.slots, control, chosen, '\t\t\t\t\t\t\t')}
 					>
 						<select.label class="pg-name">${control.label ?? control.local?.label ?? control.prop}</select.label>
 						<select.trigger class="pg-pick-trigger">
+							<svg class="pg-art" viewBox={'0 0 ' + controlArt.pick.width + ' ' + controlArt.pick.height} preserveAspectRatio="none" aria-hidden="true"><path class="pg-art-face" d={controlArt.pick.face} /><path class="pg-art-ink" d={controlArt.pick.ink} /></svg>
 							<span class="pg-pick-value">{${control.shown}}</span>
 							<lucide.chevrondown class="pg-pick-caret" aria-hidden="true" />
 						</select.trigger>
@@ -1628,6 +1630,7 @@ ${written}
 			>
 				<select.label class="pg-bar-name">Scenario</select.label>
 				<select.trigger class="pg-pick-trigger pg-bar-trigger">
+					<svg class="pg-art" viewBox={'0 0 ' + controlArt.pick.width + ' ' + controlArt.pick.height} preserveAspectRatio="none" aria-hidden="true"><path class="pg-art-face" d={controlArt.pick.face} /><path class="pg-art-ink" d={controlArt.pick.ink} /></svg>
 					<span class="pg-pick-value">{scenario}</span>
 					<lucide.chevrondown class="pg-pick-caret" aria-hidden="true" />
 				</select.trigger>
@@ -1764,6 +1767,8 @@ ${rest}
 	return `import { ${coreImports.join(', ')} } from '@markless/core';
 import { ${uiImports.join(', ')} } from '@markless/ui';
 import { attributeText, heldList, listText, pickValue, toggled, valueText } from '../slot-text.ts';
+import InkScreen from '../../../figures/ink/ink-screen.tsrx';
+import { art as controlArt } from '../../../figures/ink/controls.art.ts';
 
 ${RUN_TYPES}
 ${helpers}
@@ -1777,19 +1782,28 @@ export default function ${componentName(demo.family, demo.stem)}() @{
 ${cells.join('\n')}
 ${prelude === '' ? '' : `\n${prelude}\n`}
 	<section class="pg" data-family="${demo.family}">
-		<header class="pg-head">
-			<span class="pg-title">Playground</span>
-${scenarioBar(emit, presets)}
-		</header>
-		<div class="pg-stage">
-			${stageMarkup(demo, emit)}
+		<div class="pg-scene">
+			<InkScreen url="localhost:3000" label=${quote(`A live ${demo.family} example`)}>
+				<div class="pg-stage">
+					${stageMarkup(demo, emit)}
+				</div>
+			</InkScreen>
+			<div class="pg-try">
+				<p class="pg-try-title">Change a prop</p>
+${scenarioBar(emit, presets)}${band}${log}			</div>
 		</div>
-${log}
 		<div class="pg-code">
+			@for (const sheet of [controlArt.slip.wide, controlArt.slip.narrow]; key sheet.width) {
+				<svg class="pg-slip" data-fit={sheet === controlArt.slip.wide ? 'wide' : 'narrow'} viewBox={'0 0 ' + sheet.width + ' ' + sheet.height} preserveAspectRatio="none" aria-hidden="true">
+					<path class="pg-slip-pencil" d={sheet.pencil} />
+					<path class="pg-slip-shade" d={sheet.shadow.wash} />
+					<path class="pg-slip-hatch" d={sheet.shadow.hatch} />
+					<path class="pg-slip-paper" d={sheet.paper} />
+					<path class="pg-slip-ink" d={sheet.ink} />
+				</svg>
+			}
 ${codePanelChrome({ scenario: `${demo.family}/${demo.stem}`, panes, indent: '\t\t\t' })}
-		</div>${band === '' ? '' : `
-		<div class="pg-try">
-			<span class="pg-try-title">Change a prop</span>${band}		</div>`}
+		</div>
 ${docsMarkup('\t\t')}
 
 		<style>
