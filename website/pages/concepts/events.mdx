@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import LabelDemo from '../../components/figures/events/label-demo.tsrx';
+import TypingAnatomy from '../../components/figures/events/typing-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -9,7 +9,7 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Events hand you the browser's own event
 
-<PageMeta time="3 min" assumes="state" />
+<PageMeta time="2 min" assumes="state" />
 
 <Subtitle text="An event prop is on plus the event name, and your handler gets the browser's own event." />
 
@@ -17,18 +17,15 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 <input onInput={(event) => (name = event.currentTarget.value)} />
 ```
 
-That is `addEventListener('input', ...)` written on the element. `event.key`, `event.target` and
-`event.preventDefault()` are the real ones, so the DOM docs you already know still apply.
+That is `addEventListener('input', …)` written on the element. `event.key` and `event.preventDefault()` are the real ones.
 
-## Type, press Enter, press Escape
+## Follow the key press
 
-Type a name, press Enter, then press Escape. The notes say what each handler got from the browser.
+The box is `name`, and the `onInput` wire is the handler. Press the drawing to type a letter.
 
-<LabelDemo />
+<TypingAnatomy />
 
-- Every key fires `input`, and the preview follows `name`.
-- Enter submits the form. `event.preventDefault()` keeps the page from reloading.
-- Your component ran once, to set up the page. A handler's code runs only when its event fires.
+The handler runs only when its event fires, and only the preview follows `name`.
 
 ## Write your own
 
@@ -68,43 +65,14 @@ export default function MugLabel() @{
 
 ## Naming the prop
 
-- Write `on` and the event name: `onClick`, `onInput`, `onKeyDown`.
-- The case after `on` doesn't matter, so `onKeydown` works too.
+- `on` plus the event name: `onClick`, `onInput`, `onKeyDown`. The case after `on` doesn't matter.
 - Pass an array to run two handlers in order: `onClick={[save, countSave]}`.
+- `onIdle` runs once when the page is idle, and `onVisible` once when the element scrolls into view.
 
-## Run code when the page is idle or in view
+Not yet:
 
-Some code belongs on the page but no click asks for it, like an analytics tag. Put `onIdle` on the
-element it belongs to:
-
-```tsrx title="footer.tsrx"
-export default function Footer() @{
-	<footer
-		onIdle={async () => {
-			const analytics = await import('./analytics.ts');
-			analytics.start();
-		}}
-	>
-		Made by Beanshop
-	</footer>
-}
-```
-
-- `onIdle` runs once per element, after the page loads and the browser is idle.
-- `onVisible` runs once, the first time the element scrolls into view.
-- An element inside an `@if` or `@for` runs it after it appears. One that's gone by then never
-  does.
-- A handler's code downloads only when it runs, and so does the `import()` inside it.
-
-## What a handler can read
-
-- State, props, imports, and `const` values built from those.
-- A function you declared in the component body, with arguments: `onClick={() => add(2)}`.
-- Not a plain `let` from the component body: `MARKLESS_HANDLER_READS_RENDER_LOCAL`.
-- A body `const` is built again for each event, so changing it, as in `list.push(3)`, stops the
-  build with `MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`.
-- `event.preventDefault()` inside an `if` runs the moment the event fires, so the test may read
-  only state, props, constants or an event field compared with a fixed value, like
-  `event.key === 'Enter'`. Anything else stops the build with `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`.
+- A handler can't read a plain `let` from the component body: `MARKLESS_HANDLER_READS_RENDER_LOCAL`.
+- Changing a body `const`, as in `list.push(3)`, stops the build with `MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`.
+- `event.preventDefault()` inside an `if` needs a test on state, props, constants or an event field, like `event.key === 'Enter'`: `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`.
 
 [Conditionals](/concepts/conditionals) shows parts of the page that come and go.
