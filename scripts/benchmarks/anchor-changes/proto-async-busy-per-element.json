@@ -1,0 +1,128 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": -110,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 76,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-refresh-busy"
+			],
+			"delta": 2150,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": -16,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 20,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": -110,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 76,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-refresh-busy"
+			],
+			"delta": 2150,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": -16,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 14,
+			"reason": "per-element refresh busy marks: the busy module now tracks pending reads and arm bindings instead of marking the whole block (+2150 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-04"
+		}
+	]
+}

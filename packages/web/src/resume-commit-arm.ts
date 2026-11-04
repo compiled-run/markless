@@ -2,6 +2,7 @@ import { runtimeResumeError } from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import { boundaryArmRecordSet, materializeArmRecords } from './resume-arm-records.ts';
 import type { AsyncBoundaryWiring } from './resume-async-wiring.ts';
+import { rememberArmBindings } from './resume-refresh-busy.ts';
 import {
 	containsElement,
 	elementsBetweenAnchors,
@@ -199,6 +200,7 @@ export async function registerArmRecordSet(
 		deps.disposedHosts.delete(hostNodeId);
 		deps.elementsByHostId.set(hostNodeId, element);
 	}
+	rememberArmBindings(boundary, materialized);
 	for (const record of materialized.events) {
 		const element = materialized.elementsByHostId.get(record.hostNodeId);
 		if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');

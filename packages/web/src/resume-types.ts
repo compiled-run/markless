@@ -136,6 +136,7 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
+	readonly asyncSources?: ProtocolViewPayload['asyncBoundaries'][number]['asyncSources'];
 	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: ProtocolViewPayload['asyncBoundaries'][number]['composedGraphProps'];

@@ -120,10 +120,12 @@ The parcel is `arrives`, a value still on its way. Until it lands, the `@pending
 
 ## While a new answer loads
 
-While the next answer loads, Markless puts `aria-busy="true"` on the element around the block, so you can style
-it, for example `[aria-busy='true'] { opacity: 0.5; }`. The attribute goes away when the new answer,
-or the `@catch` block, is on the page. If the block shares its element with other content, each
-element inside the block gets the attribute instead.
+While the next answer loads, Markless puts `aria-busy="true"` on each element that shows that
+value, so you can style it, for example `[aria-busy='true'] { opacity: 0.5; }`. That covers text,
+attributes, a list built from the value, a value passed to a child component, and values computed
+from it. A picker or checkbox in the same block that reads only plain state is never marked. If a
+block shows two async values, each one marks its own elements, and each mark goes away when its
+own answer, or the `@catch` block, is on the page.
 
 `@pending` only comes back if the newest request has been waiting for more than 5 seconds. Each new
 pick starts that wait over, so fast typing never brings it back.
