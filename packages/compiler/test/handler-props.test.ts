@@ -111,3 +111,44 @@ test('a module-constant list goes on the graph when a row component reads the ro
 test('a module-constant list stays off the graph when the row item feeds only a prop the child prints', async () => {
 	expect(collections(await compile(ROW_PAGE('<Shelf label="fixed" tone={shelf} />')))).toEqual([null]);
 });
+
+test('a callback prop handed straight to an event attribute is a prop the handler reads', async () => {
+	const compiled = await compile(`export function Pick({ onPick, label }) @{
+	<button onClick={onPick}>{label}</button>
+}
+`);
+	expect(handlerProps(compiled)).toEqual({ Pick: ['onPick'] });
+});
+
+test('a wrapper spreading its props into a child reads what the child\'s handlers read', async () => {
+	const compiled = await compile(`import { state } from '@markless/core';
+function Leaf({ label, tone }) @{
+	const seen = state({ text: '' });
+	<button onClick={() => { seen.text = label; }}>{tone}</button>
+}
+export function Spreads(props) @{
+	<Leaf {...props} />
+}
+export function Rests({ tone, ...rest }) @{
+	<div data-tone={tone}><Leaf tone={tone} {...rest} /></div>
+}
+`);
+	expect(handlerProps(compiled)).toEqual({ Leaf: ['label'], Spreads: ['label'], Rests: ['label'] });
+});
+
+test('a row placing a member tag of a local object lifts its list like the component it names', async () => {
+	const compiled = await compile(
+		ROW_PAGE('<parts.shelf label={shelf} tone="t" />').replace(
+			'export default function Page',
+			'const parts = { shelf: Shelf };\nexport default function Page',
+		),
+	);
+	expect(collections(compiled)).toEqual([expect.stringContaining('templateExpression')]);
+});
+
+test('a row spreading its item into a child whose handlers read a prop lifts its list', async () => {
+	const compiled = await compile(
+		ROW_PAGE('<Shelf {...{ label: shelf }} tone="t" />'),
+	);
+	expect(collections(compiled)).toEqual([expect.stringContaining('templateExpression')]);
+});

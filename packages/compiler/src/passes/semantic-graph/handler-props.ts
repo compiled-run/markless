@@ -4,6 +4,7 @@ import {
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
+	isSpreadAttribute,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import { resolveImportedChildComponent } from './collect-components.ts';
@@ -46,27 +47,30 @@ export function moduleHandlerProps(state: WalkState): ReadonlyMap<string, Readon
 			const tagName = getElementTagName(element);
 			if (!tagName) return;
 			const host = isHostTagName(tagName);
-			const child = host ? undefined : resolveImportedChildComponent(tagName, state);
+			const child = host ? undefined : childComponent(tagName, state);
 			for (const attribute of getElementAttributes(element)) {
+				if (isSpreadAttribute(attribute)) {
+					// A spread hands the child every prop it carries, under the child's own names.
+					const spread = propReadsIn(attribute.argument as AnyNode, props, semantic);
+					if (child && spread.has(EVERY_PROP))
+						passed.push({ ...childTarget(child), attributeName: EVERY_PROP, propNames: spread });
+					continue;
+				}
 				const name = getIdentifierName(attribute.name as AnyNode | undefined);
 				const value = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
 				if (!name || !value) continue;
 				if (host) {
 					if (!/^on[A-Z]/.test(name)) continue;
 					const handler = handlerFunction(value, semantic);
-					if (handler) for (const prop of capturedProps(handler, props, semantic)) reads.add(prop);
+					const handled = handler
+						? capturedProps(handler, props, semantic)
+						: propReadsIn(value, props, semantic);
+					for (const prop of handled) reads.add(prop);
 					continue;
 				}
 				const propNames = propReadsIn(value, props, semantic);
 				if (propNames.size > 0)
-					passed.push({
-						childComponentName: child!.childComponentName,
-						...(child!.importSource.importSource
-							? { importSource: child!.importSource.importSource }
-							: {}),
-						attributeName: name,
-						propNames,
-					});
+					passed.push({ ...childTarget(child!), attributeName: name, propNames });
 			}
 		});
 		own.set(component.name, reads);
@@ -79,9 +83,16 @@ export function moduleHandlerProps(state: WalkState): ReadonlyMap<string, Readon
 				const childReads = forward.importSource
 					? importedHandlerProps(state, forward.importSource, forward.childComponentName)
 					: own.get(forward.childComponentName);
-				if (!childReads?.has(forward.attributeName) && !childReads?.has(EVERY_PROP)) continue;
+				if (!childReads?.size) continue;
+				if (
+					forward.attributeName !== EVERY_PROP &&
+					!childReads.has(forward.attributeName) &&
+					!childReads.has(EVERY_PROP)
+				)
+					continue;
 				const reads = own.get(componentName)!;
-				for (const prop of forward.propNames)
+				const gained = forward.attributeName === EVERY_PROP ? childReads : forward.propNames;
+				for (const prop of gained)
 					if (!reads.has(prop)) {
 						reads.add(prop);
 						grew = true;
@@ -101,6 +112,18 @@ export function childHandlerProps(
 	return importSource
 		? importedHandlerProps(state, importSource, childComponentName)
 		: moduleHandlerProps(state).get(childComponentName);
+}
+
+// A member tag off a local object names that object's component, as component edges resolve it.
+function childComponent(tagName: string, state: WalkState) {
+	return resolveImportedChildComponent(state.memberTagTargets.get(tagName) ?? tagName, state);
+}
+
+function childTarget(child: ReturnType<typeof childComponent>) {
+	return {
+		childComponentName: child.childComponentName,
+		...(child.importSource.importSource ? { importSource: child.importSource.importSource } : {}),
+	};
 }
 
 function importedHandlerProps(
@@ -229,10 +252,15 @@ export function rowChildHandlerName(
 	visitMarkup(forNode.body as AnyNode | undefined, (element) => {
 		const tagName = getElementTagName(element);
 		if (found || !tagName || isHostTagName(tagName)) return;
-		const child = resolveImportedChildComponent(tagName, state);
+		const child = childComponent(tagName, state);
 		const reads = childHandlerProps(state, child.childComponentName, child.importSource.importSource);
 		if (!reads) return;
 		for (const attribute of getElementAttributes(element)) {
+			if (isSpreadAttribute(attribute)) {
+				if (reads.size > 0 && readsRow(attribute.argument as AnyNode)) found = `${tagName}.*`;
+				if (found) return;
+				continue;
+			}
 			const name = getIdentifierName(attribute.name as AnyNode | undefined);
 			const value = unwrapExpressionContainer(attribute.value as AnyNode | undefined);
 			if (!name || !value || !(reads.has(name) || reads.has(EVERY_PROP)) || !readsRow(value)) continue;
