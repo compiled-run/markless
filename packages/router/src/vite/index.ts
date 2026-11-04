@@ -65,7 +65,11 @@ import { LINK_ATTRIBUTE, PREFETCH_ATTRIBUTE } from '../link-attributes.ts';
 import { NAVIGATION_POLYFILL_MODULE } from '../navigation-polyfill.ts';
 import { listenForLinkIntent } from './link-intent.ts';
 import { documentHandlerError, documentNavigationFor } from './document-navigation.ts';
-import { runFragmentNavigation, startFragmentNavigation } from './fragment-navigation.ts';
+import {
+	STYLESHEET_KEY_ATTRIBUTE,
+	runFragmentNavigation,
+	startFragmentNavigation,
+} from './fragment-navigation.ts';
 import { fragmentRequestModule } from './nitro-fragment-requests.ts';
 import {
 	brotliCopiesPlugin,
@@ -86,12 +90,21 @@ import {
 	type ServerBuildState,
 } from './nitro-prerender.ts';
 import {
+	cloudflareModule,
+	cloudflareNodeBuildsPlugin,
+	cloudflareWorkerTrimPlugin,
+} from './nitro-cloudflare.ts';
+import {
 	buildRouteManifestFromFileIds,
 	isPageModuleFile,
 	matchRouteManifest,
 	normalizeRouteFileId,
 } from '../route-manifest.ts';
-import { routerLinkBridgeModules, type LinkBridgeModule } from './runtime/create-server-entry.ts';
+import {
+	PAGE_STYLESHEET_SOURCES_EXPORT,
+	routerLinkBridgeModules,
+	type LinkBridgeModule,
+} from './runtime/create-server-entry.ts';
 import { LINK_BRIDGE_DIR } from './runtime/link-bridge-module.ts';
 
 // The compiler refuses browser code that reads these page props: they hold request data.
@@ -124,7 +137,10 @@ const FRAGMENT_ENTRY_PATH_ID = 'virtual:markless-router/fragment-entry-path';
 const ROUTE_PRELOADS_ID = 'virtual:markless-router/route-preloads';
 const ROUTE_PRELOADS_PLACEHOLDER = '__MARKLESS_ROUTER_ROUTE_PRELOADS__';
 const DOCUMENT_STYLESHEETS_PLACEHOLDER = '__MARKLESS_ROUTER_DOCUMENT_STYLESHEETS__';
+const STYLESHEET_SOURCES_PLACEHOLDER = '__MARKLESS_ROUTER_STYLESHEET_SOURCES__';
 const LINK_BRIDGE_PATHS_PLACEHOLDER = '__MARKLESS_ROUTER_LINK_BRIDGE_PATHS__';
+const PAGE_STYLESHEETS_ID = 'virtual:markless-router/page-stylesheets';
+const STYLESHEET_TEXT_ID = 'virtual:markless-router/stylesheet-text';
 const SERVER_ENTRY_ID = 'virtual:markless-router/server-entry';
 const ROUTE_HREF_ID = 'virtual:markless-router/route-href';
 const ROUTER_OPTIONS_ID = 'virtual:markless-router/options';
@@ -223,9 +239,12 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			options,
 			fragmentEntry,
 		),
+		pageStylesheetSourcesPlugin(routePreloads),
 		linkBridgeFilesPlugin(navigationEntry, fragmentEntry, options),
 		devNitroClosePlugin(devNitro),
 		brotliCopiesPlugin(compressedAssets),
+		cloudflareNodeBuildsPlugin(),
+		cloudflareWorkerTrimPlugin(),
 		nitroPlugins,
 	];
 }
@@ -247,6 +266,13 @@ function pageServerOnlyPropsPlugin(): Plugin {
 								) => typeof PAGE_SERVER_ONLY_PROPS | undefined,
 							): void;
 							declareRouteModules?(isRoute: (moduleId: string) => boolean): void;
+							declareElementOnlyAttributes?(
+								attributes: ReadonlyArray<{
+									readonly name: string;
+									readonly tagName: string;
+									readonly authored: string;
+								}>,
+							): void;
 						};
 				  }
 				| undefined;
@@ -258,6 +284,10 @@ function pageServerOnlyPropsPlugin(): Plugin {
 			markless?.api.declareRouteModules?.((moduleId) =>
 				isPageModuleFile(normalizeRouteFileId(moduleId)),
 			);
+			// The anchor transform lowers `prefetch={false}` on a component to this attribute; only an <a> acts on it.
+			markless?.api.declareElementOnlyAttributes?.([
+				{ name: PREFETCH_ATTRIBUTE, tagName: 'a', authored: 'prefetch={false}' },
+			]);
 		},
 	};
 }
@@ -405,21 +435,17 @@ function routerConfigPlugin(
 
 			const serverWatch = withWatchIgnores(config.server?.watch);
 
-			return {
-				nitro: createNitroConfig(
-					config.nitro,
-					config.root,
-					serverWatch.ignored,
-					env?.command === 'build',
-					serverBuild,
-					devNitro,
-					compressedAssets,
-				),
-				server: {
-					...config.server,
-					watch: serverWatch,
-				},
-			};
+			// Replaced in place: Vite deep-merges a returned config and concatenates its arrays, so the app's handlers would run twice.
+			config.nitro = createNitroConfig(
+				config.nitro,
+				config.root,
+				serverWatch.ignored,
+				env?.command === 'build',
+				serverBuild,
+				devNitro,
+				compressedAssets,
+			);
+			config.server = { ...config.server, watch: serverWatch };
 		},
 		configResolved(config) {
 			productionBuild = config.command === 'build';
@@ -455,6 +481,9 @@ function routerConfigPlugin(
 						?.chunkImportMap === 'function',
 			) as { api: { chunkImportMap(): boolean; enableChunkImportMap?(): void } } | undefined;
 			markless?.api.enableChunkImportMap?.();
+			if (config.command === 'build')
+				(markless?.api as { deliverStylesheetsInDocuments?(): void } | undefined)
+					?.deliverStylesheetsInDocuments?.();
 			routePreloads.chunkSpecifiers = markless?.api.chunkImportMap() === true;
 		},
 		configEnvironment(_name, config) {
@@ -484,6 +513,7 @@ function routerConfigPlugin(
 				fragmentEntry.fileName = undefined;
 				routePreloads.routes = { navigation: {}, ssr: {}, styles: {} };
 				routePreloads.resumeModules = {};
+				routePreloads.stylesheetSources = {};
 				routePreloads.persisted = false;
 				routePreloads.importMap = undefined;
 				await removeClientAssetsManifest(clientOutDir);
@@ -506,6 +536,11 @@ function routerConfigPlugin(
 			fragmentEntry.imports = manifest.entries.fragmentImports;
 			routePreloads.routes = manifest.routes;
 			routePreloads.resumeModules = manifest.resumeModules ?? {};
+			routePreloads.stylesheetSources = await clientStylesheetSources(
+				clientOutDir,
+				manifest.base,
+				Object.values(manifest.routes.styles).flat(),
+			);
 			routePreloads.persisted = true;
 			routePreloads.importMap = manifest.importMap;
 		},
@@ -515,14 +550,27 @@ function routerConfigPlugin(
 			handler(_options, bundle) {
 				if (this.environment?.config.consumer !== 'client') {
 					if (this.environment?.config.consumer === 'server') {
-						patchDocumentStylesheetsInBundle(
+						const documentStylesheets = documentStylesheetsFromBundle(
 							bundle,
-							documentStylesheetsFromBundle(
-								bundle,
-								routePreloads.root,
-								routePreloads.base,
-							),
+							routePreloads.root,
+							routePreloads.base,
 						);
+						patchDocumentStylesheetsInBundle(bundle, documentStylesheets);
+						// Only the document's text is resident; a route's arrives with its page module, so a prerendered page's never ships.
+						patchStylesheetSourcesInBundle(bundle, {
+							...Object.fromEntries(
+								documentStylesheets.flatMap((href) =>
+									Object.hasOwn(routePreloads.stylesheetSources, href)
+										? [[href, routePreloads.stylesheetSources[href]!]]
+										: [],
+								),
+							),
+							...bundleStylesheetSources(
+								bundle,
+								routePreloads.base,
+								documentStylesheets,
+							),
+						});
 					}
 					return;
 				}
@@ -801,6 +849,9 @@ function createNitroConfig(
 				nitroConfig?.compressPublicAssets !== undefined,
 				compressedAssets,
 			),
+			cloudflareModule({
+				autoSubfolderIndex: nitroConfig?.prerender?.autoSubfolderIndex !== undefined,
+			}),
 			...(isBuild
 				? [prerenderRendererModule(serverBuild, [MARKLESS_BUILD_PREFIX, LINK_BRIDGE_DIR])]
 				: [devNitroModule(devNitro)]),
@@ -919,6 +970,8 @@ interface RoutePreloadState {
 	root: string;
 	routes: RoutePreloadMaps;
 	resumeModules: RouteResumeModules;
+	/** The text of each stylesheet a route links, so its document carries the CSS instead of a request for it. */
+	stylesheetSources: Record<string, string>;
 }
 
 type RoutePreloadMaps = MarklessRouterClientAssetRoutes;
@@ -935,6 +988,7 @@ function routePreloadState(): RoutePreloadState {
 		root: '.',
 		routes: { navigation: {}, ssr: {}, styles: {} },
 		resumeModules: {},
+		stylesheetSources: {},
 	};
 }
 
@@ -1116,6 +1170,92 @@ function virtualModulesPlugin(
 	};
 }
 
+// A built server page module carries the text of its route's stylesheets, one module per sheet, so a page the Worker
+// never renders (prerendered) takes its text with it when it is left out, and a sheet several pages link ships once.
+function pageStylesheetSourcesPlugin(routePreloads: RoutePreloadState): Plugin {
+	let root = '';
+	// Ids carry indices, never file names: other plugins claim ids that mention a .tsrx or .css file.
+	const ID = /^\0?virtual:markless-router\/(page-stylesheets|stylesheet-text)\/(\d+)$/;
+	return {
+		name: 'markless-router:page-stylesheet-sources',
+		apply: 'build',
+		configResolved(config) {
+			root = config.root;
+		},
+		resolveId: {
+			filter: { id: ID },
+			handler(id) {
+				return { id: `\0${id}`, moduleSideEffects: false };
+			},
+		},
+		load: {
+			filter: { id: ID },
+			handler(id) {
+				const [, kind, index] = ID.exec(id)!;
+				const sheets = stylesheetModules(routePreloads);
+				if (kind === 'stylesheet-text')
+					return `export default ${JSON.stringify(sheets.texts[Number(index)] ?? '')};`;
+				const hrefs = pageStylesheetHrefs(routePreloads, sheets.files[Number(index)] ?? '');
+				return [
+					...hrefs.map(
+						(href, at) =>
+							`import sheet${at} from "${STYLESHEET_TEXT_ID}/${sheets.textOfHref.get(href)}";`,
+					),
+					`export default { ${hrefs.map((href, at) => `${JSON.stringify(href)}: sheet${at}`).join(', ')} };`,
+				].join('\n');
+			},
+		},
+		transform: {
+			order: 'post',
+			filter: { id: /\.(?:tsrx|mdx)$/ },
+			handler(code, id) {
+				if (this.environment?.name !== 'ssr' || !routePreloads.persisted) return;
+				const file = normalizeRouteFileId(relative(root, decodePath(id)));
+				if (
+					!isPageModuleFile(file) ||
+					pageStylesheetHrefs(routePreloads, file).length === 0
+				)
+					return;
+				const index = stylesheetModules(routePreloads).files.indexOf(file);
+				return {
+					code: `${code}\nexport { default as ${PAGE_STYLESHEET_SOURCES_EXPORT} } from "${PAGE_STYLESHEETS_ID}/${index}";\n`,
+					map: null,
+				};
+			},
+		},
+	};
+}
+
+function pageStylesheetHrefs(state: RoutePreloadState, file: string): string[] {
+	return [...new Set(state.routes.styles[file] ?? [])].filter((href) =>
+		Object.hasOwn(state.stylesheetSources, href),
+	);
+}
+
+const stylesheetModuleTables = new WeakMap<
+	Record<string, string>,
+	{ files: string[]; texts: string[]; textOfHref: Map<string, number> }
+>();
+
+// Sheets with the same text are one module.
+function stylesheetModules(state: RoutePreloadState) {
+	let table = stylesheetModuleTables.get(state.stylesheetSources);
+	if (table) return table;
+	const indexOfText = new Map<string, number>();
+	const textOfHref = new Map<string, number>();
+	for (const [href, text] of Object.entries(state.stylesheetSources)) {
+		if (!indexOfText.has(text)) indexOfText.set(text, indexOfText.size);
+		textOfHref.set(href, indexOfText.get(text)!);
+	}
+	table = {
+		files: Object.keys(state.routes.styles).sort(),
+		texts: [...indexOfText.keys()],
+		textOfHref,
+	};
+	stylesheetModuleTables.set(state.stylesheetSources, table);
+	return table;
+}
+
 async function routerOptionsSource(
 	options: MarklessRouterOptions,
 	documentFile: string,
@@ -1245,7 +1385,7 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`import { prerenderWakeEntryPath } from ${JSON.stringify(`${PRERENDER_WAKE_ENTRY_PATH_ID}${query}`)};`,
 		`import { navigationEntryPath } from ${JSON.stringify(`${NAVIGATION_ENTRY_PATH_ID}${query}`)};`,
 		`import { fragmentEntryPath } from ${JSON.stringify(`${FRAGMENT_ENTRY_PATH_ID}${query}`)};`,
-		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, documentImportMap, routeResumeModules } from ${JSON.stringify(`${ROUTE_PRELOADS_ID}${query}`)};`,
+		`import { documentStylesheets, routeModulePreloads, routeSsrModulePreloads, routeStylesheets, stylesheetSources, inlineStylesheets, documentImportMap, routeResumeModules } from ${JSON.stringify(`${ROUTE_PRELOADS_ID}${query}`)};`,
 		`import { pageModuleLoaders, routeFileIds } from ${JSON.stringify(`${ROUTE_DISCOVERY_ID}${query}`)};`,
 		`import { documentNavigation } from ${JSON.stringify(`${ROUTER_OPTIONS_ID}${query}`)};`,
 		`const documentModuleLoaders = import.meta.glob(['/document.tsrx']);`,
@@ -1266,6 +1406,8 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  routeResumeModules,`,
 		`  routeStylesheets,`,
 		`  documentStylesheets,`,
+		`  stylesheetSources,`,
+		`  inlineStylesheets,`,
 		`  importMap: documentImportMap,`,
 		`  documentModuleLoader: documentModuleLoaders['/document.tsrx'],`,
 		`  documentNavigation,`,
@@ -1319,7 +1461,11 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		: [
 				`export const routeStylesheets = ${state.persisted ? 'routePreloadData.styles ?? {}' : 'undefined'};`,
 				`const documentStylesheetsJson = globalThis.__marklessRouterDocumentStylesheetsJson ?? ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)};`,
-				`export const documentStylesheets = documentStylesheetsJson === ${JSON.stringify(DOCUMENT_STYLESHEETS_PLACEHOLDER)} ? [] : JSON.parse(documentStylesheetsJson);`,
+				// The placeholder is spelled once: a second server bundle pass (Nitro's) must find nothing left to patch.
+				`export const documentStylesheets = documentStylesheetsJson.startsWith('[') ? JSON.parse(documentStylesheetsJson) : [];`,
+				`const stylesheetSourcesJson = globalThis.__marklessRouterStylesheetSourcesJson ?? ${JSON.stringify(STYLESHEET_SOURCES_PLACEHOLDER)};`,
+				`export const stylesheetSources = stylesheetSourcesJson.startsWith('{') ? JSON.parse(stylesheetSourcesJson) : {};`,
+				`export const inlineStylesheets = ${JSON.stringify(state.persisted ? Object.keys(state.stylesheetSources) : [])};`,
 				`export const documentImportMap = ${JSON.stringify(state.persisted && state.importMap ? importMapScript(state.importMap) : '')};`,
 				`export const routeResumeModules = ${JSON.stringify(state.persisted ? state.resumeModules : {})};`,
 			];
@@ -1330,6 +1476,7 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		`export const routeModulePreloads = routePreloadData.navigation ?? {};`,
 		`export const routeSsrModulePreloads = routePreloadData.ssr ?? {};`,
 		...routeStylesheetExport,
+		...(client ? clientRouteStylesheetsSource() : []),
 		`export function preloadRouteModule(file, document = globalThis.document) {`,
 		`  const hrefs = routeModulePreloads[file];`,
 		`  if (!hrefs?.length || !document?.head) return [];`,
@@ -1348,6 +1495,35 @@ function routePreloadsSource(state: RoutePreloadState, client: boolean): string 
 		`  return appended;`,
 		`}`,
 	].join('\n');
+}
+
+// A page rendered in the browser (a '#/' route) brings the stylesheets its document lacks, as files; one that fails fails the render.
+function clientRouteStylesheetsSource(): string[] {
+	const key = JSON.stringify(STYLESHEET_KEY_ATTRIBUTE);
+	return [
+		`const pageStylesheets = routePreloadData.styles ?? {};`,
+		`const stylesheetLoads = new Map();`,
+		`export function loadRouteStylesheets(file, document = globalThis.document) {`,
+		`  const hrefs = pageStylesheets[file];`,
+		`  if (!hrefs?.length || !document?.head) return Promise.resolve();`,
+		`  const have = new Set([...document.head.children].map((node) => node.getAttribute(${key}) ?? (node.rel === 'stylesheet' ? node.getAttribute('href') : null)));`,
+		`  return Promise.all(hrefs.map((href) => {`,
+		`    if (stylesheetLoads.has(href)) return stylesheetLoads.get(href);`,
+		`    if (have.has(href)) return undefined;`,
+		`    const load = new Promise((done, fail) => {`,
+		`      const link = document.createElement('link');`,
+		`      link.rel = 'stylesheet';`,
+		`      link.href = href;`,
+		`      link.setAttribute(${key}, href);`,
+		`      link.onload = () => { stylesheetLoads.delete(href); done(); };`,
+		`      link.onerror = () => { stylesheetLoads.delete(href); link.remove(); fail(new Error('Unable to load the stylesheet ' + href)); };`,
+		`      document.head.appendChild(link);`,
+		`    });`,
+		`    stylesheetLoads.set(href, load);`,
+		`    return load;`,
+		`  }));`,
+		`}`,
+	];
 }
 
 function patchRoutePreloadsInBundle(
@@ -1387,6 +1563,46 @@ function documentStylesheetsFromBundle(
 		chunksByFileName,
 		base,
 	);
+}
+
+async function clientStylesheetSources(
+	clientOutDir: string,
+	base: string,
+	hrefs: readonly string[],
+): Promise<Record<string, string>> {
+	const sources: Record<string, string> = {};
+	for (const href of new Set(hrefs))
+		sources[href] = await readFile(join(clientOutDir, clientAssetFileName(href, base)), 'utf8');
+	return sources;
+}
+
+function bundleStylesheetSources(
+	bundle: Record<string, unknown>,
+	base: string,
+	hrefs: readonly string[],
+): Record<string, string> {
+	const sources: Record<string, string> = {};
+	for (const href of hrefs) {
+		const asset = bundle[clientAssetFileName(href, base)] as
+			| { readonly type?: unknown; readonly source?: unknown }
+			| undefined;
+		if (asset?.type !== 'asset') continue;
+		const source = asset.source;
+		if (typeof source === 'string') sources[href] = source;
+		else if (source instanceof Uint8Array) sources[href] = new TextDecoder().decode(source);
+	}
+	return sources;
+}
+
+function patchStylesheetSourcesInBundle(
+	bundle: Record<string, unknown>,
+	sources: Readonly<Record<string, string>>,
+): void {
+	const replacement = jsStringLiteralContent(JSON.stringify(sources));
+	for (const chunk of outputChunks(bundle)) {
+		if (!chunk.code?.includes(STYLESHEET_SOURCES_PLACEHOLDER)) continue;
+		chunk.code = chunk.code.replace(STYLESHEET_SOURCES_PLACEHOLDER, () => replacement);
+	}
 }
 
 function patchDocumentStylesheetsInBundle(

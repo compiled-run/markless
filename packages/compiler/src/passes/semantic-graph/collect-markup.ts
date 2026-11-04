@@ -33,6 +33,7 @@ import type {
 } from '../../artifacts.ts';
 import { resolveSharedInstanceGraphPath, sharedInstanceVisibleFrom } from './collect-shared.ts';
 import {
+	asyncArmOrderDiagnostic,
 	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
@@ -513,6 +514,7 @@ function emitNode(
 					coordinate: { kind: 'child-index', path },
 					residue,
 					excludeNames,
+					...(spreadsRestBinding ? { carriesProps: true as const } : {}),
 					...(context.destructuredNames.length > 0
 						? { destructuredNames: context.destructuredNames }
 						: {}),
@@ -1031,6 +1033,11 @@ function emitNodes(
 				branchElseSpellingDiagnostic({ node, filename: context.filename }),
 			);
 		}
+		if (isPendingAfterCatch(previous, node)) {
+			context.graph.diagnostics.push(
+				asyncArmOrderDiagnostic({ node, filename: context.filename }),
+			);
+		}
 		previous = node;
 		childIndex += emitNode(node, [...prefix, childIndex], builder, context, repeat);
 	}
@@ -1054,6 +1061,11 @@ const PLAIN_ELSE_TEXT = /^else$|^else\s+if\s*\(/;
 function isPlainElseSpelling(previous: AnyNode | null, node: AnyNode): boolean {
 	if (!previous || previous.type !== 'JSXIfExpression') return false;
 	return isStaticTextNode(node) && PLAIN_ELSE_TEXT.test(staticTextValue(node).trim());
+}
+
+function isPendingAfterCatch(previous: AnyNode | null, node: AnyNode): boolean {
+	if (!previous || previous.type !== 'JSXTryExpression' || !previous.handler) return false;
+	return isStaticTextNode(node) && staticTextValue(node).trim() === '@pending';
 }
 
 function emitAsyncArm(
@@ -1090,7 +1102,8 @@ function expressionResidue(
 	);
 	if (residue.kind !== 'authored-expression' || residue.source !== source) return residue;
 	// No computed stands behind it, so the render writes the object's CSS text itself.
-	const styleSource = attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
+	const styleSource =
+		attributeName === 'style' ? styleObjectCssSource(expression, context) : null;
 	if (styleSource !== null) return { kind: 'authored-expression', source: styleSource };
 	const inlined = context.nestedLocalSource?.(expression);
 	return inlined ? { kind: 'authored-expression', source: inlined } : residue;
@@ -1128,7 +1141,7 @@ function sourceResidue(
 	}
 	const computedRead = context.graph.templateReads.find(
 		(read) =>
-			read.source === source &&
+			(read.source === source || read.authoredSource === source) &&
 			read.sourceSpan?.start === span?.start &&
 			read.computedGraphNodeId,
 	);

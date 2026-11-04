@@ -138,7 +138,8 @@ test('an opaque call that reads no state stays an opaque prop', async () => {
 // expression, so no computed is minted for it. A self-composing component's
 // `depth={depth - 1}` is exactly that shape, and minting a computed for it sent
 // the child edge through a capture read the render evaluator never supplies.
-test('an edge expression over props alone stays opaque and mints no computed', async () => {
+// A recursive tree's own parent may pass state as `depth`, so `depth - 1` moves with it.
+test('an edge expression over props alone lifts to a computed', async () => {
 	const results = await compileTsrxModulesWithInterfaces([
 		{
 			filename: 'src/tree-node.tsrx',
@@ -161,16 +162,14 @@ export default function TreeNode({ depth }) @{
 	const tree = results[results.length - 1]!;
 	const depth = tree.semanticGraph.componentEdges[0]?.props.find((prop) => prop.name === 'depth');
 
-	expect(depth?.kind).toBe('opaque');
-	// The edge expression itself, not the module: the `@if (depth > 0)` beside it
-	// is a branch condition and mints its own computed so the arm can re-decide.
+	expect(depth?.kind).toBe('graph-reference');
 	expect(
 		tree.semanticGraph.graphBindings.filter(
 			(binding) =>
 				binding.id.startsWith('computed:templateExpression:') &&
 				binding.functionSource?.includes('depth - 1'),
 		),
-	).toEqual([]);
+	).toHaveLength(1);
 	expect(
 		tree.semanticGraph.diagnostics.filter(
 			(candidate) => candidate.code === 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED',

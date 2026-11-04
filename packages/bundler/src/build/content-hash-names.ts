@@ -1,7 +1,7 @@
 // Finalize rewrites code after Rolldown fixed names, so hashed names are re-derived from the shipped bytes.
 import { withoutMachinePaths } from './machine-paths.ts';
 import type { PackOwnership } from './native-packing.ts';
-import { packOfPart, startupPackOfLazy } from './route-pack-groups.ts';
+import { packOfPart, packOfPiece, startupPackOfLazy } from './route-pack-groups.ts';
 import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
 
 export type HashCharacters = 'base64' | 'base36' | 'hex';
@@ -507,9 +507,7 @@ function chunkPages(chunk: Chunk, options: SpecifierOwnership): readonly string[
 	const { packs, isRoute, root } = options;
 	if (packs) {
 		const names = new Set(
-			ids.map((id) =>
-				packOfPart(startupPackOfLazy(packs.packOf(id) ?? '').replace(/~\d+$/, '')),
-			),
+			ids.map((id) => packOfPart(packOfPiece(startupPackOfLazy(packs.packOf(id) ?? '')))),
 		);
 		const [pack] = names;
 		if (names.size === 1 && pack) {

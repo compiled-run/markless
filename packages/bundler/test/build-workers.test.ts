@@ -1,6 +1,7 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'pathe';
+import { join, relative } from 'pathe';
+import { rolldown } from 'rolldown';
 import { afterAll, afterEach, expect, test } from 'vitest';
 import {
 	clearCompileCache,
@@ -8,8 +9,17 @@ import {
 	useCompileRunner,
 	usePersistentCompileStore,
 } from '@markless/compiler';
-import { compilerFingerprint, createPersistentCompileCache } from '../src/compile-store.ts';
-import { createCompileWorkerPool } from '../src/build-workers.ts';
+import {
+	compileStoreEntry,
+	compilerFingerprint,
+	createPersistentCompileCache,
+} from '../src/compile-store.ts';
+import {
+	compileWorkerPids,
+	createCompileWorkerPool,
+	retireCompileWorkers,
+} from '../src/build-workers.ts';
+import { marklessClient } from '../src/rolldown.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'markless-build-workers-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -86,6 +96,27 @@ test('a worker writes the result to the store, and a later build reads it back',
 	expect(await compileTsrxModule(input('Stored'))).toEqual(compiled);
 });
 
+test('closing a pool waits for compiles it handed a worker but nobody awaited', async () => {
+	const directory = join(scratch, 'unawaited');
+	const fingerprint = compilerFingerprint();
+	const cache = createPersistentCompileCache({ directory, fingerprint });
+	await (await onlinePool({ size: 1 })).close();
+	const pool = createCompileWorkerPool({ size: 1, store: { cache, directory, fingerprint } });
+	const names = ['Left', 'Right', 'Up', 'Down'];
+	for (const name of names) void pool.run(input(name), name);
+	await pool.close();
+	const written = readdirSync(directory, { recursive: true }).filter((name) =>
+		String(name).endsWith('.bin'),
+	);
+	for (const name of names)
+		expect(written).toContain(
+			relative(
+				directory,
+				compileStoreEntry(directory, fingerprint, input(name).source, name).path,
+			),
+		);
+});
+
 test('a compile a runner hands back is compiled here, once', async () => {
 	const here = await compileTsrxModule(input('HandedBack'));
 	clearCompileCache();
@@ -101,4 +132,86 @@ test('a compile a runner hands back is compiled here, once', async () => {
 	expect(asked).toBe(1);
 	expect(right).toBe(left);
 	expect(left).toEqual(here);
+});
+
+const alive = (pid: number) => {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+};
+
+async function exited(pids: readonly number[]) {
+	for (let turn = 0; turn < 500 && pids.some(alive); turn++)
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	return pids.filter(alive);
+}
+
+// A thread that ran the wasm parser cannot be torn down safely, so compiles run in processes that exit when retired.
+test('retired compile processes exit, and a later compile starts new ones', async () => {
+	const pool = await onlinePool({ size: 1 });
+	const pids = compileWorkerPids();
+	expect(pids.length).toBeGreaterThan(0);
+	await retireCompileWorkers();
+	expect(await exited(pids)).toEqual([]);
+	expect(compileWorkerPids()).toEqual([]);
+	const here = await compileTsrxModule(input('After'));
+	clearCompileCache();
+	const again = await onlinePool({ size: 1 });
+	useCompileRunner(again.run);
+	expect(await compileTsrxModule(input('After'))).toEqual(here);
+	expect(compileWorkerPids().some((pid) => !pids.includes(pid))).toBe(true);
+	await pool.close();
+	await again.close();
+	await retireCompileWorkers();
+});
+
+test('a build retires its compile processes once its module graph is built', async () => {
+	const directory = realpathSync(mkdtempSync(join(scratch, 'graph-')));
+	writeFileSync(join(directory, 'Counter.tsrx'), counter('Counter'));
+	writeFileSync(join(directory, 'entry.js'), "export { default } from './Counter.tsrx';\n");
+	const pool = await onlinePool({ size: 1 });
+	useCompileRunner(pool.run);
+	const pids = compileWorkerPids();
+	expect(pids.length).toBeGreaterThan(0);
+	const build = await rolldown({
+		input: join(directory, 'entry.js'),
+		external: [/^@markless\//],
+		plugins: [marklessClient({ rootDir: directory })],
+	});
+	try {
+		await build.generate({ format: 'es' });
+	} finally {
+		await build.close();
+	}
+	await pool.close();
+	expect(await exited(pids)).toEqual([]);
+});
+
+test('a compile process retired while it boots exits, and starts no other', async () => {
+	const pool = createCompileWorkerPool({ size: 2 });
+	pool.run(input('Booting'), 'booting');
+	const pids = compileWorkerPids();
+	expect(pids.length).toBe(1);
+	await retireCompileWorkers();
+	expect(await exited(pids)).toEqual([]);
+	expect(compileWorkerPids()).toEqual([]);
+	await pool.close();
+});
+
+test('retiring returns once the compile processes have exited, their store writes done', async () => {
+	const directory = join(scratch, 'retire-writes');
+	const fingerprint = compilerFingerprint();
+	const cache = createPersistentCompileCache({ directory, fingerprint });
+	const pool = await onlinePool({ size: 1, store: { cache, directory, fingerprint } });
+	const pids = compileWorkerPids();
+	void pool.run(input('Retired'), 'retired');
+	await retireCompileWorkers();
+	expect(pids.filter(alive)).toEqual([]);
+	expect(
+		readdirSync(directory, { recursive: true }).some((name) => String(name).endsWith('.bin')),
+	).toBe(true);
+	await pool.close();
 });

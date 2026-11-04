@@ -11,7 +11,7 @@ const WAIT = { timeoutMs: 10_000 };
 
 export default box(
 	{
-		name: 'router app preview: scoped TSRX style reaches first paint',
+		name: 'router app preview: scoped TSRX style reaches first paint inside the HTML',
 		tags: ['router', 'build', 'preview', 'browser', 'styles'],
 		modes: ['build', 'preview'],
 	},
@@ -37,13 +37,18 @@ export default box(
 			const html = await preview.request('/');
 			const headEnd = html.indexOf('</head>');
 			const head = headEnd === -1 ? '' : html.slice(0, headEnd);
-			const stylesheetHrefs = [...head.matchAll(/<link\b[^>]*>/gi)].flatMap(([link]) => {
-				if (!/\brel\s*=\s*["']stylesheet["']/i.test(link)) return [];
-				const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(link)?.[1];
-				return href && /\.css(?:[?#]|$)/i.test(href) ? [href] : [];
-			});
-			if (stylesheetHrefs.length === 0) {
-				throw new Error('Router preview did not deliver a built external stylesheet.');
+			if (/<link\b[^>]*\brel\s*=\s*["']stylesheet["']/i.test(head)) {
+				throw new Error(
+					'Router preview linked a stylesheet the page should carry in its HTML.',
+				);
+			}
+			const inline = [
+				...head.matchAll(
+					/<style\b[^>]*\bdata-markless-css\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/style>/gi,
+				),
+			].map(([, href, text]) => ({ href: href!, text: text! }));
+			if (inline.length === 0) {
+				throw new Error('Router preview did not carry the built page CSS in its HTML.');
 			}
 			const hasScopedCounter = [...html.matchAll(/<button\b[^>]*>/gi)].some(([button]) =>
 				/\bclass\s*=\s*["'][^"']*\bmk-[\w-]+\b[^"']*["']/i.test(button),
@@ -56,7 +61,7 @@ export default box(
 			if (!hasScopedCounter || !hasScopedChild) {
 				throw new Error('Router SSR HTML did not include both scoped fixture elements.');
 			}
-			if (/<style\b/i.test(head) || html.includes('data-markless-scoped-style')) {
+			if (html.includes('data-markless-scoped-style')) {
 				throw new Error('Router preview must not deliver an inline scoped-style fallback.');
 			}
 			if (html.includes('?inline')) {
@@ -67,9 +72,12 @@ export default box(
 					'Router preview must deliver scoped CSS without eager page JavaScript; only the declared, cached router link bridge may load as a module.',
 				);
 			}
-			const css = (
-				await Promise.all(stylesheetHrefs.map((href) => preview.request(href)))
-			).join('\n');
+			// The text in the page is the built stylesheet itself, not a second copy the server made.
+			for (const { href, text } of inline) {
+				if ((await preview.request(href)) !== text)
+					throw new Error(`The page's CSS for ${href} is not the built file's text.`);
+			}
+			const css = inline.map(({ text }) => text).join('\n');
 			if (!/button\.mk-[\w-]+\s*\{[^}]*background\s*:\s*red/i.test(css)) {
 				throw new Error('Built route CSS did not include the page scoped style.');
 			}
@@ -101,7 +109,7 @@ export default box(
 			await expect.page.text(page, COUNTER, 'Count 1', WAIT);
 			await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 			await receipt.capture(
-				'built router delivered external page and imported-child scoped CSS at first paint',
+				'built router carried the page and imported-child scoped CSS in its HTML at first paint',
 			);
 		} finally {
 			await preview.close();

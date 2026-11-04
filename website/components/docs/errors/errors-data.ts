@@ -275,6 +275,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_ARM_ORDER',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'An `@pending` arm is written after `@catch`: a Markless build error.',
+		printed: [
+			'MARKLESS_ASYNC_ARM_ORDER: This `@pending` follows the @catch arm of an @try. The arms of an @try go in the order @try, @pending, @catch, so the @try ends at its @catch and this `@pending` is read as literal text, with the block after it as a separate expression.',
+			'TSRX defines the order of the arms, and the parser has no @try left to attach a later `@pending` to. Building it anyway would put the word "@pending" and the arm\'s source on the page, with no waiting state.',
+			'Move the `@pending { ... }` arm before `@catch`: `@try { ... } @pending { ... } @catch (error) { ... }`.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_ARM_ORDER',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/compiler/src/compile-module.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/compile-module.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -543,20 +570,20 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'An async computed() reads state after an await.',
+		description: 'An async computed() looks a value up with a key that comes from an await.',
 		printed: [
-			'MARKLESS_ASYNC_POST_AWAIT_READ: Cannot read "<source>" after await in async computed "<computedName>". Snapshot the value before awaiting.',
-			'Async computed dependency keys are captured before the first await. Reading graph state after suspension would make revalidation and resume depend on hidden async timing.',
-			'Read the graph value before the first await, or split post-await formatting into a separate sync computed().',
+			'MARKLESS_ASYNC_POST_AWAIT_READ: Cannot read "<source>" in async computed "<computedName>": the key "<awaitedSegment>" comes from awaited work, so the read cannot be part of the dependency key captured before the await.',
+			'Reads after an await join the dependency key, which is fixed before the await starts. This path is only known after the await, so the key could only hold the whole collection, and every write anywhere in it would rerun the awaited work.',
+			'Return what "<awaitedSegment>" comes from in this computed\'s result, and do the lookup "<source>" in a sync computed() that reads it.',
 			'https://markless.dev/errors/MARKLESS_ASYNC_POST_AWAIT_READ',
 		],
 		structured: true,
 		guide: {
-			summary: 'An async computed() reads state after an await.',
+			summary: 'An async computed() looks a value up with a key that comes from an await.',
 			what: [
 				{
 					id: 's0',
-					text: 'Markless records which state an async ',
+					text: 'Markless reads every state an async ',
 				},
 				{
 					id: 's1',
@@ -565,7 +592,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's2',
-					text: ' reads before its first ',
+					text: ' names when it starts running, including reads after an ',
 				},
 				{
 					id: 's3',
@@ -574,31 +601,40 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's4',
-					text: '. A read after the ',
+					text: ', and runs it again when one of them changes. A lookup whose key is the awaited answer, such as ',
 				},
 				{
 					id: 's5',
-					text: 'await',
+					text: 'items[res.id]',
 					code: true,
 				},
 				{
 					id: 's6',
-					text: ' is invisible to it.',
+					text: ', cannot be read before the answer arrives.',
 				},
 			],
 			how: [
 				{
 					id: 's0',
-					text: 'Copy the value into a local before the first ',
+					text: 'Return the answer from the async ',
 				},
 				{
 					id: 's1',
-					text: 'await',
+					text: 'computed()',
 					code: true,
 				},
 				{
 					id: 's2',
-					text: '. Use the local after it.',
+					text: '. Do the lookup in a plain ',
+				},
+				{
+					id: 's3',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' that reads it.',
 				},
 			],
 			example: [
@@ -617,7 +653,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r2',
-							text: 'details',
+							text: 'picked',
 							style: 'color:#005cc5;--shiki-dark:#79b8ff',
 						},
 						{
@@ -672,7 +708,17 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r13',
-							text: ' {',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: 'loadPick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r15',
+							text: '(signal));',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 					],
@@ -682,87 +728,52 @@ export const errorEntries: readonly ErrorEntry[] = [
 					runs: [
 						{
 							id: 'r0',
-							text: '\t',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r1',
 							text: 'const',
 							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 						{
-							id: 'r2',
+							id: 'r1',
 							text: ' ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
-							id: 'r3',
-							text: 'q',
+							id: 'r2',
+							text: 'item',
 							style: 'color:#005cc5;--shiki-dark:#79b8ff',
 						},
 						{
-							id: 'r4',
+							id: 'r3',
 							text: ' ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
-							id: 'r5',
+							id: 'r4',
 							text: '=',
 							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 						{
-							id: 'r6',
-							text: ' name;',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-					],
-				},
-				{
-					id: 'l2',
-					runs: [
-						{
-							id: 'r0',
-							text: '\t',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r1',
-							text: 'return',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
-						},
-						{
-							id: 'r2',
-							text: ' { title: ',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r3',
-							text: 'await',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
-						},
-						{
-							id: 'r4',
+							id: 'r5',
 							text: ' ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
-							id: 'r5',
-							text: 'loadGreeting',
+							id: 'r6',
+							text: 'computed',
 							style: 'color:#6f42c1;--shiki-dark:#b392f0',
 						},
 						{
-							id: 'r6',
-							text: '(q, signal) };',
+							id: 'r7',
+							text: '(() ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
-					],
-				},
-				{
-					id: 'l3',
-					runs: [
 						{
-							id: 'r0',
-							text: '});',
+							id: 'r8',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' items[picked.id]);',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 					],
@@ -1181,7 +1192,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'Changing this <label> cannot rebuild what it shows: a Markless build error.',
 		printed: [
 			'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: this <label> (<testSource>) cannot be rebuilt when <testSource> changes because <detail>.',
-			'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+			'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 			'Move the component outside the <label> and hide it with an attribute, lift its state up to the component that owns the <label>, or keep the <label> content to plain elements, text, and state reads.',
 			'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		],
@@ -1393,6 +1404,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f1',
 				file: 'packages/compiler/src/compile-module.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/compile-module.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_CALL_WRITES_ASSUMED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'This call is assumed to change the state it is passed: a Markless build error.',
+		printed: [
+			'MARKLESS_CALL_WRITES_ASSUMED: `<call>` is handed `<argument>`, and Markless cannot see which parts of it the call changes, so all of `<argument>` is treated as changed once the call returns.',
+			'The called function is looked up at run time, comes from a package, or passes the value on to code the compiler cannot read. Changes it makes before returning still reach the page; everything that reads the value updates, not only what changed.',
+			'Call a function from a .ts or .tsrx file in this project so Markless can read which paths it writes, or write the state in the handler itself.',
+			'https://markless.dev/errors/MARKLESS_CALL_WRITES_ASSUMED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
 			},
 		],
 		moreSources: 0,
@@ -1708,6 +1742,44 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_CLIENT_BUILD_FAILED',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_CLIENT_BUILD_FAILED: the client build failed in its own process (<exit>); its error is printed above. Set MARKLESS_CLIENT_BUILD_PROCESS=0 to build every environment in one process.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/separate-client-build.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/separate-client-build.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_CLIENT_BUILD_PROCESS',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_CLIENT_BUILD_PROCESS: the client build failed in its own process (<exit>); its error is printed above. Set MARKLESS_CLIENT_BUILD_PROCESS=0 to build every environment in one process.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/separate-client-build.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/separate-client-build.ts',
 			},
 		],
 		moreSources: 0,
@@ -3539,6 +3611,337 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'prefetch={false} sits on something that never renders the link.',
+		printed: [
+			'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED: `<authored>` on <<childComponentName>> does nothing: <childComponentName> does not pass its props to an <tag>.',
+			'Only an <tag> acts on `<authored>`. On a component, it works when the component spreads its props (`{...rest}`) onto an <tag> that does not set it itself; anywhere else nothing would act on it and the page would behave as if it were not there.',
+			'Put `<authored>` on the <tag> itself, or on a component that spreads its props onto one.',
+			'https://markless.dev/errors/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED',
+		],
+		structured: true,
+		guide: {
+			summary: 'prefetch={false} sits on something that never renders the link.',
+			what: [
+				{
+					id: 's0',
+					text: 'Only an ',
+				},
+				{
+					id: 's1',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' acts on ',
+				},
+				{
+					id: 's3',
+					text: 'prefetch={false}',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: '. Here it is on another element, or on a component that does not pass its props on to an ',
+				},
+				{
+					id: 's5',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', so the router would still request the page early and nothing would tell you.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Put ',
+				},
+				{
+					id: 's1',
+					text: 'prefetch={false}',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' on the ',
+				},
+				{
+					id: 's3',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' or ',
+				},
+				{
+					id: 's5',
+					text: '<Link>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' itself. A component of your own can take it when it spreads its props onto its ',
+				},
+				{
+					id: 's7',
+					text: '<a>',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ' and does not set the same attribute there itself.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'NavLink',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'children',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r7',
+							text: ', ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '...',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: 'rest',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r10',
+							text: ' }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r11',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r12',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r13',
+							text: 'PropsOf',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r14',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r15',
+							text: "'a'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r16',
+							text: '>) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r17',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'a',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '...',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: 'rest}>{children}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'a',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r6',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'NavLink',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'href',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '"/logout"',
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r6',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'prefetch',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: '{',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'false',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r11',
+							text: '}>Log out</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'NavLink',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/element-only-attributes.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/element-only-attributes.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/router/src/vite/anchor-transform.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/anchor-transform.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ELEMENT_UNADDRESSABLE',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -4850,11 +5253,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must render an element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY: Each row of this @for over <itemName> is one <branchLabel> (<testSource>) with no <value>, so a row whose test fails renders nothing. After the page loads, the browser finds a list’s rows as one element each, so this list would show the rows the server sent and never update.',
+			'The browser adds, moves and removes a list’s rows by counting the parent’s child elements, one element per row. A row that renders nothing has no element to count, so the browser cannot tell which rows are which.',
+			'Filter the list before the @for instead: `<filter>` and `@for (const <itemName> of shown; ...)`. Or give the @if an @else that renders one element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
-		description: 'This list can never grow in the browser: a Markless build warning.',
+		severity: 'error-or-warning',
+		description: 'This list can never grow in the browser: a Markless build error.',
 		printed: [
 			'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: <message> The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.',
 			'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text and attributes read off the row item or off a state cell the page holds, and nothing else, so a row needing anything more ships no template at all.',
@@ -4873,6 +5298,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 				],
 			},
 		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'Each row of this list must be one element: a Markless build error.',
+		printed: [
+			'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: Each row of this @for over <itemName> renders <rowShape>. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.',
+			'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+			'Wrap each row in one element, such as `<span>...</span>`, so every row of <itemName> is a single element.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		],
+		structured: true,
 		sources: [
 			{
 				id: 'f0',
@@ -5913,8 +6365,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'Two @for loops give the same name two different meanings: a Markless build error.',
 		printed: [
-			'MARKLESS_REPEAT_BINDING_NAME_CONFLICT: "<name>" is one @for loop\'s item and another @for loop\'s index in the same file. Rename one of them.',
-			'Every @for expression in a file is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
+			'MARKLESS_REPEAT_BINDING_NAME_CONFLICT: "<name>" is one @for loop\'s item and another @for loop\'s index in the same component. Rename one of them.',
+			'Every @for expression in a component is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
 			"Rename this loop's binding - two loops may reuse a name freely as long as both use it the same way (both items, or both indexes).",
 			'https://markless.dev/errors/MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
 		],
@@ -7289,9 +7741,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error-or-warning',
 		description:
-			'This <branchLabel> in a @for row never changes in the browser: a Markless build warning.',
+			'This <branchLabel> in a @for row never changes in the browser: a Markless build error.',
 		printed: [
 			'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: <message> So each row keeps the arm the server rendered for <branchLabel> (<testSource>): when <testSource> changes after the page loads, the row does not show the other arm.',
 			"A row flips its own <branchLabel> from the row markup the payload carries: the test read per row, and each arm's elements, text and attributes. A row needing anything more ships no markup at all, so nothing can rebuild an arm in it.",
@@ -7315,6 +7767,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
 			},
 		],
 		moreSources: 0,
@@ -8442,6 +8899,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_SHARED_SHAPE_MISMATCH',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_SHARED_SHAPE_MISMATCH: shared() definition "<id>" is already live in this document with a different shape, so this container keeps its own instance. Live: <live>. This container: <own>.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/shared-instances.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/shared-instances.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -9199,6 +9675,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f1',
 				file: 'packages/compiler/src/passes/state-lowering.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A function cannot be stored in state: a Markless build error.',
+		printed: [
+			'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE: state "<stateName>" holds a function, `<source>`, in its initial value. A function cannot be written into the page, so the browser would read a value that is not callable.',
+			'state() values are serialized into the page and the browser resumes from them without running the component body, so only data (strings, numbers, booleans, null, arrays and plain objects) survives the trip.',
+			'Keep the function outside state(): declare it in the component body or at module scope, and store only the data it needs, for example a name to pick it by.',
+			'https://markless.dev/errors/MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
 			},
 		],
 		moreSources: 0,
@@ -10431,7 +10929,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		packageName: '@markless/compiler',
 		stage: 'compile',
-		severity: 'warning',
+		severity: 'error-or-warning',
 		description: 'A markup expression assigns a value, so its text never updates.',
 		printed: [
 			'MARKLESS_TEMPLATE_EXPRESSION_STATIC: This text reads `<readSource>`, but only plain reads like `{<readSource>}` update the page today. The expression renders its initial value and never changes when `<readSource>` changes.',
@@ -10622,6 +11120,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				file: 'packages/compiler/src/passes/state-lowering.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/state-lowering.ts',
 			},
+			{
+				id: 'f1',
+				file: 'packages/bundler/src/prop-flow.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/prop-flow.ts',
+			},
 		],
 		moreSources: 0,
 	},
@@ -10635,7 +11138,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		printed: [
 			'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED: <target> is written as `<source>`, which reads state but is not an expression this compiler can keep current.',
 			'An expression with no graph node behind it renders once, from whatever the value was at render, and a later write never reaches it - so the page would show a stale value and nothing would say so.',
-			'Write a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads. If the value needs a function of your own, put that function inside a `computed()` and read the computed here.',
+			'Write a plain read (`group.value`), an expression built from reads, operators and method calls, or a call to a function declared with `function` or `const` that does not change state. A function held in a `let`, or one that writes state, cannot be followed: move the write into an event handler.',
 			'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 		],
 		structured: true,

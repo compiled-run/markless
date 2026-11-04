@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import type { Plugin } from 'vite';
-import { CODE_PREFETCH_FILE } from '../components/docs/code/prefetch.ts';
+import { CODE_PREFETCH_FILE, type CodePrefetchManifest } from '../components/docs/code/prefetch.ts';
 import { codePrefetchManifest, type PrefetchBundle } from './code-prefetch.ts';
 
 const RUNTIME_SOURCES_SCRIPT = fileURLToPath(new URL('./code-runtime-sources.ts', import.meta.url));
@@ -47,6 +47,9 @@ const BROWSER_ENTRIES: Readonly<Record<string, { readonly file: string; readonly
 		name: 'code-live',
 	},
 };
+const FONT_DIR = fileURLToPath(new URL('../styles/fonts/', import.meta.url));
+const FRAME_FONTS = ['ShantellSans-latin-variable.woff2', 'JoyElia-Regular.woff2', 'JoyElia-Bold.woff2'] as const;
+type FrameFonts = Readonly<Record<(typeof FRAME_FONTS)[number], string>>;
 const BUNDLER_SWAPS: Readonly<Record<string, string>> = {
 	'node:fs': `${CODE_DIR}source-fs.ts`,
 	'node:fs/promises': `${CODE_DIR}source-fs.ts`,
@@ -67,7 +70,11 @@ const BUNDLER_SWAP_SOURCE = new RegExp(
 export const CODE_FRAME_FILE = '_code-frame.html';
 
 /** The frame page: an empty stage and the script that fills it. */
-export function codeFrameHtml(script: string, preloads: readonly string[] = []): string {
+export function codeFrameHtml(
+	script: string,
+	fonts: FrameFonts,
+	preloads: readonly string[] = [],
+): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -75,13 +82,17 @@ export function codeFrameHtml(script: string, preloads: readonly string[] = []):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Code result</title>
-<style>@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/ShantellSans-latin-variable.woff2') format('woff2')}html{background:transparent;color-scheme:light}html.dark{color-scheme:dark}body{margin:0;color:CanvasText;font-family:system-ui,sans-serif}</style>
+<style>@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400 700;font-display:swap;src:url('${fonts['ShantellSans-latin-variable.woff2']}') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:400;font-display:swap;src:url('${fonts['JoyElia-Regular.woff2']}') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:700;font-display:swap;src:url('${fonts['JoyElia-Bold.woff2']}') format('woff2')}html{background:transparent;color-scheme:light}html.dark{color-scheme:dark}body{margin:0;color:CanvasText;font-family:system-ui,sans-serif}</style>
 ${preloads.map((href) => `<link rel="modulepreload" href="${href}">`).join('\n')}
 <script type="module" src="${script}"></script>
 </head>
 <body class="code-stage" data-code-frame></body>
 </html>
 `;
+}
+
+function frameFonts(url: (font: (typeof FRAME_FONTS)[number]) => string): FrameFonts {
+	return Object.fromEntries(FRAME_FONTS.map((font) => [font, url(font)])) as FrameFonts;
 }
 
 /** Answers the bundler's Node-only imports with in-memory stand-ins, for the worker only. */
@@ -104,9 +115,21 @@ export function codeCompilerSwaps(): Plugin {
 	};
 }
 
+/** The dev server has no bundle to list, so dev prefetches the entries it serves unbundled. */
+function devPrefetchManifest(base: string): CodePrefetchManifest {
+	const url = (name: string) => `${base}@fs${BROWSER_ENTRIES[name]!.file}`;
+	return {
+		session: [url('virtual:code-session-url')],
+		live: [url('virtual:code-live-url')],
+		cache: [`${base}${CODE_FRAME_FILE}`],
+		blocks: {},
+	};
+}
+
 export function codeClient(): Plugin[] {
 	let base = '/';
 	let frameRef = '';
+	const fontRefs = new Map<(typeof FRAME_FONTS)[number], string>();
 	let runtimeSources: Promise<Record<string, string[]>> | undefined;
 	const entryRefs = new Map<string, string>();
 	return [
@@ -124,9 +147,19 @@ export function codeClient(): Plugin[] {
 			configureServer(server) {
 				server.middlewares.use((req, res, next) => {
 					const path = (req.url ?? '').split('?', 1)[0];
+					if (path === `${base}${CODE_PREFETCH_FILE}`) {
+						res.setHeader('content-type', 'application/json; charset=utf-8');
+						res.end(JSON.stringify(devPrefetchManifest(base)));
+						return;
+					}
 					if (path !== `${base}${CODE_FRAME_FILE}`) return next();
 					res.setHeader('content-type', 'text/html; charset=utf-8');
-					res.end(codeFrameHtml(`${base}@fs${FRAME_ENTRY}`));
+					res.end(
+						codeFrameHtml(
+							`${base}@fs${FRAME_ENTRY}`,
+							frameFonts((font) => `${base}@fs${FONT_DIR}${font}`),
+						),
+					);
 				});
 			},
 			buildStart() {
@@ -138,6 +171,11 @@ export function codeClient(): Plugin[] {
 				runtimeSources = siteRuntimeSources();
 				runtimeSources.catch(() => {});
 				frameRef = this.emitFile({ type: 'chunk', id: FRAME_ENTRY, name: 'code-frame' });
+				for (const font of FRAME_FONTS)
+					fontRefs.set(
+						font,
+						this.emitFile({ type: 'asset', name: font, source: readFileSync(`${FONT_DIR}${font}`) }),
+					);
 				for (const [url, entry] of Object.entries(BROWSER_ENTRIES))
 					entryRefs.set(url, this.emitFile({ type: 'chunk', id: entry.file, name: entry.name }));
 			},
@@ -174,6 +212,7 @@ export function codeClient(): Plugin[] {
 					fileName: CODE_FRAME_FILE,
 					source: codeFrameHtml(
 						`${base}${script}`,
+						frameFonts((font) => `${base}${this.getFileName(fontRefs.get(font)!)}`),
 						imports.map((file) => `${base}${file}`),
 					),
 				});

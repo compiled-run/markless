@@ -8,11 +8,13 @@ import type { CompileTsrxModuleInput, CompileTsrxModuleResult } from './artifact
 
 // Eviction only costs a recompile, so this bounds a long dev session's memory rather than deciding correctness.
 // At 512, a 123-page app re-ran 5,203 of its 8,160 compiles after eviction; holding them all did not raise peak memory.
-const MAX_ENTRIES = 16_384;
+const DEFAULT_MAX_ENTRIES = 16_384;
+let maxEntries = DEFAULT_MAX_ENTRIES;
 
 // Outer key is the source text itself: stringifying it into every key cost more than the compiles the memo saved.
 const compiles = new Map<string, Map<string, Promise<CompileTsrxModuleResult>>>();
 let entries = 0;
+let runs = 0;
 
 // Sorted, because the two requests for one module build their interface records
 // in whatever order they resolved imports; the values are compiler artifacts,
@@ -48,11 +50,14 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 			input.omitAuthoredSource === true,
 			input.additionalFrameworkApiSources ?? null,
 			input.serverOnlyProps ?? null,
+			input.elementOnlyAttributes ?? null,
 			input.routeRoot === true,
 			input.symbols,
 		])}${sortedRecordJson(input.importedModuleInterfaces)}${sortedRecordJson(
 			input.importedModuleConstants,
-		)}${sortedRecordJson(input.artifactChildMaterializations)}`;
+		)}${sortedRecordJson(input.importedFunctionWrites)}${sortedRecordJson(
+			input.artifactChildMaterializations,
+		)}`;
 	} catch {
 		return null;
 	}
@@ -120,6 +125,7 @@ export function memoizedCompile(
 		compiles.set(input.source, bySource!);
 		return cached;
 	}
+	runs++;
 	const pending = compileThroughStore(input, key, compile);
 	if (!bySource) compiles.set(input.source, (bySource = new Map()));
 	bySource.set(key, pending);
@@ -137,7 +143,7 @@ export function memoizedCompile(
 		}
 	});
 	for (const [source, oldest] of compiles) {
-		if (entries <= MAX_ENTRIES || oldest === owner) break;
+		if (entries <= maxEntries || oldest === owner) break;
 		compiles.delete(source);
 		entries -= oldest.size;
 	}
@@ -147,6 +153,18 @@ export function memoizedCompile(
 export function clearCompileCache(): void {
 	compiles.clear();
 	entries = 0;
+}
+
+/** Bounds the memo to `limit` entries (the default when undefined) and returns the bound it replaced. */
+export function setCompileCacheLimit(limit: number | undefined): number {
+	const previous = maxEntries;
+	maxEntries = limit ?? DEFAULT_MAX_ENTRIES;
+	return previous;
+}
+
+/** Compiles this process has started that the memo did not answer, since it started. */
+export function compileRuns(): number {
+	return runs;
 }
 
 export function compileCacheSize(): number {

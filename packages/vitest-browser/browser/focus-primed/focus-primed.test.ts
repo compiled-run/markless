@@ -43,8 +43,8 @@ test('SSR: an arrow 50ms after focus moves the selection, on a handler already l
 		resetExecutedModules();
 
 		await focusThenWait(Option0.element());
-		// The handler is in the browser before the key that needs it exists.
-		expect(executedModules().length).toBeGreaterThan(0);
+		// The focus alone brings the handler in, before the key that needs it exists; how fast depends on the machine.
+		await expect.poll(() => executedModules().length).toBeGreaterThan(0);
 
 		await userEvent.keyboard('{ArrowDown}');
 		await expect.poll(countOf(Selected)).toBe(1);
@@ -81,7 +81,7 @@ test('SSR: focus onto a press-only host fetches the handler Enter would reach', 
 
 	await focusThenWait(Keyless.element());
 
-	expect(executedModules().length).toBeGreaterThan(0);
+	await expect.poll(() => executedModules().length).toBeGreaterThan(0);
 	// Fetched, never dispatched.
 	expect(Number(page.getByTestId('clicks').element().textContent)).toBe(0);
 });

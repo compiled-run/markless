@@ -8,7 +8,7 @@ import type {
 } from '@markless/web/inline/resumer';
 import { MARKLESS_COMPONENT_PART_BRAND } from '@markless/web/render-to-string';
 import type { StorageSeedMetadata } from '@markless/serializer';
-import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import { ASYNC_PROTOCOL_VERSION, hasLiveSharedDefinitions } from '@markless/serializer';
 import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
@@ -24,8 +24,6 @@ export type SourceSymbolRow = {
 	readonly id: string;
 	readonly chunk: string;
 	readonly exportName: string;
-	/** What `import()` names when `chunk` is also imported statically; see SymbolResolverModuleInput. */
-	readonly lazyChunk?: string;
 };
 
 export type SourceSymbolRoute = {
@@ -78,8 +76,9 @@ export function symbolVirtualModuleId(filename: string, symbolId: string) {
 	return `${SYMBOL_VIRTUAL_PREFIX}${encodeURIComponent(filename)}:${encodeURIComponent(symbolId)}`;
 }
 
-export function symbolEntryVirtualModuleId(filename: string, symbolId: string) {
-	return `${symbolVirtualModuleId(filename, symbolId)}:entry`;
+/** One module holding several of a source's symbols; it reads back as a symbol module of that source. */
+export function symbolGroupVirtualModuleId(filename: string, groupId: string) {
+	return symbolVirtualModuleId(filename, groupId);
 }
 
 export function encodedSymbolSource(filename: string): string {
@@ -318,6 +317,7 @@ export function emitSourceModule(input: {
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
 	readonly hasOverlayMarks?: boolean;
+	readonly hasLiveSharedState?: boolean;
 	readonly hasIdleEvents?: boolean;
 	readonly runtimeDemandMap?: unknown;
 	readonly scalarActions?: RuntimeDemandMapArtifact['actions'];
@@ -404,6 +404,9 @@ export function emitSourceModule(input: {
 		// has to name the behaviour here or it would never install.
 		input.environment === 'client' && input.hasOverlayMarks === true
 			? emitOverlayLoaderInstall()
+			: null,
+		input.environment === 'client' && input.hasLiveSharedState === true
+			? emitSharedInstancesLoaderInstall()
 			: null,
 		// And for `onIdle`: a CSR mount gets the idle wake only from an app module with an idle record.
 		input.environment === 'client' && input.hasIdleEvents === true && !symbolsOnly
@@ -598,6 +601,15 @@ export function emitOverlayLoaderInstall(): string {
  * modules every resumed page runs, which is why neither may write the specifier.
  * A composed MDX route writes it too: it cannot see its islands' computeds.
  */
+/**
+ * The same one line for shared() instances that outlive the page: graph
+ * construction, resume start and CSR mount sit in modules every app loads, so the
+ * specifier lives only in a module whose state declares a non-widget definition.
+ */
+export function emitSharedInstancesLoaderInstall(): string {
+	return "globalThis.__marklessSharedInstances ??= () => import('@markless/web/fns/shared-instances');";
+}
+
 export function emitRosterResumeLoaderInstall(): string {
 	return "globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');";
 }
@@ -919,6 +931,9 @@ export function emitResumeModule(input: {
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
 		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		hasLiveSharedDefinitions(input.payloadState as Parameters<typeof hasLiveSharedDefinitions>[0])
+			? emitSharedInstancesLoaderInstall()
+			: null,
 		input.hasIdleEvents ? emitIdleTriggerInstall() : null,
 		// Row building is pay-per-use the same way: this module is the ONLY place
 		// the mint's specifier is written, so an app whose repeats carry neither
@@ -2240,7 +2255,7 @@ function emitDirectSourceSymbolLoader(
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import(${singleQuoted(symbol.lazyChunk ?? symbol.chunk)})`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import(${singleQuoted(symbol.chunk)})`,
 			`		.then((mod) => ${readerName}(mod, ${JSON.stringify(symbol.exportName)}));`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',

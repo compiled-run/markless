@@ -17,9 +17,9 @@
 			"modules": 78
 		},
 		"search": {
-			"executedChars": 16156,
-			"functions": 207,
-			"modules": 3
+			"executedChars": 21434,
+			"functions": 265,
+			"modules": 0
 		},
 		"dialog": {
 			"executedChars": 109120,
@@ -33,9 +33,7 @@
 		}
 	},
 	"lean": {
-		"/": [
-			"click@counter-increment"
-		],
+		"/": ["click@counter-increment"],
 		"/records": [],
 		"/settings": []
 	},
@@ -167,9 +165,7 @@
 			"guard": "lean",
 			"subject": "/",
 			"from": null,
-			"to": [
-				"click@counter-increment"
-			],
+			"to": ["click@counter-increment"],
 			"reason": "initial anchors: measured on bb53b203 (packed-delivery-performance tree) when the guards were introduced"
 		},
 		{
@@ -1906,45 +1902,2412 @@
 			"from": null,
 			"to": 477,
 			"reason": "every handler call site sets currentTarget to the handler's own element for its synchronous part"
+		},
+		{
+			"date": "2026-10-27",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 18241,
+			"to": 20104,
+			"reason": "a composed child's @try settle routes its live props to the caller's nodes, so rows and attributes in a settled arm follow the parent; loads only on pages with component edges and runs on a settle"
+		},
+		{
+			"date": "2026-10-27",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 9728,
+			"to": 9858,
+			"reason": "a settle whose answer rendered after a newer run started leaves the held content in place instead of painting @pending; runs on a settle"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 28332,
+			"to": 29345,
+			"reason": "measured: an in-place navigation restyles the document once instead of three times (arriving sheets held at media=\"not all\" until the swap, transitions the swap starts cancelled before paint), 85+79+54 ms of style passes at 4x on the shadcn port down to one; +1013 B rendered, loaded on link intent, never at page load"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "runtime",
+			"subject": "web/resume-keyed-repeats",
+			"from": 18371,
+			"to": 18824,
+			"reason": "rows counted from the parent's start are placed after the last row, so the first row after a list empties lands ahead of an @if that follows it (+204 B minified, +78 B gzip standalone)"
+		},
+		{
+			"subject": "runtime/graph",
+			"from": 10187,
+			"to": 10407,
+			"reason": "a write observer stands down while an update due in the same pass still loads its code, so one task's writes land together (edit-row demo)"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 11016,
+				"jsGzipBytes": 87498
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 11032,
+				"jsGzipBytes": 87498
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 10982,
+				"jsGzipBytes": 87498
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 147105,
+				"jsGzipBytes": 1563808
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 149654,
+				"jsGzipBytes": 1667412
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-28",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": null,
+			"to": {
+				"executedChars": 47829,
+				"jsGzipBytes": 408451
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main 1fbde2d9b, lowest of three loads"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 11370,
+				"jsGzipBytes": 88497
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 11386,
+				"jsGzipBytes": 88497
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 11443,
+				"jsGzipBytes": 88497
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 113031,
+				"jsGzipBytes": 1579694
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 124826,
+				"jsGzipBytes": 1693361
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": null,
+			"to": {
+				"executedChars": 22657,
+				"jsGzipBytes": 417354
+			},
+			"reason": "G16 anchors: JS run and downloaded at load on main b80c68315, read off two CI runs of this tree (identical values)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11370,
+				"jsGzipBytes": 88497
+			},
+			"to": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87007
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11386,
+				"jsGzipBytes": 88497
+			},
+			"to": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87007
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11443,
+				"jsGzipBytes": 88497
+			},
+			"to": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87007
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 113031,
+				"jsGzipBytes": 1579694
+			},
+			"to": {
+				"executedChars": 110779,
+				"jsGzipBytes": 1564841
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 124826,
+				"jsGzipBytes": 1693361
+			},
+			"to": {
+				"executedChars": 121829,
+				"jsGzipBytes": 1678055
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22657,
+				"jsGzipBytes": 417354
+			},
+			"to": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
+			},
+			"reason": "a source's symbols the pack planner treats alike ship as one module and a page loads a group whole: less JS downloaded at load on every guarded page; executed falls on docs / and /concepts/state and moves by 1 char elsewhere (CI run 40815323579)"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 11016,
+				"jsGzipBytes": 87498
+			},
+			"to": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87007
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 11032,
+				"jsGzipBytes": 87498
+			},
+			"to": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87007
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10982,
+				"jsGzipBytes": 87498
+			},
+			"to": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87007
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 147105,
+				"jsGzipBytes": 1563808
+			},
+			"to": {
+				"executedChars": 110612,
+				"jsGzipBytes": 1566081
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 149654,
+				"jsGzipBytes": 1667412
+			},
+			"to": {
+				"executedChars": 121354,
+				"jsGzipBytes": 1678656
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-29",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 47829,
+				"jsGzipBytes": 408451
+			},
+			"to": {
+				"executedChars": 22480,
+				"jsGzipBytes": 406068
+			},
+			"reason": "G16 Mac anchors re-read on main b7cebce73: they were 1fbde2d9b's, and main has since moved (docs pages download more and run less at load, grouped symbol modules download less), so a Mac run failed docs / and /concepts/state on download"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110779,
+				"jsGzipBytes": 1564841
+			},
+			"to": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1564960
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's dev-error module; clipping long-line frames and building pluginCode on first read adds 119 B gzip (measured on CI, PR #375 on main 587f11549)"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121829,
+				"jsGzipBytes": 1678055
+			},
+			"to": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678174
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's dev-error module; clipping long-line frames and building pluginCode on first read adds 119 B gzip (measured on CI, PR #375 on main 587f11549)"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1564960
+			},
+			"to": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1565036
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's transform; holding link-pending refusals on a first pass adds 76 B gzip (measured on CI, PR #377 on #375)"
+		},
+		{
+			"date": "2026-10-30",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678174
+			},
+			"to": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678250
+			},
+			"reason": "the docs pages' in-browser compiler carries the bundler's transform; holding link-pending refusals on a first pass adds 76 B gzip (measured on CI, PR #377 on #375)"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110778,
+				"jsGzipBytes": 1565036
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1565456
+			},
+			"reason": "the docs pages' in-browser compiler gains the post-await read classifier; measured on CI run 41244233368 (PR #397 on main 64dc4b798): docs / +420 B gzip, /concepts/state +513 B gzip, executed chars -1; the 93 B gap between the two pages is not attributed"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121828,
+				"jsGzipBytes": 1678250
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1678763
+			},
+			"reason": "the docs pages' in-browser compiler gains the post-await read classifier; measured on CI run 41244233368 (PR #397 on main 64dc4b798): docs / +420 B gzip, /concepts/state +513 B gzip, executed chars -1; the 93 B gap between the two pages is not attributed"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87016
+			},
+			"reason": "graph.changed, so a handler that hands state to a helper which changes it in place can mark what changed; measured on CI run 41290852179 (PR #401 on main 8a3787394): +9 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87016
+			},
+			"reason": "graph.changed, so a handler that hands state to a helper which changes it in place can mark what changed; measured on CI run 41290852179 (PR #401 on main 8a3787394): +9 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87016
+			},
+			"reason": "graph.changed, so a handler that hands state to a helper which changes it in place can mark what changed; measured on CI run 41290852179 (PR #401 on main 8a3787394): +9 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1565456
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1568939
+			},
+			"reason": "the docs pages' in-browser compiler gains the parameter-write analysis that reads which paths a helper writes; measured on CI run 41290852179 (PR #401 on main 8a3787394): docs / +3,483 B gzip, /concepts/state +3,481 B gzip downloaded, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1678763
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682244
+			},
+			"reason": "the docs pages' in-browser compiler gains the parameter-write analysis that reads which paths a helper writes; measured on CI run 41290852179 (PR #401 on main 8a3787394): docs / +3,483 B gzip, /concepts/state +3,481 B gzip downloaded, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1568939
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569078
+			},
+			"reason": "the second review round on the parameter-write analysis (type assertions, mapped arrays, seedless reduces, stores) grows the docs pages' in-browser compiler; measured on CI run 41293354099 (PR #401 on main 8a3787394): +139 B gzip downloaded on both pages, executed chars unchanged"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682244
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682383
+			},
+			"reason": "the second review round on the parameter-write analysis (type assertions, mapped arrays, seedless reduces, stores) grows the docs pages' in-browser compiler; measured on CI run 41293354099 (PR #401 on main 8a3787394): +139 B gzip downloaded on both pages, executed chars unchanged"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569078
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569188
+			},
+			"reason": "the third review round on the parameter-write analysis (loop targets, values followed through where they were stored, unknown reader methods) grows the docs pages' in-browser compiler; measured on CI run 41321602773 (PR #401 at 8315f1de9 on main 8a3787394): +110 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682383
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682493
+			},
+			"reason": "the third review round on the parameter-write analysis (loop targets, values followed through where they were stored, unknown reader methods) grows the docs pages' in-browser compiler; measured on CI run 41321602773 (PR #401 at 8315f1de9 on main 8a3787394): +110 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569188
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569196
+			},
+			"reason": "the toSorted comparator fix on the parameter-write analysis grows the docs pages' in-browser compiler; measured on CI run 41326242234 (PR #401 at 482b5a4a0 on main 8a3787394): +8 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682493
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682501
+			},
+			"reason": "the toSorted comparator fix on the parameter-write analysis grows the docs pages' in-browser compiler; measured on CI run 41326242234 (PR #401 at 482b5a4a0 on main 8a3787394): +8 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569196
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569197
+			},
+			"reason": "main's v0.10.0 release lengthens the version string the docs pages' in-browser compiler carries (0.9.0 to 0.10.0), one more byte on top of this PR's write analysis; measured on merge_group run 41329326175 (PR #401 on main 177f49ba9): +1 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682501
+			},
+			"to": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682502
+			},
+			"reason": "main's v0.10.0 release lengthens the version string the docs pages' in-browser compiler carries (0.9.0 to 0.10.0), one more byte on top of this PR's write analysis; measured on merge_group run 41329326175 (PR #401 on main 177f49ba9): +1 B gzip downloaded on both pages, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "runtime",
+			"subject": "router/vite/entries/client-entry",
+			"from": 2666,
+			"to": 2816,
+			"reason": "a page rendered in the browser (a '#/' route) loads the stylesheets its document lacks itself, since dynamic imports no longer wait on CSS the documents carry inline (PR #391); +150 B rendered, measured on CI"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11370,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11386,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11443,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-10-31",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87007
+			},
+			"to": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87060
+			},
+			"reason": "the fragment swap module keys head stylesheets by name and the client entry loads a browser-rendered page's stylesheets, so a page keeps the CSS it carries inline (PR #391); +53 B gzip measured on CI linux-x64, the same files on darwin"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 29345,
+			"to": 29709,
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +364 B rendered, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87060
+			},
+			"to": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87105
+			},
+			"reason": "the fragment swap module gains keeping a stylesheet's served media until a navigation shows it, so a navigation that reuses one an abandoned navigation hid restores it (PR #391); +45 B gzip downloaded, measured on CI run 41343347283 (PR #391 at 386c38c96 on main 1ec52b44b) and identically on run 41282999205 before the rebase on linux-x64, executed chars within budget and left as anchored; the bench pages download the same files on darwin, whose anchor matched linux before this change"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87128
+			},
+			"reason": "PR #391 rebased on main 3583d2f21, which carries PR #401's graph.changed in the same downloaded files; the two compress together to 23 B more than PR #391 alone; measured on CI run 41346211808 (PR #391 at bff2fbb61): executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "runtime/graph",
+			"from": 10407,
+			"to": 10737,
+			"reason": "a sync computed that only markup reads re-derives when read (spec 03): graph pullBeforeRead and subscriptionCount; stale tracking in resume-sync-computed, loaded on the first computed write, not run at load (PR #405)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "web/resume-sync-computed",
+			"from": 2751,
+			"to": 7870,
+			"reason": "a sync computed that only markup reads re-derives when read (spec 03): graph pullBeforeRead and subscriptionCount; stale tracking in resume-sync-computed, loaded on the first computed write, not run at load (PR #405)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "runtime",
+			"subject": "web/resume-sync-demand",
+			"from": 1099,
+			"to": 1530,
+			"reason": "a sync computed that only markup reads re-derives when read (spec 03): graph pullBeforeRead and subscriptionCount; stale tracking in resume-sync-computed, loaded on the first computed write, not run at load (PR #405)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10775,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88095
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on this Mac against main 901047270, bench +967 B gzip downloaded and +1 char run at load, docs / +1,378 B and +142 chars, /concepts/state +1,321 B and +142 chars (the docs pages' in-browser compiler also gains the deriveOnRead marking and imported-arm escalation)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10791,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88095
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on this Mac against main 901047270, bench +967 B gzip downloaded and +1 char run at load, docs / +1,378 B and +142 chars, /concepts/state +1,321 B and +142 chars (the docs pages' in-browser compiler also gains the deriveOnRead marking and imported-arm escalation)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10741,
+				"jsGzipBytes": 87105
+			},
+			"to": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88095
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on this Mac against main 901047270, bench +967 B gzip downloaded and +1 char run at load, docs / +1,378 B and +142 chars, /concepts/state +1,321 B and +142 chars (the docs pages' in-browser compiler also gains the deriveOnRead marking and imported-arm escalation)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 110612,
+				"jsGzipBytes": 1566081
+			},
+			"to": {
+				"executedChars": 108937,
+				"jsGzipBytes": 1568228
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on this Mac against main 901047270, bench +967 B gzip downloaded and +1 char run at load, docs / +1,378 B and +142 chars, /concepts/state +1,321 B and +142 chars (the docs pages' in-browser compiler also gains the deriveOnRead marking and imported-arm escalation)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 121354,
+				"jsGzipBytes": 1678656
+			},
+			"to": {
+				"executedChars": 119276,
+				"jsGzipBytes": 1679186
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on this Mac against main 901047270, bench +967 B gzip downloaded and +1 char run at load, docs / +1,378 B and +142 chars, /concepts/state +1,321 B and +142 chars (the docs pages' in-browser compiler also gains the deriveOnRead marking and imported-arm escalation)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 22480,
+				"jsGzipBytes": 406068
+			},
+			"to": {
+				"executedChars": 22495,
+				"jsGzipBytes": 404051
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on this Mac against main 901047270, bench +967 B gzip downloaded and +1 char run at load, docs / +1,378 B and +142 chars, /concepts/state +1,321 B and +142 chars (the docs pages' in-browser compiler also gains the deriveOnRead marking and imported-arm escalation)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11235,
+				"jsGzipBytes": 87128
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88095
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on CI run 41354553292 (PR #405 merged with main 901047270), +967 B gzip downloaded at load; executed at load within the anchor"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 87128
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88095
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on CI run 41354553292 (PR #405 merged with main 901047270), +967 B gzip downloaded at load; executed at load within the anchor"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 87128
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88095
+			},
+			"reason": "read-time computed derivation (PR #405) ships its resume module in the page's preload: measured on CI run 41354553292 (PR #405 merged with main 901047270), +967 B gzip downloaded at load; executed at load within the anchor"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88095
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88100
+			},
+			"reason": "PR #405: a derive read before its symbol arrived is held until it settles, so a flip waits for it (+5 B gzip in the preloaded resume-sync-computed); measured on CI run 41358265312"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88095
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88100
+			},
+			"reason": "PR #405: a derive read before its symbol arrived is held until it settles, so a flip waits for it (+5 B gzip in the preloaded resume-sync-computed); measured on CI run 41358265312"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88095
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88100
+			},
+			"reason": "PR #405: a derive read before its symbol arrived is held until it settles, so a flip waits for it (+5 B gzip in the preloaded resume-sync-computed); measured on CI run 41358265312"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88095
+			},
+			"to": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88100
+			},
+			"reason": "PR #405: a derive read before its symbol arrived is held until it settles, so a flip waits for it (+5 B gzip in the preloaded resume-sync-computed); measured on CI run 41358265312 (gzip bytes are the same build on both platforms)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88095
+			},
+			"to": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88100
+			},
+			"reason": "PR #405: a derive read before its symbol arrived is held until it settles, so a flip waits for it (+5 B gzip in the preloaded resume-sync-computed); measured on CI run 41358265312 (gzip bytes are the same build on both platforms)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88095
+			},
+			"to": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88100
+			},
+			"reason": "PR #405: a derive read before its symbol arrived is held until it settles, so a flip waits for it (+5 B gzip in the preloaded resume-sync-computed); measured on CI run 41358265312 (gzip bytes are the same build on both platforms)"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-01",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88100
+			},
+			"to": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88104
+			},
+			"reason": "PR #405: a read during a pending derive keeps the read-time pull armed, and settle waits for both the load and the refresh (+4 B gzip in the preloaded resume-sync-computed); measured on CI run 41361221986, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk, so a part outside every root no longer captures a navbar's row parts; measured on CI run 41403541377 (PR #413 on main 6d2b94bf0): +7 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk, so a part outside every root no longer captures a navbar's row parts; measured on CI run 41403541377 (PR #413 on main 6d2b94bf0): +7 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk, so a part outside every root no longer captures a navbar's row parts; measured on CI run 41403541377 (PR #413 on main 6d2b94bf0): +7 B gzip downloaded in the shared runtime chunk, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk (PR #413); the same +7 B gzip CI run 41403541377 measured on linux-x64, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk (PR #413); the same +7 B gzip CI run 41403541377 measured on linux-x64, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88104
+			},
+			"to": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88111
+			},
+			"reason": "the widget-root lookup leaves a root above a row to the row-free walk (PR #413); the same +7 B gzip CI run 41403541377 measured on linux-x64, gzip bytes are the same build on both platforms"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "construct",
+			"subject": "text binding",
+			"from": 4211,
+			"to": 4256,
+			"reason": "measured +45 B: a text binding's synthetic computed now names the component that wrote it, so resume derives it on read (deriveOnRead flag in the payload and render data) instead of eagerly as an ownerless module node; the root no longer runs a child's derive"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "construct",
+			"subject": "@if",
+			"from": 7991,
+			"to": 8056,
+			"reason": "measured +65 B: an @if test's synthetic computed now names the component that wrote it, so resume derives it on read (deriveOnRead flag in the payload and render data) instead of eagerly as an ownerless module node; the root no longer runs a child's derive"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 29709,
+			"to": 31647,
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10862,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 10863,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on this Mac, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10878,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 10879,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on this Mac, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10935,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 10829,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on this Mac, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88111
+			},
+			"to": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88379
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +268 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569197
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569238
+			},
+			"reason": "the swap blurs a focused element its morph will remove before changing the page (a dry run of the morph's pairing), so removing the clicked link no longer forces a second whole-document restyle mid-swap: shadcn port home to changelog swap task 204 to 141 ms at 4x CPU (PR #415); measured on CI run 41416397025, +41 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569238
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569463
+			},
+			"reason": "the fragment swap module's morph dry run (PR #415) on main 520c96247 (after #414 and #416): the docs page downloads +266 B gzip over main (the same change measured +41 B on an older main; the page's pack compresses differently around it); measured on CI run 41427605874, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1569463
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1570040
+			},
+			"reason": "the in-browser compiler behind the docs' live code blocks (assets/compile-worker.js, fetched at idle) carries the element-only attribute check that refuses a misplaced prefetch={false}; measured on CI run 41433570242 (PR #418 on main 2ec91d8bb): +577 B gzip downloaded, executed chars within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 9858,
+			"to": 10693,
+			"reason": "measured: settle tracking and the re-settle hold now start in this @try-only chunk, moved out of resume-runtime-start, so a @try an @if renders after start can be wired"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/resume-runtime-start",
+			"from": 9385,
+			"to": 8979,
+			"reason": "measured: settle tracking and re-settle hold setup moved to resume-async-wiring, which only pages with a @try load"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1570040
+			},
+			"to": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1571123
+			},
+			"reason": "the docs' live code blocks run the compiler in a worker the page fetches at idle; publishing derivedProps and serving forwarded props (PR #422) adds 1083 B gzip to it, and no other built JS file changes (a local before/after site build has the same per-module rendered bytes in byte-attribution.json); measured on CI run 41468171523, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "router/vite/entries/fragment-entry",
+			"from": 31647,
+			"to": 32404,
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe)"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10863,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10879,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10829,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on this Mac, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11342,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11251,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11308,
+				"jsGzipBytes": 88379
+			},
+			"to": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"reason": "the swap keeps a part whose only differences between pages are attributes its props set, writing the next page's values for exactly those attributes once both sides' vary marks pair up, so a shared header keeps its nodes, focus and script-set attributes (shadcn port header, 187 routes failing the deploy check's focus probe); measured on CI run 41461332686 (linux), +127 B gzip downloaded, executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 110777,
+				"jsGzipBytes": 1571123
+			},
+			"to": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
+			},
+			"reason": "the swap module's vary-mark pairing on the docs home (shared header kept across in-place navigation, PR #423); measured on CI run 41483435764 (linux), +129 B gzip downloaded, executed chars lower"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 20104,
+			"to": 20368,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the dispatch reads a forwarded event row one edge above its host; measured on CI run 41525857883 (linux), +264 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/fns/ssr",
+			"from": 30833,
+			"to": 31486,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): composition drops forwarded records whose edge this render did not place; measured on CI run 41525857883 (linux), +653 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "runtime",
+			"subject": "web/ssr-data/renderer",
+			"from": 20878,
+			"to": 21060,
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix): the render structure lists the component edges it placed; measured on CI run 41525857883 (linux), +182 B rendered"
+		},
+		{
+			"date": "2026-11-02",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109103,
+				"jsGzipBytes": 1571252
+			},
+			"to": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
+			},
+			"reason": "a record a component states for a child spread host is kept only by the render that placed that child through its edge, and its event dispatches in its component keyed row (PR #432, wrong-handler fix); measured on CI run 41525857883 (linux), +191 B gzip downloaded, executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/fns/instance-scope",
+			"from": 20368,
+			"to": 21687,
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10989,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10882,
+				"jsGzipBytes": 88704
+			},
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88704
+			},
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88704
+			},
+			"reason": "measured on this PR merged with main 816428f8e: an @if holding a @try block, or a component, inside a nested or layer component commits its browser render in page space, and a @try inside it keeps its symbol prefix when it settles again; flip and settle-time code, none of it executed at load (PR #428); darwin-arm64 anchor, which main had not re-measured since 6ee752c36"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88506
+			},
+			"to": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88704
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571443
+			},
+			"to": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
+			},
+			"reason": "the composed-record qualifier in fns/instance-scope commits an @if (holding a @try block or a component) that a nested or layer component renders in the browser, and a @try inside it keeps its symbol prefix on later settles (PR #428): flip and settle-time code, none of it executed at load; measured on CI run 41560555998, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "*",
+			"from": null,
+			"to": "51 runtime modules re-anchored: router/route-dom, router/route-manifest, router/route-renderer, router/vite/entries/fragment-entry, router/vite/entries/resume-entry, router/vite/runtime/create-route-discovery, runtime/graph-computed, runtime/graph-reconcile, runtime/graph-scheduler, serializer/payload-scripts, serializer/protocol, serializer/protocol-client, serializer/protocol-event-names, serializer/protocol-record-keys, serializer/protocol-shared-instances, serializer/protocol-templated-lists, web/dom-journal, web/dom-journal-direct, web/fns/bound-symbol, web/fns/closure-action, web/fns/composition, web/fns/container-region, web/fns/roster-resume, web/fns/row-locals, web/fns/row-slot-mint, web/fns/scalar-served, web/fns/shared-instances, web/fns/visible-trigger, web/fns/write-scalar, web/inline/sync-policy-core, web/payload-document-common, web/payload-graph-construct, web/payload-resume, web/pending-timing, web/prerender/evaluator, web/render, web/render-csr, web/resume, web/resume-anchor-census, web/resume-arm-records, web/resume-behaviors, web/resume-branches, web/resume-census, web/resume-commit-arm, web/resume-events, web/resume-locators, web/resume-runtime, web/resume-sync-computed, web/shared-swap, web/ssr-data/branch-arm-idrefs, web/storage-plane",
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10882,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 10998,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 10898,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11014,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 10955,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11071,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip at load on this Mac) and never downloads or runs the binding or swap modules; executed chars at load within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (darwin-arm64)",
+			"from": {
+				"executedChars": 108937,
+				"jsGzipBytes": 1568228
+			},
+			"to": {
+				"executedChars": 109825,
+				"jsGzipBytes": 1575481
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (darwin-arm64)",
+			"from": {
+				"executedChars": 119276,
+				"jsGzipBytes": 1679186
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686491
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (darwin-arm64)",
+			"from": {
+				"executedChars": 22495,
+				"jsGzipBytes": 404051
+			},
+			"to": {
+				"executedChars": 22685,
+				"jsGzipBytes": 408850
+			},
+			"reason": "a shared() instance lives for the document: the router binds the next page to its live values before the swap (a synchronous gate in the fragment entry, the deferred @markless/web/shared-swap binder), and runtimes bind and publish their cells (the binding module is named only by compiled modules whose state declares a non-widget shared(), with gates in graph construction, resume start and CSR mount); the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts (measured on this Mac)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11362,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41574794000 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11271,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41574794000 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11328,
+				"jsGzipBytes": 88704
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89152
+			},
+			"reason": "a shared() instance lives for the document (gates in the fragment entry and in graph construction, resume start and CSR mount); this app declares no shared(), so it downloads only the gates (+448 B gzip) and never downloads or runs the binding or swap modules; measured on CI run 41574794000 (linux), executed chars within budget"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109124,
+				"jsGzipBytes": 1571608
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575486
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41574794000 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 121827,
+				"jsGzipBytes": 1682502
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686495
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41574794000 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22657,
+				"jsGzipBytes": 406069
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408852
+			},
+			"reason": "a shared() instance lives for the document; the docs site declares page-scoped shared() definitions, so its pages download the binding module, push their container onto the dormant list at startup, ship the payload of pages that only read one, and bind when the runtime starts; measured on CI run 41574794000 (linux)"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575486
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575504
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686495
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686513
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (darwin-arm64)",
+			"from": {
+				"executedChars": 10998,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 10998,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (darwin-arm64)",
+			"from": {
+				"executedChars": 11014,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11014,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (darwin-arm64)",
+			"from": {
+				"executedChars": 11071,
+				"jsGzipBytes": 89152
+			},
+			"to": {
+				"executedChars": 11071,
+				"jsGzipBytes": 89170
+			},
+			"reason": "a click on a link to the page already shown keeps that page (PR #441): an early return in the link handler and the pre-wake click handler, +18 B gzip in the landing router code, none of it executed at load; executed chars at load within budget and left as anchored; measured on CI run 41580923479 (linux) and a Mac run (darwin bench pages), then carried onto the anchors of #433"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575504
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575505
+			},
+			"reason": "the same-page link early return (PR #441) measured on its rebased tree: CI run 41602532446 (linux), 19 B gzip on the docs pages rather than 18; none of it executed at load"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686513
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686514
+			},
+			"reason": "the same-page link early return (PR #441) measured on its rebased tree: CI run 41602532446 (linux), 19 B gzip on the docs pages rather than 18; none of it executed at load"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408852
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408871
+			},
+			"reason": "the same-page link early return (PR #441) measured on its rebased tree: CI run 41602532446 (linux), 19 B gzip on the docs pages rather than 18; none of it executed at load"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/resume-events",
+			"from": 18056,
+			"to": 18241,
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/resume-async-wiring",
+			"from": 10693,
+			"to": 11022,
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/resume-commit-arm",
+			"from": 12019,
+			"to": 12244,
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89170
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89275
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89170
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89275
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89170
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89275
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575505
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575654
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686514
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686663
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 408871
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409020
+			},
+			"reason": "a press on content an arm commit just inserted waits for its records instead of being dropped, and a @try an @if browser render already settled is not committed again over rows being pressed (PR #442): dispatch and settle-time code, none of it executed at load; the +105 (bench) and +149 (docs) B gzip this PR adds over main 4566fd60f, carried onto the anchors of #441; measured on CI run 41610216919, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/prerender/evaluator",
+			"from": 22965,
+			"to": 23337,
+			"reason": "the browser render of an @if evaluates the component that holds it when that is not the module root, and hands the commit the nested @if blocks inside its range (PR #443): flip-time code"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575654
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575850
+			},
+			"reason": "prerender/evaluator grew 372 B rendered (PR #443: the browser render of an @if starts from the component that holds it and hands the commit its nested @if blocks); the docs pages download it in a chunk they fetch at load but run none of it until such an @if flips; the +196/+196/+137 B gzip measured over main 6533cee36, carried onto the anchors of #442; measured on CI run 41630466455, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686663
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686859
+			},
+			"reason": "prerender/evaluator grew 372 B rendered (PR #443: the browser render of an @if starts from the component that holds it and hands the commit its nested @if blocks); the docs pages download it in a chunk they fetch at load but run none of it until such an @if flips; the +196/+196/+137 B gzip measured over main 6533cee36, carried onto the anchors of #442; measured on CI run 41630466455, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409020
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409157
+			},
+			"reason": "prerender/evaluator grew 372 B rendered (PR #443: the browser render of an @if starts from the component that holds it and hands the commit its nested @if blocks); the docs pages download it in a chunk they fetch at load but run none of it until such an @if flips; the +196/+196/+137 B gzip measured over main 6533cee36, carried onto the anchors of #442; measured on CI run 41630466455, executed chars at load within budget and left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "execution",
+			"subject": "search",
+			"from": {
+				"executedChars": 16156,
+				"functions": 207,
+				"modules": 3
+			},
+			"to": {
+				"executedChars": 21434,
+				"functions": 265,
+				"modules": 0
+			},
+			"reason": "a keyed @for over a computed now resumes with the served value, so the focus click before typing (an unrelated wake) no longer runs the startup derive and its module; the search input that changes the list initializes that derive module instead. Measured on bench /records: focus click plus input together 363,757 -> 364,277 chars of executed function source (+0.1%), the input alone +33%"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "construct",
+			"subject": "keyed @for",
+			"from": 6879,
+			"to": 6906,
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so a CSR mount and a wake-channel rebuild keep its value instead of running the derive again; +27 B per keyed @for"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89275
+			},
+			"to": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89285
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89275
+			},
+			"to": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89285
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89275
+			},
+			"to": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89285
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1575850
+			},
+			"to": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1576002
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686859
+			},
+			"to": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1687007
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409157
+			},
+			"to": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409162
+			},
+			"reason": "a keyed @for over a computed lists that computed in the client render data's servedComputedIndexes, so the page keeps its value instead of deriving it at startup: +10 B gzip downloaded on the bench pages, +148 to +152 B on docs / and /concepts/state, +5 B on /ui/accordion, measured on CI run 41626691637 (linux) and added to the anchors main moved to since (#442, #443), because these render-data files are not the runtime files those changed; executed chars at load left as anchored"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench / (linux-x64)",
+			"from": {
+				"executedChars": 11371,
+				"jsGzipBytes": 89285
+			},
+			"to": {
+				"executedChars": 11372,
+				"jsGzipBytes": 89532
+			},
+			"reason": "+247 B gzip, PR #430: a keyed row's bound computed is placed in its row at resume (fns/row-placed-derive, which rides in the resume chunk here, and the row check in resume-sync-computed) and on the first client render (row-free bound id and row-aware instance lookup in the evaluator); download only, it runs only for a bound computed inside a row; executed chars at load within budget; the delta measured on CI run 41665355760 (main ea4eddeda), carried onto #440's anchor and checked by this PR's CI run on top of it"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /records (linux-x64)",
+			"from": {
+				"executedChars": 11387,
+				"jsGzipBytes": 89285
+			},
+			"to": {
+				"executedChars": 11388,
+				"jsGzipBytes": 89532
+			},
+			"reason": "+247 B gzip, PR #430: a keyed row's bound computed is placed in its row at resume (fns/row-placed-derive, which rides in the resume chunk here, and the row check in resume-sync-computed) and on the first client render (row-free bound id and row-aware instance lookup in the evaluator); download only, it runs only for a bound computed inside a row; executed chars at load within budget; the delta measured on CI run 41665355760 (main ea4eddeda), carried onto #440's anchor and checked by this PR's CI run on top of it"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "bench /settings (linux-x64)",
+			"from": {
+				"executedChars": 11444,
+				"jsGzipBytes": 89285
+			},
+			"to": {
+				"executedChars": 11445,
+				"jsGzipBytes": 89532
+			},
+			"reason": "+247 B gzip, PR #430: a keyed row's bound computed is placed in its row at resume (fns/row-placed-derive, which rides in the resume chunk here, and the row check in resume-sync-computed) and on the first client render (row-free bound id and row-aware instance lookup in the evaluator); download only, it runs only for a bound computed inside a row; executed chars at load within budget; the delta measured on CI run 41665355760 (main ea4eddeda), carried onto #440's anchor and checked by this PR's CI run on top of it"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs / (linux-x64)",
+			"from": {
+				"executedChars": 109992,
+				"jsGzipBytes": 1576002
+			},
+			"to": {
+				"executedChars": 110166,
+				"jsGzipBytes": 1577217
+			},
+			"reason": "+1215 B gzip, PR #430: the same row-placed computed as bench, plus the in-browser compiler worker behind the docs' live code blocks (+511 B gzip in a local before/after site build: the row-item derive route and derive read paths) and the in-browser server render seeding derive-only props narrowed to the fields their computeds read (serializer/value-paths, fns/ssr); download only; executed chars at load within budget; the delta measured on CI run 41665355760 (main ea4eddeda), carried onto #440's anchor and checked by this PR's CI run on top of it"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /concepts/state (linux-x64)",
+			"from": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1687007
+			},
+			"to": {
+				"executedChars": 120114,
+				"jsGzipBytes": 1688222
+			},
+			"reason": "+1215 B gzip, PR #430: the same row-placed computed as bench, plus the in-browser compiler worker behind the docs' live code blocks (+511 B gzip in a local before/after site build: the row-item derive route and derive read paths) and the in-browser server render seeding derive-only props narrowed to the fields their computeds read (serializer/value-paths, fns/ssr); download only; executed chars at load within budget; the delta measured on CI run 41665355760 (main ea4eddeda), carried onto #440's anchor and checked by this PR's CI run on top of it"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "load",
+			"subject": "docs /ui/accordion (linux-x64)",
+			"from": {
+				"executedChars": 22830,
+				"jsGzipBytes": 409162
+			},
+			"to": {
+				"executedChars": 22863,
+				"jsGzipBytes": 409874
+			},
+			"reason": "+712 B gzip, PR #430: the same row-placed computed as bench, plus the in-browser compiler worker behind the docs' live code blocks (+511 B gzip in a local before/after site build: the row-item derive route and derive read paths) and the in-browser server render seeding derive-only props narrowed to the fields their computeds read (serializer/value-paths, fns/ssr); download only; executed chars at load within budget; the delta measured on CI run 41665355760 (main ea4eddeda), carried onto #440's anchor and checked by this PR's CI run on top of it"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/fns/row-placed-derive",
+			"from": null,
+			"to": 684,
+			"reason": "PR #430: a keyed row's computed reads the row it sits in after resume (bound derive placed by the computed node's row) and on the first client render (row-free bound id, row-aware instance lookup); runs only for a bound derive inside a row; measured on CI run 41665355760"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/prerender/evaluator",
+			"from": 23337,
+			"to": 23624,
+			"reason": "PR #430: a keyed row's computed reads the row it sits in after resume (bound derive placed by the computed node's row) and on the first client render (row-free bound id, row-aware instance lookup); runs only for a bound derive inside a row; measured on CI run 41665355760"
+		},
+		{
+			"date": "2026-11-03",
+			"guard": "runtime",
+			"subject": "web/resume-sync-computed",
+			"from": 7940,
+			"to": 8331,
+			"reason": "PR #430: a keyed row's computed reads the row it sits in after resume (bound derive placed by the computed node's row) and on the first client render (row-free bound id, row-aware instance lookup); runs only for a bound derive inside a row; measured on CI run 41665355760"
 		}
 	],
 	"runtimeModules": {
 		"core/web/resume-storage-free": 219,
 		"router/link-attributes": 380,
 		"router/navigation-hold": 508,
-		"router/route-dom": 2193,
-		"router/route-manifest": 7039,
-		"router/route-renderer": 1735,
+		"router/route-dom": 2254,
+		"router/route-manifest": 6924,
+		"router/route-renderer": 1741,
 		"router/route-state": 805,
 		"router/spa-navigation": 6391,
-		"router/vite/entries/client-entry": 2666,
-		"router/vite/entries/fragment-entry": 28332,
-		"router/vite/entries/resume-entry": 2309,
+		"router/vite/entries/client-entry": 2816,
+		"router/vite/entries/fragment-entry": 33125,
+		"router/vite/entries/resume-entry": 2423,
 		"router/vite/entries/resume-modules": 920,
-		"router/vite/runtime/create-route-discovery": 527,
-		"runtime/graph": 10187,
+		"router/vite/runtime/create-route-discovery": 605,
+		"runtime/graph": 10737,
 		"runtime/graph-async": 4122,
 		"runtime/graph-collections": 4282,
-		"runtime/graph-computed": 2313,
+		"runtime/graph-computed": 2236,
 		"runtime/graph-core": 2231,
-		"runtime/graph-reconcile": 8625,
-		"runtime/graph-scheduler": 579,
+		"runtime/graph-reconcile": 8577,
+		"runtime/graph-scheduler": 311,
 		"runtime/graph-shared": 3658,
 		"runtime/index": 152,
 		"serializer/async-boundary-arm": 303,
-		"serializer/payload-scripts": 611,
-		"serializer/protocol": 570,
-		"serializer/protocol-client": 6652,
+		"serializer/payload-scripts": 730,
+		"serializer/protocol": 691,
+		"serializer/protocol-client": 6722,
 		"serializer/protocol-constants": 1171,
-		"serializer/protocol-event-names": 264,
+		"serializer/protocol-event-names": 327,
 		"serializer/protocol-locator-paths": 292,
 		"serializer/protocol-locator-paths-format": 352,
 		"serializer/protocol-page-markers": 564,
 		"serializer/protocol-prop-prefix": 270,
-		"serializer/protocol-record-keys": 1134,
+		"serializer/protocol-record-keys": 1157,
 		"serializer/protocol-record-templates": 1787,
+		"serializer/protocol-shared-instances": 442,
 		"serializer/protocol-shared-records-decode": 2061,
-		"serializer/protocol-templated-lists": 437,
+		"serializer/protocol-templated-lists": 521,
 		"serializer/storage-slot": 780,
 		"serializer/value-constants": 360,
 		"serializer/value-decode-client": 3580,
@@ -1953,88 +4316,91 @@
 		"web/coded-error": 368,
 		"web/control-edit-hold": 1651,
 		"web/dom-attribute": 874,
-		"web/dom-journal": 7373,
-		"web/dom-journal-direct": 1223,
+		"web/dom-journal": 7478,
+		"web/dom-journal-direct": 1138,
 		"web/event-current-target": 477,
-		"web/fns/bound-symbol": 1497,
-		"web/fns/closure-action": 7539,
-		"web/fns/composition": 19974,
-		"web/fns/container-region": 279,
+		"web/fns/bound-symbol": 1340,
+		"web/fns/closure-action": 7579,
+		"web/fns/composition": 19958,
+		"web/fns/container-region": 246,
 		"web/fns/dom-order": 633,
 		"web/fns/element-handle-prop": 751,
-		"web/fns/instance-scope": 18241,
+		"web/fns/instance-scope": 21687,
 		"web/fns/projection-html": 343,
 		"web/fns/reconcile-plane": 334,
-		"web/fns/roster-resume": 5123,
-		"web/fns/row-locals": 942,
+		"web/fns/roster-resume": 5251,
+		"web/fns/row-locals": 1018,
 		"web/fns/row-mint": 7992,
-		"web/fns/row-slot-mint": 2633,
-		"web/fns/scalar-served": 3982,
+		"web/fns/row-slot-mint": 2662,
+		"web/fns/scalar-served": 4091,
 		"web/fns/scalar-specialized": 1426,
 		"web/fns/served-census-repair": 3988,
-		"web/fns/ssr": 30833,
+		"web/fns/shared-instances": 5300,
+		"web/fns/ssr": 31486,
 		"web/fns/text-node": 507,
 		"web/fns/update-text": 531,
-		"web/fns/visible-trigger": 791,
-		"web/fns/write-scalar": 983,
+		"web/fns/visible-trigger": 857,
+		"web/fns/write-scalar": 1004,
 		"web/inline/resume-errors": 1437,
-		"web/inline/sync-policy-core": 1255,
+		"web/inline/sync-policy-core": 1338,
 		"web/inline/sync-policy-core-lazy": 234,
 		"web/markup-nodes": 472,
-		"web/payload-document-common": 2608,
+		"web/payload-document-common": 2532,
 		"web/payload-full-storage-free": 773,
-		"web/payload-graph-construct": 4384,
-		"web/payload-resume": 5411,
+		"web/payload-graph-construct": 4706,
+		"web/payload-resume": 5490,
 		"web/payload-resume-lazy": 203,
 		"web/payload-resume-registry": 1916,
-		"web/pending-timing": 521,
-		"web/prerender/evaluator": 22981,
+		"web/pending-timing": 599,
+		"web/prerender/evaluator": 23624,
 		"web/prerender/owning-surface": 1212,
 		"web/prerender/shared-seed-slot": 2836,
 		"web/prerender/staged-graph": 411,
 		"web/reconcile-plane-slot": 344,
-		"web/render": 4003,
+		"web/render": 3867,
 		"web/render-canonical": 2642,
-		"web/render-csr": 17457,
+		"web/render-csr": 17701,
 		"web/render-route-holder": 1005,
 		"web/repeat-runtime": 2594,
-		"web/resume": 3419,
-		"web/resume-anchor-census": 1608,
+		"web/resume": 3195,
+		"web/resume-anchor-census": 1650,
 		"web/resume-arm-keyed-repeats": 1225,
-		"web/resume-arm-records": 7741,
+		"web/resume-arm-records": 7528,
 		"web/resume-arm-records-lazy": 219,
-		"web/resume-async-wiring": 9728,
-		"web/resume-behaviors": 8804,
-		"web/resume-branches": 15037,
-		"web/resume-census": 1471,
-		"web/resume-commit-arm": 12013,
-		"web/resume-events": 17992,
+		"web/resume-async-wiring": 11022,
+		"web/resume-behaviors": 8577,
+		"web/resume-branches": 14986,
+		"web/resume-census": 1454,
+		"web/resume-commit-arm": 12244,
+		"web/resume-events": 18241,
 		"web/resume-handle-qualifier": 685,
 		"web/resume-handoff": 1360,
-		"web/resume-keyed-repeats": 18371,
+		"web/resume-keyed-repeats": 18824,
 		"web/resume-keyed-repeats-lazy": 227,
-		"web/resume-locators": 5644,
+		"web/resume-locators": 5695,
 		"web/resume-refresh-busy": 987,
 		"web/resume-repeat-branch-arm": 1785,
 		"web/resume-resettle-hold": 2929,
-		"web/resume-runtime": 15275,
+		"web/resume-runtime": 15373,
 		"web/resume-runtime-shared": 2089,
-		"web/resume-runtime-start": 9385,
+		"web/resume-runtime-start": 8979,
 		"web/resume-shared-patch": 1200,
 		"web/resume-stream-patches": 2414,
-		"web/resume-sync-computed": 2751,
-		"web/resume-sync-demand": 1099,
+		"web/resume-sync-computed": 8331,
+		"web/resume-sync-demand": 1530,
 		"web/runtime-error-reporting": 1876,
+		"web/shared-swap": 5243,
 		"web/ssr-data/awaitable": 856,
-		"web/ssr-data/branch-arm-idrefs": 1766,
-		"web/ssr-data/renderer": 20878,
-		"web/storage-plane": 1810
+		"web/ssr-data/branch-arm-idrefs": 1859,
+		"web/ssr-data/renderer": 21060,
+		"web/storage-plane": 1932,
+		"web/fns/row-placed-derive": 684
 	},
 	"constructGlue": {
 		"event handler": 3184,
-		"text binding": 4211,
-		"@if": 7991,
-		"keyed @for": 6879,
+		"text binding": 4256,
+		"@if": 8056,
+		"keyed @for": 6906,
 		"async boundary": 10095
 	},
 	"resumeRows": {
@@ -2065,6 +4431,60 @@
 		"docs /ui/accordion": {
 			"raw": 312457,
 			"gzip": 27737
+		}
+	},
+	"loadWeight": {
+		"darwin-arm64": {
+			"bench /": {
+				"executedChars": 10998,
+				"jsGzipBytes": 89170
+			},
+			"bench /records": {
+				"executedChars": 11014,
+				"jsGzipBytes": 89170
+			},
+			"bench /settings": {
+				"executedChars": 11071,
+				"jsGzipBytes": 89170
+			},
+			"docs /": {
+				"executedChars": 109825,
+				"jsGzipBytes": 1575481
+			},
+			"docs /concepts/state": {
+				"executedChars": 119772,
+				"jsGzipBytes": 1686491
+			},
+			"docs /ui/accordion": {
+				"executedChars": 22685,
+				"jsGzipBytes": 408850
+			}
+		},
+		"linux-x64": {
+			"bench /": {
+				"executedChars": 11372,
+				"jsGzipBytes": 89532
+			},
+			"bench /records": {
+				"executedChars": 11388,
+				"jsGzipBytes": 89532
+			},
+			"bench /settings": {
+				"executedChars": 11445,
+				"jsGzipBytes": 89532
+			},
+			"docs /": {
+				"executedChars": 110166,
+				"jsGzipBytes": 1577217
+			},
+			"docs /concepts/state": {
+				"executedChars": 120114,
+				"jsGzipBytes": 1688222
+			},
+			"docs /ui/accordion": {
+				"executedChars": 22863,
+				"jsGzipBytes": 409874
+			}
 		}
 	}
 }

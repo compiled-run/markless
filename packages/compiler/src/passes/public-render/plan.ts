@@ -5,7 +5,7 @@ import type {
 	PublicRenderPlanArtifact,
 	PublicRenderPlanInput,
 } from '../../artifacts.ts';
-import { collectModuleStyleScopes } from './style-scopes.ts';
+import { collectModuleStyleScopes, collectStylesheetImports } from './style-scopes.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
 import { resolveBoundaryRunners } from './boundary-runner.ts';
@@ -52,8 +52,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	if (!selectedRoot) return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 
 	const repeatBindingConflictDiagnostics = collectRepeatBindingConflictDiagnostics({
-		// Module-wide, because the emitted row prelude is built from the module's
-		// whole keyed-repeat list rather than one component's slice of it.
 		root: ast,
 		filename: input.source.filename,
 	});
@@ -65,9 +63,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		component: selectedRoot.component,
 		filename: input.source.filename,
 		moduleImports: input.semanticGraph.moduleImports.map((item) => item.localName),
-		repeatLocals: input.semanticGraph.keyedRepeats.flatMap((repeat) =>
-			repeat.indexName ? [repeat.itemName, repeat.indexName] : [repeat.itemName],
-		),
 		root: selectedRoot.root,
 		source: input.source.source,
 	});
@@ -143,6 +138,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	return {
 		passId: 'public-render-plan',
 		styleScopes: styles.styleScopes,
+		stylesheetImports: collectStylesheetImports(ast),
 		diagnostics: [
 			...styles.diagnostics,
 			...sameModuleChildBoundaryDiagnostics(

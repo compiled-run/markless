@@ -3,12 +3,17 @@
 // starter as the Result pane's first paint, and a `<Code>` the starter is projected into.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { editorText } from '../components/docs/code/editor.ts';
 import { ColourTable, DocRegistry, highlightHtml, paneLines } from './ui-code-runs.ts';
 
 export const CODE_GENERATED_DIR = 'components/docs/code/generated';
 const CODE_COMPONENT = 'components/docs/code.tsrx';
+const PAGE_STYLE_SOURCE = fileURLToPath(new URL('../components/docs/code/style.css', import.meta.url));
+/** The tab every block without a `.css` fence of its own shows the result's stylesheet in. */
+export const PAGE_STYLE = 'style.css';
+const SCOPED_PAGE_STYLE = 'page-style.css';
 
 // Attribute values may hold `>` (a note can show markup), so quoted and braced values are matched whole;
 // a braced value may nest one level of braces, and strings inside it may hold any brace.
@@ -37,6 +42,8 @@ export type CodeBlock = {
 	/** 0-based lines of the block's `<Code>` and `</Code>` in the page. */
 	readonly startLine: number;
 	readonly endLine: number;
+	/** `PAGE_STYLE` is the site's shared sheet, applied to the result as its page's own stylesheet. */
+	readonly pageStyle?: boolean;
 };
 
 /** One run of highlighted code: shiki's colour pair as an inline style. */
@@ -126,6 +133,17 @@ export function findCodeBlocks(source: string, file: string): CodeBlock[] {
 	return blocks;
 }
 
+/** A block with no `.css` fence gets the shared sheet as its `PAGE_STYLE` tab. */
+export function withPageStyle(block: CodeBlock, css: string): CodeBlock {
+	if (block.files.some((file) => file.name.endsWith('.css'))) return block;
+	return { ...block, files: [...block.files, { name: PAGE_STYLE, code: css }], pageStyle: true };
+}
+
+/** The shared sheet confined to the in-page starter render, where `body` is the `.code-stage` box. */
+export function scopedPageStyle(css: string): string {
+	return `@scope (.code-stage) {\n${css.replace(/(^|[\s,])body(?=[\s,{])/gm, '$1:scope')}}\n`;
+}
+
 /** The highlighted lines of one file, drawn under the textarea that holds its text. */
 export async function codePane(file: CodeBlockFile, index = 0): Promise<CodePane> {
 	const language = LANGUAGES[file.name.slice(file.name.lastIndexOf('.') + 1)] ?? 'ts';
@@ -183,9 +201,13 @@ export function codeBlockModule(input: {
 	];
 	const files = ordered.map(({ name, code }) => ({ name, code }));
 	const attributes = block.attributes ? ` ${block.attributes}` : '';
-	const sheets = ordered.filter((file) => file.name.endsWith('.css'));
+	const sheets = ordered
+		.filter((file) => file.name.endsWith('.css'))
+		.map((file) =>
+			block.pageStyle && file.name === PAGE_STYLE ? `../${SCOPED_PAGE_STYLE}` : `./${file.name}`,
+		);
 	const sheetImports = sheets
-		.map((file, index) => `import sheet${index} from ${JSON.stringify(`./${file.name}?url`)};\n`)
+		.map((sheet, index) => `import sheet${index} from ${JSON.stringify(`${sheet}?url`)};\n`)
 		.join('');
 	const stylesheets = sheets.length > 0 ? ` stylesheets={[${sheets.map((_, index) => `sheet${index}`).join(', ')}]}` : '';
 	return `// Written by tooling/code-blocks.ts from ${page}. Edit the page, not this file.
@@ -227,7 +249,10 @@ export async function rewriteCodeBlocks(
 	const slug = pageSlug(file);
 	const componentFile = join(root, CODE_COMPONENT);
 	const page = relative(root, file);
-	for (const [index, block] of blocks.entries()) {
+	const pageStyle = readFileSync(PAGE_STYLE_SOURCE, 'utf8');
+	write(join(root, CODE_GENERATED_DIR, SCOPED_PAGE_STYLE), scopedPageStyle(pageStyle));
+	for (const [index, found] of blocks.entries()) {
+		const block = withPageStyle(found, pageStyle);
 		const dir = join(root, CODE_GENERATED_DIR, `${slug}-${index + 1}`);
 		const moduleFile = join(dir, MODULE_NAME);
 		for (const starter of block.files) write(join(dir, starter.name), starter.code);
@@ -261,6 +286,7 @@ export function codeBlocks(): Plugin {
 			async handler(code: string, id: string) {
 				const file = id.split('?', 1)[0] ?? id;
 				if (!file.endsWith('.mdx') || !code.includes('<Code')) return;
+				this.addWatchFile(PAGE_STYLE_SOURCE);
 				const next = await rewriteCodeBlocks(code, file, root);
 				return next === undefined ? undefined : { code: next, map: null };
 			},

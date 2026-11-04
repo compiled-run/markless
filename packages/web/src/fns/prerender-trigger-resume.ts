@@ -468,6 +468,9 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 				deleted = segment.graph.delete(deletion) || deleted;
 			return deleted;
 		},
+		changed: (change) => {
+			for (const segment of owners(change.graphNodeId)) segment.graph.changed(change);
+		},
 		subscribe: (subscription) => local.graph.subscribe(subscription),
 		subscribeJournal: (listener) => local.graph.subscribeJournal(listener),
 		flush: async () => {

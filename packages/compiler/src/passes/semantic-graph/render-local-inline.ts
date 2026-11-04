@@ -1,4 +1,7 @@
-import { PROTOCOL_PROP_GRAPH_NODE_PREFIX, PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
+import {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+} from '@markless/serializer';
 import {
 	childNodes,
 	getIdentifierName,
@@ -79,7 +82,9 @@ export function inlineRenderLocals(
 		inlineFunctions: options.inlineFunctions === true,
 		inlineOnly: options.inlineOnly,
 	});
-	return 'source' in result ? { kind: 'inlined', source: result.source, definitions, names } : result;
+	return 'source' in result
+		? { kind: 'inlined', source: result.source, definitions, names }
+		: result;
 }
 
 function inlineWithin(
@@ -152,8 +157,18 @@ function inlineWithin(
 						!isFunctionNode(local.init) &&
 						rebuiltLocalWrite(candidate, ancestors, local.init, state.source)
 					) {
-						const write = rebuiltLocalWrite(candidate, ancestors, local.init, state.source)!;
-						refusal = { kind: 'writes-render-local', name, write: write.source, call: write.call };
+						const write = rebuiltLocalWrite(
+							candidate,
+							ancestors,
+							local.init,
+							state.source,
+						)!;
+						refusal = {
+							kind: 'writes-render-local',
+							name,
+							write: write.source,
+							call: write.call,
+						};
 					} else {
 						const definition = local.init;
 						definitions.push(definition);
@@ -249,7 +264,8 @@ function nestedTemplateScopes(state: WalkState): ReadonlyArray<Span> {
 			add(candidate.alternate as AnyNode | undefined);
 		}
 		if (candidate.type === 'JSXSwitchExpression')
-			for (const switchCase of (candidate.cases as AnyNode[] | undefined) ?? []) add(switchCase);
+			for (const switchCase of (candidate.cases as AnyNode[] | undefined) ?? [])
+				add(switchCase);
 		if (candidate.type === 'JSXTryExpression') {
 			add(candidate.block as AnyNode | undefined);
 			add(candidate.pending as AnyNode | undefined);
@@ -316,7 +332,7 @@ export function liftRenderLocalComposite(
 	expression: AnyNode,
 	state: WalkState,
 	options: CompositeReadOptions,
-): { readonly graphNodeId: string } | null {
+): { readonly graphNodeId: string; readonly splicedSource?: string } | null {
 	if (state.currentKeyedRepeatScopeIds.length > 0 || state.currentSharedDefinitionId) return null;
 	if (
 		!isCompositeTemplateExpression(expression, options) &&
@@ -324,33 +340,89 @@ export function liftRenderLocalComposite(
 	)
 		return null;
 	const readSources = pureCompositeReadSources(expression, state, options);
-	if (!readSources) return null;
-	const inlined = inlineRenderLocals(expression, state);
+	const inlineFunctions = !readSources && callsBodyFunction(expression, state);
+	if (!readSources && !inlineFunctions) return null;
+	const inlined = inlineRenderLocals(expression, state, { inlineFunctions });
 	if (inlined.kind !== 'inlined' || inlined.definitions.length === 0) return null;
-	const sources = new Set(readSources.filter((source) => readsGraphRoot(source, state)));
+	if (
+		inlineFunctions &&
+		inlined.definitions.some((definition) => writesOutside(definition, state))
+	)
+		return null;
+	const sources = new Set(
+		(
+			readSources ?? collectGraphDependencies(expression, state).map(({ source }) => source)
+		).filter((source) => readsGraphRoot(source, state)),
+	);
 	for (const definition of inlined.definitions)
 		for (const dependency of collectGraphDependencies(definition, state))
 			sources.add(dependency.source);
-	const lifted = mintTemplateExpressionComputed(
-		`() => ${inlined.source}`,
-		[...sources],
-		state,
-		true,
-	);
+	const lifted = mintTemplateExpressionComputed(`() => ${inlined.source}`, [...sources], state);
 	if (lifted)
 		for (const definition of new Set(inlined.definitions))
 			collectDefinitionReads(definition, state);
-	return lifted;
+	// A spliced function has no body to run in, so the update record carries the spliced call.
+	return lifted && inlineFunctions ? { ...lifted, splicedSource: inlined.source } : lifted;
+}
+
+// `label(count)` naming a function declared in the component body: the call runs its spliced definition.
+function callsBodyFunction(expression: AnyNode, state: WalkState): boolean {
+	const semantic = state.semantic();
+	let found = false;
+	walkNode(expression, (candidate) => {
+		const callee = candidate.type === 'CallExpression' ? (candidate.callee as AnyNode) : null;
+		if (found || callee?.type !== 'Identifier' || typeof callee.start !== 'number') return;
+		const symbolId = resolvedSymbolAt(semantic, callee.start);
+		if (
+			symbolId !== null &&
+			semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module'
+		)
+			found = true;
+	});
+	return found;
+}
+
+// A spliced function that assigns a name it did not declare would write from inside a render.
+export function writesOutside(definition: AnyNode, state: WalkState): boolean {
+	if (!isFunctionNode(definition)) return false;
+	const semantic = state.semantic();
+	let writes = false;
+	walkNode(definition, (candidate) => {
+		const target =
+			candidate.type === 'AssignmentExpression'
+				? (candidate.left as AnyNode)
+				: candidate.type === 'UpdateExpression'
+					? (candidate.argument as AnyNode)
+					: null;
+		if (writes || !target) return;
+		let root = target;
+		while (root.type === 'MemberExpression') root = root.object as AnyNode;
+		const symbolId =
+			root.type === 'Identifier' && typeof root.start === 'number'
+				? resolvedSymbolAt(semantic, root.start)
+				: null;
+		const scope =
+			symbolId === null ? null : semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.node;
+		writes =
+			!scope ||
+			typeof definition.start !== 'number' ||
+			typeof definition.end !== 'number' ||
+			scope.start < definition.start ||
+			scope.end > definition.end;
+	});
+	return writes;
 }
 
 // A const written inside an arm, row or `@{ }` re-runs with every render of that block, so a plain read of it is live.
 function namesNestedTemplateLocal(expression: AnyNode, state: WalkState): boolean {
 	let root = expression;
-	while (root.type === 'MemberExpression' && root.computed !== true) root = root.object as AnyNode;
+	while (root.type === 'MemberExpression' && root.computed !== true)
+		root = root.object as AnyNode;
 	if (root.type !== 'Identifier' || typeof root.start !== 'number') return false;
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, root.start);
-	const declared = symbolId === null ? undefined : semantic.bindings[symbolId]!.declarations[0]?.start;
+	const declared =
+		symbolId === null ? undefined : semantic.bindings[symbolId]!.declarations[0]?.start;
 	return (
 		declared !== undefined &&
 		nestedTemplateScopes(state).some((scope) => declared >= scope.start && declared < scope.end)
@@ -400,7 +472,10 @@ export function liftArmRenderLocalValue(
 	);
 	if (dependencies.some((dependency) => asyncNodeIds.has(dependency.graphNodeId))) return null;
 	// Nothing the browser can change decides the arm or its value, so the server's render of it stands.
-	if (dependencies.length > 0 && dependencies.every((dependency) => readsServerOnlyProp(dependency, state)))
+	if (
+		dependencies.length > 0 &&
+		dependencies.every((dependency) => readsServerOnlyProp(dependency, state))
+	)
 		return null;
 	const lifted = mintTemplateExpressionComputed(
 		guard.source === null
@@ -408,7 +483,6 @@ export function liftArmRenderLocalValue(
 			: `() => (${guard.source}) ? ${inlined.source} : undefined`,
 		[...new Set(dependencies.map((dependency) => dependency.source))],
 		state,
-		false,
 		undefined,
 		true,
 	);
@@ -552,9 +626,9 @@ function classifyDeclaration(
 								  init.type === 'FunctionExpression' ||
 								  isClassInstanceValue(init)
 								? { kind: 'capture-owned' }
-							: candidate.kind === 'const'
-								? { kind: 'definition', init: declarator.init as AnyNode }
-								: { kind: 'opaque' };
+								: candidate.kind === 'const'
+									? { kind: 'definition', init: declarator.init as AnyNode }
+									: { kind: 'opaque' };
 		}
 	});
 	return found ?? { kind: 'opaque' };
@@ -591,7 +665,8 @@ function readsServerOnlyProp(
 	return state.serverOnlyProps.some(
 		({ exportName: owner, propName }) =>
 			owner === exportName &&
-			((dependency.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID && dependency.path[0] === propName) ||
+			((dependency.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID &&
+				dependency.path[0] === propName) ||
 				dependency.graphNodeId === `${PROTOCOL_PROP_GRAPH_NODE_PREFIX}${propName}`),
 	);
 }

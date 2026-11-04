@@ -876,7 +876,7 @@ function nestedRepeatMints(
 		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === enclosing.repeatId,
 	);
 	const render = renderDataOf(input).repeats.find((candidate) => candidate.repeatId === repeatId);
-	if (!nested || !render || render.rowStartOffset === 'unknown' || render.rowElementCount < 1)
+	if (!nested || !render || render.rowStartOffset === 'unknown' || !rowRootsOneElement(input, render))
 		return false;
 	if (
 		input.semanticGraph?.keyedRepeats.some(
@@ -1119,8 +1119,8 @@ function rowRootsOneElement(
 	input: ProtocolViewPayloadInput,
 	render: { readonly rowElementCount: number; readonly rowChunkId: string },
 ): boolean {
-	if (render.rowElementCount > 0) return true;
 	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === render.rowChunkId);
+	if (render.rowElementCount > 0) return chunk !== undefined && armRootsOneElement(chunk);
 	if ((chunk?.slots ?? []).some((slot) => slot.kind === 'child-component')) return true;
 	// A row that is one @if or @switch is the one element its shown arm renders.
 	const slot = chunk?.slots[0];
@@ -1421,9 +1421,14 @@ function boundSymbolIds(
 			kinds.has(symbol.kind) ? [symbol.id] : [],
 		),
 	);
+	const rows = new Map<string, string[]>();
+	for (const row of input.captureAnalysis?.boundResolverRows ?? [])
+		if (baseSymbolIds.has(row.baseSymbolId))
+			rows.set(row.baseSymbolId, [...(rows.get(row.baseSymbolId) ?? []), row.id]);
+	// A symbol bound once per instance keeps its own id: each instance's composition binds it to that instance's row.
 	return new Map(
-		(input.captureAnalysis?.boundResolverRows ?? []).flatMap((row) =>
-			baseSymbolIds.has(row.baseSymbolId) ? [[row.baseSymbolId, row.id] as const] : [],
+		[...rows].flatMap(([baseSymbolId, ids]) =>
+			ids.length === 1 ? [[baseSymbolId, ids[0]!] as const] : [],
 		),
 	);
 }

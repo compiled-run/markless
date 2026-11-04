@@ -21,7 +21,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
-import { protocolInstanceQualifies } from '@markless/serializer';
+import { protocolInstanceQualifies, valueAlongPaths } from '@markless/serializer';
 import { componentEdgeInstancePath } from '../component-edge-instance.ts';
 import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
@@ -895,7 +895,14 @@ function captureSlot(
 		((symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
 			referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source));
 	let routes = propName
-		? propCaptureRoutes(componentName, propName, routePath, input, absentPropIsUndefined)
+		? propCaptureRoutes(
+				componentName,
+				propName,
+				routePath,
+				input,
+				absentPropIsUndefined,
+				symbol.kind === 'sync-computed-derive' ? read : undefined,
+			)
 		: [
 				{
 					kind: 'graph-reference' as const,
@@ -962,6 +969,7 @@ function propCaptureRoutes(
 	readPath: ReadonlyArray<string>,
 	input: CaptureAnalysisInput,
 	absentPropIsUndefined = false,
+	deriveRead?: RowItemDeriveRead,
 ): ReadonlyArray<CaptureSlotRoute> {
 	const edges = componentName
 		? input.semanticGraph.componentEdges.filter(
@@ -982,10 +990,14 @@ function propCaptureRoutes(
 
 	return edges.flatMap((edge) =>
 		componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges).map((path) =>
-			propCaptureRoute(path, propName, readPath, input, absentPropIsUndefined),
+			propCaptureRoute(path, propName, readPath, input, absentPropIsUndefined, deriveRead),
 		),
 	);
 }
+
+// A derive re-runs outside any dispatch, so a row's item reaches it from the props of the
+// instance the row placed, which a changed item rebuilds; a handler reads the row's own locals.
+type RowItemDeriveRead = { readonly graphNodeId: string; readonly path: ReadonlyArray<string> };
 
 function propCaptureRoute(
 	componentEdgePath: ReadonlyArray<SemanticComponentEdge>,
@@ -993,6 +1005,7 @@ function propCaptureRoute(
 	readPath: ReadonlyArray<string>,
 	input: CaptureAnalysisInput,
 	absentPropIsUndefined = false,
+	deriveRead?: RowItemDeriveRead,
 ): CaptureSlotRoute {
 	const terminalEdge = componentEdgePath.at(-1);
 	if (!terminalEdge) {
@@ -1007,6 +1020,7 @@ function propCaptureRoute(
 		terminalEdge.id,
 		input,
 		absentPropIsUndefined,
+		deriveRead,
 	);
 }
 
@@ -1019,6 +1033,7 @@ function resolvePropCaptureRoute(
 	terminalEdgeId: string,
 	input: CaptureAnalysisInput,
 	absentPropIsUndefined: boolean,
+	deriveRead?: RowItemDeriveRead,
 ): CaptureSlotRoute {
 	const edge = componentEdgePath[edgeIndex];
 	if (!edge) throw new Error('Capture route ancestry ended before its terminal value.');
@@ -1045,7 +1060,7 @@ function resolvePropCaptureRoute(
 		if (scoped?.binding.kind === 'prop') {
 			const upstreamPropName = scoped.path[0];
 			if (edgeIndex > 0 && upstreamPropName) {
-				return resolvePropCaptureRoute(
+				const upstream = resolvePropCaptureRoute(
 					componentEdgePath,
 					edgeIndex - 1,
 					upstreamPropName,
@@ -1054,7 +1069,19 @@ function resolvePropCaptureRoute(
 					terminalEdgeId,
 					input,
 					absentPropIsUndefined,
+					deriveRead,
 				);
+				if (upstream.kind !== 'row-local' || !deriveRead) return upstream;
+				return {
+					kind: 'graph-reference',
+					componentEdgeId: terminalEdgeId,
+					componentEdgePath: edgePathIds,
+					graphNodeId: prop.graphNodeId,
+					path: [...prop.path, ...forwardedPath, ...readPath],
+					...(edgeIndex < componentEdgePath.length - 1
+						? { ownerEdgeCount: edgeIndex }
+						: {}),
+				};
 			}
 			if (upstreamPropName && scoped.bindingId) {
 				return {
@@ -1120,6 +1147,15 @@ function resolvePropCaptureRoute(
 	}
 
 	const rowItem = rowItemPath(prop.source, edge, input);
+	if (rowItem && deriveRead && edgeIndex === componentEdgePath.length - 1)
+		return {
+			kind: 'graph-reference',
+			componentEdgeId: terminalEdgeId,
+			componentEdgePath: edgePathIds,
+			graphNodeId: deriveRead.graphNodeId,
+			path: deriveRead.path,
+			ownerEdgeCount: componentEdgePath.length,
+		};
 	if (rowItem)
 		return {
 			kind: 'row-local',
@@ -1315,44 +1351,6 @@ function memberPathAbove(identifier: AnyNode, ancestors: ReadonlyArray<AnyNode>)
 		current = parent;
 	}
 	return path;
-}
-
-// The value with only what `paths` reach kept, so the page ships the fields
-// browser code reads and not the whole constant.
-function valueAlongPaths(value: unknown, paths: ReadonlyArray<ReadonlyArray<string>>): unknown {
-	if (value === null || typeof value !== 'object' || paths.some((path) => path.length === 0))
-		return value;
-	const rests = new Map<string, Array<ReadonlyArray<string>>>();
-	for (const [key, ...rest] of paths) {
-		if (key === undefined) continue;
-		const known = rests.get(key) ?? [];
-		known.push(rest);
-		rests.set(key, known);
-	}
-	if (Array.isArray(value)) {
-		const indices = [...rests.keys()]
-			.map(Number)
-			.filter((index) => Number.isInteger(index) && index >= 0 && index < value.length);
-		const length = rests.has('length')
-			? value.length
-			: indices.length > 0
-				? Math.max(...indices) + 1
-				: 0;
-		const kept: unknown[] = Array.from({ length }, () => null);
-		for (const index of indices)
-			kept[index] = valueAlongPaths(value[index], rests.get(String(index)) ?? []);
-		return kept;
-	}
-	const kept: Record<string, unknown> = {};
-	for (const [key, rest] of rests)
-		if (Object.hasOwn(value, key))
-			Object.defineProperty(kept, key, {
-				value: valueAlongPaths((value as Record<string, unknown>)[key], rest),
-				enumerable: true,
-				writable: true,
-				configurable: true,
-			});
-	return kept;
 }
 
 function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {

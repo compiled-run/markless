@@ -42,7 +42,8 @@ const JOB_POLICY = {
 		'boxes-router': { mode: 'full', needsBrowser: true },
 		'boxes-music-player': { mode: 'full', needsBrowser: true },
 		'boxes-music-player-ssr': { mode: 'full', needsBrowser: true },
-		receipts: { mode: 'full' },
+		// The gate job checks the analyzer receipt set after its result step.
+		test: { mode: 'full' },
 		'website-boxes': { mode: 'full', needsBrowser: true },
 		'perf-guards': { mode: 'full', needsBrowser: true },
 		'demo-boxes': { mode: 'full', needsBrowser: true },

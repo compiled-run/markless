@@ -121,6 +121,10 @@ function materializeAsyncBoundaryLocators(
 			startAnchor,
 			endAnchor,
 			asyncReads: boundary.asyncReads,
+			...(boundary.composedGraphProps && {
+				composedInstancePath: boundary.composedInstancePath,
+				composedGraphProps: boundary.composedGraphProps,
+			}),
 		});
 	}
 	return byId;

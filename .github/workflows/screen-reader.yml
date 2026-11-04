@@ -11,8 +11,8 @@ name: Screen reader
 #              release cut refuses unless it passed (scripts/release/reader-gate.mjs).
 #   voiceover- the real VoiceOver screen reader on macOS. Nightly, advisory, see below.
 #
-# The matrix key is the component family. A new family adds its name to each
-# matrix and nothing else changes.
+# A new family adds its name to SR_FAMILIES in the virtual lane and to each
+# real-reader matrix, and nothing else changes.
 #
 # The two real-reader lanes read a served page: packages/headless/sr-app renders every
 # family's Basic scenario, and each family's <family>.nvda.ts / .voiceover.ts,
@@ -66,58 +66,58 @@ jobs:
         timeout-minutes: 15
         strategy:
             fail-fast: false
-            # The org runs 60 jobs at once; a pull request's readers leave room for every other workflow.
-            max-parallel: 12
             matrix:
-                # Every family with a src/<family>/<family>.sr.ts. One job per
-                # family, so a red lane names the family in its own job title.
-                family:
-                    [
-                        accordion,
-                        buttongroup,
-                        calendar,
-                        carousel,
-                        checkbox,
-                        checklist,
-                        collapsible,
-                        colorpicker,
-                        combobox,
-                        crop,
-                        datebox,
-                        drawer,
-                        editable,
-                        fileupload,
-                        gridlist,
-                        hovercard,
-                        ink,
-                        menu,
-                        menubar,
-                        modal,
-                        navbar,
-                        numberbox,
-                        otp,
-                        pad,
-                        pagination,
-                        popover,
-                        progress,
-                        qr-code,
-                        radio-group,
-                        rating,
-                        resizable,
-                        select,
-                        slider,
-                        table,
-                        tabs,
-                        taglist,
-                        textbox,
-                        timebox,
-                        toaster,
-                        toggle,
-                        toolbar,
-                        tooltip,
-                        tour,
-                        tree,
-                    ]
+                # One job per family cost 44 runners a pull request, each spending 33 s of its 55 s installing and
+                # type-checking, while the org's 60 runners were the merge queue's bottleneck. The failing test's
+                # file still names its family.
+                shard: ['1/3', '2/3', '3/3']
+        env:
+            # Every family with a src/<family>/<family>.sr.ts. A new family adds its name here.
+            SR_FAMILIES: >-
+                accordion
+                buttongroup
+                calendar
+                carousel
+                checkbox
+                checklist
+                collapsible
+                colorpicker
+                combobox
+                crop
+                datebox
+                drawer
+                editable
+                fileupload
+                gridlist
+                hovercard
+                ink
+                menu
+                menubar
+                modal
+                navbar
+                numberbox
+                otp
+                pad
+                pagination
+                popover
+                progress
+                qr-code
+                radio-group
+                rating
+                resizable
+                select
+                slider
+                table
+                tabs
+                taglist
+                textbox
+                timebox
+                toaster
+                toggle
+                toolbar
+                tooltip
+                tour
+                tree
 
         steps:
             - uses: actions/checkout@v4
@@ -138,19 +138,21 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Typecheck the screen-reader lanes
+              if: matrix.shard == '1/3'
               run: pnpm typecheck:sr
 
             - name: Typecheck the real-reader lane
+              if: matrix.shard == '1/3'
               run: pnpm typecheck:sr-real
 
             # The runner image's Google Chrome, not a downloaded Chromium: about a hundred
             # downloads a push failed a different family whenever one CDN edge served the wrong
             # certificate for cdn.playwright.dev, and caching the download instead throttled the
             # repository's cache egress for every other job.
-            - name: Read the ${{ matrix.family }} family with the virtual screen reader
+            - name: Read the families with the virtual screen reader
               env:
                   MARKLESS_SR_BROWSER_CHANNEL: chrome
-              run: pnpm test:sr src/${{ matrix.family }}/${{ matrix.family }}.sr.ts
+              run: pnpm test:sr $(for family in $SR_FAMILIES; do printf 'src/%s/%s.sr.ts ' "$family" "$family"; done) --shard=${{ matrix.shard }}
 
     # Real NVDA on a real Windows desktop session. guidepup/setup-action
     # installs NVDA and the keyboard automation it needs.

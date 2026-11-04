@@ -239,7 +239,7 @@ export function appView(app: ShowcaseApp): AppView {
 	).length;
 	return {
 		app,
-		hostName: host(app.links.frontDoor),
+		hostName: host(app.links.frontDoor ?? app.links.markless),
 		facts: [
 			{ id: 'built', text: `Was built with ${app.builtWith}` },
 			{
@@ -265,15 +265,24 @@ export function appView(app: ShowcaseApp): AppView {
 		missing: (app.coverage?.missing ?? []).slice(0, missingShown),
 		missingMore: Math.max(0, (app.coverage?.missing.length ?? 0) - missingShown),
 		links: [
+			...(app.links.frontDoor
+				? [
+						{
+							id: 'front',
+							label: done ? 'Visit the site' : 'Visit the front door',
+							href: app.links.frontDoor,
+							main: true,
+						},
+					]
+				: []),
+			...(app.links.old ? [{ id: 'old', label: 'Original', href: app.links.old, main: false }] : []),
 			{
-				id: 'front',
-				label: done ? 'Visit the site' : 'Visit the front door',
-				href: app.links.frontDoor,
-				main: true,
+				id: 'markless',
+				label: app.links.frontDoor ? 'Markless only' : 'Visit the Markless port',
+				href: app.links.markless,
+				main: !app.links.frontDoor,
 			},
-			{ id: 'old', label: 'Original', href: app.links.old, main: false },
-			{ id: 'markless', label: 'Markless only', href: app.links.markless, main: false },
-			{ id: 'report', label: 'Full report', href: app.links.report, main: false },
+			...(app.links.report ? [{ id: 'report', label: 'Full report', href: app.links.report, main: false }] : []),
 			{ id: 'port', label: 'Source of the port', href: app.links.port, main: false },
 			...(app.links.originalRepo
 				? [

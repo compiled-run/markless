@@ -1,6 +1,6 @@
 {
 	"name": "@markless/web",
-	"version": "0.9.0",
+	"version": "0.11.0",
 	"description": "Markless unified render/resume runtime for the web.",
 	"license": "MIT",
 	"repository": {
@@ -29,7 +29,8 @@
 		"./render-to-stream": "./src/render-to-stream.ts",
 		"./render-to-string": "./src/render-to-string.ts",
 		"./resume": "./src/payload-full.ts",
-		"./resume-storage-free": "./src/payload-full-storage-free.ts"
+		"./resume-storage-free": "./src/payload-full-storage-free.ts",
+		"./shared-swap": "./src/shared-swap.ts"
 	},
 	"publishConfig": {
 		"access": "public",
@@ -97,6 +98,10 @@
 			"./resume-storage-free": {
 				"types": "./dist/resume-storage-free.d.ts",
 				"default": "./dist/resume-storage-free.js"
+			},
+			"./shared-swap": {
+				"types": "./dist/shared-swap.d.ts",
+				"default": "./dist/shared-swap.js"
 			}
 		},
 		"provenance": true

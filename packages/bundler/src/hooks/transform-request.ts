@@ -11,9 +11,11 @@ import { transformCompileInput } from '../transform.ts';
 import type { MarklessEnvironment, TransformTsrxModuleInput } from '../types.ts';
 import {
 	MARKLESS_ROUTE_SOURCE_QUERY_RE,
+	devBrowserFileUrl,
 	devBrowserSourceModuleUrl,
 	devBrowserVirtualModuleUrl,
 	isClientPrimarySourceRequest,
+	isMarklessVirtualId,
 	isPrerenderWakeSourceRequest,
 	isRenderDataSourceRequest,
 	isResumeSourceRequest,
@@ -114,6 +116,7 @@ export function planTransformHookRequest(
 		moduleId: moduleIdFor(source, ctx.getRoot()),
 		source: code,
 		serverOnlyProps: internalOptions.serverOnlyProps?.(moduleIdFor(source, ctx.getRoot())),
+		elementOnlyAttributes: internalOptions.elementOnlyAttributes,
 		routeRoot:
 			internalOptions.unimportedRouteModule?.(moduleIdFor(source, ctx.getRoot())) === true,
 		dev: plan.dev,
@@ -169,14 +172,18 @@ export function planTransformHookRequest(
 				: undefined,
 		styleModuleUrl:
 			internalOptions.dev === true && currentEnvironment === 'server'
-				? (virtualId) =>
+				? (styleModuleId) =>
 						withQuery(
-							devBrowserVirtualModuleUrl(virtualId, internalOptions.publicPath),
+							isMarklessVirtualId(styleModuleId)
+								? devBrowserVirtualModuleUrl(styleModuleId, internalOptions.publicPath)
+								: devBrowserFileUrl(styleModuleId, internalOptions.publicPath),
 							{
 								direct: null,
 							},
 						)
 				: undefined,
+		resolveStylesheetImport: async (request) =>
+			(await pluginContext.resolve(request, source))?.id,
 		headInjections:
 			internalOptions.dev === true && currentEnvironment === 'server'
 				? internalOptions.devInjections
@@ -185,6 +192,8 @@ export function planTransformHookRequest(
 		prerenderRecordData:
 			currentEnvironment === 'client' ? ctx.prerenderRecordsBySource?.get(source) : undefined,
 		serverRenderedPages: internalOptions.routeModules !== undefined,
+		// A route artifact emits its first pass unlinked, so its refusals have to stand.
+		linkPending: !clientRouteArtifact,
 	};
 	return {
 		ctx,
@@ -218,6 +227,7 @@ export function interfaceCompileInput(ctx: MarklessHookContext) {
 			source,
 			buildId: internalOptions.buildId,
 			serverOnlyProps: internalOptions.serverOnlyProps?.(moduleId),
+			elementOnlyAttributes: internalOptions.elementOnlyAttributes,
 			routeRoot: internalOptions.unimportedRouteModule?.(moduleId) === true,
 			executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 		});

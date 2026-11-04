@@ -3,6 +3,7 @@
 import { compileTsrxModuleLinkArtifact, overlayBarrelInterfaces } from '@markless/compiler';
 import type { TransformPluginContext } from 'rolldown';
 import { importedModuleConstants, missingConstantSources } from './module-constants.ts';
+import { importedFunctionWrites, missingFunctionWriteSources } from './function-writes.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	injectExecutionLogModuleHook,
@@ -22,13 +23,14 @@ import {
 } from '../link-driver.ts';
 import { isReExportOnlySource } from '../build/undemanded-runtime.ts';
 import { yieldToEventLoop } from '../event-loop.ts';
-import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from '../transform.ts';
+import { MARKLESS_VIRTUAL_PREFIX, throwIfLinkPending, transformTsrxModule } from '../transform.ts';
 import type {
 	MarklessEnvironment,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from '../types.ts';
 import {
+	STRING_EXPORT_QUERY,
 	TSRX_SOURCE_FILE,
 	executionLogRuntimeModuleId,
 	isMarklessRuntimeModule,
@@ -64,7 +66,7 @@ export async function transformHook(
 ) {
 	const currentEnvironment = ctx.getEnvironment(pluginContext);
 	const virtualId = normalizeVirtualId(id);
-	if (!TSRX_SOURCE_FILE.test(id)) {
+	if (!TSRX_SOURCE_FILE.test(id) || STRING_EXPORT_QUERY.test(id)) {
 		return transformNonTsrxModule(ctx, pluginContext, code, id, currentEnvironment);
 	}
 	if (virtualId.startsWith(MARKLESS_VIRTUAL_PREFIX)) {
@@ -135,6 +137,7 @@ async function runTransformSteps(request: TransformRequest) {
 		linkedTransformInput,
 		linked.linkedChildHasBrowserTriggers,
 	);
+	throwIfLinkPending(request.transformInput, transformed);
 	registerFinalTransformArtifacts(request, transformed);
 	recordLinkedTransform(request, transformed, linkedTransformInput, linked);
 	return await emitTransformResult(request, transformed, linked.resolvedChildren);
@@ -237,6 +240,7 @@ async function runFirstPassTransform(
 			cached.importedInterfaceHashes === cachedLink.signature &&
 			cached.importedSymbolClaims === cachedLink.claimSignature &&
 			(await importedConstantsUnchanged(pluginContext, manifestSource, cached.input)) &&
+			(await importedFunctionWritesUnchanged(pluginContext, manifestSource, cached.input)) &&
 			childStyleModuleIds.join('\n') ===
 				[...cached.linkedStyleModuleIds].toSorted().join('\n')
 		) {
@@ -336,6 +340,20 @@ async function runFirstPassTransform(
 			};
 			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
 		}
+		const missingWrites = missingFunctionWriteSources(
+			linkedTransformResult.importedFunctionWriteRequests,
+			linkedTransformInput.importedFunctionWrites,
+		);
+		if (missingWrites.length > 0) {
+			linkedTransformInput = {
+				...linkedTransformInput,
+				importedFunctionWrites: {
+					...linkedTransformInput.importedFunctionWrites,
+					...(await importedFunctionWrites(pluginContext, manifestSource, missingWrites)),
+				},
+			};
+			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
+		}
 	}
 	return {
 		result: linkedTransformResult,
@@ -353,5 +371,17 @@ async function importedConstantsUnchanged(
 	const known = input.importedModuleConstants;
 	if (!known || Object.keys(known).length === 0) return true;
 	const current = await importedModuleConstants(pluginContext, importer, Object.keys(known));
+	return JSON.stringify(current) === JSON.stringify(known);
+}
+
+// A helper module edited under an unchanged importer changes which paths its calls mark changed.
+async function importedFunctionWritesUnchanged(
+	pluginContext: TransformPluginContext,
+	importer: string,
+	input: TransformTsrxModuleInput,
+): Promise<boolean> {
+	const known = input.importedFunctionWrites;
+	if (!known || Object.keys(known).length === 0) return true;
+	const current = await importedFunctionWrites(pluginContext, importer, Object.keys(known));
 	return JSON.stringify(current) === JSON.stringify(known);
 }

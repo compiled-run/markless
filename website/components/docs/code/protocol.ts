@@ -40,6 +40,8 @@ export type FrameRequest =
 			readonly id: number;
 			readonly entry: string;
 			readonly modules: readonly CompiledModule[];
+			/** The block's `.css` files no module imports, applied as the result page's own stylesheets. */
+			readonly pageStyles: readonly string[];
 	  }
 	| {
 			readonly type: 'code:look';

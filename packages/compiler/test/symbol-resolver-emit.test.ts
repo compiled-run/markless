@@ -499,3 +499,33 @@ test('emitSymbolResolverModule exports the symbol manifest with protocol and bui
 		},
 	]);
 });
+
+// A packed module's namespace is a proxy whose property reads run export getters; a group holds many exports.
+test('loading a symbol runs the chunk initializers without reading any other export of its module', () => {
+	const symbols = Array.from({ length: 12 }, (_, index) => ({
+		id: `symbol:${index}`,
+		chunk: 'virtual:markless:symbol:group',
+		exportName: `symbol_${index}`,
+	}));
+	const output = emitSymbolResolverModule({ symbols });
+	const scan = /function runGeneratedSymbolChunkInitializers\(mod\) \{[\s\S]*?\n\}/.exec(output)![0];
+	const read: string[] = [];
+	let initialized = 0;
+	const exports: Record<string, unknown> = {
+		init__virtual_markless_symbol_a: () => initialized++,
+		...Object.fromEntries(symbols.map((symbol) => [symbol.exportName, () => symbol.id])),
+	};
+	const namespace = new Proxy(exports, {
+		get(target, key) {
+			if (typeof key === 'string') read.push(key);
+			return Reflect.get(target, key);
+		},
+		getOwnPropertyDescriptor(target, key) {
+			if (typeof key === 'string') read.push(key);
+			return Reflect.getOwnPropertyDescriptor(target, key);
+		},
+	});
+	new Function(`${scan}\nrunGeneratedSymbolChunkInitializers(arguments[0]);`)(namespace);
+	expect(initialized).toBe(1);
+	expect(read).toEqual(['init__virtual_markless_symbol_a']);
+});

@@ -25,7 +25,11 @@ import {
 	isFrameworkApiName,
 	type FrameworkApiName,
 } from './imports.ts';
-import { collectDestructuredAliases, collectWholeBindingAlias } from './collect-aliases.ts';
+import {
+	collectDestructuredAliases,
+	collectWholeBindingAlias,
+	patternIdentifiers,
+} from './collect-aliases.ts';
 import { collectAsyncComputedPostAwaitReads, collectGraphDependencies } from './collect-async.ts';
 import {
 	collectExpressionReads,
@@ -43,11 +47,12 @@ import {
 	helperStateReturnUnsupportedDiagnostic,
 	nestedStateCreationDiagnostic,
 	stateElementHandleUnsupportedDiagnostic,
+	stateFunctionValueUnsupportedDiagnostic,
 	unsupportedHelperStateReturnDiagnostic,
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
-import { inlineRenderLocals } from './render-local-inline.ts';
+import { inlineRenderLocals, writesOutside } from './render-local-inline.ts';
 import { ownedModuleAst, type ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
@@ -72,6 +77,20 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		if (id && init && !name && collectUnsupportedHelperReturnShape(id, init, state)) {
 			continue;
 		}
+		if (id && !name && (id.type === 'ObjectPattern' || id.type === 'ArrayPattern'))
+			for (const local of patternIdentifiers(id)) {
+				const localName = getIdentifierName(local);
+				if (
+					!localName ||
+					state.graph.aliases.some((alias) => alias.sourceSpan?.start === local.start)
+				)
+					continue;
+				state.graph.localDeclarations.push({
+					name: localName,
+					scope: localDeclarationScope(state),
+					componentName: state.currentComponentName ?? undefined,
+				});
+			}
 		if (!id || !name || !init) continue;
 
 		state.graph.localDeclarations.push({
@@ -224,6 +243,15 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			const partialInitial = evaluatedInitial.ok
 				? null
 				: partialInitialStateValue(initial, state);
+			const storedFunction = findFunctionStateValue(initial);
+			if (storedFunction)
+				state.graph.diagnostics.push(
+					stateFunctionValueUnsupportedDiagnostic({
+						stateName: name,
+						source: expressionSource(storedFunction, state.source),
+						sourceSpan: sourceSpan(storedFunction, state.filename),
+					}),
+				);
 			const elementHandle = findElementHandleStateValue(initial, state);
 			if (elementHandle) {
 				state.graph.diagnostics.push(
@@ -378,9 +406,7 @@ export function collectComputedBinding(input: {
 	}
 	// A shared() factory's locals are carried by the factory scope, not recomputed here.
 	const inlined =
-		body && !state.currentSharedDefinitionId
-			? inlineRenderLocals(body, state, { leaveCaptureOwned: true })
-			: null;
+		body && !state.currentSharedDefinitionId ? inlineRecipeLocals(body, state) : null;
 	if (inlined && inlined.kind !== 'inlined') {
 		state.graph.diagnostics.push(
 			computedReadsRenderLocalDiagnostic({
@@ -421,6 +447,18 @@ export function collectComputedBinding(input: {
 	collectExpressionReads(body, state);
 	if (isAsync) collectAsyncComputedPostAwaitReads(name, body, state);
 	return binding;
+}
+
+// A body function the recipe calls is spliced in, unless it writes; that one stays a capture to refuse.
+function inlineRecipeLocals(body: AnyNode, state: WalkState) {
+	const spliced = inlineRenderLocals(body, state, {
+		leaveCaptureOwned: true,
+		inlineFunctions: true,
+	});
+	return spliced.kind === 'inlined' &&
+		!spliced.definitions.some((definition) => writesOutside(definition, state))
+		? spliced
+		: inlineRenderLocals(body, state, { leaveCaptureOwned: true });
 }
 
 export function collectModuleGraphInterface(input: {
@@ -604,7 +642,9 @@ function freeNames(node: AnyNode, state: WalkState): ReadonlyArray<string> {
 	const visit = (current: AnyNode, parent: AnyNode | null) => {
 		const isKey =
 			parent &&
-			((parent.type === 'MemberExpression' && parent.property === current && parent.computed !== true) ||
+			((parent.type === 'MemberExpression' &&
+				parent.property === current &&
+				parent.computed !== true) ||
 				(parent.type === 'Property' && parent.key === current && parent.computed !== true));
 		if (
 			current.type === 'Identifier' &&
@@ -627,7 +667,9 @@ function initializerForCall(
 	state: WalkState,
 ): string {
 	if (parameters.length === 0) return initializerSource;
-	const args = asNodes(call.arguments).map((argument) => expressionSource(argument, state.source));
+	const args = asNodes(call.arguments).map((argument) =>
+		expressionSource(argument, state.source),
+	);
 	return `((${parameters.join(', ')}) => (${initializerSource}))(${args.join(', ')})`;
 }
 
@@ -781,8 +823,13 @@ function collectImportedHelperBindingForCall(
 
 	const returns = helperExport.returns;
 	const parameters = returns.parameters ?? [];
-	const unreachable = (returns.initializerNames ?? []).filter((name) => !parameters.includes(name));
-	if (returns.initializerSource !== undefined && (unreachable.length > 0 || !returns.parameters)) {
+	const unreachable = (returns.initializerNames ?? []).filter(
+		(name) => !parameters.includes(name),
+	);
+	if (
+		returns.initializerSource !== undefined &&
+		(unreachable.length > 0 || !returns.parameters)
+	) {
 		state.graph.diagnostics.push(
 			unsupportedHelperStateReturnDiagnostic({
 				helperName: moduleImport.localName,
@@ -806,7 +853,14 @@ function collectImportedHelperBindingForCall(
 		...graphBindingFromInterfaceReturn(returns, state),
 		...declaringComponent(state),
 		...(returns.initializerSource !== undefined
-			? { initializerSource: initializerForCall(returns.initializerSource, parameters, call, state) }
+			? {
+					initializerSource: initializerForCall(
+						returns.initializerSource,
+						parameters,
+						call,
+						state,
+					),
+				}
 			: {}),
 	});
 	state.currentHelperCall = previousCall;
@@ -857,7 +911,9 @@ function collectHelperBindingForCall(
 			...(returns.parameters ? [] : ['a parameter pattern']),
 			...declaredNamesIn(helper.body as AnyNode | undefined),
 		]);
-		const unreachable = (returns.initializerNames ?? []).filter((name) => helperLocals.has(name));
+		const unreachable = (returns.initializerNames ?? []).filter((name) =>
+			helperLocals.has(name),
+		);
 		if (!returns.parameters || unreachable.length > 0) {
 			state.graph.diagnostics.push(
 				unsupportedHelperStateReturnDiagnostic({
@@ -891,7 +947,12 @@ function collectHelperBindingForCall(
 	if (binding?.initializerSource !== undefined && returns?.kind === 'state' && returns.parameters)
 		state.graph.graphBindings[index] = {
 			...binding,
-			initializerSource: initializerForCall(binding.initializerSource, returns.parameters, call, state),
+			initializerSource: initializerForCall(
+				binding.initializerSource,
+				returns.parameters,
+				call,
+				state,
+			),
 		} as SemanticGraphBinding;
 	return target;
 }
@@ -1438,6 +1499,39 @@ function containsNonSerializableConstantValue(
 	if (isFunctionValue(node) || isClassInstanceValue(node) || isDomNodeValue(node)) return true;
 
 	return isNonSerializableConstantValue(node, state);
+}
+
+// A literal's own values only: a function that returns data is a value that never reaches state.
+function findFunctionStateValue(node: AnyNode | undefined): AnyNode | null {
+	if (!node) return null;
+	if (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'ClassExpression'
+	)
+		return node;
+	if (
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'ParenthesizedExpression'
+	)
+		return findFunctionStateValue(node.expression as AnyNode | undefined);
+	if (node.type === 'ObjectExpression')
+		for (const property of asNodes(node.properties)) {
+			if (property.type === 'Property' && property.method === true) return property;
+			const found = findFunctionStateValue(
+				(property.type === 'SpreadElement' ? property.argument : property.value) as
+					| AnyNode
+					| undefined,
+			);
+			if (found) return found;
+		}
+	if (node.type === 'ArrayExpression')
+		for (const element of asNodes(node.elements)) {
+			const found = findFunctionStateValue(element);
+			if (found) return found;
+		}
+	return null;
 }
 
 function findElementHandleStateValue(

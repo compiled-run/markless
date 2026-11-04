@@ -1,5 +1,6 @@
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
 import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
+import { composedArmRecordQualifier } from './resume-handle-qualifier.ts';
 import type {
 	ResumeBehaviorRecord,
 	ResumeBranchRecord,
@@ -149,20 +150,34 @@ function createBranchRegistration(
 					graph,
 					branch,
 				);
-			const update = await symbol({
+			const context = {
 				graph,
 				arm,
 				branchId: branch.sourceId ?? branch.id,
 				composedBranchId: branch.id,
 				element: input.root,
 				getElementHandle: input.elementHandles.get,
-			});
+			};
+			// A computed only the incoming arm reads derives as the arm reads it.
+			await input.graph.settleWriteObservers?.();
+			let update = await symbol(context);
+			// One that derives through a promise lands after this read, so the arm reads again.
+			const derived = !update?.armRecords && input.graph.settleWriteObservers?.();
+			if (derived) {
+				await derived;
+				update = await symbol(context);
+			}
 			if (!isResumeBranchUpdate(update)) return;
 			currentArm = update.arm;
 			paintArm(update.arm);
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
-			if (update.armRecords) return input.commitArm(branch, { ...update, html });
+			// A composed child's escalated render spells its ids in the child's own space.
+			if (update.armRecords)
+				return input.commitArm(branch, {
+					...(composedArmRecordQualifier()?.branchUpdate?.(branch, update as never, input.graph) ?? update),
+					html,
+				});
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
 						html,
@@ -267,13 +282,18 @@ function createBranchRegistration(
 	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
 }
 
+export type ComposedBranchGraph = RuntimeGraph & {
+	readonly composedGraphProps?: ResumeBranchRecord['composedGraphProps'];
+};
+
 // Read local prop IDs without importing the composition runtime into resume.
-export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
+export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): ComposedBranchGraph {
 	const routes = branch.composedGraphProps;
 	if (!routes?.length) return graph;
 	const scope = branch.composedInstancePath ?? '';
 	return {
 		...graph,
+		composedGraphProps: routes,
 		read(id: string, path: ReadonlyArray<string> = []) {
 			// Resume scoped this symbol, so the id arrives carrying the instance
 			// path; `prop:` is not page space, so taking it back off is exact.

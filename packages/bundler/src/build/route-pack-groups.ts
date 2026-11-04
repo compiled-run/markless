@@ -317,13 +317,70 @@ export function planRoutePackGroups(input: {
 	// Entry-rooted builds resolve symbols through their source's symbol chunk, so their packs stay whole.
 	return splitOversizedLazyPacks(
 		input.pagesLoadOneRoute
-			? splitFrameworkFromApp(
-					splitStartupPacksByStaticReach(groups, roots, sources, owners, input),
+			? splitOversizedStartupPacks(
+					splitFrameworkFromApp(
+						splitStartupPacksByStaticReach(groups, roots, sources, owners, input),
+						input,
+					),
 					input,
 				)
 			: groups,
 		input,
 	);
+}
+
+// A routed page preloads every piece of its startup pack at once; pieces cut from the pack's execution order import only earlier pieces.
+function splitOversizedStartupPacks(
+	groups: Map<string, string>,
+	input: Parameters<typeof planRoutePackGroups>[0],
+): Map<string, string> {
+	const cap = input.maxPackBytes;
+	if (!cap) return groups;
+	const packs = new Map<string, string[]>();
+	for (const [id, group] of groups) if (isStartupPack(group)) push(packs, group, id);
+	const sizeOf = (id: string) =>
+		(input.modules.get(id)?.size ?? 0) + PACK_COST_MODEL.packedModuleWrapperBytes;
+	const routeRoots = [...input.routes.values()].flat();
+	for (const [group, ids] of packs) {
+		if (ids.reduce((sum, id) => sum + sizeOf(id), 0) <= cap) continue;
+		const members = new Set(ids);
+		const order: string[] = [];
+		const seen = new Set<string>();
+		const visit = (start: string) => {
+			const stack: Array<[string, number]> = [[start, 0]];
+			seen.add(start);
+			while (stack.length) {
+				const top = stack[stack.length - 1]!;
+				const dependencies = input.modules.get(top[0])?.dependencies ?? [];
+				const next = dependencies
+					.slice(top[1])
+					.findIndex((dependency) => members.has(dependency) && !seen.has(dependency));
+				if (next < 0) {
+					order.push(top[0]);
+					stack.pop();
+					continue;
+				}
+				const dependency = dependencies[top[1] + next]!;
+				top[1] += next + 1;
+				seen.add(dependency);
+				stack.push([dependency, 0]);
+			}
+		};
+		for (const id of [...routeRoots.filter((id) => members.has(id)), ...[...ids].sort()])
+			if (!seen.has(id)) visit(id);
+		let piece = 1;
+		let filled = 0;
+		for (const id of order) {
+			const size = sizeOf(id);
+			if (filled > 0 && filled + size > cap) {
+				piece++;
+				filled = 0;
+			}
+			filled += size;
+			if (piece > 1) groups.set(id, `${group}~${piece}`);
+		}
+	}
+	return groups;
 }
 
 // Nothing preloads a navigation or deferred pack, so cutting one into files under the cap costs no extra round.
@@ -343,7 +400,9 @@ function splitOversizedLazyPacks(
 		for (const id of ids) push(bySource, input.modules.get(id)?.source ?? id, id);
 		let part = 0;
 		let filled = Infinity;
-		for (const [, members] of [...bySource].sort(([left], [right]) => left.localeCompare(right))) {
+		for (const [, members] of [...bySource].sort(([left], [right]) =>
+			left.localeCompare(right),
+		)) {
 			const size = members.reduce((sum, id) => sum + sizeOf(id), 0);
 			if (filled + size > cap) {
 				part++;
@@ -511,6 +570,13 @@ export function startupPackOfLazy(name: string): string {
 
 const LAZY_PACK_MARK = '-lazy';
 const PACK_PART_MARK = '-part';
+
+// The pack a startup piece was cut from: the framework half and size-capped pieces serve the same routes.
+export function packOfPiece(name: string): string {
+	return name.replace(PACK_PIECES, '');
+}
+
+const PACK_PIECES = /(?:~\d+)+$/;
 
 // The pack a size-capped file was cut from: its parts serve the same routes.
 export function packOfPart(name: string): string {

@@ -2395,6 +2395,26 @@ export function App() @{
 	expect(output.html).not.toContain('<style');
 });
 
+test('compileTsrxModule names the stylesheets a module imports for their effect, in source order', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SiteShell.tsrx',
+		source: `
+import './site.css';
+import type { Theme } from './theme.css';
+import tokens from './tokens.css?url';
+import 'some-kit/base.scss';
+import './polyfill.ts';
+
+export function Shell() @{
+	<main class="shell"><p>{tokens}</p></main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.stylesheetImports).toEqual(['./site.css', 'some-kit/base.scss']);
+});
+
 // A scoped rule only matches an element carrying the scope class, so an element
 // whose class is an expression has to compose with it too.
 test('compileTsrxModule scopes an element whose class is a dynamic expression', async () => {
@@ -5048,9 +5068,15 @@ export function Page() @{
 	expect(output.html).toContain('data-capture-literal="true"');
 	expect(output.html).toContain('>Server spruce</button>');
 	expect(output.html).toContain('>Server copper</button>');
-	expect(output.view.domUpdates).toEqual([
+	expect(output.view.domUpdates).toContainEqual(
 		expect.objectContaining({ hostNodeId: 'c0:h0', graphNodeId: 'state:graphLabel' }),
-	]);
+	);
+	// The marker attributes read props alone; a parent passing state would move them.
+	expect(
+		output.view.domUpdates
+			.filter((update) => update.graphNodeId !== 'state:graphLabel')
+			.every((update) => update.graphNodeId.includes('computed:templateExpression:')),
+	).toBe(true);
 });
 
 test('compileTsrxModule offsets sibling children by element count, not locator count', async () => {

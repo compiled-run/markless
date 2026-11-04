@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { codePane, FIRST_TAB, findCodeBlocks, rewriteCodeBlocks } from './code-blocks.ts';
+import { readFileSync } from 'node:fs';
+import {
+	codePane,
+	FIRST_TAB,
+	findCodeBlocks,
+	PAGE_STYLE,
+	rewriteCodeBlocks,
+	scopedPageStyle,
+} from './code-blocks.ts';
+
+const SHARED_SHEET = readFileSync(new URL('../components/docs/code/style.css', import.meta.url), 'utf8');
 
 const PAGE = '/site/pages/concepts/demo.mdx';
 
@@ -113,13 +123,13 @@ describe('several .tsrx files in one block', () => {
 		const dir = '/site/components/docs/code/generated/concepts-demo-1';
 		const module = written.get(`${dir}/block.tsrx`) ?? '';
 		expect(module).toContain('import Starter from "./Card.tsrx";');
-		expect(module).toContain('<Code files={files} panes={panes} note="Edit the card">');
+		expect(module).toContain('<Code files={files} panes={panes} note="Edit the card" stylesheets={[sheet0]}>');
 		const files = JSON.parse(/const files = (.*);/.exec(module)?.[1] ?? '[]') as { name: string }[];
-		expect(files.map((file) => file.name)).toEqual(['Card.tsrx', 'Page.tsrx']);
+		expect(files.map((file) => file.name)).toEqual(['Card.tsrx', 'Page.tsrx', PAGE_STYLE]);
 		const panes = JSON.parse(/const panes = (.*);/.exec(module)?.[1] ?? '[]') as { name: string }[];
-		expect(panes.map((pane) => pane.name)).toEqual(['Page.tsrx', 'Card.tsrx']);
+		expect(panes.map((pane) => pane.name)).toEqual(['Page.tsrx', 'Card.tsrx', PAGE_STYLE]);
 		const tabs = JSON.parse(/const panes = (.*);/.exec(module)?.[1] ?? '[]') as { tab: string }[];
-		expect(tabs.map((pane) => pane.tab)).toEqual([FIRST_TAB, 'Card.tsrx']);
+		expect(tabs.map((pane) => pane.tab)).toEqual([FIRST_TAB, 'Card.tsrx', PAGE_STYLE]);
 	});
 
 	it('writes every .tsrx file beside the module so the entry\'s relative imports resolve', async () => {
@@ -152,7 +162,7 @@ describe('rewriteCodeBlocks', () => {
 		const module = written.get(`${dir}/block.tsrx`) ?? '';
 		expect(module).toContain('import Code from "../../../code.tsrx";');
 		expect(module).toContain('import Starter from "./Panel.tsrx";');
-		expect(module).toContain('<Code files={files} panes={panes} note="Try it">');
+		expect(module).toContain('<Code files={files} panes={panes} note="Try it" stylesheets={[sheet0]}>');
 		expect(module).toContain('<Starter />');
 	});
 
@@ -161,6 +171,46 @@ describe('rewriteCodeBlocks', () => {
 		const withImport = `import Code from '../../components/docs/code.tsrx';\n\n${page}`;
 		const next = await rewriteCodeBlocks(withImport, PAGE, '/site', () => {});
 		expect(next).not.toMatch(/^import Code /m);
+	});
+});
+
+describe('the shared style.css tab', () => {
+	const dir = '/site/components/docs/code/generated/concepts-demo-1';
+	const filesOf = (module: string) =>
+		JSON.parse(/const files = (.*);/.exec(module)?.[1] ?? '[]') as { name: string; code: string }[];
+
+	it('adds the site sheet as the last tab of a block without a .css fence and links its scoped copy', async () => {
+		const written = new Map<string, string>();
+		await rewriteCodeBlocks(page, PAGE, '/site', (path, text) => written.set(path, text));
+		const module = written.get(`${dir}/block.tsrx`) ?? '';
+		const files = filesOf(module);
+		expect(files.map((file) => file.name)).toEqual(['Panel.tsrx', 'text.ts', PAGE_STYLE]);
+		expect(files.at(-1)?.code).toBe(SHARED_SHEET);
+		expect(written.get(`${dir}/${PAGE_STYLE}`)).toBe(SHARED_SHEET);
+		expect(module).toContain('import sheet0 from "../page-style.css?url";');
+		expect(written.get('/site/components/docs/code/generated/page-style.css')).toBe(scopedPageStyle(SHARED_SHEET));
+	});
+
+	it('leaves a block that brings its own .css fence with only its own sheet', async () => {
+		const own = page.replace(
+			'```ts title="text.ts"',
+			'```css title="look.css"\np { color: red; }\n```\n\n```ts title="text.ts"',
+		);
+		const written = new Map<string, string>();
+		await rewriteCodeBlocks(own, PAGE, '/site', (path, text) => written.set(path, text));
+		const module = written.get(`${dir}/block.tsrx`) ?? '';
+		expect(filesOf(module).map((file) => file.name)).toEqual(['Panel.tsrx', 'look.css', 'text.ts']);
+		expect(module).toContain('import sheet0 from "./look.css?url";');
+	});
+
+	it('confines the in-page copy to the result box, reading body as that box', () => {
+		const scoped = scopedPageStyle('body {\n\tcolor: red;\n}\n\nh1,\nbody p {\n\tmargin: 0;\n}\n');
+		expect(scoped).toBe('@scope (.code-stage) {\n:scope {\n\tcolor: red;\n}\n\nh1,\n:scope p {\n\tmargin: 0;\n}\n}\n');
+	});
+
+	it('fits the code column beside the preview', () => {
+		const wide = SHARED_SHEET.split('\n').filter((line) => line.replaceAll('\t', '  ').length > 50);
+		expect(wide).toEqual([]);
 	});
 });
 

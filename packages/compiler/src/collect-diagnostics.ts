@@ -1,5 +1,5 @@
 import type { CompileTsrxModuleResult } from './artifacts.ts';
-import type { CompilerDiagnostic } from './diagnostics.ts';
+import { applyMarklessAllowDirectives, type CompilerDiagnostic } from './diagnostics.ts';
 
 type DiagnosticIdentity = readonly [
 	code: unknown,
@@ -45,7 +45,22 @@ export function collectTsrxModuleDiagnostics(
 	}
 
 	visit(result);
-	return diagnostics;
+	if (!result.allowScan) return diagnostics;
+	const allowed: CompilerDiagnostic[] = [];
+	const seen: DiagnosticIdentity[] = [];
+	for (const diagnostic of applyMarklessAllowDirectives({
+		...result.allowScan,
+		diagnostics,
+		phase: 'semantic-graph',
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+	})) {
+		const identity = diagnosticIdentity(diagnostic);
+		if (seen.some((other) => sameIdentity(other, identity))) continue;
+		seen.push(identity);
+		allowed.push(diagnostic);
+	}
+	return allowed;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

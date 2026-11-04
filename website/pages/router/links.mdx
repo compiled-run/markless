@@ -75,7 +75,7 @@ Plain `<a>` links to your pages navigate the same way.
 <Callout
 	sprite="cross"
 	title="Does visiting the page change something?"
-	text="An early request is a real GET to your server, so it counts as a visit. A log-out link, a one-time token, a view counter: any of them runs when the visitor only looked at the link. Put prefetch={false} on a Link to such a page, and only a real click asks for it."
+	text="An early request is a real GET to your server, so it counts as a visit. A log-out link, a one-time token, a view counter: any of them runs when the visitor only looked at the link. Put prefetch={false} on the link to such a page, and only a real click asks for it."
 />
 
 The router never requests these early:
@@ -85,7 +85,7 @@ The router never requests these early:
 | another site's address | the router only fetches your own pages |
 | a path under `/api/` | an endpoint can do anything on a GET |
 | `download`, `target="_blank"` (any `target` but `_self`), or `rel="external"` | the click leaves this tab or this app |
-| `<Link prefetch={false}>` | you said so |
+| `prefetch={false}` on the link | you said so |
 
 Everything else that names one of your pages is fair game, plain `<a>` included. `rel="nofollow"`
 does not stop it: that tells search engines what to trust, not browsers what to fetch. Next.js,
@@ -131,6 +131,10 @@ only that one click skips the swap.
 | `prefetch={false}` | the router requests nothing before the click |
 | `replace` | replaces the current history entry instead of adding one |
 | `scroll={false}` | keeps the scroll position |
+
+`prefetch={false}` works on a `<Link>`, on a plain `<a>`, and on a component that passes its props
+on to an `<a>`, such as a navbar's link part. Anywhere else nothing would act on it, so the build
+stops with `MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED` and names the element.
 
 To turn early requests off for every link, write `router({ prefetch: false })` in `vite.config.ts`.
 Links still work.

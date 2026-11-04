@@ -26,6 +26,8 @@ export type SemanticGraphInput = {
 	 * `importedConstants` on this module's props.
 	 */
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	/** What each imported module's exported functions write below their arguments, by specifier and export name. */
+	readonly importedFunctionWrites?: Readonly<Record<string, ModuleFunctionWrites>>;
 	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly additionalFrameworkApiSources?: readonly string[];
 	/**
@@ -35,10 +37,25 @@ export type SemanticGraphInput = {
 	 */
 	readonly serverOnlyProps?: readonly ServerOnlyProp[];
 	/**
+	 * Attributes only one kind of element acts on. A component given one must pass
+	 * it, through the spread of its props, to such an element, or the build fails:
+	 * on any other element nothing would act on it and nothing would say so.
+	 */
+	readonly elementOnlyAttributes?: readonly ElementOnlyAttribute[];
+	/**
 	 * The router renders this module's root component as a page, and no module
 	 * renders it as a child, so its props never change in the browser.
 	 */
 	readonly routeRoot?: boolean;
+};
+
+export type ElementOnlyAttribute = {
+	/** The attribute as the element carries it. */
+	readonly name: string;
+	/** The one element that acts on it, lowercase. */
+	readonly tagName: string;
+	/** How an author writes it, which is what the diagnostic quotes. */
+	readonly authored: string;
 };
 
 export type ServerOnlyProp = {
@@ -342,6 +359,23 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
+			 * Props this component's event handlers read, directly or through a child
+			 * it hands them to; `*` when a handler reads the props object whole. A
+			 * module rendering it in the rows of a module constant puts that list on
+			 * the graph, so each row's handler reads its own row's value.
+			 */
+			readonly handlerProps?: ReadonlyArray<string>;
+			/**
+			 * Props this component's tree re-derives from after resume, served only
+			 * while they arrive as a constant. A module forwarding one of its own
+			 * props here serves that prop itself. Absent when there are none.
+			 */
+			readonly derivedProps?: ReadonlyArray<string>;
+			/** The paths below each derived prop its derives read, for a prop they do not read whole. */
+			readonly derivedPropPaths?: Readonly<
+				Record<string, ReadonlyArray<ReadonlyArray<string>>>
+			>;
+			/**
 			 * Present when a keyed repeat sits at this component's top level, so its
 			 * rows need the container as their parent.
 			 */
@@ -453,6 +487,10 @@ export type ModuleGraphInterfaceArmMaterial = {
  */
 export type ModuleGraphInterfaceSpreadHost = {
 	readonly hostNodeId: string;
+	/** The element the spread lands on, lowercase. */
+	readonly tagName: string;
+	/** The spread is the component's props rest binding; a spread of any other object carries none of a consumer's props. */
+	readonly carriesProps?: true;
 	readonly excludeNames: ReadonlyArray<string>;
 	readonly destructuredNames: ReadonlyArray<string>;
 	/** The class the element writes ahead of a spread-carried `class`: its module's style scope. */
@@ -779,6 +817,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED'
 		| 'MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE'
 		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
@@ -789,6 +828,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_SCOPE_INVALID'
 		| 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
+		| 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
 		| 'MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF'
 		| 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED'
@@ -829,16 +869,43 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_ROWS_FROZEN'
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
+		| 'MARKLESS_ASYNC_ARM_ORDER'
 		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_TAG_UNRESOLVED'
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
-		| 'MARKLESS_ALLOW_STALE';
+		| 'MARKLESS_ALLOW_STALE'
+		| 'MARKLESS_CALL_WRITES_ASSUMED';
 	// The external TSRX parser fails before the graph pass runs; that diagnostic carries phase 'parse'.
 	readonly phase: 'parse' | 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
+};
+
+/** A member path below an argument that a function writes; `[]` is the whole value. */
+export type ParameterWrite = {
+	readonly path: ReadonlyArray<string>;
+	/** The function hands this value to code the analysis cannot see, so the write is assumed. */
+	readonly assumed?: true;
+};
+
+/** What a function writes below each value it is passed, by argument position. */
+export type FunctionParameterWrites = {
+	readonly parameters: ReadonlyArray<ReadonlyArray<ParameterWrite>>;
+	/** Every argument from `parameters.length` on, when the last parameter is a rest parameter. */
+	readonly rest?: ReadonlyArray<ParameterWrite>;
+};
+
+export type ModuleFunctionWrites = Readonly<Record<string, FunctionParameterWrites>>;
+
+/** State handed to a function call that changes it in place before the call returns. */
+export type PassedStateWrite = {
+	/** The argument and callee as authored, which the lowering finds the call by. */
+	readonly argument: string;
+	readonly argumentIndex: number;
+	readonly callee: string;
+	readonly assumed?: true;
 };
 
 export type SemanticStateWrite = {
@@ -862,6 +929,8 @@ export type SemanticStateWrite = {
 	readonly through?: SemanticWriteThrough;
 	/** `Object.assign(target, ...sources)`: `target` is the first argument, `argumentSources` the rest. */
 	readonly objectAssign?: true;
+	/** `target` is the path a function call writes below the state passed to it. */
+	readonly passedTo?: PassedStateWrite;
 };
 
 /**
@@ -944,6 +1013,10 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// The expression as written, when `source` carries a body function spliced into its call.
+	readonly authoredSource?: string;
+	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
+	readonly keyedRepeatId?: string;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).
@@ -1209,6 +1282,8 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly kind: 'spread-attributes';
 				readonly residue: SemanticMarkupResidue;
 				readonly excludeNames: ReadonlyArray<string>;
+				// The spread is the component's props rest binding, so it carries what a consumer passed.
+				readonly carriesProps?: true;
 				// Prop names the component signature already took out of the rest
 				// binding, so they never reach this spread at all.
 				readonly destructuredNames?: ReadonlyArray<string>;
@@ -1329,6 +1404,8 @@ export type SemanticGraphArtifact = {
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
+	/** Imported modules whose function write facts this compile was not given. */
+	readonly importedFunctionWriteRequests?: ReadonlyArray<string>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
 		readonly anchorOrder: number;
@@ -1530,6 +1607,8 @@ export type LoweredStateWrite = {
 	readonly through?: LoweredWriteThrough;
 	/** `Object.assign(target, ...sources)`: each member the sources carry is written. */
 	readonly objectAssign?: true;
+	/** A function call changed this path in place; it is marked changed once the call returns. */
+	readonly passedTo?: PassedStateWrite;
 };
 
 export type LoweredWriteThrough = {
@@ -2365,11 +2444,6 @@ export type SymbolResolverModuleInput = {
 		// callback slot alone and leaves the child's own captures to the child.
 		readonly claimKind?: 'prop-bound' | 'widget-callback';
 		readonly captureSymbol?: ExtractedCaptureSymbol;
-		/**
-		 * The module a literal `import()` of this symbol names when something else
-		 * imports `chunk` statically: an `export *` entry, so no module is imported both ways.
-		 */
-		readonly lazyChunk?: string;
 	}>;
 	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;
 };
@@ -2703,6 +2777,8 @@ export type PublicRenderPlanAsyncBoundaryGate =
 export type PublicRenderPlanArtifact = {
 	readonly passId: 'public-render-plan';
 	readonly styleScopes: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
+	/** Stylesheets the module imports for their effect (`import './site.css'`), in source order. */
+	readonly stylesheetImports: ReadonlyArray<string>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
@@ -2811,6 +2887,8 @@ export type CompilerPassGraph = {
 
 export type CompileTsrxModuleResult = {
 	readonly passGraph: CompilerPassGraph;
+	/** The authored source, read once more for `markless-allow` comments that name any pass's warning. */
+	readonly allowScan?: { readonly filename: string; readonly source: string };
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	readonly stateLowering: StateLoweringArtifact;

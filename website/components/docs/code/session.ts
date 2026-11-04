@@ -6,6 +6,7 @@ import type {
 	CodeDiagnostic,
 	CodeFile,
 	CompileOutcome,
+	CompiledModule,
 	FrameReply,
 	FrameRequest,
 	WorkerReply,
@@ -87,6 +88,13 @@ function part<T extends HTMLElement>(box: HTMLElement, name: string): T {
 	const found = box.querySelector<T>(`[data-code-${name}]`);
 	if (!found) throw new Error(`The Code block has no [data-code-${name}] element.`);
 	return found;
+}
+
+function pageStyles(files: readonly CodeFile[], modules: readonly CompiledModule[]): string[] {
+	const imported = modules.filter((module) => module.kind === 'style').map((module) => module.id.split('?', 1)[0]!);
+	return files
+		.filter((file) => file.name.endsWith('.css') && !imported.some((id) => id.endsWith(`/${file.name}`)))
+		.map((file) => file.code);
 }
 
 let fluidNames: readonly string[] | undefined;
@@ -340,6 +348,7 @@ async function start(box: HTMLElement, starters: readonly CodeFile[]): Promise<C
 			id,
 			entry: outcome.entry,
 			modules: outcome.modules,
+			pageStyles: pageStyles(current, outcome.modules),
 		};
 		if (ready) send(modules);
 		else held = modules;

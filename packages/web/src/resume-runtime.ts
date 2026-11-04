@@ -2,6 +2,7 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalResult } from '@markless/runtime';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import type { ArmCommitUpdate, ArmRegistrationDeps } from './resume-commit-arm.ts';
 import type {
 	ResumeArmRange,
@@ -14,6 +15,10 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 
+// Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
+type SharedInstancesHost = {
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-instances.ts')>;
+};
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 type RuntimeShared = ReturnType<
 	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
@@ -62,8 +67,10 @@ export function createResumeRuntime(
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(),
 		containerSubscriptionReleases: Array<() => void> = [];
 	const asyncBoundariesById = prepared.asyncBoundariesById;
-	let settleTracker: AsyncBoundarySettleTracker | undefined;
-	let asyncBoundaryWiring: import('./resume-async-wiring.ts').AsyncBoundaryWiring | undefined;
+	let settleTracker: () => AsyncBoundarySettleTracker | undefined = () => undefined;
+	let asyncBoundaryWiring:
+		| (() => Promise<import('./resume-async-wiring.ts').AsyncBoundaryWiring>)
+		| undefined;
 	let behaviorRuntime: BehaviorRuntime | undefined, branchRuntime: BranchRuntime | undefined;
 	let events: EventWiring | undefined, runtimeShared: RuntimeShared | undefined;
 	const behaviorHostIds = new Set(input.view.behaviors.map((behavior) => behavior.hostNodeId));
@@ -177,6 +184,7 @@ export function createResumeRuntime(
 				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
+				ready: () => typeof input.loadSymbol(domUpdate.symbolId!) === 'function',
 				async run(value) {
 					const symbol = await input.loadSymbol(domUpdate.symbolId!);
 					return (await symbol({
@@ -312,7 +320,7 @@ export function createResumeRuntime(
 						await behaviors.activateBehaviors(hostNodeId, { flush: false });
 					}
 				: undefined,
-			asyncBoundaryWiring: () => asyncBoundaryWiring,
+			asyncBoundaryWiring: () => asyncBoundaryWiring?.(),
 			registerArmBranches: async (boundaryId, records) => {
 				const branches = await loadBranchRuntime();
 				for (const hostNodeId of branches.registerArmBranches(boundaryId, records as never))
@@ -447,6 +455,13 @@ export function createResumeRuntime(
 		});
 		// The seeded-value reconcile flushed before the journal listener existed; the graph kept its entries.
 		if (storagePlane) await input.graph.flush();
+		if (
+			hasLiveSharedDefinitions(input.state) &&
+			(await (globalThis as SharedInstancesHost).__marklessSharedInstances?.())?.reconcileSharedCells(
+				input.graph,
+			)
+		)
+			await input.graph.flush();
 		captureListenersStarted = true;
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
 			if (disposed) return;
@@ -487,7 +502,7 @@ export function createResumeRuntime(
 					status: 'missing' as const,
 					runVersion: null,
 					pendingSince: null,
-					hasSettledContent: settleTracker?.hasSettledContent(boundary.id) === true,
+					hasSettledContent: settleTracker()?.hasSettledContent(boundary.id) === true,
 					missingReason,
 				});
 				let snapshot: { readonly status?: unknown; readonly version?: unknown } | undefined;
@@ -519,7 +534,7 @@ export function createResumeRuntime(
 					hasSettledContent:
 						status === 'fulfilled' ||
 						status === 'rejected' ||
-						settleTracker?.hasSettledContent(boundary.id) === true,
+						settleTracker()?.hasSettledContent(boundary.id) === true,
 				};
 			}),
 		);
@@ -534,12 +549,13 @@ export function createResumeRuntime(
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
 		whenAsyncBoundariesSettled: async () => {
-			if (!settleTracker) return;
-			await settleTracker.whenAllSettled();
+			const tracker = settleTracker();
+			if (!tracker) return;
+			await tracker.whenAllSettled();
 			await input.graph.flush();
 		},
 		holdPendingSettleCommits: (minVisibleMs: number) => {
-			settleTracker?.holdSettleCommitsFor(minVisibleMs);
+			settleTracker()?.holdSettleCommitsFor(minVisibleMs);
 		},
 		getElement: (hostNodeId: string) =>
 			connectedElement(input.root, elementsByHostId.get(hostNodeId)),

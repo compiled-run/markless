@@ -38,15 +38,18 @@ describe('dense async generated symbol tables', () => {
 			expect(
 				verifyGeneratedSymbolTableRoutes(result.bundle, [result.manifest]),
 				result.bundleShape,
-			).toEqual({ verified: result.manifestSymbolIds.length, errors: [] });
+			).toEqual({ verified: result.manifest.symbols.length, errors: [] });
 		},
 	);
 
 	test('resolves all 31 compiler rows for the ten-by-ten shape', async () => {
 		const result = await buildDenseAsyncShape({ computeds: 10, boundaries: 10 });
 
-		expect(result.manifestSymbolIds).toHaveLength(31);
-		expect(result.tableRewrite).toEqual({ rewritten: 31, unresolved: [] });
+		expect(result.manifest.symbols).toHaveLength(31);
+		expect(result.tableRewrite).toEqual({
+			rewritten: result.manifestSymbolIds.length,
+			unresolved: [],
+		});
 		expect(result.resolverCode).not.toContain(symbolPrefix);
 	});
 
@@ -89,7 +92,7 @@ describe('dense async generated symbol tables', () => {
 			tableSource.replace(routeSpecifiers[0]!, routeSpecifiers[1]!);
 
 		expect(verifyGeneratedSymbolTableRoutes(bundle, [result.manifest])).toEqual({
-			verified: result.manifestSymbolIds.length - 1,
+			verified: result.manifest.symbols.length - 1,
 			errors: [
 				{
 					symbolId: 'symbol:0',
@@ -158,14 +161,19 @@ async function captureDenseAsyncBuild(shape: DenseAsyncShape): Promise<DenseAsyn
 	const outputs = Array.isArray(output) ? output.flatMap((item) => item.output) : output.output;
 	const rawBundle = cloneBundle(Object.fromEntries(outputs.map((item) => [item.fileName, item])));
 	const bundle = cloneBundle(rawBundle);
+	// The build packs, so its manifest names the module each symbol ships in, grouped or its own.
 	const transformed = await transformTsrxModule({
 		filename: sourceId,
 		source,
 		environment: 'client',
+		experimentalNativePacking: true,
+		executionLog: 'never',
 	});
-	const manifestSymbolIds = transformed.manifest.symbols.map((symbol) =>
-		normalizeVirtualId(symbol.virtualModuleId),
-	);
+	const manifestSymbolIds = [
+		...new Set(
+			transformed.manifest.symbols.map((symbol) => normalizeVirtualId(symbol.virtualModuleId)),
+		),
+	];
 	const bundleShape = JSON.stringify(
 		generatedChunks(bundle)
 			.filter((chunk) =>

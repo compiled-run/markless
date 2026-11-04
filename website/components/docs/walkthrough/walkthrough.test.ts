@@ -101,7 +101,8 @@ describe('the package-manager commands', () => {
 
 
 	it('puts every manager command on the page through the components', () => {
-		for (const kind of ['create', 'dev', 'ship']) expect(page).toContain(`<Commands kind="${kind}" />`);
+		for (const kind of ['create', 'dev', 'ship']) expect(page).toMatch(new RegExp(`<Commands kind="${kind}"( copy)? />`));
+		expect(page, 'the create command carries the ink Copy button').toContain('<Commands kind="create" copy />');
 		expect(page).not.toMatch(/^npm (create|run) /m);
 	});
 });

@@ -125,6 +125,8 @@ export type ProtocolEventRecord = {
 	readonly syncPolicy?: ProtocolSyncPolicy;
 	readonly symbolIds: ReadonlyArray<string>;
 	readonly action?: ProtocolEventAction;
+	/** The element sits in a child this record's component spread its props onto, so that component's instance is one edge above the host. */
+	readonly forwarded?: true;
 };
 
 export function protocolEventActionKind(
@@ -158,10 +160,7 @@ export type ProtocolStatePayload = {
 		readonly async: boolean;
 		// Sync computeds only: the update symbol that recomputes this node on resume.
 		readonly deriveSymbolId?: string;
-		// The value the render already derived, in the same envelope a cell value
-		// uses. A resume only re-derives a sync computed when a dependency is
-		// WRITTEN, so without this a handler reading one before the first write
-		// answers undefined. Served only for computeds a handler reads.
+		// The render's derived value, served only where resume reads it before a dependency write: a handler, a flipped arm or a keyed @for.
 		readonly value?: unknown;
 		// The same value on the live channel cells use: a CSR mount hands it over
 		// in memory, so it never needs an envelope. Never served — payload
@@ -196,6 +195,9 @@ export type ProtocolStatePayload = {
 		// A roster derive only: the host-id prefix of the component that declared it,
 		// which its symbol-space id cannot spell once a module holds several components.
 		readonly hostScope?: string;
+		// Only subscriptions and other such computeds read it, so resume re-derives it
+		// when it is read rather than on every dependency write.
+		readonly deriveOnRead?: true;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which
@@ -802,6 +804,9 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 			readonly runnerSymbolId?: string;
 		}>;
+		/** As on a branch: the part instance that authored this boundary and where its live props now live, for the arm its own module re-renders on settle. */
+		readonly composedInstancePath?: string;
+		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
 	}>;
 };
 

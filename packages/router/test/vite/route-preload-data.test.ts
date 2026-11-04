@@ -356,3 +356,52 @@ test('resolves chunk specifiers through the document import map when chunks impo
 		'pages/a.tsrx': ['/nested/build/chunk-hashed.js', '/nested/build/plain.js'],
 	});
 });
+
+test('a page rendered in the browser loads the stylesheets its document lacks once, and a failed one fails the load', async () => {
+	const code =
+		source().code.replace(/export (const|function) /g, '$1 ') + ';({loadRouteStylesheets})';
+	const { loadRouteStylesheets } = runInNewContext(code, {
+		__marklessRouterRoutePreloadsJson: JSON.stringify(
+			compactRoutePreloadData({
+				navigation: {},
+				ssr: {},
+				styles: {
+					'pages/a.tsrx': ['/nested/kept.css', '/nested/new.css', '/nested/broken.css'],
+				},
+			}),
+		),
+	});
+	const attributes = (pairs: Record<string, string>) => (name: string) => pairs[name] ?? null;
+	const head = {
+		children: [
+			{ getAttribute: attributes({ 'data-markless-css': '/nested/kept.css' }) },
+		] as any[],
+		appendChild(link: any) {
+			this.children.push(link);
+		},
+	};
+	const created: any[] = [];
+	const document = {
+		head,
+		createElement: () => {
+			const link: any = { pairs: {} as Record<string, string> };
+			link.setAttribute = (name: string, value: string) => (link.pairs[name] = value);
+			link.getAttribute = (name: string) =>
+				link.pairs[name] ?? (name === 'href' ? link.href : null);
+			link.remove = () => head.children.splice(head.children.indexOf(link), 1);
+			created.push(link);
+			return link;
+		},
+	};
+	const first = loadRouteStylesheets('pages/a.tsrx', document);
+	const second = loadRouteStylesheets('pages/a.tsrx', document);
+	expect(created.map((link) => link.href)).toEqual(['/nested/new.css', '/nested/broken.css']);
+	created[0].onload();
+	created[1].onerror();
+	await expect(first).rejects.toThrow('/nested/broken.css');
+	await expect(second).rejects.toThrow('/nested/broken.css');
+	expect(head.children.map((node) => node.getAttribute('data-markless-css'))).toEqual([
+		'/nested/kept.css',
+		'/nested/new.css',
+	]);
+});

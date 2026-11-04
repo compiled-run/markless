@@ -9,6 +9,9 @@ import { beforeAll, expect, test } from 'vitest';
 
 type VolarResult = ReturnType<typeof compileToVolarMappings>;
 
+// A test that type-checks against the real tsconfig builds a whole TypeScript program: about 2.5 s idle, past 5 s on a loaded machine.
+const TYPE_CHECK_TIMEOUT_MS = 60_000;
+
 const expectedFeatureData = {
 	verification: true,
 	completion: true,
@@ -185,7 +188,7 @@ export default function ControlPanel() @{
 	});
 	expect(propDiagnostic, formatDiagnostics(diagnostics).join('\n')).toBeDefined();
 	expect(mapGeneratedDiagnosticToSource(panel, propDiagnostic)?.start).toBe(propNameOffset);
-});
+}, TYPE_CHECK_TIMEOUT_MS);
 
 test('alternate component shape preserves mapped TypeScript prop diagnostics', () => {
 	const source = `import { state } from '@markless/core';
@@ -219,7 +222,7 @@ export default function Dashboard() @{
 	expect(
 		exactMappingAt(result, source, source.indexOf('article'), 'article'.length)?.data,
 	).toMatchObject(expectedFeatureData);
-});
+}, TYPE_CHECK_TIMEOUT_MS);
 
 test('returns recoverable usage errors and throws unusable files as fatal errors', () => {
 	const recoverableSource = `export default function Duplicate() @{

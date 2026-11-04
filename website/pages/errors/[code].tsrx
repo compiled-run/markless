@@ -5,5 +5,5 @@ export default function ErrorCodePage({
 }: {
 	readonly params: { readonly code: string };
 }) @{
-	<ErrorPage code={String(params.code)} />;
+	<ErrorPage code={params.code} />;
 }

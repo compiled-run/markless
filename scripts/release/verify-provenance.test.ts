@@ -61,6 +61,9 @@ function runVerify(fakeDirectory: string, deadlineMs: number) {
 
 const [first, second] = releasePackages().map((entry) => entry.name) as [string, string];
 
+// Each run spawns a node process per registry read, a dozen or more that together pass 5 s on a loaded machine.
+const RUN_TIMEOUT_MS = 120_000;
+
 test('a package the registry does not show yet is waited for, not failed', async () => {
 	const fake = await fakeRegistry({
 		[first]: [
@@ -74,19 +77,20 @@ test('a package the registry does not show yet is waited for, not failed', async
 			'attested',
 		],
 	});
-	const result = runVerify(fake, 10_000);
+	// The eighth read answers, so the deadline only bounds a run that never would.
+	const result = runVerify(fake, 60_000);
 	expect(result.stderr).toBe('');
 	expect(result.exitCode).toBe(0);
 	expect(result.stdout).toContain(`not visible on the registry yet: ${first}@${version}`);
 	expect(result.stdout).toContain(`provenance verified for every release package at ${version}`);
-});
+}, RUN_TIMEOUT_MS);
 
 test('a package that stays invisible past the deadline fails and says so', async () => {
 	const fake = await fakeRegistry({ [first]: ['missing'] });
 	const result = runVerify(fake, 300);
 	expect(result.exitCode).toBe(1);
 	expect(result.stderr).toContain(`${first}@${version}: still not visible on the registry`);
-});
+}, RUN_TIMEOUT_MS);
 
 test('a visible package without an attestation fails as published without provenance', async () => {
 	const fake = await fakeRegistry({ [second]: ['bare'] });
@@ -94,4 +98,4 @@ test('a visible package without an attestation fails as published without proven
 	expect(result.exitCode).toBe(1);
 	expect(result.stderr).toContain(`${second}@${version}: dist.attestations is empty`);
 	expect(result.stderr).not.toContain(first);
-});
+}, RUN_TIMEOUT_MS);

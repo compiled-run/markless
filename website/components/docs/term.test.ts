@@ -58,6 +58,10 @@ describe('Term', () => {
 		for (const caption of Object.values(GLOSSARY)) expect(caption).not.toMatch(/[—;]/);
 	});
 
+	it('keeps each code fragment in a caption on one line', () => {
+		for (const caption of Object.values(GLOSSARY)) expect(caption).not.toMatch(/\{ |[(=] |\w = /);
+	});
+
 	it('draws with filled ink only: no filters, patterns, hrefs or dy', () => {
 		expect(source).not.toMatch(/<(filter|pattern|use)\b|\bhref=|\bdy=/);
 		for (const sketch of [sketches.elements, sketches.events]) {
@@ -74,18 +78,30 @@ describe('Subtitle', () => {
 	});
 
 	it('turns listed words into terms and leaves the wording as written', async () => {
-		const text = 'Write elements and events in TypeScript. Markless is designed to compile them to any device.';
+		const text = 'Write elements and events in JavaScript. Markless is designed to compile them to any device.';
 		expect(splitTerms(text, 'elements events').map((piece) => piece.text).join('')).toBe(text);
 		expect(splitTerms(text, 'events elements').filter((piece) => piece.term).map((piece) => piece.text)).toEqual(['elements', 'events']);
 		const html = await render(Subtitle, { text, terms: 'elements events' });
 		expect(html).toContain('role="paragraph"');
 		expect(html.match(/aria-describedby=/g)).toHaveLength(2);
-		expect(html.replace(/<[^>]*>/g, '')).toContain('Write elements and events in TypeScript.');
+		expect(html.replace(/<[^>]*>/g, '')).toContain('Write elements and events in JavaScript.');
+	});
+
+	it('explains values and instructions on the reading page', async () => {
+		const reading = readFileSync(new URL('../../pages/start/reading-tsrx.mdx', import.meta.url), 'utf8');
+		expect(reading).toContain('<Subtitle text="Every .tsrx file is made of two things: values and instructions." terms="values instructions" />');
+		for (const word of ['values', 'instructions'] as const) {
+			const html = await render(Term, { word });
+			expect(html).toContain(GLOSSARY[word]);
+			expect(html).toContain('aria-describedby=');
+		}
+		expect(sketches.values.ink.length).toBeGreaterThan(100);
+		expect(sketches.instructions.ink.length).toBeGreaterThan(100);
 	});
 
 	it('is what the intro page uses', () => {
 		expect(page).toContain(
-			'<Subtitle text="Write elements and events in TypeScript. Markless is designed to compile them to any device." terms="elements events" />',
+			'<Subtitle text="Write elements and events in JavaScript. Markless is designed to compile them to any device." terms="elements events" />',
 		);
 	});
 });

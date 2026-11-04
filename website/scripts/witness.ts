@@ -1,6 +1,6 @@
 // Run: node --experimental-strip-types scripts/witness.ts
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -823,73 +823,24 @@ try {
 
 		// --- widgets on the reading-tsrx page ------------------------------------
 		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
-		// The page walks through counter.tsrx line by line, so the card's code box
-		// is the file the home page runs, not a second counter that differs.
-		const trimmedLines = (text: string) =>
-			text
-				.split('\n')
-				.map((line) => line.trim())
-				.filter((line) => line !== '');
-		const lineCard = page.locator('section[data-preview="line-to-part"]');
-		const counterFile = trimmedLines(
-			await readFile(`${root}/components/demos/start/counter.tsrx`, 'utf8'),
-		);
-		const cardLines = trimmedLines(await lineCard.locator('.code').innerText());
-		check(
-			cardLines.join('\n') === counterFile.join('\n'),
-			'the reading-tsrx card prints the counter file line by line',
-			cardLines.join(' | '),
-		);
-		const lineWatch = lineCard.locator('.pv-watch-text');
-		check(
-			(await lineWatch.innerText()).includes('made the number'),
-			'the line card opens on the state line and the number it made',
-			await lineWatch.innerText(),
-		);
-		await lineCard.getByRole('button', { name: /^\s*<button onClick/ }).click();
-		await settleInner(
-			lineWatch,
-			(text) => text.includes('The markup made the button'),
-			'clicking the markup line names the button it made',
-		);
-		await lineCard.locator('.count').click();
-		await settleInner(
-			lineCard.locator('.count'),
-			(text) => text === 'Count 1',
-			'the counter inside the line card counts',
-		);
+		check((await page.locator('figure.anatomy').count()) === 1, 'the marked-up printout is on the reading page');
+		check((await page.locator('figure.sketch').count()) === 2, 'the values and instructions sketches are on the reading page');
 		const readingDemos = page.locator('.code-block [data-code-stage]');
-		const labelledLine = readingDemos.nth(0).locator('p').first();
-		await labelledLine.waitFor();
-		check(
-			((await labelledLine.textContent()) ?? '').trim() === 'You clicked 0 times.',
-			'the fragment demo serves its paragraph at 0',
-			((await labelledLine.textContent()) ?? '').trim(),
-		);
-		await readingDemos.nth(0).getByRole('button', { name: 'Click me' }).click();
-		await settleText(
-			labelledLine,
-			(text) => text === 'You clicked 1 times.',
-			'the paragraph beside the button follows its click',
-		);
-		const teaToggle = readingDemos.nth(1).getByRole('button');
-		const teaNote = readingDemos.nth(1).locator('p.note');
-		check(
-			((await teaToggle.textContent()) ?? '').trim() === 'Show the note' &&
-				(await teaNote.count()) === 0,
-			'the @if demo starts with no note in the page',
-		);
-		await teaToggle.click();
-		await teaNote.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-		check(
-			((await teaNote.textContent()) ?? '').trim() === 'Steep it for three minutes.' &&
-				((await teaToggle.textContent()) ?? '').trim() === 'Hide the note',
-			'opening the branch puts the note into the page',
-			((await teaToggle.textContent()) ?? '').trim(),
-		);
-		await teaToggle.click();
-		await teaNote.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-		check((await teaNote.count()) === 0, 'closing the branch takes the note out of the page');
+		const rsvp = readingDemos.nth(0);
+		const rsvpHeading = rsvp.locator('h2');
+		await rsvpHeading.waitFor();
+		check(((await rsvpHeading.textContent()) ?? '').trim() === 'Coming?', 'the values playground serves its question', ((await rsvpHeading.textContent()) ?? '').trim());
+		await rsvp.getByRole('button', { name: 'RSVP' }).click();
+		await settleText(rsvpHeading, (text) => text === 'See you there', 'every value in the RSVP playground follows the click');
+		check(((await readingDemos.nth(1).locator('p').nth(1).textContent()) ?? '').trim() === 'Plus 2 guests', 'the nested statement block renders its own element');
+		const blocks = page.locator('figure.blocks-demo');
+		const guestRows = blocks.locator('.row');
+		check((await guestRows.count()) === 2, 'the @for in the blocks demo serves one row per guest', String(await guestRows.count()));
+		await blocks.getByRole('button', { name: 'Clear' }).click();
+		await settleText(blocks.locator('.list'), (text) => text.includes('No one yet'), 'the @if line shows once no one is going');
+		check((await guestRows.count()) === 0, 'Clear removes every @for row');
+		await blocks.getByRole('button', { name: 'Add' }).click();
+		await settleText(blocks.locator('.list'), (text) => text.includes('Ada') && !text.includes('No one yet'), 'Add brings a row back and hides the @if line');
 		await page.screenshot({
 			path: `${shotsDir}/T005-reading-tsrx-after.png`,
 			fullPage: true,
@@ -1719,54 +1670,46 @@ try {
 
 		// --- the footer doodles react to the pointer ----------------------------
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const doodles = page.locator('.pager-doodles .sprite');
+		const doodles = page.locator('.pager-doodles .pager-doodle');
 		await doodles.first().waitFor();
 		check(
-			(await doodles.count()) === 6,
-			'the pager carries its six doodles',
+			(await doodles.count()) === 8,
+			'the pager carries its eight ink doodles',
 			String(await doodles.count()),
 		);
-		const doodleImage = (index: number) => doodles.nth(index).locator('img.sprite-ink-light');
 		const doodleMotion = (index: number) =>
-			doodleImage(index).evaluate((node) => {
-				const style = getComputedStyle(node as Element);
-				return { transform: style.transform, animation: style.animationName };
-			});
-		const restingCrown = await doodleMotion(0);
+			doodles
+				.nth(index)
+				.locator('svg')
+				.evaluate((node) => {
+					const style = getComputedStyle(node as Element);
+					return { transform: style.transform, animation: style.animationName };
+				});
+		const restingFirst = await doodleMotion(0);
 		await doodles.first().hover();
 		await page.waitForTimeout(450);
-		const hoveredCrown = await doodleMotion(0);
+		const hoveredFirst = await doodleMotion(0);
 		check(
-			hoveredCrown.transform !== restingCrown.transform && hoveredCrown.transform !== 'none',
+			hoveredFirst.transform !== restingFirst.transform && hoveredFirst.transform !== 'none',
 			'the first pager doodle moves when it is pointed at',
-			`${restingCrown.transform} then ${hoveredCrown.transform}`,
+			`${restingFirst.transform} then ${hoveredFirst.transform}`,
 		);
-		// The sun is keyframed rather than swapped for another drawing: what proves
-		// the reaction is that an animation is running on the image the reader is
-		// looking at, not that its src changed. The flower turns on the row's own
-		// spring transition instead, so it is read as a transform.
-		for (const [index, name] of [[4, 'doodle-sun-turn']] as const) {
+		for (const index of [3, 4, 7]) {
 			await page.mouse.move(0, 0);
 			await page.waitForTimeout(80);
 			const resting = await doodleMotion(index);
-			check(
-				resting.animation === 'none',
-				`doodle ${index + 1} is still at rest`,
-				resting.animation,
-			);
+			check(resting.animation === 'none', `doodle ${index + 1} is still at rest`, resting.animation);
 			await doodles.nth(index).hover();
 			await page.waitForTimeout(60);
 			const hovered = await doodleMotion(index);
 			check(
-				hovered.animation === name,
-				`doodle ${index + 1} runs its ${name} reaction on hover`,
+				hovered.animation.startsWith('doodle-'),
+				`doodle ${index + 1} runs its reaction on hover`,
 				hovered.animation,
 			);
 		}
 		await page.mouse.move(0, 0);
 		await page.waitForTimeout(80);
-		// The strip on paper: the doodles are the low-contrast end of the palette,
-		// so both themes are shot for a look rather than only measured.
 		for (const theme of ['light', 'dark'] as const) {
 			await page.evaluate(
 				(wanted) => document.documentElement.setAttribute('data-theme', wanted),
@@ -1778,17 +1721,6 @@ try {
 				.screenshot({ path: `${shotsDir}/T034-pager-${theme}.png` });
 		}
 		await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
-		await page.waitForTimeout(80);
-		const restingFlower = await doodleMotion(5);
-		await doodles.nth(5).hover();
-		await page.waitForTimeout(360);
-		const hoveredFlower = await doodleMotion(5);
-		check(
-			restingFlower.transform !== hoveredFlower.transform &&
-				hoveredFlower.transform !== 'none',
-			'the flower turns when it is pointed at',
-			`${restingFlower.transform} then ${hoveredFlower.transform}`,
-		);
 		await page.mouse.move(0, 0);
 
 		// --- batch 2: events, conditionals, lists ------------------------------
@@ -3041,29 +2973,25 @@ try {
 		// --- the computed page keeps its framework comparison behind a collapsible --
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const comparison = page
-			.locator('.collapsible')
-			.filter({ has: page.getByRole('button', { name: 'Coming from another framework?' }) });
-		const comparisonTrigger = comparison.getByRole('button', {
-			name: 'Coming from another framework?',
-		});
+			.locator('.collapsible details')
+			.filter({ has: page.locator('summary', { hasText: 'Coming from another framework?' }) });
+		const comparisonTrigger = comparison.locator('summary');
 		const comparisonText = comparison.locator('p');
+		const comparisonOpen = () => comparison.evaluate((details) => (details as HTMLDetailsElement).open);
 		check(
-			(await comparisonTrigger.getAttribute('aria-expanded')) === 'false' &&
-				!(await comparisonText.isVisible()),
+			!(await comparisonOpen()) && !(await comparisonText.isVisible()),
 			'the framework comparison starts closed with its text hidden',
 		);
 		await comparisonTrigger.click();
 		await comparisonText.waitFor({ state: 'visible' });
 		check(
-			(await comparisonTrigger.getAttribute('aria-expanded')) === 'true' &&
-				/dependency array/.test(await comparisonText.innerText()),
+			(await comparisonOpen()) && /dependency array/.test(await comparisonText.innerText()),
 			'opening the comparison exposes its actual text',
 		);
 		await comparisonTrigger.click();
 		await comparisonText.waitFor({ state: 'hidden' });
 		check(
-			(await comparisonTrigger.getAttribute('aria-expanded')) === 'false' &&
-				!(await comparisonText.isVisible()),
+			!(await comparisonOpen()) && !(await comparisonText.isVisible()),
 			'closing the comparison hides its text again',
 		);
 

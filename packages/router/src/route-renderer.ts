@@ -29,7 +29,8 @@ interface ClientPageArtifact {
 
 async function renderRouteUpdate(document: Document, update: RouteUpdate): Promise<void> {
 	try {
-		const artifact = update.page.default as ClientPageArtifact | undefined;
+		// A client page module exports its artifact as a promise.
+		const artifact = (await update.page.default) as ClientPageArtifact | undefined;
 		if (!artifact || update.signal?.aborted) return;
 		if (!artifact.renderData) {
 			throw new Error(

@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
 	buildSemanticGraph,
+	compileTsrxModule,
 	createProtocolStatePayloadFromArena,
 	lowerStateAccess,
 	planPayloadArena,
@@ -143,8 +144,47 @@ export function App() @{
 			async: false,
 			deriveSymbolId: 'symbol:1',
 			dependencies: [{ graphNodeId: 'state:count', path: [] }],
+			deriveOnRead: true,
 		},
 	]);
+});
+
+async function deriveOnReadNames(source: string) {
+	const { protocolState } = await compileTsrxModule({
+		filename: 'src/derive-on-read.tsrx',
+		source,
+		symbols: [],
+	});
+	return protocolState.computed.flatMap((computed) =>
+		computed.deriveOnRead ? [computed.name] : [],
+	);
+}
+
+// Spec 03: only markup and other markup-only computeds read these, so resume derives them when read.
+test('a sync computed only markup reads derives on read; one a handler or a child can reach stays current', async () => {
+	expect(
+		await deriveOnReadNames(`
+import { state, computed } from '@markless/core';
+import { Child } from './child.tsrx';
+
+export function App() @{
+	let seed = state(2);
+	const base = computed(() => seed + 1);
+	const shown = computed(() => base * 2);
+	const logged = computed(() => seed * 3);
+	const fed = computed(() => logged + 1);
+	const passed = computed(() => seed * 4);
+	let open = state(false);
+
+	<main>
+		<button onClick={() => console.info(fed)}>log</button>
+		<button onClick={() => (open = !open)}>toggle</button>
+		@if (open) { <p>{shown}</p> }
+		<Child value={passed} />
+	</main>
+}
+`),
+	).toEqual(['base', 'shown']);
 });
 
 // Composition qualifies a composed child's ids by concatenating its instance

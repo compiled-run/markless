@@ -34,7 +34,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	if ((input.boundSymbols?.length ?? 0) === 0) {
 		return input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_SWITCH_LIMIT
 			? emitSmallSymbolResolverModule(input)
-			: emitTableSymbolResolverModule(manifest, input.literalImports, input.symbols);
+			: emitTableSymbolResolverModule(manifest, input.literalImports);
 	}
 	const scopesInstances = (input.boundSymbols ?? []).some((row) => row.instancePath);
 	// Which space an id belongs to is a runtime reading, not a prefix: a shared id
@@ -79,7 +79,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		';',
 		'',
 		input.literalImports
-			? literalModuleLoads(manifest, input.symbols)
+			? literalModuleLoads(manifest)
 			: 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
@@ -189,8 +189,8 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'}',
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
-		'	for (const name in mod) {',
-		'		if (!name.startsWith("init__virtual_markless_symbol")) continue;',
+		'	for (const name of Reflect.ownKeys(mod)) {',
+		'		if (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;',
 		'		const init = mod[name];',
 		'		if (typeof init === "function") init();',
 		'	}',
@@ -325,26 +325,30 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 			),
 		},
 	]);
-	return JSON.stringify(Object.fromEntries(serializedRows), (key, value) =>
-		Array.isArray(value) && value.length === 0 && OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key)
-			? undefined
-			: value,
+	// A row-local route reads its item along `path`, so an empty one stays.
+	return JSON.stringify(
+		Object.fromEntries(serializedRows),
+		function (this: { readonly kind?: unknown }, key: string, value: unknown) {
+			return Array.isArray(value) &&
+				value.length === 0 &&
+				OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key) &&
+				this.kind !== 'row-local'
+				? undefined
+				: value;
+		},
 	);
 }
 
 function emitTableSymbolResolverModule(
 	manifest: SymbolResolverModuleManifest,
 	literalImports = false,
-	symbols: SymbolResolverModuleInput['symbols'] = [],
 ): string {
 	return [
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
 		';',
 		'',
-		literalImports
-			? literalModuleLoads(manifest, symbols)
-			: 'const moduleUrls = symbolManifest[3];',
+		literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		'',
@@ -361,8 +365,8 @@ function emitTableSymbolResolverModule(
 		'}',
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
-		'\tfor (const name in mod) {',
-		'\t\tif (!name.startsWith("init__virtual_markless_symbol")) continue;',
+		'\tfor (const name of Reflect.ownKeys(mod)) {',
+		'\t\tif (typeof name !== "string" || !name.startsWith("init__virtual_markless_symbol")) continue;',
 		'\t\tconst init = mod[name];',
 		'\t\tif (typeof init === "function") init();',
 		'\t}',
@@ -380,24 +384,18 @@ function emitTableSymbolResolverModule(
 	].join('\n');
 }
 
-function literalModuleLoads(
-	manifest: SymbolResolverModuleManifest,
-	symbols: SymbolResolverModuleInput['symbols'],
-): string {
-	const lazy = new Map(
-		symbols.flatMap((symbol) => (symbol.lazyChunk ? [[symbol.id, symbol.lazyChunk]] : [])),
-	);
+function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {
 	return `const moduleLoads = {${Object.entries(manifest[5])
 		.map(
 			([id, row]) =>
-				`${JSON.stringify(id)}:()=>import(${JSON.stringify(lazy.get(id) ?? manifest[3][row[0]])})`,
+				`${JSON.stringify(id)}:()=>import(${JSON.stringify(manifest[3][row[0]])})`,
 		)
 		.join(',')}};`;
 }
 
 function emitSmallSymbolResolverModule(input: SymbolResolverModuleInput): string {
 	const symbolBranches = input.symbols.flatMap((symbol) => [
-		`	if (id === ${JSON.stringify(symbol.id)}) return import(${input.bundlerVisibleImports ? '' : '/* @vite-ignore */ '}${JSON.stringify(symbol.lazyChunk ?? symbol.chunk)})`,
+		`	if (id === ${JSON.stringify(symbol.id)}) return import(${input.bundlerVisibleImports ? '' : '/* @vite-ignore */ '}${JSON.stringify(symbol.chunk)})`,
 		`		.then((mod) => { mod.init__virtual_markless_symbol?.(); return mod${moduleExportAccess(symbol.exportName)}; });`,
 	]);
 

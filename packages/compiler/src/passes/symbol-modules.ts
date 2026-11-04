@@ -28,6 +28,7 @@ import type {
 	SymbolModulesInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
+import { rowsDecidedBy } from '../artifact-helpers/prop-deciders.ts';
 import {
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
@@ -1363,9 +1364,11 @@ function armPartReadPath(
 type ArmRefusal = {
 	readonly detail: string;
 	readonly span?: SourceSpan;
-	// A same-module component that has to run: the one refusal a re-render of the
-	// page through the prerender evaluator can answer.
+	// A component that has to run, or content a flip cannot rebuild: what a
+	// re-render of the page through the prerender evaluator can answer.
 	readonly escalatable?: boolean;
+	// What the browser runs instead, in the author's words: "the @try block it holds".
+	readonly runs?: string;
 };
 
 type ArmPartsContext = {
@@ -1425,36 +1428,44 @@ function renderBranchArms(
 		};
 		const arms = branch.armChunkIds.map((chunkId) => renderChunkParts(context, chunkId));
 		if (arms.some((arm) => arm === null)) {
-			// A branch nobody asks to flip ships no symbol, so it needs no diagnostic.
-			const symbol = input.symbolResolver.symbols.find(
-				(candidate) =>
-					candidate.kind === 'branch-update' &&
-					candidate.branchSiteId === branch.branchSiteId,
-			);
+			// A branch nobody asks to flip ships no symbol, and one whose test reads nothing never flips.
+			const symbol =
+				branch.testReads.length > 0
+					? input.symbolResolver.symbols.find(
+							(candidate) =>
+								candidate.kind === 'branch-update' &&
+								candidate.branchSiteId === branch.branchSiteId,
+						)
+					: undefined;
 			if (symbol) {
-				const diagnostic = branchArmUnsupportedDiagnostic(
+				const refused = branchArmUnsupportedDiagnostic(
 					branch,
 					refusals[0],
 					symbol.id,
 					input.semanticGraph,
 				);
-				diagnostics.push(diagnostic);
 				const componentName = renderData.chunks.find(
 					(chunk) => chunk.id === branch.armChunkIds[0],
 				)?.componentName;
-				if (diagnostic.severity === 'warning' && componentName)
-					propDecided.push({
-						componentName,
-						props: [
-							...new Set(
-								branch.testReads.flatMap((read) =>
-									readPropNames(read.graphNodeId, read.path, input.semanticGraph),
-								),
-							),
-						],
-						symbolId: symbol.id,
-						diagnostic,
-					});
+				const props = [
+					...new Set([
+						...branch.testReads.flatMap((read) =>
+							readPropNames(read.graphNodeId, read.path, input.semanticGraph),
+						),
+						...(rowListDeciders(branch, input.semanticGraph) ?? []),
+					]),
+				];
+				// A row's item can change under its key in a list state holds, so that warning stays printed.
+				const decided =
+					refused.severity === 'warning' &&
+					componentName !== undefined &&
+					rowListDeciders(branch, input.semanticGraph) !== null;
+				const diagnostic = decided
+					? { ...refused, decidedByProps: { componentName, props } }
+					: refused;
+				diagnostics.push(diagnostic);
+				if (decided)
+					propDecided.push({ componentName, props, symbolId: symbol.id, diagnostic });
 				// Every refusal escalatable, or none: a branch that also holds a shape
 				// no re-render answers stays plainly refused. A refusal that only warns
 				// blocks no build, so its branch keeps shipping the plan it ships today.
@@ -1499,6 +1510,23 @@ function readsOnlyProps(
 	);
 }
 
+// A branch inside a @for row also flips when its row's item changes, so the list's deciders join its test's.
+function rowListDeciders(
+	branch: RenderDataBranch,
+	semanticGraph: SemanticGraphArtifact | undefined,
+): ReadonlyArray<string> | null {
+	if (!semanticGraph) return [];
+	const row = semanticGraph.markup.chunks.find(
+		(chunk) =>
+			/^repeat:.*:row$/.test(chunk.id) &&
+			chunk.slots.some((slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId),
+	);
+	const repeat = row
+		? semanticGraph.keyedRepeats.find((candidate) => row.id === `repeat:${candidate.id}:row`)
+		: undefined;
+	return repeat ? rowsDecidedBy(repeat, semanticGraph) : [];
+}
+
 function readPropNames(
 	graphNodeId: string,
 	path: ReadonlyArray<string>,
@@ -1527,6 +1555,7 @@ function branchArmRendersInBrowserDiagnostic(
 	const names = [
 		...new Set(refusals.flatMap((refusal) => /^<([^>]+)>/.exec(refusal.detail)?.[1] ?? [])),
 	].map((name) => `<${name}>`);
+	names.push(...new Set(refusals.flatMap((refusal) => refusal.runs ?? [])));
 	const shown = names.length > 0 ? names.join(', ') : 'its components';
 	return {
 		code: BRANCH_ARM_RENDERS_IN_BROWSER_CODE,
@@ -1568,7 +1597,7 @@ function branchArmUnsupportedDiagnostic(
 		phase: 'public-render',
 		title: `Changing this ${label} cannot rebuild what it shows`,
 		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
-		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 		...(refusal?.span ? { primarySpan: refusal.span } : {}),
 		passId: 'symbol-modules',
 		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
@@ -1622,8 +1651,15 @@ function renderChunkParts(
 		context.refusals?.push({
 			detail,
 			...(span ? { span } : {}),
-			...(escalatable ? { escalatable: true } : {}),
+			// An imported child renders in its own module when the browser runs it.
+			...(escalatable || child?.imported ? { escalatable: true } : {}),
 		});
+		return null;
+	};
+	// This module's own render answers it; an imported child's content keeps refuse()'s answer.
+	const renderedHere = (detail: string, runs: string) => {
+		if (!context.inline || child?.imported) return refuse(detail);
+		context.refusals?.push({ detail, escalatable: true, runs });
 		return null;
 	};
 	const chunk = (child?.chunks ?? renderData.chunks).find(
@@ -1647,9 +1683,7 @@ function renderChunkParts(
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
 					return refuse('a value it shows comes from a prop the flip cannot recompute');
-				// A value inside an imported child refreshes through records that
-				// module owns, and this module cannot address them, so only a value
-				// that is already decided may be shown there.
+				// An imported child's changing value refreshes through records its own module owns.
 				if (child?.imported && (!scoped || 'read' in scoped))
 					return refuse(
 						`<${child.componentName}> shows a value that changes after it is shown`,
@@ -1751,8 +1785,11 @@ function renderChunkParts(
 							continue;
 						}
 						if (rowSlot.kind !== 'text')
-							return refuse(
-								`a repeated row inside it holds a ${rowSlot.kind} binding`,
+							return renderedHere(
+								`a repeated row inside it holds ${rowSlot.kind === 'attribute' ? 'an' : 'a'} ${
+									rowSlot.kind
+								} binding`,
+								'the @for block it holds',
 							);
 						if (rowSlot.residue.kind === 'repeat-item')
 							rowParts.push({ itemPath: rowSlot.residue.path });
@@ -1768,8 +1805,9 @@ function renderChunkParts(
 								},
 							});
 						else
-							return refuse(
+							return renderedHere(
 								'a repeated row inside it reads a value that cannot be recomputed',
+								'the @for block it holds',
 							);
 					}
 				}
@@ -1869,6 +1907,23 @@ function renderChunkParts(
 				});
 				continue;
 			}
+			if (slot.kind === 'async') {
+				context.refusals?.push({
+					detail: armSlotRefusalDetail(slot),
+					escalatable: true,
+					runs: 'the @try block it holds',
+				});
+				return null;
+			}
+			if (slot.kind === 'branch') {
+				const nested = renderData.branches?.find(
+					(candidate) => candidate.branchSiteId === slot.branchSiteId,
+				);
+				return renderedHere(
+					armSlotRefusalDetail(slot),
+					`the ${nested?.kind === 'switch' ? '@switch' : '@if'} it holds`,
+				);
+			}
 			return refuse(armSlotRefusalDetail(slot));
 		}
 	}
@@ -1883,7 +1938,8 @@ function armSlotRefusalDetail(slot: SemanticMarkupSlot): string {
 		return 'an element() handle it binds is named by an IDREF, and that id is minted for the rendered widget, which a flip has no way to mint again';
 	if ('residue' in slot && slot.residue.kind === 'element-handle-id-list')
 		return 'an element() handle it binds is named by an IDREF list, and those ids are minted for the rendered widget, which a flip has no way to mint again';
-	return `it holds ${slot.kind === 'attribute' || slot.kind === 'async' ? 'an' : 'a'} ${slot.kind} binding`;
+	if (slot.kind === 'async') return 'it holds a @try block';
+	return `it holds ${slot.kind === 'attribute' ? 'an' : 'a'} ${slot.kind} binding`;
 }
 
 // One prop name to the value a flip rebuilds the child's markup with.
@@ -2044,10 +2100,8 @@ function staticChildComponentMarkup(
 	return wired ? null : chunk.statics.join('');
 }
 
-// Names the one value that kept the flip out; falls back to the shape-level
-// refusal for a child this descent cannot express for any other reason. Only a
-// same-module child's own value is escalatable: an imported child's markup and
-// records belong to a module this one cannot address.
+// Names the one value that kept the flip out. A child given only constants, or
+// one from another file without projected children, renders in the browser by running it.
 function childRefusalReason(
 	context: ArmPartsContext,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
@@ -2060,14 +2114,16 @@ function childRefusalReason(
 		semanticGraph && edge && !edge.importSource
 			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
 			: undefined;
-	// A child given only constants renders the same in the browser as on the server, whichever module it lives in.
-	const constantProps =
-		edge !== undefined &&
-		edge.children.childCount === 0 &&
-		edge.props.every((prop) => prop.kind === 'serializable');
 	return own
 		? { detail: own, escalatable: true }
-		: { detail: 'has to run to produce its content', escalatable: constantProps };
+		: {
+				detail: 'has to run to produce its content',
+				escalatable:
+					edge !== undefined &&
+					edge.children.childCount === 0 &&
+					(edge.importSource !== undefined ||
+						edge.props.every((prop) => prop.kind === 'serializable')),
+			};
 }
 
 function componentEdgeSpan(
@@ -6049,6 +6105,15 @@ export function buildEventHandlerEmission(
 						source: '@markless/web/fns/write-through',
 					}),
 				),
+			...(referenced.has(CHANGED_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: CHANGED_FN,
+							source: '@markless/web/fns/changed',
+						}),
+					]
+				: []),
 			...(referenced.has(CALLBACK_SLOT_FN)
 				? [
 						moduleImportNode({
@@ -6701,6 +6766,9 @@ function rewriteEventHandlerNode(
 	const unfilled = unfilledCallbackSlotNode(node, rewrite);
 	if (unfilled) return carryEventHandlerComments(node, unfilled);
 
+	const passed = passedStateCallNode(node, rewrite);
+	if (passed) return carryEventHandlerComments(node, passed);
+
 	const write = eventWriteNode(node, rewrite);
 	if (write) return carryEventHandlerComments(node, write);
 
@@ -6814,6 +6882,47 @@ function containsOwnAwait(node: unknown): boolean {
 	}
 
 	return false;
+}
+
+// The call runs as authored, then each path it wrote is marked changed before the handler reads on.
+function passedStateCallNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	const chain = node.type === 'ChainExpression' && isNode(node.expression) ? node : null;
+	const call = chain ? (chain.expression as AnyNode) : node;
+	if (call.type !== 'CallExpression') return null;
+	const args = asNodes(call.arguments);
+	const claimed = new Set<string>();
+	const writes = (rewrite.symbol.writes ?? []).filter((write) => {
+		const passedTo = write.passedTo;
+		if (!passedTo || rewrite.claimedWrites.has(write)) return false;
+		const argument = args[passedTo.argumentIndex];
+		if (!argument || valueNodeText(argument, rewrite.source) !== passedTo.argument)
+			return false;
+		if (!isNode(call.callee) || valueNodeText(call.callee, rewrite.source) !== passedTo.callee)
+			return false;
+		const key = `${passedTo.argumentIndex}:${write.graphNodeId}:${JSON.stringify(write.path)}:${JSON.stringify(write.row?.itemPath ?? null)}`;
+		if (claimed.has(key)) return false;
+		claimed.add(key);
+		return true;
+	});
+	if (writes.length === 0) return null;
+	for (const write of writes) rewrite.claimedWrites.add(write);
+
+	const rewritten = rewriteEventHandlerChildren(call, (child) =>
+		rewriteEventHandlerNode(child, call, rewrite),
+	);
+	// The paths are found before the call runs: a row the call removes has no path after it.
+	return callNode(identifierNode(CHANGED_FN), [
+		memberChainNode('context.graph'),
+		arrayNode(
+			writes.map((write) =>
+				arrayNode([
+					literalNode(write.graphNodeId),
+					rowItemPathNode(write) ?? stringArrayNode(write.path),
+				]),
+			),
+		),
+		chain ? chainExpressionNode(chain, rewritten) : rewritten,
+	]);
 }
 
 /**
@@ -7389,6 +7498,7 @@ function collectIdentifierNames(node: unknown, names: Set<string>): void {
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
 const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
+const CHANGED_FN = 'marklessChanged';
 
 // The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
 function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {

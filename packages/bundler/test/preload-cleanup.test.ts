@@ -176,4 +176,85 @@ describe('Vite preload cleanup', () => {
 		);
 		expect(stripEmptyVitePreloadWrappers(free)).toBe(free);
 	});
+
+	// A minifier reuses a short name in an inner scope that never reads the outer binding; the removal must not reach it.
+	test('keeps a call to a local that shadows the removed helper init', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as l}from"./preload.js";function open(d,n){let c=g(),l=h(n);d.cleanup=()=>{n.remove(),l(),c(),d.done=!0}}var A=e((()=>{f(),l(),m=["./symbol.js"]}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";function open(d,n){let c=g(),l=h(n);d.cleanup=()=>{n.remove(),l(),c(),d.done=!0}}var A=e((()=>{f(),m=["./symbol.js"]}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps a call to a local that shadows the removed helper module init', () => {
+		const helper =
+			'A=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}))';
+		const code = `import{__esmMin as e}from"./shared.js";var T=e((()=>{})),O,k,S,p,${helper};async function load(){let{run:e}=await p(async()=>{let{run:e}=await import("./graph.js");return{run:e}},[]);return e()}function close(d){let A=d.undo;d.cleanup=()=>{d.x(),A(),d.y()}}var z=e((()=>{T(),A()}));e((()=>{z()}))();`;
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var T=e((()=>{}));async function load(){let{run:e}=await (async()=>{let{run:e}=await import("./graph.js");return{run:e}})();return e()}function close(d){let A=d.undo;d.cleanup=()=>{d.x(),A(),d.y()}}var z=e((()=>{T()}));e((()=>{z()}))();',
+		);
+	});
+
+	test('keeps the imported helper when its init is called where removing the call would change an expression', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var A=e((()=>{f(n())}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
+	test('keeps calls to a loop variable or catch parameter named like the removed helper init', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as l}from"./preload.js";function run(q){for(let l of q)g(),l(),h();try{g()}catch(l){g(),l(),h()}}var A=e((()=>{f(),l(),m=["./symbol.js"]}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";function run(q){for(let l of q)g(),l(),h();try{g()}catch(l){g(),l(),h()}}var A=e((()=>{f(),m=["./symbol.js"]}));e((()=>{A()}))();',
+		);
+	});
+
+	test('removes the helper init called inside a catch whose pattern has a key named like it', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";function run(){try{g()}catch({n:r}){g(),n(),h(r)}}var A=e((()=>{f(),n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";function run(){try{g()}catch({n:r}){g(),h(r)}}var A=e((()=>{f()}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps a method called through a sequence without its receiver', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var A=e((()=>{(n(),o.m)()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var A=e((()=>{(0,o.m)()}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps a call to a var declared in a loop head and read after the loop', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";function run(q){for(var n=q.next;0;);g(),n(),h()}var A=e((()=>{f(),n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";function run(q){for(var n=q.next;0;);g(),n(),h()}var A=e((()=>{f()}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps the value of a sequence the helper init ends', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var get=()=>(f(),n()),A=e((()=>{n()}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var get=()=>(f(),void 0),A=e((()=>{}));e((()=>{A()}))();',
+		);
+	});
+
+	test('keeps a typeof of a sequence reading its operand as a value', () => {
+		const code =
+			'import{__esmMin as e}from"./shared.js";import{__vitePreload as t,init_preload_helper as n}from"./preload.js";var A=e((()=>{k=typeof(n(),maybeGlobal)}));e((()=>{A()}))();';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__esmMin as e}from"./shared.js";var A=e((()=>{k=typeof(0,maybeGlobal)}));e((()=>{A()}))();',
+		);
+	});
 });

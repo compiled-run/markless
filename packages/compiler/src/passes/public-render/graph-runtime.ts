@@ -1,6 +1,6 @@
 import type { SymbolResolverPlan } from '../../artifacts.ts';
 
-type PublicGraphMethod = 'call' | 'delete';
+type PublicGraphMethod = 'call' | 'delete' | 'changed';
 
 export function publicGraphMethods(
 	symbolResolver: SymbolResolverPlan,
@@ -11,6 +11,7 @@ export function publicGraphMethods(
 		for (const write of symbol.writes ?? []) {
 			if (write.operation === 'call') methods.add('call');
 			if (write.operation === 'delete') methods.add('delete');
+			if (write.passedTo) methods.add('changed');
 		}
 	}
 	return methods;
@@ -28,6 +29,9 @@ export function emitCreatePublicGraph(
 			: null,
 		methods.has('delete')
 			? `\t\tdelete(deletion) { const path = deletion.path ?? []; if (path.length === 0) return false; const parent = readMarklessPublicPath(cells.get(deletion.graphNodeId), path.slice(0, -1)); if (!parent || typeof parent !== "object") return true; dirtyGraphNodeIds.add(deletion.graphNodeId); ${trackDirtyArrayIndexes ? 'dirtyArrayIndexes.delete(deletion.graphNodeId); ' : ''}return delete parent[path[path.length - 1]]; },`
+			: null,
+		methods.has('changed')
+			? `\t\tchanged(change) { dirtyGraphNodeIds.add(change.graphNodeId); ${trackDirtyArrayIndexes ? 'dirtyArrayIndexes.delete(change.graphNodeId); ' : ''}},`
 			: null,
 	].filter((method): method is string => method !== null);
 	const trackDirtyArrayIndexesDeclaration = trackDirtyArrayIndexes

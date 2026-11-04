@@ -43,11 +43,11 @@ The script owns one small table that puts each job in a mode. A new job with che
 - `boxes-router` (full): `pnpm --dir packages/router test:boxes`.
 - `boxes-music-player` (full): `test:analyzer` and `test:boxes` in `demos/music-player`.
 - `boxes-music-player-ssr` (full): `test:analyzer` and `test:boxes` in `demos/music-player-ssr`.
-- `receipts` (full): `pnpm receipts:generate`, `pnpm receipts:check`.
+- `test` (full): the gate, then the analyzer receipt set with `pnpm receipts:generate` and `pnpm receipts:check`.
 - `package-manager-matrix` (full): `pnpm exec vp test run packages/cli/test/workspace-matrix.test.ts --project node`.
 - `benchmark`, `benchmark-guard` (CI only): JS Framework Benchmark runs against a baseline, then a compare.
 
-`lanes`, `prepare-playwright`, `save-lane-markers`, `test` and `changes` route work and have no checks. `test` is the gate. It fails unless every test lane passed or hit its cache.
+`lanes`, `prepare-playwright`, `save-lane-markers` and `changes` route work and have no checks. `test` is the gate. It fails unless every test lane passed or hit its cache, then checks the receipt set.
 
 ## Run it at home
 

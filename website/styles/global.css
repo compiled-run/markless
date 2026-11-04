@@ -116,8 +116,8 @@
 	font-weight: 400;
 	font-display: swap;
 	src:
-		url('/fonts/JoyElia-Regular.woff2') format('woff2'),
-		url('/fonts/JoyElia-Regular.woff') format('woff');
+		url('./fonts/JoyElia-Regular.woff2') format('woff2'),
+		url('./fonts/JoyElia-Regular.woff') format('woff');
 }
 
 @font-face {
@@ -126,8 +126,8 @@
 	font-weight: 700;
 	font-display: swap;
 	src:
-		url('/fonts/JoyElia-Bold.woff2') format('woff2'),
-		url('/fonts/JoyElia-Bold.woff') format('woff');
+		url('./fonts/JoyElia-Bold.woff2') format('woff2'),
+		url('./fonts/JoyElia-Bold.woff') format('woff');
 }
 
 /* Shantell Sans — self-hosted, SIL Open Font License. The body face: a marker
@@ -138,7 +138,7 @@
 	font-style: normal;
 	font-weight: 400 700;
 	font-display: swap;
-	src: url('/fonts/ShantellSans-latin-variable.woff2') format('woff2');
+	src: url('./fonts/ShantellSans-latin-variable.woff2') format('woff2');
 }
 
 /* Recursive, self-hosted, SIL Open Font License. The code face: its MONO axis
@@ -148,11 +148,42 @@
 	font-style: oblique 0deg 15deg;
 	font-weight: 300 1000;
 	font-display: swap;
-	src: url('/fonts/Recursive-variable.woff2') format('woff2');
+	src: url('./fonts/Recursive-variable.woff2') format('woff2');
+}
+
+/* Arial scaled to the brand faces' width and line box, measured in Chromium, so a first visit's swap barely moves text. */
+@font-face {
+	font-family: 'Joy Elia fallback';
+	font-weight: 400;
+	src: local('Arial'), local('ArialMT');
+	size-adjust: 104.2%;
+	ascent-override: 93.1%;
+	descent-override: 23%;
+	line-gap-override: 0%;
+}
+
+@font-face {
+	font-family: 'Joy Elia fallback';
+	font-weight: 700;
+	src: local('Arial Bold'), local('Arial-BoldMT');
+	size-adjust: 105%;
+	ascent-override: 92.4%;
+	descent-override: 22.9%;
+	line-gap-override: 0%;
+}
+
+@font-face {
+	font-family: 'Shantell Sans fallback';
+	font-weight: 400 700;
+	src: local('Arial'), local('ArialMT');
+	size-adjust: 109.8%;
+	ascent-override: 92.9%;
+	descent-override: 29.1%;
+	line-gap-override: 0%;
 }
 
 *:where(:not(.code-stage *)) {
-	font-family: 'Joy Elia';
+	font-family: 'Joy Elia', 'Joy Elia fallback', sans-serif;
 	/* Only Recursive has these axes, so every other face ignores them. */
 	font-variation-settings: 'MONO' 1, 'CASL' 1;
 }
@@ -162,7 +193,7 @@
    children are matched explicitly. Bold maps to the real 600 weight. */
 .prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary):where(:not(.code-stage *)),
 .prose :is(p, li, blockquote, dd, dt, td, th, figcaption, summary) :is(a, strong, em, b, i, mark, small, span):where(:not(.code-stage *)) {
-	font-family: 'Shantell Sans', system-ui, sans-serif;
+	font-family: 'Shantell Sans', 'Shantell Sans fallback', system-ui, sans-serif;
 }
 
 .prose :is(p, li, blockquote) :is(strong, b):where(:not(.code-stage *)) {
@@ -736,8 +767,10 @@ body {
 	overscroll-behavior: none;
 }
 
+/* The browser paints the top of a long page before the rest arrives; a reserved gutter keeps the late scrollbar from moving the layout. */
 html {
 	background: var(--paper);
+	scrollbar-gutter: stable;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1178,141 +1211,6 @@ html.dark .prose .torn-strip {
 }
 
 /* ---------------------------------------------------------------------------
-   Prev/next pager: the same two links on the foot of every page, driven by the
-   flat entry order in nav.ts, with a strip of doodles between them. The dashed
-   rule is the one already proven on .more-from.
-   --------------------------------------------------------------------------- */
-
-.pager {
-	display: flex;
-	gap: var(--space-s);
-	justify-content: space-between;
-	align-items: center;
-	margin-top: var(--space-xl);
-	padding-top: var(--space-m);
-	border-top: 2px dashed var(--code-edge);
-}
-
-/* ---------------------------------------------------------------------------
-   The doodles in the pager react when they are pointed at, each one its own
-   way: a lift, a spin, a heartbeat, a wiggle, a dart and a roll. No script — a
-   hover and a keyframe on the drawing the sprite already ships. Every reaction
-   is under 400ms and stops for a reader who asked for less motion.
-   --------------------------------------------------------------------------- */
-
-/* Each doodle answers to a pointer well before it touches the drawing. The row's
-   gap moves onto the doodles as padding — half of it on each side — so the
-   drawings sit exactly where they did and the spacing looks unchanged, while the
-   box that hears the pointer is a whole gap wider. Vertically there is nothing
-   to collide with, so the ::before reaches half a line above and below. Sized in
-   em rather than px so a doodle's target grows with it. */
-.pager-doodles .sprite {
-	position: relative;
-	padding-inline: 0.225em;
-}
-
-.pager-doodles .sprite::before {
-	content: '';
-	position: absolute;
-	inset-block: -0.5em;
-	inset-inline: 0;
-}
-
-/* Yellow crayon on paper is nearly the paper, so every doodle in the strip is
-   given one line of ink under it. It is a shadow rather than an outline, so the
-   drawing keeps its own edge. */
-.pager-doodles .sprite img {
-	transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
-	filter: drop-shadow(0 1px 0 color-mix(in oklch, var(--ink) 35%, transparent))
-		drop-shadow(0 0 1px color-mix(in oklch, var(--ink) 20%, transparent));
-}
-
-/* 1 crown: tilts and lifts, landing with a small bounce. */
-.pager-doodles .sprite:nth-child(2):hover img {
-	transform: rotate(-12deg) translateY(-5px);
-}
-
-/* 2 sparkle: turns over and grows. */
-.pager-doodles .sprite:nth-child(3):hover img {
-	transform: rotate(180deg) scale(1.25);
-}
-
-/* 3 heart: one beat. */
-@keyframes doodle-heartbeat {
-	0% {
-		transform: scale(1);
-	}
-	25% {
-		transform: scale(1.3);
-	}
-	45% {
-		transform: scale(1);
-	}
-	65% {
-		transform: scale(1.18);
-	}
-	100% {
-		transform: scale(1);
-	}
-}
-
-.pager-doodles .sprite:nth-child(4):hover img {
-	animation: doodle-heartbeat 380ms ease-in-out;
-}
-
-/* 4 squiggle: wiggles. */
-@keyframes doodle-wiggle {
-	0%,
-	100% {
-		transform: skewX(0deg);
-	}
-	25% {
-		transform: skewX(-12deg) rotate(-3deg);
-	}
-	75% {
-		transform: skewX(12deg) rotate(3deg);
-	}
-}
-
-.pager-doodles .sprite:nth-child(5):hover img {
-	animation: doodle-wiggle 360ms ease-in-out;
-}
-
-/* 5 sun: one slow turn, growing a little as it goes round. */
-@keyframes doodle-sun-turn {
-	0% {
-		transform: rotate(0deg) scale(1);
-	}
-	50% {
-		transform: rotate(180deg) scale(1.12);
-	}
-	100% {
-		transform: rotate(360deg) scale(1);
-	}
-}
-
-.pager-doodles .sprite:nth-child(6):hover img {
-	animation: doodle-sun-turn 600ms ease-in-out;
-}
-
-/* 6 flower: half a turn and a little bigger, sprung there and sprung back. The
-   spring is the row's own transition easing, so leaving it undoes the turn. */
-.pager-doodles .sprite:nth-child(7):hover img {
-	transform: rotate(180deg) scale(1.15);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.pager-doodles .sprite img {
-		transition: none;
-	}
-	.pager-doodles .sprite:hover img {
-		animation: none;
-		transform: none;
-		filter: none;
-	}
-}
-
-/* ---------------------------------------------------------------------------
    Batch-2 demos: the name echo, the draft panels, the sortable rows. Each one
    is inside a `.playground` frame, so these rules only dress the pieces the
    frame does not already cover: text fields, the row list and its marker.
@@ -1403,23 +1301,6 @@ html.dark .prose .torn-strip {
 
 .callout[data-sticker='scribble']::after {
 	background-image: url('/stickers/scribble.png');
-}
-
-.pager-doodles .sticker {
-	transition:
-		rotate 220ms ease-out,
-		translate 220ms ease-out;
-}
-
-.pager-doodles .sticker:hover {
-	rotate: -7deg;
-	translate: 0 -0.25rem;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.pager-doodles .sticker {
-		transition-duration: 1ms;
-	}
 }
 
 /* The props table. `display: block` is what lets a table scroll inside its own

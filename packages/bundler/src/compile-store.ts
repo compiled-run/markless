@@ -17,6 +17,8 @@ export const DEFAULT_COMPILE_CACHE_MAX_BYTES = 1024 * 1024 * 1024;
 export type PersistentCompileCache = PersistentCompileStore & {
 	/** Waits for every write this process started, then trims the store to its size budget. */
 	flush(): Promise<void>;
+	/** Waits for every write started so far, leaving the store open for more. */
+	settle(): Promise<void>;
 	/** Holds `flush` until a write started elsewhere, such as on a compile worker, has finished. */
 	track(write: Promise<void>): void;
 	/** Type-stripped emitted code, by the exact text and mode that was stripped. */
@@ -40,6 +42,10 @@ export function createPersistentCompileCache(input: {
 }): PersistentCompileCache {
 	const used = new Set<string>();
 	const writes = new Set<Promise<void>>();
+	let flushed = false;
+	const settle = async () => {
+		while (writes.size) await Promise.all(writes);
+	};
 	const strippedCode = persistentTextMemo(
 		join(input.directory, 'stripped-code.bin'),
 		`${input.fingerprint}\0${stripperVersion()}`,
@@ -70,6 +76,8 @@ export function createPersistentCompileCache(input: {
 			}
 		},
 		write(source, key, result) {
+			// A compile that outlives its build would otherwise write after `flush` has resolved.
+			if (flushed) return;
 			const path = pathOf(source, key);
 			let bytes: Buffer;
 			try {
@@ -83,12 +91,15 @@ export function createPersistentCompileCache(input: {
 			writes.add(pending);
 		},
 		track(write) {
+			if (flushed) return;
 			const pending = write.finally(() => writes.delete(pending));
 			writes.add(pending);
 		},
 		strippedCode,
+		settle,
 		async flush() {
-			while (writes.size) await Promise.all(writes);
+			await settle();
+			flushed = true;
 			await strippedCode.save();
 			await trim(input.directory, input.maxBytes ?? DEFAULT_COMPILE_CACHE_MAX_BYTES, used);
 		},

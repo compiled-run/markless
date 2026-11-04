@@ -269,10 +269,10 @@ export default function MigrateAnatomy() @{
 					@for (const footer of FOOTERS; key footer.agent) {
 						<tspan class="others" data-for={footer.agent}>
 							@for (const other of footer.others; key other.id) {
-								<>
+								<tspan>
 									<tspan class="gap">{other.gap}</tspan>
 									<tspan class="pick" data-pick={other.id}>{other.id}</tspan>
-								</>
+								</tspan>
 							}
 						</tspan>
 					}

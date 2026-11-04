@@ -8,7 +8,7 @@ export function servedLinkBridge(
 	const inline = /<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(html)?.[1];
 	if (inline !== undefined) return inline;
 	const stub =
-		/<script type="module" data-markless-router-link-resumer>import b from"([^"]+)";b\(([\s\S]*?)\)<\/script>/.exec(
+		/<script type="module" async data-markless-router-link-resumer>import b from"([^"]+)";b\(([\s\S]*?)\)<\/script>/.exec(
 			html,
 		);
 	if (!stub) return undefined;
@@ -30,4 +30,20 @@ export function laterLinkBridge(entry: {
 		.slice(2)
 		.map((module) => module.source)
 		.join('\n');
+}
+
+// The page's route table, decoded: each destination's preloads, in order.
+export function servedRouteTable(html: string): Record<string, unknown[]> | undefined {
+	const json =
+		/<script type="application\/json" data-markless-router-links>([\s\S]*?)<\/script>/.exec(
+			html,
+		)?.[1];
+	if (json === undefined) return undefined;
+	const [preloads, destinations] = JSON.parse(json) as [unknown[], Record<string, number[]>];
+	return Object.fromEntries(
+		Object.entries(destinations).map(([path, indexes]) => [
+			path,
+			indexes.map((at) => preloads[at]),
+		]),
+	);
 }

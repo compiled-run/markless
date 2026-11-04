@@ -29,19 +29,24 @@ import type {
  * spread forwarding costs no shipped runtime code, and a part whose consumer
  * passed only static props emits nothing at all.
  */
+// The module's view serves every component in it, so composition keeps a forwarded record only where its edge rendered, and drops this field.
+type StatedByEdge<T> = T & { readonly componentEdgeId: string };
+
 export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
-	readonly locators: ProtocolViewPayload['locators'];
-	readonly events: ProtocolViewPayload['events'];
-	readonly domUpdates: ProtocolViewPayload['domUpdates'];
-	readonly elementHandles: ProtocolViewPayload['elementHandles'];
+	readonly locators: ReadonlyArray<StatedByEdge<ProtocolViewPayload['locators'][number]>>;
+	readonly events: ReadonlyArray<StatedByEdge<ProtocolViewPayload['events'][number]>>;
+	readonly domUpdates: ReadonlyArray<StatedByEdge<ProtocolViewPayload['domUpdates'][number]>>;
+	readonly elementHandles: ReadonlyArray<
+		StatedByEdge<ProtocolViewPayload['elementHandles'][number]>
+	>;
 } {
 	const empty = { locators: [], events: [], domUpdates: [], elementHandles: [] };
 	if (!input.semanticGraph) return empty;
 
-	const locators: Array<ProtocolViewPayload['locators'][number]> = [];
-	const events: Array<ProtocolViewPayload['events'][number]> = [];
-	const domUpdates: Array<ProtocolViewPayload['domUpdates'][number]> = [];
-	const elementHandles: Array<ProtocolViewPayload['elementHandles'][number]> = [];
+	const locators: Array<StatedByEdge<ProtocolViewPayload['locators'][number]>> = [];
+	const events: Array<StatedByEdge<ProtocolViewPayload['events'][number]>> = [];
+	const domUpdates: Array<StatedByEdge<ProtocolViewPayload['domUpdates'][number]>> = [];
+	const elementHandles: Array<StatedByEdge<ProtocolViewPayload['elementHandles'][number]>> = [];
 	const callbackSymbolIds = new Map<string, string>();
 	const domUpdateSymbolIds = new Map<string, string>();
 	for (const symbol of input.symbolResolver.symbols) {
@@ -66,6 +71,7 @@ export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
 					hostNodeId,
 					handleId: prop.graphNodeId,
 					name: prop.source,
+					componentEdgeId: edge.id,
 				});
 				continue;
 			}
@@ -80,6 +86,7 @@ export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
 					hostNodeId,
 					eventName: normalizeEventName(prop.name),
 					symbolIds: [symbolId],
+					componentEdgeId: edge.id,
 					// Without this the consumer's preventDefault waits for the lazy
 					// callback symbol, which lands after the native default action:
 					// a forwarded onSubmit navigates the page.
@@ -90,7 +97,11 @@ export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
 			const update = forwardedAttributeUpdate(hostNodeId, spread, prop);
 			if (!update) continue;
 			const symbolId = domUpdateSymbolIds.get(forwardedUpdateKey(update));
-			domUpdates.push(symbolId ? { ...update, symbolId } : update);
+			domUpdates.push({
+				...update,
+				...(symbolId ? { symbolId } : {}),
+				componentEdgeId: edge.id,
+			});
 		}
 		// Composition keeps a parent record only for a host the parent's own
 		// view locates; the child's locator for the same element is filtered
@@ -101,6 +112,7 @@ export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
 				strategy: 'dom-order',
 				index: 0,
 				tagName: '*',
+				componentEdgeId: edge.id,
 			});
 	}
 

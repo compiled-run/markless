@@ -15,7 +15,7 @@ describe('link bridge module checks', () => {
 	});
 
 	it('allows only the bridge stub as a module script', () => {
-		const stub = `<script type="module" data-markless-router-link-resumer>import b from"${bridge}";b(0,[],{})</script>`;
+		const stub = `<script type="module" async data-markless-router-link-resumer>import b from"${bridge}";b(0,[],{})</script>`;
 		expect(moduleScriptsAreOnlyLinkBridge(`<div>${stub}</div>`)).toBe(true);
 		expect(
 			moduleScriptsAreOnlyLinkBridge('<script data-async-resumer>(()=>{})()</script>'),
@@ -25,12 +25,12 @@ describe('link bridge module checks', () => {
 		).toBe(false);
 		expect(
 			moduleScriptsAreOnlyLinkBridge(
-				`<script type="module" data-markless-router-link-resumer>import b from"/build/page.js";b()</script>`,
+				`<script type="module" async data-markless-router-link-resumer>import b from"/build/page.js";b()</script>`,
 			),
 		).toBe(false);
 		expect(
 			moduleScriptsAreOnlyLinkBridge(
-				`<script type="module" data-markless-router-link-resumer>import b from"${bridge}";import("/build/page.js");b()</script>`,
+				`<script type="module" async data-markless-router-link-resumer>import b from"${bridge}";import("/build/page.js");b()</script>`,
 			),
 		).toBe(false);
 	});

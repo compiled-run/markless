@@ -274,7 +274,7 @@ export function templateExpressionUnsupportedDiagnostic(input: {
 		why: 'An expression with no graph node behind it renders once, from whatever the value was at render, and a later write never reaches it - so the page would show a stale value and nothing would say so.',
 		span: sourceSpan(input.node, input.filename),
 		suggestion:
-			'Write a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads. If the value needs a function of your own, put that function inside a `computed()` and read the computed here.',
+			'Write a plain read (`group.value`), an expression built from reads, operators and method calls, or a call to a function declared with `function` or `const` that does not change state. A function held in a `let`, or one that writes state, cannot be followed: move the write into an event handler.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 	});
 }
@@ -546,6 +546,27 @@ export function crossModuleHelperStateReturnUnsupportedDiagnostic(input: {
 	});
 }
 
+export function callWritesAssumedDiagnostic(input: {
+	readonly call: string;
+	readonly argument: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		...semanticGraphDiagnostic({
+			code: 'MARKLESS_CALL_WRITES_ASSUMED',
+			title: 'This call is assumed to change the state it is passed',
+			message: `\`${input.call}\` is handed \`${input.argument}\`, and Markless cannot see which parts of it the call changes, so all of \`${input.argument}\` is treated as changed once the call returns.`,
+			why: 'The called function is looked up at run time, comes from a package, or passes the value on to code the compiler cannot read. Changes it makes before returning still reach the page; everything that reads the value updates, not only what changed.',
+			span: sourceSpan(input.node, input.filename),
+			suggestion:
+				'Call a function from a .ts or .tsrx file in this project so Markless can read which paths it writes, or write the state in the handler itself.',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_CALL_WRITES_ASSUMED',
+		}),
+		severity: 'info',
+	};
+}
+
 export function crossModuleStateImportDiagnostic(input: {
 	readonly importedName: string;
 	readonly sourceModule: string;
@@ -641,24 +662,28 @@ function unstableCreationSiteText(
 	}[site];
 }
 
-export function asyncPostAwaitReadDiagnostic(
+export function asyncPostAwaitDependentReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,
+	awaitedSegment: string,
 ): SemanticGraphDiagnostic {
 	return {
 		code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
 		severity: 'error',
 		phase: 'semantic-graph',
-		title: 'Reactive reads after await are not resumable',
-		message: `Cannot read "${read.source}" after await in async computed "${computedName}". Snapshot the value before awaiting.`,
-		why: 'Async computed dependency keys are captured before the first await. Reading graph state after suspension would make revalidation and resume depend on hidden async timing.',
+		title: 'This read depends on a value the await produced',
+		message: `Cannot read "${read.source}" in async computed "${computedName}": the key "${awaitedSegment}" comes from awaited work, so the read cannot be part of the dependency key captured before the await.`,
+		why: 'Reads after an await join the dependency key, which is fixed before the await starts. This path is only known after the await, so the key could only hold the whole collection, and every write anywhere in it would rerun the awaited work.',
 		primarySpan: read.sourceSpan,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		suggestions: [
 			{
+				message: `Return what "${awaitedSegment}" comes from in this computed's result, and do the lookup "${read.source}" in a sync computed() that reads it.`,
+			},
+			{
 				message:
-					'Read the graph value before the first await, or split post-await formatting into a separate sync computed().',
+					'Or copy the whole collection into a const before the first await and index that copy, accepting a rerun on any write to it.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_POST_AWAIT_READ',
@@ -744,6 +769,33 @@ export function stateElementHandleUnsupportedDiagnostic(input: {
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+	};
+}
+
+export function stateFunctionValueUnsupportedDiagnostic(input: {
+	readonly stateName: string;
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A function cannot be stored in state',
+		message: `state "${input.stateName}" holds a function, \`${input.source}\`, in its initial value. A function cannot be written into the page, so the browser would read a value that is not callable.`,
+		why: 'state() values are serialized into the page and the browser resumes from them without running the component body, so only data (strings, numbers, booleans, null, arrays and plain objects) survives the trip.',
+		primarySpan: input.sourceSpan,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		statePath: input.stateName,
+		source: input.source,
+		suggestions: [
+			{
+				message:
+					'Keep the function outside state(): declare it in the component body or at module scope, and store only the data it needs, for example a name to pick it by.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
 	};
 }
 
@@ -1912,6 +1964,32 @@ export function branchElseSpellingDiagnostic(input: {
 			{ message: 'For a chained condition, write `@else if (condition) { ... }`.' },
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ELSE_SPELLING',
+	};
+}
+
+// TSRX reads arms in the order @try, @pending, @catch: an @pending after @catch ends the @try and parses as text plus a stray block.
+export function asyncArmOrderDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_ARM_ORDER',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'An `@pending` arm is written after `@catch`',
+		message:
+			'This `@pending` follows the @catch arm of an @try. The arms of an @try go in the order @try, @pending, @catch, so the @try ends at its @catch and this `@pending` is read as literal text, with the block after it as a separate expression.',
+		why: 'TSRX defines the order of the arms, and the parser has no @try left to attach a later `@pending` to. Building it anyway would put the word "@pending" and the arm\'s source on the page, with no waiting state.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Move the `@pending { ... }` arm before `@catch`: `@try { ... } @pending { ... } @catch (error) { ... }`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARM_ORDER',
 	};
 }
 

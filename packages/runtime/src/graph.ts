@@ -202,6 +202,11 @@ export type RuntimeGraphCall = {
 	readonly args?: ReadonlyArray<unknown>;
 };
 
+export type RuntimeGraphChange = {
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+};
+
 export type RuntimeGraphDelete = {
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
@@ -221,6 +226,8 @@ export type RuntimeGraphSubscription = {
 		| RuntimeGraphCommit
 		| void
 		| Promise<DomJournalResult | RuntimeGraphCommit | void>;
+	/** False while `run` still has code to load; a write observer then leaves its DOM to the pass, so the task's writes land together. */
+	readonly ready?: () => boolean;
 };
 
 /**
@@ -276,7 +283,16 @@ export type RuntimeGraph = {
 	readonly update: (update: RuntimeGraphUpdate) => unknown;
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
+	/** Code outside the graph changed the value at `path` in place; everything reading it updates. */
+	readonly changed: (change: RuntimeGraphChange) => void;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
+	/** How many subscriptions are registered on `graphNodeId`. */
+	readonly subscriptionCount?: (graphNodeId: string) => number;
+	/**
+	 * Runs `pull` once, at the next read of `graphNodeId` and before that read
+	 * answers, so a value derived on demand can write itself first.
+	 */
+	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
 	/**
@@ -406,6 +422,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (writeObservers.length === 0 || flushing || notifyingWrite) return;
 
 		const write: DirtyPath = { graphNodeId, path };
+		if (passWaitsOnCode()) return;
 		notifyingWrite = true;
 		try {
 			// A copy: an observer is free to release itself or another.
@@ -420,6 +437,17 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			notifyingWrite = false;
 		}
 	};
+
+	const passWaitsOnCode = (): boolean =>
+		dirtyPaths.some(({ graphNodeId, path }) =>
+			subscriptionsByNode
+				.get(graphNodeId)
+				?.some(
+					(subscription) =>
+						subscription.ready?.() === false &&
+						pathsIntersect(path, subscription.path ?? []),
+				),
+		);
 
 	const scheduleFlush = (): void => {
 		if (flushScheduled || flushing) return;
@@ -592,7 +620,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const seeded = cells.has(write.graphNodeId);
 			if (
 				!seeded ||
-				!(plane?.commitDerived(write, path) || Object.is(readPath(current, path), write.value))
+				!(
+					plane?.commitDerived(write, path) ||
+					Object.is(readPath(current, path), write.value)
+				)
 			)
 				commitCell(write.graphNodeId, path, write.value);
 			return write.value;
@@ -626,6 +657,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 			return outcome.result;
 		},
+		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
 		defineAsyncComputed(asyncComputed) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncComputedNodes.has(id) || cells.has(id)) return false;
@@ -644,6 +676,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				bucket.splice(index, 1);
 				subscriptionOrder.delete(subscription);
 			};
+		},
+		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,
+		pullBeforeRead(graphNodeId, pull) {
+			// The pull writes the node itself, so the initializer answers what it held before.
+			readInitializers.set(graphNodeId, () => {
+				const before = cells.get(graphNodeId);
+				pull();
+				return before;
+			});
 		},
 		subscribeWrite(observer) {
 			writeObservers.push(observer);

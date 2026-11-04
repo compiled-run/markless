@@ -70,6 +70,7 @@ export type EventResumeGraph = Omit<
 		| 'update'
 		| 'call'
 		| 'delete'
+		| 'changed'
 		| 'subscribe'
 		| 'subscribeJournal'
 		| 'flush'
@@ -304,6 +305,9 @@ function createEventResumeGraph(input: {
 			const result = deletePath(cells.get(deletion.graphNodeId), deletion.path);
 			if (result) markDirty(deletion.graphNodeId, deletion.path);
 			return result;
+		},
+		changed(change) {
+			markDirty(change.graphNodeId, change.path);
 		},
 		subscribe(subscription) {
 			subscriptions.push(subscription);

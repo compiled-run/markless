@@ -243,6 +243,31 @@ test(
 );
 
 test(
+	'--changelog starts where --from says and names the last release with --since',
+	async () => {
+		const fixture = await changelogFixture();
+		const cutFrom = git(fixture, ['rev-parse', 'HEAD~2']);
+		const section = (
+			await runNotes(fixture, [
+				'--changelog',
+				'--version',
+				'1.1.0',
+				'--from',
+				cutFrom,
+				'--since',
+				'v1.0.0',
+			])
+		).stdout;
+		expect(section).toContain('- **Fixed:** Plain unscoped fix.');
+		expect(section).not.toContain('Open the harbor in one round trip');
+		expect(section).toContain(
+			`[All 2 commits since v1.0.0](https://github.com/example/fixture/compare/${cutFrom}...v1.1.0)`,
+		);
+	},
+	SPAWN_HEAVY_TIMEOUT_MS,
+);
+
+test(
 	'--changelog needs --version',
 	async () => {
 		const fixture = await changelogFixture();

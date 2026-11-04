@@ -3,19 +3,26 @@ export type * from './diagnostics.ts';
 export type * from './type-service.ts';
 
 export { collectTsrxModuleDiagnostics } from './collect-diagnostics.ts';
+export { propsDeciding, rowsDecidedBy } from './artifact-helpers/prop-deciders.ts';
 export { DEBUGGING_PLAYBOOK_HINT } from './debugging-playbook.ts';
 export { compileTsrxModule } from './compile-module.ts';
+export { ELEMENT_ONLY_ATTRIBUTE_MISPLACED_CODE } from './passes/semantic-graph/element-only-attributes.ts';
 export {
 	clearCompileCache,
+	setCompileCacheLimit,
 	useCompileRunner,
 	usePersistentCompileStore,
 	type CompileRunner,
 	type PersistentCompileStore,
 } from './compile-cache.ts';
 export { compileTsrxForTypeService, compile_to_volar_mappings } from './type-service.ts';
-export { parseJavaScriptModule, type JavaScriptAstNode } from './js-ast.ts';
+export { parseJavaScriptModule, resetParseCache, type JavaScriptAstNode } from './js-ast.ts';
 export { isEventAttribute, normalizeEventName } from './ast/events.ts';
-export { callsImportedOrFreeName } from './module-free-calls.ts';
+export {
+	callsImportedOrFreeName,
+	importedOrFreeNameCalls,
+	type ImportedOrFreeNameCall,
+} from './module-free-calls.ts';
 export { LEAN_DISPATCH_MARKER_MODULES } from './lean-dispatch-modules.ts';
 export { CompilerPassGraphError, validateCompilerPassGraph } from './pass-graph.ts';
 export { formatCompilerArtifactDump, runCompilerPassPipeline } from './pass-pipeline.ts';
@@ -106,6 +113,7 @@ export {
 export { createTriggerGroups } from './passes/trigger-groups.ts';
 export { buildSemanticGraph } from './passes/semantic-graph/index.ts';
 export { evaluateModuleConstants } from './passes/semantic-graph/constant-values.ts';
+export { analyzeModuleFunctionWrites } from './passes/semantic-graph/parameter-writes.ts';
 export { lowerStateAccess } from './passes/state-lowering.ts';
 export { emitSymbolModules } from './passes/symbol-modules.ts';
 export {

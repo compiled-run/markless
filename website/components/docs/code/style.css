@@ -1,0 +1,60 @@
+body {
+	--ink: light-dark(
+		oklch(28% 0.015 90),
+		oklch(93% 0.012 85)
+	);
+	--pen: oklch(84% 0.1 140);
+	color: var(--ink);
+	font-family: 'Shantell Sans', sans-serif;
+	font-size: 1.1rem;
+	line-height: 1.55;
+}
+
+h1,
+h2,
+h3 {
+	margin: 0 0 0.4em;
+	font-family: 'Joy Elia', sans-serif;
+	line-height: 1.15;
+}
+
+p {
+	margin: 0 0 0.6em;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	margin: 0.2em 0.4em 0.2em 0;
+	padding: 0.25em 0.9em;
+	border: 2px solid var(--ink);
+	border-radius: 14px 18px 12px 16px;
+	background: var(--pen);
+	color: oklch(28% 0.015 90);
+	box-shadow: 2px 3px 0 var(--ink);
+	cursor: pointer;
+}
+
+button:active {
+	translate: 2px 3px;
+	box-shadow: none;
+}
+
+input:not([type='checkbox']),
+select,
+textarea {
+	padding: 0.25em 0.6em;
+	border: 2px solid var(--ink);
+	border-radius: 10px 6px 12px 8px;
+	background: transparent;
+}
+
+input[type='checkbox'] {
+	accent-color: var(--pen);
+}

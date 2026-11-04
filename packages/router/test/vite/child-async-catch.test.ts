@@ -53,6 +53,9 @@ async function searchFailsThenRetries(page: Page, errors: ReadonlyArray<string>)
 	await page.waitForLoadState('networkidle');
 	await page.locator('input').pressSequentially('ap', { delay: 100 });
 	await expect.poll(() => items(page)).toEqual(['apple', 'apricot', 'grape']);
+	await expect
+		.poll(() => page.locator('li').evaluateAll((rows) => rows.map((row) => row.dataset.match)))
+		.toEqual(['yes', 'yes', 'no']);
 	await expect.poll(() => page.locator('ul').getAttribute('style')).toBe('opacity: 1');
 	await page.locator('input').fill('');
 	await expect.poll(() => items(page)).toHaveLength(7);

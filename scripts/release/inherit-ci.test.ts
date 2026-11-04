@@ -283,6 +283,24 @@ describe('the run a release inherits', () => {
 		]);
 	});
 
+	test("with mergeGroup, also main's merge queue run on the base commit", () => {
+		const queued = {
+			...run,
+			event: 'merge_group',
+			head_branch: `gh-readonly-queue/main/pr-4-${base}`,
+		};
+		expect(runProblems(queued, base)).toEqual([
+			`it is a merge_group run on gh-readonly-queue/main/pr-4-${base}, not a push to main`,
+		]);
+		expect(runProblems(queued, base, { mergeGroup: true })).toEqual([]);
+		expect(runProblems(run, base, { mergeGroup: true })).toEqual([]);
+		expect(
+			runProblems({ ...queued, head_branch: 'release/v0.9.0' }, base, { mergeGroup: true }),
+		).toEqual([
+			"it is a merge_group run on release/v0.9.0, not a push to main or main's merge queue",
+		]);
+	});
+
 	test('each required check becomes a success status that links the run', () => {
 		const statuses = inheritedStatuses(
 			[

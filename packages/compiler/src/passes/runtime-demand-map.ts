@@ -29,6 +29,7 @@ import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	PROTOCOL_VISIBLE_EVENT_NAME,
+	hasLiveSharedDefinitions,
 	protocolEventActionKind,
 	type ProtocolArmBranchRecord,
 	type ProtocolArmRecordSet,
@@ -89,10 +90,15 @@ const ASYNC_BOUNDARY = [
 	'web/resume-stream-patches',
 ];
 const BEHAVIOR = ['web/resume-behaviors'];
+// A shared() instance that outlives the page: its binding at wake.
+const SHARED_INSTANCES = ['web/fns/shared-instances'];
+// The router's swap binder: no record demands it, so it stays off every page until a navigation imports it.
+const SHARED_SWAP = ['web/shared-swap'];
 // Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,
 	...ASYNC_BOUNDARY,
+	...SHARED_INSTANCES,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
 // all: no module the runtime always loads may write the `import()` specifier, or
@@ -245,6 +251,7 @@ export function createRuntimeDemandMap(
 		dispatchCore,
 		fullTier,
 		input.overlays ?? [],
+		fixedBranchSymbolIds(input.symbolModules),
 	);
 	const scope: FirstUseScope = {
 		resolver: input.symbolResolver,
@@ -268,7 +275,11 @@ export function createRuntimeDemandMap(
 			closurePlans,
 		),
 		armActions: armActionDemandRecords(scope, dispatchCore),
-		capabilityModuleIds: capabilityModuleIds(input.symbolResolver, input.protocolView),
+		capabilityModuleIds: capabilityModuleIds(
+			input.symbolResolver,
+			input.protocolView,
+			input.protocolState,
+		),
 		...nestedRecordDemand(
 			input.protocolView,
 			closedSymbolDemand,
@@ -288,6 +299,8 @@ export function createRuntimeDemandMap(
 			...BRANCH,
 			...ASYNC_BOUNDARY,
 			...BEHAVIOR,
+			...SHARED_INSTANCES,
+			...SHARED_SWAP,
 			// Conditional, unlike the kinds above: the overlay behaviour is only
 			// reachable in an app that compiled a mark, so listing it unconditionally
 			// would let the execution oracle excuse it everywhere.
@@ -308,6 +321,7 @@ function firstUseComposition(
 	| 'importedModuleInterfaces'
 	| 'components'
 	| 'sharedCallbackBindings'
+	| 'fixedBranchSymbolIds'
 > {
 	return {
 		componentEdges: Array.isArray(input.componentEdges)
@@ -317,7 +331,13 @@ function firstUseComposition(
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		components: input.components ?? [],
 		sharedCallbackBindings: input.sharedCallbackBindings ?? [],
+		fixedBranchSymbolIds: fixedBranchSymbolIds(input.symbolModules),
 	};
+}
+
+// The build refuses every caller that can change a prop-decided branch's props, so its flip, which ships no code, never runs.
+function fixedBranchSymbolIds(symbolModules: SymbolModulesArtifact): ReadonlySet<string> {
+	return new Set((symbolModules.propDecidedBranches ?? []).map((branch) => branch.symbolId));
 }
 
 /** The scope a module's own first-use answers are computed in, for publishing on its interface. */
@@ -378,6 +398,7 @@ function closureEventPlans(
 function capabilityModuleIds(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
 ): ReadonlyArray<string> {
 	const symbols = resolver.symbols;
 	const behavior =
@@ -393,7 +414,11 @@ function capabilityModuleIds(
 			(symbol) =>
 				symbol.kind === 'async-computed-runner' || symbol.kind === 'async-boundary-update',
 		);
-	return [...(behavior ? BEHAVIOR : []), ...(asyncBoundary ? ASYNC_BOUNDARY : [])];
+	return [
+		...(behavior ? BEHAVIOR : []),
+		...(asyncBoundary ? ASYNC_BOUNDARY : []),
+		...(hasLiveSharedDefinitions(state) ? SHARED_INSTANCES : []),
+	];
 }
 
 // Records served inside arms and rows ride outside the flat payload streams. Every one the compiler
@@ -890,6 +915,7 @@ function payloadDemandRecords(
 	dispatchCore: ReadonlyArray<string>,
 	fullTier: ReadonlyArray<string>,
 	overlays: ReadonlyArray<{ readonly hostNodeId: string }>,
+	fixedBranchSymbolIds: ReadonlySet<string> = new Set(),
 ): RuntimeDemandMapArtifact['payloadRecords'] {
 	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : fullTier;
 	return [
@@ -949,14 +975,19 @@ function payloadDemandRecords(
 		...(view.branches ?? []).map((record): RuntimeDemandMapRecord => {
 			// A branch whose test reads nothing never flips, so nothing ever loads its flip symbol.
 			const flipSymbolIds =
-				record.symbolId && (record.testReads?.length || record.contentReads?.length)
+				record.symbolId &&
+				!fixedBranchSymbolIds.has(record.symbolId) &&
+				(record.testReads?.length || record.contentReads?.length)
 					? [record.symbolId]
 					: [];
 			return {
 				recordId: `branch:${record.id}`,
 				kind: 'branch',
 				symbolIds: flipSymbolIds,
-				runtimeModuleIds: unique([...BRANCH, ...symbolIdsDemand(flipSymbolIds, symbolDemand)]),
+				runtimeModuleIds: unique([
+					...BRANCH,
+					...symbolIdsDemand(flipSymbolIds, symbolDemand),
+				]),
 			};
 		}),
 		...(view.asyncBoundaries ?? []).map((record): RuntimeDemandMapRecord => ({
@@ -1385,6 +1416,8 @@ export type FirstUseScope = {
 		| undefined;
 	readonly components: ReadonlyArray<SemanticComponent>;
 	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
+	// Flip symbols of branches that never flip once built.
+	readonly fixedBranchSymbolIds: ReadonlySet<string>;
 };
 
 // Written paths per graph node; null when the whole node may have changed.
@@ -1574,8 +1607,10 @@ function consequenceReach(
 				(written) => startsWithPath(path, written) || startsWithPath(written, path),
 			);
 		});
+	const fixed = (branch: { readonly symbolId?: string }) =>
+		branch.symbolId !== undefined && scope.fixedBranchSymbolIds.has(branch.symbolId);
 	const branchFlips = (branch: NonNullable<ProtocolViewPayload['branches']>[number]) =>
-		reads(branch.testReads) || reads(branch.contentReads);
+		!fixed(branch) && (reads(branch.testReads) || reads(branch.contentReads));
 	const repeatMoves = (repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]) => {
 		const branches = repeat.rowTemplate?.branchSlots ?? [];
 		const slotReads = [
@@ -1695,6 +1730,39 @@ function consequenceReach(
 				for (const id of event.symbolIds ?? []) symbolIds.add(id);
 		for (const branch of set.branches ?? []) {
 			if (!branch.symbolId) return false;
+			if (!fixed(branch)) symbolIds.add(branch.symbolId);
+			for (const arm of branch.armRecords ?? []) if (!armSymbols(arm)) return false;
+		}
+		return true;
+	};
+	const readsNothing = (branch: {
+		readonly symbolId?: string;
+		readonly testReads?: ReadonlyArray<unknown>;
+		readonly contentReads?: ReadonlyArray<unknown>;
+	}) => fixed(branch) || (!branch.testReads?.length && !branch.contentReads?.length);
+	// A branch that reads nothing never flips, so its served arm stays wired and a write reaches that arm's records like the page's own.
+	const liveArmReach = (set: ArmRecordSetLike | undefined): boolean => {
+		if (!set) return true;
+		for (const update of (set.domUpdates ?? []) as NonNullable<
+			ProtocolViewPayload['domUpdates']
+		>)
+			if (reads([update])) {
+				recordIds.add(`dom-update:${update.hostNodeId}:${update.symbolId ?? ''}`);
+				if (update.symbolId) symbolIds.add(update.symbolId);
+			}
+		for (const repeat of set.keyedRepeats ?? []) {
+			if (!repeatMoves(repeat)) continue;
+			recordIds.add(`keyed-repeat:${repeat.id}`);
+			for (const event of repeat.rowEvents)
+				for (const id of event.symbolIds ?? []) symbolIds.add(id);
+		}
+		for (const branch of set.branches ?? []) {
+			if (fixed(branch) || !(reads(branch.testReads) || reads(branch.contentReads))) {
+				if (readsNothing(branch))
+					for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return false;
+				continue;
+			}
+			if (!branch.symbolId) return false;
 			symbolIds.add(branch.symbolId);
 			for (const arm of branch.armRecords ?? []) if (!armSymbols(arm)) return false;
 		}
@@ -1707,7 +1775,11 @@ function consequenceReach(
 				const symbolId = (behavior as { readonly symbolId?: unknown }).symbolId;
 				if (typeof symbolId === 'string') symbolIds.add(symbolId);
 			}
-		if (!branchFlips(branch)) continue;
+		if (!branchFlips(branch)) {
+			if (readsNothing(branch))
+				for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return 'unknown';
+			continue;
+		}
 		if (branch.escalates || !branch.symbolId) return 'unknown';
 		recordIds.add(`branch:${branch.id}`);
 		symbolIds.add(branch.symbolId);
@@ -1776,7 +1848,8 @@ function moduleMountReach(
 	scope: FirstUseScope,
 	parts: ReachParts = emptyParts(),
 ): RuntimeDemandMapFirstUseReach {
-	for (const symbol of scope.resolver.symbols) parts.symbolIds.add(symbol.id);
+	for (const symbol of scope.resolver.symbols)
+		if (!scope.fixedBranchSymbolIds.has(symbol.id)) parts.symbolIds.add(symbol.id);
 	for (const record of scope.records) parts.recordIds.add(record.recordId);
 	// A new instance seeds its shared state, which every reader of those cells sees.
 	for (const seed of scope.state.sharedSeeds ?? [])

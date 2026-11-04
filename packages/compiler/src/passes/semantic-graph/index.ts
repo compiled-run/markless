@@ -26,6 +26,7 @@ import { collectComponentProps } from './collect-components.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
+import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach } from '../construct-reach.ts';
 import {
@@ -48,6 +49,7 @@ import {
 	collectAssignment,
 	collectCollectionCall,
 	collectObjectAssign,
+	collectPassedStateWrites,
 	collectComputedWriteDiagnostics,
 	collectDelete,
 	collectExpressionReads,
@@ -70,6 +72,7 @@ import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { childContainerRepeatDiagnostics, containerRepeatComponents } from './container-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
+import { moduleHandlerProps } from './handler-props.ts';
 import {
 	createMutableSemanticGraphArtifact,
 	createWalkState,
@@ -111,6 +114,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionWrites: input.importedFunctionWrites,
 		serverOnlyProps: input.serverOnlyProps,
 	});
 	state.walk = walk;
@@ -238,6 +242,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	// the count is a placeholder until the page composes, and only this module
 	// knows what its own components do with the value once it lands.
 	const propSpends = collectComponentPropSpends(state);
+	const handlerProps = moduleHandlerProps(state);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -298,6 +303,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...(propSpends.get(component.name)?.length
 							? { propSpends: propSpends.get(component.name)! }
 							: {}),
+						...(handlerProps.get(component.name)?.size
+							? { handlerProps: [...handlerProps.get(component.name)!].sort() }
+							: {}),
 					},
 				];
 			}),
@@ -311,17 +319,29 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		return component ? [{ componentName: component.name, propName: declared.propName }] : [];
 	});
 
+	const misplacedAttributes = elementOnlyAttributeDiagnostics({
+		attributes: input.elementOnlyAttributes ?? [],
+		componentEdges: graph.componentEdges,
+		ownInterface: graph.moduleGraphInterface,
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
+	});
+
 	return {
 		...graph,
 		...(serverOnlyProps.length > 0 ? { serverOnlyProps } : {}),
-		diagnostics: applyMarklessAllowDirectives({
-			source: input.source,
-			filename: input.filename,
-			diagnostics: graph.diagnostics,
-			phase: 'semantic-graph',
-			passId: 'tsrx-semantic-graph',
-			artifactKeys: ['semanticGraph'],
-		}) as SemanticGraphArtifact['diagnostics'],
+		diagnostics: applyMarklessAllowDirectives(
+			{
+				source: input.source,
+				filename: input.filename,
+				diagnostics: [...graph.diagnostics, ...misplacedAttributes],
+				phase: 'semantic-graph',
+				passId: 'tsrx-semantic-graph',
+				artifactKeys: ['semanticGraph'],
+			},
+			{ reportUnused: false },
+		) as SemanticGraphArtifact['diagnostics'],
 	};
 }
 
@@ -609,6 +629,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'CallExpression':
 			collectCollectionCall(node, state);
 			collectObjectAssign(node, state);
+			collectPassedStateWrites(node, state);
 			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
 				const [body, ...rest] = asNodes(node.arguments);
 				withFunctionSite(state, 'computed', () => {

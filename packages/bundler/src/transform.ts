@@ -33,6 +33,7 @@ import {
 	jsonSourceWithNonFiniteNumbers,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
+	hasLiveSharedDefinitions,
 } from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
@@ -54,7 +55,7 @@ import {
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
 	settleVirtualModuleId,
-	symbolEntryVirtualModuleId,
+	symbolGroupVirtualModuleId,
 	symbolVirtualModuleId,
 	type BoundSymbolDescriptor,
 	type BoundSymbolDescriptorMap,
@@ -78,6 +79,7 @@ import {
 } from './trigger-groups.ts';
 import { adaptImportedCaptureResolver } from './bound-resolver.ts';
 import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundles.ts';
+import { planSymbolGroups, symbolGroupKey } from './build/symbol-groups.ts';
 
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
@@ -90,6 +92,10 @@ const strippedCode = new Map<string, string>();
 let persistentStrippedCode:
 	| { get(key: string): string | undefined; set(key: string, value: string): void }
 	| undefined;
+
+export function clearStrippedCode(): void {
+	strippedCode.clear();
+}
 
 export function usePersistentStrippedCode(memo: typeof persistentStrippedCode): void {
 	persistentStrippedCode = memo;
@@ -305,7 +311,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const settleId = settleVirtualModuleId(input.filename);
 	const { compiled: compiledForAllClasses, blockingDiagnostics } =
 		await compileWithBlockingDiagnostics(input, resolverId);
-	throwIfBlocked(input, blockingDiagnostics);
+	const linkPendingDiagnostics = linkPendingRefusals(
+		input,
+		compiledForAllClasses,
+		blockingDiagnostics,
+	);
+	throwIfBlocked(
+		input,
+		blockingDiagnostics.filter((diagnostic) => !linkPendingDiagnostics.includes(diagnostic)),
+	);
 	const runtimeDemandClass = input.runtimeDemandClass ?? 'prerender';
 	const servedScalarPlans =
 		input.servedScalarPlans === true && runtimeDemandClass === 'prerender' && !input.prerenderRecords
@@ -320,17 +334,45 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			? withServedScalarDemand(classDemandMap, servedScalarPlans)
 			: classDemandMap,
 	};
-	// Only packed loaders name every symbol with a literal specifier; a computed table import is no module edge.
-	const renderDataInitializers = input.experimentalNativePacking
-		? renderDataInitializerSymbolIds(compiled)
-		: new Set<string>();
-	const compilerSymbolRows = compiled.symbolModules.modules.map((module) => ({
+	const executionLogModuleHookMode =
+		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
+	const symbolExportNames = compiled.symbolModules.modules.map((module) =>
+		scopedSymbolExportName(input.moduleId ?? input.filename, module.exportName),
+	);
+	const symbolSources = await Promise.all(
+		compiled.symbolModules.modules.map(async (module, index) =>
+			injectExecutionLogModuleHook(
+				await stripEmittedTypes(
+					rewriteSymbolModuleExport(module.source, module.exportName, symbolExportNames[index]!),
+					symbolVirtualModuleId(input.filename, module.symbolId),
+				),
+				`symbol:${module.symbolId}`,
+				executionLogModuleHookMode,
+			),
+		),
+	);
+	const symbolGroups =
+		input.experimentalNativePacking &&
+		normalizeExecutionLogMode(executionLogModuleHookMode) === 'never'
+			? planSymbolGroups(
+					compiled.symbolModules.modules.map((module, index) => ({
+						symbolId: module.symbolId,
+						kind: module.kind,
+						source: symbolSources[index]!,
+					})),
+					(member) => symbolGroupKey(member.symbolId, member.kind, compiled.runtimeDemandMap),
+				)
+			: [];
+	const symbolModuleIds = new Map<string, string>();
+	for (const group of symbolGroups)
+		for (const symbolId of group.symbolIds)
+			symbolModuleIds.set(symbolId, symbolGroupVirtualModuleId(input.filename, group.groupId));
+	const symbolModuleIdOf = (symbolId: string) =>
+		symbolModuleIds.get(symbolId) ?? symbolVirtualModuleId(input.filename, symbolId);
+	const compilerSymbolRows = compiled.symbolModules.modules.map((module, index) => ({
 		id: module.symbolId,
-		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
-		exportName: scopedSymbolExportName(input.moduleId ?? input.filename, module.exportName),
-		...(renderDataInitializers.has(module.symbolId)
-			? { lazyChunk: symbolEntryVirtualModuleId(input.filename, module.symbolId) }
-			: {}),
+		chunk: symbolModuleIdOf(module.symbolId),
+		exportName: symbolExportNames[index]!,
 	}));
 	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
 		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
@@ -376,14 +418,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					: input.importedModuleInterfaces?.[route.importSource],
 			),
 	);
-	const executionLogModuleHookMode =
-		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const symbolManifestEntries = [
 		...compiled.symbolModules.modules.map((module, index) => ({
 			symbolId: module.symbolId,
 			kind: module.kind,
 			exportName: compilerSymbolRows[index]!.exportName,
-			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
+			virtualModuleId: symbolModuleIdOf(module.symbolId),
 		})),
 		...linkedBoundarySymbols.map((symbol) => symbol.manifest),
 	];
@@ -469,6 +509,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		},
 		symbols: manifestOwnsSymbolRoutes ? symbolManifestEntries : [],
 		runtimeDemandMap: compiled.runtimeDemandMap,
+		...(symbolGroups.length
+			? {
+					symbolGroups: Object.fromEntries(
+						symbolGroups.flatMap((group) =>
+							group.symbolIds.map((symbolId) => [symbolId, group.groupId]),
+						),
+					),
+				}
+			: {}),
 		...(input.directCsr === true && compiled.publicRenderModule.moduleSource
 			? { directCsr: true }
 			: {}),
@@ -726,42 +775,36 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			}),
 		),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
-		...compilerSymbolRows.flatMap((row): MarklessVirtualModule[] =>
-			row.lazyChunk
-				? [
+		...compiled.symbolModules.modules.flatMap((module, index): MarklessVirtualModule[] =>
+			symbolModuleIds.has(module.symbolId)
+				? []
+				: [
 						{
-							id: row.lazyChunk,
-							type: 'symbol-entry',
-							source: `export * from ${JSON.stringify(row.chunk)};`,
+							id: symbolVirtualModuleId(input.filename, module.symbolId),
+							type: 'symbol',
+							symbolId: module.symbolId,
+							exportName: symbolExportNames[index]!,
+							source: symbolSources[index]!,
 						},
-					]
-				: [],
+					],
 		),
-		...(await Promise.all(
-			compiled.symbolModules.modules.map(
-				async (module, index): Promise<MarklessVirtualModule> => ({
-					id: symbolVirtualModuleId(input.filename, module.symbolId),
-					type: 'symbol',
-					symbolId: module.symbolId,
-					exportName: symbolRows[index]!.exportName,
-					source: injectExecutionLogModuleHook(
-						await stripEmittedTypes(
-							rewriteSymbolModuleExport(
-								module.source,
-								module.exportName,
-								symbolRows[index]!.exportName,
-							),
-							symbolVirtualModuleId(input.filename, module.symbolId),
-						),
-						`symbol:${module.symbolId}`,
-						executionLogModuleHookMode,
-					),
-				}),
-			),
-		)),
+		...symbolGroups.map(
+			(group): MarklessVirtualModule => ({
+				id: symbolGroupVirtualModuleId(input.filename, group.groupId),
+				type: 'symbol',
+				source: group.source,
+				groupedSymbolIds: group.symbolIds,
+			}),
+		),
 	];
 
-	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
+	const stylesheetImports = await resolvedStylesheetImports(
+		compiled.publicRenderPlan.stylesheetImports,
+		input.resolveStylesheetImport,
+	);
+	const styleImport = [...stylesheetImports, ...(styleId ? [styleId] : [])]
+		.map((id) => `import ${JSON.stringify(id)};\n`)
+		.join('');
 	const inlineResumerSources =
 		(input.environment ?? 'lib') === 'client'
 			? undefined
@@ -771,7 +814,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				});
 	// Dev links the children's scoped styles too, so the SSR HTML is styled before any island's JS.
 	const styleModuleIds = [
-		...new Set([...(styleId ? [styleId] : []), ...(input.linkedStyleModuleIds ?? [])]),
+		...new Set([
+			...stylesheetImports,
+			...(styleId ? [styleId] : []),
+			...(input.linkedStyleModuleIds ?? []),
+		]),
 	];
 	const styleModuleUrl = input.styleModuleUrl;
 	const headInjections = [
@@ -839,6 +886,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
+					hasLiveSharedState: hasLiveSharedDefinitions(compiled.payloadScripts.state),
 					hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
@@ -879,14 +927,43 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
+		stylesheetImports,
 		artifactChildren: artifactChildCandidates(compiled),
-		propFlow: modulePropFlow(compiled),
+		propFlow: modulePropFlow(compiled, moduleDiagnostics(compiled)),
 		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],
 			),
 		),
+		...(compiled.semanticGraph.importedFunctionWriteRequests?.length
+			? {
+					importedFunctionWriteRequests:
+						compiled.semanticGraph.importedFunctionWriteRequests,
+				}
+			: {}),
+		...(linkPendingDiagnostics.length > 0 ? { linkPendingDiagnostics } : {}),
 	};
+}
+
+// An imported component with no interface yet counts as an unknown number of elements, so an
+// element beside it is refused until a compile with every component's interface decides it.
+function linkPendingRefusals(
+	input: TransformTsrxModuleInput,
+	compiled: CompileTsrxModuleResult,
+	blockingDiagnostics: readonly CompilerDiagnostic[],
+): readonly CompilerDiagnostic[] {
+	if (input.linkPending !== true || prerenderInterfacesComplete(compiled, input)) return [];
+	return blockingDiagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_UNADDRESSABLE',
+	);
+}
+
+/** Throws the refusals a `linkPending` compile held when no compile against linked imports replaced it. */
+export function throwIfLinkPending(
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source'>,
+	result: Pick<TransformTsrxModuleResult, 'linkPendingDiagnostics'>,
+): void {
+	throwIfBlocked(input, result.linkPendingDiagnostics ?? []);
 }
 
 // A relative specifier in the render-data virtual module would resolve against
@@ -928,18 +1005,6 @@ function initializerModuleSymbolIds(compiled: CompileTsrxModuleResult): Set<stri
 			)
 			.map((module) => module.symbolId),
 	);
-}
-
-// Every initializer module render data imports statically; a packed loader reaches these through their export-star entry.
-function renderDataInitializerSymbolIds(compiled: CompileTsrxModuleResult): Set<string> {
-	const initializerSymbolIds = initializerModuleSymbolIds(compiled);
-	const ids = new Set<string>();
-	for (const definition of compiled.publicRenderModule.componentDefinitions as ReadonlyArray<InitializerDefinition>)
-		for (const initial of definition.initialValues ?? []) {
-			const symbolId = renderDataInitializerSymbolId(definition, initial, initializerSymbolIds);
-			if (symbolId) ids.add(symbolId);
-		}
-	return ids;
 }
 
 // A served page evaluates a component only where the browser renders part of it; one it merely walks
@@ -1253,9 +1318,11 @@ type CompiledTransformInput = Pick<
 	| 'symbols'
 	| 'importedModuleInterfaces'
 	| 'importedModuleConstants'
+	| 'importedFunctionWrites'
 	| 'artifactChildMaterializations'
 	| 'executionLog'
 	| 'serverOnlyProps'
+	| 'elementOnlyAttributes'
 	| 'routeRoot'
 >;
 
@@ -1266,12 +1333,16 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 		moduleId: input.moduleId,
 		source: input.source,
 		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
+		...(input.elementOnlyAttributes?.length
+			? { elementOnlyAttributes: input.elementOnlyAttributes }
+			: {}),
 		...(input.routeRoot ? { routeRoot: true } : {}),
 		buildId: input.buildId,
 		resolverId: `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`,
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionWrites: input.importedFunctionWrites,
 		artifactChildMaterializations: input.artifactChildMaterializations,
 		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
 		// default 'auto' keeps the authored-source strings for dev tooling.
@@ -1627,4 +1698,12 @@ function authorsPendingArm(markup: {
 				(slot.armTemplateIds as { readonly pending?: string }).pending !== undefined,
 		),
 	);
+}
+
+async function resolvedStylesheetImports(
+	requests: ReadonlyArray<string>,
+	resolve: TransformTsrxModuleInput['resolveStylesheetImport'],
+): Promise<ReadonlyArray<string>> {
+	const ids = await Promise.all(requests.map(async (request) => (await resolve?.(request)) ?? request));
+	return [...new Set(ids)];
 }

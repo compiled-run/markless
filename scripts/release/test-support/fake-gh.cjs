@@ -64,6 +64,8 @@ if (path.endsWith('/rules/branches/main')) {
 			},
 		],
 	});
+} else if (path.endsWith('/pulls')) {
+	print([]);
 } else if (path.includes('/statuses')) {
 	print(state.statuses[commitIn(path)] ?? []);
 } else {

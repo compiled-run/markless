@@ -84,7 +84,9 @@ export function registerFirstPassArtifacts(
 			updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 		});
 	} else {
-		moduleMetadata.recordCaptureMetadata(source, transformed.manifest);
+		moduleMetadata.recordCaptureMetadata(source, transformed.manifest, {
+			provisional: internalOptions.dev !== true,
+		});
 		moduleMetadata.recordSymbolClaims(
 			manifestSource,
 			renderDataClaimManifest(transformed.manifest, manifestSource),
@@ -226,7 +228,7 @@ export async function emitTransformResult(
 				linkedModules: virtualModules.keys(),
 			});
 			throwIfRenderDataUnlinked(renderData);
-			const styleImports = renderData.styleModules.map(
+			const styleImports = [...transformed.stylesheetImports, ...renderData.styleModules].map(
 				(styleModule) => `import ${JSON.stringify(styleModule)};`,
 			);
 			if (sharesCanonicalRenderData(request, renderDataModule)) {
@@ -263,6 +265,7 @@ export async function emitTransformResult(
 	state.styleClosures.set(
 		source,
 		new Set([
+			...transformed.stylesheetImports,
 			...transformed.virtualModules.flatMap((module) =>
 				module.type === 'style' ? [module.id] : [],
 			),
@@ -426,6 +429,10 @@ function renderDataNativeDependencies(
 // Symbol modules recur across a source's render-data variants; scan each text once.
 const specifiersByCode = new Map<string, readonly string[]>();
 const SPECIFIERS_LIMIT = 2048;
+
+export function clearModuleSpecifiers(): void {
+	specifiersByCode.clear();
+}
 
 export function moduleSpecifiers(code: string): readonly string[] {
 	let specifiers = specifiersByCode.get(code);

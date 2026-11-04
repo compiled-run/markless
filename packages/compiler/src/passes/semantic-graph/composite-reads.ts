@@ -1,5 +1,5 @@
 import { GLOBAL_CONVERSION_FUNCTIONS } from '../../ast/globals.ts';
-import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import type {
 	SemanticGraphAlias,
@@ -39,9 +39,8 @@ export type GraphReadScope = {
  * Both positions say yes. A component edge needs it for
  * `checked={group.value.includes(item.value)}`, the only way to say "this item's
  * membership"; a template position needs it because `{list.value.join('|')}` in
- * markup otherwise renders once and never moves. Callers bound the cost with
- * `requireWritableRead`, which drops a props-only call - nothing can move it after
- * the render that read it.
+ * markup otherwise renders once and never moves. A props-only call counts too: a
+ * parent that passes state moves the prop.
  */
 /**
  * Whether a unary operator standing over the whole expression counts as part of
@@ -146,9 +145,7 @@ export function pureCompositeReadSources(
 	}
 	if (node.type === 'TemplateLiteral') {
 		return joinReadSources(
-			asNodes(node.expressions).map((part) =>
-				pureCompositeReadSources(part, state, options),
-			),
+			asNodes(node.expressions).map((part) => pureCompositeReadSources(part, state, options)),
 		);
 	}
 	return null;
@@ -241,7 +238,10 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 	if (offset === null) return false;
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, offset);
-	if (symbolId !== null && semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module')
+	if (
+		symbolId !== null &&
+		semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module'
+	)
 		return false;
 	if (repeatRowBindsName(source, state)) return false;
 	return (
@@ -278,7 +278,6 @@ export function collectCompositeTemplateExpression(
 	node: AnyNode,
 	state: WalkState,
 	options: CompositeReadOptions & {
-		readonly requireWritableRead?: boolean;
 		readonly scope?: GraphReadScope;
 	} = {},
 ): { readonly graphNodeId: string } | null {
@@ -291,9 +290,24 @@ export function collectCompositeTemplateExpression(
 		`() => ${expressionSource(node, state.source)}`,
 		readSources,
 		state,
-		options.requireWritableRead === true,
 		options.scope,
+		false,
+		memberRoots(node),
 	);
+}
+
+function armRebuildsFromGraph(state: WalkState): boolean {
+	return !!state.currentArmScope && state.currentKeyedRepeatScopeIds.length === 0;
+}
+
+function memberRoots(node: AnyNode): ReadonlySet<string> {
+	const roots = new Set<string>();
+	walkNode(node, (child) => {
+		if (child.type !== 'MemberExpression') return;
+		const name = getIdentifierName(child.object as AnyNode | undefined);
+		if (name) roots.add(name);
+	});
+	return roots;
 }
 
 // A flipped arm rebuilds from graph reads alone, so a module value it shows rides a constant computed.
@@ -311,7 +325,6 @@ export function liftArmModuleValue(
 		`() => ${expressionSource(expression, state.source)}`,
 		[],
 		state,
-		false,
 		undefined,
 		true,
 	);
@@ -325,15 +338,17 @@ export function mintTemplateExpressionComputed(
 	functionSource: string,
 	readSources: ReadonlyArray<string>,
 	state: WalkState,
-	requireWritableRead = false,
 	scope?: GraphReadScope,
 	// A collection lifted for its row handlers is a graph node even when nothing moves it.
 	allowConstant = false,
+	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
+	propObjectRoots?: ReadonlySet<string>,
 ): { readonly graphNodeId: string } | null {
-	const bindings = scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
-	const aliases = scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+	const bindings =
+		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
+	const aliases =
+		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
 	const dependencies: SemanticGraphDependency[] = [];
-	let readsGraphCell = false;
 	for (const source of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.
 		// An enclosing row binding outranks both - it is the name's real declaration.
@@ -351,12 +366,20 @@ export function mintTemplateExpressionComputed(
 		) {
 			return null;
 		}
-		if (resolved.binding.kind !== 'prop') readsGraphCell = true;
 		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
 	}
 	if (dependencies.length === 0 && !allowConstant) return null;
-	// No write can move a prop after the render that read it, so props-only owes no record.
-	if (requireWritableRead && !readsGraphCell) return null;
+	if (
+		!allowConstant &&
+		!armRebuildsFromGraph(state) &&
+		dependencies.every((dependency) => dependency.graphNodeId.startsWith('prop:')) &&
+		dependencies.some(
+			(dependency) =>
+				propObjectRoots?.has(dependency.source) ||
+				dependency.path.length > (dependency.graphNodeId === 'prop:props' ? 1 : 0),
+		)
+	)
+		return null;
 
 	const index = state.graph.graphBindings.filter((binding) =>
 		binding.id.startsWith('computed:templateExpression:'),
@@ -371,6 +394,7 @@ export function mintTemplateExpressionComputed(
 		asyncCapable: false,
 		functionSource,
 		dependencies: uniqueDependencies(dependencies),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
 	return { graphNodeId };
 }
@@ -430,7 +454,9 @@ export function readsUnroutedGraphCell(
 	const visit = (node: AnyNode, parent: AnyNode | null): void => {
 		const isName =
 			parent &&
-			((parent.type === 'MemberExpression' && parent.property === node && parent.computed !== true) ||
+			((parent.type === 'MemberExpression' &&
+				parent.property === node &&
+				parent.computed !== true) ||
 				((parent.type === 'Property' || parent.type === 'ObjectProperty') &&
 					parent.key === node &&
 					parent.computed !== true));

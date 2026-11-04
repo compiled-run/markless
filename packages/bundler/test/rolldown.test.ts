@@ -1507,8 +1507,8 @@ export default function Page() @{ <main><StaticFrame /><StyledChild /></main> }`
 			return null;
 		});
 		const load = vi.fn(async ({ id }: { readonly id: string }) => {
-			if (id !== childFilename) return null;
-			return await callTransform(plugin, childSource, childFilename, {
+			if (id.split('?')[0] !== childFilename) return null;
+			return await callTransform(plugin, childSource, id, {
 				resolve: resolveImport,
 				getModuleInfo: () => ({ isEntry: false }),
 			});
@@ -1582,7 +1582,7 @@ export default function Panel() @{ <section><Badge /></section> }`;
 						: null,
 		);
 		const load = vi.fn(async ({ id }: { readonly id: string }) => {
-			const code = sources.get(id);
+			const code = sources.get(id.split('?')[0]!);
 			if (code === undefined) return null;
 			return await callTransform(plugin, code, id, {
 				resolve: resolveImport,
@@ -2011,12 +2011,18 @@ export function App() @{
 			expect(rendered.html).toContain('data-capture-literal="true"');
 			expect(rendered.html).toContain('>Server spruce</button>');
 			expect(rendered.html).toContain('>Server copper</button>');
-			expect(rendered.view.domUpdates).toEqual([
+			expect(rendered.view.domUpdates).toContainEqual(
 				expect.objectContaining({
 					hostNodeId: 'c0:h0',
 					graphNodeId: 'state:graphLabel',
 				}),
-			]);
+			);
+			// The marker attributes read props alone; a parent passing state would move them.
+			expect(
+				rendered.view.domUpdates
+					.filter((update) => update.graphNodeId !== 'state:graphLabel')
+					.every((update) => update.graphNodeId.includes('computed:templateExpression:')),
+			).toBe(true);
 		} finally {
 			await rm(ssrOutputDirectory, { recursive: true, force: true });
 		}

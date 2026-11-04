@@ -9,7 +9,11 @@ import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
 type EdgeRoute = {
 	readonly src: string;
 	readonly dest: string;
-	readonly has: ReadonlyArray<{ readonly type: 'header'; readonly key: string; readonly value: string }>;
+	readonly has: ReadonlyArray<{
+		readonly type: 'header';
+		readonly key: string;
+		readonly value: string;
+	}>;
 	readonly headers: Readonly<Record<string, string>>;
 };
 
@@ -102,6 +106,11 @@ export function compressedAssetsState(): CompressedAssetsState {
 	return { brotliDir: undefined };
 }
 
+/** Whether a Nitro preset deploys to Cloudflare Workers or Pages. */
+export function isCloudflarePreset(preset: string | undefined): boolean {
+	return preset !== undefined && preset.startsWith('cloudflare') && preset !== 'cloudflare-dev';
+}
+
 // A server that serves its own files (node, bun, deno) gets gzip and brotli copies; a host with a CDN (vercel, netlify) compresses at its edge.
 export function compressedAssetsModule(
 	configured: boolean,
@@ -113,6 +122,11 @@ export function compressedAssetsModule(
 			const { preset, serveStatic } = nitro.options;
 			// The prerenderer is a second Nitro with its own preset and output; the files served are the build's own.
 			if (preset === 'nitro-prerender') return;
+			if (isCloudflarePreset(preset) && !nitro.options.dev) {
+				// Cloudflare compresses static files at its edge and never serves Nitro's .gz or .br copies, which only count against its file limit.
+				nitro.options.compressPublicAssets = false;
+				return;
+			}
 			if (preset?.startsWith('vercel')) {
 				if (configured) return;
 				const base = nitro.options.baseURL ?? '/';
@@ -121,7 +135,13 @@ export function compressedAssetsModule(
 				nitro.options.vercel.config.routes = [
 					...Object.entries(EDGE_CONTENT_TYPES).map(([extension, type]) => ({
 						src: `^${escapeRegExp(`${base}${MARKLESS_BUILD_PREFIX}`)}(.+\\.${extension})$`,
-						has: [{ type: 'header' as const, key: 'accept-encoding', value: '.*\\bbr\\b.*' }],
+						has: [
+							{
+								type: 'header' as const,
+								key: 'accept-encoding',
+								value: '.*\\bbr\\b.*',
+							},
+						],
 						dest: `${base}${MARKLESS_BUILD_PREFIX}$1.br`,
 						headers: {
 							'content-encoding': 'br',
@@ -178,7 +198,9 @@ export function brotliCopiesPlugin(state: CompressedAssetsState): Plugin {
 				const extensions = Object.keys(EDGE_CONTENT_TYPES);
 				await writeBrotliCopies(
 					(await readdir(dir, { recursive: true }).catch(() => []))
-						.filter((file) => extensions.includes(file.slice(file.lastIndexOf('.') + 1)))
+						.filter((file) =>
+							extensions.includes(file.slice(file.lastIndexOf('.') + 1)),
+						)
 						.map((file) => join(dir, file)),
 					EDGE_BROTLI_QUALITY,
 				);

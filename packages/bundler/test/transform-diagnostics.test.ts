@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import {
 	MarklessCompileError,
 	formatMarklessSourceFrame,
@@ -90,6 +90,45 @@ test('formats two context lines and underlines a multiline span to the first lin
 	expect(frame).toContain('  6 | five');
 });
 
+// Converted pages carry megabyte-long lines; a frame that copied them whole held gigabytes on the shadcn port.
+test('a frame on a very long line shows a window around the caret', () => {
+	const line = `${'a'.repeat(500_000)}target${'b'.repeat(500_000)}`;
+	const source = ['before', line, 'after'].join('\n');
+	const start = source.indexOf('target');
+	const frame = formatMarklessSourceFrame(source, {
+		filename: 'src/Long.tsrx',
+		start,
+		end: start + 'target'.length,
+	});
+	expect(frame.length).toBeLessThan(1_000);
+	const lines = frame.split('\n');
+	const active = lines.find((text) => text.startsWith('>'))!;
+	const caret = lines[lines.indexOf(active) + 1]!;
+	expect(active).toContain('target');
+	expect(active.indexOf('target')).toBe(caret.indexOf('^'));
+	expect(caret).toContain('^^^^^^');
+	expect(frame).toContain('  1 | before');
+	expect(frame).toContain('  3 | after');
+});
+
+test('a compile error serializes its payload only when pluginCode is read', () => {
+	const stringify = vi.spyOn(JSON, 'stringify');
+	try {
+		const error = new MarklessCompileError({
+			version: 1,
+			id: 'src/Lazy.tsrx',
+			kind: 'compile',
+			diagnostics: [{ code: 'MARKLESS_TEST', message: 'lazy' }],
+			details: 'lazy',
+		});
+		expect(stringify).not.toHaveBeenCalled();
+		expect(normalizeMarklessDevError({ pluginCode: error.pluginCode })).toEqual(error.payload);
+		expect(error.pluginCode).toBe(error.pluginCode);
+	} finally {
+		stringify.mockRestore();
+	}
+});
+
 test('rejects a write to a read-only prop with a source position', async () => {
 	const filename = 'src/Counter.tsrx';
 	const source = `export function Counter({ count }: { count: number }) @{
@@ -151,4 +190,34 @@ test('rejects an alternate-shaped prefix write to a read-only prop', async () =>
 }`;
 
 	await expect(transform(filename, source)).rejects.toThrow('MARKLESS_STATE_READ_ONLY_WRITE');
+});
+
+test('an @pending after @catch names the arm order instead of failing the type strip', async () => {
+	const filename = 'src/Search.tsrx';
+	const source = `import { computed, state } from '@markless/core';
+
+export default function Search() @{
+	let query = state('');
+	const results = computed(async () => {
+		const q = query;
+		await null;
+		return { q };
+	});
+
+	<main>
+		@try {
+			<ul>{results.q}</ul>
+		} @catch (error) {
+			<p>{error.message}</p>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}`;
+
+	for (const environment of ['client', 'server'] as const) {
+		const build = transformTsrxModule({ filename, source, environment });
+		await expect(build).rejects.toThrow('MARKLESS_ASYNC_ARM_ORDER');
+		await expect(build).rejects.not.toThrow('MARKLESS_TYPE_STRIP_FAILED');
+	}
 });

@@ -150,11 +150,14 @@ async function stylesheetsBeforePage(
 	const own = await page.evaluate(async (destination) => {
 		const text = await (await fetch(`/_markless/fragment${destination}`)).text();
 		const doc = new DOMParser().parseFromString(text, 'text/html');
-		const have = new Set(
-			[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
+		const have = new Set([
+			...[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
 				(l) => l.href,
 			),
-		);
+			...[...document.querySelectorAll('[data-markless-css]')].map(
+				(node) => new URL(node.getAttribute('data-markless-css')!, location.href).href,
+			),
+		]);
 		return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
 			.map((l) => new URL(l.getAttribute('href')!, location.href))
 			.filter((url) => !have.has(url.href))
@@ -428,39 +431,37 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('a prefetched page loads its own stylesheets before the click, so the swap never waits on them', async () => {
+		// A destination's own route CSS rides inside its fragment, so neither the prefetch nor the swap waits on a stylesheet file.
+		test('a prefetched page brings its route CSS inside its fragment, so the swap fetches no stylesheet', async () => {
 			const { page, errors } = await open(browser);
 			const styles: string[] = [];
 			page.on('request', (request) => {
 				if (request.resourceType() === 'stylesheet')
 					styles.push(new URL(request.url()).pathname);
 			});
-			const own = await page.evaluate(async () => {
+			const carried = await page.evaluate(async () => {
 				const text = await (await fetch('/_markless/fragment/other')).text();
 				const doc = new DOMParser().parseFromString(text, 'text/html');
-				const have = new Set(
-					[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
-						(l) => l.href,
-					),
-				);
-				return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
-					.map((l) => new URL(l.getAttribute('href')!, location.href))
-					.filter((url) => !have.has(url.href))
-					.map((url) => url.pathname);
+				return doc.querySelectorAll('style[data-markless-css]').length;
 			});
-			expect(own.length).toBeGreaterThan(0);
+			expect(carried).toBeGreaterThan(0);
 			await page.locator('[data-nav="other"]').hover();
-			await expect.poll(() => own.every((path) => styles.includes(path))).toBe(true);
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
+			expect(
+				await page
+					.locator('[data-mark]')
+					.evaluate((element) => getComputedStyle(element).color),
+			).toBe('rgb(200, 100, 50)');
+			expect(styles).toEqual([]);
 			expect(errors).toEqual([]);
 			await page.close();
 		});
 
-		test('a press with no hover before it requests the destination stylesheets with its page, not after it', async () => {
+		test('a press with no hover before it has no destination stylesheet left to request, its route CSS rides the page', async () => {
 			expect(
 				await stylesheetsBeforePage(browser, origin, '/', '[data-nav="other"]', '/other'),
-			).toEqual([true]);
+			).toEqual([]);
 		});
 
 		test('a press requests the stylesheets the document adds for the destination URL with its page', async () => {
@@ -532,16 +533,16 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('page-scoped shared state starts from the server on the new page', async () => {
+		test('page-scoped shared state keeps its live value on the new page', async () => {
 			const { page, errors } = await open(browser);
 			await page.locator('[data-hit]').click();
 			await page.locator('[data-hit]').click();
 			await expect.poll(() => text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
-			expect(await text(page, '[data-hits]')).toBe('0');
+			expect(await text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-hit]').click();
-			await expect.poll(() => text(page, '[data-hits]')).toBe('1');
+			await expect.poll(() => text(page, '[data-hits]')).toBe('3');
 			expect(errors).toEqual([]);
 			await page.close();
 		});
@@ -1042,6 +1043,45 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a navigation cancelled while its stylesheet loads leaves the head of the page shown', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			await page.evaluate(() => {
+				// The arriving page's stylesheet goes into the head, unapplied, ahead of the swap: cancel right then.
+				new MutationObserver((records, observer) => {
+					const added = records.flatMap((record) => [...record.addedNodes]);
+					if (!added.some((node) => (node as HTMLLinkElement).rel === 'stylesheet')) return;
+					observer.disconnect();
+					(document.querySelector('[data-crumb-home]') as HTMLElement).click();
+				}).observe(document.head, { childList: true });
+				(document.querySelector('[data-pager-next]') as HTMLElement).click();
+			});
+			await page.waitForTimeout(1000);
+			expect(new URL(page.url()).pathname).toBe('/');
+			expect(await page.title()).toBe('Guide home');
+			const head = () =>
+				page.evaluate(() =>
+					[...document.head.querySelectorAll('title, meta[name], link[rel="canonical"]')].map(
+						(element) =>
+							element.localName === 'title'
+								? element.textContent
+								: (element.getAttribute('content') ?? element.getAttribute('href')),
+					),
+				);
+			expect(await head()).toEqual(['Guide home', 'About Guide home', 'https://guide.test/']);
+			expect(
+				await page.evaluate(() =>
+					[...document.head.querySelectorAll('link[rel="stylesheet"]')].map((link) =>
+						link.getAttribute('media'),
+					),
+				),
+			).toEqual(['not all']);
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'alpha');
+			expect(await head()).toEqual(['Alpha guide', 'About Alpha guide', 'https://guide.test/alpha']);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('a scrolled box the next page wraps differently keeps its offset, and the page lands without a smooth scroll', async () => {
 			const { page, errors } = await open(browser, '/', docOrigin);
 			// The router learns a box scrolled from its scroll event, which fires a frame after the write.
@@ -1111,6 +1151,7 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		// Its five 3.5 s idle windows spend 17.5 s of the budget before any navigation runs.
 		test('the idle tier fetches each page at most once a session, even after its fetch was used or a page was left', async () => {
 			const { page, errors } = await open(browser);
 			// Requests made while the page sits idle after landing: the idle tier's, not a hover's or a click's.
@@ -1140,7 +1181,7 @@ for (const [name, browserType] of [
 			expect(idle.toSorted()).toEqual([...new Set(idle)].toSorted());
 			expect(errors).toEqual([]);
 			await page.close();
-		});
+		}, 60_000);
 
 		test('the idle tier stops a page whose region passes its byte budget, and a hover fetches that page whole', async () => {
 			const whole = await (await fetch(`${origin}/_markless/fragment/large`)).arrayBuffer();
@@ -1191,8 +1232,20 @@ for (const [name, browserType] of [
 		test('the idle tier starts only once the code the page landed with has arrived', async () => {
 			const held = new URL(landing['pages/index.tsrx']!.at(-1)!, origin).pathname;
 			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-			let arrived = Infinity;
-			const fragments: number[] = [];
+			// The page reads its link as fast whatever this machine's load: transfers that took 300 ms on a busy runner read slow and the tier never ran.
+			await page.addInitScript(() => {
+				const entries = performance.getEntriesByType.bind(performance);
+				performance.getEntriesByType = (type: string) =>
+					entries(type).map(
+						(entry) =>
+							new Proxy(entry, {
+								get: (target, key) =>
+									key === 'responseEnd'
+										? (target as PerformanceResourceTiming).responseStart
+										: Reflect.get(target, key, target),
+							}),
+					);
+			});
 			await page.route(
 				(url) => url.pathname === held,
 				async (route) => {
@@ -1200,15 +1253,20 @@ for (const [name, browserType] of [
 					await route.continue();
 				},
 			);
-			page.on('requestfinished', (request) => {
-				if (new URL(request.url()).pathname === held) arrived = Date.now();
-			});
-			page.on('request', (request) => {
-				if (fragmentPageUrl(new URL(request.url()))) fragments.push(Date.now());
-			});
+			const arrival = page.waitForEvent(
+				'requestfinished',
+				(request) => new URL(request.url()).pathname === held,
+			);
+			const fragment = page.waitForRequest((request) =>
+				Boolean(fragmentPageUrl(new URL(request.url()))),
+			);
+			let arrived = Infinity;
+			let fetched = -Infinity;
+			void arrival.then(() => (arrived = Date.now()));
+			void fragment.then(() => (fetched = Date.now()));
 			await page.goto(origin + '/');
-			await expect.poll(() => fragments.length, { timeout: 10_000 }).toBeGreaterThan(0);
-			expect(Math.min(...fragments)).toBeGreaterThanOrEqual(arrived);
+			await Promise.all([arrival, fragment]);
+			expect(fetched).toBeGreaterThanOrEqual(arrived);
 			await page.close();
 		});
 

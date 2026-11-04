@@ -34,12 +34,15 @@ import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+	PROTOCOL_SHARED_INSTANCES_PROPERTY,
 	PROTOCOL_STREAM_OPEN_PROPERTY,
+	RESUME_MODULE_ATTRIBUTE,
 } from '@markless/web/fns/container-region';
 import {
 	installKeepParts,
 	PROTOCOL_KEEP_ATTRIBUTE,
 	PROTOCOL_OWN_ATTRIBUTE,
+	PROTOCOL_VARY_ATTRIBUTE,
 } from '@markless/web/fns/keep-parts';
 import {
 	normalizeMarklessDevError,
@@ -47,7 +50,11 @@ import {
 } from '@markless/bundler/dev-error';
 import { __marklessDebugBootstrapSource } from '../../../../web/src/debug-channel.ts';
 import { appendModulePreloads, listenForLinkIntent } from '../link-intent.ts';
-import { LINK_BRIDGE_SCRIPT_ATTRIBUTE, linkBridgeModulePath } from './link-bridge-module.ts';
+import {
+	LINK_BRIDGE_SCRIPT_ATTRIBUTE,
+	LINK_TABLE_SCRIPT_ATTRIBUTE,
+	linkBridgeModulePath,
+} from './link-bridge-module.ts';
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
 import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../navigation-timing.ts';
@@ -64,6 +71,7 @@ import {
 	FRAGMENT_PREFETCH_CONNECTIONS,
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
+	STYLESHEET_KEY_ATTRIBUTE,
 	fragmentPageUrl,
 	runFragmentNavigation,
 	startFragmentNavigation,
@@ -87,6 +95,10 @@ export interface ServerEntryOptions {
 	readonly routeStylesheets?: Record<string, readonly string[]>;
 	// The document shell's scoped CSS, linked on every route ahead of the route's own.
 	readonly documentStylesheets?: readonly string[];
+	// The text of the document's stylesheets: a page carries each one inline instead of requesting it.
+	readonly stylesheetSources?: Readonly<Record<string, string>>;
+	// Route stylesheets whose text arrives with the page module that uses them, under PAGE_STYLESHEET_SOURCES_EXPORT.
+	readonly inlineStylesheets?: readonly string[];
 	// `<script type="importmap">` resolving the chunk specifiers built chunks import each other by.
 	readonly importMap?: string;
 	readonly documentModuleLoader: (() => Promise<unknown>) | undefined;
@@ -130,9 +142,13 @@ interface SsrArtifact {
 	readonly storageSeeds?: SsrRenderArtifact['storageSeeds'];
 }
 
+/** The page module export, added by the build, holding the text of the stylesheets its route links. */
+export const PAGE_STYLESHEET_SOURCES_EXPORT = 'marklessStylesheetSources';
+
 interface PageModule {
 	readonly default?: SsrArtifact;
 	readonly marklessRenderSsr?: SsrRender;
+	readonly [PAGE_STYLESHEET_SOURCES_EXPORT]?: Readonly<Record<string, string>>;
 }
 
 interface DocumentModule {
@@ -211,6 +227,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 		: (options.linkBridgePaths ??
 			(linkBridgeModules && [linkBridgeModules[0].path, linkBridgeModules[1].path]));
 
+	const inlineStylesheets = inlineStylesheetPlan(options);
 	// A press preloads the stylesheets a destination adds beside its page: its route's, and those its document writes for its URL.
 	const documentHeads = new Map<string, Promise<readonly string[]>>();
 	function pageStylesheetsAt(
@@ -237,6 +254,17 @@ export function createServerEntry(options: ServerEntryOptions) {
 			documentHeads.set(key, head);
 		}
 		return head.then((hrefs) => [...new Set([...own, ...hrefs])]);
+	}
+	// A destination's own stylesheets arrive inside its fragment, so a press preloads only those it may request.
+	function requestedStylesheetsAt(
+		url: URL,
+		match: NonNullable<ReturnType<typeof matchRouteManifest>>,
+		documentModule: DocumentModule | undefined,
+		request: Request,
+	): Promise<readonly string[]> {
+		return pageStylesheetsAt(url, match, documentModule, request).then((hrefs) =>
+			hrefs.filter((href) => !inlineStylesheets.carries(href)),
+		);
 	}
 
 	async function fetch(request: Request): Promise<Response> {
@@ -385,7 +413,13 @@ export function createServerEntry(options: ServerEntryOptions) {
 					: {}),
 			},
 			options.navigationEntryPath,
-			pageStylesheets(options, file),
+			(pageStylesheets(options, file) ?? []).map((href) =>
+				inlineStylesheets.injection(
+					href,
+					fragment,
+					pageModule[PAGE_STYLESHEET_SOURCES_EXPORT],
+				),
+			),
 			documentModule?.default?.headInjections ?? [],
 			linkIntent
 				? (html: string) =>
@@ -397,7 +431,7 @@ export function createServerEntry(options: ServerEntryOptions) {
 							fragmentNavigation,
 							fragmentNavigation
 								? (destination, match) =>
-										pageStylesheetsAt(
+										requestedStylesheetsAt(
 											destination,
 											match,
 											documentModule,
@@ -570,12 +604,55 @@ function dedupeHeadLinks(
 ): ReadonlyArray<RenderHeadInjection> {
 	const seen = new Set<string>();
 	return injections.filter((injection) => {
-		const href = injection.tag === 'link' ? injection.attributes?.href : undefined;
+		const href =
+			injection.attributes?.[STYLESHEET_KEY_ATTRIBUTE] ??
+			(injection.tag === 'link' ? injection.attributes?.href : undefined);
 		if (typeof href !== 'string') return true;
 		if (seen.has(href)) return false;
 		seen.add(href);
 		return true;
 	});
+}
+
+// A stylesheet the build holds the text of rides inside the page. A fragment carries the text only of those its own route
+// alone uses; the rest it names, so a document keeps the one it has and fetches, as a file, one it lacks.
+function inlineStylesheetPlan(options: ServerEntryOptions) {
+	const resident = options.stylesheetSources ?? {};
+	const held = new Set([...Object.keys(resident), ...(options.inlineStylesheets ?? [])]);
+	const routes = new Map<string, number>();
+	for (const hrefs of Object.values(options.routeStylesheets ?? {}))
+		for (const href of new Set(hrefs)) routes.set(href, (routes.get(href) ?? 0) + 1);
+	const documentHrefs = new Set(options.documentStylesheets ?? []);
+	const routeOwn = (href: string) => routes.get(href) === 1 && !documentHrefs.has(href);
+	return {
+		// What a destination's fragment carries as text, so a press need not fetch it.
+		carries: (href: string) => held.has(href) && routeOwn(href),
+		injection(
+			href: string,
+			fragment: boolean,
+			pageSources: Readonly<Record<string, string>> = {},
+		): RenderHeadInjection {
+			const text = Object.hasOwn(pageSources, href)
+				? pageSources[href]
+				: Object.hasOwn(resident, href)
+					? resident[href]
+					: undefined;
+			if (text === undefined)
+				return { tag: 'link', location: 'head', attributes: { rel: 'stylesheet', href } };
+			if (fragment && !routeOwn(href))
+				return {
+					tag: 'link',
+					location: 'head',
+					attributes: { rel: 'stylesheet', href, [STYLESHEET_KEY_ATTRIBUTE]: href },
+				};
+			return {
+				tag: 'style',
+				location: 'head',
+				attributes: { [STYLESHEET_KEY_ATTRIBUTE]: href },
+				children: text,
+			};
+		},
+	};
 }
 
 function pageStylesheets(options: ServerEntryOptions, file: string): readonly string[] | undefined {
@@ -591,7 +668,7 @@ function routedPageArtifact(
 	pageProps: PageComponentProps,
 	route: RouteScript,
 	navigationEntryPath: string | undefined,
-	stylesheetHrefs: readonly string[] | undefined,
+	stylesheetInjections: ReadonlyArray<RenderHeadInjection>,
 	documentHeadInjections: ReadonlyArray<RenderHeadInjection> = [],
 	intentPreloads?: (html: string) => Promise<Record<string, readonly FragmentPreload[]>>,
 	documentLoads = false,
@@ -602,11 +679,7 @@ function routedPageArtifact(
 	const headInjections = dedupeHeadLinks([
 		...documentHeadInjections,
 		...(baseArtifact?.headInjections ?? []),
-		...(stylesheetHrefs ?? []).map((href): RenderHeadInjection => ({
-			tag: 'link',
-			location: 'head',
-			attributes: { rel: 'stylesheet', href },
-		})),
+		...stylesheetInjections,
 	]);
 	return {
 		resumeModuleUrl: baseArtifact?.resumeModuleUrl,
@@ -677,15 +750,15 @@ function landingModulePreloads(
 ): readonly ModulePreloadInput[] | undefined {
 	const preloads: ModulePreloadInput[] = [];
 	addModulePreloads(preloads, new Set(), routePreloads);
-	// The first click waits on the landing plan: below high, a font the stylesheet asks for late is sent ahead of it.
-	const landing = preloads.map(highFetchPriority);
+	// Low: Chromium sends a high-priority script ahead of first paint, and Lighthouse counts every one finished before it as render-blocking.
+	const landing = preloads.map(lowFetchPriority);
 	if (linkBridgePath) landing.push({ href: linkBridgePath, fetchPriority: 'low' });
 	return landing.length > 0 ? landing : undefined;
 }
 
-function highFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
-	if (typeof preload === 'string') return { href: preload, fetchPriority: 'high' };
-	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'high' };
+function lowFetchPriority(preload: ModulePreloadInput): ModulePreloadInput {
+	if (typeof preload === 'string') return { href: preload, fetchPriority: 'low' };
+	return preload.fetchPriority ? preload : { ...preload, fetchPriority: 'low' };
 }
 
 function routerLinkHrefs(html: string): string[] {
@@ -816,10 +889,11 @@ async function renderDocumentShell(
 	);
 	const attributes = htmlAttributes(documentModule, pageProps, written);
 	if (documentHtml !== undefined) {
+		const { html, preloads } = takeHeadModulePreloads(insertHeadHtml(documentHtml, headHtml));
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertImportMap(insertHeadHtml(documentHtml, headHtml), importMap),
+			insertHeadModulePreloads(insertImportMap(html, importMap), importMap, preloads),
 			'</html>',
 		].join('');
 	}
@@ -910,6 +984,59 @@ function documentStorageRecords(state: unknown): ReadonlyArray<{ readonly key: s
 	return Array.isArray(storage) ? (storage as ReadonlyArray<{ readonly key: string }>) : [];
 }
 
+// A modulepreload tag, or text a preload scan must step over whole: a comment or the content of a raw-text element.
+const HEAD_SCAN =
+	/<!--[\s\S]*?-->|<(script|style|template|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\1\s*>|(<link\b[^>]*\brel=["']?modulepreload\b[^>]*>)/gi;
+
+// Firefox and Safari fetch a modulepreload only once the parser reaches it: the head's modulepreloads, the document's own included, are gathered and placed together.
+function takeHeadModulePreloads(html: string): {
+	readonly html: string;
+	readonly preloads: string;
+} {
+	const headEnd = html.search(/<\/head>/i);
+	if (headEnd === -1) return { html, preloads: '' };
+	let preloads = '';
+	const head = html.slice(0, headEnd).replace(HEAD_SCAN, (match, _raw, preload) => {
+		if (!preload) return match;
+		preloads += preload;
+		return '';
+	});
+	return { html: head + html.slice(headEnd), preloads };
+}
+
+// Steps over comments and raw-text elements whole; captures a script's attributes, a template open or close, and a link tag.
+const HEAD_ORDER_SCAN =
+	/<!--[\s\S]*?-->|<script\b((?:[^"'>]|"[^"]*"|'[^']*')*)>[\s\S]*?<\/script\s*>|<(style|noscript|textarea|title|xmp)\b[^>]*>[\s\S]*?<\/\2\s*>|<(\/?)template\b[^>]*>|(<link\b(?:[^"'>]|"[^"]*"|'[^']*')*>)/gi;
+const JAVASCRIPT_TYPE =
+	/^(?:(?:text|application)\/(?:x-)?(?:java|ecma)script|text\/(?:javascript1\.[0-5]|jscript|livescript))$/;
+
+// WebKit holds first paint for modulepreloads above a stylesheet, yet a classic head script waits for every stylesheet above it:
+// the preloads go after the stylesheets that come before the first such script.
+function insertHeadModulePreloads(html: string, importMap: string, preloads: string): string {
+	if (!preloads) return html;
+	const start = importMap ? html.indexOf(importMap) + importMap.length : headContentStart(html);
+	const headEnd = html.slice(start).search(/<\/head\s*>/i);
+	const head = headEnd === -1 ? html.slice(start) : html.slice(start, start + headEnd);
+	let at = 0;
+	let templates = 0;
+	for (const match of head.matchAll(HEAD_ORDER_SCAN)) {
+		if (match[3] !== undefined) templates = Math.max(0, templates + (match[3] ? -1 : 1));
+		if (templates > 0) continue;
+		if (match[1] !== undefined && isParserBlockingScript(match[1])) break;
+		if (match[4] && /\brel=["']?(?:[^"'>]*\s)?stylesheet\b/i.test(match[4]))
+			at = match.index + match[0].length;
+	}
+	return html.slice(0, start + at) + preloads + html.slice(start + at);
+}
+
+function isParserBlockingScript(attributes: string): boolean {
+	const type = /(?:^|\s)type=["']?([^"'\s>]*)/i.exec(attributes)?.[1]?.toLowerCase() ?? '';
+	if (type && !JAVASCRIPT_TYPE.test(type)) return false;
+	return !(
+		/(?:^|\s)src=/i.test(attributes) && /(?:^|\s)(?:async|defer)(?=[\s=/]|$)/i.test(attributes)
+	);
+}
+
 function insertHeadHtml(documentHtml: string, headHtml: string): string {
 	if (!headHtml) return documentHtml;
 	const headEnd = documentHtml.indexOf('</head>');
@@ -947,7 +1074,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${inline ? escapeScriptJson((page as LinkBridgePage).intentPreloads ?? {}) : 'r'},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}));`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}));`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1112,15 +1239,22 @@ function renderLinkBridgeScript(
 	try { globalThis[Symbol.for('markless.debug.channel.v1.bootstrap')] = ${__marklessDebugBootstrapSource()}(r, 'ssr-inline', false); } catch {}
 })();`)}</script>`
 			: '';
+	// Inert JSON, each preload once: parsed at idle or on the first link intent, never evaluated at load.
+	const table =
+		fragment && intentPreloads && Object.keys(intentPreloads).length
+			? (({ preloads, destinations }) =>
+					`<script type="application/json" ${LINK_TABLE_SCRIPT_ATTRIBUTE}>${escapeScriptJson([preloads, destinations])}</script>`)(
+					indexedPreloads(intentPreloads),
+				)
+			: '';
 	const modulePath = modulePaths?.[hashLinks ? 1 : 0];
 	if (modulePath) {
 		const indexed = !fragment && intentPreloads ? indexedPreloads(intentPreloads) : undefined;
-		const args = fragment
-			? [escapeScriptJson(intentPreloads ?? {})]
-			: indexed
-				? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
-				: [];
-		return `${debugBootstrap}<script type="module" ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
+		const args = indexed
+			? ['0', escapeScriptJson(indexed.preloads), escapeScriptJson(indexed.destinations)]
+			: [];
+		// Async: a module script waits for every one before it, so the document's own scripts would wait on this low-priority download.
+		return `${debugBootstrap}${table}<script type="module" async ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`import b from${JSON.stringify(modulePath)};b(${args.join(',')})`)}</script>`;
 	}
 	const body = linkBridgeBody(
 		resumeEntryPath,
@@ -1132,7 +1266,7 @@ function renderLinkBridgeScript(
 			hashLinks,
 		},
 	);
-	return `${debugBootstrap}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
+	return `${debugBootstrap}${table}<script ${LINK_BRIDGE_SCRIPT_ATTRIBUTE}>${escapeInlineScript(`(()=>{const d=document,s=d.currentScript,r=s&&s.closest('[data-async-container]');if(!r)return;${body}
 })();`)}</script>`;
 }
 
@@ -1164,7 +1298,9 @@ function fragmentConfig(
 		routeScriptType: ROUTE_SCRIPT_TYPE,
 		servedHtmlAttributesProperty: SERVED_HTML_ATTRIBUTES_PROPERTY,
 		servedBodyAttributesProperty: SERVED_BODY_ATTRIBUTES_PROPERTY,
+		stylesheetKeyAttribute: STYLESHEET_KEY_ATTRIBUTE,
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
+		sharedInstances: [PROTOCOL_SHARED_INSTANCES_PROPERTY, RESUME_MODULE_ATTRIBUTE],
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
 		streamOpenProperty: PROTOCOL_STREAM_OPEN_PROPERTY,
@@ -1175,7 +1311,7 @@ function fragmentConfig(
 		pageEndComment: PROTOCOL_CONTAINER_END_COMMENT,
 		pageStartComment: PROTOCOL_CONTAINER_START_COMMENT,
 		containerAttributes: [CONTAINER_ATTRIBUTE, PROTOCOL_LOCATOR_PATHS_ATTRIBUTE],
-		keepAttributes: [PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_OWN_ATTRIBUTE],
+		keepAttributes: [PROTOCOL_KEEP_ATTRIBUTE, PROTOCOL_OWN_ATTRIBUTE, PROTOCOL_VARY_ATTRIBUTE],
 		documentLoads,
 		hoverDwellMs: FRAGMENT_HOVER_DWELL_MS,
 		prefetchTtlMs: FRAGMENT_PREFETCH_TTL_MS,
@@ -1243,14 +1379,17 @@ function isNitroApiPathname(pathname: string) {
 // Ahead of every module script and modulepreload, after <meta charset> so the charset stays in the first 1024 bytes.
 function insertImportMap(html: string, importMap: string): string {
 	if (!importMap) return html;
+	const at = headContentStart(html);
+	return `${html.slice(0, at)}${importMap}${html.slice(at)}`;
+}
+
+function headContentStart(html: string): number {
 	const head = /<head(?:\s[^>]*)?>/i.exec(html);
-	if (!head) return `${importMap}${html}`;
+	if (!head) return 0;
 	const afterHead = head.index + head[0].length;
 	const headEnd = html.indexOf('</head>', afterHead);
 	const charset = /<meta\s[^>]*charset[^>]*>(?:<\/meta>)?/i.exec(html.slice(afterHead));
-	const at =
-		charset && (headEnd === -1 || afterHead + charset.index < headEnd)
-			? afterHead + charset.index + charset[0].length
-			: afterHead;
-	return `${html.slice(0, at)}${importMap}${html.slice(at)}`;
+	return charset && (headEnd === -1 || afterHead + charset.index < headEnd)
+		? afterHead + charset.index + charset[0].length
+		: afterHead;
 }

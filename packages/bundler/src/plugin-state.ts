@@ -196,6 +196,9 @@ export function registerTransformArtifacts(
 					input.devServer !== true))
 				? { provisional: true }
 				: {}),
+			...(input.finalPublication === false && input.devServer !== true
+				? { firstPass: true }
+				: {}),
 		};
 		const published = publishesVirtualModule(stored, state.virtualModules.get(module.id));
 		if (published) {
@@ -215,7 +218,9 @@ export function registerTransformArtifacts(
 				state.executionLogEmittedIds.set(logId, module.id);
 		}
 	}
-	state.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
+	state.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest, {
+		provisional: input.finalPublication === false && input.devServer !== true,
+	});
 	if (input.finalPublication !== false && input.recordSymbolClaims !== false) {
 		recordEmittedClaimOwnership(state, {
 			source: input.source,
@@ -267,6 +272,7 @@ function publishesVirtualModule(
 	if (!current) return true;
 	if (next.provisional === true) return false;
 	if (current.provisional === true) return true;
+	if (next.firstPass === true && current.firstPass !== true) return false;
 	if (next.type === 'resolver' && current.type === 'resolver') {
 		const verdict = linkedResolverClaimVerdict({
 			resolverId: next.id,

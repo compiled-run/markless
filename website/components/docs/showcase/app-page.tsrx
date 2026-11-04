@@ -208,8 +208,8 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 				<h2 id="licence">Original project</h2>
 				<p>
 					<span>{app.links.originalRepo ? 'Source: ' : 'Moved from the live site at '}</span>
-					<a href={app.links.originalRepo ?? app.links.originalSite ?? app.links.old}>
-						{app.links.originalRepo ?? app.links.originalSite ?? app.links.old}
+					<a href={app.links.originalRepo ?? app.links.originalSite ?? app.links.old ?? app.links.port}>
+						{app.links.originalRepo ?? app.links.originalSite ?? app.links.old ?? app.links.port}
 					</a>
 					<span>. Licence: {app.links.licence ?? 'not recorded in the migration log'}.</span>
 				</p>

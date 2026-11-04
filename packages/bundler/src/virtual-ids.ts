@@ -14,6 +14,8 @@ import {
 } from './served-render-data.ts';
 
 export const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
+/** A request that exports its file as a string or URL (`?raw`, `?url`, `?inline`), never runs it. */
+export const STRING_EXPORT_QUERY = /[?&](?:raw|url|inline)(?:&|=|$)/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const MARKLESS_RENDER_DATA_SOURCE_QUERY_RE = /[?&]markless-render-data(?:[&#]|$)/;
@@ -60,6 +62,14 @@ export function devBrowserSourceModuleUrl(
 	publicPath: ((fileName: string) => string) | undefined,
 ) {
 	const path = withQuery(joinURL('@fs', withoutLeadingSlash(source)), { import: null });
+	return publicPath ? publicPath(path) : joinURL('/', path);
+}
+
+export function devBrowserFileUrl(
+	file: string,
+	publicPath: ((fileName: string) => string) | undefined,
+) {
+	const path = joinURL('@fs', withoutLeadingSlash(pathname(file)));
 	return publicPath ? publicPath(path) : joinURL('/', path);
 }
 
@@ -183,12 +193,12 @@ export function clientRouteArtifactReference(source: string): string {
 	const renderDataSource = source.includes('?')
 		? `${source}&markless-render-data`
 		: `${source}?markless-render-data`;
+	// No top-level await: one awaiting module stops Rolldown merging every lazily loaded module into its pack.
 	return [
-		`const [symbolModule, renderDataModule] = await Promise.all([import(${JSON.stringify(symbolSource)}), import(${JSON.stringify(renderDataSource)})]);`,
-		'const marklessRouteArtifact = {',
+		`const marklessRouteArtifact = Promise.all([import(${JSON.stringify(symbolSource)}), import(${JSON.stringify(renderDataSource)})]).then(([symbolModule, renderDataModule]) => ({`,
 		'\trenderData: renderDataModule.marklessPrerenderData,',
 		'\tloadSymbol: symbolModule.loadSymbol,',
-		'};',
+		'}));',
 		'export default marklessRouteArtifact;',
 	].join('\n');
 }
@@ -309,6 +319,10 @@ export function resolveVirtualId(id: string) {
 	}
 
 	return `\0${id}`;
+}
+
+export function isMarklessVirtualId(id: string): boolean {
+	return id.replace(/^\0/, '').startsWith(MARKLESS_VIRTUAL_PREFIX);
 }
 
 export function pathname(id: string) {
