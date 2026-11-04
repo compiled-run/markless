@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 17,
+			"reason": "a late-arriving keyed @for row code no longer re-inserts a row the browser deleted (PR #454): one guard in web/resume-keyed-repeats, downloaded with the page; executed chars at load unchanged; measured on CI run 41825686407 against main's anchors (main's merge-queue run 41817187314 reused its perf-guards lane, so no merge-base measurement exists)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 17,
+			"reason": "a late-arriving keyed @for row code no longer re-inserts a row the browser deleted (PR #454): one guard in web/resume-keyed-repeats, downloaded with the page; executed chars at load unchanged; measured on CI run 41825686407 against main's anchors (main's merge-queue run 41817187314 reused its perf-guards lane, so no merge-base measurement exists)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 17,
+			"reason": "a late-arriving keyed @for row code no longer re-inserts a row the browser deleted (PR #454): one guard in web/resume-keyed-repeats, downloaded with the page; executed chars at load unchanged; measured on CI run 41825686407 against main's anchors (main's merge-queue run 41817187314 reused its perf-guards lane, so no merge-base measurement exists)",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 13,
+			"reason": "a late-arriving keyed @for row code no longer re-inserts a row the browser deleted (PR #454): one guard in web/resume-keyed-repeats, downloaded with the page; executed chars at load unchanged; measured on CI run 41825686407 against main's anchors (main's merge-queue run 41817187314 reused its perf-guards lane, so no merge-base measurement exists)",
+			"date": "2026-11-04"
+		}
+	]
+}
