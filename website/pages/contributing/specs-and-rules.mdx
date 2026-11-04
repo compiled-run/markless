@@ -1,3 +1,4 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
@@ -8,11 +9,16 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Specs, rules and skills
 
-<PageMeta time="3 min" assumes="nothing" />
+<PageMeta time="2 min" assumes="nothing" />
 
-Last page, CI checked your code. But who decides what the code must do?
+<Subtitle text="Two folders decide what the code must do: specs/ says how Markless behaves, and .ruler/ says how people and AI agents work in the repo." />
 
-Two folders answer that. `specs/` says how Markless behaves. `.ruler/` says how people and AI agents work in the repo.
+```txt
+specs/framework-design.md     the index of the behavior contract
+specs/framework/*.md          one area each, like 03-state-graph.md
+.ruler/AGENTS.md              the rules for every agent and contributor
+.ruler/skills/*/              the skills, like markless-implementation
+```
 
 ## Specs: the behavior contract
 
@@ -22,63 +28,42 @@ Two folders answer that. `specs/` says how Markless behaves. `.ruler/` says how 
 - `specs/router/` covers routing, typed routing and the router CLI.
 - `specs/framework/archive/` is history, not the current contract.
 
-When you edit a spec, follow `.ruler/skills/markless-spec-maintenance/spec.md`:
-
-- Keep accepted decisions, unless your task reopens them.
-- Record an open topic as deferred. Do not decide it in passing.
-- Write behavior that a test can check, not storage shapes or exact compiler output.
-- Check TSRX syntax with the TSRX MCP server first, and record what you checked. If the server is not available, use `tsrx.dev/specification` and record that fallback.
-- Run `git diff --check` before you finish.
-
 <Callout
 	sprite="cross"
 	title="Specs are not proof"
 	text="A spec can drift from the code. When they disagree, the code and its tests show what Markless does today."
 />
 
-<Callout
-	sprite="thought-bubble"
-	title="Where is specs/state.md?"
-	text="CONTRIBUTING.md and specs/framework-design.md link to specs/state.md. That file is not in the repo today."
-/>
+## Edit a spec
 
-## Rules: one source in .ruler/
+Follow `.ruler/skills/markless-spec-maintenance/spec.md`:
 
-`pnpm rules` runs `ruler apply`. It generates `AGENTS.md`, `CLAUDE.md`, the skill copies and the MCP configuration. Do not edit those outputs by hand.
+- Keep accepted decisions, unless your task reopens them.
+- Record an open topic as deferred. Don't decide it in passing.
+- Write behavior a test can check, not storage shapes or exact compiler output.
+- Check TSRX syntax with the TSRX MCP server, and record what you checked. If it isn't there, use `tsrx.dev/specification` and record that instead.
+- Run `git diff --check` before you finish.
+
+## Rules: one source in `.ruler/`
+
+`pnpm rules` runs `ruler apply`. It writes `AGENTS.md`, `CLAUDE.md`, the skill copies and the MCP configuration. Never edit those outputs by hand.
 
 - `.ruler/AGENTS.md` holds the rules for every agent.
 - `.ruler/claude.md` holds extra notes for Claude.
 - `.ruler/ruler.toml` lists the outputs and the MCP servers.
 - `.ruler/skills/*/` holds the skills, such as `markless-implementation`, `markless-spec-maintenance` and `markless-component-research`.
 
-After you edit `.ruler/`, regenerate the outputs and commit them:
-
-```bash
-pnpm rules
-```
-
-The `agent-files` CI job fails if the generated files drift from `.ruler/`. The `pre-commit` hook runs the same drift check when you stage a `.ruler/` file.
+After you edit `.ruler/`, run `pnpm rules` and commit what it writes. The `agent-files` CI job fails if the outputs drift from `.ruler/`, and the pre-commit hook checks the same when you stage a `.ruler/` file.
 
 ## Rules to know
 
 - Run `pnpm run typecheck` and `pnpm ci:local --fast` before you call a change done.
-- Write tests first. Run the narrowest failing test, then make the smallest change.
-- Do not re-run components in the browser over server HTML. Do not add a virtual DOM or a second build stack besides Rolldown and Vite.
+- Write the test first. Run the narrowest failing test, then make the smallest change.
+- Never run components again in the browser over server HTML. No virtual DOM, and no second build stack besides Rolldown and Vite.
 - Keep compiler, runtime, serializer and render code free of Node-only APIs.
-- Import protocol and configuration facts from the package that owns them. Do not copy them as literals.
-- A merge or push to `main` needs the owner's explicit go-ahead. So does a push to any shared branch. Each go-ahead covers one change set, and it does not carry over to new commits.
-- A PR stays open until every review finding has an answer. CodeRabbit findings count too.
+- Import protocol and config facts from the package that owns them. Don't copy them as literals.
+- A merge, or a push to `main` or any shared branch, needs the owner's go-ahead for that one change set.
+- A pull request stays open until every review finding, CodeRabbit's too, has an answer.
+- Comments are a last resort: one short line, only for a fact the code can't show. Never task numbers or process notes. Doc comments on public props and types stay.
 
-## Comments in code
-
-Comments are a last resort. Write one only for a fact the code cannot show, such as a hidden constraint. Keep it to one short line.
-
-Never write task numbers or process notes in comments. That history belongs in git.
-
-<Callout
-	sprite="check"
-	title="Does this apply to doc comments?"
-	text="No. Doc comments on public props and types stay. They are part of the API that users read."
-/>
-
-Next: [improve the docs](/contributing/improve-the-docs).
+[Improve the docs](/contributing/improve-the-docs) has the rules for this website.

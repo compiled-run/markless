@@ -1,5 +1,6 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import ReleaseVersion from '../../components/docs/release-version.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -10,42 +11,41 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="2 min" assumes="nothing" />
 
-This section is for looking things up. It starts with the package list: what each one does, and whether you can install it from npm today.
+<Subtitle text="An app installs a few Markless packages, and those use a few more. Every published package shares one version number." />
 
-All packages share one version. The repo is at `0.5.0`. On npm, the latest release is `0.4.0`. The npm versions below come from `npm view` on 2026-10-06.
+<ReleaseVersion />
 
 ## Packages you install
 
-These are the packages an app author touches. A Node or Bun app from `npm create markless` lists `core`, `router`, `typescript-plugin` and `analyzer`.
+A new app from `npm create markless` lists `core` and `router`, with `typescript-plugin` and `analyzer` as dev dependencies.
 
-- **`@markless/core`** (`0.4.0` on npm). The authoring calls `state`, `computed`, `shared`, `element` and `storage`. Also `render()` for the browser, `renderToString()` for HTML, and the Vite plugin at `@markless/core/vite`.
-- **`@markless/router`** (`0.4.0` on npm). Multi-page apps: file routes in `pages/`, `Html`, `Link`, and the Vite plugin at `@markless/router/vite`. It builds through Nitro, which deploys to many hosts.
-- **`@markless/typescript-plugin`** (`0.4.0` on npm). Editor support for `.tsrx` files: completions and errors.
-- **`@markless/ui`** (`0.4.0` on npm). Headless, accessible UI components. See [UI components](/ui).
-- **`@markless/vitest-browser`** (`0.4.0` on npm). Browser test helpers `render()` and `renderSSR()`.
-- **`@markless/analyzer`** (`0.4.0` on npm). Browser checks for a running app: console errors, network requests, event wiring, and JavaScript budgets that you set. Optional Playwright driver at `@markless/analyzer/playwright`.
-- **`create-markless`** (`0.4.0` on npm). Creates a new app. See [CLI](/reference/cli).
+| Package | What it gives you |
+| --- | --- |
+| `@markless/core` | `state`, `computed`, `shared`, `element` and `storage`. Also `render()` for the browser, `renderToString()` for HTML, and the Vite plugin at `@markless/core/vite`. |
+| `@markless/router` | Apps with many pages: file routes in `pages/`, `Html`, `Link`, `navigate()`, and the Vite plugin at `@markless/router/vite`. It builds through Nitro, which deploys to many hosts. |
+| `@markless/typescript-plugin` | Editor support for `.tsrx` files. See [Editor setup](/tooling/editor-setup). |
+| `@markless/vitest-browser` | `render()` and `renderSSR()` for tests in a real browser. See [Testing](/tooling/testing). |
+| `@markless/analyzer` | Checks a running app in the browser: console errors, network requests, event wiring and JavaScript budgets you set. The Playwright driver is at `@markless/analyzer/playwright`. |
+| `create-markless` | Creates a new app. See [CLI](/reference/cli). |
 
 ## Packages the others use
 
 You don't import these yourself. The packages above depend on them.
 
-- **`@markless/compiler`** (`0.4.0` on npm). The TSRX compiler. Before your app runs, it plans the state, the updates and the code each event runs.
-- **`@markless/bundler`** (`0.4.0` on npm). Build plugins for Rolldown and Vite.
-- **`@markless/runtime`** (`0.4.0` on npm). The state runtime: reads, writes and computed updates.
-- **`@markless/serializer`** (`0.4.0` on npm). The format for state and page data that travel with rendered HTML.
-- **`@markless/web`** (`0.4.0` on npm). The render code behind `render()` in the browser and `renderToString()` for HTML.
-- **`@markless/icons`** (not published). Iconify icon packs as `<pack.icon />` tags, inlined at build time.
-- **`@markless/ui-tools`** (not published). Build tools for the `@markless/ui` design system.
+| Package | What it does |
+| --- | --- |
+| `@markless/compiler` | Reads `.tsrx` files and plans the state, the updates and the code each event runs, before your app runs. |
+| `@markless/bundler` | Runs the compiler inside Vite and Rolldown. |
+| `@markless/runtime` | Keeps state: reads, writes and computed updates. |
+| `@markless/serializer` | The format for the state and page data that travel with rendered HTML. |
+| `@markless/web` | The render code behind `render()` in the browser and `renderToString()` for HTML. |
 
-In the repo, `@markless/ui` `0.5.0` depends on `@markless/icons` and `@markless/ui-tools`. The `0.4.0` release on npm depends only on `@markless/core`.
+## Not on npm yet
 
-`markless-sr-app` is private. It serves the app for the screen-reader test lanes, and it never goes to npm.
+- **`@markless/ui`**: headless, accessible UI components. See [UI components](/ui). It waits on the two packages below. npm still holds an old `0.4.0` from before these pages.
+- **`@markless/icons`**: icon packs as `<pack.icon />` tags, inlined at build time.
+- **`@markless/ui-tools`**: the build tools behind `@markless/ui`.
 
-<Callout
-	sprite="thought-bubble"
-	title="Why does a new app say ^0.4.0 when the repo says 0.5.0?"
-	text="The CLI pins @markless/* to its own version, with a ^ in front. The 0.5.0 packages are not on npm yet, so npm create markless@latest writes ^0.4.0 today."
-/>
+The repo also holds `markless-sr-app`, which serves the app for the screen-reader tests. It's private and never goes to npm.
 
-Next: [the glossary](/reference/glossary).
+[The glossary](/reference/glossary) gives one meaning for each word these packages use.

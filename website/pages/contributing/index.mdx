@@ -1,6 +1,5 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import RepoMap from '../../components/demos/contributing/repo-map.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -11,74 +10,60 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="3 min" assumes="nothing" />
 
-Open the Markless repo for the first time and you get a screenful of folders. Where do you start?
+<Subtitle text="Most packages form one pipeline: one half reads your .tsrx files before your app runs, and the other half runs the result wherever you pick." />
 
-Most of the packages form one pipeline. The compile half reads `Counter.tsrx` before your app runs. It plans the state, the updates and the code each event runs. The render half runs that plan where you pick: a browser, a server, a build step or a test.
+```txt
+Counter.tsrx  →  compiler, bundler  →  web, runtime, serializer  →  a browser, a server, a build step or a test
+```
 
-Press a package to see its job and what it imports.
-
-<RepoMap />
-
-Press `web`. One package serves the browser, the server, build time and tests. Only the host around it changes. Then press `serializer`. Four packages import it, and it imports none.
+Each list below gives the package, its folder, its job, and the other Markless packages its `src/` imports.
 
 ## Compile time
 
 These packages do their work before your app runs.
 
-- **`@markless/compiler`** in `packages/compiler`. Reads `.tsrx` and plans it: semantic graph, state lowering, payload planning, emit. Imports: `serializer`.
-- **`@markless/bundler`** in `packages/bundler`. Runs the compiler inside Vite or Rolldown. Build-time prerendering lives here too, as a preview. Imports: `compiler`, `serializer`, `web`.
-- **`@markless/typescript-plugin`** in `packages/typescript-plugin`. Gives editors `.tsrx` support, and holds the `src/tsc.ts` checker. Imports: `compiler`.
+- **`@markless/compiler`** in `packages/compiler`. Reads `.tsrx` and plans it: semantic graph, state lowering, payload planning, emit. Imports `serializer`.
+- **`@markless/bundler`** in `packages/bundler`. Runs the compiler inside Vite or Rolldown. Build-time prerendering lives here too, as a preview. Imports `compiler`, `serializer` and `web`.
+- **`@markless/typescript-plugin`** in `packages/typescript-plugin`. Gives editors `.tsrx` support, and holds the repo's `src/tsc.ts` checker. Imports `compiler`.
 
-The compiler does not import `web`. The code it writes does. Compiled components import helpers from `@markless/web/fns/*`.
+The compiler doesn't import `web`, but the code it writes does: compiled components import helpers from `@markless/web/fns/*`.
 
-## Render in any environment
+## Render anywhere
 
-These packages run the compiled plan in whichever environment you pick.
+These packages run the compiled plan in whichever place you pick.
 
-- **`@markless/web`** in `packages/web`. Renders and resumes for the web: `render` in a browser, `renderToString` and `renderToStream` for HTML. Imports: `runtime`, `serializer`.
-- **`@markless/runtime`** in `packages/runtime`. The state graph: reads, writes, computed values, the flush journal. Imports: `serializer`.
-- **`@markless/serializer`** in `packages/serializer`. Value serialization and the payload protocol types. Imports: none.
-- **`@markless/core`** in `packages/core`. The one import for apps: `state`, `computed`, `shared`, `element`, `storage`, plus re-exports of `render`, `renderToString` and the plugins. Imports: `web`, `bundler`, `router`.
+- **`@markless/web`** in `packages/web`. Renders and resumes for the web: `render` in a browser, `renderToString` and `renderToStream` for HTML. Imports `runtime` and `serializer`.
+- **`@markless/runtime`** in `packages/runtime`. The state graph: reads, writes, computed values and the flush journal. Imports `serializer`.
+- **`@markless/serializer`** in `packages/serializer`. Value serialization and the payload protocol types. Imports nothing.
+- **`@markless/core`** in `packages/core`. The one import for apps: `state`, `computed`, `shared`, `element` and `storage`, plus `render`, `renderToString` and the Vite plugin. Imports `web`, `bundler` and `router`.
 
-`render()` from `@markless/core` is `render` from `@markless/web/render`. A browser-only app calls it and needs no server at all.
+A server render and a browser render are two phases of one runtime, and it lives in `web`. That's why there's no `packages/server`. The protocol types live in `serializer`, so there's no `packages/protocol` either.
 
-<Callout
-	sprite="thought-bubble"
-	title="Why is there no packages/server?"
-	text="A server render and a browser render are two phases of one runtime, and that runtime lives in web. The protocol types live in serializer, so there is no packages/protocol either."
-/>
+## Apps with many pages
 
-## Multi-page apps
-
-- **`@markless/router`** in `packages/router`. File routes, client navigation and streaming, built on Nitro. Imports: `bundler`, `web`.
-- **`create-markless`** in `packages/cli`. Creates apps from the `minimal`, `app`, `docs` and `full-stack` starters, which all use the router. Imports: none.
-
-Nitro deploys to many hosts, so a router app is not tied to one kind of server.
+- **`@markless/router`** in `packages/router`. File routes, navigation in the page and streaming, built on Nitro. Imports `bundler`, `compiler` and `web`.
+- **`create-markless`** in `packages/cli`. Creates apps from the `minimal`, `app`, `docs` and `full-stack` starters, which all use the router. Imports nothing.
 
 ## Tools around the pipeline
 
-- **`@markless/vitest-browser`** in `packages/vitest-browser`. Renders components inside Vitest browser tests. Imports: `core`, `web`.
-- **`@markless/analyzer`** in `packages/analyzer`. Checks browser evidence from a running app against its route and action policy. Imports: none.
-- **`@markless/ui`** in `packages/headless/components`. Headless, accessible UI components. Imports: `core`, `icons`, `ui-tools`.
-- **`@markless/icons`** in `packages/headless/icons`. Iconify packs as `<pack.icon />` tags, inlined at build time. Imports: none.
-- **`@markless/ui-tools`** in `packages/headless/tools`. Build tools for the UI packages. Imports: `icons`.
+- **`@markless/vitest-browser`** in `packages/vitest-browser`. Renders components inside Vitest browser tests. Imports `core` and `web`.
+- **`@markless/analyzer`** in `packages/analyzer`. Checks browser evidence from a running app against its route and action policy. Imports nothing.
+- **`@markless/ui`** in `packages/headless/components`. Headless, accessible UI components. Imports `core`, `icons` and `ui-tools`.
+- **`@markless/icons`** in `packages/headless/icons`. Icon packs as `<pack.icon />` tags, inlined at build time. Imports nothing.
+- **`@markless/ui-tools`** in `packages/headless/tools`. Build tools for the UI packages. Imports `icons`.
 
-"Imports" names the other Markless packages that a package's `src/` imports. No package imports one that depends on it. `web`, `runtime` and `serializer` never import `core`.
+No package imports one that depends on it, so `web`, `runtime` and `serializer` never import `core`.
 
 ## Everything else
 
-- `poc/fixtures/proofs/` holds proof fixtures. Two of them are native: `ios-native-rendering-target` and `macos-native-rendering-target`. They are design evidence, not production code.
-- `demos/` holds demo apps, such as `todomvc`, `music-player`, `music-player-ssr` and `js-framework-benchmark`.
 - `specs/` holds the behavior contract. Start at `specs/framework-design.md`.
+- `demos/` holds demo apps, such as `todomvc`, `music-player` and `js-framework-benchmark`.
+- `poc/fixtures/proofs/` holds proof fixtures, including the native `ios-native-rendering-target` and `macos-native-rendering-target`. They are design evidence, not production code.
 - `scripts/` holds `ci/local.mjs`, the release scripts and the benchmark tools.
 - `docs/` holds `ci-process.md` and the CI failure history.
 - `.ruler/` holds the source of the agent rules and skills.
 - `website/` holds this site.
 
-<Callout
-	sprite="check"
-	title="Which folders can I skip?"
-	text="Skip goals/, dist/ and .witness/ while you read. CONTRIBUTING.md lists them as generated or local output."
-/>
+Skip `goals/`, `dist/` and `.witness/` while you read. `CONTRIBUTING.md` lists them as local or generated output.
 
-Next: [set up the repo on your machine](/contributing/dev-setup).
+[Dev setup](/contributing/dev-setup) gets every package building on your machine.
