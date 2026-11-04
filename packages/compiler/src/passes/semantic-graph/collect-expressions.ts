@@ -12,6 +12,7 @@ import {
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
+import { callsSharedInstanceMethod } from './collect-shared.ts';
 import { getFrameworkApiForCall } from './imports.ts';
 import type {
 	FunctionParameterWrites,
@@ -312,6 +313,7 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 
 	const target = unwrapChainExpression(callee.object as AnyNode | undefined);
 	if (!target) return;
+	if (callsSharedInstanceMethod(target, method, state)) return;
 	if (isFreshValue(target, state)) return;
 	if (diagnoseBannedWriteSite(node, target, state)) return;
 
@@ -506,7 +508,13 @@ function collectReadsIn(
 			const method = getStaticMemberPropertyName(callee);
 			if (
 				method &&
-				(isMutatingCollectionMethod(method) || callsMethodOnReadValue(callee, state))
+				((isMutatingCollectionMethod(method) &&
+					!callsSharedInstanceMethod(
+						unwrapChainExpression(callee.object as AnyNode | undefined),
+						method,
+						state,
+					)) ||
+					callsMethodOnReadValue(callee, state))
 			) {
 				collectReadsIn(callee.object as AnyNode | undefined, state, region);
 				for (const argument of asNodes(node.arguments)) {

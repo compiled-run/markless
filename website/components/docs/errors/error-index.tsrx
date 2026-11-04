@@ -1,6 +1,6 @@
 import { Link } from '@markless/core/router';
 import Sidebar from '../sidebar.tsrx';
-import ThemeToggle from '../theme-toggle.tsrx';
+import SiteNavbar from '../navbar/site-navbar.tsrx';
 import PageMeta from '../../page-meta.tsrx';
 import { errorIndex } from './errors-index.ts';
 
@@ -14,10 +14,10 @@ export default function ErrorIndex() @{
 	const guided = errorIndex.guided;
 
 	<div class="error-index">
+		<SiteNavbar pathname="/errors" />
 		<Sidebar pathname="/errors" />
 		<h1>Error codes</h1>
 		<PageMeta pathname="/errors" time="1 min" assumes="nothing" />
-		<ThemeToggle />
 		<p class="summary">Every code Markless can print, grouped by the package that raises it.</p>
 		<p>
 			<span>Every Markless error starts with </span>

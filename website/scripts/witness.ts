@@ -856,36 +856,27 @@ try {
 
 		const themeState = () =>
 			page.evaluate(() => {
-				const slot = document.querySelector('.theme-toggle-slot')?.getBoundingClientRect();
-				const island = document
-					.querySelector('.theme-toggle-island')
-					?.getBoundingClientRect();
+				const shown = [...document.querySelectorAll('.theme-toggle')].filter((node) =>
+					(node as HTMLElement).checkVisibility(),
+				);
 				return {
 					attr: document.documentElement.getAttribute('data-theme'),
 					painted: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
 					stored: localStorage.getItem('theme'),
 					prefers: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
 					paper: getComputedStyle(document.body).backgroundColor,
-					offered: [...document.querySelectorAll('.theme-toggle')]
-						.filter((node) => getComputedStyle(node as Element).display !== 'none')
-						.map((node) => (node as HTMLElement).dataset.themeToggle)
-						.join(),
-					onSlot:
-						Boolean(slot && island) &&
-						Math.abs(slot!.left - island!.left) < 2 &&
-						Math.abs(slot!.right - island!.right) < 2,
-					// The drawing on the button that is actually offered, and whether
-					// the browser decoded it: a 404 still leaves the <img> in the DOM.
+					offered: shown.map((node) => (node as HTMLElement).dataset.themeToggle).join(),
+					inNavbar: shown.every((node) => node.closest('.site-navbar') !== null),
+					// The ink drawing on the button that is actually offered, and whether it carries ink.
 					icon: (() => {
-						const shown = [...document.querySelectorAll('.theme-toggle')].find(
-							(node) => getComputedStyle(node as Element).display !== 'none',
-						);
-						const image = shown?.querySelector(
-							'img.theme-toggle-icon',
-						) as HTMLImageElement | null;
+						const drawing = shown[0]?.querySelector('svg.theme-toggle-icon');
 						return {
-							src: image?.getAttribute('src') ?? '',
-							decoded: (image?.naturalWidth ?? 0) > 0,
+							drawing: drawing?.classList.contains('theme-toggle-sun')
+								? 'sun'
+								: drawing?.classList.contains('theme-toggle-moon')
+									? 'moon'
+									: '',
+							inked: (drawing?.querySelector('.theme-toggle-ink')?.getAttribute('d')?.length ?? 0) > 40,
 						};
 					})(),
 				};
@@ -900,20 +891,16 @@ try {
 			'an untouched reader stores nothing and is put on their system theme',
 			`painted ${atRest.painted}, prefers ${atRest.prefers}, stored ${String(atRest.stored)}`,
 		);
-		check(atRest.onSlot, 'the toggle lands on the hole the header reserves for it');
+		check(atRest.inNavbar, 'the toggle sits in the site navbar');
 		check(
 			atRest.offered === 'dark',
 			'exactly one button is offered, and on a light page it is the dark one',
 			atRest.offered,
 		);
-		check(
-			atRest.icon.src === '/theme/sun.png',
-			'the light page shows the sun drawing',
-			atRest.icon.src,
-		);
-		check(atRest.icon.decoded, 'the sun drawing decoded');
+		check(atRest.icon.drawing === 'sun', 'the light page shows the sun drawing', atRest.icon.drawing);
+		check(atRest.icon.inked, 'the sun drawing carries ink');
 
-		await page.locator('.theme-toggle-to-dark').click();
+		await page.locator('.theme-toggle-to-dark:visible').click();
 		for (let attempt = 0; attempt < 40; attempt += 1) {
 			if ((await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark')
 				break;
@@ -933,11 +920,11 @@ try {
 		);
 		check(dark.offered === 'light', 'the dark page offers the light button', dark.offered);
 		check(
-			dark.icon.src === '/theme/moon.png',
+			dark.icon.drawing === 'moon',
 			'the drawing swaps with the theme: dark shows the moon',
-			dark.icon.src,
+			dark.icon.drawing,
 		);
-		check(dark.icon.decoded, 'the moon drawing decoded');
+		check(dark.icon.inked, 'the moon drawing carries ink');
 
 		await page.reload({ waitUntil: 'load' });
 		const reloaded = await themeState();
@@ -949,7 +936,7 @@ try {
 		);
 		await page.screenshot({ path: `${shotsDir}/T019-theme-toggle-dark.png`, fullPage: false });
 
-		await page.locator('.theme-toggle-to-light').click();
+		await page.locator('.theme-toggle-to-light:visible').click();
 		for (let attempt = 0; attempt < 40; attempt += 1) {
 			if ((await page.evaluate(() => document.documentElement.dataset.theme)) === 'light')
 				break;
@@ -979,7 +966,7 @@ try {
 				}));
 			const papers: Record<string, string> = {};
 			for (const chosen of [os === 'light' ? 'dark' : 'light', os] as const) {
-				await navPage.locator(`.theme-toggle-to-${chosen}`).click();
+				await navPage.locator(`.theme-toggle-to-${chosen}:visible`).click();
 				await navPage.waitForFunction(
 					(wanted) => document.documentElement.classList.contains(wanted),
 					chosen,
@@ -988,7 +975,7 @@ try {
 			}
 			check(papers.light !== papers.dark, `OS ${os}: the two themes paint different paper`);
 			for (const chosen of [os === 'light' ? 'dark' : 'light', os] as const) {
-				await navPage.locator(`.theme-toggle-to-${chosen}`).click();
+				await navPage.locator(`.theme-toggle-to-${chosen}:visible`).click();
 				const seen: string[] = [];
 				const visited = new Set([new URL(navPage.url()).pathname]);
 				for (let step = 0; step < 5; step += 1) {
@@ -1054,7 +1041,7 @@ try {
 			.catch(() => {});
 		const landed = await page.evaluate(() => ({
 			heading: document.querySelector('h1')?.textContent ?? '',
-			crumb: document.querySelector('.crumb-page')?.textContent ?? '',
+			active: document.querySelector('.sidebar-link.is-active')?.textContent?.trim() ?? '',
 			title: document.title,
 			canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? '',
 			description:
@@ -1064,18 +1051,18 @@ try {
 		const sidebarAfter = await sidebarBox();
 		const sidebarKept = sidebarBefore !== '' && sidebarAfter === sidebarBefore;
 		check(
-			landed.crumb === 'Computed' &&
+			landed.active === 'Computed' &&
 				landed.title.startsWith('Computed') &&
 				landed.canonical.endsWith('/concepts/computed'),
 			'a sidebar click lands on the page it names, chrome and all',
-			`${landed.crumb} / ${landed.title} / ${landed.canonical} / ${landed.heading}`,
+			`${landed.active} / ${landed.title} / ${landed.canonical} / ${landed.heading}`,
 		);
 		check(
 			landed.survived && sidebarKept && landed.description !== '',
 			'that click is no document load: the sidebar stays and the head follows the page',
 			`survived ${landed.survived} / sidebar ${sidebarBefore} -> ${sidebarAfter} / description "${landed.description}"`,
 		);
-		// The pager and the breadcrumb home are plain anchors: the router takes them the same way.
+		// The pager and the navbar's home link are plain anchors: the router takes them the same way.
 		const nextHref = await page.locator('a.pager-next').getAttribute('href');
 		await page.locator('a.pager-next').click();
 		await page.waitForURL(`**${nextHref}`);
@@ -1099,7 +1086,7 @@ try {
 			'the pager link is no document load and lands on the next page',
 			`${nextHref} / ${paged.canonical} / survived ${paged.survived}`,
 		);
-		await page.locator('a.crumb-home').click();
+		await page.locator('.site-navbar a[href="/"]:visible').first().click();
 		await page.waitForURL('**/');
 		await page
 			.waitForFunction(
@@ -1118,7 +1105,7 @@ try {
 		}));
 		check(
 			home.survived && home.canonical === `${siteOrigin}/`,
-			'the breadcrumb home link is no document load and lands on the docs home',
+			'the navbar home link is no document load and lands on the docs home',
 			`${home.canonical} / survived ${home.survived}`,
 		);
 
@@ -1409,7 +1396,6 @@ try {
 			const entry = nav
 				.flatMap((section) => section.entries)
 				.find((one) => one.href === href);
-			const section = nav.find((one) => one.entries.some((one) => one.href === href));
 			for (const theme of ['light', 'dark'] as const) {
 				for (const width of [1440, 390] as const) {
 					await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
@@ -1420,7 +1406,9 @@ try {
 					await page.waitForTimeout(150);
 
 					const chrome = await page.evaluate(() => {
-						const header = document.querySelector('.site-header');
+						const bar = [...document.querySelectorAll('.navbar-edge')].find((node) =>
+							(node as HTMLElement).checkVisibility(),
+						);
 						const rail = document.querySelector('.on-this-page');
 						const railVisible = rail
 							? getComputedStyle(rail).display !== 'none'
@@ -1430,17 +1418,15 @@ try {
 						const navBox = nav?.getBoundingClientRect();
 						const h1Box = h1?.getBoundingClientRect();
 						return {
-							header: Boolean(header),
-							headerSticky: header ? getComputedStyle(header).position : '',
-							crumbSection:
-								document.querySelector('.crumb-section')?.textContent?.trim() ?? '',
-							crumbPage:
-								document.querySelector('.crumb-page')?.textContent?.trim() ?? '',
-							search: Boolean(document.querySelector('.site-search')),
-							themeToggle: Boolean(document.querySelector('[data-theme-toggle]')),
+							header: Boolean(bar),
+							headerFixed: bar ? getComputedStyle(bar).position : '',
+							title: document.title,
+							themeToggle: [...document.querySelectorAll('.site-navbar [data-theme-toggle]')].some(
+								(node) => (node as HTMLElement).checkVisibility(),
+							),
 							github: Boolean(
 								document.querySelector(
-									'a.header-link[href*="github.com/compiled-run/markless"]',
+									'.site-navbar a[href*="github.com/compiled-run/markless"]',
 								),
 							),
 							railVisible,
@@ -1511,25 +1497,19 @@ try {
 					});
 
 					const at = `${label} ${theme} ${width}`;
-					check(chrome.header, `${at}: the header is on the page`);
+					check(chrome.header, `${at}: the navbar is on the page`);
 					check(
-						chrome.headerSticky === 'sticky',
-						`${at}: the header is sticky`,
-						chrome.headerSticky,
+						chrome.headerFixed === 'fixed',
+						`${at}: the navbar stays in view`,
+						chrome.headerFixed,
 					);
 					check(
-						chrome.crumbPage === (entry?.title ?? ''),
-						`${at}: the breadcrumb names this page`,
-						`${chrome.crumbSection} > ${chrome.crumbPage}`,
+						chrome.title.startsWith(entry?.title ?? ''),
+						`${at}: the tab title names this page`,
+						chrome.title,
 					);
-					check(
-						chrome.crumbSection === (section?.title ?? ''),
-						`${at}: the breadcrumb names this section`,
-						chrome.crumbSection,
-					);
-					check(chrome.search, `${at}: the header carries a search slot`);
-					check(chrome.themeToggle, `${at}: the header carries a theme-toggle slot`);
-					check(chrome.github, `${at}: the header links the repo`);
+					check(chrome.themeToggle, `${at}: the navbar carries the theme toggle`);
+					check(chrome.github, `${at}: the navbar links the repo`);
 					check(chrome.pager, `${at}: the page ends with a prev/next pager`);
 					check(!chrome.scrollX, `${at}: the document is no wider than the viewport`);
 					check(
