@@ -85,6 +85,12 @@ test.each([
 		['state:picked'],
 	],
 	[
+		'a factory whose returned function has a default parameter reading state',
+		`const make = () => (row: { key: number }, at = picked) => at === row.key;\n\tconst on = make();`,
+		`on(row) ? 'on' : 'off'`,
+		['state:picked'],
+	],
+	[
 		'a helper naming a local spelled like the row item',
 		`const row = () => picked;\n\tconst on = (item: { key: number }) => row() === item.key;`,
 		`on(row) ? 'on' : 'off'`,

@@ -63,8 +63,10 @@ function followLocal(
 	if (!value) return binding.name;
 	const componentName = state.currentComponentName ?? undefined;
 	reads.push(...collectGraphDependencies(value, state, componentName));
-	for (const fallback of parameterDefaults(value))
-		reads.push(...collectGraphDependencies(fallback, state, componentName));
+	walkNode(value, (node) => {
+		for (const fallback of parameterDefaults(node))
+			reads.push(...collectGraphDependencies(fallback, state, componentName));
+	});
 	for (const local of bodyLocalsNamed(value, state)) {
 		if (seen.has(local.symbolId)) continue;
 		seen.add(local.symbolId);
@@ -147,6 +149,12 @@ function definitionOf(declarationStart: number, state: WalkState): AnyNode | nul
 
 // A parameter's default value runs with the call, so its reads are the helper's too.
 function parameterDefaults(value: AnyNode): ReadonlyArray<AnyNode> {
+	if (
+		value.type !== 'ArrowFunctionExpression' &&
+		value.type !== 'FunctionExpression' &&
+		value.type !== 'FunctionDeclaration'
+	)
+		return [];
 	const defaults: AnyNode[] = [];
 	const visit = (pattern: AnyNode | null | undefined): void => {
 		if (!pattern) return;
