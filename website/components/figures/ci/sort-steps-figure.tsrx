@@ -1,4 +1,4 @@
-// Ci.yml's typecheck job, each step sorted by ci:local.
+// The typecheck job's steps in ci.yml, each sorted by ci:local.
 import DeskFigure from '../ink/desk-figure.tsrx';
 import { art } from './sort-steps.art.ts';
 

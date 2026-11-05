@@ -280,6 +280,36 @@ export default function DeskFigure({
 				letter-spacing: 0.06em;
 			}
 
+			.faint {
+				opacity: 0.45;
+			}
+
+			.roller {
+				fill: none;
+				stroke: var(--ink);
+				stroke-width: 0.6;
+				opacity: 0.35;
+			}
+
+			.perforation {
+				fill: none;
+				stroke: var(--sheet-ink);
+				stroke-width: 0.9;
+				stroke-linecap: round;
+				opacity: 0.6;
+			}
+
+			.stamp-ink {
+				fill: var(--sheet-ink);
+				opacity: 0.85;
+			}
+
+			.stamp-word {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 8px;
+				letter-spacing: 0.12em;
+			}
+
 			.desk-text {
 				fill: var(--ink);
 			}

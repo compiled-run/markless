@@ -4,9 +4,9 @@ import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import HomeRunFigure from '../../components/figures/ci/home-run-figure.tsrx';
+import CheckInFigure from '../../components/figures/ci/check-in-figure.tsrx';
 import SortStepsFigure from '../../components/figures/ci/sort-steps-figure.tsrx';
-import MergeQueueFigure from '../../components/figures/ci/merge-queue-figure.tsrx';
+import SecurityGateFigure from '../../components/figures/ci/security-gate-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -21,11 +21,11 @@ import MergeQueueFigure from '../../components/figures/ci/merge-queue-figure.tsr
 pnpm ci:local --fast
 ```
 
-## Run the fast jobs at home
+## Check in at home
 
-Press the drawing to run it again:
+Press the boarding pass to check in again:
 
-<HomeRunFigure />
+<CheckInFigure />
 
 The four fast jobs run on your machine, and the pre-commit hook runs them too. Everything heavier runs on GitHub, where the pull request's green run is the proof.
 
@@ -41,9 +41,11 @@ The four fast jobs run on your machine, and the pre-commit hook runs them too. E
 
 A new job with check steps but no entry in the script's mode table makes it stop with an error naming the job.
 
-## A pull request lands through the merge queue
+## Security on GitHub, then the gate
 
-<MergeQueueFigure />
+<SecurityGateFigure />
+
+The merge queue is the gate: `main` takes a change only from it.
 
 The required checks are `test`, `typecheck` and `agent-files`. `test` is the gate: it fails unless every lane passed or hit its cache.
 

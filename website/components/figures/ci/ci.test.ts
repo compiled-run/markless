@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
-import * as home_run from './home-run.ts';
+import * as check_in from './check-in.ts';
 import * as sort_steps from './sort-steps.ts';
-import * as merge_queue from './merge-queue.ts';
+import * as security_gate from './security-gate.ts';
 
-const figures = { 'home-run': home_run, 'sort-steps': sort_steps, 'merge-queue': merge_queue };
+const figures = { 'check-in': check_in, 'sort-steps': sort_steps, 'security-gate': security_gate };
 
 describe('ci figures', () => {
 	for (const [name, figure] of Object.entries(figures)) {
@@ -16,9 +16,4 @@ describe('ci figures', () => {
 			await expect(frozen(name + '.ts', 'ci.test.ts', figure.drawing())).toMatchFileSnapshot('./' + name + '.art.ts');
 		});
 	}
-
-	it('ticks the four fast jobs and the three required checks', () => {
-		expect(home_run.SUMMARY.filter((row) => row.includes('passed'))).toHaveLength(4);
-		expect(merge_queue.REQUIRED).toEqual(['test', 'typecheck', 'agent-files']);
-	});
 });

@@ -408,6 +408,8 @@ export function desk(width: number, specs: readonly SheetSpec[], extra: Point3[]
 	const raw = {
 		path,
 		text: (key: string, u: number, v: number, text: string, cls: string, m: Motion = '', at?: At) => layer.texts.push({ text, cls: [cls, m].filter(Boolean).join(' '), style: motion(m, at), matrix: matrixAt(get(key), u, v) }),
+		/** A text placed with a matrix the figure built itself, such as on the top face of a block. */
+		textWith: (matrix: string, text: string, cls: string, m: Motion = '', at?: At) => layer.texts.push({ text, cls: [cls, m].filter(Boolean).join(' '), style: motion(m, at), matrix }),
 		motion,
 		on: (key: string, pts: P[], lift = 0) => on(get(key), pts, lift),
 		at: (key: string, u: number, v: number, lift = 0) => get(key).at(u, v, lift),
