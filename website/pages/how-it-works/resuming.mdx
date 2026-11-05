@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import InkCards from '../../components/docs/ink-cards.tsrx';
 import ResumeAnatomy from '../../components/figures/resuming/resume-anatomy.tsrx';
 
 <SiteNavbar />
@@ -41,11 +42,14 @@ Play any move, then press **Next move**:
 
 Who hears the first press depends on how the page was made:
 
-| | Browser, direct module | Browser, general path | Server-rendered page |
-| --- | --- | --- | --- |
-| Who builds the elements? | The compiled module | Markless, from the compiled output | The server |
-| Who listens? | Each element with an event | The container, one listener per event name | The inline resumer, on the container |
-| What starts on the first click? | That click's symbol | Its symbols, the state graph and the full runtime | The resume module, then only what it needs |
+<InkCards
+	label="Three ways a page hears its first press"
+	cards={[
+		{ icon: 'brick', name: 'Browser, direct module', line: "The compiled module builds the elements, each element with an event listens for itself, and the first click starts only that click's symbol." },
+		{ icon: 'gear', name: 'Browser, general path', line: 'Markless builds the elements from the compiled output, the container holds one listener per event name, and the first click starts its symbols, the state graph and the full runtime.' },
+		{ icon: 'envelope', name: 'Server-rendered page', line: 'The server builds the elements, the inline resumer listens on the container, and the first click starts the resume module, then only what it needs.' },
+	]}
+/>
 
 ## On a server-rendered page
 

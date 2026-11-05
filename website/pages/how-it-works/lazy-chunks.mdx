@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import InkCards from '../../components/docs/ink-cards.tsrx';
 import GalleryAnatomy from '../../components/figures/lazy-chunks/gallery-anatomy.tsrx';
 
 <SiteNavbar />
@@ -51,11 +52,14 @@ The compiler cuts a component into *symbols*: one small function each for an eve
 
 Production client builds put the symbols into a few files, cut by what each page needs and when:
 
-| Pack | Holds | Downloads |
-| --- | --- | --- |
-| First use | What the page load and its first interactions run | With the page |
-| Navigation | What only a client-side navigation runs | When a navigation is about to happen |
-| Deferred | Everything else | On its first `import()` |
+<InkCards
+	label="The three packs"
+	cards={[
+		{ icon: 'play', name: 'First use', line: 'What the page load and its first interactions run. It downloads with the page.' },
+		{ icon: 'map', name: 'Navigation', line: 'What only a client-side navigation runs. It downloads when a navigation is about to happen.' },
+		{ icon: 'hourglass', name: 'Deferred', line: 'Everything else. It downloads on its first import().' },
+	]}
+/>
 
 Each module in a pack still starts only when something first imports it. Set `packing: false` in the `markless()` options to ship one file per module.
 
