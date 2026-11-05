@@ -57,22 +57,26 @@ export default function Document({
 		<body>
 			<style>
 				/* Unconditional rules first, the narrow-viewport media queries last: a query adds no specificity. */
+				/* The floating navbar is fixed but reads these edges to sit exactly over the prose. */
 				.site-shell {
-					padding-inline: var(--space-s-l);
+					--shell-start: var(--space-s-l);
+					--shell-end: var(--space-s-l);
+					padding-inline: var(--shell-start) var(--shell-end);
 					padding-block-start: var(--navbar-clear);
 				}
 				.example-shell { width:100%; margin:0; padding:0; }
 
 				@media (max-width: 96rem) {
 					.site-shell {
-						padding-left: calc(16rem + 2 * var(--space-s-l));
-						padding-right: calc(11rem + 2 * var(--space-s-l));
+						--shell-start: calc(16rem + 2 * var(--space-s-l));
+						--shell-end: calc(11rem + 2 * var(--space-s-l));
 					}
 				}
 
 				@media (max-width: 70rem) {
 					.site-shell {
-						padding-inline: var(--space-s-l);
+						--shell-start: var(--space-s-l);
+						--shell-end: var(--space-s-l);
 					}
 				}
 			</style>

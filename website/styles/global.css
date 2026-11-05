@@ -479,8 +479,16 @@ markless-outline { display: contents; }
 
 /* The phone gets the whole list at once, so the icon steps down there. */
 
+/* Registered so the 68ch resolves in the prose's font, and the navbar inside the prose inherits that length. */
+@property --prose-measure {
+	syntax: '<length>';
+	inherits: true;
+	initial-value: 600px;
+}
+
 .prose {
-	max-width: 68ch;
+	--prose-measure: 68ch;
+	max-width: var(--prose-measure);
 	margin-inline: auto;
 	padding-block: var(--space-m) var(--space-2xl);
 	/* An inline `code` token longer than a phone's column is the one thing in the
