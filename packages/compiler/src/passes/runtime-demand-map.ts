@@ -97,8 +97,8 @@ const HELD_INPUTS = ['web/fns/held-inputs-plane'];
 const BEHAVIOR = ['web/resume-behaviors'];
 // A shared() instance that outlives the page: its binding at wake.
 const SHARED_INSTANCES = ['web/fns/shared-instances'];
-// The router's swap binder: no record demands it, so it stays off every page until a navigation imports it.
-const SHARED_SWAP = ['web/shared-swap'];
+// The router's swap binders: no record demands them, so they stay off every page until a navigation imports them.
+const SHARED_SWAP = ['web/shared-swap', 'web/kept-swap'];
 // Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,

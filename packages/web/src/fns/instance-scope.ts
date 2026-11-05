@@ -49,6 +49,26 @@ export function marklessRowSegment(key: unknown): string {
 	return `r:${encodeURIComponent(String(key))}:`;
 }
 
+type RowContext = {
+	readonly repeatId?: string;
+	readonly repeatKey?: unknown;
+	readonly repeatOuter?: RowContext;
+};
+
+/** The segments of every row a render sits in, outermost first; undefined when one of those rows has no key to name it. */
+export function marklessRowPath(context: RowContext | undefined): string | undefined {
+	let path = '';
+	for (
+		let row = context;
+		row && (row.repeatId !== undefined || row.repeatKey !== undefined);
+		row = row.repeatOuter
+	) {
+		if (row.repeatKey === undefined) return undefined;
+		path = marklessRowSegment(row.repeatKey) + path;
+	}
+	return path;
+}
+
 // Row segments are runtime identity, so no route literal or symbol table holds one.
 export function marklessRowFreeSymbolId(symbolId: string, instancePath?: string): string {
 	const path = instancePath ?? INSTANCE_PATH.exec(symbolId)?.[0] ?? '';

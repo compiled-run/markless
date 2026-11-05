@@ -131,6 +131,7 @@ export const runtimeDemandMap = {
 		"web/fns/held-inputs-plane",
 		"web/fns/shared-instances",
 		"web/inline/sync-policy-core",
+		"web/kept-swap",
 		"web/payload-full-storage-free",
 		"web/payload-graph-construct",
 		"web/payload-resume",

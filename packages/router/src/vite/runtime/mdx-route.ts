@@ -7,6 +7,7 @@ import { type StructureToken, withProjectionSpan } from '../../../../web/src/ssr
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
+import type { KeepParts } from '../../../../web/src/fns/keep-parts-hook.ts';
 import {
 	protocolInstancePath,
 	protocolInstanceQualifies,
@@ -321,7 +322,11 @@ export async function renderMdxChild(
 				)
 			: rendered;
 	if (output) children.push({ ...child, output });
-	return output?.html ?? '';
+	const keep = (globalThis as Record<symbol, KeepParts | undefined>)[Symbol.for('markless.keep-parts')];
+	// An island with markdown between its tags places that content itself, so only a childless one is offered for keeping.
+	return output?.html && keep && !child.childrenElementTags?.length
+		? keep(output.html, undefined, { ...output, instancePath: child.hostPrefix })
+		: (output?.html ?? '');
 }
 
 // Markdown children travel as a projection, so the island counts their elements where its `{children}` lands.

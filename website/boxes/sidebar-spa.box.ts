@@ -34,7 +34,7 @@ export default box(
 		}
 		await expect.page.exists(
 			page,
-			'.sidebar a[aria-current="page"][href="/start/new-app"]',
+			'.sidebar .branch[aria-expanded="true"] a[aria-current="page"][href="/start/new-app"]',
 			WAIT,
 		);
 		await page.click('[data-theme-toggle="dark"]', WAIT);

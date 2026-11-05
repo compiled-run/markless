@@ -1,13 +1,116 @@
+import { computed, state } from '@markless/core';
 import { tree } from '@markless/ui';
 import { Link } from '@markless/core/router';
 import ModeSelect from './mode-select.tsrx';
-import { modeFor, sidebarFor } from '../../nav.ts';
+import { modeFor, sidebarFor, type SidebarEntry } from '../../nav.ts';
 import { asset } from '../../site-base.ts';
 import { INK_MARKS } from './ink-marks.ts';
 
+// The current page's mark is the link's own state, so two pages render the sidebar alike and a navigation keeps it.
+function PageLink({ entry }: { readonly entry: SidebarEntry }) @{
+	const link = state({ current: entry.active });
+	const marks = asset(INK_MARKS) + '#';
+	const current = computed(() => (link.current ? 'page' : undefined));
+
+	<Link class="sidebar-link page-link" href={entry.href} tabindex={-1} aria-current={current}>
+		<svg class="nav-icon" viewBox="0 0 108 108" aria-hidden="true">
+			<use href={marks + entry.icon} />
+		</svg>
+		<tree.itemlabel class="sidebar-text">{entry.title}</tree.itemlabel>
+
+		<style>
+			.nav-icon {
+				width: 2.6em;
+				height: 2.6em;
+				flex: none;
+				overflow: visible;
+			}
+
+			@media (max-width: 70rem) {
+				.nav-icon {
+					width: 2em;
+					height: 2em;
+				}
+
+				.sidebar-link {
+					min-height: 2.5em;
+				}
+			}
+
+			/* Three columns, so the sprite, the number and the title line up down the
+			   column. The resting border is transparent and the same width as the active
+			   one, so nothing shifts when an entry becomes the current page. */
+			.sidebar-link {
+				display: grid;
+				grid-template-columns: 2.6em 1.2em 1fr;
+				gap: 0.45em;
+				align-items: center;
+				min-height: 3em;
+				padding: 0.3em 0.5em;
+				color: var(--ink);
+				text-decoration: none;
+				border: 2px solid transparent;
+				border-radius: 6px;
+				line-height: 130%;
+			}
+
+			/* Hover is a wash of the page's own ink, so one rule reads right on both
+			   grounds. The current page is not a filled row: its title alone is run over
+			   with the yellow marker, dark ink on a pastel like everything else printed on
+			   an accent. */
+			.sidebar-link:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.sidebar-link[aria-current='page'] {
+				font-weight: 700;
+			}
+
+			.sidebar-link[aria-current='page'] .sidebar-text {
+				justify-self: start;
+				padding: 0.02em 0.28em;
+				margin-left: -0.28em;
+				background: var(--yellow);
+				color: var(--on-accent);
+				border-radius: 3px 5px 3px 6px;
+				transform: rotate(-0.8deg);
+			}
+
+			.prose .sidebar a {
+				text-decoration: none;
+			}
+
+			html .prose .sidebar-link:is(:hover, :focus-visible) {
+				background: var(--quiet-fill);
+				outline: 1px dashed var(--ink);
+				outline-offset: -3px;
+			}
+
+			.page-link {
+				grid-template-columns: 1.8rem minmax(0, 1fr);
+				gap: 0.5rem;
+				min-height: var(--page-height);
+				padding: 0.15rem 0.25rem;
+				border: 0;
+				line-height: 1.3;
+			}
+
+			.nav-icon {
+				width: 1.8rem;
+				height: 1.8rem;
+			}
+
+			.page-node:focus-visible > .page-link {
+				background: var(--quiet-fill);
+				outline: 1px dashed var(--ink);
+				outline-offset: -3px;
+			}
+		</style>
+	</Link>
+}
+
 export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	const here = modeFor(pathname);
-	const marks = asset(INK_MARKS) + '#';
 	const sections = sidebarFor(pathname).map((section) => ({
 		...section,
 		expanded: section.entries.some((entry) => entry.active),
@@ -30,7 +133,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				<div role="none">
 					@for (const section of sections; key section.title) {
 						<tree.item
-							class={'branch stroke-' + (section.stroke ?? 'pink') + (section.expanded ? ' branch-current' : '')}
+							class={'branch stroke-' + (section.stroke ?? 'pink')}
 							open={section.expanded}
 							level={1}
 							aria-label={section.title}
@@ -57,17 +160,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 											<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
 												<path d="M12 1 V23" />
 											</svg>
-											<Link
-												class={entry.active ? 'sidebar-link page-link is-active' : 'sidebar-link page-link'}
-												href={entry.href}
-												tabindex={-1}
-												aria-current={entry.active ? 'page' : undefined}
-											>
-												<svg class="nav-icon" viewBox="0 0 108 108" aria-hidden="true">
-													<use href={marks + entry.icon} />
-												</svg>
-												<tree.itemlabel class="sidebar-text">{entry.title}</tree.itemlabel>
-											</Link>
+											<PageLink entry={entry} />
 										</tree.item>
 									}
 								</div>
@@ -125,63 +218,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 			}
 
-			.nav-icon {
-				width: 2.6em;
-				height: 2.6em;
-				flex: none;
-				overflow: visible;
-			}
-
-			@media (max-width: 70rem) {
-				.nav-icon {
-					width: 2em;
-					height: 2em;
-				}
-
-				.sidebar-link {
-					min-height: 2.5em;
-				}
-			}
-
-			/* Three columns, so the sprite, the number and the title line up down the
-			   column. The resting border is transparent and the same width as the active
-			   one, so nothing shifts when an entry becomes the current page. */
-			.sidebar-link {
-				display: grid;
-				grid-template-columns: 2.6em 1.2em 1fr;
-				gap: 0.45em;
-				align-items: center;
-				min-height: 3em;
-				padding: 0.3em 0.5em;
-				color: var(--ink);
-				text-decoration: none;
-				border: 2px solid transparent;
-				border-radius: 6px;
-				line-height: 130%;
-			}
-
-			/* Hover is a wash of the page's own ink, so one rule reads right on both
-			   grounds. The current page is not a filled row: its title alone is run over
-			   with the yellow marker, dark ink on a pastel like everything else printed on
-			   an accent. */
-			.sidebar-link:hover {
-				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
-			}
-
-			.sidebar-link.is-active {
-				font-weight: 700;
-			}
-
-			.sidebar-link.is-active .sidebar-text {
-				justify-self: start;
-				padding: 0.02em 0.28em;
-				margin-left: -0.28em;
-				background: var(--yellow);
-				color: var(--on-accent);
-				border-radius: 3px 5px 3px 6px;
-				transform: rotate(-0.8deg);
-			}
-
 			.sidebar {
 				position: fixed;
 				left: var(--space-s-l);
@@ -216,16 +252,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 					margin-inline: auto;
 					padding-block: var(--space-s) 0;
 				}
-			}
-
-			.prose .sidebar a {
-				text-decoration: none;
-			}
-
-			html .prose .sidebar-link:is(:hover, :focus-visible) {
-				background: var(--quiet-fill);
-				outline: 1px dashed var(--ink);
-				outline-offset: -3px;
 			}
 
 			.sidebar {
@@ -272,7 +298,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				color: var(--path-ink);
 			}
 
-			.branch-current > .branch-trigger .branch-indicator {
+			.branch:has([aria-current='page']) > .branch-trigger .branch-indicator {
 				color: var(--ink);
 			}
 
@@ -367,23 +393,8 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				height: calc(100% - 2rem);
 			}
 
-			.page-link {
-				grid-template-columns: 1.8rem minmax(0, 1fr);
-				gap: 0.5rem;
-				min-height: var(--page-height);
-				padding: 0.15rem 0.25rem;
-				border: 0;
-				line-height: 1.3;
-			}
-
-			.nav-icon {
-				width: 1.8rem;
-				height: 1.8rem;
-			}
-
 			.branch-trigger:hover,
-			.branch:focus-visible > .branch-trigger,
-			.page-node:focus-visible > .page-link {
+			.branch:focus-visible > .branch-trigger {
 				background: var(--quiet-fill);
 				outline: 1px dashed var(--ink);
 				outline-offset: -3px;
