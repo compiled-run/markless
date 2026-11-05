@@ -1,5 +1,6 @@
 import {
 	marklessComposedGraphNodeId,
+	marklessInstancePath,
 	marklessInstanceSegments,
 	marklessPageSpaceId,
 	type MarklessWidgetRegistry,
@@ -7,7 +8,9 @@ import {
 
 type RowBoundRow = {
 	readonly instancePath?: string;
-	readonly rowPieces?: ReadonlyArray<readonly [hostSegment: string, instanceSegment: string, rows: number]>;
+	readonly rowPieces?: ReadonlyArray<
+		readonly [hostSegment: string, instanceSegment: string, rows: number]
+	>;
 };
 
 /**
@@ -45,6 +48,36 @@ export function marklessRowBoundPath(
 		spelled += instanceSegment.length;
 	}
 	return rowed + path.slice(spelled);
+}
+
+/**
+ * The id a bound row's callback prop answers to, in the row the dispatch sits in.
+ *
+ * The callback was written by a component this row's edges pass through, so its
+ * row-free path is a prefix of the row's own; the rows above that component's
+ * edge are the ones its captures were rendered with.
+ */
+export function marklessRowBoundCallbackId(
+	bound: RowBoundRow,
+	graph:
+		| { readonly marklessRowHostPath?: string; readonly marklessInstancePath?: string }
+		| undefined,
+	callbackSymbolId: string,
+): string {
+	const outer = graph?.marklessInstancePath ?? '';
+	const callbackPath = marklessInstancePath(callbackSymbolId);
+	const rowed = outer.includes('r:') ? '' : marklessRowBoundPath(bound, graph);
+	if (!callbackPath || !rowed.includes('r:')) return outer + callbackSymbolId;
+	let rowFree = '';
+	let withRows = '';
+	for (const segment of marklessInstanceSegments(rowed)) {
+		if (rowFree === callbackPath) break;
+		withRows += segment;
+		if (!segment.startsWith('r:')) rowFree += segment;
+	}
+	return rowFree === callbackPath
+		? outer + withRows + callbackSymbolId.slice(callbackPath.length)
+		: outer + callbackSymbolId;
 }
 
 // Widget and page ids keep the row-free path: the dispatch's row scope and, when given, the widget registry place those.
