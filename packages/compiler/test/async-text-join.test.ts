@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph, compileTsrxModule } from '../src/index.ts';
-import { resolveBoundaryRunners } from '../src/passes/public-render/boundary-runner.ts';
+import {
+	ASYNC_GATE_GRAPH_NODE_PREFIX,
+	resolveBoundaryRunners,
+} from '../src/passes/public-render/boundary-runner.ts';
 
 const pageSource = (markup: string) => `import { computed, state } from '@markless/core';
 export default function Page() @{
@@ -51,13 +54,12 @@ test('state before the async value, and an attribute template, gate the same way
 	}
 });
 
-test('two async values joined with state in one @try are refused like two direct reads', async () => {
-	expect((await compile(`<p>{folder}/{data.title}: {count}</p>`)).codes).toEqual([
-		'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
-	]);
-	expect((await compile(`<><p>{folder}</p><p>{data.title}</p></>`)).codes).toEqual([
-		'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
-	]);
+test('two async values joined with state in one @try settle on one gate over both', async () => {
+	for (const markup of [`<p>{folder}/{data.title}: {count}</p>`, `<><p>{folder}</p><p>{data.title}</p></>`]) {
+		const { codes, runner } = await compile(markup);
+		expect(codes).toEqual([]);
+		expect(runner?.runnerGraphNodeId?.startsWith(ASYNC_GATE_GRAPH_NODE_PREFIX)).toBe(true);
+	}
 });
 
 test('two reads of the same async value in one run of text stay a direct read', async () => {

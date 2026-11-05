@@ -1410,6 +1410,8 @@ export type SemanticGraphArtifact = {
 		readonly id: string;
 		readonly anchorOrder: number;
 		readonly parentBoundaryId?: string;
+		/** The minted sync computed a boundary reading several async values settles on. */
+		readonly gateGraphNodeId?: string;
 	}>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
 	readonly markup: SemanticMarkupArtifact;

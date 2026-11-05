@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 567,
+			"reason": "CSR first render skips a sync computed derive while an async ancestor has no settled value (spec 03)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "CSR first render skips a sync computed derive while an async ancestor has no settled value (spec 03)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 567,
+			"reason": "CSR first render skips a sync computed derive while an async ancestor has no settled value (spec 03)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "CSR first render skips a sync computed derive while an async ancestor has no settled value (spec 03)",
+			"date": "2026-11-05"
+		}
+	]
+}

@@ -82,6 +82,7 @@ export type MutableSemanticGraphArtifact = {
 		readonly id: string;
 		readonly anchorOrder: number;
 		readonly parentBoundaryId?: string;
+		readonly gateGraphNodeId?: string;
 	}>;
 	branchSites: SemanticBranchSite[];
 	markup: SemanticMarkupArtifact;

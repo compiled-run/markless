@@ -842,6 +842,17 @@ export function evaluatePrerenderDataComponent(input: {
 		marklessRosterPositions(input.sharedSeeds) ??
 		marklessRosterPositions(marklessRosterPositionSeeds())!;
 	const rosterPositionContext = marklessRosterRenderContext(positions, input.sharedSeeds);
+	const computedById = new Map(definition.state.computed.map((c) => [c.graphNodeId, c]));
+	// Spec 03 and D8: true while an async ancestor has no settled value, not even a prior one.
+	const awaitsAsync = (id: string, seen = new Set<string>()): boolean =>
+		(computedById.get(id)?.dependencies ?? []).some(({ graphNodeId: up }) => {
+			const record = computedById.get(up);
+			if (!record || seen.has(up)) return false;
+			seen.add(up);
+			if (!record.async) return awaitsAsync(up, seen);
+			const { status, value } = (symbolRead(up) ?? {}) as { status?: unknown; value?: unknown };
+			return status !== 'fulfilled' && (status !== 'pending' || value === undefined);
+		});
 	const initials = definition.initialValues ?? [];
 	const derived = marklessWalk(initials.length, (index) => {
 		const initial = initials[index]!;
@@ -855,6 +866,7 @@ export function evaluatePrerenderDataComponent(input: {
 		// derive reaches it unbound and dies on the capture context it never got.
 		if (!marklessOwnsDerivedNode(input.surface, input.componentName, initial.graphNodeId))
 			return undefined;
+		if (awaitsAsync(initial.graphNodeId)) return undefined;
 		const symbolId = symbolValue.symbolId;
 		const initializer = definition.initializerResidues?.[symbolId];
 		if (initializer && definition.readResidue) {
