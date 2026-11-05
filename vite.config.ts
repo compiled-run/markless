@@ -102,6 +102,7 @@ const buildOrder: PackUserConfig[] = [
 		packageName: 'serializer',
 		entry: {
 			index: './src/index.ts',
+			'attribute-text': './src/attribute-text.ts',
 			decode: './src/value-decode.ts',
 			'decode-client': './src/value-decode-client.ts',
 			protocol: './src/protocol.ts',

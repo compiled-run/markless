@@ -16,6 +16,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./async-boundary-arm": "./src/async-boundary-arm.ts",
+		"./attribute-text": "./src/attribute-text.ts",
 		"./decode": "./src/value-decode.ts",
 		"./resume-record-delta": "./src/resume-record-delta.ts",
 		"./resume-record-merge": "./src/resume-record-merge.ts",
@@ -26,7 +27,6 @@
 		"./protocol-validation": "./src/protocol-validation-storage.ts"
 	},
 	"publishConfig": {
-		"access": "public",
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -35,6 +35,10 @@
 			"./async-boundary-arm": {
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
+			},
+			"./attribute-text": {
+				"types": "./dist/attribute-text.d.ts",
+				"default": "./dist/attribute-text.js"
 			},
 			"./decode": {
 				"types": "./dist/decode.d.ts",
@@ -69,6 +73,7 @@
 				"default": "./dist/protocol-validation.js"
 			}
 		},
+		"access": "public",
 		"provenance": true
 	},
 	"scripts": {

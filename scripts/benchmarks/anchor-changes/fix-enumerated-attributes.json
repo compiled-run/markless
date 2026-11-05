@@ -1,0 +1,95 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "serializer/attribute-text"],
+			"set": 554,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/dom-attribute"],
+			"delta": -194,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/dom-journal"],
+			"delta": 16,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/dom-journal-direct"],
+			"delta": 16,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/ssr-data/renderer"],
+			"delta": 7,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["walls", "@fixtures/vite-csr", "maxEmittedRuntimeGzipBytes", "measured"],
+			"delta": 9,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "serializer/attribute-text"],
+			"set": 554,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/dom-attribute"],
+			"delta": -194,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/dom-journal"],
+			"delta": 16,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/dom-journal-direct"],
+			"delta": 16,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/ssr-data/renderer"],
+			"delta": 7,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["walls", "@fixtures/vite-plus", "maxRuntimeChunkGzipBytes", "measured"],
+			"delta": -1,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["walls", "@fixtures/vite-plus", "maxEmittedRuntimeGzipBytes", "measured"],
+			"delta": 10,
+			"reason": "the attribute presence rule moved from web/dom-attribute into serializer/attribute-text so the compiler and runtime share it, and draggable, contenteditable and spellcheck write true and false",
+			"date": "2026-11-05"
+		}
+	]
+}
