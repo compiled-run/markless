@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import TypingAnatomy from '../../components/figures/events/typing-anatomy.tsrx';
+import KeycardAnatomy from '../../components/figures/events/keycard-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -19,13 +19,13 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 That is `addEventListener('input', …)` written on the element. `event.key` and `event.preventDefault()` are the real ones.
 
-## Strike a key
+## Press a key
 
-The keys are the browser, and the roller lettered `onInput` is your handler. Press the drawing to strike a key.
+Press the key, or click it and type on your own keyboard.
 
-<TypingAnatomy />
+<KeycardAnatomy />
 
-Each strike is one event that carries its key. The handler runs only then, and only the field and the preview change.
+The hand is your handler. It gets the browser's own event, with the key you really pressed, and nothing until then.
 
 ## Write your own
 
