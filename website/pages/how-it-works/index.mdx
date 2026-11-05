@@ -3,6 +3,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import SurveyAnatomy from '../../components/figures/how-index/survey-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -28,17 +29,11 @@ export default function Cart() @{
 
 Before this file runs anywhere, the compiler knows that `bags` is state, that one text shows it, and that the click changes it. Reading code for what it means, not only for how it is spelled, is called semantic analysis.
 
-This section is for contributors and agents who want to weigh the design. You don't need it to ship an app.
-
 ## The analyzer maps the whole project at build time
 
-The compiler's analyzer, built on yuku, reads every `.tsrx` file for its scopes, names and references. From that it maps the project:
+<SurveyAnatomy />
 
-- Each file becomes a plan: its state, the text and attributes that read it, and the code each event runs.
-- A link step joins the plans: which component renders which, and which code each page's first interactions need.
-- The bundler packs each page's code from that map.
-
-[The compiler](/how-it-works/compiler) shows the plan for the cart, line by line.
+Press the drawing to finish the survey. The compiler's analyzer, built on yuku, reads every `.tsrx` file for its scopes, names and references. A link step joins the files into one map: which component renders which, and which spots can change. The bundler packs each page's code from that map.
 
 ## One plan, every environment
 
@@ -60,10 +55,10 @@ On a whole site, the [shadcn/ui home page port](https://github.com/compiled-run/
 
 The design also has limits:
 
-- A handler can read only what the compiler can find again later: state, element handles, props, imports and plain constants. Anything else fails with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`.
-- State a server sends must be data. A function fails with `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`.
-- Components live in `.tsrx` files, which need the Markless compiler to build and `@markless/typescript-plugin` to type-check.
-- Rendering pages at build time is a preview behind `MARKLESS_PRERENDER=1`, with no public option.
+- A handler can read only what crosses to the browser: state, element handles, props, imports and constants.
+- State a server sends must be data, not functions.
+- Components live in `.tsrx` files, which need the Markless compiler and `@markless/typescript-plugin`.
+- Rendering pages at build time is a preview behind `MARKLESS_PRERENDER=1`.
 
 <Collapsible sprite="star-badge" summary="How does this compare with other frameworks?">
 

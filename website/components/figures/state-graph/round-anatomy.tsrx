@@ -274,6 +274,13 @@ export default function RoundAnatomy() @{
 				clip-path: inset(50%);
 				white-space: nowrap;
 			}
+
+			.code {
+				font-family: var(--font-mono);
+				font-size: 4.4px;
+				font-variation-settings: 'MONO' 1;
+				fill: var(--sheet-ink);
+			}
 			.sign {
 				font-size: 4.6px;
 				font-weight: 800;

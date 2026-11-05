@@ -95,7 +95,9 @@ export function createDesk({ width, height, bounds, target, elevation = 50, azim
 		put(paper, pathOf(outlinePts, true));
 		for (const [i, f] of shown.entries()) if (f.gap > 0) put('hatch', hatch(atAll(f.pts), f.angle, f.gap, seed + 3 + i, { cluster: 4, skip: 0.25, trim: 0.4 }));
 		put('ink', outline(outlinePts, { w: 1.5, heavy: 1.3, centre: centreOf(outlinePts), seed: seed + 6 }) + shown.map((f, i) => outline(atAll(f.pts), { w: 0.75, seed: seed + 7 + i })).join(''));
-		return { top: surface(c(0, 0, h), [1, 0, 0], [0, 1, 0]), front: surface(c(0, d, 0), [1, 0, 0], [0, 0, 1], [0, 1, 0]), point: (du: number, dv: number, dz: number) => at(c(du, dv, dz)) };
+		const frontFace = surface(c(0, d, 0), [1, 0, 0], [0, 0, 1], [0, 1, 0]);
+		const front: Surface = { ...frontFace, matrix: (u, v, unit = 0.1, lift = 0.02) => matrixOf(at(frontFace.at(u, v, lift)), at(frontFace.at(u + unit, v, lift)), at(frontFace.at(u, v - unit, lift))) };
+		return { top: surface(c(0, 0, h), [1, 0, 0], [0, 1, 0]), front, point: (du: number, dv: number, dz: number) => at(c(du, dv, dz)) };
 	}
 
 	/** A loose yellow wash over a spot, with its darker pool. Returned, not layered, so a figure can show it on cue. */
@@ -122,7 +124,15 @@ export function createDesk({ width, height, bounds, target, elevation = 50, azim
 		put('desk-hatch', hatch(atAll([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]]), -0.5, 2.6, seed, { cluster: 5, skip: 0.35, trim: 0.5 }));
 	}
 
-	return { at, atAll, put, say, layers, words, surface, flat, upright, card, box, spot, note, deskTone, pencilLine: (pts: P[], seed: number) => pathOf(jitter(resample(pts, 6), seed, 0.7)) };
+	/** Collects the layers and words `draw` adds into their own lists, so a figure can move them as one group. */
+	function group(draw: () => void) {
+		const start = layers.length;
+		const wordStart = words.length;
+		draw();
+		return { layers: layers.splice(start), words: words.splice(wordStart) };
+	}
+
+	return { at, atAll, put, say, layers, words, group, surface, flat, upright, card, box, spot, note, deskTone, pencilLine: (pts: P[], seed: number) => pathOf(jitter(resample(pts, 6), seed, 0.7)) };
 }
 
 const centre3 = (pts: Point3[]): Point3 => mul3(pts.reduce((a, b) => add3(a, b), [0, 0, 0] as Point3), 1 / pts.length);

@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import PassAnatomy from '../../components/figures/lazy-chunks/pass-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -12,56 +13,37 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <Subtitle text="Downloading code and running it are two different costs, and Markless pays them at different times." />
 
-Here is part of the head of the [cart](/how-it-works/compiler), built as a one-page `@markless/router` app, with the file names cut:
+<PassAnatomy />
 
-```html title="head, cut"
-<link rel="modulepreload" href="/build/chunk-….js" crossorigin="anonymous" fetchpriority="low">
-<link rel="modulepreload" href="/build/chunk-….js" crossorigin="anonymous" fetchpriority="low">
-<link rel="modulepreload" href="/build/chunk-….js" crossorigin="anonymous" fetchpriority="low">
-<link rel="modulepreload" href="/build/chunk-….js" crossorigin="anonymous" fetchpriority="low">
-<link rel="modulepreload" href="/build/chunk-….js" crossorigin="anonymous" fetchpriority="low">
-```
+Press the drawing to send in an order. Every tub arrived with the page, but only the one that was ordered is opened. On a page, the tubs are the code behind each handler, and the order is the first press.
 
-Those five files hold the code the first press of **Add to cart** runs. A `modulepreload` tag tells the browser to fetch a module and get it ready, without running it.
+## What the cart page pays
 
-## Downloading and running are two costs
-
-Downloading costs network time, and running costs main-thread time. Waiting for the press to download makes the press wait; running everything at load makes the load wait. Measured in Chromium for the cart above (uncompressed, main at `2efb1c6e2`):
+Measured in Chromium for the [cart](/how-it-works/compiler) as a one-page `@markless/router` app (uncompressed, main at `2efb1c6e2`):
 
 - **Executed at load:** 8.4 kB, four small inline scripts and the router's link script.
-- **Downloaded at load, not executed:** 23.6 kB, the five files above, at low priority so they don't hold up the first paint.
+- **Downloaded at load, not executed:** 23.6 kB, fetched with `modulepreload` at low priority.
 - **Executed on the first click:** that same 23.6 kB, with nothing new to download.
 
 ## Every handler and update is a symbol
 
-The compiler cuts a component into [symbols](/how-it-works/compiler), one for each:
-
-- event handler, such as `onClick`, and callback prop
-- update, such as the text that shows `bags`
-- `attach={...}` behavior
-- `computed()` recipe, sync or async
-- `state()` starting value and `shared()` seed
-- `@if` branch and async block update
-
-A symbol runs only when its trigger fires: a click runs its handler, and a write runs the updates that read what changed. An `onVisible` handler runs when its element scrolls into view, and an `onIdle` handler once the page has loaded and gone idle. At mount, no handler runs, on every path in [resuming](/how-it-works/resuming).
+The compiler cuts a component into *symbols*: one small function each for an event handler, a text or attribute update, an `attach={...}` behavior, a `computed()` recipe, a `state()` starting value and an `@if` or async update. A symbol runs only when its trigger fires, and no handler runs at mount.
 
 ## Packing decides which file holds which code
 
-A *chunk* is one JavaScript file the browser downloads. Production client builds turn on *packing* by default: the bundler puts the lazily loaded modules into a few chunks, cut by what each page needs and when.
+Production client builds put the symbols into a few files, cut by what each page needs and when:
 
 | Pack | Holds | Downloads |
 | --- | --- | --- |
-| First use | Code the page load and its first interactions run | With the page, through `modulepreload` |
-| Navigation | Code only a client-side navigation runs | When a navigation is about to happen |
-| Deferred | Code nothing above needs | On its first `import()` |
+| First use | What the page load and its first interactions run | With the page |
+| Navigation | What only a client-side navigation runs | When a navigation is about to happen |
+| Deferred | Everything else | On its first `import()` |
 
-- A tier too small to earn a file of its own rides in the first-use pack.
-- Each module inside a pack still starts only when something first imports it.
-- Set `packing: false` in the `markless()` plugin options to ship one chunk per module. Dev builds are never packed.
+Each module in a pack still starts only when something first imports it. Set `packing: false` in the `markless()` options to ship one file per module.
 
 ## A symbol reaches only what crosses
 
-A symbol runs after the component body has finished, maybe on another machine. So it can use only what Markless can find again: state and computed values, element handles, props, `shared()` values, imports, and constants it can write down. Press **Focus**, then follow the steps:
+A symbol runs after the component body, maybe on another machine, so it can use only state, computed values, element handles, props, `shared()` values, imports and plain constants.
 
 <Code steps={[{ label: 'Change `Focus` to `Focus the note`.', shows: 'Focus the note' }, { label: "Above the elements, add `const box = document.querySelector('input');`, change `field?.focus()` to `box?.focus()`, and read the build error.", source: 'box?.focus()' }]}>
 ```tsrx title="gift-note.tsrx"
@@ -85,12 +67,6 @@ export default function GiftNote() @{
 ```
 </Code>
 
-That error is `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`, and its message names `box` as a local DOM node value that cannot cross a resume boundary. A function declared in the component body is fine: the chunk carries its definition along. It fails only if it reads something that can't cross, or is declared with `let`.
-
-| Symbol kind | Error when it reaches too far |
-| --- | --- |
-| Event handler or callback prop | `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` |
-| `attach={...}` behavior | `MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED` |
-| Any other symbol | `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` |
+The broken version fails with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`, naming `box` as a local DOM node value. A function declared in the component body is fine, unless it reads something that can't cross or is declared with `let`.
 
 [Native targets](/how-it-works/native-targets) asks whether a browser has to run these symbols at all.

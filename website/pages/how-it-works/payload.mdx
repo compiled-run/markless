@@ -3,6 +3,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import WallAnatomy from '../../components/figures/payload/wall-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -12,6 +13,10 @@ import MugSpot from '../../components/mascot/mug-spot.tsrx';
 <PageMeta time="2 min" assumes="state, events" />
 
 <Subtitle text="A server adds the state values and which element does what to its HTML, so the browser can carry on without running your components." />
+
+<WallAnatomy />
+
+Press the drawing. The two cards are everything the server adds to the finished page, and a page with nothing to react to gets none.
 
 Everything the server adds is called the *payload*. It applies only when a server renders the page, with `renderToString()`, `renderToStream()` or `@markless/router`. In the browser alone, `render()` keeps the same records in memory and writes none of these scripts.
 
@@ -44,10 +49,8 @@ The locator `index` is `2` here and `1` in the compiler's own output, because th
 
 ## How a value travels
 
-In `"value":{"version":1,"root":0,"records":[]}`, `root` holds the number `0` itself. An object or an array goes into `records`, and `root` points at it. An object that shows up twice is written once, and both places point at the same record.
-
-- Values must be data. `@markless/serializer` refuses a function with `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`.
-- Both scripts hold plain `JSON.stringify` output. The serializer escapes only `</` and `<!`, the two sequences that could end the script tag early.
+- `root` holds a plain value such as `0`. An object or array goes into `records`, and an object that shows up twice is written once.
+- Values must be data: `@markless/serializer` refuses a function with `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`.
 
 ## A page with nothing to react to
 
