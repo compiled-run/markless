@@ -243,6 +243,150 @@
 			"delta": -86,
 			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 55,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 55,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 55,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 19,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 725,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 186,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 725,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 168,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 343,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
 		}
 	]
 }
