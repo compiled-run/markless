@@ -33,6 +33,7 @@ import {
 	soleLoopRoot,
 	supportedFragmentRoot,
 } from './template.ts';
+import { repeatItemBinding } from '../semantic-graph/repeat-item-binding.ts';
 
 export function emptyPlan(
 	diagnostics: ReadonlyArray<PublicRenderPlanArtifact['diagnostics'][number]> = [],
@@ -189,15 +190,17 @@ export function componentRootDiagnostics(ast: AnyNode, filename: string) {
 
 		// Direct fragments and `return <>...</>` both need the multi-root
 		// story; single-element returns are supported by firstComponentRoot.
-		const fragment = implicitFragmentRoot(componentFunction?.node) ?? childNodes(body).find(
-			(child) =>
-				child.type === 'Fragment' ||
-				child.type === 'JSXFragment' ||
-				(child.type === 'ReturnStatement' &&
-					['Fragment', 'JSXFragment'].includes(
-						(child.argument as AnyNode | undefined)?.type ?? '',
-					)),
-		);
+		const fragment =
+			implicitFragmentRoot(componentFunction?.node) ??
+			childNodes(body).find(
+				(child) =>
+					child.type === 'Fragment' ||
+					child.type === 'JSXFragment' ||
+					(child.type === 'ReturnStatement' &&
+						['Fragment', 'JSXFragment'].includes(
+							(child.argument as AnyNode | undefined)?.type ?? '',
+						)),
+			);
 		if (fragment) {
 			const fragmentNode =
 				fragment.type === 'ReturnStatement'
@@ -348,11 +351,14 @@ export function collectRepeatBindingConflictDiagnostics(input: {
 			// Only `@for` heads: a plain JS for-of in module code declares no index and
 			// contributes no row binding to the emitted readers.
 			if (node.type !== 'JSXForExpression') return;
-			const itemName = getIdentifierName(
-				asNodes((node.left as AnyNode | undefined)?.declarations)[0]?.id as AnyNode | undefined,
-			);
+			const binding = repeatItemBinding(node);
+			const itemNames = binding?.aliases.length
+				? binding.aliases.map((alias) => alias.name)
+				: binding
+					? [binding.itemName]
+					: [];
 			const indexName = getIdentifierName(node.index as AnyNode | undefined);
-			if (itemName) {
+			for (const itemName of itemNames) {
 				if (asIndex.has(itemName)) conflicts.push({ name: itemName, node });
 				asItem.add(itemName);
 			}
@@ -400,7 +406,9 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 	for (const read of emittedTemplateReads(input.root, input.source)) {
 		const found = unresolved.find(
 			(reference) =>
-				reference.start >= read.start && reference.end <= read.end && !inRenderScope(reference),
+				reference.start >= read.start &&
+				reference.end <= read.end &&
+				!inRenderScope(reference),
 		);
 		if (!found) continue;
 		return [
@@ -421,9 +429,7 @@ type LoopBinding = {
 };
 
 // A bare `@for (row of rows)` head declares `row` to the render, not to the analyzer, and only inside that loop.
-function undeclaredLoopBindings(
-	root: AnyNode,
-): ReadonlyArray<LoopBinding> {
+function undeclaredLoopBindings(root: AnyNode): ReadonlyArray<LoopBinding> {
 	const loops: LoopBinding[] = [];
 	walkNode(root, (node) => {
 		if (node.type !== 'JSXForExpression') return;
@@ -452,11 +458,18 @@ function unresolvedValueReferences(
 	filename: string,
 ): Array<{ readonly name: string; readonly start: number; readonly end: number }> {
 	const view = moduleSemantics(source, filename);
-	const references: Array<{ readonly name: string; readonly start: number; readonly end: number }> =
-		[];
+	const references: Array<{
+		readonly name: string;
+		readonly start: number;
+		readonly end: number;
+	}> = [];
 	for (const reference of view.unresolvedReferences) {
 		if (reference.inTypePosition) continue;
-		references.push({ name: reference.name, start: reference.node.start, end: reference.node.end });
+		references.push({
+			name: reference.name,
+			start: reference.node.start,
+			end: reference.node.end,
+		});
 	}
 	return references.sort((left, right) => left.start - right.start);
 }
@@ -465,7 +478,8 @@ function emittedTemplateReads(
 	root: AnyNode,
 	fileSource: string,
 ): Array<{ readonly start: number; readonly end: number; readonly node: AnyNode }> {
-	const reads: Array<{ readonly start: number; readonly end: number; readonly node: AnyNode }> = [];
+	const reads: Array<{ readonly start: number; readonly end: number; readonly node: AnyNode }> =
+		[];
 	const add = (node: AnyNode | undefined) => {
 		if (!node) return;
 		// A read whose authored source cannot be recovered is not emitted, so it
