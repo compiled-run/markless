@@ -427,7 +427,7 @@ export function NavbarItemLink({ current, children, onKeydown, ...rest }: Navbar
 	<a
 		{...rest}
 		el={navbar.controlEls}
-		aria-current={current === true ? 'page' : false}
+		aria-current={current === true ? 'page' : undefined}
 		ui-active={current === true}
 		onKeydown={(event) => {
 			if (
