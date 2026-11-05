@@ -55,6 +55,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 	readonly scheduleFlush: () => void;
 	readonly reconcile?: Pick<DerivedReconcilePlane, 'publishAsync'>;
+	/** No handler statement follows an async answer, so what it dirties lands in the pass, past the write observers. */
+	readonly landWithoutObservers: (land: () => void) => void;
 };
 
 /** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
@@ -263,10 +265,8 @@ export type RuntimeGraphSubscription = {
 		| RuntimeGraphCommit
 		| void
 		| Promise<DomJournalResult | RuntimeGraphCommit | void>;
-	/** False while `run` still has code to load; a write observer then leaves its DOM to the pass, so the task's writes land together. */
-	readonly ready?: () => boolean;
-	/** Loads what `run` waits on without running it. */
-	readonly load?: () => Promise<unknown>;
+	/** The code `run` needs, a promise while it still loads: a write observer then leaves its DOM to the pass, and the pass waits for it before its commits land. */
+	readonly code?: () => unknown;
 };
 
 /**
@@ -489,7 +489,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		}
 	};
 
-	// No handler statement follows an async answer, so its rows land in the pass with the text beside them.
 	const landWithoutObservers = (land: () => void): void => {
 		const was = notifyingWrite;
 		notifyingWrite = true;
@@ -500,13 +499,14 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		}
 	};
 
-	const codeThePassWaitsOn = (): RuntimeGraphSubscription[] =>
+	const codeThePassWaitsOn = (): PromiseLike<unknown>[] =>
 		dirtyPaths.flatMap(({ graphNodeId, path }) =>
-			(subscriptionsByNode.get(graphNodeId) ?? []).filter(
-				(subscription) =>
-					subscription.ready?.() === false &&
-					pathsIntersect(path, subscription.path ?? []),
-			),
+			(subscriptionsByNode.get(graphNodeId) ?? []).flatMap((subscription) => {
+				const code = subscription.code?.() as PromiseLike<unknown> | undefined;
+				return typeof code?.then === 'function' && pathsIntersect(path, subscription.path ?? [])
+					? [code]
+					: [];
+			}),
 		);
 
 	const scheduleFlush = (): void => {
@@ -548,13 +548,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			cells,
 			computedNodes,
 			readGraph,
-			markDirtyPath: (graphNodeId, path) =>
-				landWithoutObservers(() => markDirtyPath(graphNodeId, path)),
+			markDirtyPath,
 			scheduleFlush,
-			reconcile: plane && {
-				publishAsync: (node, previous) =>
-					landWithoutObservers(() => plane.publishAsync(node, previous)),
-			},
+			reconcile: plane,
+			landWithoutObservers,
 		});
 		if (held) asyncPlane!.holdInputs(held);
 		if (asyncComputed) asyncPlane!.define(asyncComputed);
@@ -617,10 +614,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					if (commits.length > 0) {
 						// The next round's code loads first, so its journal paints in the task these commits do.
 						const waits = codeThePassWaitsOn();
-						if (waits.length > 0)
-							await Promise.all(
-								waits.map((subscription) => subscription.load?.().catch(() => {})),
-							);
+						if (waits.length > 0) await Promise.all(waits.map((code) => code.then(undefined, () => {})));
 						const landing = commits.map((commit) => commit());
 						await notifyJournalListeners();
 						await Promise.all(landing);

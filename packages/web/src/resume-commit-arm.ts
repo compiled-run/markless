@@ -23,7 +23,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
-import type { SlotRead } from './fns/row-slot-reads.ts';
+import type { SlotRead } from './resume-keyed-repeats.ts';
 
 // D1 tier 4: commitArm replaces the DOM range between an async boundary's
 // comment-anchor pair with freshly rendered arm content and re-registers the
@@ -308,8 +308,7 @@ function registerArmDomUpdates(
 				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
-				ready: () => typeof deps.loadSymbol!(domUpdate.symbolId!) === 'function',
-				load: async () => deps.loadSymbol!(domUpdate.symbolId!),
+				code: () => deps.loadSymbol!(domUpdate.symbolId!),
 				async run(value) {
 					const symbol = (await deps.loadSymbol!(domUpdate.symbolId!)) as (
 						context: unknown,

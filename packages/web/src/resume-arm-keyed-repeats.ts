@@ -5,7 +5,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ResumeEventWiring } from './resume-events.ts';
-import type { SlotRead } from './fns/row-slot-reads.ts';
+import type { SlotRead } from './resume-keyed-repeats.ts';
 
 // An arm's rows adopt the served ones only once the computed they read from holds the served value.
 export async function wireArmKeyedRepeats(

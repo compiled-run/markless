@@ -79,7 +79,7 @@ test('a write observer leaves its DOM to the pass while a subscription in that p
 	graph.subscribe({
 		id: 'dom-update:requests',
 		graphNodeId: 'state:requests',
-		ready: () => loaded,
+		code: () => (loaded ? 'loaded' : macrotask()),
 		run: async (value) => {
 			await macrotask();
 			loaded = true;
@@ -113,6 +113,7 @@ test('a write observer leaves its DOM to the pass while a subscription in that p
 test('a commit waits for code the next round loads, so that round lands in the task the commit paints in', async () => {
 	const landed: string[] = [];
 	let loaded = false;
+	let loading: Promise<void> | undefined;
 	const graph = createRuntimeGraph({
 		cells: [
 			{ graphNodeId: 'state:answer', value: 1 },
@@ -130,12 +131,14 @@ test('a commit waits for code the next round loads, so that round lands in the t
 	graph.subscribe({
 		id: 'dom-update:label',
 		graphNodeId: 'state:label',
-		ready: () => loaded,
-		load: async () => {
-			await macrotask();
-			loaded = true;
-			landed.push('loaded');
-		},
+		code: () =>
+			loaded
+				? 'loaded'
+				: (loading ??= (async () => {
+						await macrotask();
+						loaded = true;
+						landed.push('loaded');
+					})()),
 		run: async (value) => {
 			if (!loaded) await macrotask();
 			return { type: 'setText', locator: 'text:label', value };

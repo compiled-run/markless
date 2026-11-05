@@ -95,13 +95,11 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		const previous = node.snapshot;
 		node.snapshot = snapshot;
 		// Readers held at the inputs the old value was fetched with move on even when the new value equals it.
-		if (landed && node.pinned) node.pinned = false;
-		else if (internals.reconcile) {
-			internals.reconcile.publishAsync(node, previous);
-			internals.scheduleFlush();
-			return;
-		}
-		internals.markDirtyPath(node.graphNodeId, []);
+		internals.landWithoutObservers(() => {
+			if (landed && node.pinned) node.pinned = false;
+			else if (internals.reconcile) return internals.reconcile.publishAsync(node, previous);
+			internals.markDirtyPath(node.graphNodeId, []);
+		});
 		internals.scheduleFlush();
 	};
 

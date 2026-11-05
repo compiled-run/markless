@@ -13,13 +13,6 @@ import type {
 import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '../../serializer/src/protocol-prop-prefix.ts';
 import { elementsOf, marklessElementAt, pageNodes } from './resume-anchor-census.ts';
-import {
-	movedSincePaint,
-	rowSlotReads,
-	slotReadGroups,
-	templateSlots,
-	type SlotRead,
-} from './fns/row-slot-reads.ts';
 
 // Nothing has moved yet, so deriving a computed collection reproduces the served rows.
 export async function primeKeyedRepeatCollections(input: {
@@ -695,4 +688,45 @@ function rowsFrom(parent: ResumeDomElement, repeat: ResumeKeyedRepeatRecord, cou
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
 	return elementsOf(pageNodes(element));
+}
+export type SlotRead = { readonly graphNodeId: string; readonly path?: ReadonlyArray<string> };
+// Row code can arrive after a gesture's write, so a slot read is compared with the state its row was painted from.
+export function movedSincePaint(graph: Pick<RuntimeGraph, 'read'>, repeats: ReadonlyArray<ResumeKeyedRepeatRecord>) {
+	// An unserializable value compares by identity.
+	const text = (read: SlotRead): unknown => {
+		let value: unknown;
+		try {
+			value = graph.read(read.graphNodeId, read.path);
+			return JSON.stringify(value, (_, v) =>
+				typeof v === 'bigint' ? `${v}n` : v instanceof Map || v instanceof Set ? [...v] : v,
+			);
+		} catch {
+			return value;
+		}
+	};
+	const served = new Map(repeats.flatMap(rowSlotReads).map((read) => [JSON.stringify(read), text(read)]));
+	return (read: SlotRead) => served.has(JSON.stringify(read)) && served.get(JSON.stringify(read)) !== text(read);
+}
+type SlotOwner = Pick<NonNullable<ResumeKeyedRepeatRecord['rowTemplate']>, 'textSlots' | 'attributeSlots'>;
+function templateSlots(repeat: ResumeKeyedRepeatRecord) {
+	return slotsOf(repeat.rowTemplate ?? {});
+}
+function slotsOf(owner: SlotOwner) {
+	return [...(owner.textSlots ?? []), ...(owner.attributeSlots ?? [])];
+}
+// One group per text or attribute slot, then one for every @if value.
+function slotReadGroups(repeat: ResumeKeyedRepeatRecord): SlotRead[][] {
+	const branches = (repeat.rowTemplate?.branchSlots ?? []).flatMap((branch) => [branch, ...branch.arms.flatMap(slotsOf)]);
+	return [...templateSlots(repeat).map((slot) => [slot]), branches].map((group: ReadonlyArray<(typeof branches)[number]>) =>
+		group.flatMap((slot) =>
+			'source' in slot
+				? (slot.reads ?? [])
+				: 'graphNodeId' in slot
+					? [{ graphNodeId: slot.graphNodeId, path: slot.graphPath }]
+					: [],
+		),
+	);
+}
+function rowSlotReads(repeat: ResumeKeyedRepeatRecord) {
+	return slotReadGroups(repeat).flat();
 }

@@ -92,6 +92,8 @@ const ASYNC_BOUNDARY = [
 	'web/resume-refresh-busy',
 	'web/fns/async-plane',
 ];
+// Per-element busy marks and their announcement: no record demands them, so they load on the first refresh over shown content.
+const REFRESH_MARKS = ['web/fns/busy-elements', 'web/fns/refresh-announcer'];
 // Matched values load only where a reader pairs an async value with an input of its key.
 const HELD_INPUTS = ['web/fns/held-inputs-plane'];
 const BEHAVIOR = ['web/resume-behaviors'];
@@ -314,6 +316,7 @@ export function createRuntimeDemandMap(
 			...BEHAVIOR,
 			...SHARED_INSTANCES,
 			...SHARED_SWAP,
+			...REFRESH_MARKS,
 			// Conditional, unlike the kinds above: the overlay behaviour is only
 			// reachable in an app that compiled a mark, so listing it unconditionally
 			// would let the execution oracle excuse it everywhere.

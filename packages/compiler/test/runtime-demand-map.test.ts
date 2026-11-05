@@ -784,6 +784,35 @@ test('an event inside an async boundary arm is a planner action owned by its bou
 	}
 });
 
+test('busy marks and the refresh announcement are known runtime no record or control demands, so they load on the first refresh', async () => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({
+		filename: '/workspace/src/Tide.tsrx',
+		symbols: [],
+		source: `import { computed, state } from '@markless/core';
+		export default function Tide() @{
+			let port = state('Oban');
+			const tide = computed(async () => ({ high: port + ' 06:10' }));
+			<section>
+				<button onClick={() => (port = 'Mallaig')}>Next port</button>
+				@try {
+					<p>{tide.high}</p>
+				} @pending {
+					<p>reading</p>
+				}
+			</section>
+		}`,
+	});
+	const lazy = ['web/fns/busy-elements', 'web/fns/refresh-announcer'];
+	for (const map of Object.values(result.runtimeDemandMaps)) {
+		expect(map.payloadRecords.some((record) => record.kind === 'async-boundary')).toBe(true);
+		expect(map.unknownRecordModuleIds).toEqual(expect.arrayContaining(lazy));
+		for (const entry of [...map.payloadRecords, ...map.actions, ...(map.armActions ?? []), ...map.symbols])
+			for (const id of lazy) expect(entry.runtimeModuleIds).not.toContain(id);
+		for (const id of lazy) expect(map.capabilityModuleIds ?? []).not.toContain(id);
+	}
+});
+
 test.each([
 	{
 		name: 'an @if on a module constant',
