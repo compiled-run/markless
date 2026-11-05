@@ -10,7 +10,7 @@ type RowQualifiableView = {
 	readonly elementHandles: ReadonlyArray<HostedRecord>;
 };
 
-const ROW_SEGMENT = /^r:[^:]*:/;
+const ROW_SEGMENTS = /^(?:r:[^:]*:)+/;
 
 /**
  * One copy of a record per keyed row that rendered its projected host behind the
@@ -26,7 +26,7 @@ export function marklessSsrRowQualifiedView<T extends RowQualifiableView>(
 		rows = new Map<string, string[]>();
 	for (const { hostNodeId } of structure.locators) {
 		const local = hostNodeId.slice(idPrefix.length),
-			bare = local.replace(ROW_SEGMENT, '');
+			bare = local.replace(ROW_SEGMENTS, '');
 		if (bare !== local && own.has(bare) && hostNodeId.startsWith(idPrefix))
 			rows.set(bare, [...(rows.get(bare) ?? []), local]);
 	}
