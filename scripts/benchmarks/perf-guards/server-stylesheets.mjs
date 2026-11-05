@@ -46,10 +46,8 @@ async function filesUnder(dir, extension) {
 		.map((file) => join(dir, file));
 }
 
-async function measureVariant(large, log) {
-	const root = await mkdtemp(
-		join(tmpdir(), `markless-server-stylesheets-${large ? 'large' : 'small'}-`),
-	);
+// One path for both variants: chunk hashes carry the app's absolute path and the Worker's chunk layout follows them.
+async function measureVariant(root, large, log) {
 	try {
 		await cp(FIXTURE, root, { recursive: true });
 		if (large)
@@ -109,5 +107,14 @@ async function measureVariant(large, log) {
 }
 
 export async function measureServerStylesheets(log = () => {}) {
-	return { small: await measureVariant(false, log), large: await measureVariant(true, log) };
+	const parent = await mkdtemp(join(tmpdir(), 'markless-server-stylesheets-'));
+	const root = join(parent, 'app');
+	try {
+		return {
+			small: await measureVariant(root, false, log),
+			large: await measureVariant(root, true, log),
+		};
+	} finally {
+		await rm(parent, { recursive: true, force: true });
+	}
 }
