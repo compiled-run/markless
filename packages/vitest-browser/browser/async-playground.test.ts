@@ -3,8 +3,13 @@ import { render, renderSSR } from '../src/index.ts';
 import IfSyncDeriveOne from './async-playground/if-sync-derive-one.tsrx';
 import IfSyncDeriveTwo from './async-playground/if-sync-derive-two.tsrx';
 import IfSyncDeriveThree from './async-playground/if-sync-derive-three.tsrx';
+import RowsCatchOne from './async-playground/rows-catch-one.tsrx';
+import RowsCatchTwo from './async-playground/rows-catch-two.tsrx';
+import RowsCatchThree from './async-playground/rows-catch-three.tsrx';
+import { userEvent } from 'vitest/browser';
 
-// An @if arm holding a component with a sync computed over its own state renders and keeps that value live.
+// The converted TanStack Query playground's shapes: an @if arm holding a component with a sync computed over
+// its own state, and rows whose @try settles by re-rendering the page, at one to three components deep.
 
 function click(container: HTMLElement, selector: string) {
 	const element = container.querySelector<HTMLElement>(selector);
@@ -53,4 +58,41 @@ test("CSR: an @if two components below the page holding a component with a sync 
 
 test("SSR: an @if two components below the page holding a component with a sync computed opens, updates and reopens", async () => {
 	await editCycle((await renderSSR(IfSyncDeriveThree)).container as HTMLElement);
+});
+
+const lists = (container: HTMLElement) =>
+	[...container.querySelectorAll('.list ul')].map((list) => [...list.querySelectorAll('li')].map((item) => item.textContent));
+
+async function rowsCycle(container: HTMLElement) {
+	await expect.poll(() => lists(container)).toEqual([['apple', 'banana', 'grape'], ['banana'], ['grape']]);
+	const first = container.querySelector<HTMLInputElement>('.list input')!;
+	await userEvent.fill(first, 'pp');
+	await expect.poll(() => lists(container)[0]).toEqual(['apple']);
+	await userEvent.fill(first, 'boom');
+	await expect.poll(() => container.querySelector('.list [data-error]')?.textContent).toContain('no items');
+	expect(lists(container).slice(-2)).toEqual([['banana'], ['grape']]);
+}
+
+test("CSR: rows of the page whose @try has a @catch settle, refresh and fail", async () => {
+	await rowsCycle((await render(RowsCatchOne)).container as HTMLElement);
+});
+
+test("SSR: rows of the page whose @try has a @catch settle, refresh and fail", async () => {
+	await rowsCycle((await renderSSR(RowsCatchOne)).container as HTMLElement);
+});
+
+test("CSR: rows in the page's child whose @try has a @catch settle, refresh and fail", async () => {
+	await rowsCycle((await render(RowsCatchTwo)).container as HTMLElement);
+});
+
+test("SSR: rows in the page's child whose @try has a @catch settle, refresh and fail", async () => {
+	await rowsCycle((await renderSSR(RowsCatchTwo)).container as HTMLElement);
+});
+
+test("CSR: rows two components below the page whose @try has a @catch settle, refresh and fail", async () => {
+	await rowsCycle((await render(RowsCatchThree)).container as HTMLElement);
+});
+
+test("SSR: rows two components below the page whose @try has a @catch settle, refresh and fail", async () => {
+	await rowsCycle((await renderSSR(RowsCatchThree)).container as HTMLElement);
 });

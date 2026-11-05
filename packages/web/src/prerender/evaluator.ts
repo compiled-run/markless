@@ -31,6 +31,7 @@ import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessInstanceScopedGraph,
 	marklessInstanceSegments,
 	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
@@ -351,12 +352,13 @@ export async function renderPrerenderBoundary(
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		const freshCellIds = new Set<string>();
+		const moduleGraph = boundaryModuleRootGraph(page, boundaryId, graph);
 		const output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
-			graph,
+			moduleGraph,
 			true,
-			servedPageProps(graph),
+			servedPageProps(moduleGraph),
 			{
 				cellIds: freshCellIds,
 				...(pageBoundaryId && {
@@ -663,6 +665,26 @@ async function evaluatePrerenderDataSurface(
 	);
 }
 
+// The settle symbol runs scoped to the boundary's owner; the render starts at the module root, so it reads from where that root stands.
+function boundaryModuleRootGraph(
+	surface: PrerenderDataSurface,
+	boundaryId: string,
+	graph: RuntimeGraph,
+): RuntimeGraph {
+	const ownerName = Object.keys(surface.components).find(
+		(name) =>
+			!!surface.components[name]?.boundaries?.some(
+				(boundary) => boundary.boundaryId === boundaryId,
+			),
+	);
+	const placement = branchOwnerPlacement(surface, ownerName, graph);
+	if (!placement || placement.ownerPath === '') return graph;
+	return marklessInstanceScopedGraph(
+		(graph as MarklessScopedGraph).marklessPageGraph ?? graph,
+		placement.moduleRootPath,
+	);
+}
+
 type BranchOwnerPlacement = {
 	// The page path of the module root the owner was composed under.
 	readonly moduleRootPath: string;
@@ -860,6 +882,18 @@ function settlesInside(
 
 // The cells this component declares, as against the module's whole list: the
 // producer hands every component in a module all of them.
+function ownedComputed(definition: PrerenderDataDefinition): ProtocolStatePayload['computed'] {
+	const computedIndexes = definition.stateComputedIndexes;
+	if (computedIndexes)
+		return computedIndexes.flatMap((index) =>
+			definition.state.computed[index] ? [definition.state.computed[index]!] : [],
+		);
+	const owned = new Set(definition.stateGraphNodeIds ?? []);
+	return definition.state.computed.filter(
+		(computed) => owned.size === 0 || owned.has(computed.graphNodeId),
+	);
+}
+
 function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayload['cells'] {
 	const cellIndexes = definition.stateCellIndexes;
 	if (cellIndexes)
@@ -967,10 +1001,13 @@ export function evaluatePrerenderDataComponent(input: {
 					.filter((graphNodeId) => !freshOwnCellIds?.has(graphNodeId)),
 			)
 		: undefined;
-	// The live graph holds a composed instance's own cells under its instance path.
+	// The live graph holds a composed instance's own cells and derives under its instance path.
 	const instanceCellIds =
 		input.graph && input.symbolPrefix
-			? new Set(ownedStateCells(definition).map((cell) => cell.graphNodeId))
+			? new Set([
+					...ownedStateCells(definition).map((cell) => cell.graphNodeId),
+					...ownedComputed(definition).map((computed) => computed.graphNodeId),
+				])
 			: undefined;
 	const readAt = (
 		graphNodeId: string,
@@ -1176,24 +1213,13 @@ export function evaluatePrerenderDataComponent(input: {
 				}),
 			),
 			() => {
-				const owned = new Set(definition.stateGraphNodeIds ?? []);
 				const servedComputed = new Set(
 					(definition.servedComputedIndexes ?? []).flatMap((index) => {
 						const computed = definition.state.computed[index];
 						return computed ? [computed.graphNodeId] : [];
 					}),
 				);
-				const computedIndexes = definition.stateComputedIndexes;
 				const ownedCells = ownedStateCells(definition);
-				const ownedComputed = computedIndexes
-					? computedIndexes.flatMap((index) =>
-							definition.state.computed[index]
-								? [definition.state.computed[index]!]
-								: [],
-						)
-					: definition.state.computed.filter(
-							(computed) => owned.size === 0 || owned.has(computed.graphNodeId),
-						);
 				const state: ProtocolStatePayload = {
 					...structuredClone(definition.state),
 					cells: ownedCells.map((cell) =>
@@ -1205,12 +1231,12 @@ export function evaluatePrerenderDataComponent(input: {
 								}
 							: { ...cell },
 					),
-					computed: ownedComputed.map((computed) =>
+					computed: ownedComputed(definition).map((computed) =>
 						computed.async
 							? {
 									...computed,
 									snapshot: input.graph
-										? (input.graph.read(computed.graphNodeId, []) as never)
+										? (input.graph.read(input.symbolPrefix + computed.graphNodeId, []) as never)
 										: {
 												status: 'pending' as const,
 												version: 1,
