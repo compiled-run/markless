@@ -99,7 +99,12 @@ function collectModuleScopeDeclarations(
 		// A shared() definition is graph data, not module code: its factory ships
 		// as payload nodes, so the authored call never reaches emitted source.
 		if (isSharedDefinitionDeclaration(declaration, sharedImports)) return [];
-		const sourceText = lowerModuleStorageDeclaration(declaration, source, storageImports);
+		const lowered = lowerModuleStorageDeclaration(declaration, source, storageImports);
+		// A carry splices declarations ahead of `(expression)`, which a semicolon-less one would call.
+		const sourceText =
+			declaration.type === 'VariableDeclaration' && lowered && !lowered.trimEnd().endsWith(';')
+				? `${lowered};`
+				: lowered;
 		return sourceText ? [{ names: declaredNames(declaration), source: sourceText }] : [];
 	});
 }
