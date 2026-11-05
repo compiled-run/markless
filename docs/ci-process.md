@@ -229,6 +229,10 @@ Changes to `.github/workflows/*.yml` go through a PR, never straight to `main`. 
 - A job that runs tests which launch browsers installs them. The current red `unit` job is this mistake.
 - External clones used by CI (`js-framework-benchmark`) are pinned to a commit, so upstream changes cannot turn CI red overnight.
 
+### Runner image
+
+`ci.yml` runs on `ubuntu-24.04`, not `ubuntu-latest`. On 2026-11-05 `ubuntu-latest` moved to Ubuntu 26.04 and every WebKit test in `unit` failed to launch: the browser cache key had no image in it, so jobs restored the Ubuntu 24.04 WebKit build, which links `libicudata.so.74`, onto an image that ships ICU 78. The browser cache key now includes the image (`needs.lanes.outputs.image_os`), and `check-workflow.mjs` requires it. Move to a newer image deliberately, in its own pull request, once the pinned Playwright version ships WebKit for it.
+
 ### Merge queue timeout
 
 The queue drops a group whose required checks have not reported within `check_response_timeout_minutes` (set in the `main` ruleset, not in this repository). It was 90. On 2026-10-28, with the org's 60 runners shared with markless-migrate's pull request CI, merge groups took about 145 minutes, roughly 10 of them running jobs and the rest waiting for runners. So the queue dropped groups that went on to pass: #328 was removed at 09:47Z with `checks_timed_out` while its group run 40655720022 finished green at 10:32Z, and #336 and #310 were dropped the same way. Every drop rebuilt the groups behind it, so nothing merged. The timeout is now 240 minutes. Lower it once the shorter merge gate (#337) and lane reuse (#350) have landed and a week of group times is measured, to about twice the slowest of those groups.

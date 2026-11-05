@@ -73,7 +73,8 @@ const PLAYWRIGHT_JOB = 'prepare-playwright';
 
 // The analyzer receipt set is checked inside the gate, after its result step.
 const RECEIPTS_JOB = GATE_JOB;
-const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-chromium-webkit-';
+// The WebKit build differs per Ubuntu release, so the browsers are keyed by the runner image too.
+const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-';
 
 // Jobs the gate depends on that are wiring rather than a content-hashed lane.
 const GATE_INFRASTRUCTURE = new Set([LANES_JOB]);
