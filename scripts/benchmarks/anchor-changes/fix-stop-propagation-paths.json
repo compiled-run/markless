@@ -1,0 +1,112 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 11,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 11,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 11,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 53,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "every resume entry passes a nested handler's stop on to the walk; without it a nested stopPropagation() stopped holding once the first click woke the page",
+			"date": "2026-11-05"
+		}
+	]
+}
