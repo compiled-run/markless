@@ -45,7 +45,7 @@ export default function DrawerAnatomy() @{
 				type="text"
 				value={query}
 				maxlength={MAX_QUERY}
-				placeholder="type to filter"
+				placeholder="type here"
 				aria-label="filter the drawer by title"
 				spellcheck={false}
 				autocomplete="off"
