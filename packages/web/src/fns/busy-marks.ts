@@ -20,6 +20,7 @@ type BoundaryBusy = {
 	boundary?: BusyBoundary;
 	readonly pending: Set<string>;
 	marked: Set<BusyNode>;
+	failed?: boolean;
 };
 type AfterAnchor = { __marklessAfter?: ResumeDomComment };
 
@@ -57,6 +58,7 @@ function note(
 ): void {
 	const status = (snapshot as { readonly status?: unknown } | null)?.status;
 	const busy = busyOf(boundary);
+	if (status === 'rejected' && busy.pending.has(graphNodeId)) busy.failed = true;
 	if (status === 'pending' && showsSettledContent) busy.pending.add(graphNodeId);
 	else if (status !== 'fulfilled' && status !== 'rejected') return;
 	// The last read to settle clears with the settle commit that shows it, not before.
@@ -103,7 +105,19 @@ function apply(boundary: BusyBoundary): void {
 	}
 	for (const host of busy.marked) if (!hosts.has(host)) host.removeAttribute?.('aria-busy');
 	for (const host of hosts) host.setAttribute?.('aria-busy', 'true');
+	if (hosts.size > 0 !== busy.marked.size > 0) announce(busy, hosts.size > 0 ? hosts : busy.marked);
 	busy.marked = hosts;
+}
+
+let announcer: Promise<typeof import('./refresh-announcer.ts')> | undefined;
+function announce(busy: BoundaryBusy, hosts: Set<BusyNode>): void {
+	const nowBusy = busy.marked.size === 0;
+	const failed = !nowBusy && busy.failed === true;
+	busy.failed = false;
+	const key = busy.pending;
+	void (announcer ??= import('./refresh-announcer.ts')).then((module) =>
+		module.refreshChanged(key, nowBusy, failed, hosts),
+	);
 }
 
 
