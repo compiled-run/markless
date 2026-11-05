@@ -1,8 +1,9 @@
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import KeyboardTable from '../../components/docs/keyboard-table.tsrx';
+import AccordionKeys from '../../components/figures/ui/accordion-keys.tsrx';
 import ApiTable from '../../components/docs/api-table.tsrx';
+import DefList from '../../components/docs/def-list.tsrx';
 import AccordionExamples from '../../components/figures/ui/accordion-examples.tsrx';
 import AccordionAnatomy from '../../components/figures/ui/accordion-anatomy.tsrx';
 
@@ -25,6 +26,8 @@ section that is open. Opening another section closes the first one. Add `multipl
 
 ## Examples
 
+Four pages, each using the accordion a different way: one step always open, several days open at once, answers opened by a search, and a plan nobody can open.
+
 <AccordionExamples />
 
 ## Anatomy
@@ -37,7 +40,7 @@ heading out, the panel has no name.
 
 ## Keyboard
 
-<KeyboardTable />
+<AccordionKeys />
 
 The arrow keys move focus between triggers. They open nothing. At the last trigger, Down goes back
 to the first, and there is no prop to stop that. The walk skips sections that are disabled.
@@ -54,13 +57,15 @@ it. A disabled section always gets plain `hidden`, so a search can never open it
 
 The family ships no CSS. It writes these attributes for your selectors:
 
-| Attribute | On | When |
-| --- | --- | --- |
-| `ui-open` | `item`, `itemtrigger`, `itemcontent` | The section is open. |
-| `ui-closed` | `item`, `itemtrigger`, `itemcontent` | The section is closed. |
-| `ui-disabled` | `root`, `item` | The accordion or this section is disabled. |
-| `ui-multiple` | `root` | `multiple` is set. |
-| `ui-value` | `item` | Always. It holds the section's own `value`. |
+<DefList
+	items={[
+		{ term: 'ui-open', on: 'on item, itemtrigger, itemcontent', text: 'The section is open.' },
+		{ term: 'ui-closed', on: 'on item, itemtrigger, itemcontent', text: 'The section is closed.' },
+		{ term: 'ui-disabled', on: 'on root, item', text: 'The accordion or this section is disabled.' },
+		{ term: 'ui-multiple', on: 'on root', text: '`multiple` is set.' },
+		{ term: 'ui-value', on: 'on item', text: "Always. It holds the section's own `value`." },
+	]}
+/>
 
 `ui-value` lets one rule reach one section:
 

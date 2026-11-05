@@ -792,7 +792,17 @@ function binder(card: string): string {
 			}
 
 			${card} .pg-rest {
-				border-block-start: 2px dashed var(--pg-band);
+				padding-block-start: 0.9em;
+				border-block-start: 0;
+			}
+
+			${card} :is(.pg-quick, .pg-rest) {
+				gap: 0.9em 2em;
+			}
+
+			${card} .pg-clamp[ui-open] .pg-code-body {
+				max-height: 20rem;
+				overflow: auto;
 			}
 
 			${card} .pg-clamp {

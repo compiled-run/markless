@@ -4,7 +4,7 @@ import InkButton from '../ink/ink-button.tsrx';
 import { art } from './accordion-anatomy.art.ts';
 
 export default function AccordionAnatomy() @{
-	let together = state(true);
+	let mode = state('rest');
 	let open = state(true);
 	let dragX = state(0);
 	let dragY = state(0);
@@ -16,7 +16,6 @@ export default function AccordionAnatomy() @{
 	let spring = state('');
 	let said = state('');
 	let picked = state('');
-	const mode = computed(() => (together ? 'together' : 'apart'));
 	const shown = computed(() => (open ? 'open' : 'closed'));
 	const pull = computed(() => '--drag-x:' + dragX + 'px;--drag-y:' + dragY + 'px');
 
@@ -25,7 +24,7 @@ export default function AccordionAnatomy() @{
 			class="stage"
 			tabindex={0}
 			role="group"
-			aria-label="An accordion. Up arrow takes it apart into its parts, Down arrow puts it together, Enter opens or closes the panel."
+			aria-label="An accordion, its parts lifted slightly apart. Up arrow pulls them fully apart, Down arrow puts them together, Escape goes back. Enter opens or closes the panel."
 			onPointerdown={(event: PointerEvent) => {
 				const part = (event.target as Element).closest('[data-part]')?.getAttribute('data-part') ?? '';
 				grabbed = part;
@@ -59,7 +58,7 @@ export default function AccordionAnatomy() @{
 					return;
 				}
 				const part = (event.target as Element).closest('[data-part]')?.getAttribute('data-part') ?? '';
-				if (!together) {
+				if (mode !== 'together') {
 					picked = part;
 					if (part !== '') said = 'accordion.' + part;
 					return;
@@ -72,13 +71,16 @@ export default function AccordionAnatomy() @{
 			onKeydown={(event: KeyboardEvent) => {
 				if (event.key === 'ArrowDown') {
 					event.preventDefault();
-					together = true;
+					mode = 'together';
 					picked = '';
 					said = 'The parts snapped together into a working accordion.';
 				} else if (event.key === 'ArrowUp') {
 					event.preventDefault();
-					together = false;
+					mode = 'apart';
 					said = 'The parts came apart.';
+				} else if (event.key === 'Escape') {
+					mode = 'rest';
+					said = 'The parts are back where they started.';
 				} else if (event.key === 'Enter' || event.key === ' ') {
 					event.preventDefault();
 					open = !open;
@@ -111,14 +113,25 @@ export default function AccordionAnatomy() @{
 		</div>
 		<div class="controls">
 			<InkButton
-				pressed={!together}
+				pressed={mode === 'apart'}
 				onClick={() => {
 					picked = '';
-					together = !together;
-					said = together ? 'The parts snapped together into a working accordion.' : 'The accordion came apart into its parts.';
+					mode = mode === 'apart' ? 'rest' : 'apart';
+					said = mode === 'apart' ? 'The accordion came apart into its parts.' : 'The parts settled back.';
 				}}
 			>
 				Take apart
+			</InkButton>
+			<InkButton
+				alt
+				pressed={mode === 'together'}
+				onClick={() => {
+					picked = '';
+					mode = mode === 'together' ? 'rest' : 'together';
+					said = mode === 'together' ? 'The parts snapped together into a working accordion.' : 'The parts lifted apart again.';
+				}}
+			>
+				Put together
 			</InkButton>
 		</div>
 		<figcaption class="sr">
@@ -156,20 +169,29 @@ export default function AccordionAnatomy() @{
 			}
 
 			.plane {
-				transform: translate(60px, 90px);
+				transform: translate(50px, 90px) skewX(-4deg) scale(1, 0.92);
 				transition: transform 560ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
 			}
 
 			.layer {
+				transform: translate(calc(var(--dx) * 0.62), calc(var(--dy) * 0.62));
 				transition: transform 560ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
 			}
 
-			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .plane {
-				transform: translate(40px, 186px) skewX(-6deg) scale(1, 0.9);
+			.accordion-anatomy:is([data-mode='apart'], :not([data-mode='together']):has(.stage:hover)) .plane {
+				transform: translate(40px, 140px) skewX(-6deg) scale(1, 0.9);
 			}
 
-			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer {
+			.accordion-anatomy:is([data-mode='apart'], :not([data-mode='together']):has(.stage:hover)) .layer {
 				transform: translate(var(--dx), var(--dy));
+			}
+
+			.accordion-anatomy[data-mode='together'] .plane {
+				transform: translate(60px, 58px);
+			}
+
+			.accordion-anatomy[data-mode='together'] .layer {
+				transform: none;
 			}
 
 			.tag,
@@ -179,7 +201,7 @@ export default function AccordionAnatomy() @{
 				transition: opacity 250ms ease 150ms;
 			}
 
-			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) :is(.tag, .leader) {
+			.accordion-anatomy:not([data-mode='together']) :is(.tag, .leader) {
 				opacity: 1;
 			}
 
@@ -203,7 +225,7 @@ export default function AccordionAnatomy() @{
 				}
 			}
 
-			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .tint {
+			.accordion-anatomy:not([data-mode='together']) .tint {
 				opacity: 0.38;
 			}
 
@@ -241,6 +263,9 @@ export default function AccordionAnatomy() @{
 			}
 
 			.controls {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.6rem;
 				margin-block-start: 0.4rem;
 			}
 
@@ -270,7 +295,7 @@ export default function AccordionAnatomy() @{
 				transition: opacity 300ms ease;
 			}
 
-			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .guide {
+			.accordion-anatomy:is([data-mode='apart'], :not([data-mode='together']):has(.stage:hover)) .guide {
 				opacity: 0.7;
 			}
 
@@ -357,50 +382,50 @@ export default function AccordionAnatomy() @{
 				transition: opacity 150ms ease;
 			}
 
-			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer:hover .name {
+			.accordion-anatomy:not([data-mode='together']) .layer:hover .name {
 				opacity: 1;
 			}
 
-			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer:hover .tag {
+			.accordion-anatomy:not([data-mode='together']) .layer:hover .tag {
 				opacity: 0;
 			}
-			.accordion-anatomy[data-mode='apart'][data-picked='root'] .layer[data-part='root'] .name {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='root'] .layer[data-part='root'] .name {
 				opacity: 1;
 			}
 
-			.accordion-anatomy[data-mode='apart'][data-picked='root'] .layer[data-part='root'] .tag {
-				opacity: 0;
-			}
-
-			.accordion-anatomy[data-mode='apart'][data-picked='item'] .layer[data-part='item'] .name {
-				opacity: 1;
-			}
-
-			.accordion-anatomy[data-mode='apart'][data-picked='item'] .layer[data-part='item'] .tag {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='root'] .layer[data-part='root'] .tag {
 				opacity: 0;
 			}
 
-			.accordion-anatomy[data-mode='apart'][data-picked='itemlabel'] .layer[data-part='itemlabel'] .name {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='item'] .layer[data-part='item'] .name {
 				opacity: 1;
 			}
 
-			.accordion-anatomy[data-mode='apart'][data-picked='itemlabel'] .layer[data-part='itemlabel'] .tag {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='item'] .layer[data-part='item'] .tag {
 				opacity: 0;
 			}
 
-			.accordion-anatomy[data-mode='apart'][data-picked='itemcontent'] .layer[data-part='itemcontent'] .name {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='itemlabel'] .layer[data-part='itemlabel'] .name {
 				opacity: 1;
 			}
 
-			.accordion-anatomy[data-mode='apart'][data-picked='itemcontent'] .layer[data-part='itemcontent'] .tag {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='itemlabel'] .layer[data-part='itemlabel'] .tag {
 				opacity: 0;
 			}
 
-			.accordion-anatomy[data-mode='apart'][data-picked='itemtrigger'] .layer[data-part='itemtrigger'] .name {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='itemcontent'] .layer[data-part='itemcontent'] .name {
 				opacity: 1;
 			}
 
-			.accordion-anatomy[data-mode='apart'][data-picked='itemtrigger'] .layer[data-part='itemtrigger'] .tag {
+			.accordion-anatomy:not([data-mode='together'])[data-picked='itemcontent'] .layer[data-part='itemcontent'] .tag {
+				opacity: 0;
+			}
+
+			.accordion-anatomy:not([data-mode='together'])[data-picked='itemtrigger'] .layer[data-part='itemtrigger'] .name {
+				opacity: 1;
+			}
+
+			.accordion-anatomy:not([data-mode='together'])[data-picked='itemtrigger'] .layer[data-part='itemtrigger'] .tag {
 				opacity: 0;
 			}
 

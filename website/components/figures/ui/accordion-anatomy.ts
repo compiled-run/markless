@@ -53,7 +53,7 @@ export function drawing() {
 	tint(48, 48, 412, 92, 'itemlabel');
 	s.pen([...roundRect(56, 54, 404, 86, 7), [63, 54]], 0, 'pen ghost-slot');
 	s.text(94, 76, 'Do you ship overseas?', 'ui ghost-text');
-	tag('itemlabel', 64, 412);
+	tag('itemlabel', 84, 412);
 
 	mark('itemcontent');
 	s.paper(48, 102, 412, 172, 8);
@@ -68,7 +68,7 @@ export function drawing() {
 	s.pen([...roundRect(56, 54, 404, 86, 7), [63, 54]], 0, 'pen');
 	s.pen([[68, 66], [75, 73], [82, 66]], 0, 'pen chevron');
 	s.text(94, 76, 'Do you ship overseas?', 'ui');
-	tag('itemtrigger', 74, 404);
+	tag('itemtrigger', 66, 404);
 
 	mark('end');
 	const layers = PARTS.map((part) => {
@@ -95,5 +95,5 @@ export function drawing() {
 		const [dx, dy] = LIFT[part]!;
 		return { part, d: pathOf([[x + px, y + py], [x + dx, y + dy]]) };
 	});
-	return { width: 700, height: 430, layers, guides };
+	return { width: 700, height: 380, layers, guides };
 }

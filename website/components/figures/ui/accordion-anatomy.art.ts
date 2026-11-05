@@ -3,7 +3,7 @@ import type { drawing } from './accordion-anatomy.ts';
 
 export const art: ReturnType<typeof drawing> = {
 	"width": 700,
-	"height": 430,
+	"height": 380,
 	"layers": [
 		{
 			"part": "root",
@@ -191,7 +191,7 @@ export const art: ReturnType<typeof drawing> = {
 				},
 				{
 					"key": 5,
-					"d": "M416 59L419.7 58.8L424.3 58.6L428.1 59.4L432.4 58.7L435.7 58.6L439.8 58.9L444.2 58.9L447.9 58.6L452.1 58.6L452 59",
+					"d": "M416 79L419.7 78.8L424.3 78.6L428.1 79.4L432.4 78.7L435.7 78.6L439.8 78.9L444.2 78.9L447.9 78.6L452.1 78.6L452 79",
 					"length": 38.7,
 					"at": 0,
 					"cls": "pen leader"
@@ -209,7 +209,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 6,
 					"x": 460,
-					"y": 64,
+					"y": 84,
 					"text": "heading",
 					"cls": "tag tag-itemlabel",
 					"style": ""
@@ -217,7 +217,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 7,
 					"x": 460,
-					"y": 64,
+					"y": 84,
 					"text": "accordion.itemlabel",
 					"cls": "name",
 					"style": ""
@@ -332,7 +332,7 @@ export const art: ReturnType<typeof drawing> = {
 				},
 				{
 					"key": 9,
-					"d": "M408 69L412.2 68.9L415.7 69.1L420.4 68.9L423.8 69L427.7 68.8L432.2 69L436.1 69.2L440.3 68.6L443.9 69.4L447.9 69L452.2 69.3L452 69",
+					"d": "M408 61L412.2 60.9L415.7 61.1L420.4 60.9L423.8 61L427.7 60.8L432.2 61L436.1 61.2L440.3 60.6L443.9 61.4L447.9 61L452.2 61.3L452 61",
 					"length": 46.7,
 					"at": 0,
 					"cls": "pen leader"
@@ -350,7 +350,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 13,
 					"x": 460,
-					"y": 74,
+					"y": 66,
 					"text": "trigger",
 					"cls": "tag tag-itemtrigger",
 					"style": ""
@@ -358,7 +358,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 14,
 					"x": 460,
-					"y": 74,
+					"y": 66,
 					"text": "accordion.itemtrigger",
 					"cls": "name",
 					"style": ""
