@@ -249,6 +249,7 @@ export function createResumeRuntime(
 				storeHostSubscription,
 				addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
 				commitArm: commitBoundaryArm,
+				prepareArmCommit: prepareBoundaryArmCommit,
 				registerServedArmRecords: registerServedBranchArmRecords,
 				skipStartupBranchIds: options.skipStartupBranchIds,
 			}),
@@ -273,12 +274,20 @@ export function createResumeRuntime(
 		boundary: ResumeArmRange,
 		update: ArmCommitUpdate,
 	): Promise<void> {
+		await (await prepareBoundaryArmCommit(boundary, update))();
+	}
+	// Loads first, so the returned call commits in the task that runs it.
+	async function prepareBoundaryArmCommit(
+		boundary: ResumeArmRange,
+		update: ArmCommitUpdate,
+	): Promise<() => Promise<void>> {
 		const registration = await armRegistrationDeps(update.armRecords);
 		const { createArmCommitter } = await import('./resume-commit-arm.ts');
-		await createArmCommitter(
+		const commit = createArmCommitter(
 			{ ...registration, renderHtml: input.renderBranchHtml },
 			installArmEventType,
-		)(boundary, update);
+		);
+		return () => commit(boundary, update);
 	}
 	async function armRegistrationDeps(
 		records: ArmCommitUpdate['armRecords'],
@@ -564,6 +573,7 @@ export function createResumeRuntime(
 		getAsyncBoundary: (boundaryId: string) => asyncBoundariesById.get(boundaryId),
 		getBranch: (branchId: string) => branchRuntime?.branchesById.get(branchId),
 		disposeHost: (hostNodeId: string) => disposeHost(hostNodeId, { ignoreFutureEvents: true }),
+		armBranches: () => branchRuntime,
 		dispose,
 	};
 	return runtime;

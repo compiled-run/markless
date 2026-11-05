@@ -438,6 +438,14 @@ export type ResumeRuntime = {
 	readonly getAsyncBoundary: (boundaryId: string) => ResumeAsyncBoundaryRecord | undefined;
 	readonly getBranch: (branchId: string) => ResumeBranchRecord | undefined;
 	readonly disposeHost: (hostNodeId: string) => void;
+	/** What a staged sibling runtime releases when its commit removes them. */
+	readonly hostElements?: ReadonlyMap<string, ResumeDomElement>;
+	readonly armBranches?: () =>
+		| {
+				readonly branchesById: ReadonlyMap<string, ResumeBranchRecord>;
+				readonly armFlipReleasesByBoundary: Map<string, Array<() => void>>;
+		  }
+		| undefined;
 	readonly dispose: () => void;
 	readonly whenAsyncBoundariesSettled?: () => Promise<void>;
 	readonly holdPendingSettleCommits?: (minVisibleMs: number) => Promise<void> | void;

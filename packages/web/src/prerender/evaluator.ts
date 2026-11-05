@@ -502,9 +502,19 @@ function armBranchRange(
 				index: boundary.endAnchor.index - range.startIndex,
 			},
 		}));
-	return nested.length > 0
-		? { ...arm, armRecords: { ...arm.armRecords, asyncBoundaries: nested } }
-		: arm;
+	// Branches the range's markup holds flip inside it, so the commit wires them again.
+	const branches = (set.branches ?? []).filter(
+		(branch) =>
+			branch.id !== branchSiteId && range.html.includes(`<!--markless:arm-branch:${branch.id}-->`),
+	);
+	return {
+		...arm,
+		armRecords: {
+			...arm.armRecords,
+			...(branches.length > 0 && { branches }),
+			...(nested.length > 0 && { asyncBoundaries: nested }),
+		},
+	};
 }
 
 // @try blocks inside a range, re-addressed from its start anchor so the commit can wire them.

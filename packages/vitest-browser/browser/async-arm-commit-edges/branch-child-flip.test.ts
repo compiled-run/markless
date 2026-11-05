@@ -19,6 +19,27 @@ function focusField(): HTMLInputElement | HTMLTextAreaElement {
 	return field;
 }
 
+// Every distinct state the browser could paint: judged when a task ends and before each frame.
+function paintedStates(read: () => string): () => string[] {
+	const seen = [read()];
+	const record = () => seen.at(-1) !== read() && seen.push(read());
+	const channel = new MessageChannel();
+	channel.port1.onmessage = record;
+	const observer = new MutationObserver(() => channel.port2.postMessage(null));
+	observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+	let frame = requestAnimationFrame(function sample() {
+		record();
+		frame = requestAnimationFrame(sample);
+	});
+	return () => {
+		observer.disconnect();
+		cancelAnimationFrame(frame);
+		channel.port1.close();
+		record();
+		return seen;
+	};
+}
+
 function kept(before: ReadonlyArray<Element>, field: HTMLInputElement | HTMLTextAreaElement) {
 	for (const element of before) expect(element.isConnected).toBe(true);
 	expect(document.activeElement).toBe(field);
@@ -33,10 +54,13 @@ async function importedChildMountsInItsOwnRange() {
 	await expect.poll(() => textOf('h3'), LOADS).toBe('account 1');
 	expect(textOf('[data-plain]')).toBe('regular account 1');
 	kept([card, head], field);
+	const painted = paintedStates(() => `${textOf('h3')} | ${textOf('[data-plain]') || textOf('[data-badge-label]')}`);
 	click('[data-again]');
 	await expect.poll(() => textOf('[data-badge-label]'), LOADS).toBe('account 2');
-	await expect.poll(() => textOf('h3'), LOADS).toBe('account 2');
+	expect(textOf('h3')).toBe('account 2');
 	expect(document.querySelector('[data-plain]')).toBe(null);
+	// The heading and the flipped arm land in one task: no paintable state pairs new with old.
+	expect(painted()).toEqual(['account 1 | regular account 1', 'account 2 | account 2']);
 	kept([card, head], field);
 	// The mounted child runs: its own state answers its own handler.
 	click('[data-tap]');

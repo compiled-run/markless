@@ -724,12 +724,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			internals.addSubscription(subscription);
 			// Disposal contract: removed scopes unsubscribe their graph wiring
 			// (spec 01-tsrx-host-contract "branch scope disposal").
+			// The release forgets the subscription, so a list still holding the release keeps nothing it bound alive.
+			let held: RuntimeGraphSubscription | undefined = subscription;
 			return () => {
-				const bucket = subscriptionsByNode.get(subscription.graphNodeId)!;
-				const index = bucket.indexOf(subscription);
-				if (index < 0) return;
-				bucket.splice(index, 1);
-				subscriptionOrder.delete(subscription);
+				if (!held) return;
+				const bucket = subscriptionsByNode.get(held.graphNodeId)!;
+				const index = bucket.indexOf(held);
+				if (index >= 0) bucket.splice(index, 1);
+				subscriptionOrder.delete(held);
+				held = undefined;
 			};
 		},
 		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,

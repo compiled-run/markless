@@ -357,7 +357,7 @@ export function planPrerenderTriggerGroups(input: {
 						const boundary =
 							completeBoundaries.get(servedBoundary.id) ?? servedBoundary;
 						if (
-							!settledArmReadGraphNodeIds(input, boundary).some((graphNodeId) =>
+							!settledArmReadGraphNodeIds(input, completeView, boundary).some((graphNodeId) =>
 								graphNodeIds.has(graphNodeId),
 							)
 						)
@@ -478,15 +478,17 @@ export function planPrerenderTriggerGroups(input: {
 	);
 }
 
-// Graph cells a settled arm reads: the arm's own records plus the props it
-// forwards to child components rendered inside it.
+// Graph cells a settled arm reads: the arm's own records, the page records bound to its
+// hosts, and the props it forwards to child components rendered inside it.
 function settledArmReadGraphNodeIds(
 	input: { readonly componentEdges?: ReadonlyArray<SemanticComponentEdge> },
+	completeView: ProtocolViewPayload,
 	boundary: ProtocolViewPayload['asyncBoundaries'][number],
 ): string[] {
 	const graphNodeIds = new Set<string>();
 	for (const arm of boundaryArmRecordSets(boundary))
 		collectCompleteArmRecordClosure(arm, graphNodeIds, new Set<string>());
+	collectSettledArmHostRecordClosure(completeView, boundary, graphNodeIds, new Set<string>());
 	for (const edge of input.componentEdges ?? [])
 		if (edge.asyncBoundaryId === boundary.id)
 			for (const prop of edge.props)

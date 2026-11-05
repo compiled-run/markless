@@ -1,0 +1,94 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-records"
+			],
+			"delta": 192,
+			"reason": "a branch nested in another branch's arm finds its anchors by name, so the outer flip's commit wires it (7516 -> 7708 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 175,
+			"reason": "a flip that renders its range commits with its pass, so it paints in the task the text beside it lands, and a nested branch rewired by its outer flip keeps its own subscription (15251 -> 15426 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 241,
+			"reason": "an arm commit splits into a load step and a commit the flush runs with its journal, and a staged runtime exposes its arm branches for release (15536 -> 15777 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-records"
+			],
+			"delta": 192,
+			"reason": "a branch nested in another branch's arm finds its anchors by name, so the outer flip's commit wires it (7516 -> 7708 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 175,
+			"reason": "a flip that renders its range commits with its pass, so it paints in the task the text beside it lands, and a nested branch rewired by its outer flip keeps its own subscription (15251 -> 15426 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 241,
+			"reason": "an arm commit splits into a load step and a commit the flush runs with its journal, and a staged runtime exposes its arm branches for release (15536 -> 15777 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 106,
+			"reason": "the arm-commit split, nested-branch anchors by name, the flip-range nested branches and the release-forgetting graph subscription, emitted runtime gzip measured on this Mac against 50c33db6e (25379 -> 25485 B)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 118,
+			"reason": "the arm-commit split, nested-branch anchors by name, the flip-range nested branches and the release-forgetting graph subscription, emitted runtime gzip measured on this Mac against 50c33db6e (24857 -> 24975 B)",
+			"date": "2026-11-05"
+		}
+	]
+}
