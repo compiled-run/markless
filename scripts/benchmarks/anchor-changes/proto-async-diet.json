@@ -48,8 +48,8 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": -55,
-			"reason": "pages without @try no longer download the async runtime: 89,115 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
+			"delta": -49,
+			"reason": "pages without @try no longer download the async runtime: 89,121 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
 			"date": "2026-11-05"
 		},
 		{
@@ -60,8 +60,8 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": -55,
-			"reason": "pages without @try no longer download the async runtime: 89,115 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
+			"delta": -49,
+			"reason": "pages without @try no longer download the async runtime: 89,121 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
 			"date": "2026-11-05"
 		},
 		{
@@ -72,8 +72,8 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": -55,
-			"reason": "pages without @try no longer download the async runtime: 89,115 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
+			"delta": -49,
+			"reason": "pages without @try no longer download the async runtime: 89,121 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
 			"date": "2026-11-05"
 		},
 		{

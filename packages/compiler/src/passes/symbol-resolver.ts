@@ -46,6 +46,7 @@ import {
 	resolveSharedInstanceGraphPath,
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
+import { asyncReach } from './paired-async-values.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 import { forwardedSpreadAttributeUpdates } from './spread-forwarding.ts';
 
@@ -1025,20 +1026,7 @@ function resetOrder(
 	reads: ReadonlyArray<string>,
 	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],
 ): ReadonlyArray<ReadonlyArray<string>> {
-	const byId = new Map(bindings.map((binding) => [binding.id, binding]));
-	const isAsync = (graphNodeId: string) => byId.get(graphNodeId)?.async === true;
-	const asyncInputs = (graphNodeId: string): string[] => {
-		const found = new Set<string>();
-		const seen = new Set<string>();
-		const visit = (id: string): void => {
-			if (seen.has(id)) return;
-			seen.add(id);
-			if (isAsync(id)) found.add(id);
-			else for (const dependency of byId.get(id)?.dependencies ?? []) visit(dependency.graphNodeId);
-		};
-		for (const dependency of byId.get(graphNodeId)?.dependencies ?? []) visit(dependency.graphNodeId);
-		return [...found];
-	};
+	const { isAsync, asyncInputs } = asyncReach(new Map(bindings.map((binding) => [binding.id, binding])));
 	const order: string[][] = [];
 	const placed = new Set<string>();
 	const place = (graphNodeId: string): void => {

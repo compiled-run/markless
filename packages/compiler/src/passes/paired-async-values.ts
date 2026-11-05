@@ -3,19 +3,9 @@ type ComputedNode = {
 	readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
 };
 
-/**
- * The async computeds some reader pairs with an input of their key: a reader that reads the
- * value beside one of those inputs, or beside another async value fetched with one of them.
- * Readers are computeds (async ones too), handlers and component edges, each a list of the
- * nodes it reads. Each paired value keeps its upstream async values, whose inputs it was
- * fetched with; only a page that serves one loads matched values.
- */
-export function pairedAsyncValues(
-	computed: ReadonlyMap<string, ComputedNode>,
-	readers: Iterable<ReadonlyArray<string>>,
-): ReadonlySet<string> {
+/** What reads reach through sync computeds: the async values they stop at, and every other node. */
+export function asyncReach(computed: ReadonlyMap<string, ComputedNode>) {
 	const isAsync = (graphNodeId: string) => computed.get(graphNodeId)?.async === true;
-	// What a set of reads reaches through sync computeds: the async values, and every other node.
 	const reach = (graphNodeIds: Iterable<string>) => {
 		const asyncValues = new Set<string>();
 		const plain = new Set<string>();
@@ -31,6 +21,23 @@ export function pairedAsyncValues(
 	};
 	const dependencyIds = (graphNodeId: string) =>
 		(computed.get(graphNodeId)?.dependencies ?? []).map((dependency) => dependency.graphNodeId);
+	// The nearest async values a node derives from.
+	const asyncInputs = (graphNodeId: string) => [...reach(dependencyIds(graphNodeId)).asyncValues];
+	return { isAsync, reach, dependencyIds, asyncInputs };
+}
+
+/**
+ * The async computeds some reader pairs with an input of their key: a reader that reads the
+ * value beside one of those inputs, or beside another async value fetched with one of them.
+ * Readers are computeds (async ones too), handlers and component edges, each a list of the
+ * nodes it reads. Each paired value keeps its upstream async values, whose inputs it was
+ * fetched with; only a page that serves one loads matched values.
+ */
+export function pairedAsyncValues(
+	computed: ReadonlyMap<string, ComputedNode>,
+	readers: Iterable<ReadonlyArray<string>>,
+): ReadonlySet<string> {
+	const { reach, dependencyIds } = asyncReach(computed);
 	const keyInputs = new Map<string, ReadonlySet<string>>();
 	const keyInputsOf = (graphNodeId: string): ReadonlySet<string> => {
 		let inputs = keyInputs.get(graphNodeId);

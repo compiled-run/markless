@@ -1,7 +1,7 @@
 import { createProtocolStatePayload, protocolInstanceQualifies } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
-import { componentEdgeReads, pairedAsyncValues } from './paired-async-values.ts';
+import { asyncReach, componentEdgeReads, pairedAsyncValues } from './paired-async-values.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { componentPropReads } from './symbol-modules.ts';
 import { planSymbolResolver } from './symbol-resolver.ts';
@@ -194,24 +194,10 @@ function deriveOnReadGraphNodeIds(
 function asyncAncestors(
 	computed: ProtocolStatePayloadInput['payloadArena']['state']['computed'],
 ): ReadonlyMap<string, ReadonlyArray<string>> {
-	const records = new Map(computed.map((node) => [node.graphNodeId, node]));
-	const ancestors = new Map<string, ReadonlyArray<string>>();
-	const of = (graphNodeId: string, seen: Set<string>): ReadonlyArray<string> => {
-		const known = ancestors.get(graphNodeId);
-		if (known) return known;
-		const found = new Set<string>();
-		for (const { graphNodeId: id } of records.get(graphNodeId)?.dependencies ?? []) {
-			if (seen.has(id)) continue;
-			seen.add(id);
-			const record = records.get(id);
-			if (record?.async) found.add(id);
-			else if (record) for (const ancestor of of(id, seen)) found.add(ancestor);
-		}
-		return [...found];
-	};
-	for (const node of computed)
-		if (!node.async) ancestors.set(node.graphNodeId, of(node.graphNodeId, new Set()));
-	return ancestors;
+	const { asyncInputs } = asyncReach(new Map(computed.map((node) => [node.graphNodeId, node])));
+	return new Map(
+		computed.flatMap((node) => (node.async ? [] : [[node.graphNodeId, asyncInputs(node.graphNodeId)]])),
+	);
 }
 
 function heldAsyncGraphNodeIds(
