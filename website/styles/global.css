@@ -602,6 +602,27 @@ markless-outline { display: contents; }
 	font-family: var(--font-mono);
 }
 
+/* Commands and terminal output read like prose: they wrap at the column edge, and each
+   wrapped line hangs under the start of its own line, so the text is never cut or scrolled. */
+.prose pre:is([data-lang='bash'], [data-lang='sh'], [data-lang='shell'], [data-lang='zsh'], [data-lang='console']):where(:not(.code-stage *)),
+.prose pre:has(> code:is(.language-text, .language-txt, .language-output, .language-console, .language-bash, .language-sh, .language-shell)):where(:not(.code-stage *)) {
+	overflow-x: visible;
+	white-space: pre-wrap;
+}
+
+.prose pre:is([data-lang='bash'], [data-lang='sh'], [data-lang='shell'], [data-lang='zsh'], [data-lang='console']) code:where(:not(.code-stage *)),
+.prose pre > code:is(.language-text, .language-txt, .language-output, .language-console, .language-bash, .language-sh, .language-shell):where(:not(.code-stage *)) {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	text-indent: 2ch hanging each-line;
+}
+
+/* Code keeps its columns, so a long line scrolls; the bar is a thin ink line and only shows when there is overflow. */
+.prose pre:where(:not(.code-stage *)) {
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in oklch, var(--ink) 55%, transparent) transparent;
+}
+
 .prose pre .tsrx-tip,
 .prose pre .tsrx-tip span {
 	font-family: var(--tip-font);
@@ -1331,31 +1352,30 @@ html.dark .prose .torn-strip {
 	overflow-x: auto;
 	margin-block: var(--space-m);
 	border-collapse: collapse;
-	font-size: var(--step--1);
 }
 
 .prose th:where(:not(.code-stage *)),
 .prose td:where(:not(.code-stage *)) {
-	padding: 0.4em 0.7em;
-	border-bottom: 1px solid var(--code-edge);
+	padding: 0.7em 1em 0.7em 0;
+	border-bottom: 1px solid color-mix(in oklch, var(--ink) 30%, transparent);
 	text-align: left;
 	vertical-align: top;
 }
 
 .prose th:where(:not(.code-stage *)) {
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	font-size: var(--step--2);
-	opacity: 0.75;
+	padding-block: 0.4em 0.55em;
+	border-bottom: 2px solid var(--ink);
+	font-weight: 700;
 }
 
-.prose td:first-child:where(:not(.code-stage *)) {
+.prose td:first-child:where(:not(.code-stage *)),
+.prose th:first-child:where(:not(.code-stage *)) {
 	white-space: nowrap;
 }
 
-/* body's 160% is inherited as pixels, which would double-space the smaller table text. */
+/* body's 160% is inherited as pixels, which would double-space the table text. */
 .prose table:where(:not(.code-stage *)) {
-	line-height: 1.45;
+	line-height: 1.5;
 }
 
 .prose td:where(:not(.code-stage *)) code {
@@ -1400,9 +1420,7 @@ html.dark .prose .torn-strip {
 	.prose table[data-stack] td:not(:first-child)::before {
 		content: attr(data-label) ': ';
 		color: color-mix(in srgb, var(--ink) 60%, var(--paper));
-		font-size: var(--step--2);
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		font-weight: 600;
 	}
 	.prose table[data-stack] tr:has(> td:nth-child(2):last-child) > td::before {
 		content: none;

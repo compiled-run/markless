@@ -18,6 +18,7 @@ import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
 import { rowChildHandlerName } from './handler-props.ts';
 import type { SemanticKeyedRepeat } from '../../artifacts.ts';
 import type { WalkState } from './types.ts';
+import { aliasedItemPath } from './repeat-item-binding.ts';
 
 // Row handlers take their item from the repeat's graph node, so an off-graph collection
 // they sit under is lifted into a synthetic computed when the browser can recompute it.
@@ -44,7 +45,9 @@ export function enclosingRowItemPath(
 	enclosing: SemanticKeyedRepeat,
 ): ReadonlyArray<string> | null {
 	const [root, ...path] = splitStaticGraphPath(collectionSource);
-	return root === enclosing.itemName && path.length > 0 ? path : null;
+	if (root === enclosing.itemName && path.length > 0) return path;
+	const aliased = aliasedItemPath(enclosing.itemAliases, collectionSource);
+	return aliased?.length ? aliased : null;
 }
 
 // Each enclosing row wires its own instance of a nested repeat, found through the enclosing

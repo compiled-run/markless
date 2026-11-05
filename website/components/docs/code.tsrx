@@ -127,7 +127,7 @@ export default function Code({
 			</div>
 		</header>
 		<CodeTabs panes={panes}>
-			<resizable.root class="body" defaultSizes={{ [codePane]: 64, [resultPane]: 36 }}>
+			<resizable.root class="body" defaultSizes={{ [codePane]: 70, [resultPane]: 30 }}>
 				<resizable.item class="source" value={codePane}>
 					<CodeFiles panes={panes} />
 				</resizable.item>
@@ -222,6 +222,15 @@ export default function Code({
 					--code-selection: color-mix(in oklch, var(--yellow) 28%, transparent);
 					--code-problem: oklch(76% 0.14 15);
 					--code-problem-wash: color-mix(in oklch, var(--pink) 13%, transparent);
+				}
+			}
+
+			@media (min-width: 96.01rem) {
+				.code-block {
+					--code-wide: min(1100px, 100vw - 2 * (17rem + var(--space-s-l)));
+					--code-font-size: clamp(0.9rem, 1.8cqi, 1.2rem);
+					width: max(calc(100% + var(--code-bleed)), var(--code-wide));
+					margin-inline-start: calc(50% - max(calc(100% + var(--code-bleed)), var(--code-wide)) / 2);
 				}
 			}
 
@@ -355,7 +364,7 @@ export default function Code({
 				display: flex;
 				flex-direction: column;
 				gap: var(--space-xs);
-				min-width: 0;
+				min-width: min-content;
 				padding: 0.9rem 0 0.9rem 1.1rem;
 				overflow: clip;
 				overflow-clip-margin: 0.4rem;

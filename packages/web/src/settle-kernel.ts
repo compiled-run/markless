@@ -360,8 +360,16 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 				throw new SettleKernelUnsupportedError(
 					`repeat collection missing: ${slot.repeatId}`,
 				);
-			const items = readAuthored(record.collectionGraphNodeId, record.collectionPath ?? []);
-			if (!Array.isArray(items) || items.length === 0)
+			const collection = readAuthored(
+				record.collectionGraphNodeId,
+				record.collectionPath ?? [],
+			);
+			const items = Array.isArray(collection)
+				? collection
+				: typeof (collection as Iterable<unknown> | null)?.[Symbol.iterator] === 'function'
+					? [...(collection as Iterable<unknown>)]
+					: [];
+			if (items.length === 0)
 				return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, undefined) : '';
 			return items.map((value) => renderChunk(slot.rowTemplateId, { value })).join('');
 		}

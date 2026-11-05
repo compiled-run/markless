@@ -46,11 +46,6 @@ export function firstReactiveRowRead(
 	return scan.found;
 }
 
-/** The names a row owns: the item and the index this `@for` declares. */
-export function repeatRowNames(itemName: string, indexName: string | null): ReadonlySet<string> {
-	return new Set(indexName ? [itemName, indexName] : [itemName]);
-}
-
 type Scan = {
 	readonly state: WalkState;
 	readonly bindings: ReturnType<typeof graphBindingMap>;
