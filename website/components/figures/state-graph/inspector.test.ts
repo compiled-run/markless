@@ -17,7 +17,7 @@ describe('the state-graph figure', () => {
 	});
 
 	it('has one margin note, a live region, a tour that stops on touch, and no wires', () => {
-		expect(piece.match(/class="note"/g)).toHaveLength(1);
+		expect(piece).toContain('updatesFor');
 		expect(piece).toContain('aria-live="polite"');
 		expect(piece).toContain('if (!seen || touched) return;');
 		expect(piece).not.toMatch(/bags|counter/i);
@@ -26,9 +26,10 @@ describe('the state-graph figure', () => {
 		expect(piece).not.toMatch(/\b(cord|crocodile|wire)s?\b/i);
 	});
 
-	it('answers the pointer: every object lifts on hover', () => {
+	it('answers the pointer: hover names what each piece reads', () => {
 		expect(piece).toContain('onPointerover');
-		expect(piece).toContain("data-hover=");
+		expect(piece).toContain('describeDrop');
+		expect(piece).toContain('hover = key');
 	});
 
 	it('is on the State graph page', () => {

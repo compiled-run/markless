@@ -1,46 +1,78 @@
-// A playlist page beside a graph inspector showing the real graph the compiler records for it: press a button and watch the change run along its edges.
+// Build a music page by dragging pieces onto it, and watch the state graph grow: a piece that reads `playing` inks a node and an edge; the heading reads nothing and draws none.
 import { computed, state } from '@markless/core';
-import { describePick, FIRST, heading, NEXT, NODE_NOTE, type NodeKey, SHUFFLE_SAID, START_SAID } from './model.ts';
+import { describeDrop, describePick, FIRST, PIECES, type PieceKey, SONGS, START_SAID, updatesFor } from './model.ts';
 import { art } from './inspector.art.ts';
 
 export default function GraphAnatomy() @{
 	let playing = state<string>(FIRST);
-	let shuffle = state(false);
-	let lit = state<string[]>([]);
+	let onLabel = state(false);
+	let onCover = state(false);
+	let onHeading = state(false);
 	let beat = state('rest');
 	let said = state(START_SAID);
 	let hover = state('');
 	let touched = state(false);
-	const text = computed(() => heading(playing));
-	const caption = computed(() => {
-		if (hover === 'title') return 'Road trip: plain HTML, so it is not in the graph';
-		if (hover === 'next') return 'Slow Train writes playing';
-		if (hover === 'shuffleButton') return 'Shuffle writes shuffle';
-		if (hover === 'pSpot') return 'this line is the one reader';
-		if (hover === 'playing' || hover === 'heading' || hover === 'p' || hover === 'shuffle') return NODE_NOTE[hover as NodeKey];
-		return 'Hover anything, then press Slow Train or Shuffle.';
-	});
-	const flash = () => (beat = beat === 'odd' ? 'even' : 'odd');
-	const pick = (song: string) => {
-		const before = playing;
-		playing = song;
-		lit = before === song ? [] : ['playing', 'e1', 'heading', 'e2', 'p', 'pSpot'];
-		said = describePick(before, song);
-		flash();
+	let held = state('');
+	let dragX = state(0);
+	let dragY = state(0);
+	let fromX = state(0);
+	let fromY = state(0);
+	let ratio = state(1);
+	let dropped = state(0);
+	const placed = computed(() => ({ label: onLabel, cover: onCover, heading: onHeading }));
+	const updates = computed(() => updatesFor(placed));
+	const place = (key: PieceKey, on: boolean, dx: number, dy: number) => {
+		const piece = art.pieces[key];
+		const x = (on ? piece.shift[0] : 0) + (held === key ? dx : 0);
+		const y = (on ? piece.shift[1] : 0) + (held === key ? dy : 0);
+		return 'transform:translate(' + x + 'px,' + y + 'px)';
 	};
-	const toggleShuffle = () => {
-		shuffle = !shuffle;
-		lit = ['shuffle'];
-		said = SHUFFLE_SAID;
-		flash();
+	const labelStyle = computed(() => place('label', onLabel, dragX, dragY));
+	const coverStyle = computed(() => place('cover', onCover, dragX, dragY));
+	const headingStyle = computed(() => place('heading', onHeading, dragX, dragY));
+	const caption = computed(() => {
+		if (hover.startsWith('piece:')) {
+			const piece = PIECES[hover.slice(6) as PieceKey];
+			return piece.name + (piece.reads ? ': reads playing' : ': reads nothing');
+		}
+		if (hover.startsWith('row:')) return 'press to play ' + hover.slice(4);
+		if (hover === 'node:list') return 'the song list: its marked row reads playing';
+		if (hover === 'node:label') return onLabel ? 'the Now playing label: one text update' : 'not on the page yet';
+		if (hover === 'node:cover') return onCover ? 'the album cover: src and alt, two updates' : 'not on the page yet';
+		if (hover === 'node:source') return 'state:playing, one value';
+		return 'Drag a piece onto the page, then pick a song.';
+	});
+	const set = (key: PieceKey, on: boolean) => {
+		if (key === 'label') onLabel = on;
+		if (key === 'cover') onCover = on;
+		if (key === 'heading') onHeading = on;
+		said = describeDrop(key, on, updatesFor({ ...placed, [key]: on }));
+	};
+	const pick = (song: string) => {
+		said = describePick(song, playing, updates);
+		if (song !== playing) beat = beat === 'odd' ? 'even' : 'odd';
+		playing = song;
 	};
 	const reset = () => {
 		playing = FIRST;
-		shuffle = false;
-		lit = [];
+		onLabel = false;
+		onCover = false;
+		onHeading = false;
 		said = START_SAID;
 	};
 	const keyOf = (target: EventTarget | null) => (target as Element | null)?.closest?.('[data-key]')?.getAttribute('data-key') ?? '';
+	const grab = (event: PointerEvent) => {
+		const key = keyOf(event.target);
+		if (!key.startsWith('piece:')) return;
+		touched = true;
+		held = key.slice(6);
+		fromX = event.clientX;
+		fromY = event.clientY;
+		dragX = 0;
+		dragY = 0;
+		const box = (event.target as Element | null)?.closest?.('svg')?.getBoundingClientRect();
+		ratio = box && box.width > 0 ? art.width / box.width : 1;
+	};
 
 	<figure
 		class="anatomy"
@@ -54,7 +86,7 @@ export default function GraphAnatomy() @{
 			watcher.observe(host);
 			const timer = setInterval(() => {
 				if (!seen || touched) return;
-				hover = hover === 'next' ? '' : 'next';
+				hover = hover === 'piece:label' ? '' : 'piece:label';
 			}, 1800);
 			return () => {
 				clearInterval(timer);
@@ -65,24 +97,33 @@ export default function GraphAnatomy() @{
 		<button
 			type="button"
 			class="stage"
-			aria-label="A playlist and its state graph. Press Slow Train or Shuffle on the page, or a node in the graph. Enter presses Slow Train, S presses Shuffle, Escape starts again."
+			aria-label="Build a music page and watch its state graph. Drag a piece onto the page or off it, or press it. Press a song to play it. Keys 1, 2 and 3 move the label, the cover and the heading; arrow keys change the song; Escape starts again."
 			onClick={(event) => {
+				if (Date.now() - dropped < 400) return;
 				touched = true;
 				const key = keyOf(event.target);
-				if (key === 'shuffleButton' || key === 'shuffle') toggleShuffle();
-				else if (key === 'playing') pick(playing === NEXT ? FIRST : NEXT);
-				else if (key === 'heading' || key === 'p' || key === 'pSpot') said = NODE_NOTE[key === 'pSpot' ? 'p' : key];
-				else if (key === 'title') said = 'Road trip is plain HTML. It is not in the graph, so nothing ever redraws it.';
-				else pick(NEXT);
+				if (key.startsWith('piece:')) {
+					const piece = key.slice(6) as PieceKey;
+					set(piece, !placed[piece]);
+				} else if (key.startsWith('row:')) pick(key.slice(4));
+				else pick(SONGS[(SONGS.indexOf(playing as (typeof SONGS)[number]) + 1) % SONGS.length]!);
 			}}
 			onKeyDown={(event) => {
 				touched = true;
-				if (event.key === 's' || event.key === 'S') toggleShuffle();
+				if (event.key === '1') set('label', !onLabel);
+				if (event.key === '2') set('cover', !onCover);
+				if (event.key === '3') set('heading', !onHeading);
+				if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+					event.preventDefault();
+					const at = SONGS.indexOf(playing as (typeof SONGS)[number]);
+					pick(SONGS[(at + (event.key === 'ArrowDown' ? 1 : 2)) % SONGS.length]!);
+				}
 				if (event.key === 'Escape') reset();
 			}}
 		>
 			<svg
 				class="scene"
+				data-beat={beat}
 				viewBox={'0 0 ' + art.width + ' ' + art.height}
 				aria-hidden="true"
 				onPointerover={(event) => {
@@ -90,7 +131,36 @@ export default function GraphAnatomy() @{
 					const key = keyOf(event.target);
 					if (key) hover = key;
 				}}
+				onPointerdown={(event) => {
+					const key = keyOf(event.target);
+					if (key) hover = key;
+					grab(event);
+				}}
+				onPointermove={(event) => {
+					if (!held) return;
+					dragX = (event.clientX - fromX) * ratio;
+					dragY = (event.clientY - fromY) * ratio;
+				}}
+				onPointerup={() => {
+					if (!held) return;
+					const key = held as PieceKey;
+					if (Math.hypot(dragX, dragY) > 6) {
+						const piece = art.pieces[key];
+						const on = placed[key];
+						const x = piece.text.x - 10 + (on ? piece.shift[0] : 0) + dragX;
+						const y = piece.text.y - 17 + (on ? piece.shift[1] : 0) + dragY;
+						const [px, py, pw, ph] = art.page;
+						const inside = x > px - 20 && x < px + pw - 20 && y > py && y < py + ph - 20;
+						if (inside !== on) set(key, inside);
+						else said = on ? 'Still on the page.' : 'Drop it on the page to add it.';
+						dropped = Date.now();
+					}
+					held = '';
+					dragX = 0;
+					dragY = 0;
+				}}
 				onPointerleave={(event) => {
+					held = '';
 					if (event.pointerType !== 'touch') hover = '';
 				}}
 			>
@@ -100,65 +170,86 @@ export default function GraphAnatomy() @{
 				@for (const words of art.words; key words.key) {
 					<text class={words.cls} transform={words.matrix}>{words.text}</text>
 				}
-				<g class="spot-on" data-on={lit.includes('pSpot') || hover === 'p' || hover === 'heading' || hover === 'playing' || hover === 'pSpot' ? 'yes' : 'no'}>
-					<path class="wash yellow" d={art.pSpot.wash} />
-				</g>
-				<g class="spot-on" data-on={hover === 'shuffle' || hover === 'shuffleButton' ? 'yes' : 'no'}>
-					<path class="wash yellow" d={art.shuffleSpot.wash} />
-				</g>
-				<g class="spot-on" data-on={hover === 'next' || hover === 'playing' ? 'yes' : 'no'}>
-					<path class="wash yellow" d={art.nextSpot.wash} />
-				</g>
-				<text class="print" x={art.pText.x} y={art.pText.y}>{text}</text>
-				<path class="hit" data-key="title" d={art.hits.title} />
-				<path class="hit" data-key="pSpot" d={art.hits.p} />
-				<path class="hit" data-key="next" d={art.hits.next} />
-				<path class="hit" data-key="shuffleButton" d={art.hits.shuffle} />
-				<path class="edge" data-lit={lit.includes('e1') ? 'yes' : 'no'} data-beat={beat} d={art.edges[0]!.d} />
-				<path class="edge e2" data-lit={lit.includes('e2') ? 'yes' : 'no'} data-beat={beat} d={art.edges[1]!.d} />
-				<g class="node" data-key="playing" data-lit={lit.includes('playing') ? 'yes' : 'no'} data-hover={hover === 'playing' ? 'yes' : 'no'} data-beat={beat}>
-					<path class="paper" d={art.nodes[0]!.poly} />
-					<g class="glow">
-						<path class="wash yellow" d={art.nodes[0]!.spot.wash} />
+				@for (const row of art.rows; key row.key) {
+					<g class="row" data-key={'row:' + row.key} data-on={playing === row.key ? 'yes' : 'no'}>
+						<path class="hit" d={row.hit} />
+						<path class="wash yellow dot" d={row.dot} />
+						<path class="ink" d={row.dotInk} />
 					</g>
-					<path class="ink" d={art.nodes[0]!.ink} />
-					<text class="code" x={art.nodes[0]!.x} y={art.nodes[0]!.y}>playing</text>
+				}
+				<g class="piece" data-key="piece:heading" data-on={onHeading ? 'yes' : 'no'} data-held={held === 'heading' ? 'yes' : 'no'} style={headingStyle}>
+					<path class="hit" d={art.pieces.heading.hit} />
+					@for (const words of art.pieces.heading.words; key words.key) {
+						<text class={words.cls} transform={words.matrix}>{words.text}</text>
+					}
 				</g>
-				<g class="node" data-key="heading" data-lit={lit.includes('heading') ? 'yes' : 'no'} data-hover={hover === 'heading' ? 'yes' : 'no'} data-beat={beat}>
-					<path class="paper" d={art.nodes[1]!.poly} />
-					<g class="glow">
-						<path class="wash yellow" d={art.nodes[1]!.spot.wash} />
+				<g class="piece" data-key="piece:cover" data-on={onCover ? 'yes' : 'no'} data-held={held === 'cover' ? 'yes' : 'no'} data-beat={beat} style={coverStyle}>
+					@for (const layer of art.pieces.cover.layers; key layer.key) {
+						<path class={layer.cls} d={layer.d} />
+					}
+					<g class="pic" data-on={playing === art.pictures[0]!.key ? 'yes' : 'no'}>
+						@for (const layer of art.pictures[0]!.art.layers; key layer.key) {
+							<path class={layer.cls} d={layer.d} />
+						}
 					</g>
-					<path class="ink" d={art.nodes[1]!.ink} />
-					<text class="code" x={art.nodes[1]!.x} y={art.nodes[1]!.y}>heading</text>
-				</g>
-				<g class="node" data-key="p" data-lit={lit.includes('p') ? 'yes' : 'no'} data-hover={hover === 'p' ? 'yes' : 'no'} data-beat={beat}>
-					<path class="paper" d={art.nodes[2]!.poly} />
-					<g class="glow">
-						<path class="wash yellow" d={art.nodes[2]!.spot.wash} />
+					<g class="pic" data-on={playing === art.pictures[1]!.key ? 'yes' : 'no'}>
+						@for (const layer of art.pictures[1]!.art.layers; key layer.key) {
+							<path class={layer.cls} d={layer.d} />
+						}
 					</g>
-					<path class="ink" d={art.nodes[2]!.ink} />
-					<text class="code" x={art.nodes[2]!.x} y={art.nodes[2]!.y}>{'<p>'}</text>
-				</g>
-				<g class="node" data-key="shuffle" data-lit={lit.includes('shuffle') ? 'yes' : 'no'} data-hover={hover === 'shuffle' ? 'yes' : 'no'} data-beat={beat}>
-					<path class="paper" d={art.nodes[3]!.poly} />
-					<g class="glow">
-						<path class="wash yellow" d={art.nodes[3]!.spot.wash} />
+					<g class="pic" data-on={playing === art.pictures[2]!.key ? 'yes' : 'no'}>
+						@for (const layer of art.pictures[2]!.art.layers; key layer.key) {
+							<path class={layer.cls} d={layer.d} />
+						}
 					</g>
-					<path class="ink" d={art.nodes[3]!.ink} />
-					<text class="code" x={art.nodes[3]!.x} y={art.nodes[3]!.y}>shuffle</text>
+					<path class="hit" d={art.pieces.cover.hit} />
 				</g>
-				<path class="desk-ink" d={art.note.arrow} />
-				<text class="note" x={art.note.x} y={art.note.y}>WRITTEN AT COMPILE TIME</text>
+				<g class="piece" data-key="piece:label" data-on={onLabel ? 'yes' : 'no'} data-held={held === 'label' ? 'yes' : 'no'} style={labelStyle}>
+					@for (const layer of art.pieces.label.layers; key layer.key) {
+						<path class={layer.cls} d={layer.d} />
+					}
+					<text class="print small-print" x={art.pieces.label.text.x} y={art.pieces.label.text.y}>Now playing: {playing}</text>
+					<path class="hit" d={art.pieces.label.hit} />
+				</g>
+				<g class="node" data-key="node:source" data-beat={beat}>
+					<path class="paper" d={art.source.poly} />
+					<path class="wash yellow glow" d={art.source.wash} />
+					<path class="ink" d={art.source.ink} />
+					<text class="code" x={art.source.x} y={art.source.y}>playing</text>
+				</g>
+				<g class="reader" data-key="node:list" data-on="yes" data-beat={beat}>
+					<path class="edge" d={art.readers.list.edge.d} style={'--len:' + art.readers.list.edge.length} />
+					<path class="paper" d={art.readers.list.node.poly} />
+					<path class="wash yellow glow" d={art.readers.list.node.wash} />
+					<path class="ink" d={art.readers.list.node.ink} />
+					<text class="code" x={art.readers.list.node.x} y={art.readers.list.node.y}>{'<button> class'}</text>
+				</g>
+				<g class="reader" data-key="node:label" data-on={onLabel ? 'yes' : 'no'} data-beat={beat}>
+					<path class="edge" d={art.readers.label.edge.d} style={'--len:' + art.readers.label.edge.length} />
+					<path class="paper" d={art.readers.label.node.poly} />
+					<path class="wash yellow glow" d={art.readers.label.node.wash} />
+					<path class="ink" d={art.readers.label.node.ink} />
+					<text class="code" x={art.readers.label.node.x} y={art.readers.label.node.y}>{'<p> text'}</text>
+				</g>
+				<g class="reader" data-key="node:cover" data-on={onCover ? 'yes' : 'no'} data-beat={beat}>
+					<path class="edge" d={art.readers.cover.edge.d} style={'--len:' + art.readers.cover.edge.length} />
+					<path class="paper" d={art.readers.cover.node.poly} />
+					<path class="wash yellow glow" d={art.readers.cover.node.wash} />
+					<path class="ink" d={art.readers.cover.node.ink} />
+					<text class="code" x={art.readers.cover.node.x} y={art.readers.cover.node.y}>{'<img> src, alt'}</text>
+				</g>
+				<text class="pencil-text heading-note" data-on={onHeading ? 'yes' : 'no'} x={art.headingNote.x} y={art.headingNote.y}>My playlist: plain HTML, no node</text>
+				<text class="print tally" x={art.tally.x} y={art.tally.y}>a song pick = {updates} update{updates === 1 ? '' : 's'}</text>
 			</svg>
 		</button>
 		<p class="hover-caption" aria-hidden="true">{caption}</p>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a playlist page called Road trip, with a line that says Now playing, a Slow Train button and a Shuffle
-			button, beside a graph inspector. The graph has four nodes: playing, heading, the paragraph, and shuffle. An edge runs from playing
-			to heading and from heading to the paragraph; shuffle has no edges. Press Slow Train, or Enter: the change runs along those two
-			edges, node by node, and only the Now playing line changes. Press it again and nothing happens, because the value is the same.
-			Press Shuffle, or S: shuffle changes, nothing reads it, and the page stays as it is. Escape starts again.
+			A pen-and-ink drawing of a music page that starts with only a song list, a tray of pieces below it, and a state graph beside it.
+			The graph starts with one node, playing, and one edge to the song list. Drag the Now playing label or the album cover onto the page,
+			or press it, or press 1 or 2: it reads playing, so a node and an edge ink themselves into the graph. Drag the My playlist heading
+			on, or press 3: it reads nothing, so no edge appears. Pick a song by pressing it, or with the arrow keys: only the edges to pieces
+			on the page pulse, and only those pieces change. Drag a piece back to the tray and its edge is erased; the tally shows one write now
+			makes fewer updates. Escape starts again.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -408,61 +499,122 @@ export default function GraphAnatomy() @{
 				opacity: 0.8;
 			}
 
-			.node {
-				cursor: pointer;
+			.piece {
+				cursor: grab;
+				transition: transform 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}
 
-			.node[data-hover='yes'] .glow {
-				opacity: 0.8;
+			.piece[data-held='yes'] {
+				cursor: grabbing;
+				transition: none;
 			}
 
-			.node[data-lit='yes'] .glow {
+			.pic {
+				opacity: 0;
+			}
+
+			.pic[data-on='yes'] {
 				opacity: 1;
 			}
 
-			.node[data-key='shuffle'] .code {
-				opacity: 0.55;
+			.row {
+				cursor: pointer;
+			}
+
+			.dot {
+				opacity: 0;
+			}
+
+			.row[data-on='yes'] .dot {
+				opacity: 1;
+			}
+
+			.scene .small-print {
+				font-size: 12px;
+			}
+
+			.reader {
+				transition: opacity 300ms ease;
+			}
+
+			.reader[data-on='no'] {
+				opacity: 0;
+				pointer-events: none;
 			}
 
 			.edge {
 				fill: var(--sheet-ink);
-				transition: fill 200ms ease;
+				stroke: none;
 			}
 
-			.edge[data-lit='yes'] {
-				fill: color-mix(in srgb, var(--pink) 70%, #c0403c);
+			.reader[data-on='yes'] .edge {
+				animation: ink-in 600ms ease both;
 			}
 
-			.node[data-lit='yes'][data-beat='odd'],
-			.edge[data-lit='yes'][data-beat='odd'] {
-				animation: pop-a 500ms ease both;
+			.reader[data-on='yes'][data-beat='odd'] .glow,
+			.node[data-beat='odd'] .glow {
+				animation: pulse-a 900ms ease;
 			}
 
-			.node[data-lit='yes'][data-beat='even'],
-			.edge[data-lit='yes'][data-beat='even'] {
-				animation: pop-b 500ms ease both;
+			.reader[data-on='yes'][data-beat='even'] .glow,
+			.node[data-beat='even'] .glow {
+				animation: pulse-b 900ms ease;
 			}
 
-			.node[data-key='heading'],
-			.edge {
-				animation-delay: 150ms !important;
+			.reader[data-on='yes'][data-beat='odd'] .edge {
+				animation: edge-a 900ms ease;
 			}
 
-			.e2,
-			.node[data-key='p'] {
-				animation-delay: 300ms !important;
+			.reader[data-on='yes'][data-beat='even'] .edge {
+				animation: edge-b 900ms ease;
 			}
 
-			@keyframes pop-a {
+			.glow {
+				opacity: 0;
+			}
+
+			@keyframes ink-in {
 				from {
-					opacity: 0.3;
+					opacity: 0;
 				}
 			}
 
-			@keyframes pop-b {
-				from {
-					opacity: 0.3;
+			@keyframes pulse-a {
+				30% {
+					opacity: 1;
 				}
+			}
+
+			@keyframes pulse-b {
+				30% {
+					opacity: 1;
+				}
+			}
+
+			@keyframes edge-a {
+				30% {
+					fill: color-mix(in srgb, var(--pink) 70%, #c0403c);
+				}
+			}
+
+			@keyframes edge-b {
+				30% {
+					fill: color-mix(in srgb, var(--pink) 70%, #c0403c);
+				}
+			}
+
+			.heading-note {
+				opacity: 0;
+				transition: opacity 300ms ease;
+			}
+
+			.heading-note[data-on='yes'] {
+				opacity: 1;
+			}
+
+			.scene .tally {
+				font-size: 14px;
+				font-weight: 800;
 			}
 		</style>
 	</figure>

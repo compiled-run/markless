@@ -13,56 +13,44 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <Subtitle text="The state graph is a list, written at compile time, of which values each spot on the page reads." terms="state values" />
 
-```tsrx title="playlist.tsrx"
-import { computed, state } from '@markless/core';
+```tsrx title="player.tsrx"
+import { state } from '@markless/core';
 
-export default function Playlist() @{
+export default function Player() @{
 	let playing = state('Harbour Lights');
-	const heading = computed(
-		() => 'Now playing: ' + playing,
-	);
 
-	<p>{heading}</p>
+	<p>Now playing: {playing}</p>
 }
 ```
 
-**`playing`** is a value the page watches. **`heading`** is worked out from it. **`{heading}`** is the one spot that shows it, so a change to `playing` reaches that line and nothing else.
+**`playing`** is a value the page watches. **`{playing}`** is a spot that reads it, so the compiler draws an edge from one to the other. A spot that reads nothing gets no edge.
 
-## The graph is written before the page runs
+## You build the graph by building the page
 
-The compiler turns each `state()` and `computed()` into a *node*, and each spot that reads one into a *subscription*:
-
-- `state:playing` is a node
-- `computed:heading` reads `state:playing`
-- the `<p>` text reads `computed:heading`
-
-Press **Slow Train**, then **Shuffle**, and watch the graph:
+The compiler turns each `state()` into a *node*, and each spot that reads one into a *subscription*, drawn as an edge. Drag pieces onto the page, then pick a song:
 
 <GraphAnatomy />
 
-- Slow Train lights one path, `playing` to `heading` to the paragraph.
-- Pressing it again does nothing: the value is the same, so the graph stops.
-- `shuffle` has no readers, so changing it changes nothing on the page.
+- The label and the cover read `playing`, so each one inks an edge as it lands.
+- The heading reads nothing, so it never gets an edge.
+- Drag a reader off again: its edge is erased, and one write makes fewer updates.
 
 ## A write runs only its own path
 
 When `playing` changes, `@markless/runtime`:
 
-1. marks `state:playing` changed and `computed:heading` stale,
+1. marks `state:playing` changed, and any computed that reads it stale,
 2. waits for the current code to finish, then runs one *flush*,
 3. runs only the subscriptions on that path and applies the page changes they return.
 
 <Code steps={[{ label: 'Change `Harbour Lights` to `Slow Train`.', shows: 'Now playing: Slow Train' }, { label: "Under the paragraph, add `<button onClick={() => (playing = 'Northbound')}>Next</button>`. Press it.", shows: 'Now playing: Northbound' }]}>
-```tsrx title="playlist.tsrx"
-import { computed, state } from '@markless/core';
+```tsrx title="player.tsrx"
+import { state } from '@markless/core';
 
-export default function Playlist() @{
+export default function Player() @{
 	let playing = state('Harbour Lights');
-	const heading = computed(
-		() => 'Now playing: ' + playing,
-	);
 
-	<p>{heading}</p>
+	<p>Now playing: {playing}</p>
 }
 ```
 </Code>

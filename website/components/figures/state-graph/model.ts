@@ -1,30 +1,31 @@
-// The playlist the State graph figure draws, and its real graph: compiled from the example on the page.
-export const TITLE = 'Road trip';
-export const FIRST = 'Harbour Lights';
-export const NEXT = 'Slow Train';
+// The player the State graph figure builds, and its real graph: compiled from player.tsrx on the page.
+export const SONGS = ['Harbour Lights', 'Slow Train', 'Northbound'] as const;
+export const FIRST = SONGS[0];
 
-/** Nodes and readers exactly as the compiler records them for playlist.tsrx. */
-export const NODES = {
-	playing: { id: 'state:playing', reads: ['heading'] },
-	shuffle: { id: 'state:shuffle', reads: [] },
-	heading: { id: 'computed:heading', reads: ['p'] },
-	p: { id: '<p> text', reads: [] },
+/** Each piece the reader can drag onto the page, with what it reads and how many updates the compiler gives it. */
+export const PIECES = {
+	label: { name: 'Now playing label', reads: true, updates: 1, node: '<p> text' },
+	cover: { name: 'album cover', reads: true, updates: 2, node: '<img> src, alt' },
+	heading: { name: 'My playlist heading', reads: false, updates: 0, node: '' },
 } as const;
-export type NodeKey = keyof typeof NODES;
+export type PieceKey = keyof typeof PIECES;
+/** The song list is on the page from the start: its marked row reads playing through one class update. */
+export const LIST_UPDATES = 1;
 
-export const heading = (playing: string) => 'Now playing: ' + playing;
+export const updatesFor = (on: Readonly<Record<PieceKey, boolean>>) =>
+	LIST_UPDATES + (Object.keys(PIECES) as PieceKey[]).reduce((n, key) => n + (on[key] ? PIECES[key].updates : 0), 0);
 
-export function describePick(before: string, after: string): string {
-	if (before === after) return `playing is already ${after}. Same value, so the graph stops and nothing on the page changes.`;
-	return `playing became ${after}. The change ran along its one path, playing to heading to the paragraph, and only that line changed.`;
+const plural = (n: number) => `${n} update${n === 1 ? '' : 's'}`;
+
+export function describeDrop(key: PieceKey, placed: boolean, updates: number): string {
+	const piece = PIECES[key];
+	if (!piece.reads) return placed ? `The ${piece.name} is plain HTML. It reads nothing, so no edge was drawn.` : `The ${piece.name} is off the page. It never had an edge.`;
+	return placed
+		? `The ${piece.name} reads playing, so a new node and edge were drawn. A song pick now makes ${plural(updates)}.`
+		: `The ${piece.name} is off the page, so its edge was erased. A song pick now makes ${plural(updates)}.`;
 }
 
-export const SHUFFLE_SAID = 'shuffle changed, but nothing reads it. No line lit up and the page did not change.';
-export const START_SAID = 'A playlist and its state graph. playing is read through heading by the paragraph; shuffle is read by nothing.';
+export const describePick = (song: string, before: string, updates: number) =>
+	song === before ? `${song} is already playing. Same value, so nothing ran.` : `Now playing ${song}. One write, ${updates} update${updates === 1 ? '' : 's'}: only the pieces with an edge changed.`;
 
-export const NODE_NOTE: Record<NodeKey, string> = {
-	playing: 'state:playing, written by Slow Train, read by heading',
-	shuffle: 'state:shuffle, written by Shuffle, nothing reads this',
-	heading: 'computed:heading, reads playing, read by the paragraph',
-	p: 'the <p> text, the only spot on the page in the graph',
-};
+export const START_SAID = 'A music page with just a song list, and its state graph: playing, read by the list. Drag pieces onto the page.';

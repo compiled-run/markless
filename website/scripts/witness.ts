@@ -2609,7 +2609,7 @@ try {
 			['compiler', 'three pieces'],
 			['payload', 'Booked March'],
 			['resuming', 'nobody replayed the game from move one'],
-			['state-graph', 'only that line changed'],
+			['state-graph', 'only the pieces with an edge changed'],
 			['lazy-chunks', 'open-photo.js ran now'],
 			['native-targets', 'No WKWebView anywhere'],
 		] as const) {
