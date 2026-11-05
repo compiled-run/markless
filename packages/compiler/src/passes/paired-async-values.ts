@@ -26,17 +26,10 @@ export function asyncReach(computed: ReadonlyMap<string, ComputedNode>) {
 	return { isAsync, reach, dependencyIds, asyncInputs };
 }
 
-/**
- * The async computeds some reader pairs with an input of their key: a reader that reads the
- * value beside one of those inputs, or beside another async value fetched with one of them.
- * Readers are computeds (async ones too), handlers and component edges, each a list of the
- * nodes it reads. Each paired value keeps its upstream async values, whose inputs it was
- * fetched with; only a page that serves one loads matched values.
- */
-export function pairedAsyncValues(
+/** The nodes an async value is fetched with: what its recipe reads, through sync computeds and upstream async values. */
+export function asyncKeyInputs(
 	computed: ReadonlyMap<string, ComputedNode>,
-	readers: Iterable<ReadonlyArray<string>>,
-): ReadonlySet<string> {
+): (graphNodeId: string) => ReadonlySet<string> {
 	const { reach, dependencyIds } = asyncReach(computed);
 	const keyInputs = new Map<string, ReadonlySet<string>>();
 	const keyInputsOf = (graphNodeId: string): ReadonlySet<string> => {
@@ -51,6 +44,22 @@ export function pairedAsyncValues(
 		keyInputs.set(graphNodeId, inputs);
 		return inputs;
 	};
+	return keyInputsOf;
+}
+
+/**
+ * The async computeds some reader pairs with an input of their key: a reader that reads the
+ * value beside one of those inputs, or beside another async value fetched with one of them.
+ * Readers are computeds (async ones too), handlers and component edges, each a list of the
+ * nodes it reads. Each paired value keeps its upstream async values, whose inputs it was
+ * fetched with; only a page that serves one loads matched values.
+ */
+export function pairedAsyncValues(
+	computed: ReadonlyMap<string, ComputedNode>,
+	readers: Iterable<ReadonlyArray<string>>,
+): ReadonlySet<string> {
+	const { reach, dependencyIds } = asyncReach(computed);
+	const keyInputsOf = asyncKeyInputs(computed);
 	const meets = (left: ReadonlySet<string>, right: ReadonlySet<string>) =>
 		[...left].some((graphNodeId) => right.has(graphNodeId));
 	const paired = new Set<string>();

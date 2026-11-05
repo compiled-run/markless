@@ -10,6 +10,14 @@ import type { CompilerDiagnostic } from './diagnostics.ts';
 import { buildSemanticGraphSync } from './passes/semantic-graph/index.ts';
 import { frameworkApiSources } from './passes/semantic-graph/imports.ts';
 import { lowerStateAccess } from './passes/state-lowering.ts';
+import {
+	asyncRefreshFacts,
+	asyncRefreshInputs,
+	type AsyncRefreshBoundary,
+} from './passes/semantic-graph/async-refresh-facts.ts';
+import { graphBindingMap } from './artifact-helpers/graph-paths.ts';
+import { getComponentFunction } from './ast/tsrx.ts';
+import type { AnyNode } from './ast/nodes.ts';
 
 export interface MarklessMappingData {
 	verification: boolean;
@@ -161,6 +169,93 @@ export function collectTsrxAuthorWarnings(
 	return [...semanticGraph.diagnostics, ...lowering].filter(
 		(diagnostic) => diagnostic.severity === 'warning' && diagnostic.suppressed !== true,
 	);
+}
+
+export type TsrxRefreshHover = { readonly start: number; readonly end: number; readonly text: string };
+
+/**
+ * Editor hovers saying what a refresh does: one on each `@try` keyword and one on each
+ * read of an async value, from the same compiler facts the runtime's busy marks follow.
+ */
+export function collectTsrxRefreshHovers(
+	source: string,
+	filename = 'module.tsrx',
+): ReadonlyArray<TsrxRefreshHover> {
+	let graph: ReturnType<typeof buildSemanticGraphSync>;
+	let program: AnyNode;
+	try {
+		graph = buildSemanticGraphSync({ filename, source });
+		program = parseModule(source, filename) as unknown as AnyNode;
+	} catch {
+		return [];
+	}
+	const boundaries = asyncRefreshFacts(graph);
+	const inputsOf = asyncRefreshInputs(graph);
+	const hovers: TsrxRefreshHover[] = [];
+	for (const boundary of boundaries) {
+		const text = refreshText(boundary.values.map((value) => value.name), boundary.inputs.map((input) => input.name), tagsOf(boundary.busy), 'block');
+		if (boundary.keywordSpan && text)
+			hovers.push({ start: boundary.keywordSpan.start, end: boundary.keywordSpan.end, text });
+	}
+	for (const statement of asNodes(program.body)) {
+		const component = getComponentFunction(statement);
+		if (!component) continue;
+		const bindings = graphBindingMap(graph, null, component.name);
+		visitReads(component.node, (identifier) => {
+			const binding = bindings.get(identifier.name as string);
+			if (binding?.kind !== 'computed' || binding.async !== true) return;
+			const busy = boundaries.flatMap((boundary) =>
+				boundary.busy.filter((element) => element.values.includes(binding.id)),
+			);
+			const text = refreshText([binding.name], inputsOf(binding.id).map((input) => input.name), tagsOf(busy), 'value');
+			if (text) hovers.push({ start: identifier.start!, end: identifier.end!, text });
+		});
+	}
+	return hovers;
+}
+
+function tagsOf(busy: AsyncRefreshBoundary['busy']): ReadonlyArray<string> {
+	return [...new Set(busy.map((element) => element.tagName))];
+}
+
+const code = (name: string) => `\`${name}\``;
+function listed(names: ReadonlyArray<string>, joiner: 'and' | 'or'): string {
+	const quoted = names.map(code);
+	return quoted.length < 2 ? (quoted[0] ?? '') : `${quoted.slice(0, -1).join(', ')} ${joiner} ${quoted.at(-1)}`;
+}
+
+function refreshText(
+	values: ReadonlyArray<string>,
+	inputs: ReadonlyArray<string>,
+	busyTags: ReadonlyArray<string>,
+	subject: 'block' | 'value',
+): string | undefined {
+	if (values.length === 0) return undefined;
+	const named = listed(values, 'and');
+	if (inputs.length === 0)
+		return `${named} ${values.length > 1 ? 'read' : 'reads'} no state or prop, so ${values.length > 1 ? 'they run' : 'it runs'} once and never ${values.length > 1 ? 'refresh' : 'refreshes'}. To refresh it, read a counter in its recipe (\`let reload = state(0)\`) and bump it.`;
+	const kept = subject === 'block' ? 'this block keeps its content' : `the block keeps showing the current ${named}`;
+	const marks = busyTags.length > 0 ? ` and marks ${busyTags.map((tag) => code(`<${tag}>`)).join(', ')} busy` : '';
+	const here = subject === 'block' ? 'Text here' : 'Text';
+	return `When ${listed(inputs, 'or')} ${inputs.length > 1 ? 'change' : 'changes'}, ${named} ${values.length > 1 ? 'run' : 'runs'} again: ${kept}${marks} until the new result lands. ${here} that reads ${listed(values, 'or')} keeps the ${listed(inputs, 'and')} it was fetched with.`;
+}
+
+const NOT_CHILDREN = new Set(['parent', 'loc', 'range', 'metadata', 'comments', 'leadingComments', 'trailingComments']);
+
+// Identifiers read as values: not property names, object keys or member names after a dot.
+function visitReads(node: AnyNode, visit: (identifier: AnyNode) => void, parent?: AnyNode, key?: string): void {
+	if (node.type === 'Identifier' && typeof node.start === 'number' && typeof node.end === 'number') {
+		const isMemberName = parent?.type === 'MemberExpression' && key === 'property' && parent.computed !== true;
+		const isKey = parent?.type === 'Property' && key === 'key' && parent.computed !== true;
+		if (!isMemberName && !isKey) visit(node);
+		return;
+	}
+	for (const childKey in node) {
+		if (NOT_CHILDREN.has(childKey)) continue;
+		const value = node[childKey];
+		for (const child of Array.isArray(value) ? value : [value])
+			if (isNode(child)) visitReads(child, visit, node, childKey);
+	}
 }
 
 const FRAMEWORK_API_SOURCES = frameworkApiSources();

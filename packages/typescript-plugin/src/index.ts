@@ -1,5 +1,8 @@
 import upstreamTsrxTypeScriptPlugin from '@tsrx/typescript-plugin';
-import { collectTsrxAuthorWarnings } from '@markless/compiler/type-service';
+import {
+	collectTsrxAuthorWarnings,
+	collectTsrxRefreshHovers,
+} from '@markless/compiler/type-service';
 import { join } from 'node:path';
 import { installMarklessCompletions } from './completions.ts';
 import {
@@ -175,6 +178,43 @@ const plugin = (modules: TsserverPluginModules) => {
 					}),
 				];
 			};
+			const getQuickInfoAtPosition =
+				enhancedLanguageService.getQuickInfoAtPosition?.bind(enhancedLanguageService);
+			if (getQuickInfoAtPosition) {
+				enhancedLanguageService.getQuickInfoAtPosition = (
+					fileName: string,
+					position: number,
+					...rest: unknown[]
+				) => {
+					const info = getQuickInfoAtPosition(fileName, position, ...rest);
+					if (!isMarklessTsrxFile(fileName)) return info;
+					const snapshot = getSourceSnapshot(fileName);
+					if (!snapshot) return info;
+					const hover = refreshHoversFor(
+						fileName,
+						snapshot.getText(0, snapshot.getLength()),
+						getSourceVersion?.(fileName),
+					).find((candidate) => candidate.start <= position && position < candidate.end);
+					if (!hover) return info;
+					const documentation = [{ kind: 'text', text: hover.text }];
+					if (info)
+						return {
+							...info,
+							documentation: [
+								...(info.documentation ?? []),
+								...(info.documentation?.length ? [{ kind: 'lineBreak', text: '\n\n' }] : []),
+								...documentation,
+							],
+						};
+					return {
+						kind: modules.typescript.ScriptElementKind.keyword,
+						kindModifiers: '',
+						textSpan: { start: hover.start, length: hover.end - hover.start },
+						displayParts: [{ kind: 'keyword', text: '@try' }],
+						documentation,
+					};
+				};
+			}
 			if (nativeCompletionEntryDetails) {
 				const getCompletionEntryDetails =
 					enhancedLanguageService.getCompletionEntryDetails.bind(enhancedLanguageService);
@@ -268,6 +308,20 @@ function authorWarningsFor(fileName: string, source: string, version: string | u
 	const warnings = collectTsrxAuthorWarnings(source, fileName);
 	authorWarnings.set(fileName, { key, warnings });
 	return warnings;
+}
+
+const refreshHovers = new Map<
+	string,
+	{ readonly key: string; readonly hovers: ReturnType<typeof collectTsrxRefreshHovers> }
+>();
+
+function refreshHoversFor(fileName: string, source: string, version: string | undefined) {
+	const key = version ?? source;
+	const cached = refreshHovers.get(fileName);
+	if (cached?.key === key) return cached.hovers;
+	const hovers = collectTsrxRefreshHovers(source, fileName);
+	refreshHovers.set(fileName, { key, hovers });
+	return hovers;
 }
 
 // Compiling the authored source is what records - or clears - the file's parse failure,

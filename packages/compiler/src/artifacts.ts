@@ -852,6 +852,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_HANDLER_READS_RENDER_LOCAL'
 		| 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL'
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
+		| 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE'
 		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
 		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
 		| 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED'
@@ -1463,6 +1464,8 @@ export type SemanticGraphArtifact = {
 		readonly errorName?: string;
 		/** The minted sync computed a boundary reading several async values settles on. */
 		readonly gateGraphNodeId?: string;
+		/** Where the `@try` keyword is written. */
+		readonly keywordSpan?: SourceSpan;
 	}>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
 	readonly markup: SemanticMarkupArtifact;

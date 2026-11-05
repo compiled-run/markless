@@ -149,6 +149,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'const item = computed(() => items[picked.id]);',
 		],
 	},
+	MARKLESS_ASYNC_INPUT_BESIDE_VALUE: {
+		summary: 'Text inside a @try shows an input of an async value without the value itself.',
+		what: 'When an input of an async `computed()` changes, the block keeps showing the old result until the new one lands. Text that reads the result waits with it. Text that reads only the input, such as `Sorted by {sort}` beside a list fetched with `sort`, changes at once, so for a moment it describes data that is not on screen yet.',
+		how: 'Return the input from the async `computed()` along with its data and show it from there. Controls that set the input, such as a `<select>` or a `<button>`, are fine as they are.',
+		example: [
+			'const posts = computed(async () => {',
+			'\tconst by = sort;',
+			'\treturn { sort: by, list: await loadPosts(by) };',
+			'});',
+			'<p>Sorted by {posts.sort}</p>',
+		],
+	},
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: {
 		summary: 'An event handler reads a local variable that does not exist in the browser.',
 		what: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a class instance, a DOM node, a function declared with `let`, or another value that is not plain data.',

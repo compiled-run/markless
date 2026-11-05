@@ -683,6 +683,32 @@ function unstableCreationSiteText(
 	}[site];
 }
 
+export function asyncInputBesideValueDiagnostic(input: {
+	readonly read: string;
+	readonly input: string;
+	readonly value: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'Text shows an input of an async value without the value',
+		message: `{${input.read}} reads "${input.input}", which "${input.value}" is fetched with, but not "${input.value}" itself. During a refresh it shows the new "${input.input}" next to the old "${input.value}".`,
+		why: `A refresh keeps the shown "${input.value}" until the new result lands. Text that reads "${input.value}" waits with it; text that reads only "${input.input}" changes at once.`,
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.read,
+		suggestions: [
+			{
+				message: `Read it through the async value: return "${input.input}" from "${input.value}" and show {${input.value}.${input.input}}.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+	};
+}
+
 export function asyncPostAwaitDependentReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,

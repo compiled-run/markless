@@ -942,6 +942,25 @@ test('M16 PropsOf and Children import into a plain .ts file and PropsOf is exact
 	).toEqual([]);
 }, 20_000);
 
+test('M19 hovering @try or an async read says what a refresh does there', async () => {
+	const fixture = openFixture('refresh-hover.tsrx');
+	const block = await server.quickinfo(fixture.file, positionAtSearch(fixture.source, '@try', 1));
+	expect(
+		documentationText(block),
+		'M19 missing capability: a @try hover must name the input, the kept content and the busy element.',
+	).toBe(
+		'When `aisle` changes, `stock` runs again: this block keeps its content and marks `<ol>` busy until the new result lands. Text here that reads `stock` keeps the `aisle` it was fetched with.',
+	);
+	const read = await server.quickinfo(
+		fixture.file,
+		positionAtSearch(fixture.source, 'stock.items', 1),
+	);
+	expect(displayText(read), 'M19: the native type hover must stay.').toContain('stock');
+	expect(documentationText(read)).toContain('When `aisle` changes, `stock` runs again');
+	const plain = await server.quickinfo(fixture.file, positionAtSearch(fixture.source, 'aisle;', 1));
+	expect(documentationText(plain)).not.toContain('runs again');
+}, 20_000);
+
 test('M17 real tsserver serves a part inlay hint naming the element each part renders', async () => {
 	// Only the consuming file is opened: the part modules reach the checker through the
 	// project, which is the state a real editor is in when the hint is first painted.
@@ -1593,6 +1612,13 @@ function completionEntries(completion: any): any[] {
 
 function completionNames(completion: any): string[] {
 	return completionEntries(completion).map((entry) => entry.name);
+}
+
+function documentationText(info: any): string {
+	const documentation = info?.documentation;
+	return typeof documentation === 'string'
+		? documentation
+		: (documentation?.map((part: any) => part.text).join('') ?? '');
 }
 
 function displayText(info: any): string {

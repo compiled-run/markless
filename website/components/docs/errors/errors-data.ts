@@ -593,6 +593,298 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'warning',
+		description:
+			'Text inside a @try shows an input of an async value without the value itself.',
+		printed: [
+			'MARKLESS_ASYNC_INPUT_BESIDE_VALUE: {<read>} reads "<input>", which "<value>" is fetched with, but not "<value>" itself. During a refresh it shows the new "<input>" next to the old "<value>".',
+			'A refresh keeps the shown "<value>" until the new result lands. Text that reads "<value>" waits with it; text that reads only "<input>" changes at once.',
+			'Read it through the async value: return "<input>" from "<value>" and show {<value>.<input>}.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+		],
+		structured: true,
+		guide: {
+			summary:
+				'Text inside a @try shows an input of an async value without the value itself.',
+			what: [
+				{
+					id: 's0',
+					text: 'When an input of an async ',
+				},
+				{
+					id: 's1',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' changes, the block keeps showing the old result until the new one lands. Text that reads the result waits with it. Text that reads only the input, such as ',
+				},
+				{
+					id: 's3',
+					text: 'Sorted by {sort}',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' beside a list fetched with ',
+				},
+				{
+					id: 's5',
+					text: 'sort',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', changes at once, so for a moment it describes data that is not on screen yet.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Return the input from the async ',
+				},
+				{
+					id: 's1',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' along with its data and show it from there. Controls that set the input, such as a ',
+				},
+				{
+					id: 's3',
+					text: '<select>',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' or a ',
+				},
+				{
+					id: 's5',
+					text: '<button>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', are fine as they are.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'posts',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'computed',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r7',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'async',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' () ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r11',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'by',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r6',
+							text: ' sort;',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'return',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' { sort: by, list: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'await',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'loadPosts',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '(by) };',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '});',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>Sorted by {posts.sort}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_ASYNC_INPUT_BESIDE_VALUE: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:#6a737d',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_PLANE_MISSING',
 		packageName: '@markless/web',
 		stage: 'runtime',

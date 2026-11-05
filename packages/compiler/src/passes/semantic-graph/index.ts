@@ -87,6 +87,7 @@ import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
 import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
+import { collectAsyncInputBesideValueDiagnostics } from './async-refresh-facts.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -199,6 +200,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectElementRosterCounts(state);
 	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
 	collectAsyncBoundaryDiagnostics(graph);
+	collectAsyncInputBesideValueDiagnostics(graph);
 	graph.markup = collectSemanticMarkup({
 		ast,
 		source: input.source,

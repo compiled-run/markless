@@ -60,6 +60,9 @@ export function collectAsyncBoundary(
 		...(errorParam?.type === 'Identifier' && typeof errorParam.name === 'string'
 			? { errorName: errorParam.name }
 			: {}),
+		...(typeof node.start === 'number'
+			? { keywordSpan: { filename: state.filename, start: node.start, end: node.start + '@try'.length } }
+			: {}),
 	});
 	state.currentAsyncBoundaryId = boundaryId;
 	const resetParam = handler?.resetParam as AnyNode | null | undefined;

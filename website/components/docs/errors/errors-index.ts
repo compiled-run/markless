@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 306,
-	guided: 46,
+	total: 307,
+	guided: 47,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -52,6 +52,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
 					kind: 'compile error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+					kind: 'compile warning',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
