@@ -71,6 +71,34 @@ export function bindSharedCells(
 	};
 }
 
+/**
+ * Binds a runtime that started before any instance held values. `mine`: its own write moved a value, which
+ * it publishes; otherwise another container's write did, which it takes.
+ */
+export function bindRunningGraph(
+	root: object,
+	state: ProtocolStatePayload,
+	graph: RuntimeGraph,
+	mine: boolean,
+): void {
+	const ids = new Set(liveDefinitions(state).flatMap((definition) => definition.graphNodeIds));
+	const cells = [...ids].map((graphNodeId) => ({ graphNodeId, value: graph.read(graphNodeId, []) }));
+	const { bound } = bindDefinitions(placesOf(root), state, cells, root, true);
+	const agreed = new Map<string, unknown>();
+	for (const { instance, cellIds } of bound)
+		for (const id of cellIds) {
+			const value = mine ? graph.read(id, []) : instance.cells[id];
+			agreed.set(id, value);
+			if (mine) instance.cells[id] = cloneValue(value);
+			else if (!sameValue(value, graph.read(id, [])))
+				graph.write({ graphNodeId: id, value: cloneValue(value) });
+		}
+	connectGraph(root as Host, graph, bound, agreed);
+	if (!mine) return;
+	for (const { instance, definition, cellIds } of bound)
+		for (const id of cellIds) publish(root as Host, instance, definition, id);
+}
+
 // Called once the runtime's bindings exist: the reads land the live values through them.
 export function reconcileSharedCells(graph: RuntimeGraph): boolean {
 	const reads = reconcileReads.get(graph);

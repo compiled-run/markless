@@ -19,7 +19,7 @@ export type ResumePayloadGraphInput = {
 
 // Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
 type SharedInstancesHost = {
-	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-instances.ts')>;
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-start.ts')>;
 };
 
 let runtimeModulePromise: Promise<RuntimeModule> | undefined;
@@ -48,11 +48,9 @@ export async function createRuntimeGraphFromResumePayload(
 		...(await decodeServedComputedValues(input.state, input.root.__marklessEventOnlyGraph)),
 	];
 	const shared = hasLiveSharedDefinitions(input.state)
-		? (await (globalThis as SharedInstancesHost).__marklessSharedInstances?.())?.bindSharedCells(
-				input.root,
-				input.state,
-				cells,
-			)
+		? await (
+				await (globalThis as SharedInstancesHost).__marklessSharedInstances?.()
+			)?.bindSharedCells(input.root, input.state, cells)
 		: undefined;
 	graph = createRuntimeGraph({
 		cells: shared?.cells ?? cells,

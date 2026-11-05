@@ -43,7 +43,7 @@ type ExecutionLogGlobal = typeof globalThis & {
 
 // Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
 type SharedInstancesHost = {
-	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-instances.ts')>;
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-start.ts')>;
 };
 
 export async function renderCsrRuntime(input: {
