@@ -1,5 +1,5 @@
 import type { SsrDataReadContext, SsrDataStructure } from '../ssr-data/renderer.ts';
-import { marklessRowSegment } from './instance-scope.ts';
+import { marklessRowPath } from './instance-scope.ts';
 
 type HostedRecord = { readonly hostNodeId: string };
 type RowQualifiableView = {
@@ -51,8 +51,7 @@ export function marklessRowProjectionSegment(context: SsrDataReadContext): {
 	readonly hostSegment?: string;
 } {
 	const hostSegment =
-		context.hostSegment ??
-		(context.repeatKey === undefined ? undefined : marklessRowSegment(context.repeatKey));
+		context.hostSegment ?? (marklessRowPath(context) || undefined);
 	return hostSegment ? { hostSegment } : {};
 }
 

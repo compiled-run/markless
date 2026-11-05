@@ -3,8 +3,10 @@ import {
 	marklessRowBoundCallbackId,
 	marklessRowBoundGraphNodeId,
 	marklessRowBoundPath,
+	marklessRowBoundCallbackGraph,
+	marklessRowLocal,
 } from '../src/fns/row-bound-path.ts';
-import { marklessRecordRowScope } from '../src/fns/instance-scope.ts';
+import { marklessRecordRowScope, marklessRowPath } from '../src/fns/instance-scope.ts';
 
 // A part two edges down a projection, inside one keyed repeat: host ids spell it c1:r:<key>:c0:, instance paths c1:p2:<row>c0:.
 const bound = {
@@ -98,4 +100,80 @@ test('a callback with no row to take keeps the id the instance path already give
 			'c7:symbol:2',
 		),
 	).toBe('r:two:c7:symbol:2');
+});
+
+// Two nested keyed @for loops place one component: the inner rows of every outer row share one parent, so the item is found by key.
+const GROUPS = [
+	{ name: 'a', items: [{ id: 'x' }, { id: 'y w' }] },
+	{ name: 'b', items: [{ id: 'x' }, { id: 'y w' }] },
+];
+const nestedRows = { instancePath: 'c0:', rowPieces: [['c0:', 'c0:', 2]] as const };
+const groupGraph = (host: string) => ({
+	marklessRowHostPath: host,
+	read: (graphNodeId: string) => (graphNodeId === 'computed:groups' ? GROUPS : undefined),
+});
+const outerStep = { rowIndex: 0, keyPath: ['name'], graphNodeId: 'computed:groups', collectionPath: [] };
+const innerStep = { rowIndex: 1, keyPath: ['id'], itemPath: ['items'] };
+
+test('an item in nested rows is the one each row key names, outermost first', () => {
+	const graph = groupGraph('r:b:r:y%20w:c0:');
+	expect(marklessRowLocal(nestedRows, graph, { rowPiece: 0, rows: [outerStep] })).toBe(GROUPS[1]);
+	expect(marklessRowLocal(nestedRows, graph, { rowPiece: 0, rows: [outerStep, innerStep] })).toBe(
+		GROUPS[1]!.items[1],
+	);
+});
+
+test('a row key that names no item, or a path the rows do not describe, answers undefined', () => {
+	const route = { rowPiece: 0, rows: [outerStep, innerStep] };
+	expect(marklessRowLocal(nestedRows, groupGraph('r:c:r:x:c0:'), route)).toBeUndefined();
+	expect(marklessRowLocal(nestedRows, groupGraph('r:b:c0:'), route)).toBeUndefined();
+	expect(marklessRowLocal(nestedRows, groupGraph('r:b:r:x:c1:'), route)).toBeUndefined();
+});
+
+test('an index-keyed row names its item by position', () => {
+	const graph = groupGraph('r:1:r:0:c0:');
+	const byIndex = { rowIndex: 0, keyPath: [], indexKey: true as const, graphNodeId: 'computed:groups' };
+	expect(marklessRowLocal(nestedRows, graph, { rowPiece: 0, rows: [byIndex, innerStep] })).toBeUndefined();
+	expect(
+		marklessRowLocal(nestedRows, graph, {
+			rowPiece: 0,
+			rows: [byIndex, { rowIndex: 1, keyPath: [], indexKey: true as const, itemPath: ['items'] }],
+		}),
+	).toBe(GROUPS[1]!.items[0]);
+});
+
+test('a placed child takes a segment for every keyed row around it', () => {
+	const outer = { repeatId: 'repeat:0', repeatKey: 'b' };
+	expect(marklessRowPath({ repeatId: 'repeat:1', repeatKey: 'y w', repeatOuter: outer })).toBe(
+		'r:b:r:y%20w:',
+	);
+	expect(marklessRowPath({ repeatId: 'repeat:1', repeatKey: 'x', repeatOuter: { repeatId: 'repeat:0' } })).toBeUndefined();
+	expect(marklessRowPath({})).toBe('');
+});
+
+// A page's @for places Group, Group places Leaf twice, and Leaf's callback is called from Press one edge further down.
+const pressRow = {
+	instancePath: 'c3:c2:c0:',
+	rowPieces: [
+		['c0:', 'c3:', 1],
+		['c1:', 'c2:', 0],
+		['c0:', 'c0:', 0],
+	] as const,
+};
+
+test("a callback's own keyed row reads its rows from the instance that wrote it", () => {
+	const graph = marklessRowBoundCallbackGraph(pressRow, { marklessRowHostPath: 'r:b:c0:c1:c0:' }, 2);
+	expect(graph.marklessRowHostPath).toBe('r:b:c0:c1:');
+	expect(
+		marklessRowBoundPath(
+			{ instancePath: 'c3:c2:', rowPieces: pressRow.rowPieces.slice(0, 2) },
+			graph,
+		),
+	).toBe('r:b:c3:c2:');
+});
+
+test('a host path the handler row does not describe is handed on unchanged', () => {
+	const graph = { marklessRowHostPath: 'r:b:c0:c1:c4:' };
+	expect(marklessRowBoundCallbackGraph(pressRow, graph, 2)).toBe(graph);
+	expect(marklessRowBoundCallbackGraph({ instancePath: 'c3:' }, graph, 0)).toBe(graph);
 });

@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/instance-scope"
+			],
+			"delta": 281,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": -86,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 62,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/instance-scope"
+			],
+			"delta": 281,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": -86,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 57,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 69,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
+			"date": "2026-11-05"
+		}
+	]
+}
