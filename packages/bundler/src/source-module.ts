@@ -607,7 +607,7 @@ export function emitOverlayLoaderInstall(): string {
  * specifier lives only in a module whose state declares a non-widget definition.
  */
 export function emitSharedInstancesLoaderInstall(): string {
-	return "globalThis.__marklessSharedInstances ??= () => import('@markless/web/fns/shared-instances');";
+	return "globalThis.__marklessSharedInstances ??= () => import('@markless/web/fns/shared-start');";
 }
 
 export function emitRosterResumeLoaderInstall(): string {
