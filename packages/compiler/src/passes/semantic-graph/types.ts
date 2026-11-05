@@ -85,6 +85,7 @@ export type MutableSemanticGraphArtifact = {
 		readonly componentName?: string;
 		/** The name `@catch (name)` binds the rejection to. */
 		readonly errorName?: string;
+		readonly gateGraphNodeId?: string;
 	}>;
 	branchSites: SemanticBranchSite[];
 	markup: SemanticMarkupArtifact;

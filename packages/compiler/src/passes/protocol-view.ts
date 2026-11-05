@@ -229,9 +229,14 @@ function boundaryAsyncSources(
 		reached.set(graphNodeId, found);
 		return found;
 	};
+	const mintedGates = new Set(
+		input.semanticGraph?.asyncBoundaries.flatMap((boundary) =>
+			boundary.gateGraphNodeId ? [boundary.gateGraphNodeId] : [],
+		),
+	);
 	const asyncSources: Record<string, string[]> = {};
 	for (const computed of input.payloadArena.state.computed) {
-		if (computed.async === true) continue;
+		if (computed.async === true || mintedGates.has(computed.graphNodeId)) continue;
 		const sources = reach(computed.graphNodeId, new Set());
 		if (sources.size > 0) asyncSources[computed.graphNodeId] = [...sources];
 	}

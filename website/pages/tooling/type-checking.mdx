@@ -1,105 +1,46 @@
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
-import TypecheckDemo from '../../components/demos/tooling/typecheck-demo.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# How TypeScript checks a `.tsrx` file
+# TypeScript checks a copy of each `.tsrx` file
 
 <PageMeta time="2 min" assumes="components" />
 
-Your editor underlines mistakes in `.tsrx` files. But TypeScript has never heard of `.tsrx`. So who
-checks them?
+<Subtitle text="Markless hands TypeScript a TSX copy of each .tsrx file. TypeScript checks the copy, and every error points back to the line you wrote." />
 
-Markless hands TypeScript a TSX copy of each `.tsrx` file. TypeScript checks the copy, and every
-error points back to the line you wrote. Your own file stays exactly as you wrote it.
-
-Pick a value for `label`, then press **Check**.
-
-<TypecheckDemo />
-
-`Nav` wants `label` to be a `string`. Pass it `42`, and TypeScript reports that `number` is not
-assignable to `string`. It points at `label` in `App.tsrx`, line 4.
-
-## What gets checked
-
-The copy keeps your real types, so a wrong prop is an error at the exact attribute. The check covers
-the whole file: props, attributes, event handlers, and element handles.
-
-```tsrx
-import { Nav } from './Nav.tsrx';
+```tsrx title="app.tsrx"
+import { Nav } from './nav.tsrx';
 
 export function App() @{
 	<Nav label={42} />
 }
 ```
 
-<Callout
-	sprite="cross"
-	title="Why is className an error?"
-	text="Markless uses the HTML name, class. The checker rejects className on HTML elements, so write class instead."
-/>
-
-## Working on Markless itself
-
-In your own app, the editor checks types. `npm run build` stops on Markless errors, but it does not
-run the type checker.
-
-Inside the Markless repo, `pnpm typecheck` checks the whole workspace. It wraps `tsc`, so `-p`,
-`--watch`, and every other `tsc` flag still work.
-
-```bash
-pnpm typecheck
-```
-
-A type error in a `.tsrx` file shows the file, the line, and the column. A file that does not parse
-fails the run too:
+`Nav` takes `label: string`, so the checker reports the wrong type at `label`, on line 4, column 7:
 
 ```text
-broken.tsrx(6,1): error TS91001: Markless TSRX parse error: Unexpected '}' in JSX text
-counter.tsrx(9,8): error TS2322: Type 'string' is not assignable to type 'number'.
-Found 1 Markless TSRX compile error.
+app.tsrx(4,7): error TS2322: Type 'number' is not assignable to type 'string'.
 ```
 
-<Callout
-	sprite="thought-bubble"
-	title="Can I run this in my own app?"
-	text="Not yet. The published @markless/typescript-plugin ships the editor plugin only, with no command."
-/>
+TSX is the file type TypeScript already understands: TypeScript with HTML-like tags. The copy exists only for the checker. Your own file stays exactly as you wrote it.
 
-## TypeScript 7.1
+## What gets checked
 
-`pnpm typecheck:ts7` runs the same check on the TypeScript 7.1 beta, over the workspace and the
-docs site. CI runs it next to `pnpm typecheck`, and both must pass.
+The copy keeps your real types, so a mistake shows at the exact spot:
 
-TypeScript 7 cannot load the Markless plugin. Its `tsc --runExternalCode` reads each `.tsrx` file
-through `@tsrx/content-mapper`, which the repo's `tsconfig.json` names. The mapper's `compiler`
-option picks `@markless/typescript-plugin/volar-strict`: the editor's TSX copy without the guesses
-the editor makes to keep reading a half-typed file, so a broken file fails the check.
+- a prop of the wrong type, or one the component doesn't take
+- an attribute HTML elements don't have, like `className` (write `class`)
+- a misspelt event handler, like `onClik`
+- a handler whose code doesn't type-check
 
-```json
-{
-	"contentMappers": [
-		{
-			"package": "@tsrx/content-mapper",
-			"extensions": [".tsrx"],
-			"options": { "compiler": "@markless/typescript-plugin/volar-strict" }
-		}
-	]
-}
-```
+## Where the check runs today
 
-TypeScript 5.9 ignores `contentMappers`, so one `tsconfig.json` serves both. The errors are the same,
-at the same line and column. Two things read differently:
+- **In your editor**, on every file you open. [Editor setup](/tooling/editor-setup) turns it on.
+- **Not in the build.** `npm run build` stops on Markless errors, but a wrong prop still builds. `npm run check` doesn't check `.tsrx` types either.
+- **Not from the command line, yet.** The published `@markless/typescript-plugin` is the editor plugin only, with no command to check every file at once.
 
-- A file that does not parse reports `error TSRX771000` instead of `error TS91001`.
-- While any file fails to parse, TypeScript 7 reports only those errors and skips the type errors.
-
-On the workspace the TypeScript 7.1 check takes about a second, against 7 to 10 seconds for
-`pnpm typecheck`. Known gaps are tracked in
-[tsrx-org/tsrx#136](https://github.com/tsrx-org/tsrx/issues/136).
-
-Next: [test a component in a real browser](/tooling/testing).
+Working on Markless itself? The repo has that command: [Dev setup](/contributing/dev-setup) shows `pnpm typecheck`.

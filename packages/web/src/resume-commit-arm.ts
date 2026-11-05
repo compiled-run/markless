@@ -2,7 +2,7 @@ import { runtimeResumeError } from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import { boundaryArmRecordSet, materializeArmRecords } from './resume-arm-records.ts';
 import type { AsyncBoundaryWiring } from './resume-async-wiring.ts';
-import { rememberArmBindings } from './resume-refresh-busy.ts';
+import { rememberAfterRange, rememberArmBindings } from './resume-refresh-busy.ts';
 import {
 	containsElement,
 	elementsBetweenAnchors,
@@ -137,6 +137,7 @@ export function createArmCommitter(
 		let anchor = afterAnchors.get(end);
 		if (update.after && (anchor as CommitAnchor | undefined)?.parentNode !== end.parentNode)
 			afterAnchors.set(end, (anchor = openAfterAnchor(end)));
+		if (update.after) rememberAfterRange(end, anchor!);
 		const boundary = update.after
 			? { id: `${target.id}:after`, startAnchor: anchor!, endAnchor: target.endAnchor }
 			: target;

@@ -2,6 +2,7 @@ import type {
 	ResumeArmRange,
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
+	ResumeDomComment,
 	ResumeDomElement,
 } from './resume-types.ts';
 
@@ -23,6 +24,12 @@ type BoundaryBusy = {
 
 const bindingsByRange = new WeakMap<object, ReadonlyArray<readonly [BusyNode, string]>>();
 const busyByRange = new WeakMap<object, BoundaryBusy>();
+const afterByEnd = new WeakMap<object, BusyNode>();
+
+// A failed refresh's @catch drawn after the kept content: a retry marks it busy as a whole.
+export function rememberAfterRange(endAnchor: object, startAnchor: ResumeDomComment): void {
+	afterByEnd.set(endAnchor, startAnchor as unknown as BusyNode);
+}
 
 // The shown arm's bindings as its records name them: each DOM update and keyed list host with the graph node it reads.
 export function rememberArmBindings(
@@ -95,6 +102,14 @@ export function applyBusy(boundary: BusyBoundary): void {
 		unbound ||= !bound;
 	}
 	if (unbound) for (const host of boundaryBusyHosts(boundary)) hosts.add(host);
+	const after = boundary.endAnchor && afterByEnd.get(boundary.endAnchor);
+	if (after?.isConnected && busy.pending.size > 0) {
+		const range = {
+			startAnchor: after as unknown as ResumeDomComment,
+			endAnchor: boundary.endAnchor,
+		};
+		for (const host of boundaryBusyHosts(range)) hosts.add(host);
+	}
 	for (const host of busy.marked) if (!hosts.has(host)) host.removeAttribute?.('aria-busy');
 	for (const host of hosts) host.setAttribute?.('aria-busy', 'true');
 	busy.marked = hosts;

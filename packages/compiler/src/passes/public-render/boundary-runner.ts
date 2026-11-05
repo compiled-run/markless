@@ -1,4 +1,4 @@
-import type { SemanticGraphArtifact } from '../../artifacts.ts';
+import type { SemanticGraphArtifact, SemanticGraphBinding } from '../../artifacts.ts';
 import {
 	graphBindingMap,
 	resolveGraphPath,
@@ -23,12 +23,115 @@ export type BoundaryRunnerResolution = {
 	readonly unresolvedSources: ReadonlyArray<string>;
 };
 
+export const ASYNC_GATE_GRAPH_NODE_PREFIX = 'computed:asyncGate:';
+
+type BoundaryGateReads = {
+	readonly reads: ReadonlyArray<BoundaryRunnerRead>;
+	readonly derivedGraphNodeIds: ReadonlyArray<string>;
+	readonly unresolvedSources: ReadonlyArray<string>;
+};
+
 // Async boundary runner identity is a semantic-graph fact. Emitters must not
 // infer it from payload or protocol lists, which intentionally have different
 // ordering after the protocol expands dependency closures.
 export function resolveBoundaryRunners(
 	semanticGraph: SemanticGraphArtifact,
 ): ReadonlyMap<string, BoundaryRunnerResolution> {
+	const bindingsById = new Map(
+		semanticGraph.graphBindings.map((binding) => [binding.id, binding]),
+	);
+	const gateReads = collectBoundaryGateReads(semanticGraph);
+	return new Map(
+		semanticGraph.asyncBoundaries.map((boundary) => {
+			const { reads, derivedGraphNodeIds, unresolvedSources } = gateReads.get(boundary.id)!;
+			const joined = boundary.gateGraphNodeId
+				? bindingsById.get(boundary.gateGraphNodeId)
+				: undefined;
+			const authored: BoundaryRunnerRead | null = joined
+				? { source: joined.name, graphNodeId: joined.id, path: [] }
+				: (coveringGateRead(reads, bindingsById) ?? null);
+			return [
+				boundary.id,
+				{
+					authored,
+					runnerGraphNodeId: authored?.graphNodeId ?? null,
+					reads,
+					derivedGraphNodeIds,
+					unresolvedSources,
+				},
+			] as const;
+		}),
+	);
+}
+
+/**
+ * A @try whose settled content reads several async values, directly or through
+ * sync computeds, settles on one minted sync computed over all of them, so
+ * every reader of the boundary gates on the complete async closure.
+ */
+export function mintAsyncBoundaryGates(
+	semanticGraph: Omit<SemanticGraphArtifact, 'graphBindings' | 'asyncBoundaries'> & {
+		graphBindings: SemanticGraphBinding[];
+		asyncBoundaries: Array<SemanticGraphArtifact['asyncBoundaries'][number]>;
+	},
+): void {
+	const bindingsById = new Map(
+		semanticGraph.graphBindings.map((binding) => [binding.id, binding]),
+	);
+	const gateReads = collectBoundaryGateReads(semanticGraph);
+	semanticGraph.asyncBoundaries = semanticGraph.asyncBoundaries.map((boundary) => {
+		const { reads } = gateReads.get(boundary.id)!;
+		if (reads.length < 2 || coveringGateRead(reads, bindingsById)) return boundary;
+		const gates = reads.flatMap((read) => {
+			const binding = bindingsById.get(read.graphNodeId);
+			return binding ? [binding] : [];
+		});
+		const index = boundary.id.slice(boundary.id.lastIndexOf(':') + 1);
+		const graphNodeId = `${ASYNC_GATE_GRAPH_NODE_PREFIX}${index}`;
+		const componentName = gates.find((gate) => gate.componentName)?.componentName;
+		semanticGraph.graphBindings.push({
+			id: graphNodeId,
+			name: `marklessAsyncGate${index}`,
+			kind: 'computed',
+			writable: false,
+			async: false,
+			asyncCapable: true,
+			functionSource: `() => [${gates.map((gate) => gate.name).join(', ')}]`,
+			dependencies: gates.map((gate) => ({
+				source: gate.name,
+				graphNodeId: gate.id,
+				path: [],
+			})),
+			...(componentName ? { componentName } : {}),
+		});
+		return { ...boundary, gateGraphNodeId: graphNodeId };
+	});
+}
+
+// One read settles the boundary alone when every other read is in its dependency closure.
+function coveringGateRead(
+	reads: ReadonlyArray<BoundaryRunnerRead>,
+	bindingsById: ReadonlyMap<string, SemanticGraphBinding>,
+): BoundaryRunnerRead | undefined {
+	return reads.find((candidate) => {
+		const closure = new Set<string>();
+		const visit = (graphNodeId: string): void => {
+			for (const dependency of bindingsById.get(graphNodeId)?.dependencies ?? []) {
+				if (closure.has(dependency.graphNodeId)) continue;
+				closure.add(dependency.graphNodeId);
+				visit(dependency.graphNodeId);
+			}
+		};
+		visit(candidate.graphNodeId);
+		return reads.every(
+			(read) => read === candidate || closure.has(read.graphNodeId),
+		);
+	});
+}
+
+function collectBoundaryGateReads(
+	semanticGraph: SemanticGraphArtifact,
+): ReadonlyMap<string, BoundaryGateReads> {
 	const bindings = graphBindingMap(semanticGraph);
 	const bindingsById = new Map(
 		semanticGraph.graphBindings.map((binding) => [binding.id, binding]),
@@ -117,28 +220,9 @@ export function resolveBoundaryRunners(
 				}
 			}
 
-			// A directly authored sync computed is the boundary's settle node. Its
-			// dependency closure may contain several async computeds, but protocol-view
-			// already expands that closure for gating; choosing one ancestor here would
-			// lose the authored value the settled arm actually reads.
-			const authoredSyncGates = reads.filter(
-				(read) => bindingsById.get(read.graphNodeId)?.async !== true,
-			);
-			const authored =
-				authoredSyncGates.length === 1
-					? (authoredSyncGates[0] ?? null)
-					: reads.length === 1
-						? (reads[0] ?? null)
-						: null;
 			return [
 				boundary.id,
-				{
-					authored,
-					runnerGraphNodeId: authored?.graphNodeId ?? null,
-					reads,
-					derivedGraphNodeIds: [...derivedGraphNodeIds],
-					unresolvedSources,
-				},
+				{ reads, derivedGraphNodeIds: [...derivedGraphNodeIds], unresolvedSources },
 			] as const;
 		}),
 	);

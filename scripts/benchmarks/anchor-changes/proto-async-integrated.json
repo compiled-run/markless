@@ -1,0 +1,18 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/resume-refresh-busy"],
+			"delta": 426,
+			"reason": "integration of W1 and W2: a retry from a @catch drawn after kept content marks that @catch range busy; measured residual over the per-branch ledgers (3125 -> 3551 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/resume-refresh-busy"],
+			"delta": 426,
+			"reason": "integration of W1 and W2: a retry from a @catch drawn after kept content marks that @catch range busy; measured residual over the per-branch ledgers (3125 -> 3551 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-05"
+		}
+	]
+}

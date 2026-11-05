@@ -83,6 +83,7 @@ import { collectSemanticMarkup, componentStyleScopeClass } from './collect-marku
 import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
+import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -187,6 +188,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
+	mintAsyncBoundaryGates(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
 	// Before the handle diagnostics: these decide which derive-time handle reads
 	// are a roster question, and the refusal below reads that answer.
