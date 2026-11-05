@@ -140,7 +140,7 @@ screenshots into the markless repo's goal notes.
   examples page still paints them; the docs toggle draws in ink.
 - `components/docs/navbar/` — the site header. `site-navbar.tsrx` is the `@markless/ui` navbar laid
   out like the QDS docs header: a floating bar of three panels from `80rem` wide and `37.5rem` tall up, and a top bar with a
-  full-screen `modal` menu below it. `sections.ts` names the panels and their cards. `decor.ts`
+  full-screen `modal` menu below it, whose links show the same drawings as the cards. `sections.ts` names the panels and their cards. `decor.ts`
   draws each card's picture, the dotted edges of the cards and panels, and the theme toggle's sun
   and moon with the figures' ink pen, object by object from back to front, each object filled with
   paper so it hides what it rests on. An object may carry one hover motion, scaled by the card's

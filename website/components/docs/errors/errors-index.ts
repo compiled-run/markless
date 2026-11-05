@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 304,
+	total: 305,
 	guided: 47,
 	groups: [
 		{
@@ -500,6 +500,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
 					kind: 'compile error',
 					guided: false,
 				},

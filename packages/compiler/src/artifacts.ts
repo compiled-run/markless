@@ -128,6 +128,8 @@ export type SemanticComponentPropBinding =
 			readonly sourceSpan?: SourceSpan;
 			// Body-local definitions spliced into a callback `source`; their reads are its too.
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
+			// A callback the compiler wrote around a prop its composer received through a props spread: the read no authored span holds.
+			readonly relayedRead?: LoweredStateRead;
 			// An opaque prop that is plain constant data: the render still runs the
 			// expression, and browser code reads this value instead.
 			readonly buildTimeValue?: { readonly value: unknown };
@@ -377,6 +379,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly constructReach?: ModuleGraphInterfaceConstructReach;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
+			/** Props this component files into a widget callback slot. */
+			readonly callbackSlotProps?: ReadonlyArray<string>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
@@ -685,6 +689,14 @@ export type SemanticSharedInstance = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+export type SemanticRowLocalReads = {
+	readonly componentName: string;
+	readonly name: string;
+	readonly reads: ReadonlyArray<SemanticGraphDependency>;
+	/** Set when a local in the chain has no definition to follow; the row value is refused. */
+	readonly unfollowed?: true;
+};
+
 export type SemanticGraphDependency = {
 	readonly source: string;
 	readonly graphNodeId: string;
@@ -901,7 +913,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
 		| 'MARKLESS_ALLOW_STALE'
-		| 'MARKLESS_CALL_WRITES_ASSUMED';
+		| 'MARKLESS_CALL_WRITES_ASSUMED'
+		| 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED';
 	// The external TSRX parser fails before the graph pass runs; that diagnostic carries phase 'parse'.
 	readonly phase: 'parse' | 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
@@ -1037,6 +1050,8 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// Names a composite read with no route reads, resolved by scope analysis.
+	readonly readNames?: ReadonlyArray<string>;
 	// The expression as written, when `source` carries a body function spliced into its call.
 	readonly authoredSource?: string;
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
@@ -1427,6 +1442,8 @@ export type SemanticGraphArtifact = {
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
+	/** Graph reads behind each component-body local a @for row value names, followed through helper definitions. */
+	readonly rowLocalReads?: ReadonlyArray<SemanticRowLocalReads>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 	/** Imported modules whose function write facts this compile was not given. */
 	readonly importedFunctionWriteRequests?: ReadonlyArray<string>;
@@ -1980,6 +1997,16 @@ export type SymbolResolverPlan = {
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };
 
+/** One keyed row on the way to a row item: its collection, read off the graph or off the enclosing row's item, and the key path its rows are named by. */
+export type RowLocalStep = {
+	readonly rowIndex: number;
+	readonly keyPath: ReadonlyArray<string>;
+	readonly indexKey?: true;
+	readonly graphNodeId?: string;
+	readonly collectionPath?: ReadonlyArray<string>;
+	readonly itemPath?: ReadonlyArray<string>;
+};
+
 export type BoundSymbolCaptureRoute = Exclude<
 	CaptureSlotRoute,
 	{ readonly kind: 'unsupported-opaque' }
@@ -2082,6 +2109,8 @@ export type CaptureSlotRoute =
 			readonly callbackSymbolId: string;
 			/** The instance path of the component whose callback this is, when it is not the module root. */
 			readonly composerPath?: string;
+			// The callback names its own keyed bound row, which places itself by this many of the dispatching row's pieces.
+			readonly callbackRowPieces?: number;
 	  }
 	| {
 			// A widget part invokes a callback slot on its shared instance. The family
@@ -2128,6 +2157,11 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly itemName: string;
 			readonly path: ReadonlyArray<string>;
+			// An edge in nested rows finds the item by the keys its dispatching record's path spells, outermost row first.
+			readonly rows?: ReadonlyArray<RowLocalStep>;
+			// The edge whose rows those are; a bound row replaces it with that edge's place on its path.
+			readonly rowEdgeId?: string;
+			readonly rowPiece?: number;
 	  }
 	| {
 			readonly kind: 'unsupported-opaque';

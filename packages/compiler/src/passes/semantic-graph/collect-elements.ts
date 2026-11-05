@@ -43,13 +43,19 @@ import {
 	collectCompositeTemplateExpression,
 	type CompositeReadOptions,
 	isCompositeTemplateExpression,
+	isDottedPath,
 	joinReadSources,
 	liftArmModuleValue,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
 } from './composite-reads.ts';
-import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
+import {
+	collectExpressionReads,
+	expressionReadNames,
+	resolvedSymbolAt,
+} from './collect-expressions.ts';
+import { collectRowLocalReads } from './row-local-reads.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -207,7 +213,10 @@ function rowScope(state: WalkState): { readonly keyedRepeatId?: string } {
 
 export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
-	if (readsShadowingRowItem(expression, state)) return;
+	if (readsShadowingRowItem(expression, state)) {
+		collectRowLocalReads(expression, state);
+		return;
+	}
 	const joined = joinedTextExpressions.get(expression);
 	if (joined === null) return;
 	const composite =
@@ -218,6 +227,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
+	collectRowLocalReads(expression, state);
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
 	// An arm re-renders its whole range, child edges included, so the arm wins.
@@ -238,8 +248,23 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 			? { projectedComponentEdgeId: state.currentProjectionScope!.componentEdgeId }
 			: {}),
 		computedGraphNodeId: composite?.graphNodeId,
+		...unroutedReadNames(expression, composite, state),
 		componentName: state.currentComponentName ?? undefined,
 	});
+}
+
+// What a read with no route names, so state lowering can say which binding it leaves stale.
+function unroutedReadNames(
+	expression: AnyNode,
+	composite: { readonly graphNodeId: string } | null | undefined,
+	state: WalkState,
+): { readonly readNames?: ReadonlyArray<string> } {
+	if (composite) return {};
+	const unwrapped =
+		expression.type === 'ChainExpression' ? (expression.expression as AnyNode) : expression;
+	if (isDottedPath(unwrapped)) return {};
+	const names = expressionReadNames(expression, state);
+	return names.length > 0 ? { readNames: names } : {};
 }
 
 function templateReadSource(
@@ -621,6 +646,7 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 			sourceSpan: sourceSpanValue,
 			target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+			...unroutedReadNames(test, null, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 	}
@@ -1174,6 +1200,7 @@ function collectAttribute(
 		? null
 		: conditionalClassTarget(attributeName, expressionValue, state.currentStyleScopeClass);
 	if (conditionalClass && readsShadowingRowItem(conditionalClass.test, state)) {
+		if (expressionValue) collectRowLocalReads(expressionValue, state);
 		walk(expressionValue, state);
 		return;
 	}
@@ -1185,6 +1212,7 @@ function collectAttribute(
 			state,
 			TEMPLATE_READ_OPTIONS,
 		);
+		if (expressionValue) collectRowLocalReads(expressionValue, state);
 		state.graph.templateReads.push({
 			...rowScope(state),
 			hostNodeId,
@@ -1193,6 +1221,7 @@ function collectAttribute(
 			target: conditionalClass.target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			...unroutedReadNames(conditionalClass.test, composite, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(expressionValue, state);
@@ -1233,6 +1262,7 @@ function collectAttribute(
 
 	if (expressionValue && expressionValue.type !== 'Literal') {
 		if (readsShadowingRowItem(expressionValue, state)) {
+			collectRowLocalReads(expressionValue, state);
 			walk(expressionValue, state);
 			return;
 		}
@@ -1258,6 +1288,7 @@ function collectAttribute(
 			walk(expressionValue, state);
 			return;
 		}
+		collectRowLocalReads(expressionValue, state);
 		state.graph.templateReads.push({
 			...rowScope(state),
 			hostNodeId,
@@ -1266,6 +1297,7 @@ function collectAttribute(
 			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			...unroutedReadNames(expressionValue, composite, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(expressionValue, state);
@@ -1327,6 +1359,7 @@ function collectStyleObjectAttribute(
 			target: bindingTargetForAttribute('style', state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			...unroutedReadNames(usageNode, composite, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(usageNode, state);

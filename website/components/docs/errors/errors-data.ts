@@ -8096,6 +8096,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'A @for row value reads a component-body local the compiler cannot follow: a Markless build error.',
+		printed: [
+			'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED: `<value>` in a @for row reads `<localName>`, and the compiler cannot find the definition that says which state it reads, so the row would keep the value it first rendered.',
+			"A row value repaints when a state or computed it reads changes. Reads through a helper are followed into the helper's definition; a local with no single definition the compiler can read has no reads to follow.",
+			'Declare `<localName>` once as a `const` or a function in the component body, or read the state through a `computed()`.',
+			'https://markless.dev/errors/MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_RUNTIME_ERROR',
 		packageName: '@markless/web',
 		stage: 'runtime',

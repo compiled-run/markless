@@ -55,6 +55,14 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	// A slot route reads its answering symbol id out of the graph, so only a page
 	// whose parts actually escape a widget callback carries the extra branch.
 	const rowed = scopesInstances && (input.boundSymbols ?? []).some((row) => row.rowPieces);
+	const keyedCallbackRows = (input.boundSymbols ?? []).some((row) =>
+		row.captureSlots.some(
+			(slot) => slot.route.kind === 'callback-route' && slot.route.callbackRowPieces !== undefined,
+		),
+	);
+	const keyedRowLocals = (input.boundSymbols ?? []).some((row) =>
+		row.captureSlots.some((slot) => slot.route.kind === 'row-local' && slot.route.rows),
+	);
 	const routesCallbackSlots = (input.boundSymbols ?? []).some((row) =>
 		row.captureSlots.some((slot) => slot.route.kind === 'callback-slot-route'),
 	);
@@ -70,7 +78,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		...(rowed
 			? [
-					`import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';`,
+					`import { marklessRowBoundCallbackId, marklessRowBoundGraphNodeId, marklessRowBoundPath${keyedRowLocals ? ', marklessRowLocal' : ''}${keyedCallbackRows ? ', marklessRowBoundCallbackGraph' : ''} } from '@markless/web/fns/row-bound-path';`,
 					'',
 				]
 			: []),
@@ -126,7 +134,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			}',
 		// A prop the root forwarded from its own props: the root's props are the page-space `prop:props` cell.
 		'			if (route.kind === "passthrough-route") return context.graph.read("prop:props", [route.propName, ...(route.path ?? []), ...(slot.path ?? [])]);',
-		'			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], context.locals?.[route.itemName]);',
+		`			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], ${rowed && keyedRowLocals ? 'route.rows ? marklessRowLocal(bound, context.graph, route) : ' : ''}context.locals?.[route.itemName]);`,
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
@@ -154,7 +162,12 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
 		// The composer's instance path rides the callback id, so the callback runs on the page graph; this scope would qualify it twice.
-		'			return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });',
+		...(rowed && keyedCallbackRows
+			? [
+					'			if (route.callbackRowPieces !== undefined) return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, graph: marklessRowBoundCallbackGraph(bound, context.graph, route.callbackRowPieces), event: context.event, args });',
+				]
+			: []),
+		`			return context.invokeSymbol(${rowed ? 'marklessRowBoundCallbackId(bound, context.graph, route.callbackSymbolId)' : '(context.graph?.marklessInstancePath || "") + route.callbackSymbolId'}, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });`,
 		'		},',
 		'	};',
 		'}',

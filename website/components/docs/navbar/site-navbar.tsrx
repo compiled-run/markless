@@ -385,9 +385,7 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 
 function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly pathname: string }) @{
 	<navbar.itemlink class={'card card-' + card.size} href={card.href} current={isCurrent(pathname, card.href)}>
-		<svg class="card-art" aria-hidden="true">
-			<use href={asset(NAV_DECOR) + '#' + card.art} width="100%" height="100%" />
-		</svg>
+		<CardArt card={card} class="card-art" />
 		<span class="card-scrim" aria-hidden="true"></span>
 		<span class="card-text">
 			<span class="card-label">
@@ -410,17 +408,11 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				background: var(--paper);
 				color: var(--ink);
 				text-decoration: none;
-				--decor-paper: var(--paper);
-				--decor-wash: var(--yellow);
-				--decor-wash-opacity: 0.75;
-				--decor-wash-blend: multiply;
 				/* QDS sets white type on a gradient to its darkest tone; here the darkest tone is the ink in light and near-black in dark. */
 				--card-scrim: var(--ink);
 				--card-text: color-mix(in oklch, var(--paper) 35%, white);
 
 				html.dark & {
-					--decor-wash-opacity: 0.4;
-					--decor-wash-blend: normal;
 					--card-scrim: oklch(12% 0.006 70);
 					--card-text: var(--ink);
 				}
@@ -569,6 +561,28 @@ function SearchButton() @{
 	</navbar.trigger>
 }
 
+/** A card's drawing, linked from the sprite; the link around it sets `--hover` to move the drawing's one object. */
+function CardArt({ card, class: className }: { readonly card: NavCard; readonly class: string }) @{
+	<svg class={'nav-art ' + className} aria-hidden="true">
+		<use href={asset(NAV_DECOR) + '#' + card.art} width="100%" height="100%" />
+
+		<style>
+			.nav-art {
+				overflow: visible;
+				--decor-paper: var(--paper);
+				--decor-wash: var(--yellow);
+				--decor-wash-opacity: 0.75;
+				--decor-wash-blend: multiply;
+
+				html.dark & {
+					--decor-wash-opacity: 0.4;
+					--decor-wash-blend: normal;
+				}
+			}
+		</style>
+	</svg>
+}
+
 /** A card's or panel's hand-inked edge, from the same sprite as the card drawings. */
 function InkEdge({ name }: { readonly name: string }) @{
 	<svg class="ink-edge" aria-hidden="true">
@@ -660,19 +674,32 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 							@for (const panel of panels; key panel.label) {
 								<div class="menu-section">
 									<span class="menu-heading">{panel.label}</span>
-									@for (const card of panel.cards; key card.href) {
-										<a
-											class="menu-link"
-											href={card.href}
-											aria-current={!card.skipActive && isCurrent(pathname, card.href) ? 'page' : undefined}
-											onClick={() => {
-												menu.open = false;
-											}}
-										><span class="menu-link-text">{card.label}</span></a>
-									}
+									<div class="menu-tiles">
+										@for (const card of panel.cards; key card.href) {
+											<a
+												class="menu-link menu-tile"
+												href={card.href}
+												aria-current={!card.skipActive && isCurrent(pathname, card.href) ? 'page' : undefined}
+												onClick={() => {
+													menu.open = false;
+												}}
+											>
+												<span class="menu-art-frame" aria-hidden="true">
+													<CardArt card={card} class="menu-art" />
+													<InkEdge name="card" />
+												</span>
+												<span class="menu-link-text">
+													{card.label}
+													@if (card.external) {
+														<lucide.arrowupright class="menu-out" aria-hidden="true" />
+													}
+												</span>
+											</a>
+										}
+									</div>
 								</div>
 							}
-							<div class="menu-section">
+							<div class="menu-section menu-more">
 								<span class="menu-heading">More</span>
 								<a class="menu-link" href={github}><span class="menu-link-text">GitHub</span></a>
 							</div>
@@ -797,15 +824,92 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 
 			.menu-grid {
 				display: grid;
-				grid-template-columns: 1fr 1fr;
-				gap: 2rem;
+				gap: 1.75rem;
 			}
 
 			.menu-section {
 				display: flex;
 				flex-direction: column;
-				gap: 1rem;
+				gap: 0.75rem;
 				min-inline-size: 0;
+			}
+
+			.menu-more {
+				align-items: flex-start;
+			}
+
+			.menu-tiles {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+				gap: 1rem 0.75rem;
+			}
+
+			.menu-tile {
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+				padding-top: 0;
+				border-bottom: 0;
+			}
+
+			.menu-art-frame {
+				position: relative;
+				display: block;
+				block-size: 5.5rem;
+				border-radius: 0.6rem;
+				background: var(--paper);
+			}
+
+			.menu-art {
+				position: absolute;
+				inset: 0.5rem 0.6rem;
+				inline-size: calc(100% - 1.2rem);
+				block-size: calc(100% - 1rem);
+				transition: scale var(--spring-hover-ms) var(--spring-hover);
+			}
+
+			.menu-tile .menu-link-text {
+				align-self: flex-start;
+				border-bottom: 2px solid transparent;
+				transition: border-color 150ms ease;
+			}
+
+			.menu-out {
+				inline-size: 0.9em;
+				block-size: 0.9em;
+				margin-inline-start: 0.2em;
+				vertical-align: -0.05em;
+			}
+
+			.menu-tile:hover .menu-link-text {
+				border-bottom-color: var(--pink);
+			}
+
+			/* A tap plays the card's hover motion while the finger is down, a little smaller than on the desktop card. */
+			@media (prefers-reduced-motion: no-preference) {
+				.menu-tile:is(:active, :focus-visible) {
+					--hover: 1;
+				}
+
+				.menu-tile:is(:active, :focus-visible) .menu-art {
+					scale: 1.03;
+				}
+
+				@media (hover: hover) {
+					.menu-tile:hover {
+						--hover: 1;
+					}
+
+					.menu-tile:hover .menu-art {
+						scale: 1.03;
+					}
+				}
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.menu-art {
+					transition: none;
+				}
 			}
 
 			.menu-heading {

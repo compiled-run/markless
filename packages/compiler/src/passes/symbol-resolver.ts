@@ -147,16 +147,18 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				inlined.foreignBodies,
 				input.semanticGraph.moduleImports,
 			);
-			const reads = eventReads(
-				input.stateLowering?.reads,
-				[
-					prop.sourceSpan,
-					...inlined.spans,
-					...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
-				],
-				source,
-				semanticsReader,
-			);
+			const reads = prop.relayedRead
+				? [prop.relayedRead]
+				: eventReads(
+						input.stateLowering?.reads,
+						[
+							prop.sourceSpan,
+							...inlined.spans,
+							...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
+						],
+						source,
+						semanticsReader,
+					);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
@@ -462,7 +464,7 @@ export function planBoundSymbolResolver(
 								{
 									slotId: slot.id,
 									path: slot.path,
-									route: qualifiedRoute(route, ownerPath),
+									route: qualifiedRoute(route, ownerPath, componentEdgePath),
 									...(slot.propName
 										? {
 												legacyGraphRead: {
@@ -521,13 +523,59 @@ export function planBoundSymbolResolver(
 		const instancePath = componentEdgeInstanceSegment(edge, edges);
 		return instancePath ? [{ componentEdgeId: edge.id, instancePath }] : [];
 	});
-	return { passId: 'bound-symbol-resolver', rows, componentEdgeInstancePaths };
+	return {
+		passId: 'bound-symbol-resolver',
+		rows: withCallbackRowsNamed(rows),
+		componentEdgeInstancePaths,
+	};
+}
+
+// The route table resolves an instance path one edge at a time and keeps one row per inner edge, so a callback whose captures differ per instance is named by its own row.
+function withCallbackRowsNamed(rows: BoundSymbolResolverRow[]): BoundSymbolResolverRow[] {
+	const callbackRows = new Map<string, BoundSymbolResolverRow>();
+	for (const row of rows)
+		if (!row.loaderSymbolId && row.instancePath)
+			callbackRows.set(`${row.instancePath}${row.baseSymbolId}`, row);
+	return rows.map((row) => ({
+		...row,
+		captureSlots: row.captureSlots.map((slot) => {
+			const route = slot.route;
+			if (route.kind !== 'callback-route' || !route.composerPath) return slot;
+			const callbackRow = callbackRows.get(route.composerPath + route.callbackSymbolId);
+			// A keyed callback row is placed by the dispatching row's pieces, which only a keyed handler row carries.
+			if (!callbackRow || (callbackRow.rowPieces && !row.rowPieces)) return slot;
+			const { composerPath: _composerPath, ...named } = route;
+			return {
+				...slot,
+				route: {
+					...named,
+					callbackSymbolId: callbackRow.id,
+					...(callbackRow.rowPieces ? { callbackRowPieces: callbackRow.rowPieces.length } : {}),
+				},
+			};
+		}),
+	}));
 }
 
 function qualifiedRoute(
 	route: BoundSymbolCaptureRoute,
 	ownerPath: (ownerEdgeCount: number | undefined) => string,
+	componentEdgePath: ReadonlyArray<string>,
 ): BoundSymbolCaptureRoute {
+	if (route.kind === 'row-local' && route.rows && route.rowEdgeId) {
+		const { rowEdgeId, ...rest } = route;
+		const rowPiece = componentEdgePath.indexOf(rowEdgeId);
+		const owner = ownerPath(rowPiece);
+		return {
+			...rest,
+			rowPiece,
+			rows: route.rows.map((step) =>
+				step.graphNodeId && owner && protocolInstanceQualifies(step.graphNodeId) === true
+					? { ...step, graphNodeId: owner + step.graphNodeId }
+					: step,
+			),
+		};
+	}
 	if (route.kind !== 'graph-reference') return route;
 	const { ownerEdgeCount, ...rest } = route;
 	const composerPath = ownerPath(ownerEdgeCount);

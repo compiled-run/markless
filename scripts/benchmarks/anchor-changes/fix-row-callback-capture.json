@@ -1,0 +1,64 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 59,
+			"reason": "a callback prop or widget callback in a component a constant @for renders now runs with its row's captures: rowed resolvers import one more row-bound-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1146,
+			"reason": "a callback prop or widget callback in a component a constant @for renders now runs with its row's captures: rowed resolvers import one more row-bound-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 59,
+			"reason": "a callback prop or widget callback in a component a constant @for renders now runs with its row's captures: rowed resolvers import one more row-bound-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 241,
+			"reason": "a callback prop or widget callback in a component a constant @for renders now runs with its row's captures: rowed resolvers import one more row-bound-path helper",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 165,
+			"reason": "a callback prop or widget callback in a component a constant @for renders now runs with its row's captures: rowed resolvers import one more row-bound-path helper",
+			"date": "2026-11-05"
+		}
+	]
+}

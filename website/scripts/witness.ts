@@ -1033,7 +1033,7 @@ try {
 		await page
 			.waitForFunction(
 				() =>
-					document.querySelector('.sidebar-link.is-active')?.getAttribute('href') ===
+					document.querySelector('.sidebar-link[aria-current="page"]')?.getAttribute('href') ===
 					'/concepts/computed',
 				undefined,
 				{ timeout: 10_000 },
@@ -1041,7 +1041,7 @@ try {
 			.catch(() => {});
 		const landed = await page.evaluate(() => ({
 			heading: document.querySelector('h1')?.textContent ?? '',
-			active: document.querySelector('.sidebar-link.is-active')?.textContent?.trim() ?? '',
+			active: document.querySelector('.sidebar-link[aria-current="page"]')?.textContent?.trim() ?? '',
 			title: document.title,
 			canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? '',
 			description:
