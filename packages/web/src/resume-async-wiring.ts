@@ -202,7 +202,8 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
-						asyncPlanes.busy?.apply(boundary);
+						// After the pass: what updates in place lands with the rest of this flush.
+						void input.graph.flush().then(() => asyncPlanes.busy?.apply(boundary));
 						return result;
 					});
 				},
@@ -342,6 +343,7 @@ export async function settleAsyncBoundaryRange(
 	boundary: ResumeAsyncBoundaryRecord,
 	snapshot: unknown,
 	claim?: () => boolean,
+	rerender?: true,
 ): Promise<DomJournalResult | void> {
 	const status = (snapshot as { readonly status?: unknown } | null)?.status;
 	if (!isSettledStatus(status)) return;
@@ -356,9 +358,11 @@ export async function settleAsyncBoundaryRange(
 			: input.graph.read(boundary.runnerGraphNodeId, ['status']);
 	// A newer run that started while this settle waited or rendered owns the boundary: its own settle commits, and the hold keeps what is shown.
 	if ((await input.settleTracker?.waitOutCommitHold()) === true && runnerStatus() !== status) return;
+	// A refresh over the shown @try arm updates it in place: its bindings, branches, rows and nested blocks follow the graph.
 	if (
 		status === 'fulfilled' &&
-		boundary.refreshesInPlace &&
+		!rerender &&
+		!boundary.rerendersOnRefresh &&
 		input.commitArm &&
 		(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try
 	) {
@@ -371,7 +375,7 @@ export async function settleAsyncBoundaryRange(
 	// Only an arm committed with its own records carries the value bindings an in-place refresh needs.
 	const commit = async (update: Omit<ArmCommitUpdate, 'arm' | 'after'>, ownRecords = true) => {
 		const after = asyncPlanes.busy?.settleRange(boundary, arm);
-		if (ownRecords) shownArms.set(boundary, arm);
+		if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
 		else shownArms.delete(boundary);
 		await input.commitArm!((after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
@@ -427,7 +431,8 @@ export async function settleAsyncBoundaryRange(
 			);
 			return;
 		}
-		shownArms.delete(boundary);
+		if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
+		else shownArms.set(boundary, arm);
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
 		if (input.root.__marklessBranchArms?.has(boundary.id)) {
 			if (claim?.() === false) return;

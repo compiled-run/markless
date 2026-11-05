@@ -42,6 +42,8 @@ export type BoundarySettleRecordsInput = {
 	readonly repeatPartCounts: ReadonlyArray<number>;
 	/** Settled reads that also read live inputs, so their bindings change between settles. */
 	readonly liveSettledReads?: ReadonlySet<string>;
+	/** Graph nodes that re-run when what they read changes; a refresh of one updates the arm in place. */
+	readonly refreshingGraphNodeIds: ReadonlySet<string>;
 };
 
 // Null when an element position cannot be stated exactly; the settle then commits html only.
@@ -100,7 +102,9 @@ export function boundarySettleRecords(
 		});
 		rowElements.push(layout.rowElements);
 	}
-	// Pay-per-use: an arm whose only bindings show the settled value needs no records.
+	// Pay-per-use: a settle that never refreshes renders its value, so an arm showing only that value needs no records.
+	if (boundary.asyncReads.some((read) => input.refreshingGraphNodeIds.has(read.graphNodeId)))
+		return { arms, rowElements };
 	const settledReads = new Set(
 		boundary.asyncReads
 			.map((read) => read.graphNodeId)

@@ -68,9 +68,11 @@ test('a handler that reads no async-backed value, or writes the input it reads, 
 	expect(emitted ?? '').not.toContain('"state:span"');
 });
 
-test('a settled arm showing a value over a live input registers its binding, one over async values only does not', async () => {
+test('a settled arm showing a value over a live input registers its binding, one over a value that never refreshes does not', async () => {
 	const live = await compile(page(''));
 	expect(live.boundaries.join('\n')).toContain('marklessBoundaryRecords');
-	const settledOnly = await compile(page('', '<p>{revenue.total}</p>'));
-	expect(settledOnly.boundaries.join('\n')).not.toContain('marklessBoundaryRecords');
+	const fixed = await compile(
+		page('', '<p>{revenue.total}</p>').replace('const days = span;', "const days = '10d';"),
+	);
+	expect(fixed.boundaries.join('\n')).not.toContain('marklessBoundaryRecords');
 });

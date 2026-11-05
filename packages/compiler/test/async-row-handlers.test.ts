@@ -63,35 +63,62 @@ export default function Page() @{
 	expect(tryRecords?.branches).toBeUndefined();
 });
 
-test('a @try whose values are all wired keeps its elements on refresh; one with a nested construct does not', async () => {
-	const live = await compile(`
+const updateModule = (result: Awaited<ReturnType<typeof compile>>) =>
+	result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update')?.source ?? '';
+
+test('a @try whose value refreshes settles with the records that update it in place; one that never refreshes renders its value', async () => {
+	const refreshing = await compile(`
 import { computed, state } from '@markless/core';
-async function load(n: number) { return [{ sku: 'p', price: n }]; }
+async function load(n: number) { return { title: 't' + n }; }
 export default function Page() @{
 	let round = state(0);
-	const prices = computed(async () => await load(round));
+	const issue = computed(async () => await load(round));
 	<main>
-		<button onClick={() => round++}>reload</button>
+		<button onClick={() => round++}>next</button>
+		@try { <h2>{issue.title}</h2> } @pending { <p>wait</p> }
+	</main>
+}`);
+	expect(updateModule(refreshing)).toContain('armRecords: marklessBoundaryRecords[arm]');
+	const fixed = await compile(`
+import { computed } from '@markless/core';
+async function load() { return { title: 't' }; }
+export default function Page() @{
+	const issue = computed(async () => await load());
+	<main>
+		@try { <h2>{issue.title}</h2> } @pending { <p>wait</p> }
+	</main>
+}`);
+	expect(updateModule(fixed)).not.toContain('armRecords');
+});
+
+test('a @try whose keyed rows the browser cannot build re-renders on refresh; one with a row template updates in place', async () => {
+	const stale = await compile(`
+import { computed, state } from '@markless/core';
+async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
+function Tag({ row, unit }: { row: { amount: number }; unit: string }) @{ <em>{row.amount + unit}</em> }
+export default function Page() @{
+	let unit = state('a');
+	const rows = computed(async () => await load(unit));
+	<main>
+		<button onClick={() => (unit = 'b')}>b</button>
 		@try {
-			<table><caption>{prices.length} rows</caption><tbody>
-				@for (const row of prices; key row.sku) { <tr data-sku={row.sku}><td>{row.price}</td></tr> }
-			</tbody></table>
+			<ol>@for (const row of rows; key row.sku) { <li><i>{row.amount + unit}</i><Tag row={row} unit={unit} /></li> }</ol>
 		} @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(live.protocolView.asyncBoundaries[0]?.refreshesInPlace).toBe(true);
-	const branching = await compile(`
+	expect(stale.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBe(true);
+	const templated = await compile(`
 import { computed, state } from '@markless/core';
-async function load(n: number) { return { open: n > 0, title: 't' }; }
+async function load(n: number) { return [{ sku: 'p', amount: n }]; }
 export default function Page() @{
 	let round = state(0);
-	const panel = computed(async () => await load(round));
+	const rows = computed(async () => await load(round));
 	<main>
-		<button onClick={() => round++}>reload</button>
+		<button onClick={() => round++}>next</button>
 		@try {
-			<section>@if (panel.open) { <h2>{panel.title}</h2> } @else { <p>shut</p> }</section>
+			<ol>@for (const row of rows; key row.sku) { <li data-sku={row.sku}>{row.amount}</li> }</ol>
 		} @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(branching.protocolView.asyncBoundaries[0]?.refreshesInPlace).toBeUndefined();
+	expect(templated.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBeUndefined();
 });

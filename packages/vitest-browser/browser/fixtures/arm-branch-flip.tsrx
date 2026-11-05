@@ -5,7 +5,7 @@ import { bumpPanelRenders } from './panel-render-probe.ts';
 // T104 tier-3 proof, dashboard branch-menu shape: a sync-state @if (with a
 // keyed @for inside it) inside a component's children inside @try. Toggling
 // the drawer must flip ONLY the branch range — the render-count probe must
-// not move — and a real re-settle (region write) must rewire the flip.
+// not move. A refresh (region write) keeps the arm; a @catch -> @try re-commit must rewire the flip.
 export function App() @{
 	let drawerOpen = state(false);
 	let region = state('west');
@@ -13,11 +13,13 @@ export function App() @{
 		const zone = region;
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		if (signal.aborted) return { zone: 'aborted', crews: [] };
+		if (zone === 'nowhere') throw new Error('No crews there');
 		return { zone, crews: [{ callsign: zone + '-kestrel' }, { callsign: zone + '-osprey' }] };
 	});
 
 	<main>
 		<button type="button" data-region onClick={() => region = 'east'}>Region</button>
+		<button type="button" data-lost onClick={() => region = 'nowhere'}>Lost</button>
 		@try {
 			<PanelFrame heading="Crews">
 				<span data-render-count>{bumpPanelRenders()}</span>

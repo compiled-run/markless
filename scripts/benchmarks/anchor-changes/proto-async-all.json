@@ -1,0 +1,26 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 144,
+			"reason": "merging W8 and W13 into the async diet: the in-place refresh skip with its shown-arm tracking, and the re-render a @try keeps when its keyed rows cannot be rebuilt (11824 -> 11968 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 144,
+			"reason": "merging W8 and W13 into the async diet: the in-place refresh skip with its shown-arm tracking, and the re-render a @try keeps when its keyed rows cannot be rebuilt (11824 -> 11968 B rendered, loaded only with @try wiring)",
+			"date": "2026-11-05"
+		}
+	]
+}
