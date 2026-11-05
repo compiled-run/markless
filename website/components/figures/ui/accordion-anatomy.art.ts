@@ -2,7 +2,7 @@
 import type { drawing } from './accordion-anatomy.ts';
 
 export const art: ReturnType<typeof drawing> = {
-	"width": 640,
+	"width": 700,
 	"height": 430,
 	"layers": [
 		{
@@ -84,7 +84,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 2,
 					"x": 460,
-					"y": 262,
+					"y": 244,
 					"text": "accordion.root",
 					"cls": "name",
 					"style": ""
@@ -143,7 +143,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 4,
 					"x": 460,
-					"y": 194,
+					"y": 176,
 					"text": "accordion.item",
 					"cls": "name",
 					"style": ""
@@ -217,7 +217,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 7,
 					"x": 460,
-					"y": 82,
+					"y": 64,
 					"text": "accordion.itemlabel",
 					"cls": "name",
 					"style": ""
@@ -292,7 +292,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 11,
 					"x": 460,
-					"y": 158,
+					"y": 140,
 					"text": "accordion.itemcontent",
 					"cls": "name",
 					"style": ""
@@ -358,7 +358,7 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 14,
 					"x": 460,
-					"y": 92,
+					"y": 74,
 					"text": "accordion.itemtrigger",
 					"cls": "name",
 					"style": ""

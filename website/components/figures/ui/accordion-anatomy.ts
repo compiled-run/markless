@@ -31,7 +31,7 @@ export function drawing() {
 	const tag = (part: string, y: number, edge: number) => {
 		s.pen([[edge + 4, y - 5], [452, y - 5]], 0, 'pen leader');
 		s.text(460, y, TAGS[part]!, 'tag tag-' + part);
-		s.text(460, y + 18, 'accordion.' + part, 'name');
+		s.text(460, y, 'accordion.' + part, 'name');
 	};
 
 	mark('root');
@@ -95,5 +95,5 @@ export function drawing() {
 		const [dx, dy] = LIFT[part]!;
 		return { part, d: pathOf([[x + px, y + py], [x + dx, y + dy]]) };
 	});
-	return { width: 640, height: 430, layers, guides };
+	return { width: 700, height: 430, layers, guides };
 }

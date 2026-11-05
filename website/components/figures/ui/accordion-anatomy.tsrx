@@ -123,7 +123,7 @@ export default function AccordionAnatomy() @{
 			}
 
 			.stage {
-				width: min(100%, 40rem);
+				width: min(100%, 44rem);
 				border-radius: 12px;
 				cursor: pointer;
 				touch-action: none;
@@ -342,7 +342,7 @@ export default function AccordionAnatomy() @{
 
 			.name {
 				font-family: 'Recursive', ui-monospace, monospace;
-				font-size: 18px;
+				font-size: 15px;
 				font-weight: 600;
 				fill: color-mix(in srgb, var(--pink) 70%, #e0603c);
 				opacity: 0;
@@ -351,6 +351,10 @@ export default function AccordionAnatomy() @{
 
 			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer:hover .name {
 				opacity: 1;
+			}
+
+			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer:hover .tag {
+				opacity: 0;
 			}
 
 			.accordion-anatomy[data-panel='closed'] .layer[data-part='itemcontent'] {
