@@ -276,6 +276,28 @@ test('a kept part that also reads document-wide shared() state shows what the ne
 	await page.close();
 });
 
+test('a kept part keeps its own state, and the page content placed inside it starts from the next page', async () => {
+	const { page, errors } = await open('/guide');
+	const press = async (selector: string, text: string) => {
+		await page.click(selector);
+		await page.waitForFunction(
+			([target, expected]) => document.querySelector(target!)?.textContent === expected,
+			[selector, text],
+		);
+	};
+	await press('[data-shell-press]', 'shell 1');
+	await press('[data-note]', 'note 1');
+	await page.click('[data-nav="reference"]');
+	await shows(page, 'Reference page');
+	expect(await page.getAttribute('[data-shell]', PROTOCOL_KEEP_INSTANCE_ATTRIBUTE)).toBeTruthy();
+	expect(await page.textContent('[data-shell-press]')).toBe('shell 1');
+	expect(await page.textContent('[data-note]')).toBe('note 0');
+	await press('[data-note]', 'note 1');
+	await press('[data-shell-press]', 'shell 2');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('Back and Forward keep the part and its state', async () => {
 	const { page, errors } = await open('/guide');
 	await toggle(page, '1');

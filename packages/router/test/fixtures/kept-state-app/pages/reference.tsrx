@@ -1,6 +1,8 @@
 import Banner from '../src/banner.tsrx';
 import SideNav from '../src/side-nav.tsrx';
 import PressCounter from '../src/press-counter.tsrx';
+import Shell from '../src/shell.tsrx';
+import Note from '../src/note.tsrx';
 import { VisitButton } from '../src/visits.tsrx';
 
 export default function Page() @{
@@ -14,5 +16,8 @@ export default function Page() @{
 		</main>
 		<PressCounter />
 		<VisitButton />
+		<Shell>
+			<Note />
+		</Shell>
 	</>
 }
