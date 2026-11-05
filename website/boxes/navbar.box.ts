@@ -231,6 +231,7 @@ export default box(
 			for (let k = 0; k < 4; k++) {
 				await page.locator('.nav-pill .theme-toggle:visible').click();
 				await page.waitForTimeout(800);
+				await expect(search, 'the theme toggle leaves the search closed').toBeHidden();
 				const next = page.locator('nav[aria-label="Page navigation"] a', { hasText: 'NEXT' });
 				const nextPath = new URL((await next.getAttribute('href'))!, server.url).pathname;
 				await navigateBy(page, () => next.click(), nextPath);
