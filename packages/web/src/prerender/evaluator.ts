@@ -31,9 +31,11 @@ import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessInstanceSegments,
 	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
 	marklessRowSegment,
+	type MarklessScopedGraph,
 } from '../fns/instance-scope.ts';
 import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
@@ -390,31 +392,38 @@ export async function renderPrerenderBranch(
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
 	readonly cells: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	// Bound symbol ids are spelled from the module root, which stands here on the page.
+	readonly moduleRootPath?: string;
 }> {
 	let output: SsrRenderOutput;
+	let owner: BranchOwnerPlacement | undefined;
 	const freshCellIds = new Set<string>();
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
+		const ownerName = branchOwnerName(page, branchSiteId);
+		owner = branchOwnerPlacement(page, ownerName, graph);
 		output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
 			graph,
 			true,
-			servedPageProps(graph, page, branchOwnerName(page, branchSiteId)),
-			{ branchSiteId, cellIds: freshCellIds },
+			servedPageProps(graph, page, ownerName),
+			{ branchSiteId, cellIds: freshCellIds, ...(owner && { owner }) },
 		);
 	} else {
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	}
 	const records = await prepareSsrResumeRecords(output);
 	const inArm = armBranchRange(output, records.view, branchSiteId);
+	const placed = owner ? { moduleRootPath: owner.moduleRootPath } : {};
 	if (inArm)
 		return {
 			...inArm,
 			computed: records.state.computed,
 			cells: freshArmCells(output, freshCellIds),
+			...placed,
 		};
 	const arm = prerenderBranchArm({
 		structure: output.structure,
@@ -444,6 +453,7 @@ export async function renderPrerenderBranch(
 		},
 		computed: records.state.computed,
 		cells: freshArmCells(output, freshCellIds),
+		...placed,
 	};
 }
 
@@ -613,12 +623,14 @@ async function evaluatePrerenderDataSurface(
 	props: Readonly<Record<string, unknown>> = {},
 	fresh?: {
 		readonly branchSiteId?: string;
+		readonly owner?: BranchOwnerPlacement;
 		readonly cellIds: Set<string>;
 		readonly settling?: PrerenderSettling;
 	},
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName = branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
+	const ownerPath = fresh?.owner?.ownerPath;
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
 	const rendered = await evaluatePrerenderDataComponent({
@@ -628,6 +640,7 @@ async function evaluatePrerenderDataSurface(
 		idPrefix: '',
 		...(surface.elementIdScope ? { elementIdScope: surface.elementIdScope } : {}),
 		symbolPrefix: '',
+		...(ownerPath ? { module: { rootPrefix: '', instanceReads: new Map(), ownerPath } } : {}),
 		loadSymbol,
 		graph,
 		requireHtml,
@@ -648,6 +661,46 @@ async function evaluatePrerenderDataSurface(
 	return roster.marklessResolveRosterCounts(
 		roster.marklessResolveDeferredCounts(rendered, positions.deferred ?? []),
 	);
+}
+
+type BranchOwnerPlacement = {
+	// The page path of the module root the owner was composed under.
+	readonly moduleRootPath: string;
+	// The owner's path from that module root, rows included.
+	readonly ownerPath: string;
+};
+
+// The flip's graph stands at the owner's page path; the module's own edges say which tail of it is the module's.
+function branchOwnerPlacement(
+	surface: PrerenderDataSurface,
+	ownerName: string | undefined,
+	graph: RuntimeGraph,
+): BranchOwnerPlacement | undefined {
+	const pagePath = (graph as MarklessScopedGraph).marklessInstancePath;
+	if (!ownerName || !pagePath) return undefined;
+	const segments = marklessInstanceSegments(pagePath);
+	const reaches = new Set<string>();
+	let frontier: ReadonlyArray<readonly [string, string]> = surface.rootComponentName
+		? [[surface.rootComponentName, '']]
+		: [];
+	for (let depth = 0; depth < segments.length && frontier.length > 0; depth++) {
+		frontier = frontier.flatMap(([name, path]) =>
+			(surface.components[name]?.edges ?? []).flatMap((edge) =>
+				surface.components[edge.childComponentName]
+					? [[edge.childComponentName, path + edge.symbolPrefix] as const]
+					: [],
+			),
+		);
+		for (const [name, path] of frontier) if (name === ownerName) reaches.add(path);
+	}
+	// An owner no edge of its own module reaches was composed from another module, at that module's root.
+	reaches.add('');
+	for (let start = 0; start <= segments.length; start++) {
+		const ownerPath = segments.slice(start).join('');
+		if (reaches.has(marklessRowFreeSymbolId(ownerPath, ownerPath)))
+			return { moduleRootPath: segments.slice(0, start).join(''), ownerPath };
+	}
+	return undefined;
 }
 
 // A flip's symbol runs as the instance of the component holding the branch, not always the module root.
@@ -760,6 +813,16 @@ export function marklessBoundGraphValues(
 	return routed.size > 0 ? routed : undefined;
 }
 
+// A bound symbol spells ids from the module root, so a render rooted at a flip's owner reads them past the owner's place.
+function marklessPlacedInstanceRead(
+	module: PrerenderBoundModule,
+	placed: string,
+): PrerenderRead | undefined {
+	const owner = module.ownerPath;
+	const local = owner && placed.startsWith(owner) ? placed.slice(owner.length) : placed;
+	return module.instanceReads.get(module.rootPrefix + local);
+}
+
 // Per live graph, the component instances its last re-render placed on the page.
 const mountedInstances = new WeakMap<RuntimeGraph, Set<string>>();
 
@@ -811,6 +874,8 @@ function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayl
 type PrerenderBoundModule = {
 	readonly rootPrefix: string;
 	readonly instanceReads: Map<string, PrerenderRead>;
+	// Where this render's root stands on the page when it is not the module root: a flip renders only the branch's owner.
+	readonly ownerPath?: string;
 };
 
 export type PrerenderBoundComposer = {
@@ -1012,7 +1077,10 @@ export function evaluatePrerenderDataComponent(input: {
 		// A route spells another instance without rows; this derive's own place supplies the rows it sits in.
 		const rows =
 			boundSymbolId && scope?.module
-				? marklessRecordRowScope(input.symbolPrefix.slice(scope.module.rootPrefix.length))
+				? marklessRecordRowScope(
+						(scope.module.ownerPath ?? '') +
+							input.symbolPrefix.slice(scope.module.rootPrefix.length),
+					)
 				: undefined;
 		// Slot routes name the composer's nodes bare and any other instance by its path in the module; a minted row knows only its composer.
 		const deriveRead: PrerenderRead =
@@ -1024,7 +1092,7 @@ export function evaluatePrerenderDataComponent(input: {
 								rows?.find((pair) => !pair.rowBoundary && pair.rowFree === at)
 									?.withRows ?? at,
 							holder = at
-								? scope.module?.instanceReads.get(scope.module.rootPrefix + placed)
+								? scope.module && marklessPlacedInstanceRead(scope.module, placed)
 								: scope.read;
 						if (holder) return holder(local, path);
 						const own = read(graphNodeId, path);
