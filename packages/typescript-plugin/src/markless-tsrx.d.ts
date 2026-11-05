@@ -319,6 +319,8 @@ declare namespace __MarklessTypeService {
 		 * or at idle when it is in view.
 		 */
 		prefetch?: boolean;
+		/** Fills the brackets of a route pattern `href`, as in `href="/blog/[slug]" params={{ slug }}`. */
+		params?: Readonly<Record<string, unknown>>;
 	};
 
 	type ImageAttributes = {

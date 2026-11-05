@@ -1,0 +1,88 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 107,
+			"reason": "pages stop loading code for arms their literal props rule out (accordion -3.2 KB); docs / and /concepts/state fetch ~2 KB more at idle: the playground compile worker carries the new prop-test pass, and packs split once Term serves fewer pages. Executed moves within the 256-char swing",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 248,
+			"reason": "pages stop loading code for arms their literal props rule out (accordion -3.2 KB); docs / and /concepts/state fetch ~2 KB more at idle: the playground compile worker carries the new prop-test pass, and packs split once Term serves fewer pages. Executed moves within the 256-char swing",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 2527,
+			"reason": "pages stop loading code for arms their literal props rule out (accordion -3.2 KB); docs / and /concepts/state fetch ~2 KB more at idle: the playground compile worker carries the new prop-test pass, and packs split once Term serves fewer pages. Executed moves within the 256-char swing",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 135,
+			"reason": "pages stop loading code for arms their literal props rule out (accordion -3.2 KB); docs / and /concepts/state fetch ~2 KB more at idle: the playground compile worker carries the new prop-test pass, and packs split once Term serves fewer pages. Executed moves within the 256-char swing",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1973,
+			"reason": "pages stop loading code for arms their literal props rule out (accordion -3.2 KB); docs / and /concepts/state fetch ~2 KB more at idle: the playground compile worker carries the new prop-test pass, and packs split once Term serves fewer pages. Executed moves within the 256-char swing",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "pages stop loading code for arms their literal props rule out (accordion -3.2 KB); docs / and /concepts/state fetch ~2 KB more at idle: the playground compile worker carries the new prop-test pass, and packs split once Term serves fewer pages. Executed moves within the 256-char swing",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -3187,
+			"reason": "pages stop loading code for arms their literal props rule out (accordion -3.2 KB); docs / and /concepts/state fetch ~2 KB more at idle: the playground compile worker carries the new prop-test pass, and packs split once Term serves fewer pages. Executed moves within the 256-char swing",
+			"date": "2026-11-05"
+		}
+	]
+}

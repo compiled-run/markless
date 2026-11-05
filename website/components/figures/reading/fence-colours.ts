@@ -25,11 +25,11 @@ export function fenceRuns(html: string): Token[][] {
 		if (part.startsWith('<')) {
 			const colour = part.match(/style="color:([^;"]+)/)?.[1];
 			const dark = part.match(/--shiki-dark:([^;"]+)/)?.[1] ?? '';
-			const tip = /class="[^"]*\btsrx-tip\b/.test(part);
+			const tip = /class="(?:[^"]*\s)?tsrx-tip(?:\s[^"]*)?"/.test(part);
 			kinds.push(tip ? 'tip' : colour ? 'colour' : 'plain');
 			if (tip) hidden++;
 			const own = (value: string) => (value.startsWith('var(') ? '' : value.toLowerCase());
-			if (colour) colours.push([own(colour), own(dark)]);
+			if (colour && !tip) colours.push([own(colour), own(dark)]);
 			if (/class="line"/.test(part) && lines.at(-1)!.length) lines.push([]);
 			continue;
 		}

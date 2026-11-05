@@ -3,7 +3,7 @@ import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
 	total: 303,
-	guided: 46,
+	guided: 47,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -126,7 +126,7 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_CAPTURE_OPAQUE_PROP',
 					kind: 'compile error',
-					guided: false,
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_CAPTURE_SLOT_UNBINDABLE',

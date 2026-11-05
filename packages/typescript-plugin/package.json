@@ -13,6 +13,9 @@
 	"type": "module",
 	"sideEffects": false,
 	"main": "./dist/index.cjs",
+	"bin": {
+		"markless-tsc": "./src/tsc.ts"
+	},
 	"exports": {
 		".": {
 			"import": "./src/index.ts",
@@ -34,6 +37,9 @@
 	"publishConfig": {
 		"access": "public",
 		"provenance": true,
+		"bin": {
+			"markless-tsc": "./dist/tsc.mjs"
+		},
 		"exports": {
 			".": {
 				"types": "./dist/index.d.cts",
@@ -64,7 +70,7 @@
 		}
 	},
 	"scripts": {
-		"build:cjs": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir dist --clean --dts --no-report && vp pack src/language.ts src/volar.ts src/volar-strict.ts --no-config --format cjs --platform node --out-dir dist --no-clean --dts --no-report && cp src/markless-tsrx.d.ts dist/markless-tsrx.d.ts",
+		"build:cjs": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir dist --clean --dts --no-report && vp pack src/language.ts src/volar.ts src/volar-strict.ts --no-config --format cjs --platform node --out-dir dist --no-clean --dts --no-report && vp pack src/tsc.ts --no-config --format esm --platform node --out-dir dist --no-clean --no-dts --no-report && cp src/markless-tsrx.d.ts dist/markless-tsrx.d.ts",
 		"prepublishOnly": "pnpm run build:cjs && node ../../scripts/release/verify-publish-ready.mjs",
 		"test:completion-matrix": "MARKLESS_COMPLETION_MATRIX_STARTED_AT=$(node -p 'Date.now()') pnpm run test:completion-matrix:run",
 		"test:completion-matrix:run": "pnpm run build:cjs && pnpm --dir ../router run build:cjs && pnpm -w exec vitest run --config packages/typescript-plugin/vitest.completion-matrix.config.ts"

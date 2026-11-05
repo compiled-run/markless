@@ -1592,7 +1592,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'Lazy handler prop capture is not resumable: a Markless build error.',
+		description: 'An event handler uses a prop whose value the browser cannot get back.',
 		printed: [
 			'MARKLESS_CAPTURE_OPAQUE_PROP: Cannot bind lazy symbol "<symbolId>" on component edge "<componentEdgeId>" because prop "<propName>" is not passed by the parent that renders "<componentName>", and this call site invokes it unconditionally.',
 			'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.',
@@ -1600,6 +1600,243 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
 		],
 		structured: true,
+		guide: {
+			summary: 'An event handler uses a prop whose value the browser cannot get back.',
+			what: [
+				{
+					id: 's0',
+					text: 'An event handler runs in the browser after the page loads, so every prop it uses needs a value the build can hand it there: state, a constant, or a callback the parent passed. A received callback works anywhere, even straight on an element: ',
+				},
+				{
+					id: 's1',
+					text: '<button onClick={onPress}>',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' runs the callback this instance was given, with the event, and runs nothing if it was given none. The build stops when the prop is something else, like the result of a function call or a ',
+				},
+				{
+					id: 's3',
+					text: 'let',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', or when a handler calls a prop the parent never passes without ',
+				},
+				{
+					id: 's5',
+					text: '?.',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: '.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Pass a callback, a literal, or plain constant data, or hold the value in ',
+				},
+				{
+					id: 's1',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' in the parent. For a callback the parent may leave out, call it as ',
+				},
+				{
+					id: 's3',
+					text: 'onPress?.()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: '.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'Key',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r3',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'onPress',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r5',
+							text: ' }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'readonly',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'onPress',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r11',
+							text: '?:',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r12',
+							text: ' (',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r13',
+							text: 'event',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r14',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r15',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: 'MouseEvent',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r17',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r18',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r19',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r20',
+							text: 'void',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r21',
+							text: ' }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r22',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '{onPress}>Go</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r7',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
+		},
 		sources: [
 			{
 				id: 'f0',

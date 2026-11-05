@@ -271,6 +271,16 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'Markless reads the `storage()` key and fallback when it builds your code. So both must be string literals.',
 		how: "Pass string literals, like `storage('theme', 'light')`. Or leave out the key: `storage('light')`.",
 	},
+	MARKLESS_CAPTURE_OPAQUE_PROP: {
+		summary: 'An event handler uses a prop whose value the browser cannot get back.',
+		what: 'An event handler runs in the browser after the page loads, so every prop it uses needs a value the build can hand it there: state, a constant, or a callback the parent passed. A received callback works anywhere, even straight on an element: `<button onClick={onPress}>` runs the callback this instance was given, with the event, and runs nothing if it was given none. The build stops when the prop is something else, like the result of a function call or a `let`, or when a handler calls a prop the parent never passes without `?.`.',
+		how: 'Pass a callback, a literal, or plain constant data, or hold the value in `state()` in the parent. For a callback the parent may leave out, call it as `onPress?.()`.',
+		example: [
+			'function Key({ onPress }: { readonly onPress?: (event: MouseEvent) => void }) @{',
+			'\t<button onClick={onPress}>Go</button>',
+			'}',
+		],
+	},
 	MARKLESS_CHILDREN_OPAQUE: {
 		summary: 'Code maps, counts, indexes, or changes children.',
 		what: 'You can place `{children}`, wrap it, or pass it on. You cannot map, count, index, or change it.',
@@ -314,7 +324,7 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'Only an `<a>` acts on `prefetch={false}`. Here it is on another element, or on a component that does not pass its props on to an `<a>`, so the router would still request the page early and nothing would tell you.',
 		how: 'Put `prefetch={false}` on the `<a>` or `<Link>` itself. A component of your own can take it when it spreads its props onto its `<a>` and does not set the same attribute there itself.',
 		example: [
-			'export function NavLink({ children, ...rest }: PropsOf<\'a\'>) @{',
+			"export function NavLink({ children, ...rest }: PropsOf<'a'>) @{",
 			'\t<a {...rest}>{children}</a>',
 			'}',
 			'',
