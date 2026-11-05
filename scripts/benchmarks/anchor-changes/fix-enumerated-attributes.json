@@ -123,6 +123,122 @@
 			"delta": 17,
 			"reason": "draggable, contenteditable and spellcheck write true and false; the compiler now imports this rule instead of restating it",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-mint"
+			],
+			"delta": 145,
+			"reason": "row slots after a nested list count from the parent's end (fromEnd, #481, +121 B) and row-mint's attribute-rule import glue (+24 B)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/dom-attribute"
+			],
+			"delta": 182,
+			"reason": "draggable, contenteditable and spellcheck write true and false, and the compiler imports this rule instead of restating it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 58,
+			"reason": "web/dom-attribute spells draggable, contenteditable and spellcheck as true and false, and the compiler imports it; downloaded at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 58,
+			"reason": "web/dom-attribute spells draggable, contenteditable and spellcheck as true and false, and the compiler imports it; downloaded at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 58,
+			"reason": "web/dom-attribute spells draggable, contenteditable and spellcheck as true and false, and the compiler imports it; downloaded at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 108,
+			"reason": "marklessAttributeValue, which runs at load here, also spells draggable, contenteditable and spellcheck as true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 29,
+			"reason": "web/dom-attribute spells draggable, contenteditable and spellcheck as true and false, and the compiler imports it; downloaded at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 108,
+			"reason": "marklessAttributeValue, which runs at load here, also spells draggable, contenteditable and spellcheck as true and false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 20,
+			"reason": "web/dom-attribute spells draggable, contenteditable and spellcheck as true and false, and the compiler imports it; downloaded at load",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 93,
+			"reason": "web/dom-attribute spells draggable, contenteditable and spellcheck as true and false, and the compiler imports it; downloaded at load",
+			"date": "2026-11-05"
 		}
 	]
 }
