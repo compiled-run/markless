@@ -310,7 +310,7 @@ export type ResumeSymbolContext = {
 	readonly signal?: AbortSignal;
 	readonly event?: ResumeDomEvent;
 	readonly element: ResumeDomElement;
-	readonly getElementHandle: (handleIdOrName: string) => ResumeElementHandleValue;
+	readonly getElementHandle: (handleIdOrName: string, ownScope?: string) => ResumeElementHandleValue;
 	/** Where the part this symbol derives for stands in its family's roster. */
 	readonly rosterPosition?: (rosterGraphNodeId: string, handleGraphNodeId: string) => number;
 	/** How many parts this symbol's family instance has in that roster. */
@@ -434,7 +434,8 @@ export type ResumeRuntime = {
 	readonly holdPendingSettleCommits?: (minVisibleMs: number) => Promise<void> | void;
 };
 export type ElementHandleRegistry = {
-	readonly get: (handleIdOrName: string) => ResumeElementHandleValue;
+	/** `ownScope` is the reader's host scope: it settles a name more than one component filed. */
+	readonly get: (handleIdOrName: string, ownScope?: string) => ResumeElementHandleValue;
 	readonly register: (
 		hostNodeId: string,
 		handle: { readonly handleId: string; readonly name: string },

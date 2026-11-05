@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/instance-scope"
+			],
+			"delta": 488,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 40,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-locators"
+			],
+			"delta": 219,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 75,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/instance-scope"
+			],
+			"delta": 488,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 40,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-locators"
+			],
+			"delta": 219,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 80,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 92,
+			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
+			"date": "2026-11-05"
+		}
+	]
+}
