@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '../src/fns/row-bound-path.ts';
+import {
+	marklessRowBoundCallbackId,
+	marklessRowBoundGraphNodeId,
+	marklessRowBoundPath,
+} from '../src/fns/row-bound-path.ts';
 import { marklessRecordRowScope } from '../src/fns/instance-scope.ts';
 
 // A part two edges down a projection, inside one keyed repeat: host ids spell it c1:r:<key>:c0:, instance paths c1:p2:<row>c0:.
@@ -12,16 +16,18 @@ const bound = {
 };
 
 test('a keyed bound row takes the row the dispatching record names', () => {
-	expect(marklessRowBoundPath(bound, { marklessRowHostPath: 'c1:r:5:c0:' })).toBe('c1:p2:r:5:c0:');
+	expect(marklessRowBoundPath(bound, { marklessRowHostPath: 'c1:r:5:c0:' })).toBe(
+		'c1:p2:r:5:c0:',
+	);
 	expect(marklessRowBoundPath(bound, { marklessRowHostPath: 'c1:r:banana:c0:' })).toBe(
 		'c1:p2:r:banana:c0:',
 	);
 });
 
 test('outer instances and the part own rows around the matched edges stay out of the path', () => {
-	expect(marklessRowBoundPath(bound, { marklessRowHostPath: 'm0:c3:r:k%3A1:c1:r:5:c0:r:inner:' })).toBe(
-		'c1:p2:r:5:c0:',
-	);
+	expect(
+		marklessRowBoundPath(bound, { marklessRowHostPath: 'm0:c3:r:k%3A1:c1:r:5:c0:r:inner:' }),
+	).toBe('c1:p2:r:5:c0:');
 	expect(
 		marklessRowBoundPath(
 			{ instancePath: 'c1:p2:c0:c4:', rowPieces: bound.rowPieces },
@@ -34,7 +40,9 @@ test('a host path the row edges do not describe keeps the build-time path', () =
 	expect(marklessRowBoundPath(bound, { marklessRowHostPath: 'c2:r:5:c0:' })).toBe('c1:p2:c0:');
 	expect(marklessRowBoundPath(bound, { marklessRowHostPath: 'c1:c0:' })).toBe('c1:p2:c0:');
 	expect(marklessRowBoundPath(bound, undefined)).toBe('c1:p2:c0:');
-	expect(marklessRowBoundPath({ instancePath: 'c1:' }, { marklessRowHostPath: 'c1:r:5:' })).toBe('c1:');
+	expect(marklessRowBoundPath({ instancePath: 'c1:' }, { marklessRowHostPath: 'c1:r:5:' })).toBe(
+		'c1:',
+	);
 });
 
 test('only a row-local id takes the row; widget and page ids keep the row-free path', () => {
@@ -53,4 +61,41 @@ test('a forwarded record takes its row from the instance one edge above its host
 		'c1:p2:r:light:c0:',
 	);
 	expect(marklessRecordRowScope('c1:r:light:c0:c0:h0')?.[0]?.withRows).toBe('c1:r:light:c0:c0:');
+});
+
+// The sidebar shape: a page's @for renders a component, which hands a callback to a child two edges down.
+const rowComponent = {
+	instancePath: 'c7:c2:',
+	rowPieces: [
+		['c0:', 'c7:', 1],
+		['c0:', 'c2:', 0],
+	] as const,
+};
+
+test('a callback prop answers in the row of the component that wrote it', () => {
+	const graph = { marklessRowHostPath: 'r:two:c0:c0:' };
+	expect(marklessRowBoundCallbackId(rowComponent, graph, 'c7:symbol:2')).toBe(
+		'r:two:c7:symbol:2',
+	);
+	expect(marklessRowBoundCallbackId(rowComponent, graph, 'c7:c2:symbol:4')).toBe(
+		'r:two:c7:c2:symbol:4',
+	);
+});
+
+test('a callback with no row to take keeps the id the instance path already gives it', () => {
+	expect(marklessRowBoundCallbackId(rowComponent, undefined, 'c7:symbol:2')).toBe('c7:symbol:2');
+	expect(
+		marklessRowBoundCallbackId(
+			rowComponent,
+			{ marklessRowHostPath: 'r:two:c0:c0:' },
+			'symbol:2',
+		),
+	).toBe('symbol:2');
+	expect(
+		marklessRowBoundCallbackId(
+			rowComponent,
+			{ marklessRowHostPath: 'r:two:c0:c0:', marklessInstancePath: 'r:two:' },
+			'c7:symbol:2',
+		),
+	).toBe('r:two:c7:symbol:2');
 });
