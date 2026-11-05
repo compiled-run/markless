@@ -1,124 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 1158,
-			"reason": "a row value reading state written before the row code arrived repaints: wiring records what the server painted",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 198,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 198,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 198,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"executedChars"
-			],
-			"delta": 377,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 192,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"executedChars"
-			],
-			"delta": 544,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 192,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"executedChars"
-			],
-			"delta": 166,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 192,
-			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
-			"date": "2026-11-05"
-		},
-		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
@@ -162,6 +44,124 @@
 			],
 			"delta": -4,
 			"reason": "a row value reading state written before the row code arrived repaints, including Map, Set and BigInt state: resume-keyed-repeats reads what the server painted at wiring",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1287,
+			"reason": "a row value reading state written before the row code arrived repaints, Map, Set and BigInt included: wiring records what the server painted",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 241,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 241,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 241,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 442,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 215,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 609,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 215,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 168,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 215,
+			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
 			"date": "2026-11-05"
 		}
 	]
