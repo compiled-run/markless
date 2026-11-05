@@ -308,6 +308,8 @@ function registerArmDomUpdates(
 				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
+				ready: () => typeof deps.loadSymbol!(domUpdate.symbolId!) === 'function',
+				load: async () => deps.loadSymbol!(domUpdate.symbolId!),
 				async run(value) {
 					const symbol = (await deps.loadSymbol!(domUpdate.symbolId!)) as (
 						context: unknown,

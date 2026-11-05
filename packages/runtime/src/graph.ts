@@ -265,6 +265,8 @@ export type RuntimeGraphSubscription = {
 		| Promise<DomJournalResult | RuntimeGraphCommit | void>;
 	/** False while `run` still has code to load; a write observer then leaves its DOM to the pass, so the task's writes land together. */
 	readonly ready?: () => boolean;
+	/** Loads what `run` waits on without running it. */
+	readonly load?: () => Promise<unknown>;
 };
 
 /**
@@ -471,7 +473,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (writeObservers.length === 0 || flushing || notifyingWrite) return;
 
 		const write: DirtyPath = { graphNodeId, path };
-		if (passWaitsOnCode()) return;
+		if (codeThePassWaitsOn().length > 0) return;
 		notifyingWrite = true;
 		try {
 			// A copy: an observer is free to release itself or another.
@@ -487,15 +489,24 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		}
 	};
 
-	const passWaitsOnCode = (): boolean =>
-		dirtyPaths.some(({ graphNodeId, path }) =>
-			subscriptionsByNode
-				.get(graphNodeId)
-				?.some(
-					(subscription) =>
-						subscription.ready?.() === false &&
-						pathsIntersect(path, subscription.path ?? []),
-				),
+	// No handler statement follows an async answer, so its rows land in the pass with the text beside them.
+	const landWithoutObservers = (land: () => void): void => {
+		const was = notifyingWrite;
+		notifyingWrite = true;
+		try {
+			land();
+		} finally {
+			notifyingWrite = was;
+		}
+	};
+
+	const codeThePassWaitsOn = (): RuntimeGraphSubscription[] =>
+		dirtyPaths.flatMap(({ graphNodeId, path }) =>
+			(subscriptionsByNode.get(graphNodeId) ?? []).filter(
+				(subscription) =>
+					subscription.ready?.() === false &&
+					pathsIntersect(path, subscription.path ?? []),
+			),
 		);
 
 	const scheduleFlush = (): void => {
@@ -537,9 +548,13 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			cells,
 			computedNodes,
 			readGraph,
-			markDirtyPath,
+			markDirtyPath: (graphNodeId, path) =>
+				landWithoutObservers(() => markDirtyPath(graphNodeId, path)),
 			scheduleFlush,
-			reconcile: plane,
+			reconcile: plane && {
+				publishAsync: (node, previous) =>
+					landWithoutObservers(() => plane.publishAsync(node, previous)),
+			},
 		});
 		if (held) asyncPlane!.holdInputs(held);
 		if (asyncComputed) asyncPlane!.define(asyncComputed);
@@ -600,6 +615,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 							else appendJournalResult(journal, entries as DomJournalResult | void);
 						}
 					if (commits.length > 0) {
+						// The next round's code loads first, so its journal paints in the task these commits do.
+						const waits = codeThePassWaitsOn();
+						if (waits.length > 0)
+							await Promise.all(
+								waits.map((subscription) => subscription.load?.().catch(() => {})),
+							);
 						const landing = commits.map((commit) => commit());
 						await notifyJournalListeners();
 						await Promise.all(landing);

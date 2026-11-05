@@ -184,6 +184,7 @@ export function createResumeRuntime(
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
 				ready: () => typeof input.loadSymbol(domUpdate.symbolId!) === 'function',
+				load: async () => input.loadSymbol(domUpdate.symbolId!),
 				async run(value) {
 					const symbol = await input.loadSymbol(domUpdate.symbolId!);
 					return (await symbol({
