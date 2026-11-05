@@ -80,6 +80,101 @@ export function marklessRowBoundCallbackId(
 		: outer + callbackSymbolId;
 }
 
+/**
+ * The graph a callback's own keyed bound row runs on: the dispatching record's
+ * row host path cut back to the pieces that row was placed by, so it reads its
+ * rows from the instance that wrote it rather than from the part that called it.
+ */
+export function marklessRowBoundCallbackGraph<T extends { readonly marklessRowHostPath?: string }>(
+	bound: RowBoundRow,
+	graph: T,
+	pieces: number,
+): T {
+	const host = graph?.marklessRowHostPath;
+	if (!host || !bound.rowPieces) return graph;
+	const segments = marklessInstanceSegments(host);
+	let at = segments.length;
+	while (segments[at - 1]?.startsWith('r:')) at -= 1;
+	for (let index = bound.rowPieces.length - 1; index >= pieces; index -= 1) {
+		const [hostSegment, , rows] = bound.rowPieces[index]!;
+		if (segments[--at] !== hostSegment) return graph;
+		for (let row = 0; row < rows; row += 1)
+			if (!segments[--at]?.startsWith('r:')) return graph;
+	}
+	return { ...graph, marklessRowHostPath: segments.slice(0, at).join('') };
+}
+
+type RowLocalRoute = {
+	readonly rowPiece?: number;
+	readonly rows?: ReadonlyArray<{
+		readonly rowIndex: number;
+		readonly keyPath: ReadonlyArray<string>;
+		readonly indexKey?: true;
+		readonly graphNodeId?: string;
+		readonly collectionPath?: ReadonlyArray<string>;
+		readonly itemPath?: ReadonlyArray<string>;
+	}>;
+};
+
+/**
+ * The item of a keyed row a bound row's edge sits in, found by the keys the
+ * dispatching record's path spells for that edge's rows: the outermost row's
+ * item from the graph, each inner row's from the item around it.
+ */
+export function marklessRowLocal(
+	bound: RowBoundRow,
+	graph: {
+		readonly marklessRowHostPath?: string;
+		read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
+	},
+	route: RowLocalRoute,
+): unknown {
+	const keys = rowKeysOf(bound, graph.marklessRowHostPath, route.rowPiece ?? -1);
+	let item: unknown;
+	for (const step of route.rows ?? []) {
+		const key = keys?.[step.rowIndex];
+		if (key === undefined) return undefined;
+		const collection = step.graphNodeId
+			? graph.read(step.graphNodeId, step.collectionPath ?? [])
+			: valueAt(item, step.itemPath ?? []);
+		const items = collection == null ? [] : Array.from(collection as Iterable<unknown>);
+		item = step.indexKey
+			? items[Number(key)]
+			: items.find((candidate) => String(valueAt(candidate, step.keyPath)) === key);
+	}
+	return item;
+}
+
+// The keys of one piece's rows, outermost first, matched edge by edge from the end as marklessRowBoundPath matches them.
+function rowKeysOf(
+	bound: RowBoundRow,
+	host: string | undefined,
+	piece: number,
+): string[] | undefined {
+	if (!host || !bound.rowPieces?.[piece]) return undefined;
+	const segments = marklessInstanceSegments(host);
+	let at = segments.length;
+	while (segments[at - 1]?.startsWith('r:')) at -= 1;
+	for (let index = bound.rowPieces.length - 1; index >= piece; index -= 1) {
+		const [hostSegment, , rows] = bound.rowPieces[index]!;
+		if (segments[--at] !== hostSegment) return undefined;
+		const keys: string[] = [];
+		for (let row = 0; row < rows; row += 1) {
+			const segment = segments[--at];
+			if (!segment?.startsWith('r:')) return undefined;
+			keys.unshift(decodeURIComponent(segment.slice(2, -1)));
+		}
+		if (index === piece) return keys;
+	}
+	return undefined;
+}
+
+function valueAt(value: unknown, path: ReadonlyArray<string>): unknown {
+	let current = value;
+	for (const key of path) current = current == null ? current : (current as Record<string, unknown>)[key];
+	return current;
+}
+
 // Widget and page ids keep the row-free path: the dispatch's row scope and, when given, the widget registry place those.
 export function marklessRowBoundGraphNodeId(
 	graphNodeId: string,

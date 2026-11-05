@@ -33,7 +33,7 @@ import {
 	marklessInstancePath,
 	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
-	marklessRowSegment,
+	marklessRowPath,
 } from '../fns/instance-scope.ts';
 import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
@@ -1182,10 +1182,7 @@ export function evaluatePrerenderDataComponent(input: {
 											input.symbolPrefix,
 											input.symbolPrefix,
 										),
-										rowSegment:
-											context.repeatKey === undefined
-												? ''
-												: marklessRowSegment(context.repeatKey),
+										rowSegment: marklessRowPath(context) ?? '',
 										readEdgeProp: (prop) => readDecision(prop.source, context),
 									},
 									definition,
@@ -1203,10 +1200,7 @@ export function evaluatePrerenderDataComponent(input: {
 									`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`,
 								);
 							// One compile-time edge inside a keyed `@for` is many instances at render time.
-							const rowSegment =
-								context.repeatKey === undefined
-									? ''
-									: marklessRowSegment(context.repeatKey);
+							const rowSegment = marklessRowPath(context) ?? '';
 							const hostPrefix = rowSegment + edge.hostPrefix;
 							const symbolPrefix = rowSegment + edge.symbolPrefix;
 							if (edge.materialized) {
