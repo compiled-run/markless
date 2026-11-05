@@ -34,6 +34,7 @@ import {
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { createSourceMemo } from './semantic-graph/shared-ast.ts';
 import { PROJECTION_PROP_NAME } from './public-render/shared-seed-pass.ts';
+import { aliasedItemPath } from './semantic-graph/repeat-item-binding.ts';
 
 // Capture analysis owns these diagnostic contract values. Tests and any other
 // reader import them from here rather than restating the strings, so the
@@ -1210,10 +1211,15 @@ function rowItemPath(
 	const segments = source.trim().split('.');
 	if (!segments.every((segment) => /^[A-Za-z_$][\w$]*$/.test(segment))) return undefined;
 	const [itemName, ...path] = segments;
-	const enclosing = input.semanticGraph.keyedRepeats.some(
-		(repeat) => edge.keyedRepeatScopeIds.includes(repeat.id) && repeat.itemName === itemName,
+	const enclosing = input.semanticGraph.keyedRepeats.filter((repeat) =>
+		edge.keyedRepeatScopeIds.includes(repeat.id),
 	);
-	return enclosing && itemName ? { itemName, path } : undefined;
+	for (const repeat of enclosing.toReversed()) {
+		if (repeat.itemName === itemName) return itemName ? { itemName, path } : undefined;
+		const aliased = aliasedItemPath(repeat.itemAliases, source.trim());
+		if (aliased) return { itemName: repeat.itemName, path: aliased };
+	}
+	return undefined;
 }
 
 // Rows that share one parent cannot be told apart by position, so an item in nested rows is found by its rows' keys; undefined when a row on the way has no collection to look in.
@@ -1261,7 +1267,11 @@ function readsOnlyRowLocals(
 	const rowLocals = new Set(
 		input.semanticGraph.keyedRepeats.flatMap((repeat) =>
 			edge.keyedRepeatScopeIds.includes(repeat.id)
-				? [repeat.itemName, ...(repeat.indexName ? [repeat.indexName] : [])]
+				? [
+						repeat.itemName,
+						...(repeat.itemAliases ?? []).map((alias) => alias.name),
+						...(repeat.indexName ? [repeat.indexName] : []),
+					]
 				: [],
 		),
 	);

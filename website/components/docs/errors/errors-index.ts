@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 304,
+	total: 305,
 	guided: 47,
 	groups: [
 		{
@@ -450,6 +450,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
 					kind: 'compile error',
 					guided: false,
 				},

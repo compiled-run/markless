@@ -1679,6 +1679,31 @@ export function repeatKeyUnstableDiagnostic(input: {
 	} as SemanticGraphDiagnostic;
 }
 
+export function repeatItemPatternUnsupportedDiagnostic(input: {
+	readonly pattern: AnyNode;
+	readonly patternSource: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'This @for loop name cannot be destructured this way',
+		message: `@for (const ${input.patternSource} of ...) uses a default value, a rest element or a computed key. A destructured loop name may only pick array positions and named fields, so this list would render no rows.`,
+		why: 'Each name a destructured loop name binds is read straight off the row item at a fixed position or field; a default, a rest element or a computed key has no fixed place on the item.',
+		primarySpan: sourceSpan(input.pattern, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Loop with a plain name and read the fields off it, such as `@for (const row of rows; key row.id) { <li>{row.name ?? "none"}</li> }`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+	} as SemanticGraphDiagnostic;
+}
+
 export function detachedContentDynamicDiagnostic(
 	node: AnyNode,
 	ownerTagName: string,
