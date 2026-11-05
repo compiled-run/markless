@@ -79,7 +79,7 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 			asyncBoundaries: [],
 		},
 		dispatch(event) {
-			return resumeFullEventOnly({ ...input, event }).then(() => undefined);
+			return resumeFullEventOnly({ ...input, event, propagationStopped: false }).then(() => undefined);
 		},
 		dispose() {
 			delete input.root.__marklessEventOnlyGraph;

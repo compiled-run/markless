@@ -233,11 +233,13 @@ export async function resumeFullEventOnly(
 		loadSymbol: input.loadSymbol,
 		handoffDispatchOptions: (handoff) => ({
 			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+			propagationStopped: handoff.propagationStopped === true,
 			ignoreUnmatched: handoff.eventRecord == null,
 		}),
 	});
 	await runtime.dispatch(input.event, {
 		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+		propagationStopped: input.propagationStopped === true,
 		// Escalation reaches here for a record-less forward too, which is the entry
 		// capture's broad sweep and passes through the live listener the same way.
 		ignoreUnmatched: input.eventRecord == null,

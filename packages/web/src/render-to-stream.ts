@@ -563,7 +563,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r)) applied = true;
 					}
 				}
-				const input = { root: r, event: e, element: e.target, eventRecord: null, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
+				const input = { root: r, event: e, element: e.target, eventRecord: null, propagationStopped: e.cancelBubble, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
 				if (r.__marklessDispatch) return r.__marklessDispatch(input);
 				if (r.__asyncResumeRuntimeStarted) return;
 				r.__marklessDelegatedDispatch = true;

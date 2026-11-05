@@ -45,6 +45,7 @@ export type ResumeDomElement = ResumeDomNode & {
 		readonly element?: ResumeDomElement | null;
 		readonly eventRecord?: ResumeEventRecord | null;
 		readonly syncPolicyAlreadyApplied?: boolean;
+		readonly propagationStopped?: boolean;
 	}) => Promise<void>;
 	// Set by the dispatch queue for the dispatch it is running: lets the next one start once this one's handler is running.
 	__marklessReleaseDispatch?: () => void;

@@ -192,6 +192,22 @@ export function renderStreamShell(
 	);
 }
 
+// Marker rewritten by testSSR() into a Node-side renderToStream command that
+// drains every append, so a test can play the whole response into the page.
+export function renderStream(
+	component: unknown,
+	options?: SsrFixtureRenderOptions,
+): Promise<{ readonly shell: string; readonly appends: ReadonlyArray<string> }> {
+	void component;
+	void options;
+	throw new Error(
+		'renderStream(Component) was not transformed. Add testSSR() from ' +
+			'@markless/vitest-browser/ssr-plugin to the browser test project plugins ' +
+			'(before the markless plugin). v1 supports renderStream(Component) with a ' +
+			'component imported from a separate .tsrx module and no props.',
+	);
+}
+
 export function renderServerHTML(
 	html: string,
 	options: SsrRenderHtmlOptions = {},

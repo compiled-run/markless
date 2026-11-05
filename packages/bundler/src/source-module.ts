@@ -1578,6 +1578,7 @@ function emitResumeContainerEvent(
 			'		element: input.element,',
 			'		runtimeDemandMap: payloadRuntimeDemandMap,',
 			'		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,',
+			'		propagationStopped: input.propagationStopped === true,',
 			`		loadSymbol: ${loadSymbolName},`,
 			'	});',
 		];

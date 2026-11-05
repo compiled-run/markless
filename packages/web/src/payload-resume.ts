@@ -178,6 +178,7 @@ function registerLiveDispatch(input: ResumePayloadScriptsInput, runtime: ResumeR
 		input.handoffDispatchOptions ??
 		((handoff: ResumeHandoff) => ({
 			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+			propagationStopped: handoff.propagationStopped === true,
 			ignoreUnmatched: true,
 		}));
 	(root as DispatchQueueRoot).__marklessRegisterDispatch?.((handoff, fallback) =>
@@ -263,6 +264,7 @@ async function startDecodedResume(
 	input.root.__marklessDispatch ??= (handoff) =>
 		runtime!.dispatch(handoff.event, {
 			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+			propagationStopped: handoff.propagationStopped === true,
 			ignoreUnmatched: true,
 		});
 	(
