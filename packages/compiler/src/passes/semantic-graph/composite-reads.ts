@@ -346,10 +346,11 @@ export function mintTemplateExpressionComputed(
 	propObjectRoots?: ReadonlySet<string>,
 	joinsText = false,
 ): { readonly graphNodeId: string } | null {
+	const component = state.currentComponentName ?? undefined;
 	const bindings =
-		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
+		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId, component);
 	const aliases =
-		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId, component);
 	const dependencies: SemanticGraphDependency[] = [];
 	for (const source of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.

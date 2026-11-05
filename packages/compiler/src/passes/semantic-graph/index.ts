@@ -87,6 +87,7 @@ import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
 import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
+import { templateHasBareTryRoot } from '../row-mint.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -307,6 +308,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),
+						...(templateHasBareTryRoot(root) ? { bareTryRoot: true as const } : {}),
 						...(propSpends.get(component.name)?.length
 							? { propSpends: propSpends.get(component.name)! }
 							: {}),

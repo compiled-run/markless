@@ -587,6 +587,20 @@ function freshArmCells(
 	);
 }
 
+// Composition routes read the live graph, where a whole async value is its snapshot's `value`.
+export function runtimeEdgeProps<P extends { readonly kind?: string; readonly graphNodeId?: string; readonly path?: ReadonlyArray<string> }>(
+	props: ReadonlyArray<P>,
+	computed: ReadonlyArray<{ readonly graphNodeId: string; readonly async?: boolean }>,
+): ReadonlyArray<P> {
+	return props.map((prop) =>
+		prop.kind === 'graph-reference' &&
+		!prop.path?.length &&
+		computed.some((record) => record.graphNodeId === prop.graphNodeId && record.async)
+			? { ...prop, path: ['value'] }
+			: prop,
+	);
+}
+
 function isPrerenderDataSurface(value: unknown): value is PrerenderDataSurface {
 	return !!value && typeof value === 'object' && 'renderData' in value && 'components' in value;
 }
@@ -1330,7 +1344,7 @@ export function evaluatePrerenderDataComponent(input: {
 									output: materialized as SsrComposableChildOutput,
 									hostPrefix,
 									symbolPrefix,
-									graphProps: edge.props,
+									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 									asyncBoundaryId: edge.asyncBoundaryId,
 									boundSymbols: edge.boundSymbols ?? {},
 									callbackProps: {},
@@ -1430,7 +1444,7 @@ export function evaluatePrerenderDataComponent(input: {
 									...(childSurface === input.surface
 										? { module: ownModule }
 										: {}),
-									graphProps: edge.props,
+									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 									loadSymbol: input.loadSymbol,
 									graph: input.graph,
 									requireHtml: input.requireHtml,
@@ -1464,7 +1478,7 @@ export function evaluatePrerenderDataComponent(input: {
 										output: output as SsrComposableChildOutput,
 										hostPrefix,
 										symbolPrefix,
-										graphProps: edge.props,
+										graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 										asyncBoundaryId: edge.asyncBoundaryId,
 										boundSymbols: edge.boundSymbols ?? {},
 										callbackProps: callbacks,

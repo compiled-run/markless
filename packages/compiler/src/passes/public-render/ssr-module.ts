@@ -893,7 +893,7 @@ function emitSsrDataLines(
 						`{const marklessSsrDerived=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(value.graphNodeId)},${value.source},marklessSsrRenderContext,false${extra});if(marklessSsrDerived.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(value.graphNodeId)},marklessSsrDerived.value);}`,
 				)
 				.join('');
-			// A sync runner settles with its async inputs, which the arm may read directly too.
+			// A sync runner settles with its async inputs, which the arm may read directly too; a stream files them under the instance.
 			const definitions = collectSsrAsyncRunnerDefinitions(input);
 			const inputs = new Set<string>();
 			const visit = (graphNodeId: string): void => {
@@ -909,7 +909,7 @@ function emitSsrDataLines(
 			]
 				.map(
 					(graphNodeId) =>
-						`{const marklessSsrInput=marklessSsrAsyncRuns.get(${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
+						`{const marklessSsrInput=marklessSsrAsyncRuns.get((marklessSsrRenderContext?.streaming?.runs?marklessSsrIdPrefix:'')+${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
 				)
 				.join('')}`;
 			return [
@@ -1116,7 +1116,15 @@ function emitSsrDataLines(
 		const child = {
 			hostPrefix: `c${index}:`,
 			symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
-			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
+			graphProps: componentEdgeGraphRoutes(
+				edge,
+				hasProjection,
+				new Set(
+					input.semanticGraph.graphBindings.flatMap((binding) =>
+						binding.kind === 'computed' && binding.async === true ? [binding.id] : [],
+					),
+				),
+			),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
 		};
 		const declaredName = edgeDeclaredComponentName(edge);

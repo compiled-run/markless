@@ -66,8 +66,10 @@ export function marklessRowBoundCallbackId(
 ): string {
 	const outer = graph?.marklessInstancePath ?? '';
 	const callbackPath = marklessInstancePath(callbackSymbolId);
+	// Rows ending the composer's own path are its @for rows, which own no nodes: the row item reaches the callback as a local.
+	if (!callbackPath) return outer.replace(/(r:[^:]*:)+$/, '') + callbackSymbolId;
 	const rowed = outer.includes('r:') ? '' : marklessRowBoundPath(bound, graph);
-	if (!callbackPath || !rowed.includes('r:')) return outer + callbackSymbolId;
+	if (!rowed.includes('r:')) return outer + callbackSymbolId;
 	let rowFree = '';
 	let withRows = '';
 	for (const segment of marklessInstanceSegments(rowed)) {

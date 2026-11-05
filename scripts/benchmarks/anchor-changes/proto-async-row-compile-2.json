@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 395,
+			"reason": "a whole async value passed as a prop routes through its snapshot value when a client render composes the child (fixes [object Object] after a refresh), measured against proto/async-all-2",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "a whole async value passed as a prop routes through its snapshot value when a client render composes the child (fixes [object Object] after a refresh), measured against proto/async-all-2",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 395,
+			"reason": "a whole async value passed as a prop routes through its snapshot value when a client render composes the child (fixes [object Object] after a refresh), measured against proto/async-all-2",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a whole async value passed as a prop routes through its snapshot value when a client render composes the child (fixes [object Object] after a refresh), measured against proto/async-all-2",
+			"date": "2026-11-05"
+		}
+	]
+}

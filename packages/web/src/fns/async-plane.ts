@@ -44,11 +44,11 @@ function awaitsAsyncAncestor(
 	return false;
 }
 
-// A re-run keeps its prior settled value readable (spec D8), so only a first run or a rejection has nothing to read.
+// A re-run and a failed refresh keep the prior settled value readable (spec D8), so only a first run or first failure has nothing to read.
 function hasReadableValue(snapshot: unknown): boolean {
 	const { status, value } =
 		(snapshot as { readonly status?: unknown; readonly value?: unknown } | null) ?? {};
-	return status === 'fulfilled' || (status === 'pending' && value !== undefined);
+	return status === 'fulfilled' || ((status === 'pending' || status === 'rejected') && value !== undefined);
 }
 
 
