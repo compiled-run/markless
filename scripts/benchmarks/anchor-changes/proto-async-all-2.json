@@ -5,6 +5,17 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
+				"web/fns/row-slot-reads"
+			],
+			"set": 1314,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
 				"runtime/graph"
 			],
 			"delta": -41,
@@ -95,8 +106,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-arm-keyed-repeats"
 			],
-			"delta": 36,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 52,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -117,8 +128,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-async-wiring"
 			],
-			"delta": 708,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 898,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -139,8 +150,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-commit-arm"
 			],
-			"delta": 347,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 361,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -150,8 +161,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-keyed-repeats"
 			],
-			"delta": 330,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": -792,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -194,8 +205,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-runtime"
 			],
-			"delta": 416,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 430,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -239,8 +250,19 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 40,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 44,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/row-slot-reads"
+			],
+			"set": 1314,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -338,8 +360,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-arm-keyed-repeats"
 			],
-			"delta": 36,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 52,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -360,8 +382,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-async-wiring"
 			],
-			"delta": 708,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 898,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -382,8 +404,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-commit-arm"
 			],
-			"delta": 347,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 361,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -393,8 +415,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-keyed-repeats"
 			],
-			"delta": 330,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": -792,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -437,8 +459,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-runtime"
 			],
-			"delta": 416,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 430,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -482,8 +504,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -1,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 1,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -494,8 +516,18 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 50,
-			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 60,
+			"reason": "async values on this branch, measured against origin/main: the async runtime moves into a plane only pages with @try load (runtime/graph-async no longer ships here), plus refresh-in-place arms, busy marks per element, row handlers and rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-slot-reads"
+			],
+			"set": 1326,
+			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -634,8 +666,8 @@
 				"runtimeModules",
 				"web/resume-arm-keyed-repeats"
 			],
-			"delta": 36,
-			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 52,
+			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -654,8 +686,8 @@
 				"runtimeModules",
 				"web/resume-async-wiring"
 			],
-			"delta": 708,
-			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 898,
+			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -674,8 +706,8 @@
 				"runtimeModules",
 				"web/resume-commit-arm"
 			],
-			"delta": 347,
-			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 361,
+			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -684,8 +716,8 @@
 				"runtimeModules",
 				"web/resume-keyed-repeats"
 			],
-			"delta": 330,
-			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": -792,
+			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -724,8 +756,8 @@
 				"runtimeModules",
 				"web/resume-runtime"
 			],
-			"delta": 416,
-			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms and same-task arm commits",
+			"delta": 430,
+			"reason": "async values on this branch, measured against origin/main: the async runtime loads as a plane only where a page serves @try, plus refresh-in-place arms, busy marks per element, row handlers, rows in arms, @if flips in component arms, same-task arm commits, and rows an arm paints keeping the state they were painted from",
 			"date": "2026-11-05"
 		},
 		{
@@ -776,7 +808,7 @@
 				"bench /",
 				"executedChars"
 			],
-			"delta": 1,
+			"delta": 3,
 			"reason": "measured against origin/main on this Mac: the async plane and row and arm fixes this branch carries; pages without @try no longer download runtime/graph-async",
 			"date": "2026-11-05"
 		},
@@ -788,7 +820,7 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": -92,
+			"delta": -59,
 			"reason": "measured against origin/main on this Mac: the async plane and row and arm fixes this branch carries; pages without @try no longer download runtime/graph-async",
 			"date": "2026-11-05"
 		},
@@ -800,7 +832,7 @@
 				"bench /records",
 				"executedChars"
 			],
-			"delta": 1,
+			"delta": 3,
 			"reason": "measured against origin/main on this Mac: the async plane and row and arm fixes this branch carries; pages without @try no longer download runtime/graph-async",
 			"date": "2026-11-05"
 		},
@@ -812,7 +844,7 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": -92,
+			"delta": -59,
 			"reason": "measured against origin/main on this Mac: the async plane and row and arm fixes this branch carries; pages without @try no longer download runtime/graph-async",
 			"date": "2026-11-05"
 		},
@@ -824,7 +856,7 @@
 				"bench /settings",
 				"executedChars"
 			],
-			"delta": 1,
+			"delta": 3,
 			"reason": "measured against origin/main on this Mac: the async plane and row and arm fixes this branch carries; pages without @try no longer download runtime/graph-async",
 			"date": "2026-11-05"
 		},
@@ -836,7 +868,7 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": -92,
+			"delta": -59,
 			"reason": "measured against origin/main on this Mac: the async plane and row and arm fixes this branch carries; pages without @try no longer download runtime/graph-async",
 			"date": "2026-11-05"
 		}

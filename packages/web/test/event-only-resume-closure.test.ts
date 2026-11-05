@@ -138,7 +138,9 @@ const resumeOnDemandEntries = [
 // fetched with: 31,214 -> 31,426 raw, in resume-keyed-repeats.ts; minified 10,208 -> 10,308, gzip 4,140 -> 4,173 bytes
 // (rolldown, workspace packages external, same method both sides).
 // 2026-11-05: merge of the two changes above with the row-value repaint: 33,152 -> 33,417 raw.
-const sourceByteLimit = 33417;
+// 2026-11-05: the row slot read helpers moved to fns/row-slot-reads.ts, which an arm commit also imports to record the
+// state its rows were painted from: the same code plus its import and export lines, 33,417 -> 33,702 raw.
+const sourceByteLimit = 33702;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

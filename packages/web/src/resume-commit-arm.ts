@@ -23,6 +23,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
+import type { SlotRead } from './fns/row-slot-reads.ts';
 
 // D1 tier 4: commitArm replaces the DOM range between an async boundary's
 // comment-anchor pair with freshly rendered arm content and re-registers the
@@ -45,6 +46,8 @@ export type ArmCommitUpdate = {
 	readonly arm?: number;
 	/** Keep the shown content and paint this arm after it, replacing only a previous `after` commit. */
 	readonly after?: boolean;
+	/** Whether a row slot's read moved since this arm's markup was rendered. */
+	readonly moved?: (read: SlotRead) => boolean;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -122,6 +125,7 @@ export function createArmCommitter(
 		readonly storeHostSubscription?: (hostNodeId: string, release: () => void) => void;
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
+			moved?: (read: SlotRead) => boolean,
 		) => Promise<void>;
 		readonly asyncBoundaryWiring?: () => Promise<AsyncBoundaryWiring> | undefined;
 		readonly documentHost?: CommitDocument;
@@ -170,7 +174,7 @@ export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
 	boundary: ResumeArmRange,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells'>,
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'moved'>,
 	eventTypesInstalled?: boolean,
 ) {
 	const exhaustive = {
@@ -226,7 +230,7 @@ export async function registerArmRecordSet(
 	}
 	registerArmDomUpdates(deps, materialized.domUpdates);
 	if (materialized.keyedRepeats.length)
-		await deps.registerKeyedRepeats?.(materialized.keyedRepeats);
+		await deps.registerKeyedRepeats?.(materialized.keyedRepeats, update.moved);
 	if (deps.addBehaviors && materialized.behaviors.length) {
 		const byHost = new Map<string, ResumeBehaviorRecord[]>();
 		for (const behavior of materialized.behaviors) {

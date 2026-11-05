@@ -5,6 +5,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ResumeEventWiring } from './resume-events.ts';
+import type { SlotRead } from './fns/row-slot-reads.ts';
 
 // An arm's rows adopt the served ones only once the computed they read from holds the served value.
 export async function wireArmKeyedRepeats(
@@ -17,6 +18,7 @@ export async function wireArmKeyedRepeats(
 		readonly storeHostSubscription: (hostNodeId: string, release: () => void) => void;
 	},
 	rowComponentHost?: import('./fns/row-component-mint.ts').RowComponentMintHost,
+	moved?: (read: SlotRead) => boolean,
 ): Promise<void> {
 	const { primeKeyedRepeatCollections, wireKeyedRepeats } =
 		await import('./resume-keyed-repeats-lazy.ts');
@@ -42,6 +44,7 @@ export async function wireArmKeyedRepeats(
 					host.storeHostSubscription(record.parentHostNodeId, release),
 				renderData: runtime.renderData,
 				pageRepeats: runtime.view.keyedRepeats,
+				moved,
 			},
 			rowComponentHost,
 		);

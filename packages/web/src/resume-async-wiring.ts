@@ -4,6 +4,7 @@ import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-r
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
+import { movedSincePaint } from './fns/row-slot-reads.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
@@ -374,11 +375,14 @@ export async function settleAsyncBoundaryRange(
 	const arm = status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try;
 	// Only an arm committed with its own records carries the value bindings an in-place refresh needs.
 	const commit = async (update: Omit<ArmCommitUpdate, 'arm' | 'after'>, ownRecords = true) => {
+		const rows = update.armRecords.keyedRepeats;
+		const moved = rows?.length ? movedSincePaint(input.graph, rows) : undefined;
 		const after = asyncPlanes.busy?.settleRange(boundary, arm);
 		if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
 		else shownArms.delete(boundary);
 		await input.commitArm!((after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
+			...(moved && { moved }),
 			arm,
 			...(after && { after: true }),
 		});

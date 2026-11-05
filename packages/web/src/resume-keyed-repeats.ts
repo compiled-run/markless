@@ -13,6 +13,13 @@ import type {
 import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '../../serializer/src/protocol-prop-prefix.ts';
 import { elementsOf, marklessElementAt, pageNodes } from './resume-anchor-census.ts';
+import {
+	movedSincePaint,
+	rowSlotReads,
+	slotReadGroups,
+	templateSlots,
+	type SlotRead,
+} from './fns/row-slot-reads.ts';
 
 // Nothing has moved yet, so deriving a computed collection reproduces the served rows.
 export async function primeKeyedRepeatCollections(input: {
@@ -170,7 +177,7 @@ export function wireKeyedRepeats(
 	onRow?: ResumeRepeatRowHook,
 ): void | Promise<void> {
 	const pageRepeats = input.pageRepeats ?? input.view.keyedRepeats ?? [];
-	const moved = input.moved ?? movedSinceWiring(input.graph, pageRepeats);
+	const moved = input.moved ?? movedSincePaint(input.graph, pageRepeats);
 	// Only a changeable component row rewrites a prop node composition left in place; with none, every such list is fixed.
 	const rowsChange = pageRepeats.some(
 		(each) =>
@@ -598,25 +605,7 @@ type RowSlots = {
 	branches?: RowMint['branchValues'];
 	moved?: boolean;
 };
-type SlotRead = { readonly graphNodeId: string; readonly path?: ReadonlyArray<string> };
 const UNPAINTED = Symbol();
-// The row code can arrive after a gesture's write, so what the server painted is the state as wiring found it.
-function movedSinceWiring(graph: Pick<RuntimeGraph, 'read'>, repeats: ReadonlyArray<ResumeKeyedRepeatRecord>) {
-	// An unserializable value compares by identity.
-	const text = (read: SlotRead): unknown => {
-		let value: unknown;
-		try {
-			value = graph.read(read.graphNodeId, read.path);
-			return JSON.stringify(value, (_, v) =>
-				typeof v === 'bigint' ? `${v}n` : v instanceof Map || v instanceof Set ? [...v] : v,
-			);
-		} catch {
-			return value;
-		}
-	};
-	const served = new Map(repeats.flatMap(rowSlotReads).map((read) => [JSON.stringify(read), text(read)]));
-	return (read: SlotRead) => served.has(JSON.stringify(read)) && served.get(JSON.stringify(read)) !== text(read);
-}
 function servedSlotValues(
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
@@ -638,13 +627,6 @@ function itemCopy(item: unknown): unknown {
 		return item;
 	}
 }
-type SlotOwner = Pick<NonNullable<ResumeKeyedRepeatRecord['rowTemplate']>, 'textSlots' | 'attributeSlots'>;
-function templateSlots(repeat: ResumeKeyedRepeatRecord) {
-	return slotsOf(repeat.rowTemplate ?? {});
-}
-function slotsOf(owner: SlotOwner) {
-	return [...(owner.textSlots ?? []), ...(owner.attributeSlots ?? [])];
-}
 // Text slots first, then one entry per @if; compared by value, since a mutation in place keeps the item's identity.
 function rowSlotValues(
 	repeat: ResumeKeyedRepeatRecord,
@@ -662,22 +644,6 @@ function rowSlotValues(
 				: graph.read(slot.graphNodeId, slot.graphPath),
 	);
 	return slots?.branches ? [...values, ...slots.branches(repeat, item, index, graph, read)] : values;
-}
-// One group per text or attribute slot, then one for every @if value.
-function slotReadGroups(repeat: ResumeKeyedRepeatRecord): SlotRead[][] {
-	const branches = (repeat.rowTemplate?.branchSlots ?? []).flatMap((branch) => [branch, ...branch.arms.flatMap(slotsOf)]);
-	return [...templateSlots(repeat).map((slot) => [slot]), branches].map((group: ReadonlyArray<(typeof branches)[number]>) =>
-		group.flatMap((slot) =>
-			'source' in slot
-				? (slot.reads ?? [])
-				: 'graphNodeId' in slot
-					? [{ graphNodeId: slot.graphNodeId, path: slot.graphPath }]
-					: [],
-		),
-	);
-}
-function rowSlotReads(repeat: ResumeKeyedRepeatRecord) {
-	return slotReadGroups(repeat).flat();
 }
 function firstDuplicateRepeatKey(
 	repeat: ResumeKeyedRepeatRecord,
