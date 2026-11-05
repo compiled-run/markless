@@ -1,52 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 1158,
-			"reason": "a row value reading state written before the row code arrived repaints: resume-keyed-repeats reads what the server painted at wiring",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 4,
-			"reason": "a row value reading state written before the row code arrived repaints: resume-keyed-repeats reads what the server painted at wiring",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 1158,
-			"reason": "a row value reading state written before the row code arrived repaints: resume-keyed-repeats reads what the server painted at wiring",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 1,
-			"reason": "a row value reading state written before the row code arrived repaints: resume-keyed-repeats reads what the server painted at wiring",
-			"date": "2026-11-05"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -162,6 +116,52 @@
 			],
 			"delta": 192,
 			"reason": "resume-keyed-repeats records each row slot's served reads at wiring, so a write before the row code arrives still repaints",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1287,
+			"reason": "a row value reading state written before the row code arrived repaints, including Map, Set and BigInt state: resume-keyed-repeats reads what the server painted at wiring",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 7,
+			"reason": "a row value reading state written before the row code arrived repaints, including Map, Set and BigInt state: resume-keyed-repeats reads what the server painted at wiring",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1287,
+			"reason": "a row value reading state written before the row code arrived repaints, including Map, Set and BigInt state: resume-keyed-repeats reads what the server painted at wiring",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -4,
+			"reason": "a row value reading state written before the row code arrived repaints, including Map, Set and BigInt state: resume-keyed-repeats reads what the server painted at wiring",
 			"date": "2026-11-05"
 		}
 	]
