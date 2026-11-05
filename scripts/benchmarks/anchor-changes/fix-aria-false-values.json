@@ -45,6 +45,112 @@
 			"delta": -9,
 			"reason": "ARIA states whose value set has false (aria-pressed, aria-expanded, aria-checked, aria-selected and others) write false instead of dropping the attribute",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/dom-attribute"
+			],
+			"delta": 201,
+			"reason": "ARIA states whose value set has false write false instead of dropping the attribute",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 97,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 97,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 97,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 198,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 236,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 365,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 236,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 114,
+			"reason": "web/dom-attribute carries the ARIA state names that write false",
+			"date": "2026-11-05"
 		}
 	]
 }
