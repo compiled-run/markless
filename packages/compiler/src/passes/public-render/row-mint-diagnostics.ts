@@ -129,15 +129,16 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			return;
 		}
 		const unpainted = unpaintedRowValues(repeat, input.semanticGraph);
-		for (const value of unpainted)
-			diagnostics.push(
-				keyedRepeatRowValueUnpaintedDiagnostic({
+		for (const { decidedByProps, ...value } of unpainted)
+			diagnostics.push({
+				...keyedRepeatRowValueUnpaintedDiagnostic({
 					itemName: repeat.itemName,
 					...value,
 					node,
 					filename: input.filename,
 				}),
-			);
+				...(decidedByProps ? { decidedByProps } : {}),
+			});
 		const refusal = rowMintRefusal({
 			chunks: input.semanticGraph.markup.chunks,
 			componentEdges: input.semanticGraph.componentEdges,
@@ -230,6 +231,10 @@ function unpaintedRowValues(
 	readonly source: string;
 	readonly attributeName?: string;
 	readonly cause: KeyedRepeatRowValueUnpaintedCause;
+	readonly decidedByProps?: {
+		readonly componentName: string;
+		readonly props: ReadonlyArray<string>;
+	};
 }> {
 	const chunk = graph.markup.chunks.find(
 		(candidate) => candidate.id === `repeat:${repeat.id}:row`,
@@ -265,8 +270,17 @@ function unpaintedRowValues(
 		const value =
 			mintableSlotValue(slot) ?? expressionSlotValue(slot, graph, component, rowNames);
 		if (!value || 'itemPath' in value) continue;
-		const reads = 'graphNodeId' in value ? [value] : (value.reads ?? []);
+		const reads =
+			'graphNodeId' in value
+				? [{ graphNodeId: value.graphNodeId, path: value.graphPath }]
+				: (value.reads ?? []);
 		if (reads.every((read) => constantInBrowser(graph, component, read.graphNodeId))) continue;
+		// A value read only off props is stale only if some caller passes one that changes; the build checks each.
+		const deciding = reads.reduce<ReadonlyArray<string> | null>(
+			(props, read) => joinDeciders(props, propsDeciding(read.graphNodeId, read.path, graph)),
+			[],
+		);
+		if (deciding?.length === 0) continue;
 		const cause: KeyedRepeatRowValueUnpaintedCause | null = betweenLists
 			? { kind: 'between-lists' }
 			: servedOnlyRefused
@@ -281,6 +295,7 @@ function unpaintedRowValues(
 							?.name ?? value.graphNodeId),
 			...(slot.kind === 'attribute' ? { attributeName: slot.name } : {}),
 			cause,
+			...(deciding ? { decidedByProps: { componentName: component, props: deciding } } : {}),
 		});
 	}
 	return values;

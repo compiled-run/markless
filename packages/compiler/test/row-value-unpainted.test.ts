@@ -164,3 +164,16 @@ test('an item-only value between two nested lists leaves the rest of the row wit
 	expect(errors).toHaveLength(1);
 	expect(errors[0]![1]).toContain("picked === row.id ? 'on' : 'off'");
 });
+
+test('a value that reads only props names them, so the build checks every caller', async () => {
+	const source = between(`<b class={label}>x</b>`).replace(
+		'export function Page() @{',
+		'export function Page({ label }) @{',
+	);
+	const compiled = await compileTsrxModule({ filename: 'src/Page.tsrx', source, symbols: [] });
+	expect(
+		compiled.publicRenderPlan.diagnostics
+			.filter((entry) => entry.code === KEYED_REPEAT_ROW_VALUE_UNPAINTED_CODE)
+			.map((entry) => entry.decidedByProps),
+	).toEqual([{ componentName: 'Page', props: ['label'] }]);
+});
