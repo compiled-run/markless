@@ -1,5 +1,6 @@
 // The Shared page's live demo: a page-scoped day total and a widget-scoped count per stall, on one inked sheet.
 import { computed, shared, state } from '@markless/core';
+import InkButton from '../ink/ink-button.tsrx';
 import InkScreen from '../ink/ink-screen.tsrx';
 import MarginNotes, { Notes, NoteTitle, Spot, Spots, Tally } from '../ink/margin-notes.tsrx';
 import Ring from '../ink/ring.tsrx';
@@ -20,7 +21,7 @@ export const stall = shared(
 	{ scope: 'widget' },
 );
 
-function Stall({ name, n }: { name: string; n: number }) @{
+function Stall({ name, n, alt }: { name: string; n: number; alt?: boolean }) @{
 	const s = stall();
 	const d = day();
 
@@ -29,16 +30,15 @@ function Stall({ name, n }: { name: string; n: number }) @{
 			<span>{name}: <strong>{s.sold}</strong> sold</span>
 			<Ring n={n} />
 		</p>
-		<button
-			type="button"
-			class="sell"
+		<InkButton
+			alt={alt}
 			onClick={() => {
 				s.sold++;
 				d.sold++;
 			}}
 		>
 			Sell one
-		</button>
+		</InkButton>
 		<style>
 			.stall {
 				display: grid;
@@ -51,20 +51,6 @@ function Stall({ name, n }: { name: string; n: number }) @{
 				align-items: center;
 				gap: 0.4rem;
 				margin: 0;
-			}
-
-			.sell {
-				padding: 0.35em 1.1em;
-				border: 1.5px solid var(--screen-ink);
-				border-radius: 0.4rem 0.6rem 0.45rem 0.55rem;
-				background: none;
-				color: var(--screen-ink);
-				font: inherit;
-				cursor: pointer;
-			}
-
-			.sell:active {
-				background: color-mix(in oklch, var(--pink) 35%, transparent);
 			}
 		</style>
 	</div>
@@ -83,7 +69,7 @@ export default function BakeSaleDemo() @{
 				</p>
 				<div class="stalls">
 					<Stall name="Lemonade" n={2} />
-					<Stall name="Cookies" n={3} />
+					<Stall name="Cookies" n={3} alt />
 				</div>
 				<style>
 					.page {
