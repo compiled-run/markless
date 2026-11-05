@@ -253,6 +253,7 @@ export default function SeatAnatomy() @{
 			}
 
 			.scene {
+				touch-action: none;
 				display: block;
 				width: 100%;
 				height: auto;

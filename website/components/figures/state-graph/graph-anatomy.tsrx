@@ -280,6 +280,7 @@ export default function GraphAnatomy() @{
 			}
 
 			.scene {
+				touch-action: none;
 				display: block;
 				width: 100%;
 				height: auto;
