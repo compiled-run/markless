@@ -85,9 +85,11 @@ test.each(combinations)(
 		]);
 
 		expect(Object.keys(scripts)).toContain('dev');
-		for (const [name, command] of Object.entries(scripts)) {
-			const binary = command.trim().split(/\s+/)[0]!;
-			expect(provided, `${manifestFile} ${name}: ${command}`).toContain(binary);
+		for (const [name, script] of Object.entries(scripts)) {
+			for (const command of script.split('&&')) {
+				const binary = command.trim().split(/\s+/)[0]!;
+				expect(provided, `${manifestFile} ${name}: ${command}`).toContain(binary);
+			}
 		}
 
 		const manager = userAgent.slice(0, userAgent.indexOf('/'));

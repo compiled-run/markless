@@ -8,6 +8,9 @@
 		"moduleResolution": "Bundler",
 		"jsx": "preserve",
 		"strict": true,
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
 		"types": ["vite/client"],
 		"plugins": [
 			{
@@ -22,6 +25,7 @@
 		"markless-router-env.d.ts",
 		"document.tsrx",
 		"pages",
+		"components",
 		"api",
 		"middleware",
 		"vite.config.ts"

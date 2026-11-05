@@ -409,7 +409,7 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 
 	expect(packageJson.scripts).toMatchObject({
 		build: 'vp build',
-		check: 'vp check',
+		check: 'vp check && markless-tsc',
 		dev: 'vp dev',
 		doctor: 'node scripts/markless-doctor.mjs',
 		preview: 'vp preview',
