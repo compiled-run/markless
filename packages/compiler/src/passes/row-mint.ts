@@ -491,7 +491,7 @@ export function expressionSlotValue(
 			reads.findIndex(
 				(other) =>
 					other.graphNodeId === read.graphNodeId &&
-					other.path.join('.') === read.path.join('.'),
+					JSON.stringify(other.path) === JSON.stringify(read.path),
 			) === index,
 	);
 	return { source: slot.residue.source, ...(distinct.length > 0 ? { reads: distinct } : {}) };

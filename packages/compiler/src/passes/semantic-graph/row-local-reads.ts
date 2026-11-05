@@ -7,7 +7,6 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectGraphDependencies } from './collect-async.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
-import { repeatRowBindsName } from './collect-repeat.ts';
 import { findSharedInstance, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { rowValueLocalUnfollowedDiagnostic } from './diagnostics.ts';
 import { ownedModuleAst } from './shared-ast.ts';
@@ -62,7 +61,10 @@ function followLocal(
 			? definitionOf(binding.declarations[0]!.start, state)
 			: null;
 	if (!value) return binding.name;
-	reads.push(...collectGraphDependencies(value, state, state.currentComponentName ?? undefined));
+	const componentName = state.currentComponentName ?? undefined;
+	reads.push(...collectGraphDependencies(value, state, componentName));
+	for (const fallback of parameterDefaults(value))
+		reads.push(...collectGraphDependencies(fallback, state, componentName));
 	for (const local of bodyLocalsNamed(value, state)) {
 		if (seen.has(local.symbolId)) continue;
 		seen.add(local.symbolId);
@@ -90,7 +92,7 @@ function bodyLocalsNamed(
 		const scope = semantic.scopes[semantic.bindings[symbolId]!.scope.id]!;
 		if (scope.kind === 'module') return;
 		if (scope.node.start >= region.start && scope.node.end <= region.end) return;
-		if (repeatRowBindsName(name, state) || readsGraph(name, state)) return;
+		if (readsGraph(name, state)) return;
 		const declarations = semantic.bindings[symbolId]!.declarations;
 		if (
 			declarations.length === 1 &&
@@ -143,6 +145,26 @@ function definitionOf(declarationStart: number, state: WalkState): AnyNode | nul
 	return definitions.get(declarationStart) ?? null;
 }
 
+// A parameter's default value runs with the call, so its reads are the helper's too.
+function parameterDefaults(value: AnyNode): ReadonlyArray<AnyNode> {
+	const defaults: AnyNode[] = [];
+	const visit = (pattern: AnyNode | null | undefined): void => {
+		if (!pattern) return;
+		if (pattern.type === 'AssignmentPattern') {
+			defaults.push(pattern.right as AnyNode);
+			visit(pattern.left as AnyNode);
+		} else if (pattern.type === 'ObjectPattern')
+			for (const property of (pattern.properties as AnyNode[] | undefined) ?? [])
+				visit((property.type === 'RestElement' ? property.argument : property.value) as AnyNode);
+		else if (pattern.type === 'ArrayPattern')
+			for (const element of (pattern.elements as Array<AnyNode | null> | undefined) ?? [])
+				visit(element);
+		else if (pattern.type === 'RestElement') visit(pattern.argument as AnyNode);
+	};
+	for (const parameter of (value.params as AnyNode[] | undefined) ?? []) visit(parameter);
+	return defaults;
+}
+
 // Where each name a declaration or binding pattern declares starts.
 function patternStarts(node: AnyNode | undefined): ReadonlyArray<number> {
 	if (!node) return [];
@@ -179,7 +201,7 @@ function unique(
 ): ReadonlyArray<SemanticGraphDependency> {
 	const seen = new Set<string>();
 	return dependencies.filter((dependency) => {
-		const key = `${dependency.graphNodeId}:${dependency.path.join('.')}`;
+		const key = `${dependency.graphNodeId}:${JSON.stringify(dependency.path)}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
 		return true;

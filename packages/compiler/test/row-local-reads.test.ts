@@ -78,6 +78,18 @@ test.each([
 		`on(row) + picked`,
 		['computed:label', 'state:picked'],
 	],
+	[
+		'a helper whose default parameter reads state',
+		`const on = (row: { key: number }, at = picked) => at === row.key;`,
+		`on(row) ? 'on' : 'off'`,
+		['state:picked'],
+	],
+	[
+		'a helper naming a local spelled like the row item',
+		`const row = () => picked;\n\tconst on = (item: { key: number }) => row() === item.key;`,
+		`on(row) ? 'on' : 'off'`,
+		['state:picked'],
+	],
 ])(
 	'a @for row value reading state through %s reads that state',
 	async (_, declarations, value, expected) => {
