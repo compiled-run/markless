@@ -599,7 +599,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			state.currentArmGuards = [];
 			withArmScope(state, null, () => {
 				for (const child of childNodes(node)) {
-					walk(child, state);
+					if (child === node.body)
+						withCreationSite(state, 'row', () => walk(child, state));
+					else walk(child, state);
 				}
 			});
 			state.currentArmGuards = outerGuards;

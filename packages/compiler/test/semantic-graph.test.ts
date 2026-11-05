@@ -422,6 +422,20 @@ const unstableCreationCases = [
 		cell: 'state:item',
 		source: `import { state } from '@markless/core'; export function App() @{ for (let i = 0; i < 3; i++) { const item = state(i); } <p>done</p> }`,
 	},
+	{
+		name: '@for rows',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a @for row',
+		cell: 'state:liked',
+		source: `import { state } from '@markless/core'; export function App() @{ let books = state([{ id: 'a' }]); <ul>@for (const book of books; key book.id) { let liked = state(false); <li onClick={() => (liked = !liked)}>{liked ? 'liked' : book.id}</li> }</ul> }`,
+	},
+	{
+		name: '@for rows with an index',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a @for row',
+		cell: 'computed:shout',
+		source: `import { computed, state } from '@markless/core'; export function List() @{ let words = state(['x']); <ol>@for (const word of words; index at; key word) { const shout = computed(() => word + at); <li>{shout}</li> }</ol> }`,
+	},
 ] as const;
 
 for (const scenario of unstableCreationCases) {
