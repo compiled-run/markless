@@ -71,6 +71,78 @@
 			"delta": 9652,
 			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 4567,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 124096,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 3721,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -8424,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 265,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 9652,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
+			"date": "2026-11-05"
 		}
 	]
 }
