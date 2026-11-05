@@ -61,9 +61,9 @@ Each module in a pack still starts only when something first imports it. Set `pa
 
 ## A symbol reaches only what crosses
 
-A symbol runs after the component body, maybe on another machine, so it can use only state, computed values, element handles, props, `shared()` values, imports and plain constants.
+A handler runs later than the component body, so it can only use what Markless can find again, like state and element handles.
 
-<Code steps={[{ label: 'Change `Focus` to `Focus the note`.', shows: 'Focus the note' }, { label: "Above the elements, add `const box = document.querySelector('input');`, change `field?.focus()` to `box?.focus()`, and read the build error.", source: 'box?.focus()' }]}>
+<Code steps={[{ label: 'Change `Focus` to `Focus the note`.', shows: 'Focus the note' }, { label: "Try breaking it: above the elements, add `const box = document.querySelector('input');` and change `field?.focus()` to `box?.focus()`. The result pane shows the error and why `box` can't cross.", source: 'box?.focus()' }]}>
 ```tsrx title="gift-note.tsrx"
 import { element, state } from '@markless/core';
 
@@ -84,7 +84,5 @@ export default function GiftNote() @{
 }
 ```
 </Code>
-
-The broken version fails with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED`, naming `box` as a local DOM node value. A function declared in the component body is fine, unless it reads something that can't cross or is declared with `let`.
 
 [Native targets](/how-it-works/native-targets) asks whether a browser has to run these symbols at all.

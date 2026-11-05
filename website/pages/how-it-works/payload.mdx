@@ -57,7 +57,7 @@ Here is the real response of `renderToString()` for the full calendar, with the 
 
 ## Only pages that can react get a payload
 
-- Values must be data: `@markless/serializer` refuses a function with `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`.
+- Values must be data, so a function can't be sent this way.
 - A page with nothing to react to gets no scripts at all, just `<div data-async-container>` and its HTML.
 - In the browser alone, `render()` keeps the same records in memory and writes none of these scripts.
 
