@@ -1,15 +1,14 @@
-// The shop page on the desk with the `cart` box: Add to cart feeds the box, and at three bags the free-shipping line is built on the page; below three it is gone.
+// The shop page on the desk with a sticker sheet: at three bags the Free shipping sticker is pressed onto the order; below three it is back on its backing and the order is plain paper.
 import { computed, state } from '@markless/core';
-import { add, BRANCH_TOUR, CART_NEW, CART_SLOT, CART_UNIT, describeBranch, flip, free, PERK, PRICE, PRODUCT, SHOP, START } from './branch-model.ts';
-import { art } from './branch.art.ts';
+import { add, bags, BRANCH_TOUR, describeBranch, flip, free, PERK, PRICE, PRODUCT, SHOP, START } from './branch-model.ts';
+import { art } from './sticker.art.ts';
 
-export default function BranchAnatomy() @{
+export default function StickerAnatomy() @{
 	let cart = state(START);
-	let prev = state(START);
 	let beat = state('rest');
 	let touched = state(false);
+	const unit = computed(() => bags(cart));
 	const shipping = computed(() => free(cart));
-	const unit = computed(() => (cart === 1 ? 'bag' : 'bags'));
 	const said = computed(() => describeBranch(cart, beat !== 'rest'));
 
 	<figure
@@ -28,7 +27,6 @@ export default function BranchAnatomy() @{
 				const next = BRANCH_TOUR[step % BRANCH_TOUR.length];
 				step++;
 				if (next === 'add') {
-					prev = cart;
 					cart = add(cart);
 					beat = flip(beat);
 				}
@@ -45,14 +43,12 @@ export default function BranchAnatomy() @{
 			aria-label="Add to cart"
 			onClick={() => {
 				touched = true;
-				prev = cart;
 				cart = add(cart);
 				beat = flip(beat);
 			}}
 			onKeyDown={(event) => {
 				if (event.key === 'Escape') {
 					touched = true;
-					prev = START;
 					cart = START;
 					beat = 'rest';
 				}
@@ -60,14 +56,14 @@ export default function BranchAnatomy() @{
 		>
 			<svg class="scene" data-beat={beat} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="pencil" d={art.sheet.pencil} />
-				<path class="pencil" d={art.cart.pencil} />
-								<path class="shadow-wash" d={art.sheet.curl.shadow} />
+				<path class="pencil" d={art.backing.pencil} />
+				<path class="shadow-wash" d={art.sheet.curl.shadow} />
 				<path class="hatch deep" d={art.sheet.curl.hatch} />
 				<path class="shadow-wash light" d={art.sheet.contactWash} />
 				<path class="hatch deep" d={art.sheet.contact} />
 				<path class="hatch deep light" d={art.sheet.desk} />
-				<path class="shadow-wash" d={art.cart.cast.wash} />
-				<path class="hatch deep light" d={art.cart.cast.hatch} />
+				<path class="shadow-wash" d={art.backing.shadow.wash} />
+				<path class="hatch deep light" d={art.backing.shadow.hatch} />
 
 				<g class="sheet">
 					<path class="sheet-paper" d={art.sheet.paper} />
@@ -100,90 +96,47 @@ export default function BranchAnatomy() @{
 					<path class="sheet-ink" d={art.page.button.ink} />
 					<text class="button-label" transform={art.page.button.matrix}>Add to cart</text>
 				</g>
-				<g class="cart-spot">
-					<path class="wash yellow" d={art.page.cartSpot.wash} />
-					<path class="wash yellow pool" d={art.page.cartSpot.pool} />
-					<path class="wash-edge" d={art.page.cartSpot.edge} />
-				</g>
+				<path class="wash yellow" d={art.page.cartSpot.wash} />
+				<path class="wash yellow pool" d={art.page.cartSpot.pool} />
 				<g transform={art.page.cartMatrix}>
 					<text class="page-text label">In your cart:</text>
-					<g class="old cart-old">
-						<text class="page-text small" x={CART_SLOT}>{prev}</text>
-						<path class="strike" d={art.cartStrike.d} style={'--l:' + art.cartStrike.length} />
-					</g>
-					<text class="digit cart-now" x={CART_NEW}>{cart}</text>
-					<text class="page-text label" x={CART_UNIT}>{unit}</text>
+					<text class="digit live step-0" x="96">{cart}</text>
+					<text class="page-text label" x="112">{unit}</text>
 				</g>
 				@if (shipping) {
-					<g class="perk">
-						<path class="wash yellow" d={art.page.perkSpot.wash} />
-						<path class="wash yellow pool" d={art.page.perkSpot.pool} />
-						<path class="wash-edge" d={art.page.perkSpot.edge} />
-						<text class="page-text perk-text" transform={art.page.perkMatrix}>{PERK}</text>
+					<g class="sticker pressed">
+						<path class="shadow-wash" d={art.page.sticker.lift} />
+						<path class="sticker-paper" d={art.page.sticker.paper} />
+						<path class="wash yellow" d={art.page.sticker.wash} />
+						<path class="sheet-ink" d={art.page.sticker.ink} />
+						<text class="sticker-text" transform={art.page.sticker.matrix}>{PERK}</text>
 					</g>
 				}
 
-				<path class="shadow-ink" d={art.wires.thin.shadow} />
-				<path class="hatch deep" d={art.wires.thin.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.cartOut.shadow} />
-				<path class="hatch deep" d={art.wires.cartOut.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.perkOut.shadow} />
-				<path class="hatch deep" d={art.wires.perkOut.shadowHatch} />
-				<path class="shadow-wash" d={art.wires.cartClip.cast} />
-				<path class="shadow-wash" d={art.wires.perkClip.cast} />
-
-				<path class="box-paper" d={art.cart.paper} />
-				<path class="wash kraft-wash" d={art.cart.kraft} />
-				<path class="hatch" d={art.cart.shade} />
-				<path class="tag-paper" d={art.cart.label} />
-				<path class="tag-ink" d={art.cart.labelInk} />
-				<path class="jar-ink" d={art.cart.ink} />
-				<text class="count stamp-count" transform={art.cart.countMatrix}>{cart}</text>
-				<path class="jar-ink" d={art.cart.tag.string} />
-				<path class="tag-paper" d={art.cart.tag.paper} />
-				<path class="tag-hatch" d={art.cart.tag.shade} />
-				<path class="tag-ink" d={art.cart.tag.ink} />
-				<text class="tag-text" transform={art.cart.tag.matrix}>cart</text>
-
-				<path class="cord" d={art.wires.thin.paper} />
-				<path class="jar-ink" d={art.wires.thin.tone} />
-				<path class="jar-ink" d={art.wires.thin.ink} />
-				<path class="boot" d={art.wires.socket.paper} />
-				<path class="jar-ink" d={art.wires.socket.ink} />
-				<path class="cord" d={art.wires.perkOut.paper} />
-				<path class="jar-ink" d={art.wires.perkOut.tone} />
-				<path class="jar-ink" d={art.wires.perkOut.ink} />
-				<path class="cord" d={art.wires.cartOut.paper} />
-				<path class="jar-ink" d={art.wires.cartOut.tone} />
-				<path class="jar-ink" d={art.wires.cartOut.ink} />
-				<path class="boot" d={art.wires.cartClip.boot} />
-				<path class="hatch" d={art.wires.cartClip.bootTone} />
-				<path class="brass" d={art.wires.cartClip.paper} />
-				<path class="wash brass-wash" d={art.wires.cartClip.wash} />
-				<path class="hatch" d={art.wires.cartClip.side} />
-				<path class="jar-ink" d={art.wires.cartClip.ink} />
-				<path class="boot" d={art.wires.perkClip.boot} />
-				<path class="hatch" d={art.wires.perkClip.bootTone} />
-				<path class="brass" d={art.wires.perkClip.paper} />
-				<path class="wash brass-wash" d={art.wires.perkClip.wash} />
-				<path class="hatch" d={art.wires.perkClip.side} />
-				<path class="jar-ink" d={art.wires.perkClip.ink} />
-
-				<path class="pulse to-cart" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
-				<path class="pulse to-cart-line" d={art.wires.cartOut.centre} style={'--len:' + art.wires.cartOut.length} />
-				<path class="pulse to-perk" d={art.wires.perkOut.centre} style={'--len:' + art.wires.perkOut.length} />
+				<path class="backing-paper" d={art.backing.paper} />
+				<path class="hatch light" d={art.backing.gloss} />
+				<path class="jar-ink" d={art.backing.ink} />
+				<path class="jar-ink thin" d={art.backing.slot} />
+				<text class="backing-label" transform={art.backing.labelMatrix}>stickers</text>
+				@if (!shipping) {
+					<g class="sticker">
+						<path class="sticker-paper" d={art.backing.sticker.paper} />
+						<path class="wash yellow" d={art.backing.sticker.wash} />
+						<path class="jar-ink" d={art.backing.sticker.ink} />
+						<text class="sticker-text on-desk" transform={art.backing.sticker.matrix}>{PERK}</text>
+					</g>
+				}
 
 				<path class="jar-ink" d={art.note.arrow} />
-				<text class="hand" x={art.note.x} y={art.note.y}>WIRED BEFORE THE PAGE RAN</text>
+				<text class="hand" x={art.note.x} y={art.note.y}>PEELED OFF, NOT COVERED</text>
 			</svg>
 		</button>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a desk. A sheet of paper on it is drawn as a shop page at beanshop.dev: the shop name {SHOP}, a bag of
-			coffee sold as {PRODUCT} for {PRICE}, a pink Add to cart button and the line "In your cart: {cart} {unit}". Beside the sheet stands
-			a box tagged cart. One wire runs from it to the cart line, and another to an empty spot under it, where the line "{PERK}" is
-			built whenever the cart holds three bags or more. A thin wire runs from the button into the box. Press the drawing, or Enter or
-			Space, to add a bag: at three bags the line is inked onto the page, and after four the cart starts again at one and the line is gone
-			from the page, with nothing left behind. Escape resets.
+			coffee sold as {PRODUCT} for {PRICE}, a pink Add to cart button and the line "In your cart: {cart} {unit}". Beside the sheet lies
+			a sticker sheet holding a yellow "{PERK}" sticker. Press the drawing, or Enter or Space, to add a bag: at three bags the sticker is
+			peeled off its backing and pressed onto the order; when the cart starts again at one, it goes back on the backing and the order
+			under it is plain paper. Escape resets.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -502,100 +455,168 @@ export default function BranchAnatomy() @{
 				transform-origin: center;
 			}
 
-			.small {
-				font-size: 12px;
-				font-weight: 600;
+			.button-label {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: 8px;
+				font-weight: 800;
+				fill: var(--sheet-ink);
 			}
 
-			.button-label,
-			.stamp-count {
+			.backing-paper {
+				fill: color-mix(in oklch, var(--paper) 60%, white);
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--paper) 30%, var(--ink));
+				}
+			}
+
+			.sticker-paper {
+				fill: var(--sheet);
+			}
+
+			.sticker-text,
+			.backing-label {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-weight: 800;
 			}
 
-			.button-label {
-				font-size: 8px;
+			.sticker-text {
+				font-size: 13px;
 				fill: var(--sheet-ink);
 			}
 
-			.stamp-count {
-				font-size: 13px;
-				text-anchor: middle;
+			.on-desk {
+				font-size: 10px;
+			}
+
+			.backing-label {
+				font-size: 8px;
+				font-style: italic;
 				fill: var(--ink);
+				opacity: 0.7;
+			}
+
+			.pressed {
+				transform-box: fill-box;
+				transform-origin: center;
+			}
+
+			.scene:not([data-beat='rest']) .pressed {
+				animation: var(--press-on) 700ms 400ms both;
+			}
+
+			.scene:not([data-beat='rest']) .sticker:not(.pressed) {
+				animation: var(--settle) 500ms 300ms both;
+			}
+
+			.live {
+				stroke: currentColor;
+				stroke-width: 0.25;
+				stroke-dasharray: 60;
+			}
+
+			.digit.live {
+				stroke: var(--sheet-ink);
+			}
+
+			.card-value.live {
+				stroke: var(--sheet-ink);
 			}
 
 			.scene[data-beat='odd'] {
 				--sink: sink-a;
-				--travel: travel-a;
-				--strike: strike-a;
-				--come-cart: come-cart-a;
-				--come-total: come-total-a;
-				--wash-cart: wash-cart-a;
-				--count: count-a;
-				--old: old-a;
+				--ink-in: ink-in-a;
+				--press-on: press-on-a;
+				--settle: settle-a;
 			}
 
 			.scene[data-beat='even'] {
 				--sink: sink-b;
-				--travel: travel-b;
-				--strike: strike-b;
-				--come-cart: come-cart-b;
-				--come-total: come-total-b;
-				--wash-cart: wash-cart-b;
-				--count: count-b;
-				--old: old-b;
+				--ink-in: ink-in-b;
+				--press-on: press-on-b;
+				--settle: settle-b;
 			}
 
 			.press {
 				animation: var(--sink) 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}
 
-			.to-cart {
-				animation: var(--travel) 700ms 300ms ease-in-out both;
+			.scene:not([data-beat='rest']) .live {
+				animation: var(--ink-in) 650ms both;
 			}
 
-			.to-cart-line,
-			.to-perk {
-				animation: var(--travel) 650ms 1150ms ease-in-out both;
+			.scene:not([data-beat='rest']) .step-0 {
+				animation-delay: 350ms;
 			}
 
-			.perk-text {
-				font-size: 12px;
-				font-weight: 800;
-				stroke: var(--sheet-ink);
-				stroke-width: 0.3;
-				stroke-dasharray: 160;
+			.scene:not([data-beat='rest']) .step-1 {
+				animation-delay: 1000ms;
 			}
 
-			.scene:not([data-beat='rest']) .perk {
-				animation: var(--come-total) 3300ms linear both;
+			.scene:not([data-beat='rest']) .step-2 {
+				animation-delay: 1550ms;
 			}
 
-			.count {
-				animation: var(--count) 3300ms linear both;
+			.scene:not([data-beat='rest']) .step-3 {
+				animation-delay: 2100ms;
 			}
 
-			.old {
-				opacity: 0;
+			.scene:not([data-beat='rest']) .step-4 {
+				animation-delay: 2650ms;
 			}
 
-			.scene:not([data-beat='rest']) .old {
-				animation: var(--old) 3300ms linear both;
+			@keyframes press-on-a {
+				0% {
+					opacity: 0;
+					transform: translate(40px, -30px) rotate(-4deg) scale(1.08);
+				}
+
+				60% {
+					opacity: 1;
+					transform: translate(0, -3px) scale(1.03);
+				}
+
+				100% {
+					opacity: 1;
+					transform: none;
+				}
 			}
 
-			.cart-old .strike {
-				animation: var(--strike) 260ms 1800ms ease-out both;
+			@keyframes press-on-b {
+				0% {
+					opacity: 0;
+					transform: translate(40px, -30px) rotate(-4deg) scale(1.08);
+				}
+
+				60% {
+					opacity: 1;
+					transform: translate(0, -3px) scale(1.03);
+				}
+
+				100% {
+					opacity: 1;
+					transform: none;
+				}
 			}
 
-			.cart-now {
-				stroke: var(--sheet-ink);
-				stroke-width: 0.3;
-				stroke-dasharray: 60;
-				animation: var(--come-cart) 3300ms linear both;
+			@keyframes settle-a {
+				0% {
+					opacity: 0;
+				}
+
+				100% {
+					opacity: 1;
+				}
 			}
 
-			.cart-spot {
-				animation: var(--wash-cart) 3300ms linear both;
+			@keyframes settle-b {
+				0% {
+					opacity: 0;
+				}
+
+				100% {
+					opacity: 1;
+				}
 			}
 
 			@keyframes sink-a {
@@ -610,75 +631,15 @@ export default function BranchAnatomy() @{
 				}
 			}
 
-			@keyframes travel-a {
+			@keyframes ink-in-a {
 				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes travel-b {
-				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes strike-a {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes strike-b {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes come-cart-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				57% {
 					opacity: 0;
 					stroke-dashoffset: 60;
 					fill-opacity: 0;
 				}
 
-				58% {
+				30% {
 					opacity: 1;
-				}
-
-				66% {
 					fill-opacity: 0;
 				}
 
@@ -688,157 +649,21 @@ export default function BranchAnatomy() @{
 				}
 			}
 
-			@keyframes come-cart-b {
+			@keyframes ink-in-b {
 				0% {
-					opacity: 1;
-				}
-
-				5%,
-				57% {
 					opacity: 0;
 					stroke-dashoffset: 60;
 					fill-opacity: 0;
 				}
 
-				58% {
+				30% {
 					opacity: 1;
-				}
-
-				66% {
 					fill-opacity: 0;
 				}
 
 				100% {
 					stroke-dashoffset: 0;
 					fill-opacity: 1;
-				}
-			}
-
-			@keyframes come-total-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				76% {
-					opacity: 0;
-					stroke-dashoffset: 60;
-					fill-opacity: 0;
-				}
-
-				77% {
-					opacity: 1;
-				}
-
-				86% {
-					fill-opacity: 0;
-				}
-
-				100% {
-					stroke-dashoffset: 0;
-					fill-opacity: 1;
-				}
-			}
-
-			@keyframes come-total-b {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				76% {
-					opacity: 0;
-					stroke-dashoffset: 60;
-					fill-opacity: 0;
-				}
-
-				77% {
-					opacity: 1;
-				}
-
-				86% {
-					fill-opacity: 0;
-				}
-
-				100% {
-					stroke-dashoffset: 0;
-					fill-opacity: 1;
-				}
-			}
-
-			@keyframes wash-cart-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				60% {
-					opacity: 0;
-				}
-			}
-
-			@keyframes wash-cart-b {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				60% {
-					opacity: 0;
-				}
-			}
-
-			@keyframes count-a {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				28% {
-					opacity: 0;
-				}
-
-				36% {
-					opacity: 1;
-				}
-			}
-
-			@keyframes count-b {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				28% {
-					opacity: 0;
-				}
-
-				36% {
-					opacity: 1;
-				}
-			}
-
-			@keyframes old-a {
-				0%,
-				4% {
-					opacity: 0;
-				}
-
-				8%,
-				100% {
-					opacity: 0.55;
-				}
-			}
-
-			@keyframes old-b {
-				0%,
-				4% {
-					opacity: 0;
-				}
-
-				8%,
-				100% {
-					opacity: 0.55;
 				}
 			}
 
