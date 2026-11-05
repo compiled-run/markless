@@ -1352,6 +1352,27 @@ function asyncComputedGraphNodeIds(
 	);
 }
 
+// A handler sees an async value as the template does: the resolved value, never its snapshot.
+function asyncValueReads<Read extends LoweredStateRead>(
+	reads: ReadonlyArray<Read> | undefined,
+	asyncComputedNodeIds: ReadonlySet<string>,
+): ReadonlyArray<Read> {
+	return (reads ?? []).map((read) =>
+		asyncComputedNodeIds.has(read.graphNodeId)
+			? { ...read, path: asyncComputedReadPath(read.path) }
+			: read,
+	);
+}
+
+function withAsyncValueReads<Symbol extends { readonly reads?: ReadonlyArray<LoweredStateRead> }>(
+	symbol: Symbol,
+	asyncComputedNodeIds: ReadonlySet<string>,
+): Symbol {
+	return symbol.reads && asyncComputedNodeIds.size > 0
+		? { ...symbol, reads: asyncValueReads(symbol.reads, asyncComputedNodeIds) }
+		: symbol;
+}
+
 function armPartReadPath(
 	graphNodeId: string,
 	path: ReadonlyArray<string>,
@@ -8072,7 +8093,10 @@ export function buildSymbolModuleEmission(
 						? { moduleImports: symbol.graphAccess.moduleImports }
 						: {}),
 					order: symbol.order,
-					reads: symbol.graphAccess.reads,
+					reads: asyncValueReads(
+						symbol.graphAccess.reads,
+						asyncComputedGraphNodeIds(input.semanticGraph),
+					),
 					writes: symbol.graphAccess.writes,
 				},
 				localNames: input.localNames ?? emptyLocalNames,
@@ -8111,7 +8135,7 @@ export function buildSymbolModuleEmission(
 
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return buildEventHandlerEmission({
-			symbol,
+			symbol: withAsyncValueReads(symbol, asyncComputedGraphNodeIds(input.semanticGraph)),
 			localNames: input.localNames ?? emptyLocalNames,
 			captureSlots: input.captureSlots,
 			unfilledCallbackSlotSources: unfilledCallbackSlotSources(input.semanticGraph),

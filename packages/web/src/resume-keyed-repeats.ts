@@ -207,7 +207,7 @@ export function wireKeyedRepeats(
 				if (!host) continue;
 				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
 			}
-			if (!arms) onRow?.(repeat, rowRoot, rowKey);
+			onRow?.(repeat, rowRoot, rowKey, (at) => cell?.mint?.armEventHost?.(rowRoot, repeat, at, slots.values.get(rowKey)), arms);
 		};
 		// A server-painted `@empty` arm is not this runtime's to remove.
 		const arm: MountedEmptyArm = { mounted: false, nodes: [] };

@@ -270,6 +270,7 @@ export function rowBranchMints(
 	componentName: string,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }>,
 	rowNames: ReadonlySet<string>,
+	repeatMints?: (repeatId: string) => boolean,
 ): boolean {
 	const graph = input.semanticGraph;
 	const site = graph.branchSites.find((candidate) => candidate.id === slot.branchSiteId);
@@ -296,9 +297,10 @@ export function rowBranchMints(
 		if (chunk.hosts.some((host) => input.unregistrableHostIds?.has(host.hostNodeId))) return false;
 		return chunk.slots.every(
 			(armSlot) =>
-				(armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
-				(mintableSlotValue(armSlot) !== null ||
-					expressionSlotValue(armSlot, graph, componentName, rowNames) !== null),
+				(armSlot.kind === 'repeat' && repeatMints?.(armSlot.repeatId) === true) ||
+				((armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
+					(mintableSlotValue(armSlot) !== null ||
+						expressionSlotValue(armSlot, graph, componentName, rowNames) !== null)),
 		);
 	});
 }

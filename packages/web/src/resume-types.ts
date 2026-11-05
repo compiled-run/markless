@@ -133,6 +133,7 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly runnerGraphNodeId: ProtocolViewPayload['asyncBoundaries'][number]['runnerGraphNodeId'];
 	readonly initiallyServedArm: ProtocolViewPayload['asyncBoundaries'][number]['initiallyServedArm'];
 	readonly updateSymbolId?: string;
+	readonly refreshesInPlace?: true;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
@@ -151,6 +152,10 @@ export type ResumeRepeatRowHook = (
 	repeat: ResumeKeyedRepeatRecord,
 	rowRoot: ResumeDomElement,
 	rowKey: unknown,
+	/** The element an arm-relative address names while the row shows that arm. */
+	armHost?: (at: ResumeKeyedRepeatRecord['rowEvents'][number]) => ResumeDomElement | undefined,
+	/** Only the row's arms changed: rewire what sits in them. */
+	armsOnly?: true,
 ) => void;
 /** The app's own module installs this only when a repeat nests inside another's rows. */
 export type ResumeNestedRepeatsHost = {

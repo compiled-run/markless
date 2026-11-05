@@ -150,7 +150,8 @@ function armElementLayout(
 				(candidate) => candidate.repeatId === slot.repeatId,
 			);
 			const row = renderData.chunks.find((candidate) => candidate.id === repeat?.rowChunkId);
-			if (!row || row.slots.some((rowSlot) => rowSlot.kind !== 'text')) return null;
+			if (!row || row.slots.some((rowSlot) => rowSlot.kind !== 'text' && rowSlot.kind !== 'attribute'))
+				return null;
 			rowElements.push(row.hosts.length);
 			continue;
 		}

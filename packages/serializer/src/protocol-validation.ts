@@ -557,6 +557,11 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	assertStringField(enclosingRow, 'repeatId', context);
 	assertElementAddressField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
+	if (enclosingRow.arm !== undefined) {
+		assertRecordShape(enclosingRow.arm, `${context}.arm`);
+		assertNonNegativeIntegerField(enclosingRow.arm, 'slot', `${context}.arm`);
+		assertNonNegativeIntegerField(enclosingRow.arm, 'arm', `${context}.arm`);
+	}
 }
 
 function assertOptionalPropRoutes(record: Record<string, unknown>, context: string): void {

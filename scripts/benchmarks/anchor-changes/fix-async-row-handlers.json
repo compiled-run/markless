@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 698,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 78,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 66,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 10,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 698,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 78,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 66,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 6,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "A refresh that lands keeps a @try's rows and focus, and a list inside a row's @if arm wires on every flip",
+			"date": "2026-11-05"
+		}
+	]
+}

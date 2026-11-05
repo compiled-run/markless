@@ -264,13 +264,25 @@ export async function startAsyncBoundaries(
 		tracker: settleTracker,
 		boundaries: input.asyncBoundariesById.values(),
 		readStatus: (graphNodeId) => input.graph.read(graphNodeId, ['status']),
-		commitArm: input.commitArm,
+		commitArm: (boundary, update) => commitShownArm(input.commitArm, boundary, update),
 		hasHtmlRenderer: !!input.renderBranchHtml,
 	});
 	return {
 		settleTracker,
 		...wireAsyncBoundariesWithoutLoadingCapability({ ...input, settleTracker, onAsyncSnapshot }),
 	};
+}
+
+// The arm a boundary's range shows, as this runtime last committed it.
+const shownArms = new WeakMap<ResumeAsyncBoundaryRecord, number>();
+
+function commitShownArm(
+	commitArm: NonNullable<WiringInput['commitArm']>,
+	boundary: ResumeAsyncBoundaryRecord,
+	update: ArmCommitUpdate,
+): Promise<void> {
+	if (update.arm !== undefined) shownArms.set(boundary, update.arm);
+	return commitArm(boundary, update);
 }
 
 function clearBusyUnlessRerun(
@@ -346,6 +358,16 @@ export async function settleAsyncBoundaryRange(
 			: input.graph.read(boundary.runnerGraphNodeId, ['status']);
 	// A newer run that started while this settle waited or rendered owns the boundary: its own settle commits, and the hold keeps what is shown.
 	if ((await input.settleTracker?.waitOutCommitHold()) === true && runnerStatus() !== status) return;
+	if (
+		status === 'fulfilled' &&
+		boundary.refreshesInPlace &&
+		input.commitArm &&
+		(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try
+	) {
+		if (claim?.() === false) return;
+		input.settleTracker?.markSettled(boundary.id);
+		return;
+	}
 	const source = resolveBoundarySettleSource(input, boundary);
 	// A composed child's arm records are minted in the child's own id space; the
 	// qualifier that re-spells them in page space is installed only by pages the
@@ -355,7 +377,7 @@ export async function settleAsyncBoundaryRange(
 		if (runnerStatus() === 'pending' || claim?.() === false) return;
 		const armRecords = boundaryArmRecordSet(rendered.armRecords);
 		if (!armRecords) throw emptySettleRenderError(boundary.id);
-		await input.commitArm!(boundary, {
+		await commitShownArm(input.commitArm!, boundary, {
 			...rendered,
 			html: rendered.html,
 			arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
@@ -387,16 +409,21 @@ export async function settleAsyncBoundaryRange(
 		if (armRecords) {
 			if (claim?.() === false) return;
 			const { computed, cells } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'>;
+			const arm = status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try;
+			// Only the module's own records carry the arm's value bindings; a planned set has none.
+			if (rawArmRecords === undefined) shownArms.delete(boundary);
+			else shownArms.set(boundary, arm);
 			await input.commitArm(boundary, {
 				...(computed && { computed }),
 				...(cells && { cells }),
 				html: update.html,
-				arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
+				arm,
 				armRecords: (composedArmRecordQualifier()?.(boundary, armRecords, input.graph) ?? armRecords),
 			});
 			input.settleTracker?.markSettled(boundary.id);
 			return;
 		}
+		shownArms.delete(boundary);
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
 		if (input.root.__marklessBranchArms?.has(boundary.id)) {
 			if (claim?.() === false) return;

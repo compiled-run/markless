@@ -134,9 +134,10 @@ export function createProtocolViewPayload(
 			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
 				armRecords: armRecords.map((set, arm) =>
-					wiredArmRecordSet(input, set, boundary.id, arm),
+					wiredArmRecordSet(input, set, boundary.id, arm, keyedRepeats),
 				),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
+				...refreshesInPlaceField(input, boundary.id, keyedRepeats),
 				startAnchor: {
 					...boundary.startAnchor,
 					index: emittedPairRank(input, boundary.id) * 2,
@@ -594,6 +595,47 @@ function asyncArmField(
 	return {};
 }
 
+// A @try whose every value is wired to update in place keeps its elements, and so focus, when a refresh lands.
+function refreshesInPlaceField(
+	input: ProtocolViewPayloadInput,
+	boundaryId: string,
+	keyedRepeats: ReturnType<typeof resumableKeyedRepeats>,
+): { readonly refreshesInPlace?: true } {
+	const data = renderDataOf(input);
+	const tryChunkId = data.boundaries.find((boundary) => boundary.boundaryId === boundaryId)
+		?.armChunkIds.try;
+	const chunk = data.chunks.find((candidate) => candidate.id === tryChunkId);
+	if (!chunk) return {};
+	const hostAt = new Map(chunk.hosts.map((host) => [host.coordinate.path.join(), host.hostNodeId]));
+	const updated = new Set(
+		input.payloadArena.view.domUpdates.map(
+			({ hostNodeId, target }) =>
+				`${hostNodeId}:${target.kind === 'text' ? '' : 'name' in target ? target.name : target.kind}`,
+		),
+	);
+	const live = chunk.slots.every((slot) => {
+		if (slot.kind === 'repeat') {
+			const record = keyedRepeats.find((candidate) => candidate.id === slot.repeatId);
+			return (
+				record !== undefined &&
+				'rowTemplate' in record &&
+				record.rowTemplate !== undefined &&
+				!('rowComponent' in record && record.rowComponent) &&
+				!('branchArm' in record && record.branchArm) &&
+				!slot.emptyTemplateId
+			);
+		}
+		if (slot.kind !== 'text' && slot.kind !== 'attribute') return false;
+		if (slot.residue.kind === 'element-handle-id' || slot.residue.kind === 'element-handle-id-list')
+			return true;
+		const host = hostAt.get(
+			(slot.kind === 'text' ? slot.coordinate.path.slice(0, -1) : slot.coordinate.path).join(),
+		);
+		return host !== undefined && updated.has(`${host}:${slot.kind === 'text' ? '' : slot.name}`);
+	});
+	return live ? { refreshesInPlace: true } : {};
+}
+
 // A nested record's own parent renders once per enclosing row, so it names the outermost
 // enclosing repeat's parent instead: every host-keyed record filter then moves it with its rows.
 function outermostParentHostNodeId(
@@ -617,12 +659,33 @@ function enclosingRowField(
 	const parentHostPath = hostPathsForChunk(input, enclosing.rowChunkId, true).get(
 		repeat.parentHostNodeId,
 	);
-	if (!parentHostPath) return null;
+	const inArm = parentHostPath ? undefined : rowArmParent(input, enclosing, repeat.parentHostNodeId);
+	if (!parentHostPath && !inArm) return null;
 	return {
 		repeatId: enclosing.repeatId,
-		parentHostPath,
+		parentHostPath: parentHostPath ?? inArm!.path,
 		...(repeat.enclosingItemPath ? { itemPath: repeat.enclosingItemPath } : {}),
+		...(inArm ? { arm: { slot: inArm.slot, arm: inArm.arm } } : {}),
 	};
+}
+
+// A parent in an arm of a branch the enclosing row template flips, addressed as that arm's row events are.
+function rowArmParent(
+	input: ProtocolViewPayloadInput,
+	enclosing: RenderDataArtifact['repeats'][number],
+	hostNodeId: string,
+): { readonly slot: number; readonly arm: number; readonly path: ReadonlyArray<number> } | undefined {
+	const branchSlots = mintableRowTemplate(input, enclosing, null).rowTemplate?.branchSlots ?? [];
+	for (const [slot, branch] of branchSlots.entries()) {
+		const site = renderDataOf(input).branches.find(
+			(candidate) => candidate.branchSiteId === branch.branchId,
+		);
+		for (const [arm, chunkId] of (site?.armChunkIds ?? []).entries()) {
+			const path = branchArmHostPaths(input, chunkId).get(hostNodeId)?.path;
+			if (path) return { slot, arm, path };
+		}
+	}
+	return undefined;
 }
 
 /**
@@ -754,7 +817,7 @@ function mintableRowTemplate(
 		if (slot === wrappedComponentSlot) continue;
 		if (slot.kind === 'repeat' && nestedRepeatMints(input, render, slot.repeatId)) continue;
 		if (slot.kind === 'branch' && !mint) {
-			const branch = rowBranchSlot(input, chunk, slot, slotValue);
+			const branch = rowBranchSlot(input, render, chunk, slot, slotValue);
 			if (!branch) return {};
 			branchSlots.push(branch);
 			continue;
@@ -794,6 +857,7 @@ type RowTemplateArm = RowTemplateBranchSlot['arms'][number];
 // An arm holding more than elements, text, attributes and events is wiring a row cannot redo on a flip, so it refuses.
 function rowBranchSlot(
 	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
 	rowChunk: SemanticMarkupChunk,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }>,
 	slotValue: (slot: SemanticMarkupSlot) => ProtocolRowTemplateSlotValue | null,
@@ -826,6 +890,8 @@ function rowBranchSlot(
 		const textSlots: Array<RowTemplateTextSlot> = [];
 		const attributeSlots: Array<RowTemplateAttributeSlot> = [];
 		for (const armSlot of chunk.slots) {
+			if (armSlot.kind === 'repeat' && nestedRepeatMints(input, render, armSlot.repeatId, chunkId))
+				continue;
 			if (armSlot.kind !== 'text' && armSlot.kind !== 'attribute') return null;
 			const value = slotValue(armSlot);
 			if (!value) return null;
@@ -871,6 +937,7 @@ function nestedRepeatMints(
 	input: ProtocolViewPayloadInput,
 	enclosing: RenderDataArtifact['repeats'][number],
 	repeatId: string,
+	armChunkId?: string,
 ): boolean {
 	const nested = input.payloadArena.view.keyedRepeats.find(
 		(candidate) => candidate.id === repeatId && candidate.enclosingRepeatId === enclosing.repeatId,
@@ -884,8 +951,10 @@ function nestedRepeatMints(
 		)
 	)
 		return false;
-	if (!hostPathsForChunk(input, enclosing.rowChunkId, true).has(nested.parentHostNodeId))
-		return false;
+	const parents = armChunkId
+		? branchArmHostPaths(input, armChunkId)
+		: hostPathsForChunk(input, enclosing.rowChunkId, true);
+	if (!parents.has(nested.parentHostNodeId)) return false;
 	if (render.emptyChunkId && !mintableEmptyArm(input, render).emptyArm) return false;
 	if (rowComponentMint(input, render)) return true;
 	const template = mintableRowTemplate(input, render, null).rowTemplate;
@@ -1041,8 +1110,17 @@ function wiredArmRecordSet(
 	set: ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number]['armRecords'][number],
 	boundaryId: string,
 	arm: number,
+	keyedRepeats: ReturnType<typeof resumableKeyedRepeats>,
 ): ProtocolViewArmRecordSet {
-	const flipHostIds = armScopedBranchHostIds(input, boundaryId);
+	// A host in a row a keyed repeat record wires is the row's to register, with its row's locals.
+	const flipHostIds = new Set([
+		...armScopedBranchHostIds(input, boundaryId),
+		...renderDataOf(input).repeats.flatMap((repeat) =>
+			keyedRepeats.some((record) => record.id === repeat.repeatId)
+				? hostIdsForChunkTree(input, repeat.rowChunkId)
+				: [],
+		),
+	]);
 	const boundEventSymbols = boundEventSymbolIds(input);
 	const eventSymbols = new Map<string, string[]>();
 	for (const symbol of input.symbolResolver.symbols) {

@@ -526,6 +526,8 @@ export type ProtocolViewPayload = {
 			readonly repeatId: string;
 			readonly parentHostPath: ProtocolElementAddress;
 			readonly itemPath?: ReadonlyArray<string>;
+			/** The parent sits in an arm of the enclosing row's `@if`/`@switch`, as on a row event: `parentHostPath` is then arm-relative. */
+			readonly arm?: { readonly slot: number; readonly arm: number };
 		};
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
@@ -785,6 +787,8 @@ export type ProtocolViewPayload = {
 		readonly runnerGraphNodeId: string | null;
 		readonly initiallyServedArm: ProtocolAsyncBoundaryArm;
 		readonly updateSymbolId?: string;
+		/** Every value the @try arm shows updates in place, so a refresh that lands keeps the arm's elements. */
+		readonly refreshesInPlace?: true;
 		// A single set is the armized truth for the arm the render actually
 		// served (SSR compose / arm-render modules); an array is the compiler's
 		// per-arm plan (index 0 = @try, 1 = @pending, 2 = @catch), which is not
