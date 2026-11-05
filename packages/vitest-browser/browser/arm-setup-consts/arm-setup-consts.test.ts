@@ -50,18 +50,18 @@ for (const [mode, mount] of modes) {
 			.poll(() => container.querySelectorAll('li').length, { timeout: 5_000 })
 			.toBe(7);
 		const list = () => container.querySelector('ul');
-		const looks = () => [list()?.getAttribute('aria-busy') ?? null, list()?.getAttribute('style')];
-		expect(looks()).toEqual([null, 'opacity: 1']);
+		const looks = () => [list()?.getAttribute('aria-busy') === 'true', list()?.getAttribute('style')];
+		expect(looks()).toEqual([false, 'opacity: 1']);
 		// The first keystroke wakes a served page; the second starts a refresh over a settled answer.
 		await type(container.querySelector('input')!, 'a');
 		await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotbananagrapemango');
-		await expect.poll(looks).toEqual([null, 'opacity: 1']);
+		await expect.poll(looks).toEqual([false, 'opacity: 1']);
 		const release = holdSearches();
 		await type(container.querySelector('input')!, 'p');
-		await expect.poll(looks, { timeout: 5_000 }).toEqual(['true', 'opacity: 0.5']);
+		await expect.poll(looks, { timeout: 5_000 }).toEqual([true, 'opacity: 0.5']);
 		release();
 		await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
-		await expect.poll(looks).toEqual([null, 'opacity: 1']);
+		await expect.poll(looks).toEqual([false, 'opacity: 1']);
 	});
 
 	test(`${mode}: after a failed search, Try again shows the answer from the @try arm`, async () => {
@@ -126,8 +126,8 @@ for (const [mode, mount] of modes) {
 		const container = screen.container as HTMLElement;
 		const current = () =>
 			[...container.querySelectorAll('li')].map((row) => row.getAttribute('aria-current'));
-		expect(current()).toEqual([null, 'true']);
+		expect(current()).toEqual(['false', 'true']);
 		container.querySelector('button')!.click();
-		await expect.poll(current).toEqual(['true', null]);
+		await expect.poll(current).toEqual(['true', 'false']);
 	});
 }

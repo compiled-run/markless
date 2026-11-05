@@ -24,6 +24,7 @@ type FakeNode = {
 	insertBefore(node: FakeNode, reference: FakeNode | null): FakeNode;
 	removeChild(node: FakeNode): FakeNode;
 	setAttribute?(name: string, value: string): void;
+	removeAttribute?(name: string): void;
 	content?: FakeNode;
 	innerHTML?: never;
 };
@@ -108,6 +109,9 @@ function fakeDocument(): FakeDocument {
 			node.attributes ??= {};
 			node.setAttribute = (name, value) => {
 				node.attributes![name] = value;
+			};
+			node.removeAttribute = (name) => {
+				delete node.attributes![name];
 			};
 			// Any markup-parsing sink is a build break, not a style preference.
 			Object.defineProperty(node, 'innerHTML', {
@@ -374,4 +378,40 @@ test('a derived hole with no symbol caller fails closed instead of half-filling'
 	).toThrow(/MARKLESS_SETTLE_PLAN_UNSUPPORTED/);
 	// Nothing was spliced: the pending arm is still what the page shows.
 	expect(serialize(fixture.host)).toContain('Checking local updates…');
+});
+
+test('attribute holes follow the shared attribute rule: false, null and true write what the server would', () => {
+	const document = fakeDocument() as Builder;
+	const button = element(document, 'button', []);
+	button.attributes!.title = 'served';
+	const arm = template(document, [
+		comment(document, 0),
+		comment(document, 1),
+		comment(document, 2),
+		comment(document, 3),
+		button,
+	]);
+	const start = document.makeNode(NODE.comment, { data: 'ab:0' });
+	const end = document.makeNode(NODE.comment, { data: '/ab:0' });
+	element(document, 'main', [start, end]);
+	const hole = (coordinate: number, name: string) =>
+		({ coordinate, kind: 'attribute', name, from: [name] }) as const;
+	marklessApplySettlePlan({
+		plan: {
+			id: 'boundary:0',
+			arm: 'try',
+			holes: [
+				hole(0, 'aria-pressed'),
+				hole(1, 'hidden'),
+				hole(2, 'title'),
+				hole(3, 'data-n'),
+			],
+		},
+		templates: { arm: arm as unknown as HTMLTemplateElement },
+		value: { 'aria-pressed': false, hidden: true, title: null, 'data-n': 0 },
+		anchors: [start as unknown as Node, end as unknown as Node],
+	});
+	expect(serialize(start.parentNode!)).toBe(
+		'<main><!--ab:0--><button aria-pressed="false" hidden="" data-n="0"></button><!--/ab:0--></main>',
+	);
 });
