@@ -13,6 +13,8 @@ const shown = (root: ParentNode) => ({
 		(li) => `${li.getAttribute('data-person')}/${li.getAttribute('title')}=${li.textContent}`,
 	),
 });
+const tally = (root: ParentNode) =>
+	[...root.querySelectorAll('[data-tally]')].map((li) => li.textContent);
 const press = (root: ParentNode, button: string) =>
 	root.querySelector<HTMLElement>(`[data-${button}]`)!.click();
 
@@ -21,6 +23,12 @@ async function destructuredRows(root: ParentNode) {
 		votes: ['pizza=pizza:2', 'tacos=tacos:1'],
 		people: ['ada/Ada=1. Ada (math)', 'bo/Bo=2. Bo (art)'],
 	});
+	// The curriculum's own shape: a state Map, destructured into its entries.
+	expect(tally(root)).toEqual(['pizza:2', 'tacos:1']);
+	press(root, 'tally-pizza');
+	await expect.poll(() => tally(root)).toEqual(['pizza:3', 'tacos:1']);
+	press(root, 'tally-sushi');
+	await expect.poll(() => tally(root)).toEqual(['pizza:3', 'tacos:1', 'sushi:1']);
 	press(root, 'vote-pizza');
 	await expect.poll(() => shown(root).votes).toEqual(['pizza=pizza:3', 'tacos=tacos:1']);
 	press(root, 'add-sushi');
