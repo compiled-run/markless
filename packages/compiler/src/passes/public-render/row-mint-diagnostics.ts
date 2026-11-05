@@ -267,12 +267,11 @@ function unpaintedRowValues(
 		if (!value || 'itemPath' in value) continue;
 		const reads = 'graphNodeId' in value ? [value] : (value.reads ?? []);
 		if (reads.every((read) => constantInBrowser(graph, component, read.graphNodeId))) continue;
-		const cause: KeyedRepeatRowValueUnpaintedCause | null =
-			betweenLists
-				? { kind: 'between-lists' }
-				: servedOnlyRefused
-					? { kind: 'served-only-list', listSource: servedOnly[0]!.collectionSource }
-					: null;
+		const cause: KeyedRepeatRowValueUnpaintedCause | null = betweenLists
+			? { kind: 'between-lists' }
+			: servedOnlyRefused
+				? { kind: 'served-only-list', listSource: servedOnly[0]!.collectionSource }
+				: null;
 		if (!cause) continue;
 		values.push({
 			source:
