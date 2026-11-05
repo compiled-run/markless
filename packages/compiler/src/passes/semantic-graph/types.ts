@@ -33,6 +33,7 @@ import type {
 	ModuleFunctionWrites,
 	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
+	SemanticRowLocalReads,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
@@ -77,6 +78,7 @@ export type MutableSemanticGraphArtifact = {
 	aliases: SemanticGraphAlias[];
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
+	rowLocalReads?: SemanticRowLocalReads[];
 	stateWrites: SemanticStateWrite[];
 	importedFunctionWriteRequests?: string[];
 	asyncBoundaries: Array<{

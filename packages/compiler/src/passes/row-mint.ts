@@ -445,6 +445,17 @@ export function expressionSlotValue(
 	for (const name of names.names) {
 		if (rowNames.has(name)) continue;
 		const resolved = resolveGraphPath(name, bindings, aliases);
+		const local = resolved
+			? undefined
+			: graph.rowLocalReads?.find(
+					(entry) => entry.componentName === componentName && entry.name === name,
+				);
+		if (local) {
+			if (local.unfollowed) return null;
+			for (const read of local.reads)
+				reads.push({ graphNodeId: read.graphNodeId, path: read.path });
+			continue;
+		}
 		if (!resolved) {
 			const instance = graph.sharedInstances.find(
 				(candidate) =>
@@ -475,7 +486,15 @@ export function expressionSlotValue(
 		}
 		reads.push({ graphNodeId: resolved.binding.id, path: resolved.path });
 	}
-	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
+	const distinct = reads.filter(
+		(read, index) =>
+			reads.findIndex(
+				(other) =>
+					other.graphNodeId === read.graphNodeId &&
+					other.path.join('.') === read.path.join('.'),
+			) === index,
+	);
+	return { source: slot.residue.source, ...(distinct.length > 0 ? { reads: distinct } : {}) };
 }
 
 // A shared() instance's members are its definition's graph nodes; the row reader qualifies a widget's per root.

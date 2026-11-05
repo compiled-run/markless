@@ -55,6 +55,7 @@ import {
 	expressionReadNames,
 	resolvedSymbolAt,
 } from './collect-expressions.ts';
+import { collectRowLocalReads } from './row-local-reads.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -223,6 +224,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
+	collectRowLocalReads(expression, state);
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
 	// An arm re-renders its whole range, child edges included, so the arm wins.
@@ -1206,6 +1208,7 @@ function collectAttribute(
 			state,
 			TEMPLATE_READ_OPTIONS,
 		);
+		if (expressionValue) collectRowLocalReads(expressionValue, state);
 		state.graph.templateReads.push({
 			...rowScope(state),
 			hostNodeId,
@@ -1280,6 +1283,7 @@ function collectAttribute(
 			walk(expressionValue, state);
 			return;
 		}
+		collectRowLocalReads(expressionValue, state);
 		state.graph.templateReads.push({
 			...rowScope(state),
 			hostNodeId,
