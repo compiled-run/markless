@@ -87,7 +87,8 @@ export default function GraphAnatomy() @{
 				aria-hidden="true"
 				onPointerover={(event) => {
 					touched = true;
-					hover = keyOf(event.target);
+					const key = keyOf(event.target);
+					if (key) hover = key;
 				}}
 				onPointerleave={() => (hover = '')}
 			>

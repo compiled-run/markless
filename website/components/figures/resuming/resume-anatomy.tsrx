@@ -14,6 +14,7 @@ export default function ResumeAnatomy() @{
 	let notes = state<string[]>([]);
 	let said = state(START_SAID);
 	let hover = state('');
+	let pointed = state('');
 	let held = state('');
 	let picked = state('wn');
 	let dragX = state(0);
@@ -27,7 +28,7 @@ export default function ResumeAnatomy() @{
 	const wpPlace = computed(() => placeOf(art.squares, 'wp', wpSq, held === 'wp' ? dragX : 0, held === 'wp' ? dragY : 0));
 	const wnPlace = computed(() => placeOf(art.squares, 'wn', wnSq, held === 'wn' ? dragX : 0, held === 'wn' ? dragY : 0));
 	const caption = computed(() => {
-		const id = held || hover;
+		const id = held || hover || pointed;
 		if (!id) return 'Hover a piece, drag it, or press the board for the next move.';
 		const name = id === 'bk' ? 'black king' : id === 'wp' ? 'white pawn' : 'white knight';
 		return name + ' on ' + (id === 'bk' ? bkSq : id === 'wp' ? wpSq : wnSq);
@@ -145,6 +146,7 @@ export default function ResumeAnatomy() @{
 				}}
 				onPointerleave={() => {
 					hover = '';
+					pointed = '';
 					held = '';
 					dragX = 0;
 					dragY = 0;
@@ -182,6 +184,7 @@ export default function ResumeAnatomy() @{
 					onPointerenter={() => {
 						touched = true;
 						hover = 'bk';
+						pointed = 'bk';
 					}}
 					onPointerleave={() => (hover = '')}
 				>
@@ -205,6 +208,7 @@ export default function ResumeAnatomy() @{
 					onPointerenter={() => {
 						touched = true;
 						hover = 'wp';
+						pointed = 'wp';
 					}}
 					onPointerleave={() => (hover = '')}
 				>
@@ -228,6 +232,7 @@ export default function ResumeAnatomy() @{
 					onPointerenter={() => {
 						touched = true;
 						hover = 'wn';
+						pointed = 'wn';
 					}}
 					onPointerleave={() => (hover = '')}
 				>

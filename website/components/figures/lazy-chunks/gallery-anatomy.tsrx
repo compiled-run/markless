@@ -11,11 +11,12 @@ export default function GalleryAnatomy() @{
 	let fresh = state('');
 	let last = state('');
 	let hover = state('');
+	let pointed = state('');
 	let touched = state(false);
 	const caption = computed(() =>
-		hover === 'share'
+		pointed === 'share'
 			? (ranShare ? 'share.js: downloaded at load, ran on this click' : 'share.js: downloaded at load, not run yet')
-			: hover.startsWith('p')
+			: pointed.startsWith('p')
 				? (ranOpen ? 'open-photo.js: downloaded at load, ran on click' : 'open-photo.js: downloaded at load, not run yet')
 				: 'Hover a photo or Share, then press it.',
 	);
@@ -78,7 +79,10 @@ export default function GalleryAnatomy() @{
 				if (event.key === 'Escape') reset();
 			}}
 		>
-			<svg class="scene" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true" onPointerleave={() => (hover = '')}>
+			<svg class="scene" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true" onPointerleave={() => {
+				hover = '';
+				pointed = '';
+			}}>
 				@for (const layer of art.layers; key layer.key) {
 					<path class={layer.cls} d={layer.d} />
 				}
@@ -93,6 +97,7 @@ export default function GalleryAnatomy() @{
 					onPointerenter={() => {
 						touched = true;
 						hover = 'p0';
+						pointed = 'p0';
 					}}
 					onPointerleave={() => (hover = '')}
 				>
@@ -121,6 +126,7 @@ export default function GalleryAnatomy() @{
 					onPointerenter={() => {
 						touched = true;
 						hover = 'p1';
+						pointed = 'p1';
 					}}
 					onPointerleave={() => (hover = '')}
 				>
@@ -149,6 +155,7 @@ export default function GalleryAnatomy() @{
 					onPointerenter={() => {
 						touched = true;
 						hover = 'p2';
+						pointed = 'p2';
 					}}
 					onPointerleave={() => (hover = '')}
 				>
@@ -176,6 +183,7 @@ export default function GalleryAnatomy() @{
 					onPointerenter={() => {
 						touched = true;
 						hover = 'share';
+						pointed = 'share';
 					}}
 					onPointerleave={() => (hover = '')}
 				>

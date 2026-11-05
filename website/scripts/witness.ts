@@ -2605,7 +2605,7 @@ try {
 		// Each How it works page opens on its ink figure; a press must change what its live line says.
 		for (const [path, said] of [
 			['', '131 kB executed at load'],
-			['the-big-idea', 'The same pattern was cut from all three fabrics'],
+			['the-big-idea', 'got the same plan'],
 			['compiler', 'The file was cut into frames before anything ran'],
 			['payload', 'That is everything the server added'],
 			['resuming', 'nobody replayed the game from move one'],

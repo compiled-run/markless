@@ -2,52 +2,42 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import PatternAnatomy from '../../components/figures/big-idea/pattern-anatomy.tsrx';
-import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import SeatAnatomy from '../../components/figures/big-idea/seat-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# One plan, rendered anywhere
+# One file, every device
 
-<PageMeta time="2 min" assumes="state, events" />
+<PageMeta time="3 min" assumes="state, events" />
 
-<Subtitle text="Markless reads a component while it builds, so the plan for every update is written before the component runs anywhere." />
+<Subtitle text="You write a component once, and Markless works it out at compile time for every place it runs." terms="events" />
 
-Here is the cart this section follows. Press **Add to cart** a few times:
-
-<Code steps={[{ label: 'Change `Add to cart` to `Add a bag`.', shows: 'Add a bag' }, { label: 'Start the cart at `2` instead of `0`.', source: 'state(2)' }, { label: 'Under the button, add `<p>Bags: {bags}</p>`. Press the button until both lines say 4.', shows: 'Bags: 4' }]}>
-```tsrx title="cart.tsrx"
+```tsrx title="seatmap.tsrx"
 import { state } from '@markless/core';
 
-export default function Cart() @{
-	let bags = state(0);
+export default function SeatMap() @{
+	let seat = state('A2');
 
-	<section>
-		<p>In your cart: {bags} bags</p>
-		<button onClick={() => bags++}>
-			Add to cart
-		</button>
-	</section>
+	<p>Your seat: {seat}</p>
 }
 ```
-</Code>
 
-## Decided before anything runs
+**`seat`** is a value the page watches, and **`{seat}`** is the spot that shows it. That is the whole plan, and it doesn't say which device it runs on.
 
-From that file, the compiler works out three things:
+## The plan is the same on every host
 
-1. **The state.** `bags` becomes a node in a graph, with the ID `state:bags`.
-2. **The update.** The text `In your cart: {bags} bags` becomes one planned text write.
-3. **The event code.** The click becomes a *symbol*, `symbol:0`: one function with a stable ID that the browser can load on its own.
+Drag the file onto each host, then pick a seat:
 
-The same compile writes two render modules: one builds the cart in a browser, the other renders it to HTML on a server. [The compiler](/how-it-works/compiler) prints both.
+<SeatAnatomy />
 
-## Rendered where you need it
+- The browser draws the plan as a web page.
+- A server prints the plan as the HTML it sends.
+- The phone draws it with native buttons. Native is an early proof: the web is what ships.
 
-<PatternAnatomy />
+## Pick where it renders
 
-Press the drawing to cut. The compiled component is one pattern, and each environment cuts the same shape from its own cloth:
+The compiled component is the same in each place; only the call changes:
 
 | Environment | How you call it | What it is good for |
 | --- | --- | --- |
@@ -58,21 +48,22 @@ Press the drawing to cut. The compiled component is one pattern, and each enviro
 | Build time | `MARKLESS_PRERENDER=1` in the repo's demos | A preview, with no public option yet |
 | iOS and macOS | See [native targets](/how-it-works/native-targets) | Hand-written proofs, not wired to the compiler |
 
-A browser-only app needs an `index.html` with a `<div id="app">`, a `vite.config.ts` that adds `markless()` from `@markless/core/vite`, and this:
+<Code steps={[{ label: 'Start at `B2` instead of `A2`.', source: "state('B2')" }, { label: "Under the paragraph, add `<button onClick={() => (seat = 'C1')}>C1</button>`. Press it.", shows: 'Your seat: C1' }]}>
+```tsrx title="seatmap.tsrx"
+import { state } from '@markless/core';
 
-```ts title="main.ts"
-import { render } from '@markless/core';
-import App from './App.tsrx';
+export default function SeatMap() @{
+	let seat = state('A2');
 
-await render(App, { target: document.querySelector('#app')! });
+	<p>Your seat: {seat}</p>
+}
 ```
+</Code>
 
-<MugSpot mood="thinking" from="left" />
+## What stays the same everywhere
 
-## What stays the same
-
-- **Setup runs once.** On a server the body runs there, and the browser never runs it.
+- **Setup runs once.** On a server the body runs there, and the browser never runs it again.
 - **No handler runs before its event.** Fetching code early is not running it.
-- **A write updates its readers and nothing else.** Nothing compares an old page with a new one.
+- **A write reaches only its readers.** Nothing compares an old page with a new one.
 
-[The compiler](/how-it-works/compiler) shows what it wrote for the cart.
+[The compiler](/how-it-works/compiler) shows the plan it writes.
