@@ -30,16 +30,16 @@ export function UserPage({ params }: { params: { id: string } }) @{
 							<li>{post.title}</li>
 						}
 					</ul>
-				} @catch (error) {
-					<p>Couldn't refresh posts. <button onClick={() => round++}>Try again</button></p>
+				} @catch (error, reset) {
+					<p>Couldn't refresh posts. <button onClick={reset}>Try again</button></p>
 				}
 			</>
 		} @pending {
 			<p>Loading profile...</p>
-		} @catch (error) {
+		} @catch (error, reset) {
 			<>
 				<p>Couldn't load this profile: {error.message}</p>
-				<button onClick={() => round++}>Retry</button>
+				<button onClick={reset}>Retry</button>
 			</>
 		}
 	</main>

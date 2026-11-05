@@ -6,7 +6,8 @@ import BranchBare from './branch-bare.tsrx';
 import ChildProp from './child-prop.tsrx';
 import NestedTry from './nested-try.tsrx';
 import UserPage from './user-page.tsrx';
-import UserPageSplit from './user-page-split.tsrx';
+import { failPostsOnce } from './api.ts';
+import ExplanationPage from './explanation-page.tsrx';
 
 afterEach(cleanup);
 
@@ -173,12 +174,47 @@ test('CSR: a refresh keeps the whole user page: header, picker and the nested po
 	await pageKeepsEverything();
 });
 
-test('CSR: a refresh keeps the user page whose posts heading sits in the posts block', async () => {
-	await render(UserPageSplit);
+test('SSR: a refresh keeps the whole user page after resume', async () => {
+	await renderSSR(UserPage);
 	await pageKeepsEverything();
 });
 
-test('SSR: a refresh keeps the user page whose posts heading sits in the posts block, after resume', async () => {
-	await renderSSR(UserPageSplit);
-	await pageKeepsEverything();
+// The explanation note's page as written: one outer block reads user and heading, which derives from posts.
+async function explanationPageKeepsEverything() {
+	await expect.poll(() => textOf('h1'), LOADS).toBe('user ada');
+	await expect.poll(titles, LOADS).toEqual(['ada first', 'ada second']);
+	expect(textOf('h2')).toBe('2 new posts');
+	const [h1, h2, select] = [
+		document.querySelector('h1')!,
+		document.querySelector('h2')!,
+		document.querySelector('select')!,
+	];
+	const posts = all('li');
+	select.focus();
+	select.value = 'top';
+	select.dispatchEvent(new Event('change', { bubbles: true }));
+	await expect.poll(titles, LOADS).toEqual(['ada second', 'ada first']);
+	await expect.poll(() => textOf('h2'), LOADS).toBe('2 top posts');
+	kept([h1, h2, select, ...posts], select);
+	expect(textOf('h1')).toBe('user ada');
+	failPostsOnce();
+	select.value = 'new';
+	select.dispatchEvent(new Event('change', { bubbles: true }));
+	await expect.poll(() => textOf('p'), LOADS).toContain("Couldn't refresh posts.");
+	click('p button');
+	await expect.poll(titles, LOADS).toEqual(['ada first', 'ada second']);
+	await expect.poll(() => document.querySelector('p')).toBe(null);
+	expect(textOf('h2')).toBe('2 new posts');
+	expect(textOf('h1')).toBe('user ada');
+}
+
+test('CSR: the explanation page keeps its header and picker while posts refresh, and its reset retries', async () => {
+	await render(ExplanationPage);
+	await explanationPageKeepsEverything();
+});
+
+test('SSR: the explanation page renders its header on the server, keeps it while posts refresh, and its reset retries', async () => {
+	const { container } = await renderSSR(ExplanationPage);
+	expect((container as HTMLElement).querySelector('h1')?.textContent).toBe('user ada');
+	await explanationPageKeepsEverything();
 });

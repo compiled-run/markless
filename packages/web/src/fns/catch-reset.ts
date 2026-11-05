@@ -1,6 +1,9 @@
 import { marklessCodedError } from '../coded-error.ts';
 
-type ResetGraph = { readonly rerun?: (graphNodeId: string) => boolean | undefined };
+type ResetGraph = {
+	readonly rerun?: (graphNodeId: string) => boolean | undefined;
+	readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
+};
 
 /**
  * `reset` from `@catch (error, reset)`: re-runs the failed async values its block reads. Each entry
@@ -19,7 +22,9 @@ export function marklessCatchReset(
 			{ resets },
 		);
 	const rerun = new Set<string>();
+	// A component's graph reads in its own ids; rerun is the page graph's, so the ids are qualified here.
+	const qualify = graph.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
 	for (const [graphNodeId, ...inputs] of resets)
-		if (inputs.some((input) => rerun.has(input)) || graph.rerun(graphNodeId))
+		if (inputs.some((input) => rerun.has(input)) || graph.rerun(qualify(graphNodeId!)))
 			rerun.add(graphNodeId!);
 }
