@@ -21,6 +21,174 @@
 			"delta": 144,
 			"reason": "merging W8 and W13 into the async diet: the in-place refresh skip with its shown-arm tracking, and the re-render a @try keeps when its keyed rows cannot be rebuilt (11824 -> 11968 B rendered, loaded only with @try wiring)",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-computed"
+			],
+			"delta": 20,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-scheduler"
+			],
+			"delta": 115,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": -367,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 1,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": 29,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-computed"
+			],
+			"delta": 20,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-scheduler"
+			],
+			"delta": 115,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": -367,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 1,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": 29,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -61,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -82,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "merged async branches (W1-W3, W7-W9, W12, W13, diet) measured against origin/main d3d7060be on this Mac, minus every async branch ledger: what those ledgers missed or charged to a module the code left (W7 and W12 runner placement now lives in web/fns/async-plane)",
+			"date": "2026-11-05"
 		}
 	]
 }
