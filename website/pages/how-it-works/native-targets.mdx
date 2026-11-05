@@ -2,28 +2,16 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import KnitAnatomy from '../../components/figures/native/knit-anatomy.tsrx';
+import DeviceAnatomy from '../../components/figures/native/device-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# The same component on a phone, as an early proof
+# Native targets, an early proof
 
 <PageMeta time="2 min" assumes="state, events" />
 
-<Subtitle text="The state graph and its symbols are data plus small functions, so a browser is not the only thing that can run them." />
-
-<KnitAnatomy />
-
-Press the drawing. One plan, written by hand, drives a real iOS button and a real macOS button, and three needles have nothing on them yet.
-
-Markless is built to compile one web-like component to any device. Today the web is what ships. iOS and macOS are two small hand-written proofs, Android, Windows and Linux are not started, and no Markless package writes native output yet. The [home page](/) draws one plan reaching each device.
-
-## What the proofs test
-
-Can a graph-shaped plan drive real native controls, with the handler still written in JavaScript?
-
-Both proofs start from this component. The macOS one differs only in its heading.
+<Subtitle text="Markless is built to compile one web-like component to any device. Today the web ships; iOS and macOS are early proofs." terms="events" />
 
 ```tsrx title="App.tsrx"
 import { state } from '@markless/core';
@@ -31,16 +19,25 @@ import { state } from '@markless/core';
 export function Counter() @{
 	let count = state(0);
 
-	<main>
-		<h1>Markless iOS Proof</h1>
-		<button onClick={() => count++}>Count {count}</button>
-	</main>
+	<button onClick={() => count++}>Count {count}</button>
 }
 ```
 
-## The plan is written by hand
+This is the proof's real source. **`<button>`** becomes a native `UIButton` on iOS and an `NSButton` on macOS, and **`onClick`** runs in JavaScriptCore when you tap it.
 
-Each proof reads an `artifact.json` checked in beside it. It lists the state cells, host nodes, events, text bindings and symbol bodies. The event maps the authored `onClick` to a device-neutral `activate`, then to the native event:
+## The views are native, not a web page
+
+Press **Debug View Hierarchy**, then search the layers for `WebView`:
+
+<DeviceAnatomy />
+
+- The layers are the proof's own views: `UIWindow`, `UIView`, `UIStackView`, `UILabel`, `UIButton`.
+- There is no `WKWebView` anywhere, and a check script in the proof makes sure of it.
+- Tapping the button runs the handler, and the native button sets its own title.
+
+## How the proof works today
+
+The plan the proof runs, its `artifact.json`, is written by hand. It lists the state, the views, the event and the text binding:
 
 ```json title="artifact.json, the event"
 {
@@ -52,27 +49,10 @@ Each proof reads an `artifact.json` checked in beside it. It lists the state cel
 }
 ```
 
-On macOS the native event is `action`. The symbol body is the same in both, and it is also written by hand:
+Not yet:
 
-```js title="symbol:counter.increment"
-graph["state:count"] = graph["state:count"] + 1;
-```
-
-## What the Swift runtime does
-
-1. It creates a `JSContext` from JavaScriptCore, and a plain `graph` object with `state:count` at `0`.
-2. It turns each host node into a control: on iOS, `main` becomes a `UIStackView` and `button` becomes a `UIButton`.
-3. It connects the native event to the symbol ID.
-4. On a tap, it runs the symbol in JavaScriptCore.
-5. It reads every text binding again and sets the button title, such as `Count 1`.
-
-The macOS proof does the same with an `NSButton`. In both, an XCTest checks that the title goes from `Count 0` to `Count 1`, and a check script makes sure no file names a web view.
-
-## What the proofs don't show yet
-
-- The compiler doesn't write `artifact.json`. Both live in `poc/fixtures/proofs/` in the Markless repo.
-- They don't use `@markless/runtime`. The graph is a plain object, and every text binding is read again after each tap.
-- They don't cover styling, lists, navigation or packaging an app.
-- Android, Windows and Linux have no proof.
+- The compiler doesn't write `artifact.json`. Both proofs live in `poc/fixtures/proofs/`.
+- They don't use `@markless/runtime`, and don't cover styling, lists, navigation or packaging.
+- Android, Windows and Linux are not started.
 
 Want a device sooner? [Contributing](/contributing) shows where to start.

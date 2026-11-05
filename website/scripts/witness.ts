@@ -2611,7 +2611,7 @@ try {
 			['resuming', 'nobody replayed the game from move one'],
 			['state-graph', 'only that line changed'],
 			['lazy-chunks', 'open-photo.js ran now'],
-			['native-targets', 'both the iOS and the macOS button now read Count 1'],
+			['native-targets', 'No WKWebView anywhere'],
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
 			const figure = page.locator('figure.anatomy, figure.explorer').first();
