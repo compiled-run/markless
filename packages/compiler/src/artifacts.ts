@@ -205,8 +205,30 @@ export type SemanticComponentEdge = {
 	readonly branchScopeIds: ReadonlyArray<string>;
 	/** The `branch-site:` ids of the @if/@switch blocks the edge sits in, outermost first. */
 	readonly branchSiteIds?: ReadonlyArray<string>;
+	/** Which arm of each enclosing @if/@switch the edge sits in, outermost first. */
+	readonly branchArms?: ReadonlyArray<SemanticBranchArm>;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
 };
+
+export type SemanticBranchArm = { readonly branchSiteId: string; readonly arm: number };
+
+/** A branch condition that reads nothing but the component's props and literals. */
+export type SemanticPropTest =
+	| { readonly kind: 'prop'; readonly path: ReadonlyArray<string> }
+	| { readonly kind: 'value'; readonly value: unknown }
+	| { readonly kind: 'not'; readonly operand: SemanticPropTest }
+	| {
+			readonly kind: 'compare';
+			readonly operator: '===' | '!==' | '==' | '!=';
+			readonly left: SemanticPropTest;
+			readonly right: SemanticPropTest;
+	  }
+	| {
+			readonly kind: 'logical';
+			readonly operator: '&&' | '||' | '??';
+			readonly left: SemanticPropTest;
+			readonly right: SemanticPropTest;
+	  };
 
 export type SemanticModuleImport = {
 	readonly localName: string;
@@ -731,6 +753,8 @@ export type SemanticBranchSite = {
 	// Arm index inside the owning boundary (0 = @try, 1 = @pending, 2 = @catch).
 	readonly asyncBoundaryArm?: number;
 	readonly armTests?: ReadonlyArray<unknown>;
+	// Set when the test reads only props and literals, so each caller's props decide the arm.
+	readonly propTest?: SemanticPropTest;
 	// The component body the condition was authored in. Without it the test text
 	// resolves module-wide and a bare instance local matches a same-named local
 	// declared in a sibling component (defect 46). Absent outside every component.

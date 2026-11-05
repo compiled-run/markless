@@ -5,11 +5,13 @@ export default {
 		name: 'website-tooling',
 		include: [
 			'tooling/**/*.test.ts',
-			'components/figures/create/create.test.ts',
+			'components/figures/**/*.test.ts',
 			'components/docs/code/worker-sources.test.ts',
 			'components/docs/navbar/*.test.ts',
 			'components/docs/search/*.test.ts',
 			'components/docs/ink-card/*.test.ts',
 		],
+		// kit.test.ts server-renders a .tsrx component, which needs the Markless plugin this config leaves out; run it with the site's own config.
+		exclude: ['components/figures/kit/**', '**/node_modules/**'],
 	},
 };
