@@ -126,7 +126,7 @@ export default function Code({
 			</div>
 		</header>
 		<CodeTabs panes={panes}>
-			<resizable.root class="body" defaultSizes={{ [codePane]: 64, [resultPane]: 36 }}>
+			<resizable.root class="body" defaultSizes={{ [codePane]: 70, [resultPane]: 30 }}>
 				<resizable.item class="source" value={codePane}>
 					<CodeFiles panes={panes} />
 				</resizable.item>
@@ -362,7 +362,7 @@ export default function Code({
 				display: flex;
 				flex-direction: column;
 				gap: var(--space-xs);
-				min-width: 0;
+				min-width: min-content;
 				padding: 0.9rem 0 0.9rem 1.1rem;
 				overflow: clip;
 				overflow-clip-margin: 0.4rem;
