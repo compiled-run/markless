@@ -2,68 +2,63 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import WallAnatomy from '../../components/figures/payload/wall-anatomy.tsrx';
+import SourceAnatomy from '../../components/figures/payload/source-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# What a server writes into its HTML
+# What a server sends
 
-<PageMeta time="2 min" assumes="state, events" />
+<PageMeta time="3 min" assumes="state, events" />
 
-<Subtitle text="A server adds the state values and which element does what to its HTML, so the browser can carry on without running your components." />
+<Subtitle text="When a server renders a page, it sends finished HTML plus two small blocks of data, so the browser can carry on without running your components." terms="elements" />
 
-<WallAnatomy />
+```tsrx title="calendar.tsrx"
+import { state } from '@markless/core';
 
-Press the drawing. The two cards are everything the server adds to the finished page, and a page with nothing to react to gets none.
+export default function Calendar() @{
+	let day = state(13);
 
-Everything the server adds is called the *payload*. It applies only when a server renders the page, with `renderToString()`, `renderToStream()` or `@markless/router`. In the browser alone, `render()` keeps the same records in memory and writes none of these scripts.
+	<p>Booked: March {day}</p>
+}
+```
 
-## The real response
+**`<p>Booked: March 13</p>`** arrives as plain HTML. **`day`** arrives as data, so the browser knows `13` is a value that can change.
 
-Here is the whole response of `renderToString()` for the [cart](/how-it-works/compiler), built with the Markless Vite plugin. The inline script bodies and the chunk file names are cut to `…`, and line breaks are added:
+## The page is real HTML
+
+Hover the page, press a day, then switch JavaScript off:
+
+<SourceAnatomy />
+
+- Every element is plain HTML, so the page shows in full even with JavaScript off.
+- An element with a handler carries `m:on`, naming its handler's record.
+- The first click fetches one small chunk of click code. The data itself never runs.
+
+## The two blocks are data
+
+Everything the server adds to your HTML is the *payload*. It's two script tags that hold JSON, not code:
+
+- **`markless/state`** holds the values: `state:day` is `13`.
+- **`markless/view`** says which element does what: the paragraph shows `state:day`, and each button's click runs its own symbol.
+
+Here is the real response of `renderToString()` for the full calendar, with the two inline scripts and the file names cut:
 
 ```html title="response"
-<link rel="modulepreload" href="/build/chunk-….js" crossorigin="anonymous" fetchpriority="high">
-<script>(function captureEarlyEvents(eventNames) { … })(["click"]);</script>
-<div data-async-container data-markless-paths="7section,p,button|010001011112|42|ksjuku">
-  <section><p>In your cart: 0 bags</p><button m:on="click:0">Add to cart</button></section>
-  <script type="markless/state">{"version":1,"cells":[{"graphNodeId":"state:bags","name":"bags","valueKind":"scalar","value":{"version":1,"root":0,"records":[]}}],"computed":[],"sharedDefinitions":[]}</script>
-  <script type="markless/view">{"version":1,"locators":[{"hostNodeId":"h1","strategy":"dom-order","index":2,"tagName":"p"},{"hostNodeId":"h2","strategy":"dom-order","index":3,"tagName":"button"}],"events":[{"hostNodeId":"h2","eventName":"click","symbolIds":["symbol:0"]}],"domUpdates":[{"hostNodeId":"h1","graphNodeId":"state:bags","path":[],"target":{"kind":"text","prefix":"In your cart: ","suffix":" bags"},"symbolId":"symbol:1"}],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]}</script>
+<link rel="modulepreload" href="/build/chunk-….js" fetchpriority="high">
+<script>…</script>
+<div data-async-container data-markless-paths="…">
+  <section><h2>March</h2><p>Booked: March 13</p><button m:on="click:0">13</button>…</section>
+  <script type="markless/state">{"version":1,"cells":[{"graphNodeId":"state:day","name":"day","valueKind":"scalar","value":{"version":1,"root":13,"records":[]}}],"computed":[],"sharedDefinitions":[]}</script>
+  <script type="markless/view">{"version":1,"locators":{…},"events":[{"hostNodeId":"h3","eventName":"click","symbolIds":["symbol:0"]},…],"domUpdates":[{"hostNodeId":"h2","graphNodeId":"state:day","path":[],"target":{"kind":"text","prefix":"Booked: March "},"symbolId":"symbol:3"}],…}</script>
   <script data-async-resumer data-markless-resume-module="/build/chunk-….js">…</script>
 </div>
 ```
 
-Read it top to bottom:
+## Only pages that can react get a payload
 
-- **The `link`** fetches the resume module early. Fetching it does not run it.
-- **The first script** records events that fire while the document is still loading.
-- **The container `div`** marks the part of the page this render owns. `data-markless-paths` records how many elements the server wrote and where each one sits, so the browser can tell when another script has changed the page.
-- **`m:on="click:0"`** says the button has a click handler, and that its record is number `0` in the view record. The browser reads it straight off the pressed element.
-- **`markless/state`** holds the state: `state:bags` is `0`.
-- **`markless/view`** holds the locators, the events and the text update.
-- **The last script** is the *inline resumer*. It waits for the first interaction.
-
-The locator `index` is `2` here and `1` in the compiler's own output, because the server counts the container `div` as element `0`.
-
-## How a value travels
-
-- `root` holds a plain value such as `0`. An object or array goes into `records`, and an object that shows up twice is written once.
 - Values must be data: `@markless/serializer` refuses a function with `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE`.
+- A page with nothing to react to gets no scripts at all, just `<div data-async-container>` and its HTML.
+- In the browser alone, `render()` keeps the same records in memory and writes none of these scripts.
 
-## A page with nothing to react to
-
-Render the same paragraph with no button, and this is the whole response:
-
-<MugSpot mood="proud" from="left" />
-
-```html title="response"
-<div data-async-container><p>In your cart: 0 bags</p></div>
-```
-
-No state script, no view script and no inline resumer. If nothing on the page can react, the browser has nothing to wake up.
-
-Pages rendered at build time, a preview, write a different payload, and this page doesn't cover them.
-
-[Resuming](/how-it-works/resuming) follows what happens when someone presses the button.
+[Resuming](/how-it-works/resuming) shows what the browser does with them on the first press.

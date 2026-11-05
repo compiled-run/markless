@@ -2607,7 +2607,7 @@ try {
 			['', '131 kB executed at load'],
 			['the-big-idea', 'got the same plan'],
 			['compiler', 'three pieces'],
-			['payload', 'That is everything the server added'],
+			['payload', 'Booked March'],
 			['resuming', 'nobody replayed the game from move one'],
 			['state-graph', 'only that line changed'],
 			['lazy-chunks', 'open-photo.js ran now'],
