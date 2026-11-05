@@ -14,10 +14,11 @@ export const LINES: Run[][] = [
 	[{ t: '}' }],
 ];
 
-/** Word lengths of the traced lines: the copy is only for the checker, so the drawing doesn't spell it out. */
-const TRACED: number[][] = [[1.6, 0.9, 1.2, 0.8, 2.2], [], [1.8, 2.4, 1.6, 0.6], [0.5, 1.1, 0.9, 1.5, 1.3, 0.7], [0.4]];
+/** The TSX copy the type service writes for app.tsrx; the test checks it against the compiler. */
+export const COPY = ['/** @jsxImportSource @markless/typescript-plugin */', "import { Nav } from './nav.tsrx';", 'export function App() {', 'return <Nav label={42} />;', '}'];
+const COPY_LABEL = 'return <Nav '.length;
 
-const W = 15;
+const W = 17;
 const H = row(5) + 0.3;
 /** Where the tracing lies once lifted off: below the file, turned a little. */
 const AWAY = { du: 2.6, dv: H + 1.6, turn: -0.05 };
@@ -46,20 +47,20 @@ export function drawing() {
 		if (m === 'show') k.raw.path(pathOf(edge, true), cls('sheet-paper light'), style);
 		k.raw.path(hatch(edge, 0.25, 9, 2300 + at, { cluster: 1, skip: 0.8, trim: 0.7 }), cls('sheet-hatch faint'), style);
 		k.raw.path(outline(edge, { w: 0.8, seed: 2310 + at }), cls('sheet-ink'), style);
-		TRACED.forEach((words, i) => {
-			let u = CODE + (i === 3 ? 0.6 : 0);
-			words.forEach((len) => {
-				const a = place(u, row(i) - 0.15);
-				const b = place(u + len, row(i) - 0.2);
-				k.raw.path(pathOf(k.raw.on('src', [a, b], 0.1)), cls('pen faint'), style);
-				u += len + 0.45;
+		if (m === 'show') {
+			COPY.forEach((text, i) => {
+				const [tu, tv] = place(CODE - 1.3, row(i));
+				k.raw.text('src', tu, tv, String(i + 1), 'num', 'show', at);
+				const [cu, cv] = place(CODE, row(i));
+				k.raw.text('src', cu, cv, text, i === 0 ? 'dim small' : 'mono', 'show', at);
 			});
-		});
-		const ringPts = ellipse(CODE + (LABEL + 2.5) * 0.3, row(3) - 0.22, 1.3, 0.5, 30).map(([u, v]) => place(u, v));
+		}
+		const col = m === 'show' ? COPY_LABEL : LABEL;
+		const ringPts = ellipse(CODE + (col + 4.2) * 0.3, row(3) - 0.2, 1.15, 0.48, 30).map(([u, v]) => place(u, v));
 		const mark = m === 'flash' ? k.raw.motion('flash', at + 700, '', until) : style;
 		k.raw.path(pathOf(k.raw.on('src', [...ringPts, ringPts[0]!, ringPts[1]!], 0.12)), cls('pen squiggle'), mark);
 		if (m === 'show') {
-			const [tu, tv] = place(CODE + (LABEL + 5) * 0.3 + 0.4, row(3) - 0.7);
+			const [tu, tv] = place(CODE + (COPY.at(3)!.length + 1) * 0.3, row(3));
 			k.raw.text('src', tu, tv, 'TS2322', 'hand tint-err', 'show', at);
 		}
 	};

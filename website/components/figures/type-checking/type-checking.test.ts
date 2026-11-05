@@ -1,3 +1,4 @@
+import { compileToVolarMappingsWithoutRecovery } from '@markless/typescript-plugin/volar';
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
 import * as tracing from './tracing.ts';
@@ -15,6 +16,12 @@ describe('type checking figures', () => {
 			await expect(frozen(name + '.ts', 'type-checking.test.ts', figure.drawing())).toMatchFileSnapshot('./' + name + '.art.ts');
 		});
 	}
+
+	it('prints the TSX copy the type service really writes for app.tsrx', () => {
+		const source = "import { Nav } from './nav.tsrx';\n\nexport function App() @{\n\t<Nav label={42} />\n}\n";
+		const emitted = compileToVolarMappingsWithoutRecovery(source, '/app.tsrx').code.trim().split('\n');
+		expect(emitted).toEqual(tracing.COPY);
+	});
 
 	it('marks the copy in red and lands the mark on line 4, column 7 of the file', () => {
 		const art = tracing.drawing();
