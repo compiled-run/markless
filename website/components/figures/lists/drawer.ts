@@ -5,10 +5,10 @@ import type { P } from '../ink/ink.ts';
 import { CARDS } from './drawer-model.ts';
 
 export const WIDTH = 680;
-export const HEIGHT = 340;
-export const FRONT = { x: 120, y: 214, w: 440, h: 110 };
-export const LABEL = { x: 270, y: 236, w: 140, h: 36 };
-const CARD = { x: 150, y: 150, w: 330, h: 120 };
+export const HEIGHT = 364;
+export const FRONT = { x: 120, y: 238, w: 440, h: 110 };
+export const LABEL = { x: 270, y: 260, w: 140, h: 36 };
+const CARD = { x: 150, y: 174, w: 330, h: 120 };
 const TABS = [0, 100, 200];
 const TAB = { w: 120, h: 22 };
 

@@ -168,9 +168,9 @@ export default function DrawerAnatomy() @{
 			.label {
 				position: absolute;
 				left: calc(270 / 680 * 100%);
-				top: calc(236 / 340 * 100%);
+				top: calc(260 / 364 * 100%);
 				width: calc(140 / 680 * 100%);
-				height: calc(36 / 340 * 100%);
+				height: calc(36 / 364 * 100%);
 				box-sizing: border-box;
 				margin: 0;
 				padding: 0 0.3em;
