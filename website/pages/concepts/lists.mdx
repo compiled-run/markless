@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import ListDemo from '../../components/figures/lists/list-demo.tsrx';
+import SeatsAnatomy from '../../components/figures/lists/seats-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -32,15 +32,13 @@ export default function Guests() @{
 
 `@for` draws one row per item. `key guest.id` names each row by its data, not its place.
 
-## Tick a row, then sort
+## Watch the cards change seats
 
-Tick **Pears**, then press **Sort A to Z** and **Reverse**.
+Each row is a place card keyed by its guest. Press **Sort A to Z**.
 
-<ListDemo />
+<SeatsAnatomy />
 
-- Each ring and each tick stays with its row.
-- A reorder moves the rows already on the page. It builds none.
-- Each row's checkbox handler changes its own `item.done`, wherever that row sits.
+Every card walks to its new seat with its own tick. The seat numbers stay put, and no card is made again.
 
 ## Change the list
 
