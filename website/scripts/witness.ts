@@ -2604,7 +2604,7 @@ try {
 
 		// Each How it works page opens on its ink figure; a press must change what its live line says.
 		for (const [path, said] of [
-			['', 'The survey is inked and stamped at build time'],
+			['', '131 kB executed at load'],
 			['the-big-idea', 'The same pattern was cut from all three fabrics'],
 			['compiler', 'The file was cut into frames before anything ran'],
 			['payload', 'That is everything the server added'],

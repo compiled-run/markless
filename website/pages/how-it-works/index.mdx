@@ -3,62 +3,57 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import SurveyAnatomy from '../../components/figures/how-index/survey-anatomy.tsrx';
+import CoverageAnatomy from '../../components/figures/how-index/coverage-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Decided at compile time, resumed on interaction
+# Design choices
 
 <PageMeta time="3 min" assumes="state, events" />
 
-<Subtitle text="At build time the analyzer maps your whole project, so Markless can plan every update for any environment and resume the page only when someone uses it." />
+<Subtitle text="Markless decides how each page works at compile time, for any device, and picks it up in the browser on the first interaction." terms="events" />
 
-```tsrx title="cart.tsrx"
+```tsrx title="weather.tsrx"
 import { state } from '@markless/core';
 
-export default function Cart() @{
-	let bags = state(0);
+export default function Weather() @{
+	let unit = state('Celsius');
 
-	<section>
-		<p>In your cart: {bags} bags</p>
-		<button onClick={() => bags++}>Add to cart</button>
-	</section>
+	<p>Showing: {unit}</p>
 }
 ```
 
-Before this file runs anywhere, the compiler knows that `bags` is state, that one text shows it, and that the click changes it. Reading code for what it means, not only for how it is spelled, is called semantic analysis.
+**`unit`** is a value the page watches, and **`{unit}`** is the one spot that shows it. Before this file runs anywhere, the compiler knows both. Reading code for what it means, not only for how it is spelled, is called semantic analysis.
 
-## The analyzer maps the whole project at build time
+## The analyzer maps the whole project at compile time
 
-<SurveyAnatomy />
+The compiler's *analyzer*, built on yuku, reads every `.tsrx` file for its names and references:
 
-Press the drawing to finish the survey. The compiler's analyzer, built on yuku, reads every `.tsrx` file for its scopes, names and references. A link step joins the files into one map: which component renders which, and which spots can change. The bundler packs each page's code from that map.
+- each file becomes a plan: its values, the spots that read them, and the code each event runs
+- a link step joins the plans into one map of the project
+- the bundler packs each page's code from that map
 
-## One plan, every environment
+## The browser does less work
 
-The same compiled component renders in the browser, on a server and in tests. [The big idea](/how-it-works/the-big-idea) lists the call for each one. Native screens are early proofs: iOS and macOS drive real buttons from a hand-written plan, and the compiler doesn't write that plan yet.
+Flip the switch, then press **Get Started**:
+
+<CoverageAnatomy />
+
+- The [shadcn/ui home page port](https://github.com/compiled-run/markless#migrate-an-existing-app) executes 131 kB of JavaScript at load, down from 1,403 kB.
+- The original runs its components again in the browser to attach their events. Markless decided that at compile time.
+- On the compile-time side, a click adds one row: that button's own code, run only then.
 
 ## The page resumes instead of starting over
 
-When a server renders the page, its HTML arrives already wired. The browser does not run your components again. It reads the records the server wrote, and code loads only when an event needs it. [Resuming](/how-it-works/resuming) follows the first click.
+When a server renders the page, its HTML arrives already wired. The browser doesn't run your components again; code loads only when an event needs it. [Resuming](/how-it-works/resuming) shows the first press.
 
 ## What it costs
 
-For the cart above, built as a one-page `@markless/router` app and measured in Chromium (uncompressed, main at `2efb1c6e2`):
-
-- **Executed at load:** 8.4 kB, four small inline scripts and the router's link script.
-- **Downloaded at load, not executed:** 23.6 kB, the code the first click needs, fetched at low priority.
-- **Executed on the first click:** that same 23.6 kB. Nothing new downloads.
-
-On a whole site, the [shadcn/ui home page port](https://github.com/compiled-run/markless#migrate-an-existing-app) executes 131 kB of JavaScript at load, down from 1,403 kB in the original.
-
-Limits:
-
 - A handler can read only what crosses to the browser: state, element handles, props, imports and constants.
-- State a server sends must be data, not functions.
+- State sent from a server must be data, not functions.
 - Components live in `.tsrx` files, which need the Markless compiler and `@markless/typescript-plugin`.
-- Rendering pages at build time is a preview behind `MARKLESS_PRERENDER=1`.
+- Native screens are early proofs. The web is what ships.
 
 <Collapsible sprite="star-badge" summary="How does this compare with other frameworks?">
 
@@ -70,8 +65,8 @@ The rows for other projects come from their public docs. They compare mechanisms
 | Solid | `createSignal`, read as `count()` | Signals write the DOM | `createEffect` | Runs components again |
 | Svelte 5 | The `$state` rune | Compiled signals | `$effect` | Runs components again |
 | Qwik | `useSignal`, read as `.value`, with `$` on lazy code | Signals | `useTask$` | Resumes |
-| Markless | `state(0)`, then plain `bags` | Writes the compiler planned | None | Resumes |
+| Markless | `state('Celsius')`, then plain `unit` | Writes the compiler planned | None | Resumes |
 
 </Collapsible>
 
-[The big idea](/how-it-works/the-big-idea) shows that one plan rendered in each environment.
+[The big idea](/how-it-works/the-big-idea) shows one file planned for every device.
