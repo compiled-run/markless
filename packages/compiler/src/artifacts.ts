@@ -1997,6 +1997,16 @@ export type SymbolResolverPlan = {
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };
 
+/** One keyed row on the way to a row item: its collection, read off the graph or off the enclosing row's item, and the key path its rows are named by. */
+export type RowLocalStep = {
+	readonly rowIndex: number;
+	readonly keyPath: ReadonlyArray<string>;
+	readonly indexKey?: true;
+	readonly graphNodeId?: string;
+	readonly collectionPath?: ReadonlyArray<string>;
+	readonly itemPath?: ReadonlyArray<string>;
+};
+
 export type BoundSymbolCaptureRoute = Exclude<
 	CaptureSlotRoute,
 	{ readonly kind: 'unsupported-opaque' }
@@ -2099,6 +2109,8 @@ export type CaptureSlotRoute =
 			readonly callbackSymbolId: string;
 			/** The instance path of the component whose callback this is, when it is not the module root. */
 			readonly composerPath?: string;
+			// The callback names its own keyed bound row, which places itself by this many of the dispatching row's pieces.
+			readonly callbackRowPieces?: number;
 	  }
 	| {
 			// A widget part invokes a callback slot on its shared instance. The family
@@ -2145,6 +2157,11 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly itemName: string;
 			readonly path: ReadonlyArray<string>;
+			// An edge in nested rows finds the item by the keys its dispatching record's path spells, outermost row first.
+			readonly rows?: ReadonlyArray<RowLocalStep>;
+			// The edge whose rows those are; a bound row replaces it with that edge's place on its path.
+			readonly rowEdgeId?: string;
+			readonly rowPiece?: number;
 	  }
 	| {
 			readonly kind: 'unsupported-opaque';

@@ -6,6 +6,7 @@ import type {
 	CaptureSlotRoute,
 	LoweredStateRead,
 	PlannedSymbol,
+	RowLocalStep,
 	SemanticComponentEdge,
 	SemanticGraphArtifact,
 	SemanticComponentPropDeclaration,
@@ -1176,13 +1177,18 @@ function resolvePropCaptureRoute(
 			path: deriveRead.path,
 			ownerEdgeCount: componentEdgePath.length,
 		};
-	if (rowItem)
+	const rows =
+		rowItem && edge.keyedRepeatScopeIds.length > 1
+			? nestedRowSteps(rowItem.itemName, edge, input)
+			: undefined;
+	if (rowItem && (edge.keyedRepeatScopeIds.length < 2 || rows))
 		return {
 			kind: 'row-local',
 			componentEdgeId: terminalEdgeId,
 			componentEdgePath: edgePathIds,
 			itemName: rowItem.itemName,
 			path: [...rowItem.path, ...forwardedPath, ...readPath],
+			...(rows ? { rows, rowEdgeId: edge.id } : {}),
 		};
 	return {
 		kind: 'unsupported-opaque',
@@ -1208,6 +1214,41 @@ function rowItemPath(
 		(repeat) => edge.keyedRepeatScopeIds.includes(repeat.id) && repeat.itemName === itemName,
 	);
 	return enclosing && itemName ? { itemName, path } : undefined;
+}
+
+// Rows that share one parent cannot be told apart by position, so an item in nested rows is found by its rows' keys; undefined when a row on the way has no collection to look in.
+function nestedRowSteps(
+	itemName: string,
+	edge: SemanticComponentEdge,
+	input: CaptureAnalysisInput,
+): ReadonlyArray<RowLocalStep> | undefined {
+	const repeatOf = (id: string | undefined) =>
+		input.semanticGraph.keyedRepeats.find((repeat) => repeat.id === id);
+	let repeat = repeatOf(
+		edge.keyedRepeatScopeIds.findLast((id) => repeatOf(id)?.itemName === itemName),
+	);
+	const steps: RowLocalStep[] = [];
+	while (repeat) {
+		const rowIndex = edge.keyedRepeatScopeIds.indexOf(repeat.id);
+		if (rowIndex < 0) return undefined;
+		const step = {
+			rowIndex,
+			keyPath: repeat.keyPath,
+			...(repeat.indexKey ? { indexKey: true as const } : {}),
+		};
+		if (repeat.collectionGraphNodeId) {
+			steps.unshift({
+				...step,
+				graphNodeId: repeat.collectionGraphNodeId,
+				collectionPath: repeat.collectionPath,
+			});
+			return steps;
+		}
+		if (!repeat.enclosingItemPath) return undefined;
+		steps.unshift({ ...step, itemPath: repeat.enclosingItemPath });
+		repeat = repeatOf(repeat.enclosingRepeatId);
+	}
+	return undefined;
 }
 
 // Whether an edge prop's expression reads nothing but the item and index of the keyed rows the edge renders in.
