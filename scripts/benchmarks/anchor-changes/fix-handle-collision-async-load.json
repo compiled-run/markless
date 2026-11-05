@@ -101,6 +101,178 @@
 			"delta": 92,
 			"reason": "element() handle reads carry the reader's host scope so two components' same-named local handles resolve to their own element (hostScopePath moved into instance-scope)",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 480,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/roster-resume"
+			],
+			"delta": -422,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 40,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-locators"
+			],
+			"delta": 221,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 64,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 64,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 64,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 138,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 100,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -29,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 100,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 64,
+			"reason": "element() handle reads carry the reader's host scope so same-named local handles in two components resolve to their own element; hostScopePath moved into instance-scope from roster-resume",
+			"date": "2026-11-05"
 		}
 	]
 }
