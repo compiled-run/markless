@@ -101,6 +101,7 @@ import {
 	shadowedRowNameSource,
 	sharedInstancePreludeLines,
 } from './residue-reader.ts';
+import { createResidueDependencyReader, residueReferences } from './residue-dependencies.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
 import type { ComponentEdge, PublicRenderRoot } from './types.ts';
@@ -675,6 +676,29 @@ function outerRowNameAliasLines(
 	);
 }
 
+// An authored residue that reads an async value runs once its @try has settled the value into the map.
+function asyncValueLocalLines(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	residueSources: ReadonlyArray<string>,
+	taken: ReadonlyArray<string>,
+): string[] {
+	if (residueSources.length === 0) return [];
+	const readDependencies = createResidueDependencyReader();
+	const read = residueSources.map((source) => readDependencies(source, 'expression'));
+	return input.semanticGraph.graphBindings.flatMap((binding) =>
+		binding.kind === 'computed' &&
+		binding.async === true &&
+		!taken.includes(binding.name) &&
+		ownedGraphBinding(input, componentName, binding.name) === binding &&
+		read.some((dependencies) => residueReferences(dependencies, binding.name))
+			? [
+					`const ${binding.name}=marklessSsrRenderStateValues.get(${JSON.stringify(binding.id)});`,
+				]
+			: [],
+	);
+}
+
 function ownedGraphBinding(input: PublicRenderModuleInput, componentName: string, name: string) {
 	return input.semanticGraph.graphBindings.find(
 		(binding) =>
@@ -733,6 +757,10 @@ function emitSsrDataLines(
 	const localLines = [
 		...repeatLocalLines(input, componentName, repeats, rowNames),
 		...errorNames.map((name) => `const ${name}=marklessSsrDataContext.asyncError;`),
+		...asyncValueLocalLines(input, componentName, residueSources, [
+			...rowNames.map((binding) => binding.name),
+			...errorNames,
+		]),
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
 			componentName,

@@ -261,6 +261,8 @@ export type SemanticGraphBinding = {
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	readonly functionSource?: string;
+	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
+	readonly joinsText?: true;
 	// element() only: the declared type argument was written as an array, so this
 	// handle names an ordered SET of elements rather than one.
 	readonly plural?: boolean;
@@ -1048,6 +1050,8 @@ export type SemanticTemplateRead = {
 	readonly authoredSource?: string;
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
 	readonly keyedRepeatId?: string;
+	// The async values a row expression reads beside its row item, which its @try waits on.
+	readonly asyncGateReads?: ReadonlyArray<{ readonly source: string; readonly graphNodeId: string }>;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).

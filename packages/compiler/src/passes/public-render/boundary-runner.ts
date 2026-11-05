@@ -137,15 +137,25 @@ function collectBoundaryGateReads(
 		semanticGraph.graphBindings.map((binding) => [binding.id, binding]),
 	);
 	const aliases = semanticAliasMap(semanticGraph);
-	const boundaryReads: ReadonlyArray<{
+	type GateRead = {
 		readonly source: string;
 		readonly asyncBoundaryId?: string | undefined;
 		readonly computedGraphNodeId?: string | undefined;
 		// The edge already names the node, so a same-named local elsewhere in the module cannot shadow it.
 		readonly graphNodeId?: string;
 		readonly path?: ReadonlyArray<string>;
-	}> = [
-		...semanticGraph.templateReads,
+	};
+	const boundaryReads: ReadonlyArray<GateRead> = [
+		...semanticGraph.templateReads.flatMap((read): ReadonlyArray<GateRead> =>
+			read.asyncGateReads && !resolveGraphPath(read.source, bindings, aliases)
+				? read.asyncGateReads.map((gate) => ({
+						source: gate.source,
+						asyncBoundaryId: read.asyncBoundaryId,
+						graphNodeId: gate.graphNodeId,
+						path: [],
+					}))
+				: [read],
+		),
 		...semanticGraph.keyedRepeats.map((repeat) => ({
 			source: repeat.collectionSource,
 			asyncBoundaryId: repeat.asyncBoundaryId,
@@ -199,7 +209,9 @@ function collectBoundaryGateReads(
 				// write to that state updates it in place instead of settling the block again.
 				const derived =
 					resolved.binding.id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX) &&
-					asyncInputs.length < (resolved.binding.dependencies ?? []).length;
+					asyncInputs.length > 0 &&
+					(resolved.binding.joinsText === true ||
+						asyncInputs.length < (resolved.binding.dependencies ?? []).length);
 				if (derived) derivedGraphNodeIds.add(resolved.binding.id);
 				const gates = derived
 					? asyncInputs

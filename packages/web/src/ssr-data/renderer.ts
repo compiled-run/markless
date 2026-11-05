@@ -883,6 +883,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							armChunkId
 								? renderChunk(armChunkId, {
 										...context,
+										item: context.repeatItem,
+										index: context.repeatIndex,
+										key: context.repeatKey,
 										...(typeof selected === 'number'
 											? {}
 											: { asyncError: selected.error }),

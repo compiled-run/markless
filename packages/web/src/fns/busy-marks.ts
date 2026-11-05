@@ -1,4 +1,5 @@
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
+import type { ArmRowsAnchor } from '../resume-repeat-branch-arm.ts';
 import { boundaryBusyHosts, type BusyNode } from '../resume-refresh-busy.ts';
 import type {
 	ResumeArmRange,
@@ -24,10 +25,14 @@ type AfterAnchor = { __marklessAfter?: ResumeDomComment };
 
 // The shown arm's bindings as its records name them: each DOM update and keyed list host with the graph node it reads.
 function armBindings(startAnchor: object | undefined): Array<readonly [BusyNode, string]> {
-	const materialized = (startAnchor as { __marklessArmRecords?: ArmRecords } | undefined)
-		?.__marklessArmRecords;
-	if (!materialized) return [];
+	const anchor = startAnchor as ({ __marklessArmRecords?: ArmRecords } & ArmRowsAnchor) | undefined;
 	const bindings: Array<readonly [BusyNode, string]> = [];
+	// Rows written straight into the arm have their parent outside it, so each row is marked.
+	for (const source of anchor?.__marklessArmRows ?? [])
+		if (source.graphNodeId)
+			for (const row of source.rows()) bindings.push([row as BusyNode, source.graphNodeId]);
+	const materialized = anchor?.__marklessArmRecords;
+	if (!materialized) return bindings;
 	for (const [hostNodeId, graphNodeId] of [
 		...materialized.domUpdates.map((update) => [update.hostNodeId, update.graphNodeId]),
 		...materialized.keyedRepeats.map((repeat) => [
