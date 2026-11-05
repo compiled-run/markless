@@ -30,18 +30,41 @@ export function followBranchArm(
 		rows.some((row) => row.__marklessRowParent !== parent);
 	const showing = (rows?: ReadonlyMap<unknown, ResumeDomElement>) =>
 		shown.arm === repeat.branchArm!.arm && !(rows?.size && replaced([...rows.values()]));
+	// The arm's first own element after the rows: new rows go in front of it.
+	let tail: ResumeDomNode | undefined;
+	// A refresh marks the rows busy, as it marks a list host inside the arm.
+	const source = {
+		graphNodeId: repeat.collectionGraphNodeId,
+		rows: () => {
+			if (!showing()) return [];
+			const rows = rowNodes(parent, shown, repeat).filter((node) => node.nodeType === 1);
+			const at = tail ? rows.indexOf(tail) : -1;
+			return at < 0 ? rows : rows.slice(0, at);
+		},
+	};
+	const sources = ((shown as { rowSources?: Set<typeof source> }).rowSources ??= new Set()).add(source);
 	const paint = () => {
-		const nodes = showing() ? nodesBetween(parent, shown) : [],
-			items = nodes.length ? readKeyedRepeatCollection(input.graph, repeat) : [];
+		if (shown.start) (shown.start as ArmRowsAnchor).__marklessArmRows = sources;
+		const nodes = showing() ? rowNodes(parent, shown, repeat) : [],
+			items = nodes.length ? readKeyedRepeatCollection(input.graph, repeat) : [],
+			rows = nodes.filter((node) => node.nodeType === 1);
 		arm.mounted = nodes.length > 0 && items.length === 0;
 		arm.nodes = arm.mounted ? nodes : [];
-		adopt(arm.mounted ? [] : nodes, items);
+		tail = arm.mounted ? undefined : rows[items.length];
+		adopt(arm.mounted ? [] : rows.slice(0, items.length), items);
 	};
 	shown.listeners.add(paint);
-	input.storeContainerSubscription(() => shown.listeners.delete(paint));
+	input.storeContainerSubscription(() => (shown.listeners.delete(paint), sources.delete(source)));
 	paint();
-	return { showing, end: () => shown.end };
+	return { showing, end: () => tail ?? shown.end };
 }
+
+export type ArmRowsAnchor = {
+	__marklessArmRows?: ReadonlySet<{
+		readonly graphNodeId?: string;
+		readonly rows: () => ReadonlyArray<ResumeDomNode>;
+	}>;
+};
 
 export function hiddenBranchArm(
 	parent: ResumeDomElement,
@@ -72,9 +95,21 @@ function branchArmEntry(
 	return shown;
 }
 
-function nodesBetween(parent: ResumeDomElement, shown: ResumeBranchArmEntry): ResumeDomNode[] {
+// The record counts rows from the parent's first element, so the arm's own elements in front of them come off first.
+function rowNodes(
+	parent: ResumeDomElement,
+	shown: ResumeBranchArmEntry,
+	repeat: ResumeKeyedRepeatRecord,
+): ResumeDomNode[] {
 	const children = Array.from(parent.childNodes ?? []);
 	const from = children.indexOf(shown.start!),
 		to = children.indexOf(shown.end!);
-	return from < 0 || to < from ? [] : children.slice(from + 1, to);
+	if (from < 0 || to < from) return [];
+	let lead =
+		repeat.rowEndOffset === undefined
+			? (repeat.rowStartOffset ?? 0) - children.slice(0, from).filter((node) => node.nodeType === 1).length
+			: 0,
+		at = from + 1;
+	while (lead > 0 && at < to) if (children[at++]!.nodeType === 1) lead--;
+	return children.slice(at, to);
 }

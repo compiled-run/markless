@@ -22,6 +22,7 @@ import type {
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
 	SemanticTemplateBindingTarget,
+	SemanticTemplateRead,
 	SourceSpan,
 } from '../../artifacts.ts';
 import {
@@ -46,6 +47,7 @@ import {
 	joinReadSources,
 	liftArmModuleValue,
 	mintTemplateExpressionComputed,
+	freeReadSources,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
 } from './composite-reads.ts';
@@ -238,8 +240,30 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 			? { projectedComponentEdgeId: state.currentProjectionScope!.componentEdgeId }
 			: {}),
 		computedGraphNodeId: composite?.graphNodeId,
+		...(composite ? {} : rowAsyncGateReads(expression, state)),
 		componentName: state.currentComponentName ?? undefined,
 	});
+}
+
+function rowAsyncGateReads(
+	expression: AnyNode,
+	state: WalkState,
+): Pick<SemanticTemplateRead, 'asyncGateReads'> {
+	if (!state.currentAsyncBoundaryId || state.currentKeyedRepeatScopeIds.length === 0) return {};
+	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId);
+	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+	const reads = new Map<string, string>();
+	for (const source of freeReadSources(expression, state, true)) {
+		if (repeatRowBindsName(source, state)) continue;
+		const binding = resolveGraphPath(source, bindings, aliases)?.binding;
+		if (binding?.kind === 'computed' && binding.asyncCapable === true)
+			reads.set(binding.id, binding.name);
+	}
+	return reads.size === 0
+		? {}
+		: {
+				asyncGateReads: [...reads].map(([graphNodeId, source]) => ({ source, graphNodeId })),
+			};
 }
 
 function templateReadSource(
@@ -368,19 +392,23 @@ function joinTextParts(
 	]);
 	if (!readSources) return null;
 	const asyncReads = readSources.filter((source) => readsAsyncComputed(source, state));
-	// Joined with other reads, an async value is gated by the @try block it renders in.
-	if (
-		asyncReads.length > 0 &&
-		(asyncReads.length === readSources.length || !state.currentAsyncBoundaryId)
-	)
-		return null;
+	// Joined in one text node, an async value is gated by the @try block it renders in.
+	if (asyncReads.length > 0 && !state.currentAsyncBoundaryId) return null;
 	const parts = children.map((child) =>
 		isTemplateExpressionChild(child)
 			? `\${(${inlined.get(child.expression as AnyNode)!.source}) ?? ''}`
 			: textPartValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
 	);
 	const source = `\`${parts.join('')}\``;
-	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state);
+	const composite = mintTemplateExpressionComputed(
+		`() => ${source}`,
+		readSources,
+		state,
+		undefined,
+		false,
+		undefined,
+		true,
+	);
 	if (!composite) return null;
 	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
@@ -1068,6 +1096,8 @@ function collectAttribute(
 				handler && !relayed
 					? inlineHandlerRenderLocals(handler.node, state, attributeName, true)
 					: null;
+			// A handler named by a body function reads at its definition, which the attribute walk never visits.
+			if (handler && !relayed && handler.node !== entry) collectDefinitionReads(handler.node, state);
 			state.graph.events.push({
 				id: `event:${state.nextEventId++}`,
 				hostNodeId,

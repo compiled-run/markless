@@ -13,7 +13,17 @@ export function repeatRowSiblingElements(
 	if (!owner || anchor?.coordinate.kind !== 'comment-anchor') return 'unknown';
 	// Projected rows sit inside the child's element, which may render more after the hole.
 	if (side === 'after' && owner.kind === 'component-projection') return 'unknown';
-	const path = anchor.coordinate.path;
+	return siblingElements(chunks, owner, anchor.coordinate.path, side);
+}
+
+type Chunk = SemanticGraphArtifact['markup']['chunks'][number];
+
+function siblingElements(
+	chunks: ReadonlyArray<Chunk>,
+	owner: Chunk,
+	path: ReadonlyArray<number>,
+	side: 'before' | 'after',
+): number | 'unknown' {
 	const parentPath = path.slice(0, -1);
 	const own = path[path.length - 1] ?? 0;
 	const siblingIndex = (candidate: ReadonlyArray<number>) =>
@@ -39,7 +49,31 @@ export function repeatRowSiblingElements(
 		);
 		if (sibling && sibling.kind !== 'text') return 'unknown';
 	}
-	return offset;
+	if (parentPath.length > 0 || (owner.kind !== 'async-arm' && owner.kind !== 'branch-arm'))
+		return offset;
+	// A fragment arm's top level shares its parent with the elements around the @try or @if.
+	const holder = armHolder(chunks, owner.id);
+	if (!holder) return 'unknown';
+	const outer = siblingElements(chunks, holder.chunk, holder.path, side);
+	return outer === 'unknown' ? outer : outer + offset;
+}
+
+function armHolder(
+	chunks: ReadonlyArray<Chunk>,
+	armChunkId: string,
+): { readonly chunk: Chunk; readonly path: ReadonlyArray<number> } | null {
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.coordinate.kind !== 'comment-anchor') continue;
+			const arms =
+				slot.kind === 'async'
+					? Object.values(slot.armTemplateIds)
+					: slot.kind === 'branch'
+						? slot.armTemplateIds
+						: [];
+			if (arms.includes(armChunkId)) return { chunk, path: slot.coordinate.path };
+		}
+	return null;
 }
 
 // Rows a reconcile can find by neither end: a run-time count of elements stands on both sides.

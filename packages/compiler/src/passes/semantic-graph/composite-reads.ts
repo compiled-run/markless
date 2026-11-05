@@ -343,6 +343,7 @@ export function mintTemplateExpressionComputed(
 	allowConstant = false,
 	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
 	propObjectRoots?: ReadonlySet<string>,
+	joinsText = false,
 ): { readonly graphNodeId: string } | null {
 	const bindings =
 		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
@@ -394,6 +395,7 @@ export function mintTemplateExpressionComputed(
 		asyncCapable: false,
 		functionSource,
 		dependencies: uniqueDependencies(dependencies),
+		...(joinsText ? { joinsText: true as const } : {}),
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
 	return { graphNodeId };
@@ -446,6 +448,15 @@ export function readsUnroutedGraphCell(
 ): boolean {
 	const readSources = pureCompositeReadSources(expression, state, options);
 	if (readSources) return readsWritableGraphCell(readSources, state, scope);
+	return readsWritableGraphCell(freeReadSources(expression, state, identifiers), state, scope);
+}
+
+// Every member chain (and, when asked, bare name) in an expression that is not bound inside it.
+export function freeReadSources(
+	expression: AnyNode,
+	state: WalkState,
+	identifiers: boolean,
+): ReadonlyArray<string> {
 	const region =
 		typeof expression.start === 'number' && typeof expression.end === 'number'
 			? { start: expression.start, end: expression.end }
@@ -470,5 +481,5 @@ export function readsUnroutedGraphCell(
 		for (const child of childNodes(node)) visit(child, node);
 	};
 	visit(expression, null);
-	return readsWritableGraphCell(sources, state, scope);
+	return sources;
 }
