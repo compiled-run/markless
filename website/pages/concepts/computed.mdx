@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import RecipeAnatomy from '../../components/figures/computed/recipe-anatomy.tsrx';
+import TilesAnatomy from '../../components/figures/computed/tiles-anatomy.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -15,18 +15,18 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 <Subtitle text="If you can work a value out from other values, don't store it. Write the recipe once with computed()." />
 
 ```tsrx
-const total = computed(() => cart * 14);
+const total = computed(() => mugs + coasters);
 ```
 
-The function you pass is the *recipe*. Markless finds `cart` in it, so you never list what it reads.
+The function you pass is the *recipe*. Markless finds `mugs` and `coasters` in it, so you never list what it reads.
 
-## Follow the recipe
+## Turn the dials
 
-The card on the desk is the recipe for `total`. Press **Add to cart**.
+Drag `mugs` or `coasters` up and down, or tap them. Then try to change `total`.
 
-<RecipeAnatomy />
+<TilesAnatomy />
 
-The press only changes `cart`. The card works itself out again, line by line, and the page shows its last line.
+`total` is worked out from the other two. You can't set it, so the build stops if you try.
 
 ## Change the recipe
 
