@@ -2,25 +2,27 @@ import { tooltip } from '@markless/ui';
 import { art } from './term-art.ts';
 import { captionOf } from './term-glossary.ts';
 
-/** A word in running text that shows a small ink sketch of what it means. `word` must be a key of the glossary in term-glossary.ts. */
+/** A word in running text that shows what it means: its one-line caption, with a small ink sketch for the words that have one. `word` must be a key of the glossary in term-glossary.ts. */
 export default function Term({ word }: { readonly word: string }) @{
 	const caption = captionOf(word);
-	const sketch = word === 'events' ? art.events : word === 'values' ? art.values : word === 'instructions' ? art.instructions : art.elements;
+	const sketch = word === 'events' ? art.events : word === 'values' ? art.values : word === 'instructions' ? art.instructions : word === 'elements' ? art.elements : null;
 
 	<tooltip.root class="term">
 		<tooltip.trigger class="word">{word}</tooltip.trigger>
 		<tooltip.content class="tip" data-term={word}>
-			<svg class="sketch" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
-				<path class="paper" d={sketch.paper} />
-				<path class="pink" d={sketch.pink} />
-				<path class="hatch" d={sketch.hatch} />
-				<path class="paper" d={sketch.cover} />
-				<path class="fine" d={sketch.fine} />
-				<path class="ink" d={sketch.ink} />
-				@for (const label of sketch.labels; key label.key) {
-					<text class="hand" x={label.x} y={label.y} transform={'rotate(' + label.tilt + ' ' + label.x + ' ' + label.y + ')'}>{label.text}</text>
-				}
-			</svg>
+			@if (sketch) {
+				<svg class="sketch" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+					<path class="paper" d={sketch.paper} />
+					<path class="pink" d={sketch.pink} />
+					<path class="hatch" d={sketch.hatch} />
+					<path class="paper" d={sketch.cover} />
+					<path class="fine" d={sketch.fine} />
+					<path class="ink" d={sketch.ink} />
+					@for (const label of sketch.labels; key label.key) {
+						<text class="hand" x={label.x} y={label.y} transform={'rotate(' + label.tilt + ' ' + label.x + ' ' + label.y + ')'}>{label.text}</text>
+					}
+				</svg>
+			}
 			<span class="caption">{caption}</span>
 		</tooltip.content>
 		<style>
