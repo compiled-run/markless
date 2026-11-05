@@ -731,6 +731,13 @@ export type SemanticKeyedRepeat = {
 	readonly asyncBoundaryId?: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
+	// A destructured header (`const [key, value]`): each name it binds and its path on the item `itemName` names.
+	readonly itemAliases?: ReadonlyArray<{
+		readonly name: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	// The destructuring as written, which diagnostics show in place of the compiler's item name.
+	readonly itemPattern?: string;
 	readonly indexName?: string;
 	readonly collectionSource: string;
 	readonly collectionGraphNodeId?: string;
@@ -903,6 +910,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_REQUIRED'
 		| 'MARKLESS_REPEAT_KEY_IS_INDEX'
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
+		| 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED'
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_REPEAT_ROWS_FROZEN'
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'

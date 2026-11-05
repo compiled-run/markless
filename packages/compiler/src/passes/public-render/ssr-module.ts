@@ -642,7 +642,13 @@ function repeatLocalLines(
 							'marklessSsrDataContext',
 							outerRowNameSource(input, componentName, binding.name),
 						)
-					: repeatLocalSource(repeats, binding.name, binding.field, 'marklessSsrDataContext')
+					: repeatLocalSource(
+							repeats,
+							binding.name,
+							binding.field,
+							'marklessSsrDataContext',
+							binding.path,
+						)
 			};`,
 	);
 }

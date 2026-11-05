@@ -17,6 +17,7 @@ import {
 } from './construct-reach.ts';
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
+import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
 
 export type RowComponentMint = {
 	/** Absent when `rowChunkId` names the row's own markup instead of one edge. */
@@ -349,10 +350,7 @@ function projectionIsMintable(
 			const nested = input.semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === slot.repeatId,
 			);
-			const nestedNames = [
-				...rowNames,
-				...[nested?.itemName, nested?.indexName].filter((name): name is string => !!name),
-			];
+			const nestedNames = [...rowNames, ...rowBoundNames(nested)];
 			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])].every(
 				(chunkId) => projectionIsMintable(input, chunkId, seen, nestedNames, true),
 			);

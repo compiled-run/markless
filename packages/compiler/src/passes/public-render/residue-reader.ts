@@ -515,16 +515,32 @@ export function repeatLocalSource(
 	name: string,
 	field: RowNameBinding['field'],
 	context: string,
+	path: ReadonlyArray<string> = [],
 ): string {
-	const declaring = repeats.filter((repeat) =>
-		field === 'repeatItem' ? repeat.itemName === name : repeat.indexName === name,
-	);
+	const declaring = repeats.filter((repeat) => declaresRowName(repeat, name, field));
 	const encloses = declaring.some((repeat) =>
 		repeats.some((candidate) => candidate.enclosingRepeatId === repeat.id),
 	);
-	if (!encloses) return `${context}.${field}`;
+	const read = itemPathAccess(path);
+	if (!encloses) return `${context}.${field}${read}`;
 	const ids = JSON.stringify(declaring.map((repeat) => repeat.id));
-	return `((r)=>{for(;r;r=r.repeatOuter)if(r.repeatId===undefined||${ids}.includes(r.repeatId))return r.${field};return ${context}.${field};})(${context})`;
+	return `((r)=>{for(;r;r=r.repeatOuter)if(r.repeatId===undefined||${ids}.includes(r.repeatId))return r.${field}${read};return ${context}.${field}${read};})(${context})`;
+}
+
+function declaresRowName(
+	repeat: KeyedRepeats[number],
+	name: string,
+	field: RowNameBinding['field'],
+): boolean {
+	if (field === 'repeatIndex') return repeat.indexName === name;
+	return (
+		repeat.itemName === name || (repeat.itemAliases ?? []).some((alias) => alias.name === name)
+	);
+}
+
+// A destructured loop name reads its value off the row item at the path it binds.
+function itemPathAccess(path: ReadonlyArray<string>): string {
+	return path.map((key) => `?.[${JSON.stringify(key)}]`).join('');
 }
 
 type KeyedRepeats = PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
@@ -533,6 +549,8 @@ type KeyedRepeats = PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
 export type RowNameBinding = {
 	readonly name: string;
 	readonly field: 'repeatItem' | 'repeatIndex';
+	/** Set for a name a destructured loop binds: where on the row item its value sits. */
+	readonly path?: ReadonlyArray<string>;
 	/** The component also binds this name outside its loops; a read outside every declaring row means that binding. */
 	readonly shadowsOuter: boolean;
 };
@@ -558,14 +576,26 @@ export function componentRowNames(
 	repeats: KeyedRepeats = componentKeyedRepeats(input, componentName),
 ): ReadonlyArray<RowNameBinding> {
 	const fields = new Map<string, RowNameBinding['field']>();
+	const paths = new Map<string, ReadonlyArray<string>>();
 	for (const repeat of repeats)
 		if (!fields.has(repeat.itemName)) fields.set(repeat.itemName, 'repeatItem');
+	for (const repeat of repeats)
+		for (const alias of repeat.itemAliases ?? [])
+			if (!fields.has(alias.name)) {
+				fields.set(alias.name, 'repeatItem');
+				paths.set(alias.name, alias.path);
+			}
 	for (const repeat of repeats)
 		if (repeat.indexName && !fields.has(repeat.indexName))
 			fields.set(repeat.indexName, 'repeatIndex');
 	if (fields.size === 0) return [];
 	const outer = componentBodyLookup(input, componentName);
-	return [...fields].map(([name, field]) => ({ name, field, shadowsOuter: outer(name) }));
+	return [...fields].map(([name, field]) => ({
+		name,
+		field,
+		shadowsOuter: outer(name),
+		...(paths.has(name) ? { path: paths.get(name)! } : {}),
+	}));
 }
 
 // Whether a name resolves to a binding from the component body's own scope, which every loop scope nests inside.
@@ -603,14 +633,10 @@ export function shadowedRowNameSource(
 ): string {
 	const ids = JSON.stringify(
 		repeats
-			.filter((repeat) =>
-				binding.field === 'repeatItem'
-					? repeat.itemName === binding.name
-					: repeat.indexName === binding.name,
-			)
+			.filter((repeat) => declaresRowName(repeat, binding.name, binding.field))
 			.map((repeat) => repeat.id),
 	);
-	return `((marklessRow)=>{for(;marklessRow;marklessRow=marklessRow.repeatOuter)if(marklessRow.repeatId===undefined?marklessRow.repeatItem!==undefined:${ids}.includes(marklessRow.repeatId))return marklessRow.${binding.field};return ${outerSource};})(${context})`;
+	return `((marklessRow)=>{for(;marklessRow;marklessRow=marklessRow.repeatOuter)if(marklessRow.repeatId===undefined?marklessRow.repeatItem!==undefined:${ids}.includes(marklessRow.repeatId))return marklessRow.${binding.field}${itemPathAccess(binding.path ?? [])};return ${outerSource};})(${context})`;
 }
 
 const CONTEXT = 'marklessResidueContext';
@@ -740,7 +766,7 @@ export function emitClientResidueReader(
 		if (binding.shadowsOuter || !reads(binding.name)) continue;
 		bound.add(binding.name);
 		lines.push(
-			`const ${binding.name}=${repeatLocalSource(repeats, binding.name, binding.field, CONTEXT)};`,
+			`const ${binding.name}=${repeatLocalSource(repeats, binding.name, binding.field, CONTEXT, binding.path)};`,
 		);
 	}
 	const shadowing = rowNames.filter((binding) => binding.shadowsOuter);
