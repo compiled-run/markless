@@ -2604,7 +2604,7 @@ try {
 
 		// Each How it works page opens on its ink figure; a press must change what its live line says.
 		for (const [path, said] of [
-			['', 'Two copies of the shadcn/ui docs home page'],
+			['', 'The Markless port answered its first click'],
 			['the-big-idea', 'got the same plan'],
 			['compiler', 'three pieces'],
 			['payload', 'Booked March'],
@@ -2614,7 +2614,7 @@ try {
 			['native-targets', 'No WKWebView anywhere'],
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
-			const figure = page.locator('figure.anatomy, figure.explorer, figure.payload').first();
+			const figure = page.locator('figure.race, figure.anatomy, figure.explorer, figure.payload').first();
 			const stage = figure.locator('.stage');
 			if (await stage.count()) {
 				await stage.focus();

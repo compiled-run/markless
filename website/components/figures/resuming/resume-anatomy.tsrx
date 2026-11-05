@@ -132,11 +132,15 @@ export default function ResumeAnatomy() @{
 				}
 				if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
 					const mine = IDS.filter((id) => pos[id] && isWhite(id) === white && movesOf(pos, id).length > 0);
-					picked = cycle(mine, picked, event.key === 'ArrowRight' ? 1 : -1) ?? '';
+					const chosen = cycle(mine, picked, event.key === 'ArrowRight' ? 1 : -1) ?? '';
+					picked = chosen;
 					aim = '';
+					if (chosen) said = 'Chose the ' + nameOf(chosen) + ' on ' + pos[chosen] + '. Up and down choose a square.';
 				}
 				if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && picked) {
-					aim = cycle(targets, aim, event.key === 'ArrowDown' ? 1 : -1) ?? '';
+					const square = cycle(targets, aim, event.key === 'ArrowDown' ? 1 : -1) ?? '';
+					aim = square;
+					if (square) said = 'Aiming at ' + square + '. Enter plays it.';
 				}
 			}}
 		>
@@ -162,7 +166,10 @@ export default function ResumeAnatomy() @{
 					const id = held;
 					if (Math.hypot(dragX, dragY) > 6) {
 						const [x, y] = art.squares[pos[id]!]!;
-						play(id, nearestSquare(art.squares, x + dragX, y + dragY));
+						const square = nearestSquare(art.squares, x + dragX, y + dragY);
+						const [sx, sy] = art.squares[square]!;
+						if (Math.hypot(sx - x - dragX, sy - y - dragY) > 34) said = 'The ' + nameOf(id) + ' was dropped off the board, so it slid back.';
+						else play(id, square);
 						dropped = Date.now();
 					}
 					held = '';

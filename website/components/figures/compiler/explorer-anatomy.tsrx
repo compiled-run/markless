@@ -30,7 +30,7 @@ export default function ExplorerAnatomy() @{
 	const rows = computed(() =>
 		Array.from({ length: LINE_SLOTS }, (_, i) => {
 			const text = lines[i] ?? '';
-			const index = shown.findIndex((p) => p.line === i);
+			const index = shown[active]?.line === i ? active : shown.findIndex((p) => p.line === i);
 			const piece = shown[index];
 			if (!piece) return { ...NONE, a: text };
 			return { a: text.slice(0, piece.from), b: text.slice(piece.from, piece.to), c: text.slice(piece.to), kind: piece.kind, on: pairOn(index) };

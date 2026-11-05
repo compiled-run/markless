@@ -71,7 +71,11 @@ export default function GraphAnatomy() @{
 		playing = song;
 	};
 	const like = () => {
-		if (!liked.includes(playing)) liked = [...liked, playing];
+		if (liked.includes(playing)) {
+			said = playing + ' is already liked. Same value, so nothing ran.';
+			return;
+		}
+		liked = [...liked, playing];
 		pulse('liked');
 		said = describeLike(playing, reachOf('liked', shown));
 	};
@@ -81,6 +85,9 @@ export default function GraphAnatomy() @{
 		said = describeVolume(volume);
 	};
 	const reset = () => {
+		held = '';
+		dragX = 0;
+		dragY = 0;
 		playing = FIRST;
 		liked = [];
 		volume = 6;
