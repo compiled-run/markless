@@ -64,6 +64,7 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 		test: fileBasenamePattern('shared-instances', 'shared-start'),
 	},
 	{ name: 'markless-shared-swap', test: fileBasenamePattern('shared-swap') },
+	{ name: 'markless-kept-swap', test: fileBasenamePattern('kept-swap') },
 	// The census splice chunks with the module that pins the census: a chunk of
 	// its own would cost every importer a preload for ~40 lines.
 	{

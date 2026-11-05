@@ -437,6 +437,26 @@ function edgePropBinding(
 	};
 }
 
+// `{...rest}` on a component tag hands the child every prop the composer received under its own name, save what the rest binding left out.
+function spreadCarriedPropBinding(
+	edge: SemanticComponentEdge,
+	propName: string,
+): SemanticComponentEdge['props'][number] | undefined {
+	const spread = edge.props.findLast(
+		(candidate) => candidate.kind === 'spread' && !candidate.excludeNames.includes(propName),
+	);
+	if (spread?.kind !== 'spread') return undefined;
+	return {
+		name: propName,
+		source: `${spread.source}.${propName}`,
+		kind: 'graph-reference',
+		graphNodeId: spread.graphNodeId,
+		graphBindingKind: 'prop',
+		path: [...spread.path, propName],
+		...(spread.sourceSpan ? { sourceSpan: spread.sourceSpan } : {}),
+	};
+}
+
 function symbolCaptureSlots(
 	symbol: PlannedSymbol,
 	input: CaptureAnalysisInput,
@@ -1038,7 +1058,7 @@ function resolvePropCaptureRoute(
 	const edge = componentEdgePath[edgeIndex];
 	if (!edge) throw new Error('Capture route ancestry ended before its terminal value.');
 	const edgePathIds = componentEdgePath.map((candidate) => candidate.id);
-	const prop = edgePropBinding(edge, propName);
+	const prop = edgePropBinding(edge, propName) ?? spreadCarriedPropBinding(edge, propName);
 	if (!prop) {
 		if (absentPropIsUndefined) {
 			return createCompilerKnownConstantCaptureRoute(terminalEdgeId, edgePathIds, undefined);

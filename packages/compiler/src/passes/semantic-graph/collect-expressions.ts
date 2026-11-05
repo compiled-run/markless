@@ -938,6 +938,58 @@ export function resolvedSymbolAt(semantic: ModuleSemantics, offset: number): num
 	return symbolsByOffset.get(offset) ?? null;
 }
 
+type ValueReference = {
+	readonly start: number;
+	readonly name: string;
+	readonly declaredIn: { readonly start: number; readonly end: number } | null;
+};
+
+const valueReferencesByStart = new WeakMap<ModuleSemantics, ReadonlyArray<ValueReference>>();
+
+function valueReferences(semantic: ModuleSemantics): ReadonlyArray<ValueReference> {
+	let references = valueReferencesByStart.get(semantic);
+	if (references) return references;
+	const list: ValueReference[] = [];
+	for (const reference of semantic.references) {
+		if (reference.inTypePosition) continue;
+		const scope = reference.binding?.scope.node;
+		list.push({
+			start: reference.node.start,
+			name: reference.name,
+			declaredIn: scope ? { start: scope.start, end: scope.end } : null,
+		});
+	}
+	references = list.sort((left, right) => left.start - right.start);
+	valueReferencesByStart.set(semantic, references);
+	return references;
+}
+
+/**
+ * The names an expression reads, in source order, as scope analysis resolves them:
+ * a property name or object key is not a read, and a name declared inside the
+ * expression or bound by an enclosing row is not the outer binding it shadows.
+ */
+export function expressionReadNames(node: AnyNode, state: WalkState): ReadonlyArray<string> {
+	if (typeof node.start !== 'number' || typeof node.end !== 'number') return [];
+	const { start, end } = node;
+	const references = valueReferences(state.semantic());
+	let low = 0;
+	let high = references.length;
+	while (low < high) {
+		const middle = (low + high) >>> 1;
+		if (references[middle]!.start < start) low = middle + 1;
+		else high = middle;
+	}
+	const names = new Set<string>();
+	for (let index = low; index < references.length && references[index]!.start < end; index += 1) {
+		const { name, declaredIn } = references[index]!;
+		if (declaredIn && declaredIn.start >= start && declaredIn.end <= end) continue;
+		if (name === 'undefined' || repeatRowBindsName(name, state)) continue;
+		names.add(name);
+	}
+	return [...names];
+}
+
 /**
  * The keyed repeat whose row item this write target is rooted in. Decided by the
  * binding the root identifier resolves to, so a handler local that shadows the

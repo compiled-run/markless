@@ -1,6 +1,6 @@
 import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
 import {
-	addressedHostNodeIds,
+	renderAddressedHostNodeIds,
 	withInertHostsFolded,
 } from '../../artifact-helpers/addressed-hosts.ts';
 import type { PublicRenderModuleInput, ServedRenderDataArtifact } from '../../artifacts.ts';
@@ -130,7 +130,7 @@ export function collectServedRenderData(
 		),
 	};
 	return {
-		renderDataModuleSource: `export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(renderData, addressedHostNodeIds(input.protocolView))) ?? 'undefined'};`,
+		renderDataModuleSource: `export const marklessRenderData = ${jsonSourceWithNonFiniteNumbers(withInertHostsFolded(renderData, renderAddressedHostNodeIds(input))) ?? 'undefined'};`,
 		readers,
 		imports: prelude.imports,
 		declarations: prelude.declarations,
