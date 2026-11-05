@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 4582,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 125836,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 3789,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -8296,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 131,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 9868,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"date": "2026-11-05"
+		}
+	]
+}

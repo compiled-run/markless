@@ -1,17 +1,15 @@
+import { computed, shared, state } from '@markless/core';
 import { tree } from '@markless/ui';
 import { Link } from '@markless/core/router';
 import ModeSelect from './mode-select.tsrx';
-import { modeFor, sidebarFor } from '../../nav.ts';
+import { modeFor, sidebarFor, type SidebarSection } from '../../nav.ts';
 import { asset } from '../../site-base.ts';
 import { INK_MARKS } from './ink-marks.ts';
 
 export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	const here = modeFor(pathname);
 	const marks = asset(INK_MARKS) + '#';
-	const sections = sidebarFor(pathname).map((section) => ({
-		...section,
-		expanded: section.entries.some((entry) => entry.active),
-	}));
+	const sections = sidebarFor(pathname);
 
 	<nav
 		id="docs-sidebar"
@@ -29,53 +27,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			<tree.root class="page-tree" aria-label="Documentation pages">
 				<div role="none">
 					@for (const section of sections; key section.title) {
-						<tree.item
-							class={'branch stroke-' + (section.stroke ?? 'pink') + (section.expanded ? ' branch-current' : '')}
-							open={section.expanded}
-							level={1}
-							aria-label={section.title}
-						>
-							<tree.itemtrigger class="branch-trigger">
-								<tree.itemindicator class="branch-indicator" aria-hidden="true">
-									<svg class="branch-node" viewBox="0 0 24 24" fill="none">
-										<circle cx="12" cy="12" r="9" fill="currentColor" />
-										<path class="node-chevron" d="m10 8 4 4-4 4" />
-									</svg>
-								</tree.itemindicator>
-								<tree.itemlabel class="branch-title">{section.title}</tree.itemlabel>
-								<svg class="branch-connector path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M12 1 C11 14 13 34 12 47" />
-								</svg>
-							</tree.itemtrigger>
-							<tree.itemcontent class="branch-content">
-								<svg class="branch-elbow path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M1 1 V28 Q1 47 23 47" />
-								</svg>
-								<div role="none">
-									@for (const entry of section.entries; key entry.href) {
-										<tree.item leaf level={2} class="page-node" aria-label={entry.title} data-page-href={entry.href}>
-											<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
-												<path d="M12 1 V23" />
-											</svg>
-											<Link
-												class={entry.active ? 'sidebar-link page-link is-active' : 'sidebar-link page-link'}
-												href={entry.href}
-												tabindex={-1}
-												aria-current={entry.active ? 'page' : undefined}
-											>
-												<svg class="nav-icon" viewBox="0 0 108 108" aria-hidden="true">
-													<use href={marks + entry.icon} />
-												</svg>
-												<tree.itemlabel class="sidebar-text">{entry.title}</tree.itemlabel>
-											</Link>
-										</tree.item>
-									}
-								</div>
-								<svg class="branch-return path-line" viewBox="0 0 40 32" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M39 1 C39 26 1 6 1 31" />
-								</svg>
-							</tree.itemcontent>
-						</tree.item>
+						<SidebarBranch section={section} pathname={pathname} marks={marks} />
 					}
 				</div>
 			</tree.root>
@@ -125,6 +77,141 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 			}
 
+			.sidebar {
+				position: fixed;
+				left: var(--space-s-l);
+				top: calc(var(--header-height) + var(--space-s));
+				width: 16rem;
+				max-height: calc(100vh - var(--header-height) - var(--space-s));
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				/* The rail scrolls, but its track is not part of the drawing: the fade at the
+				   bottom (T017) is what says there is more list under the fold. */
+				scrollbar-width: none;
+				padding-block: var(--space-s);
+				font-size: var(--step--1);
+			}
+
+			.sidebar::-webkit-scrollbar {
+				display: none;
+			}
+
+			@media (min-width: 70.01rem) and (max-height: 62rem) {
+				.sidebar {
+					mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
+				}
+			}
+
+			@media (max-width: 70rem) {
+				.sidebar {
+					position: static;
+					width: auto;
+					max-height: none;
+					max-width: 68ch;
+					margin-inline: auto;
+					padding-block: var(--space-s) 0;
+				}
+			}
+
+			.sidebar {
+				padding-block: 0.5rem 1rem;
+				mask-image: none;
+			}
+
+			.page-tree {
+				--branch-height: 2.75rem;
+				--page-height: 2.5rem;
+				--path-ink: var(--muted-ink);
+				font-size: 1rem;
+				padding: 0.2rem;
+			}
+		</style>
+	</nav>
+}
+
+// Per document in the browser, so the sections a reader opened outlive in-place navigation.
+const sidebarSections = shared(() => {
+	const sidebar = state({ opened: [] as string[], closedOn: '' });
+	return {
+		...sidebar,
+		// `page` is the pathname when the section is the one the reader's page is in.
+		keep(title: string, opened: boolean, page: string) {
+			const others = sidebar.opened.filter((other) => other !== title);
+			sidebar.opened = opened ? [...others, title] : others;
+			if (page) sidebar.closedOn = opened ? '' : page;
+		},
+		leave(here: string, page: string) {
+			if (here && sidebar.closedOn !== page && !sidebar.opened.includes(here))
+				sidebar.opened = [...sidebar.opened, here];
+		},
+	};
+});
+
+function SidebarBranch({
+	section,
+	pathname,
+	marks,
+}: {
+	readonly section: SidebarSection;
+	readonly pathname: string;
+	readonly marks: string;
+}) @{
+	const sidebar = sidebarSections();
+	const open = computed(
+		() =>
+			sidebar.opened.includes(section.title) ||
+			(section.current && sidebar.closedOn !== pathname),
+	);
+
+	<tree.item
+		class={'branch stroke-' + (section.stroke ?? 'pink') + (section.current ? ' branch-current' : '')}
+		open={open}
+		onChange={(opened) => sidebar.keep(section.title, opened, section.current ? pathname : '')}
+		level={1}
+		aria-label={section.title}
+	>
+		<tree.itemtrigger class="branch-trigger">
+			<tree.itemindicator class="branch-indicator" aria-hidden="true">
+				<svg class="branch-node" viewBox="0 0 24 24" fill="none">
+					<circle cx="12" cy="12" r="9" fill="currentColor" />
+					<path class="node-chevron" d="m10 8 4 4-4 4" />
+				</svg>
+			</tree.itemindicator>
+			<tree.itemlabel class="branch-title">{section.title}</tree.itemlabel>
+			<svg class="branch-connector path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
+				<path d="M12 1 C11 14 13 34 12 47" />
+			</svg>
+		</tree.itemtrigger>
+		<tree.itemcontent class="branch-content">
+			<svg class="branch-elbow path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
+				<path d="M1 1 V28 Q1 47 23 47" />
+			</svg>
+			<div role="none">
+				@for (const entry of section.entries; key entry.href) {
+					<tree.item leaf level={2} class="page-node" aria-label={entry.title} data-page-href={entry.href}>
+						<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
+							<path d="M12 1 V23" />
+						</svg>
+						<Link
+							class={entry.active ? 'sidebar-link page-link is-active' : 'sidebar-link page-link'}
+							href={entry.href}
+							tabindex={-1}
+							onClick={() => sidebar.leave(section.here, pathname)}
+							aria-current={entry.active ? 'page' : undefined}
+						>
+							<svg class="nav-icon" viewBox="0 0 108 108" aria-hidden="true">
+								<use href={marks + entry.icon} />
+							</svg>
+							<tree.itemlabel class="sidebar-text">{entry.title}</tree.itemlabel>
+						</Link>
+					</tree.item>
+				}
+			</div>
+			<svg class="branch-return path-line" viewBox="0 0 40 32" preserveAspectRatio="none" aria-hidden="true">
+				<path d="M39 1 C39 26 1 6 1 31" />
+			</svg>
+		</tree.itemcontent>
+		<style>
 			.nav-icon {
 				width: 2.6em;
 				height: 2.6em;
@@ -182,42 +269,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				transform: rotate(-0.8deg);
 			}
 
-			.sidebar {
-				position: fixed;
-				left: var(--space-s-l);
-				top: calc(var(--header-height) + var(--space-s));
-				width: 16rem;
-				max-height: calc(100vh - var(--header-height) - var(--space-s));
-				overflow-y: auto;
-				overscroll-behavior: contain;
-				/* The rail scrolls, but its track is not part of the drawing: the fade at the
-				   bottom (T017) is what says there is more list under the fold. */
-				scrollbar-width: none;
-				padding-block: var(--space-s);
-				font-size: var(--step--1);
-			}
-
-			.sidebar::-webkit-scrollbar {
-				display: none;
-			}
-
-			@media (min-width: 70.01rem) and (max-height: 62rem) {
-				.sidebar {
-					mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
-				}
-			}
-
-			@media (max-width: 70rem) {
-				.sidebar {
-					position: static;
-					width: auto;
-					max-height: none;
-					max-width: 68ch;
-					margin-inline: auto;
-					padding-block: var(--space-s) 0;
-				}
-			}
-
 			.prose .sidebar a {
 				text-decoration: none;
 			}
@@ -226,19 +277,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				background: var(--quiet-fill);
 				outline: 1px dashed var(--ink);
 				outline-offset: -3px;
-			}
-
-			.sidebar {
-				padding-block: 0.5rem 1rem;
-				mask-image: none;
-			}
-
-			.page-tree {
-				--branch-height: 2.75rem;
-				--page-height: 2.5rem;
-				--path-ink: var(--muted-ink);
-				font-size: 1rem;
-				padding: 0.2rem;
 			}
 
 			.branch {
@@ -406,5 +444,5 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 			}
 		</style>
-	</nav>
+	</tree.item>
 }

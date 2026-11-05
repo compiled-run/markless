@@ -446,7 +446,9 @@ export function headFor(
 	errorFor?: (
 		code: string,
 	) => { readonly code: string; readonly description: string } | undefined,
-	migratedAppFor?: (slug: string) => { readonly name: string; readonly builtWith: string } | undefined,
+	migratedAppFor?: (
+		slug: string,
+	) => { readonly name: string; readonly builtWith: string } | undefined,
 ): Head {
 	const entry = allFlat.find((one) => one.href === pathname);
 	if (!entry) {
@@ -587,14 +589,16 @@ export const uiNav: readonly NavSection[] = [
 				href: '/ui',
 				icon: 'shapes',
 				number: '1',
-				description: 'Families that handle the keyboard, focus and screen readers. The look is yours.',
+				description:
+					'Families that handle the keyboard, focus and screen readers. The look is yours.',
 			},
 			{
 				title: 'Styling',
 				href: '/ui/styling',
 				icon: 'palette',
 				number: '2',
-				description: 'Parts write their state as ui-* attributes, so plain CSS can style them.',
+				description:
+					'Parts write their state as ui-* attributes, so plain CSS can style them.',
 			},
 		],
 	},
@@ -869,15 +873,25 @@ export function navFor(pathname: string): readonly NavSection[] {
 export type SidebarEntry = NavEntry & { readonly active: boolean };
 export type SidebarSection = Omit<NavSection, 'entries'> & {
 	readonly entries: readonly SidebarEntry[];
+	/** Whether the reader's page is in this section. */
+	readonly current: boolean;
+	/** The title of the section the reader's page is in. */
+	readonly here: string;
 };
 
 // Worked out here rather than compared inside the sidebar's loop: a repeat over
 // a plain collection renders its rows once, so a row reading the pathname prop
 // is refused as frozen.
 export function sidebarFor(pathname: string): readonly SidebarSection[] {
-	return navFor(pathname).map((section) => ({
+	const sections = navFor(pathname);
+	const here =
+		sections.find((section) => section.entries.some((entry) => entry.href === pathname))
+			?.title ?? '';
+	return sections.map((section) => ({
 		...section,
 		entries: section.entries.map((entry) => ({ ...entry, active: entry.href === pathname })),
+		current: section.title === here,
+		here,
 	}));
 }
 
