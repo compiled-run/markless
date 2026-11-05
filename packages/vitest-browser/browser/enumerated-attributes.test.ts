@@ -32,7 +32,7 @@ async function enumeratedWords() {
 	document.querySelector<HTMLElement>('[data-flip]')!.click();
 	await expect
 		.poll(() => read('[data-live]', [...ENUMERATED, 'aria-pressed']))
-		.toEqual(['false', 'false', 'false', null]);
+		.toEqual(['false', 'false', 'false', 'false']);
 	await expect.poll(rows).toEqual(['false', 'false', 'false', 'false']);
 	expect((document.querySelector('[data-live]') as HTMLElement).draggable).toBe(false);
 	document.querySelector<HTMLElement>('[data-flip]')!.click();

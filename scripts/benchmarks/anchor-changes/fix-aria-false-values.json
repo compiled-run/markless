@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/dom-attribute"
+			],
+			"delta": 201,
+			"reason": "ARIA states whose value set has false (aria-pressed, aria-expanded, aria-checked, aria-selected and others) write false instead of dropping the attribute",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -5,
+			"reason": "ARIA states whose value set has false (aria-pressed, aria-expanded, aria-checked, aria-selected and others) write false instead of dropping the attribute",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/dom-attribute"
+			],
+			"delta": 201,
+			"reason": "ARIA states whose value set has false (aria-pressed, aria-expanded, aria-checked, aria-selected and others) write false instead of dropping the attribute",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -9,
+			"reason": "ARIA states whose value set has false (aria-pressed, aria-expanded, aria-checked, aria-selected and others) write false instead of dropping the attribute",
+			"date": "2026-11-05"
+		}
+	]
+}

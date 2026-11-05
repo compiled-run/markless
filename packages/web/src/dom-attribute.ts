@@ -1,8 +1,12 @@
-// null, undefined and false mean absent and true is bare, except aria-/data- names (true reads "true") and the enumerated ones, which spell both words.
+// null, undefined and false mean absent and true is bare, except aria-/data- names (true reads "true"); the names below spell false too.
 export const ENUMERATED_BOOLEAN_ATTRIBUTE = /^(draggable|contenteditable|spellcheck)$/;
 
+// The enumerated names, and the WAI-ARIA 1.2 states whose "false" differs from absent; aria-hidden="false" is unreliable in browsers, so it stays absent.
+const SPELLS_FALSE =
+	/^(draggable|contenteditable|spellcheck|aria-(atomic|busy|checked|current|disabled|expanded|grabbed|haspopup|invalid|modal|multi(line|selectable)|pressed|re(adonly|quired)|selected))$/;
+
 export function marklessAttributeValue(name: string, value: unknown): string | null {
-	if (value == null || (value === false && !ENUMERATED_BOOLEAN_ATTRIBUTE.test(name))) return null;
+	if (value == null || (value === false && !SPELLS_FALSE.test(name))) return null;
 	return value !== true || ENUMERATED_BOOLEAN_ATTRIBUTE.test(name) || /^(aria|data)-/.test(name)
 		? String(value)
 		: '';
