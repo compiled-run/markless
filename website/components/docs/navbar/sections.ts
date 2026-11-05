@@ -1,6 +1,6 @@
 import type { NavEntry } from '../../../nav.ts';
 
-/** The card drawings, as one SVG sprite in `public/`: a card links a `<symbol>` by name, and the file loads only when a panel first shows. */
+/** The card drawings, as one SVG sprite in `public/`: a desktop card and its mobile menu link each link a `<symbol>` by name. Browsers fetch it at page load, closed panels included. */
 export const NAV_DECOR = 'nav-decor.svg';
 
 type Href = NavEntry['href'];

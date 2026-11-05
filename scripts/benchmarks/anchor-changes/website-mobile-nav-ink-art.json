@@ -1,0 +1,64 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -352,
+			"reason": "the mobile menu links draw their desktop card's ink art: the tiles' render code adds about 1.1 KB gzip of JS at load on docs pages, and nothing more runs",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1998,
+			"reason": "the mobile menu links draw their desktop card's ink art: the tiles' render code adds about 1.1 KB gzip of JS at load on docs pages, and nothing more runs",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -352,
+			"reason": "the mobile menu links draw their desktop card's ink art: the tiles' render code adds about 1.1 KB gzip of JS at load on docs pages, and nothing more runs",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1102,
+			"reason": "the mobile menu links draw their desktop card's ink art: the tiles' render code adds about 1.1 KB gzip of JS at load on docs pages, and nothing more runs",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1102,
+			"reason": "the mobile menu links draw their desktop card's ink art: the tiles' render code adds about 1.1 KB gzip of JS at load on docs pages, and nothing more runs",
+			"date": "2026-11-05"
+		}
+	]
+}
