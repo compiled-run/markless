@@ -1,3 +1,4 @@
+import type { LiteralComponentInstance } from './prop-flow.ts';
 import type { InputOptions, Plugin } from 'rolldown';
 import {
 	DEBUGGING_PLAYBOOK_HINT,
@@ -126,8 +127,18 @@ export function createMarklessRolldownPlugin(input: {
 					runtimeDemandMaps,
 					runtimeDemandSources,
 					directCsrOnly,
+					undefined,
+					unreachableChildren,
 				)
 			: [];
+
+	function unreachableChildren(
+		files: ReadonlySet<string>,
+		roots: ReadonlySet<string>,
+		importers: ReadonlyMap<string, ReadonlySet<string>>,
+	) {
+		return state.moduleMetadata.propFlow.unreachableChildren(files, roots, importers);
+	}
 
 	function* runtimeDemandMaps() {
 		for (const manifest of state.moduleMetadata.symbolClaimManifests())
@@ -199,6 +210,11 @@ export function createMarklessRolldownPlugin(input: {
 			runtimeDemandMaps,
 			runtimeDemandSources,
 			directCsrOnly,
+			unreachableChildren,
+			recordLiteralComponentInstances: (
+				source: string,
+				instances: ReadonlyArray<LiteralComponentInstance>,
+			) => state.moduleMetadata.propFlow.recordLiteralInstances(source, instances),
 			chunkImportMap: () => chunkImportMapEnabled(internalOptions),
 			enableChunkImportMap: () => {
 				internalOptions.chunkImportMap = true;

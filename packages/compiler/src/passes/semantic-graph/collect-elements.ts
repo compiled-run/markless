@@ -30,7 +30,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectAttachStartDiagnostic, isProjectedChildren } from './attach-start.ts';
-import { collectComponentEdge } from './collect-components.ts';
+import { collectComponentEdge, receivedHandlerRelay } from './collect-components.ts';
 import {
 	detachedContentMode,
 	isDeclarativeShadowRoot,
@@ -1063,23 +1063,29 @@ function collectAttribute(
 					secondSyncPolicyCancelDiagnostic(attributeName, strayCancel, state),
 				);
 			}
-			const inlined = handler
-				? inlineHandlerRenderLocals(handler.node, state, attributeName)
-				: null;
+			const relayed = handler ? receivedHandlerRelay(handler.node, state) : undefined;
+			const inlined =
+				handler && !relayed
+					? inlineHandlerRenderLocals(handler.node, state, attributeName)
+					: null;
 			state.graph.events.push({
 				id: `event:${state.nextEventId++}`,
 				hostNodeId,
 				eventName: normalizeEventName(attributeName),
 				...(handler
 					? {
-							handlerSource: inlined?.source ?? handler.source,
+							handlerSource: relayed?.source ?? inlined?.source ?? handler.source,
 							handlerSpan: handler.span,
 						}
 					: {}),
 				...(inlined?.definitionSpans.length
 					? { handlerDefinitionSpans: inlined.definitionSpans }
 					: {}),
-				handlerParameters: handler ? handlerParameterNames(handler.node) : [],
+				handlerParameters: relayed
+					? [relayed.parameter]
+					: handler
+						? handlerParameterNames(handler.node)
+						: [],
 				hasSyncPolicyCandidate,
 				syncPolicy,
 			});

@@ -248,7 +248,8 @@ export const pool = (poly: P[], toward: P, keep: number): P[] => poly.map(([x, y
 
 export function hull(points: P[]): P[] {
 	const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-	const cross = (o: P, a: P, b: P) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+	// Near-collinear points are dropped with a margin, so float noise between machines can't flip which ones stay.
+	const cross = (o: P, a: P, b: P) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]) - 1e-6;
 	const lower: P[] = [];
 	for (const p of pts) {
 		while (lower.length >= 2 && cross(lower.at(-2)!, lower.at(-1)!, p) <= 0) lower.pop();
