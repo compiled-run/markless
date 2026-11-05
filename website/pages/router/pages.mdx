@@ -65,12 +65,8 @@ export default function Invoice({ params, http }: PageProps<{ id: string }>) @{
 }
 ```
 
-Set it before anything the page waits on. Changing it later throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
+Set it before anything the page waits on, because the status leaves with the first bytes.
 
-Not yet:
-
-- Two files for one address stop the build, like `docs.tsrx` next to `docs.mdx`.
-- `http` exists only on the server. Reading it in a handler stops the build with `MARKLESS_SERVER_ONLY_PROP_BROWSER_READ`.
-- `document.tsrx` wraps every page, using `Html` from `@markless/router`, and can't hold event handlers.
+`http` exists only on the server, so read it in the page body, never in a handler ([why the build stops](/errors/MARKLESS_SERVER_ONLY_PROP_BROWSER_READ)).
 
 Next, [link between your pages](/router/links) so the build checks every link.

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { angleOf, BIG, clamp, describePlay, describeScrub, describeVolume, MINI, tick, TRACK, VOLUME } from './model.ts';
+import { angleOf, bearing, BIG, clamp, turnBy, unwrap, describePlay, describeScrub, describeVolume, MINI, tick, TRACK, VOLUME } from './model.ts';
 import { drawing } from './player.ts';
 
 const playerArt = drawing();
@@ -34,7 +34,9 @@ describe('two players, one shared track', () => {
 	});
 
 	it('plays: press, scrub by drag or keys, knobs that turn alone, hover names', () => {
-		expect(piece.match(/setPointerCapture/g)).toHaveLength(4);
+		expect(piece.match(/setPointerCapture/g)).toHaveLength(3);
+		expect(piece.match(/onPointerdown=\{\(event\) => knobDown\(event\)\}/g)).toHaveLength(2);
+		expect(piece).toContain('touch-action: none;');
 		expect(piece).toContain('onPointerenter={() => (hovered = MINI)}');
 		expect(piece.match(/tabindex="0"/g)).toHaveLength(6);
 		expect(piece).toContain("event.key === 'Escape'");
@@ -52,6 +54,35 @@ describe('two players, one shared track', () => {
 	it('is on the Shared page under its own heading', () => {
 		expect(page).toContain("import PlayerAnatomy from '../../components/figures/player/player-anatomy.tsrx';");
 		expect(page.indexOf('## Two components read one copy')).toBeLessThan(page.indexOf('<PlayerAnatomy />'));
+	});
+});
+
+describe('the volume knob follows the pointer around it', () => {
+	it('reads screen bearings with 0 straight up, growing clockwise', () => {
+		expect(bearing(0, -10)).toBeCloseTo(0);
+		expect(bearing(10, 0)).toBeCloseTo(90);
+		expect(bearing(-10, 0)).toBeCloseTo(-90);
+		expect(Math.abs(bearing(0, 10))).toBeCloseTo(180);
+	});
+
+	it('turns by the swing, so 270 degrees covers the whole range', () => {
+		expect(turnBy(0.5, 27)).toBeCloseTo(0.6);
+		expect(turnBy(0.5, -27)).toBeCloseTo(0.4);
+		expect([30, 30, 30, 30, 30, 30, 30, 30, 30].reduce(turnBy, 0)).toBe(1);
+	});
+
+	it('never jumps a whole turn when the pointer crosses straight down', () => {
+		expect(unwrap(350)).toBe(-10);
+		expect(unwrap(-350)).toBe(10);
+		expect(turnBy(0.5, 170 - -170)).toBeCloseTo(0.5 - 20 / 270);
+	});
+
+	it('clamps at the ends, and the pointer angle matches the value', () => {
+		expect(turnBy(0.95, 90)).toBe(1);
+		expect(turnBy(0.05, -90)).toBe(0);
+		expect(angleOf(0)).toBe(-135);
+		expect(angleOf(1)).toBe(135);
+		expect(angleOf(0.5)).toBe(0);
 	});
 });
 

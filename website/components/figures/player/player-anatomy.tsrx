@@ -1,6 +1,6 @@
 // Two players reading one shared() track: the MiniPlayer in the header and the NowPlaying card move together; each volume knob is its own widget.
 import { computed, state } from '@markless/core';
-import { angleOf, BIG, clamp, describePlay, describeScrub, describeVolume, MINI, tick, TRACK, VOLUME, type Who } from './model.ts';
+import { angleOf, bearing, BIG, clamp, turnBy, describePlay, describeScrub, describeVolume, MINI, tick, TRACK, VOLUME, type Who } from './model.ts';
 import { art } from './player.art.ts';
 
 export default function PlayerAnatomy() @{
@@ -38,6 +38,32 @@ export default function PlayerAnatomy() @{
 		if (who === 'mini') volMini = clamp(to);
 		else volBig = clamp(to);
 		said = who === 'mini' ? describeVolume('mini', volMini, volBig) : describeVolume('big', volBig, volMini);
+	};
+	const bearingOf = (event: PointerEvent) => {
+		const body = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		const dx = event.clientX - (body.left + body.width / 2);
+		const dy = event.clientY - (body.top + body.height / 2);
+		return Math.hypot(dx, dy) < 3 ? null : bearing(dx, dy);
+	};
+	const knobDown = (event: PointerEvent) => {
+		touched = true;
+		const el = event.currentTarget as HTMLElement;
+		try {
+			el.setPointerCapture(event.pointerId);
+		} catch {}
+		const at = bearingOf(event);
+		el.dataset.a = at === null ? '' : String(at);
+	};
+	const knobMove = (event: PointerEvent, who: Who) => {
+		const el = event.currentTarget as HTMLElement;
+		if (el.dataset.a === undefined) return;
+		const at = bearingOf(event);
+		if (at === null) return;
+		if (el.dataset.a !== '') turn(who, turnBy(who === 'mini' ? volMini : volBig, at - Number(el.dataset.a)));
+		el.dataset.a = String(at);
+	};
+	const knobUp = (event: PointerEvent) => {
+		delete (event.currentTarget as HTMLElement).dataset.a;
 	};
 	const xOf = (event: PointerEvent) => {
 		const svg = (event.currentTarget as SVGGraphicsElement).ownerSVGElement;
@@ -79,6 +105,7 @@ export default function PlayerAnatomy() @{
 			}
 		}}
 	>
+		<div class="board">
 		<svg class="scene" data-playing={playing ? 'yes' : 'no'} viewBox={'0 0 ' + art.width + ' ' + art.height} role="group" aria-label="A page with two music players">
 			<path class="hatch light" d={art.page.shadow} />
 			<path class="paper" d={art.page.sheet} />
@@ -174,44 +201,7 @@ export default function PlayerAnatomy() @{
 					</g>
 				</g>
 
-				<g
-					class="toy knob"
-					tabindex="0"
-					role="slider"
-					aria-label={MINI + ' volume'}
-					aria-valuemin="0"
-					aria-valuemax="100"
-					aria-valuenow={miniVol}
-					onPointerdown={(event) => {
-						touched = true;
-						const el = event.currentTarget as SVGGElement;
-						if (el.hasPointerCapture?.(event.pointerId) === false) {
-							try {
-								el.setPointerCapture(event.pointerId);
-							} catch {}
-						}
-						el.dataset.y = String(event.clientY);
-						el.dataset.v = String(volMini);
-					}}
-					onPointermove={(event) => {
-						const el = event.currentTarget as SVGGElement;
-						if (el.dataset.y === undefined) return;
-						turn('mini', Number(el.dataset.v) + (Number(el.dataset.y) - event.clientY) / 120);
-					}}
-					onPointerup={(event) => {
-						delete (event.currentTarget as SVGGElement).dataset.y;
-					}}
-					onKeyDown={(event) => {
-						if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-							event.preventDefault();
-							turn('mini', volMini + 0.1);
-						}
-						if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-							event.preventDefault();
-							turn('mini', volMini - 0.1);
-						}
-					}}
-				>
+				<g class="knob mini">
 					<path class="hatch light" d={art.mini.knob.shadow} />
 					<path class="ink" d={art.mini.knob.ticks} />
 					<path class="steel" d={art.mini.knob.body} />
@@ -311,44 +301,7 @@ export default function PlayerAnatomy() @{
 					</g>
 				</g>
 
-				<g
-					class="toy knob"
-					tabindex="0"
-					role="slider"
-					aria-label={BIG + ' volume'}
-					aria-valuemin="0"
-					aria-valuemax="100"
-					aria-valuenow={bigVol}
-					onPointerdown={(event) => {
-						touched = true;
-						const el = event.currentTarget as SVGGElement;
-						if (el.hasPointerCapture?.(event.pointerId) === false) {
-							try {
-								el.setPointerCapture(event.pointerId);
-							} catch {}
-						}
-						el.dataset.y = String(event.clientY);
-						el.dataset.v = String(volBig);
-					}}
-					onPointermove={(event) => {
-						const el = event.currentTarget as SVGGElement;
-						if (el.dataset.y === undefined) return;
-						turn('big', Number(el.dataset.v) + (Number(el.dataset.y) - event.clientY) / 120);
-					}}
-					onPointerup={(event) => {
-						delete (event.currentTarget as SVGGElement).dataset.y;
-					}}
-					onKeyDown={(event) => {
-						if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-							event.preventDefault();
-							turn('big', volBig + 0.1);
-						}
-						if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-							event.preventDefault();
-							turn('big', volBig - 0.1);
-						}
-					}}
-				>
+				<g class="knob big">
 					<path class="hatch light" d={art.big.knob.shadow} />
 					<path class="ink" d={art.big.knob.ticks} />
 					<path class="steel" d={art.big.knob.body} />
@@ -360,6 +313,69 @@ export default function PlayerAnatomy() @{
 				</g>
 			</g>
 		</svg>
+			<span
+				class="grip mini"
+				style={art.mini.knob.grip}
+				onPointerenter={() => (hovered = MINI)}
+				onFocus={() => (hovered = MINI)}
+				tabindex="0"
+				role="slider"
+				aria-label={MINI + ' volume'}
+				aria-valuemin="0"
+				aria-valuemax="100"
+				aria-valuenow={miniVol}
+				onPointerdown={(event) => knobDown(event)}
+				onPointermove={(event) => knobMove(event, 'mini')}
+				onPointerup={(event) => knobUp(event)}
+				onPointercancel={(event) => knobUp(event)}
+				onLostpointercapture={(event) => knobUp(event)}
+				onWheel={(event) => {
+					event.preventDefault();
+					turn('mini', volMini - Math.sign(event.deltaY) * 0.05);
+				}}
+				onKeyDown={(event) => {
+					if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+						event.preventDefault();
+						turn('mini', volMini + 0.1);
+					}
+					if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+						event.preventDefault();
+						turn('mini', volMini - 0.1);
+					}
+				}}
+			></span>
+			<span
+				class="grip big"
+				style={art.big.knob.grip}
+				onPointerenter={() => (hovered = BIG)}
+				onFocus={() => (hovered = BIG)}
+				tabindex="0"
+				role="slider"
+				aria-label={BIG + ' volume'}
+				aria-valuemin="0"
+				aria-valuemax="100"
+				aria-valuenow={bigVol}
+				onPointerdown={(event) => knobDown(event)}
+				onPointermove={(event) => knobMove(event, 'big')}
+				onPointerup={(event) => knobUp(event)}
+				onPointercancel={(event) => knobUp(event)}
+				onLostpointercapture={(event) => knobUp(event)}
+				onWheel={(event) => {
+					event.preventDefault();
+					turn('big', volBig - Math.sign(event.deltaY) * 0.05);
+				}}
+				onKeyDown={(event) => {
+					if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+						event.preventDefault();
+						turn('big', volBig + 0.1);
+					}
+					if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+						event.preventDefault();
+						turn('big', volBig - 0.1);
+					}
+				}}
+			></span>
+		</div>
 		<p class="caption" aria-hidden="true">{hovered}</p>
 		<figcaption class="sr">
 			A pen-and-ink web page. In its header sits a small {MINI}, and below it a large {BIG} card, both showing the track {TRACK}. Press
@@ -487,8 +503,7 @@ export default function PlayerAnatomy() @{
 				outline: none;
 			}
 
-			.bar,
-			.knob {
+			.bar {
 				cursor: grab;
 			}
 
@@ -508,9 +523,28 @@ export default function PlayerAnatomy() @{
 				transform: translateY(1px);
 			}
 
-			.knob:hover,
-			.knob:focus-visible {
+			.board {
+				position: relative;
+			}
+
+			.grip {
+				position: absolute;
+				border-radius: 50%;
+				cursor: grab;
+				touch-action: none;
+				outline: none;
+			}
+
+			.anatomy:has(.grip.mini:hover, .grip.mini:focus-visible) .knob.mini,
+			.anatomy:has(.grip.big:hover, .grip.big:focus-visible) .knob.big {
 				transform: scale(1.06);
+			}
+
+			.anatomy:has(.grip.mini:focus-visible) .knob.mini .steel,
+			.anatomy:has(.grip.big:focus-visible) .knob.big .steel {
+				stroke: var(--sheet-ink);
+				stroke-width: 1.2;
+				stroke-dasharray: 3 3;
 			}
 
 			.toy:focus-visible .hit,

@@ -37,7 +37,9 @@ Flip the switch, open the sidebar, then press the reload arrow.
 
 <ReloadAnatomy />
 
-<Code steps={[{ label: 'Press the button until it says dark, then reload this page.', shows: 'Mode: dark' }, { label: "Change the key to `'look'`, and the saved choice is gone.", source: "storage('look'" }]}>
+The key must be written as a plain string, so the build can find every saved value.
+
+<Code steps={[{ label: 'Press the button until it says dark, then reload this page.', shows: 'Mode: dark' }, { label: "Change the key to `'look'`, and the saved choice is gone.", source: "storage('look'" }, { label: "Try breaking it: build the key, `storage('mo' + 'de', 'light')`, and read the error under the result.", source: "storage('mo'+'de'" }]}>
 ```tsrx title="mode-switch.tsrx"
 import { storage } from '@markless/core';
 
@@ -72,11 +74,6 @@ A page that shows a `storage()` value answers `Cache-Control: private`, so a sha
 
 With one argument, the key comes from the variable name, so renaming the variable loses saved values. Pass the key yourself for anything you ship.
 
-Not yet:
-
-- The key and starting value must be plain strings, or the build stops with `MARKLESS_STORAGE_KEY_STATIC`.
-- The value is always a string.
-- A `const` storage value is read-only (`MARKLESS_STATE_CONST_REASSIGNMENT`).
-- A prerendered page sets the `<html>` attribute from a small script before the content. It covers the page file and, on an `.mdx` page, the components it imports directly.
+The value is always a string. On a prerendered page, a small script sets the `<html>` attribute before the content, for the page file and, on an `.mdx` page, the components it imports directly.
 
 When several components need one value, [share it with `shared()`](/build/shared).

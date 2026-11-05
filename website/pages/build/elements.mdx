@@ -36,7 +36,9 @@ Press **Focus search**, then type, then flip the switch and press again.
 
 <SearchFormAnatomy />
 
-<Code steps={[{ label: 'Rename the label to `Find a recipe`.', shows: 'Find a recipe' }, { label: "Add a Clear button whose handler runs `if (field) field.value = '';` and then `field?.focus();`.", source: "field.value = ''" }]}>
+A handle reaches the element from a handler. It can't be shown on the page, because the element doesn't exist yet when the page is set up.
+
+<Code steps={[{ label: 'Rename the label to `Find a recipe`.', shows: 'Find a recipe' }, { label: "Add a Clear button whose handler runs `if (field) field.value = '';` and then `field?.focus();`.", source: "field.value = ''" }, { label: 'Try breaking it: under the button, add `<p>{field.value}</p>`, and read the error under the result.', source: '<p>{field.value}</p>' }]}>
 ```tsrx title="search-box.tsrx"
 import { element } from '@markless/core';
 
@@ -93,10 +95,6 @@ On a server-rendered page, `attach` starts at the first of these:
 - `onVisible`, when the element scrolls into view
 - `onIdle`, once the page has loaded and the browser is idle
 
-Keep in mind:
-
-- `element<HTMLLIElement[]>()` collects every element bound to it, in page order. A single handle binds one element (`MARKLESS_ELEMENT_HANDLE_DUPLICATE`).
-- `attach` goes on page elements, not components (`MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED`), and needs one of the three starters ([`MARKLESS_ATTACH_NO_START_TRIGGER`](/errors/MARKLESS_ATTACH_NO_START_TRIGGER)).
-- A handle can't be shown in the elements: `{field.value}` stops the build (`MARKLESS_ELEMENT_HANDLE_RENDER_READ`). Keep that text in `state()`.
+Give `element()` an array type, like `element<HTMLLIElement[]>()`, and the handle collects every element bound to it, in page order.
 
 Some values should outlive a reload. [Keep them with `storage()`](/build/storage).

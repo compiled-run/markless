@@ -90,8 +90,6 @@ export default function Checkout() @{
 
 **`navigate()`** resolves once the new page is in place. **`replace`** swaps the current history entry instead of adding one, on `navigate()` and on `Link`.
 
-Not yet:
-
-- `prefetch={false}` works on `Link`, a plain `<a>`, or a component that passes it to one. Anywhere else stops the build with `MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED`.
+`prefetch={false}` belongs on a link, or on a component that passes it to one ([why anywhere else stops the build](/errors/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED)).
 
 Pages often need data from somewhere slow. [Load it in the page](/router/data).

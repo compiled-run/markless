@@ -36,7 +36,7 @@ Press play on either player, then turn one volume knob.
 
 <PlayerAnatomy />
 
-<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }]}>
+<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }, { label: "Try breaking it: change `{ scope: 'page' }` to `{ scope: 'everyone' }`, and read the error under the result.", source: "scope: 'everyone'" }]}>
 ```tsrx title="player.tsrx"
 import { shared, state } from '@markless/core';
 
@@ -89,7 +89,7 @@ The second argument is the *scope*: who shares one copy.
 | `'container'` | one Markless app on the page |
 | `'widget'` | the pieces of one rendered widget |
 
-A widget is the first component that calls the definition, plus everything inside it. The volume knobs above are `'widget'`, and so are the [UI components](/ui), so two menus open and close on their own.
+The scope is one of these four words, and the player above shows what happens with any other. A widget is the first component that calls the definition, plus everything inside it. The volume knobs above are `'widget'`, and so are the [UI components](/ui), so two menus open and close on their own.
 
 ## A copy lasts until a reload
 
@@ -101,10 +101,6 @@ A widget is the first component that calls the definition, plus everything insid
 
 Two separately built apps on one page that call the same definition read and write one copy. The name is the file plus its export, like `lib/player.tsrx#player`, so both must import it from the same place.
 
-Not yet:
-
-- If one app's value has a different shape, it keeps its own copy and logs `MARKLESS_SHARED_SHAPE_MISMATCH`.
-- Two components in one file calling a definition with no scope get the warning `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`. Write the scope you mean.
-- From another file, `p.toggle()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`. Change the field instead: `p.playing = true`.
+Both apps must also give the value the same shape: the same field names and types.
 
 Use `state()` when one component owns a value, and `shared()` when several need it. Next, [turn files into pages](/router/pages).

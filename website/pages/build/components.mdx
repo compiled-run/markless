@@ -71,7 +71,9 @@ export default function Profile() @{
 
 A child can't change the parent's state. The parent hands it a *callback*: a function the child calls.
 
-<Code steps={[{ label: 'Press Grace.', shows: 'Host: Grace' }, { label: 'Add a third guest, `<Guest name="Linus" onPick={choose} />`, and press it.', shows: 'Host: Linus' }]}>
+A callback takes one value at most, so send more as one object.
+
+<Code steps={[{ label: 'Press Grace.', shows: 'Host: Grace' }, { label: 'Add a third guest, `<Guest name="Linus" onPick={choose} />`, and press it.', shows: 'Host: Linus' }, { label: "Try breaking it: give Ada `onPick={(name, seat) => (host = name)}`, and read the error under the result.", source: '(name, seat) =>' }]}>
 ```tsrx title="host-pick.tsrx"
 import { state } from '@markless/core';
 
@@ -120,11 +122,5 @@ export default function Shop() @{
 }
 ```
 </Code>
-
-Not yet:
-
-- A callback prop takes zero parameters or one (`MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED`). Pass one object instead.
-- You can place, wrap or pass on `children`, but not map, count or index it (`MARKLESS_CHILDREN_OPAQUE`).
-- A default like `{ text = 'none' }` that the elements show stops the build (`MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`). Write `computed(() => text ?? 'none')` instead.
 
 When a handler needs the real `<input>`, [reach a real element](/build/elements).

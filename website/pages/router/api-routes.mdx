@@ -61,10 +61,6 @@ export default function request(http: import('@markless/router').MiddlewareHttpC
 }
 ```
 
-Keep in mind:
-
-- Files in `api/` and `middleware/` end in `.ts`, and each has one `export default` function.
-- Don't export a function named `GET` or `POST`; the file name gives the method.
-- A page in `pages/api/` is still a page, so a reference page can live at `/api/` beside your endpoints.
+Each file in `api/` or `middleware/` is a `.ts` file with one `export default` function, and the file name gives the method.
 
 Ready to put it online? [Build and deploy your app](/router/deploying).

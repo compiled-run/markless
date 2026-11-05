@@ -3,7 +3,7 @@
 // Change: both progress bars move together. Unchanged: each player's volume knob (widget scope, its own copy).
 // Prevents: "each player keeps its own copy, so they drift apart". Surprise: turn one knob and only that one turns.
 import { ellipse, roundRect } from '../ink/desk.ts';
-import { hatch, line, outline, type P, pathOf, stroke, wash } from '../ink/ink.ts';
+import { hatch, line, outline, type P, pathOf, r1, stroke, wash } from '../ink/ink.ts';
 
 export const WIDTH = 680;
 export const HEIGHT = 440;
@@ -117,6 +117,7 @@ function knobArt(who: 'mini' | 'big', seed: number) {
 		ticks,
 		pointer: stroke([[cx, cy - r * 0.15], [cx, cy - r * 0.78]], { w: who === 'mini' ? 1.3 : 2.2, seed: seed + 3, over: 0 }),
 		origin: `${cx}px ${cy}px`,
+		grip: `left:${r1((100 * (cx - r - 6)) / WIDTH)}%;top:${r1((100 * (cy - r - 6)) / HEIGHT)}%;width:${r1((100 * (2 * r + 12)) / WIDTH)}%;height:${r1((100 * (2 * r + 12)) / HEIGHT)}%`,
 	};
 }
 
