@@ -72,6 +72,13 @@ local graph scopes. A keyed loop item keeps its component instances, local
 `state()`, `computed()` nodes, async nodes, DOM updates, and event wiring
 attached to the same logical item across reorder, insert, and delete operations.
 
+Today a row gets its own `state()` through a component: `state()`,
+`computed()` or `storage()` written directly in a `@for` body is the build error
+`MARKLESS_STATE_CREATION_SITE_UNSTABLE` ("inside a @for row"), because one
+declaration there would be one cell shared by every row. The fix is a row
+component in its own file (`<BookRow book={book} />`) that declares the state;
+each instance keeps it with the row's key.
+
 Unkeyed `@for` is positional. That is acceptable for static/stateless output,
 but any loop body that creates resumable graph identity must either provide a
 stable domain key or explicitly key by position (`index i; key i`) when state

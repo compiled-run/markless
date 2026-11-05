@@ -505,7 +505,7 @@ export function moduleScopeElementDiagnostic(
 export function unstableStateCreationSiteDiagnostic(input: {
 	readonly name: string;
 	readonly apiName: 'state' | 'computed' | 'storage';
-	readonly site: 'computed' | 'handler' | 'branch' | 'loop';
+	readonly site: 'computed' | 'handler' | 'branch' | 'loop' | 'row';
 	readonly init: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
@@ -656,7 +656,7 @@ function helperReturnUnsupportedDiagnostic(input: {
 }
 
 function unstableCreationSiteText(
-	site: 'computed' | 'handler' | 'branch' | 'loop',
+	site: 'computed' | 'handler' | 'branch' | 'loop' | 'row',
 	name: string,
 ): { readonly message: string; readonly why: string; readonly fix: string } {
 	return {
@@ -679,6 +679,11 @@ function unstableCreationSiteText(
 			message: 'inside a loop',
 			why: 'A loop body can run any number of times, so one authored declaration cannot map to one stable payload cell.',
 			fix: 'Declare component-level state outside the loop; use keyed repeat row graph scope when per-row state is supported.',
+		},
+		row: {
+			message: 'inside a @for row',
+			why: 'One declaration in a row body would be one cell for every row: pressing one row would change them all.',
+			fix: "Move the row into a component in its own file and declare the cell there, e.g. <BookRow book={book} />. Each row then gets its own value, and it stays with the row's key when the list reorders.",
 		},
 	}[site];
 }
