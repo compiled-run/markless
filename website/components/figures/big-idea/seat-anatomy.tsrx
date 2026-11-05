@@ -146,7 +146,8 @@ export default function SeatAnatomy() @{
 					dragX = 0;
 					dragY = 0;
 				}}
-				onPointerleave={() => {
+				onPointerleave={(event) => {
+					if (event.pointerType === 'touch') return;
 					hover = '';
 					held = false;
 				}}

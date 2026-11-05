@@ -2606,7 +2606,7 @@ try {
 		for (const [path, said] of [
 			['', '131 kB executed at load'],
 			['the-big-idea', 'got the same plan'],
-			['compiler', 'The file was cut into frames before anything ran'],
+			['compiler', 'three pieces'],
 			['payload', 'That is everything the server added'],
 			['resuming', 'nobody replayed the game from move one'],
 			['state-graph', 'only that line changed'],
@@ -2614,9 +2614,12 @@ try {
 			['native-targets', 'both the iOS and the macOS button now read Count 1'],
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
-			const figure = page.locator('figure.anatomy').first();
-			await figure.locator('.stage').focus();
-			await page.keyboard.press('Enter');
+			const figure = page.locator('figure.anatomy, figure.explorer').first();
+			const stage = figure.locator('.stage');
+			if (await stage.count()) {
+				await stage.focus();
+				await page.keyboard.press('Enter');
+			}
 			await see(figure.locator('[aria-live]').first(), (text) => text.includes(said), `the ${path} figure answers a press`);
 		}
 		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });

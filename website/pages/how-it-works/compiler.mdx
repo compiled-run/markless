@@ -3,61 +3,50 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import PassList from '../../components/figures/compiler/pass-list.tsrx';
-import BenchAnatomy from '../../components/figures/compiler/bench-anatomy.tsrx';
+import ExplorerAnatomy from '../../components/figures/compiler/explorer-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# What the compiler writes for the cart
+# What the compiler writes
 
-<PageMeta time="2 min" assumes="state, events" />
+<PageMeta time="3 min" assumes="state, events" />
 
-<Subtitle text="The compiler cuts one .tsrx file into small pieces with stable IDs: one function per event and per update, and a record that ties them to elements." />
+<Subtitle text="The compiler turns one .tsrx file into small pieces with stable IDs, before the page runs anywhere." terms="events" />
 
-<BenchAnatomy />
-
-Press the drawing to make the cut. It all happens at build time, before the page runs anywhere. Every excerpt below is the real output of `compileTsrxModule()` from `@markless/compiler` for the cart:
-
-```tsrx title="cart.tsrx"
+```tsrx title="chat.tsrx"
 import { state } from '@markless/core';
 
-export default function Cart() @{
-	let bags = state(0);
+export default function Chat() @{
+	let draft = state('Hi');
 
-	<section>
-		<p>In your cart: {bags} bags</p>
-		<button onClick={() => bags++}>Add to cart</button>
-	</section>
+	<p>Typing: {draft}</p>
 }
 ```
 
-## The cut is a chain of passes
+**`draft`** becomes the node `state:draft`. **`{draft}`** becomes `symbol:1`, a small function that sets that one line's text when `draft` changes.
 
-A *pass* is one small step with named inputs and outputs. The first one runs the analyzer over the file and writes the *semantic graph*: every piece of state, element, read and write, with what each one means. If the chain itself is broken, the compile stops with `MARKLESS_COMPILER_PASS_GRAPH_INVALID`.
+## Every line becomes named pieces
 
-The 16 passes, in the order they run:
+A *symbol* is one small function with a stable ID, in a module of its own:
+
+- each `state()` becomes a node, like `state:draft`
+- each handler becomes a symbol, like `symbol:0`
+- each spot that shows a value becomes an update symbol, like `symbol:1`
+
+Hover a line, then press **Edit** and change it. The compiler runs in your browser:
+
+<ExplorerAnatomy />
+
+- Each piece points back at the line it came from.
+- Change `state('Hi')` to a plain `'Hi'`: the node and its update disappear, and the build names the handler that still writes it.
+
+## The pieces are planned by a chain of passes
+
+A *pass* is one small step with named inputs and outputs. The first one runs the analyzer and writes the *semantic graph*: every value, element, read and write in the file. The 16 passes, in the order they run:
 
 <PassList />
 
-## Each frame is a symbol
+For a component this simple, the browser module is a *direct module*: it keeps `state:draft` in a plain `Map` and puts the listener on the input itself. Props, child components, a scoped `<style>` or a `computed()` send a component down the general path instead.
 
-A *symbol* is one function with a stable ID, in a module of its own. The click became `symbol:0`, an update to the graph node `state:bags`:
-
-```js title="symbol:0"
-import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
-/* scalar leaf marker: context.graph.update({ */
-export function symbol_0(context) {
-  return marklessWriteScalar(context, { graphNodeId: "state:bags", returnValue: "next", update(value) {
-    return Number(value) + 1;
-  } });
-}
-```
-
-
-The text became `symbol:1`, which returns one `setText` for `h1`, the paragraph. The view record is the edit list: a click on `h2` runs `symbol:0`, and a change to `state:bags` runs `symbol:1` against `h1`.
-
-## Two render modules
-
-The same compile writes a server module, `marklessRenderSsr`, and a browser module. For a component this simple, the browser one is a *direct module*: it keeps `state:bags` in a plain `Map`, clones the elements from a template and puts the click listener on the button. Props, child components, a scoped `<style>`, a `computed()` or an async block each send a component down the general path instead.
-
-[The payload](/how-it-works/payload) shows what the server module sends.
+[The payload](/how-it-works/payload) shows what a server sends with these pieces.

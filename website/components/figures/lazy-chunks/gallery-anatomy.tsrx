@@ -79,7 +79,8 @@ export default function GalleryAnatomy() @{
 				if (event.key === 'Escape') reset();
 			}}
 		>
-			<svg class="scene" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true" onPointerleave={() => {
+			<svg class="scene" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true" onPointerleave={(event) => {
+				if (event.pointerType === 'touch') return;
 				hover = '';
 				pointed = '';
 			}}>

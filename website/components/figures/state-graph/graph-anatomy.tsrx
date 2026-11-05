@@ -90,7 +90,9 @@ export default function GraphAnatomy() @{
 					const key = keyOf(event.target);
 					if (key) hover = key;
 				}}
-				onPointerleave={() => (hover = '')}
+				onPointerleave={(event) => {
+					if (event.pointerType !== 'touch') hover = '';
+				}}
 			>
 				@for (const layer of art.layers; key layer.key) {
 					<path class={layer.cls} d={layer.d} />
