@@ -4,6 +4,7 @@ import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
 import {
+	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
@@ -42,6 +43,7 @@ import {
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import { propsRestSignature } from './spread-event-guard.ts';
 import { inlineHandlerRenderLocals, liftArmRenderLocalValue } from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
@@ -302,6 +304,22 @@ function componentPropBindings(
 				sourceSpan: sourceSpan(callback, state.filename),
 				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
 				...(syncPolicy ? { syncPolicy } : {}),
+			});
+			continue;
+		}
+
+		// A received handler handed on as is (`onClick={onPress}`) runs as this instance's `(event) => onPress?.(event)` would.
+		const relayed =
+			expression && isEventAttribute(name)
+				? relayedHandlerSource(expression, source, scope, state)
+				: undefined;
+		if (relayed && childSpreadsProp(name, link, state, childComponentName)) {
+			props.push({
+				name,
+				source: relayed.source,
+				kind: 'callback',
+				parameters: [relayed.parameter],
+				sourceSpan: span,
 			});
 			continue;
 		}
@@ -656,6 +674,36 @@ function spreadForwardsProp(
 		(spread) =>
 			!spread.destructuredNames.includes(propName) && !spread.excludeNames.includes(propName),
 	);
+}
+
+function relayedHandlerSource(
+	expression: AnyNode,
+	source: string,
+	scope: GraphReadScope,
+	state: WalkState,
+): { readonly source: string; readonly parameter: string } | undefined {
+	if (expression.type !== 'Identifier' || repeatRowBindsName(source, state)) return undefined;
+	const graph = resolveGraphPath(source, scope.bindings, scope.aliases);
+	if (graph?.binding.kind !== 'prop' || graph.path.length !== 1) return undefined;
+	const parameter = source === 'event' ? 'domEvent' : 'event';
+	return { source: `(${parameter}) => ${source}?.(${parameter})`, parameter };
+}
+
+function childSpreadsProp(
+	propName: string,
+	link: { readonly childComponentName: string; readonly importSource?: string } | undefined,
+	state: WalkState,
+	fallbackChildName: string,
+): boolean {
+	if (link?.importSource) return spreadForwardsProp(propName, link, state, fallbackChildName);
+	const childName = link?.childComponentName || fallbackChildName;
+	for (const statement of asNodes(state.semantic().ast.body as unknown)) {
+		const component = getComponentFunction(statement);
+		if (component?.name !== childName) continue;
+		const signature = propsRestSignature(component.node);
+		return Boolean(signature && !signature.destructuredNames.has(propName));
+	}
+	return false;
 }
 
 function servedComponentNames(
