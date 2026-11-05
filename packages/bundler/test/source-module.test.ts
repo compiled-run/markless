@@ -643,7 +643,7 @@ test('specialized scalar dispatcher carries sync policy state through full fallb
 		'await marklessFullResumeHandoff({ ...input, document: input.root, syncPolicyAlreadyApplied });',
 	);
 	expect(resumeCode).toContain(
-		'await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+		'await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 	);
 	expect(resumeCode).not.toContain('__marklessCsrBootstrapReplayed');
 });

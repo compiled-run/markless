@@ -234,7 +234,7 @@ function renderMdxResumeHandler(): string[] {
 				'  await runtime.dispatch(input.event, marklessMdxDispatchOptions(input));',
 				'}',
 				'function marklessMdxDispatchOptions(input) {',
-				'  return { syncPolicyAlreadyApplied: true, propagationStopped: input.propagationStopped, ignoreUnmatched: input.eventRecord == null };',
+				'  return { syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true, propagationStopped: input.propagationStopped === true, ignoreUnmatched: input.eventRecord == null };',
 				'}',
 			].join('\n'),
 		),
