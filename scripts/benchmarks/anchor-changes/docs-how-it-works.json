@@ -11,6 +11,18 @@
 			"delta": 3048,
 			"reason": "app code, not framework: the docs home prefetches the rewritten How it works pages, whose live cart blocks, PassList and the State graph page's MarginNotes column are new page modules; JS executed at load stayed within its anchor and only downloaded bytes failed; +3045 B gzip downloaded on PR #463 run 41916706848 over main 3650b2f99, and +3048 on run 41919848836 over a newer main",
 			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 401,
+			"reason": "app code, not framework: the eight How it works figures are new page modules, and their entries grow the docs site's shared symbol and route tables that run at load (built locally against merge base 109227ffa: the same 61 files load, two shared table chunks grow by 8 and 20 bytes, no framework module changes); +401 chars on PR #463 runs 41976667780 and 41980754376",
+			"date": "2026-11-05"
 		}
 	]
 }
