@@ -529,11 +529,15 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			const site = lastBranchSiteId(state);
 			const test = node.test as AnyNode | undefined;
 			withArmScope(state, site, () => {
-				withArmGuard(state, test && { kind: 'if', test, holds: true }, () =>
-					walkBranch(node.consequent as AnyNode | undefined, state),
+				withArm(state, site, 0, () =>
+					withArmGuard(state, test && { kind: 'if', test, holds: true }, () =>
+						walkBranch(node.consequent as AnyNode | undefined, state),
+					),
 				);
-				withArmGuard(state, test && { kind: 'if', test, holds: false }, () =>
-					walkBranch(node.alternate as AnyNode | undefined, state),
+				withArm(state, site, 1, () =>
+					withArmGuard(state, test && { kind: 'if', test, holds: false }, () =>
+						walkBranch(node.alternate as AnyNode | undefined, state),
+					),
 				);
 			});
 			collectConditionalBranchText(node, state);
@@ -548,7 +552,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				switchCase.test ? [switchCase.test as AnyNode] : [],
 			);
 			withArmScope(state, site, () => {
-				for (const switchCase of asNodes(node.cases)) {
+				for (const [arm, switchCase] of asNodes(node.cases).entries()) {
 					walk(switchCase.test as AnyNode | undefined, state);
 					const caseBranchId = `branch:${state.nextBranchId++}`;
 					const caseTest = switchCase.test as AnyNode | undefined;
@@ -558,11 +562,13 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 							? { kind: 'case', discriminant, test: caseTest }
 							: { kind: 'default', discriminant, tests: caseTests });
 					state.currentBranchScopeIds.push(caseBranchId);
-					withArmGuard(state, guard, () => {
-						for (const caseChild of asNodes(switchCase.consequent)) {
-							walkMarkupStatement(caseChild, state);
-						}
-					});
+					withArm(state, site, arm, () =>
+						withArmGuard(state, guard, () => {
+							for (const caseChild of asNodes(switchCase.consequent)) {
+								walkMarkupStatement(caseChild, state);
+							}
+						}),
+					);
 					state.currentBranchScopeIds.pop();
 				}
 			});
@@ -762,6 +768,12 @@ function withArmScope(state: WalkState, branchSiteId: string | null, run: () => 
 	run();
 	if (branchSiteId) state.currentBranchSiteIds.pop();
 	state.currentArmScope = previous;
+}
+
+function withArm(state: WalkState, branchSiteId: string | null, arm: number, run: () => void): void {
+	if (branchSiteId) state.currentBranchArms.push({ branchSiteId, arm });
+	run();
+	if (branchSiteId) state.currentBranchArms.pop();
 }
 
 function withArmGuard(state: WalkState, guard: ArmGuard | undefined, run: () => void): void {

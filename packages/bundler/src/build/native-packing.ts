@@ -18,6 +18,7 @@ import {
 	interactionClosuresAsset,
 	type InteractionDemandSource,
 	type RouteInteractionClosures,
+	type UnreachableChildren,
 } from './interaction-closures.ts';
 import type { RuntimeDemandMapManifest } from '../types.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../execution-log.ts';
@@ -38,6 +39,7 @@ import {
 	sourceForTriggerGroupVirtualImporter,
 } from '../virtual-ids.ts';
 import { isServedRenderDataRequest } from '../served-render-data.ts';
+import { marklessVirtualModuleSourceFile } from '../transform.ts';
 
 // Leading V8 compile hint: the browser compiles the whole pack while streaming it, not at first use.
 export const EAGER_COMPILE_HINT = '//# allFunctionsCalledOnLoad';
@@ -67,6 +69,7 @@ export function nativePackingPlugins(
 	demandSources: () => Iterable<InteractionDemandSource> = () => [],
 	directCsrOnly: () => boolean = () => false,
 	maxPackBytes: () => number | undefined = () => undefined,
+	unreachableChildren?: UnreachableChildren,
 ): NativePackingPlugin[] {
 	let groups = new Map<string, string>();
 	let routeSets = new Map<string, ReadonlyArray<string>>();
@@ -103,6 +106,7 @@ export function nativePackingPlugins(
 						dependencies: readonly string[];
 						dynamicDependencies: readonly string[];
 						source?: string;
+						owner?: string;
 						reachedFrom?: string;
 						navigationOnly?: boolean;
 						firstEvent?: boolean;
@@ -143,6 +147,10 @@ export function nativePackingPlugins(
 						dependencies: info.importedIds,
 						dynamicDependencies: info.dynamicallyImportedIds,
 						source: clientRenderOnly ? undefined : source,
+						owner:
+							clientRenderOnly || !source
+								? (source ?? marklessVirtualModuleSourceFile(id, root()) ?? undefined)
+								: undefined,
 						reachedFrom: renderDataReachedFromQuery(id),
 						size: info.code?.length ?? 0,
 						app: isAppModule(id, root()),
@@ -195,6 +203,7 @@ export function nativePackingPlugins(
 					routes,
 					demand: demandSources(),
 					landingArmsServed: routeSources.size > 0,
+					...(unreachableChildren ? { unreachableChildren } : {}),
 				});
 				// Entry-rooted builds resolve symbols through their source's symbol chunk, so their first use counts as unknown.
 				partitioned = routeSources.size > 0;

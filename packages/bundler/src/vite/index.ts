@@ -199,6 +199,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			adoptClientBuildHandoff: MarklessRolldownPluginApi['adoptClientBuildHandoff'];
 			runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 			directCsrOnly: MarklessRolldownPluginApi['directCsrOnly'];
+			unreachableChildren: MarklessRolldownPluginApi['unreachableChildren'];
+			recordLiteralComponentInstances: MarklessRolldownPluginApi['recordLiteralComponentInstances'];
 		};
 	};
 	const packingPlugins = nativePackingEnabled(options)
@@ -208,6 +210,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				() => basePlugin.api.runtimeDemandSources(),
 				() => basePlugin.api.directCsrOnly(),
 				() => chunkSizeWarningBytes,
+				(files, roots, importers) => basePlugin.api.unreachableChildren(files, roots, importers),
 			)
 		: undefined;
 	const packOwnership = packingPlugins?.[0]?.api;
@@ -826,6 +829,7 @@ type MarklessVitePluginApi = {
 	runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
 	runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 	declareRouteModules: MarklessRolldownPluginApi['declareRouteModules'];
+	recordLiteralComponentInstances: MarklessRolldownPluginApi['recordLiteralComponentInstances'];
 	/** A host plugin names the root-relative page module it renders at a URL, so a dev edit reloads only the open pages it reached. */
 	declarePageForUrl: (pageForUrl: (url: string) => string | undefined) => void;
 	registerBundleGraphAdder?: (adder: BundleGraphAdder) => void;
