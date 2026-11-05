@@ -253,6 +253,36 @@ mistakes here, they are unrepresentable. (Prior art: Ryan Carniato's
 derived-first direction for Solid 2.0 — "you don't need effects; computed is
 your effect.")
 
+### A received callback as the handler
+
+A component may hand a callback prop it received straight to an event prop, on
+a native element or on a part it renders:
+
+```tsrx
+function Key({ onPress }: { readonly onPress?: (event: MouseEvent) => void }) @{
+  <button onClick={onPress}>Go</button>
+}
+```
+
+The semantic graph pass reads `onClick={onPress}`, where `onPress` resolves to
+one of the component's own props, as the handler
+`(event) => onPress?.(event)` (the parameter is renamed when the prop itself is
+called `event`). Everything downstream sees an ordinary handler that invokes a
+callback prop, so:
+
+- each instance runs the callback its own parent passed, with the DOM event as
+  the callback's first argument, and its writes land on the graph nodes of the
+  parent that passed it, including widget-scoped `shared()` state;
+- an instance whose parent passed no callback runs nothing;
+- a parent that passes something other than a callback, such as a function
+  call's result or a `let`, still stops the build with
+  `MARKLESS_CAPTURE_OPAQUE_PROP`, as it does for any handler reading that prop.
+
+Only a bare identifier naming a prop is rewritten. A `@for` row binding of the
+same name, a component-local function, or any other expression keeps its own
+meaning. Validated by `packages/vitest-browser/browser/direct-callback.test.ts`
+(CSR and SSR resume) and `packages/compiler/test/direct-callback-prop.test.ts`.
+
 ### Event handler arrays and sync policy
 
 Event and behavior props accept either one expression or an array of expressions:
