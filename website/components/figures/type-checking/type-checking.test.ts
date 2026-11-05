@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { drawing, ERRORS, VARIANTS } from './editor.ts';
+import { CHECK, drawing, ERRORS, VARIANTS, wrap } from './editor.ts';
 
 const art = drawing();
 const page = readFileSync(new URL('../../../pages/tooling/type-checking.mdx', import.meta.url), 'utf8');
@@ -29,6 +29,17 @@ export const art: ReturnType<typeof drawing> = ${JSON.stringify(art, null, '\t')
 		expect(ERRORS.titel).toMatchObject({ code: D.Cannot_find_name_0_Did_you_mean_1!.code, message: fill(D.Cannot_find_name_0_Did_you_mean_1!.message, 'titel', 'title') });
 		expect(text(VARIANTS.size.wrong)).toContain('<Avatar size="large" />');
 		expect(text(VARIANTS.titel.wrong)).toContain('{titel}');
+	});
+
+	// From the repo checker on the same card.tsrx text: TypeScript counts a tab as one column.
+	it('prints the error lines npm run check prints, at their real line and column', () => {
+		expect(CHECK.errors.map((e) => e.text)).toEqual([
+			"pages/card.tsrx(8,11): error TS2322: Type 'string' is not assignable to type 'number'.",
+			"pages/card.tsrx(9,8): error TS2552: Cannot find name 'titel'. Did you mean 'title'?",
+		]);
+		expect(CHECK.pass).toHaveLength(2);
+		for (const line of [...CHECK.pass, ...CHECK.errors.map((e) => e.text)]) expect(wrap(line).join(' ')).toBe(line);
+		expect(art.terminal.shift).toBeGreaterThan(0);
 	});
 
 	it('quotes the same messages on the page, with no internals', () => {

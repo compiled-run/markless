@@ -92,7 +92,7 @@ Add or remove it later with `create-markless agents <add|remove> [--agents <list
 | `npm run dev` | `vp dev` | Starts the dev server on `http://localhost:3000`. |
 | `npm run build` | `vp build` | Builds the app and its server into `.output/`. |
 | `npm run preview` | `vp preview` | Serves the build. |
-| `npm run check` | `vp check` | Checks the formatting and lints the code. |
+| `npm run check` | `vp check` | Checks formatting, lints, and type-checks `.tsrx` files (type checks from the next release). |
 | `npm run doctor` | `node scripts/markless-doctor.mjs` | Checks the Markless packages and `tsconfig.json`, then runs `vp build`. Add `-- --no-build` to skip the build. |
 | `npm run fmt` | `vp fmt` | Formats the code. |
 | `npm run test` | `vp test` | Runs Vitest. |

@@ -27,12 +27,12 @@ export default function Card() @{
 
 ## Type errors show up as squiggles
 
-A *squiggle* is the red wavy line your editor draws under a mistake, with TypeScript's message on hover. Hover a red line, then click the wrong value to fix it:
+A *squiggle* is the red wavy line your editor draws under a mistake, with TypeScript's message on hover. Click an error in the terminal to jump to it, then click the wrong value to fix it:
 
 <EditorFigure />
 
 - Each fix clears its own squiggle.
-- The rest of the file stays as it was.
+- Its line leaves the terminal, until only the `pass` lines remain.
 - The check runs on every file you open, once [your editor is set up](/tooling/editor-setup).
 
 ## The check catches real mistakes
@@ -45,8 +45,18 @@ These are the messages TypeScript gives in a `.tsrx` file:
 - **An attribute HTML doesn't have**, like `className` (write `class`).
 - **A handler whose code doesn't type-check.**
 
-## The editor is the only place it runs
+## `npm run check` checks the whole app
 
-Today your editor is the only place `.tsrx` types are checked; `npm run check` doesn't check them yet. `npm run build` stops on Markless errors, but a wrong prop still builds, so clear the red lines before you ship.
+From the next Markless release, `npm run check` type-checks every `.tsrx` file too, so CI can run the same check on each pull request:
+
+```text title="terminal"
+$ npm run check
+pass: All 8 files are correctly formatted (346ms, 18 threads)
+pass: Found no warnings or lint errors in 2 files (299ms, 18 threads)
+pages/card.tsrx(8,11): error TS2322: Type 'string' is not assignable to type 'number'.
+pages/card.tsrx(9,8): error TS2552: Cannot find name 'titel'. Did you mean 'title'?
+```
+
+Each error gives the file, the line and the column. It exits with code 2 until you fix them, then prints only the two `pass` lines. `npm run build` still stops only on Markless errors, so a wrong prop builds.
 
 [Editor setup](/tooling/editor-setup) turns the check on.
