@@ -26,6 +26,7 @@ import type {
 	SemanticLocalDeclaration,
 	SemanticMarkupArtifact,
 	SemanticOverlay,
+	SemanticBranchArm,
 	SemanticBranchSite,
 	SemanticStateRead,
 	SemanticStateWrite,
@@ -139,6 +140,7 @@ export type WalkState = {
 	currentBranchScopeIds: string[];
 	/** The `branch-site:` ids of the @if/@switch blocks enclosing the walk, outermost first. */
 	currentBranchSiteIds: string[];
+	currentBranchArms: SemanticBranchArm[];
 	currentKeyedRepeatScopeIds: string[];
 	/** Source span of each keyed repeat's item declaration, by repeat id. */
 	readonly keyedRepeatItemSpans: Map<string, { readonly start: number; readonly end: number }>;
@@ -294,6 +296,7 @@ export function createWalkState(input: {
 		currentStyleScopeClass: null,
 		currentBranchScopeIds: [],
 		currentBranchSiteIds: [],
+		currentBranchArms: [],
 		currentKeyedRepeatScopeIds: [],
 		keyedRepeatItemSpans: new Map(),
 		currentHostNodeId: null,

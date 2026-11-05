@@ -73,9 +73,19 @@ export type InteractionClosureModule = {
 	readonly dependencies: readonly string[];
 	readonly dynamicDependencies?: readonly string[];
 	readonly source?: string;
+	// The file whose component this module serves, where `source` is left unset (render data only a client render imports).
+	readonly owner?: string;
 	readonly reachedFrom?: string;
 	readonly reExportsOnly?: boolean;
 };
+
+/** Per component file of a route: the child files it imports only for arms no caller on the route renders. */
+export type UnreachableChildren = (
+	files: ReadonlySet<string>,
+	roots: ReadonlySet<string>,
+	// Per file: the other files on the route that import one of its modules.
+	importers: ReadonlyMap<string, ReadonlySet<string>>,
+) => ReadonlyMap<string, ReadonlySet<string>>;
 
 export type InteractionDemandSource = {
 	// The emitted module's source request; the file is everything before `?`.
@@ -163,8 +173,15 @@ export function computeInteractionClosures(input: {
 	readonly demand: Iterable<InteractionDemandSource>;
 	// Landings stream every async boundary's arm, so one settles in the browser only when a control's writes reach its reads.
 	readonly landingArmsServed?: boolean;
+	readonly unreachableChildren?: UnreachableChildren;
 }): RouteInteractionClosures[] {
 	const { modules } = input;
+	const fileOf = (id: string) => {
+		const module = modules.get(id);
+		return module?.source?.split('?')[0] ?? module?.owner;
+	};
+	// Imports a route never follows: from a component into a child only its ruled-out arms render.
+	let cut: (from: string, to: string) => boolean = () => false;
 	// Every route's walks ask both of the same few thousand ids, and each answer normalizes a path.
 	const authoredLazy = memoById(isAuthoredLazyImport);
 	const runtimeIdOf = memoById((id: string) => runtimeModuleIdFromOrigin(id.split('?')[0]!));
@@ -249,6 +266,7 @@ export function computeInteractionClosures(input: {
 					if (isSymbolOnlySourceRequest(sibling)) pending.push([sibling, inside]);
 			for (const dependency of module.dependencies) pending.push([dependency, inside]);
 			for (const target of module.dynamicDependencies ?? []) {
+				if (cut(id, target)) continue;
 				if (routeOf.has(target) && routeOf.get(target) !== (inside ?? route)) continue;
 				if (!routeOf.has(target) && authoredLazy(target)) continue;
 				if (isClientRenderDataEntry(target)) continue;
@@ -283,6 +301,31 @@ export function computeInteractionClosures(input: {
 		return ids;
 	};
 
+	const routeCut = (roots: readonly string[], reach: ReadonlySet<string>) => {
+		if (!input.unreachableChildren) return () => false;
+		const files = new Set<string>();
+		const importers = new Map<string, Set<string>>();
+		for (const id of reach) {
+			const file = fileOf(id);
+			if (!file) continue;
+			files.add(file);
+			const module = modules.get(id)!;
+			for (const target of [...module.dependencies, ...(module.dynamicDependencies ?? [])]) {
+				const imported = reach.has(target) ? fileOf(target) : undefined;
+				if (imported && imported !== file)
+					(importers.get(imported) ?? importers.set(imported, new Set()).get(imported)!).add(file);
+			}
+		}
+		const rootFiles = new Set(roots.flatMap((id) => fileOf(id) ?? []));
+		const unreachable = input.unreachableChildren(files, rootFiles, importers);
+		if (!unreachable.size) return () => false;
+		return (from: string, to: string) => {
+			const children = unreachable.get(fileOf(from) ?? '');
+			const child = children && fileOf(to);
+			return !!child && children.has(child);
+		};
+	};
+
 	const result: RouteInteractionClosures[] = [];
 	for (const route of [...input.routes.keys()].sort()) {
 		const roots = input.routes.get(route)!;
@@ -298,12 +341,25 @@ export function computeInteractionClosures(input: {
 			pending.push(...module.dependencies, ...(module.dynamicDependencies ?? []));
 			if (module.source) pending.push(...(siblings.get(module.source) ?? []));
 		}
+		cut = routeCut(roots, reach);
+		// The files whose components can render on this route: reach without the imports it never follows.
+		const landed = new Set<string>();
+		pending.push(...roots);
+		while (pending.length) {
+			const id = pending.pop()!;
+			if (landed.has(id) || !reach.has(id)) continue;
+			const module = modules.get(id)!;
+			landed.add(id);
+			for (const target of [...module.dependencies, ...(module.dynamicDependencies ?? [])])
+				if (!cut(id, target)) pending.push(target);
+			if (module.source) pending.push(...(siblings.get(module.source) ?? []));
+		}
 		const files = new Set<string>();
-		for (const id of reach) {
+		for (const id of landed) {
 			const file = symbolVirtualModuleSourceFile(normalizeVirtualId(id));
 			if (file) files.add(file);
 		}
-		for (const id of reach) {
+		for (const id of landed) {
 			const file = modules.get(id)?.source?.split('?')[0];
 			if (file && demand.has(file)) files.add(file);
 		}

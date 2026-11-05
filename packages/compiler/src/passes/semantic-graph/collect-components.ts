@@ -175,6 +175,7 @@ export function collectComponentEdge(
 		},
 		branchScopeIds: [...state.currentBranchScopeIds],
 		branchSiteIds: [...state.currentBranchSiteIds],
+		...(state.currentBranchArms.length > 0 ? { branchArms: [...state.currentBranchArms] } : {}),
 		keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 	});
 
