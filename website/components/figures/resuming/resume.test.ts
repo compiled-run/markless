@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { legal, nearestSquare, noteOf, PIECES, placeOf, serverMove, sheetLines, START, stepped } from './model.ts';
+import { legal, nearestSquare, noteOf, PIECES, placeOf, nextMove, sheetLines, START, stepped } from './model.ts';
 import { drawing, squareCentre } from './board.ts';
 
 const boardArt = drawing();
@@ -15,9 +15,9 @@ describe('the chess toy', () => {
 		expect(Object.keys(boardArt.squares)).toHaveLength(64);
 	});
 
-	it("plays the server's next move with the knight, and only the knight", () => {
-		expect(serverMove(START)).toBe('g5');
-		expect(serverMove({ ...START, wn: 'g5' })).not.toBe('');
+	it("plays the next move with the knight, and only the knight", () => {
+		expect(nextMove(START)).toBe('g5');
+		expect(nextMove({ ...START, wn: 'g5' })).not.toBe('');
 		expect(noteOf('wn', 'g5')).toBe('Ng5');
 		expect(noteOf('wp', 'e5')).toBe('e5');
 	});

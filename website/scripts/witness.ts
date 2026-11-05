@@ -2610,7 +2610,7 @@ try {
 			['payload', 'That is everything the server added'],
 			['resuming', 'nobody replayed the game from move one'],
 			['state-graph', 'reached only the two spots ruled to it'],
-			['lazy-chunks', 'was ordered and opened'],
+			['lazy-chunks', 'open-photo.js ran now'],
 			['native-targets', 'both the iOS and the macOS button now read Count 1'],
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });

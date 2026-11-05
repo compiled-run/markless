@@ -2,7 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import PassAnatomy from '../../components/figures/lazy-chunks/pass-anatomy.tsrx';
+import GalleryAnatomy from '../../components/figures/lazy-chunks/gallery-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -13,13 +13,13 @@ import PassAnatomy from '../../components/figures/lazy-chunks/pass-anatomy.tsrx'
 
 <Subtitle text="Downloading code and running it are two different costs, and Markless pays them at different times." />
 
-<PassAnatomy />
+<GalleryAnatomy />
 
-Press the drawing, or drag the ticket onto a tub. Both tubs arrived with the page; only the one that is ordered is opened. On a page, a tub is the code behind a handler, and the order is the first press.
+Open a photo or press Share. Both files were downloaded when the page loaded; each one runs only on its own click, and the network panel never fetches anything new.
 
-## What the cart page pays
+## What a small page pays
 
-Measured in Chromium for the [cart](/how-it-works/compiler) as a one-page `@markless/router` app (uncompressed, main at `2efb1c6e2`):
+Measured in Chromium for a one-page `@markless/router` app with one button and one line of text (uncompressed, main at `2efb1c6e2`):
 
 - **Executed at load:** 8.4 kB, four small inline scripts and the router's link script.
 - **Downloaded at load, not executed:** 23.6 kB, fetched with `modulepreload` at low priority.

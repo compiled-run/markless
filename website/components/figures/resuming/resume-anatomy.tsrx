@@ -1,6 +1,6 @@
-// A chess board left mid-game with three pieces and a score sheet. Press the board and the server's next move plays; hover, drag or use the keys to play the pieces yourself.
+// A chess board left mid-game with three pieces and a score sheet. Press the board and the next move plays; hover, drag or use the keys to play the pieces yourself.
 import { computed, state } from '@markless/core';
-import { describeMove, describeRefusal, legal, nearestSquare, noteOf, placeOf, serverMove, sheetLines, START, START_SAID, stepped } from './model.ts';
+import { describeMove, describeRefusal, legal, nearestSquare, noteOf, placeOf, nextMove, sheetLines, START, START_SAID, stepped } from './model.ts';
 import { art } from './board.art.ts';
 
 const BK = art.pieces.find((piece) => piece.id === 'bk')!;
@@ -86,7 +86,7 @@ export default function ResumeAnatomy() @{
 		<button
 			type="button"
 			class="stage"
-			aria-label="Chess board. Press for the server's next move; arrow keys move the chosen piece; 1, 2 and 3 choose a piece."
+			aria-label="Chess board. Press for the next move; arrow keys move the chosen piece; 1, 2 and 3 choose a piece."
 			onClick={() => {
 				if (Date.now() - dropped < 400) return;
 				if (hover) {
@@ -95,7 +95,7 @@ export default function ResumeAnatomy() @{
 					return;
 				}
 				touched = true;
-				const to = serverMove({ bk: bkSq, wp: wpSq, wn: wnSq });
+				const to = nextMove({ bk: bkSq, wp: wpSq, wn: wnSq });
 				if (to) play('wn', to);
 			}}
 			onKeyDown={(event) => {
@@ -242,7 +242,7 @@ export default function ResumeAnatomy() @{
 		</button>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a chess board on a desk, left mid-game with three pieces: a black king on g8, a white pawn on e4 and a
-			white knight on f3, with a blank score sheet beside it. Press the board, or Enter or Space, for the server's next move: only the
+			white knight on f3, with a blank score sheet beside it. Press the board, or Enter or Space, for the next move: only the
 			knight moves, to g5, and the move is written on the score sheet. Nothing else moves, and the board is never set up again. You can
 			also drag a piece, or choose one with 1, 2 or 3 and move it with the arrow keys; a legal move is played and written down, and an
 			illegal one slides back. Escape sets the board back.

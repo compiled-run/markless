@@ -3,7 +3,7 @@ export type Kind = 'pawn' | 'rook' | 'knight' | 'bishop' | 'queen' | 'king';
 export type Piece = { readonly id: string; readonly kind: Kind; readonly white: boolean; readonly square: string };
 export type Position = Readonly<Record<string, string>>;
 
-/** The position the server left: three pieces, mid-game. */
+/** The position worked out ahead of time: three pieces, mid-game. */
 export const PIECES: ReadonlyArray<Piece> = [
 	{ id: 'bk', kind: 'king', white: false, square: 'g8' },
 	{ id: 'wp', kind: 'pawn', white: true, square: 'e4' },
@@ -11,7 +11,7 @@ export const PIECES: ReadonlyArray<Piece> = [
 ];
 
 export const START: Position = Object.fromEntries(PIECES.map((p) => [p.id, p.square]));
-/** The server's next move when the reader presses the board. */
+/** The next move when the reader presses the board. */
 export const MOVER = 'wn';
 export const FROM = 'f3';
 export const TO = 'g5';
@@ -57,8 +57,8 @@ export function stepped(square: string, key: string): string {
 	return '';
 }
 
-/** The server's next move: the knight to g5, or its first other legal square if g5 is taken. */
-export function serverMove(position: Position): string {
+/** The next move: the knight to g5, or its first other legal square if g5 is taken. */
+export function nextMove(position: Position): string {
 	if (legal(position, MOVER, TO)) return TO;
 	const [f, r] = coords(position[MOVER]!);
 	for (const [a, b] of [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]] as const) {

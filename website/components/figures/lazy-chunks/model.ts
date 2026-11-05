@@ -1,11 +1,11 @@
-// The values the prep-tub figure shows and the sentences its live region speaks.
-export const TUBS = { add: 'Add', gift: 'Gift' } as const;
+// The photo gallery the Lazy chunks figure draws, and the network panel rows beside it.
+export const PHOTOS = ['Hills', 'Bay', 'Oak'] as const;
+export const FILES = { open: 'open-photo.js', share: 'share.js' } as const;
 
-export const describePass = (add: boolean, gift: boolean) => {
-	if (!add && !gift) return 'Two prep tubs, Add and Gift, arrived with the page and stand sealed.';
-	const open = [add ? 'Add' : '', gift ? 'Gift' : ''].filter(Boolean).join(' and ');
-	const sealed = !add ? 'Add' : !gift ? 'Gift' : '';
-	return `${open} ${add && gift ? 'were' : 'was'} ordered and opened. ${sealed ? `${sealed} arrived too, and stays sealed until it is ordered.` : 'Both arrived with the page; each opened only when ordered.'}`;
-};
+export type Ran = { readonly open: boolean; readonly share: boolean };
 
-export const NO_TUB = 'That order has no tub, so the ticket came back.';
+export function describeGallery(ran: Ran, shown: number, last: string): string {
+	if (!last) return 'A photo gallery. Its click code, open-photo.js and share.js, was downloaded with the page and has not run.';
+	if (last === 'share') return 'Share pressed: share.js ran now, from the copy downloaded with the page. Nothing new was downloaded.';
+	return `Opened ${PHOTOS[shown]}: open-photo.js ran now, from the copy downloaded with the page.${ran.share ? '' : ' share.js is still downloaded and waiting.'} Nothing new was downloaded.`;
+}
