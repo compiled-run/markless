@@ -73,6 +73,7 @@ const HOST_SCOPE = /r:[^:]*:|[cm]\d+:/g;
  * rendered widgets file the same compiled id and the same name; handing back
  * whichever registered last is the defect this registry exists to end, and it is
  * silent — the handler runs, touches a real element, and the wrong one moves.
+ * A reader naming its host scope gets the one filing made from that scope.
  */
 export function materializeElementHandles(
 	root: ResumeDomElement,
@@ -87,6 +88,7 @@ export function materializeElementHandles(
 		readonly handleId: string;
 		readonly keys: ReadonlyArray<string>;
 		readonly element: ResumeDomElement;
+		readonly scope: string;
 	};
 	// One element routinely carries more than one handle - a library part binds
 	// its family's own, and the consumer binds theirs onto the same tag - so a
@@ -140,7 +142,7 @@ export function materializeElementHandles(
 			if (filed) filed.push(element);
 			else byKey.set(key, [element]);
 		}
-		held.push({ handleId, keys, element });
+		held.push({ handleId, keys, element, scope });
 		heldByHostId.set(hostNodeId, held);
 	}
 	// The keys that answer as a SET, declared at `element<T[]>()` and stamped on
@@ -180,12 +182,16 @@ export function materializeElementHandles(
 		// One key, one answer, and the DECLARATION decides which kind: an array
 		// handle answers its live members in document order, every other handle
 		// answers the one element and still refuses when a key names two.
-		get(id) {
+		get(id, ownScope = '') {
 			if (!pluralKeys.has(id)) {
 				const filed = byKey.get(id);
 				if (!filed?.length) return undefined;
-				if (filed.length > 1) throw ambiguousElementHandleError(id, filed.length);
-				return connectedElement(root, filed[0]);
+				if (filed.length === 1) return connectedElement(root, filed[0]);
+				const own = [...heldByHostId.values()]
+					.flat()
+					.filter((held) => held.scope === ownScope && held.keys.includes(id));
+				if (own.length !== 1) throw ambiguousElementHandleError(id, filed.length);
+				return connectedElement(root, own[0]!.element);
 			}
 			const live = new Set<ResumeDomElement>();
 			for (const element of [...(byKey.get(id) ?? []), ...rowMembers(id)]) {

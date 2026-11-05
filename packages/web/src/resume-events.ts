@@ -176,10 +176,10 @@ function reachThroughRuntime(target: HandleElement | undefined): void {
 
 /** Wraps a dispatch's handle reader so every element it hands out focuses through the runtime. */
 export function marklessHandleFocusReader(
-	read: (handleIdOrName: string) => ResumeElementHandleValue,
-): (handleIdOrName: string) => ResumeElementHandleValue {
-	return (handleIdOrName) => {
-		const value = read(handleIdOrName);
+	read: (handleIdOrName: string, ownScope?: string) => ResumeElementHandleValue,
+): (handleIdOrName: string, ownScope?: string) => ResumeElementHandleValue {
+	return (handleIdOrName, ownScope) => {
+		const value = read(handleIdOrName, ownScope);
 		if (Array.isArray(value))
 			for (const item of value) reachThroughRuntime(item as HandleElement);
 		else reachThroughRuntime(value as HandleElement | undefined);
@@ -842,7 +842,10 @@ export function marklessRowScopedSymbolContext(
 	const qualify = graph.marklessQualifyGraphNodeId;
 	const read = context.getElementHandle;
 	if (!qualify || typeof read !== 'function') return { graph };
-	return { graph, getElementHandle: (handleIdOrName) => read(qualify(handleIdOrName)) };
+	return {
+		graph,
+		getElementHandle: (handleIdOrName, ownScope) => read(qualify(handleIdOrName), ownScope),
+	};
 }
 
 function recordDebugInteraction(root: Element, element: Element, eventName: string, record: any) {
