@@ -1,0 +1,64 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -53,
+			"reason": "a callback a component hands to a @markless/ui root by name or through its props spread becomes that component's own callback symbol, and family interfaces list their slot props",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 2665,
+			"reason": "a callback a component hands to a @markless/ui root by name or through its props spread becomes that component's own callback symbol, and family interfaces list their slot props",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -84,
+			"reason": "a callback a component hands to a @markless/ui root by name or through its props spread becomes that component's own callback symbol, and family interfaces list their slot props",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 2653,
+			"reason": "a callback a component hands to a @markless/ui root by name or through its props spread becomes that component's own callback symbol, and family interfaces list their slot props",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -722,
+			"reason": "a callback a component hands to a @markless/ui root by name or through its props spread becomes that component's own callback symbol, and family interfaces list their slot props",
+			"date": "2026-11-05"
+		}
+	]
+}
