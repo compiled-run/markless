@@ -312,6 +312,7 @@ async function startTriggerGroup(
 			type Handoff = {
 				readonly event: ResumeDomEvent;
 				readonly syncPolicyAlreadyApplied?: boolean;
+				readonly propagationStopped?: boolean;
 			};
 			(
 				adopted.root as typeof adopted.root & {
@@ -328,6 +329,7 @@ async function startTriggerGroup(
 					try {
 						await candidate.runtime.dispatch(handoff.event, {
 							syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+							propagationStopped: handoff.propagationStopped === true,
 						});
 						matched = true;
 					} catch (error) {

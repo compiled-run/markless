@@ -514,11 +514,11 @@ export function MenuItem({
 			? menu.checked.includes(item.value)
 				? 'true'
 				: 'false'
-			: false,
+			: undefined,
 	);
-	const hasPopup = computed(() => (item.submenu ? 'menu' : false));
+	const hasPopup = computed(() => (item.submenu ? 'menu' : undefined));
 	const isExpanded = computed(() =>
-		item.submenu ? (item.expanded ? 'true' : 'false') : false,
+		item.submenu ? (item.expanded ? 'true' : 'false') : undefined,
 	);
 
 	<div

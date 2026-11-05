@@ -15,6 +15,7 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
+		"./dom-attribute": "./src/dom-attribute.ts",
 		"./dom-journal": "./src/dom-journal.ts",
 		"./dom-update": "./src/dom-update.ts",
 		"./event-only-resume": "./src/event-only-resume.ts",
@@ -38,6 +39,10 @@
 			".": {
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
+			},
+			"./dom-attribute": {
+				"types": "./dist/dom-attribute.d.ts",
+				"default": "./dist/dom-attribute.js"
 			},
 			"./dom-journal": {
 				"types": "./dist/dom-journal.d.ts",

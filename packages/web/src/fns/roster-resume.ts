@@ -10,7 +10,11 @@ import {
 	MARKLESS_DEFERRED_COUNT_NAME,
 	MARKLESS_DEFERRED_COUNT_OPEN,
 } from '../ssr-data/deferred-count.ts';
-import { marklessInstancePath, marklessInstanceScopedElementHandle } from './instance-scope.ts';
+import {
+	marklessHostScopePath,
+	marklessInstancePath,
+	marklessInstanceScopedElementHandle,
+} from './instance-scope.ts';
 
 /**
  * The roster half that only a resumed page runs, in one module nothing eagerly
@@ -28,7 +32,6 @@ import { marklessInstancePath, marklessInstanceScopedElementHandle } from './ins
 // An element() binding's graph node id, restating the compiler's spelling for
 // the reason instance-scope.ts restates the serializer's grammar.
 const ELEMENT_BINDING_SEGMENT = '/element:';
-const INSTANCE_SEGMENT = /r:[^:]*:|[cpm]\d+:/g;
 
 type RosterComputedRecord = {
 	readonly graphNodeId: string;
@@ -76,7 +79,7 @@ export function createRosterPositionReader(input: {
 	const hostScope = input.computed.hostScope;
 	const scope =
 		hostScope === undefined
-			? hostScopePath(instancePath)
+			? marklessHostScopePath(instancePath)
 			: (/^(?:m\d+:)*/.exec(instancePath)?.[0] ?? '') + hostScope;
 	return (rosterGraphNodeId, handleGraphNodeId) => {
 		const roster = rosterOf?.(rosterGraphNodeId);
@@ -108,27 +111,6 @@ export function createRosterCountReader(input: {
 		const roster = rosterOf?.(rosterGraphNodeId);
 		return Array.isArray(roster) ? roster.length : 0;
 	};
-}
-
-/**
- * The host id space spelling of an instance path, which is the space element
- * handles are registered in.
- *
- * Both spaces number one component edge the same, but only symbol space carries
- * the edge a PROJECTED component was projected into: symbol `c0:p1:` and host
- * `c1:` name one rendered component. So a segment another segment projects out
- * of is dropped, and what is left is respelled as the host's own `c`.
- */
-function hostScopePath(instancePath: string): string {
-	const segments = instancePath.match(INSTANCE_SEGMENT) ?? [];
-	let scope = '';
-	for (let at = 0; at < segments.length; at++) {
-		const segment = segments[at]!;
-		// An island segment names no component edge, so no projection collapses it.
-		if (!segment.startsWith('m') && segments[at + 1]?.startsWith('p')) continue;
-		scope += segment.startsWith('p') ? 'c' + segment.slice(1) : segment;
-	}
-	return scope;
 }
 
 // A key naming more than one rendered part answers no part, and the caller has

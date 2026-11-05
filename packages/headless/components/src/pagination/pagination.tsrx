@@ -109,7 +109,7 @@ export function PaginationItemTrigger({
 	<button
 		{...rest}
 		type="button"
-		aria-current={pagination.page === item.value ? 'page' : false}
+		aria-current={pagination.page === item.value ? 'page' : undefined}
 		disabled={pagination.disabled}
 		ui-active={pagination.page === item.value}
 		onClick={(event) => {
@@ -126,8 +126,8 @@ export function PaginationItemLink({ children, onClick, ...rest }: PaginationIte
 	// An anchor has no `disabled`, so it stays focusable and says so with aria-disabled; goTo() is what refuses to move, and the href it keeps for crawlers is not followed.
 	<a
 		{...rest}
-		aria-current={pagination.page === item.value ? 'page' : false}
-		aria-disabled={pagination.disabled ? 'true' : false}
+		aria-current={pagination.page === item.value ? 'page' : undefined}
+		aria-disabled={pagination.disabled ? 'true' : undefined}
 		ui-active={pagination.page === item.value}
 		onClick={(event) => {
 			if (pagination.disabled) event.preventDefault();
