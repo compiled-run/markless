@@ -736,8 +736,10 @@ Markless versions, share state.
   an in-place navigation's next page, starts from the factory's initial values
   (plus component seeds). A value written in one request, or in a browser, is
   never seen by another request.
-- **Browser: one instance per document.** The first container that wakes on a
-  page creates the instance from its served values. From then on the instance
+- **Browser: one instance per document.** Until a value moves, the served values
+  are the instance, so a running container loads no binding code. The first
+  container whose value changes, or that receives another container's write,
+  creates the instance; a container that starts after that binds as it starts. From then on the instance
   holds the live value through every in-place (router) navigation, Back and
   Forward included, until the document is reloaded. A full reload starts again
   from the served values.

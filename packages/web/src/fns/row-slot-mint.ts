@@ -75,7 +75,9 @@ export function marklessRowSlotReader(
 					repeatItem: item,
 					repeatIndex: index,
 					...(rowOuter && { repeatId: authoredId ?? repeat.id, repeatOuter: rowOuter() }),
-					read: graphRead,
+					// A fresh read per call: the reader keys its body locals by this function, and a cached helper keeps the values it closed over.
+					read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
+						graphRead(graphNodeId, path),
 				},
 			);
 		};

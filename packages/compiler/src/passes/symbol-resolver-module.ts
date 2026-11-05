@@ -70,7 +70,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		...(rowed
 			? [
-					`import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';`,
+					`import { marklessRowBoundCallbackId, marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';`,
 					'',
 				]
 			: []),
@@ -154,7 +154,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
 		// The composer's instance path rides the callback id, so the callback runs on the page graph; this scope would qualify it twice.
-		'			return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });',
+		`			return context.invokeSymbol(${rowed ? 'marklessRowBoundCallbackId(bound, context.graph, route.callbackSymbolId)' : '(context.graph?.marklessInstancePath || "") + route.callbackSymbolId'}, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });`,
 		'		},',
 		'	};',
 		'}',

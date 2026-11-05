@@ -130,12 +130,15 @@ const resumeOnDemandEntries = [
 // reordered by the repeat that painted them: 30,849 -> 30,862 raw (the check itself is in the lazy resume-repeat-branch-arm.ts).
 // 2026-11-04: row code that arrives after a contenteditable deleted a row no longer re-inserts it when nothing wrote the
 // list: 30,862 -> 31,139 raw, one guard in resume-keyed-repeats.ts; the fixture builds' rendered module stays inside its +128 B budget.
+// 2026-11-05: a row value reading state that a gesture wrote before the row code arrived repaints instead of keeping the
+// served value: 31,139 -> 33,152 raw, the wiring-time read of what the server painted in resume-keyed-repeats.ts.
 // 2026-11-05: a row hands its nested repeats the elements its @if arms hold, so a list in an arm wires on every flip:
 // 31,139 -> 31,214 raw, one call in resume-keyed-repeats.ts; the fixture builds re-anchor the rendered module.
 // 2026-11-05: a row wrapping a component patches its wrapper's slots, and rows read the inputs a refreshing collection was
 // fetched with: 31,214 -> 31,426 raw, in resume-keyed-repeats.ts; minified 10,208 -> 10,308, gzip 4,140 -> 4,173 bytes
 // (rolldown, workspace packages external, same method both sides).
-const sourceByteLimit = 31426;
+// 2026-11-05: merge of the two changes above with the row-value repaint: 33,152 -> 33,417 raw.
+const sourceByteLimit = 33417;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

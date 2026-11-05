@@ -691,6 +691,14 @@ export type SemanticSharedInstance = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+export type SemanticRowLocalReads = {
+	readonly componentName: string;
+	readonly name: string;
+	readonly reads: ReadonlyArray<SemanticGraphDependency>;
+	/** Set when a local in the chain has no definition to follow; the row value is refused. */
+	readonly unfollowed?: true;
+};
+
 export type SemanticGraphDependency = {
 	readonly source: string;
 	readonly graphNodeId: string;
@@ -910,7 +918,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
 		| 'MARKLESS_ALLOW_STALE'
-		| 'MARKLESS_CALL_WRITES_ASSUMED';
+		| 'MARKLESS_CALL_WRITES_ASSUMED'
+		| 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED';
 	// The external TSRX parser fails before the graph pass runs; that diagnostic carries phase 'parse'.
 	readonly phase: 'parse' | 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
@@ -1046,6 +1055,8 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// Names a composite read with no route reads, resolved by scope analysis.
+	readonly readNames?: ReadonlyArray<string>;
 	// The expression as written, when `source` carries a body function spliced into its call.
 	readonly authoredSource?: string;
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
@@ -1438,6 +1449,8 @@ export type SemanticGraphArtifact = {
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;
+	/** Graph reads behind each component-body local a @for row value names, followed through helper definitions. */
+	readonly rowLocalReads?: ReadonlyArray<SemanticRowLocalReads>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 	/** Imported modules whose function write facts this compile was not given. */
 	readonly importedFunctionWriteRequests?: ReadonlyArray<string>;

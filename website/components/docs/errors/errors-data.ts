@@ -5635,6 +5635,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'This value in a @for row never updates in the browser: a Markless build error.',
+		printed: [
+			"MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED: This @for row over <itemName> <value>, which reads page state, but the row has a value on an element that stands between two nested @for lists in one parent element. After the page loads, the browser finds that element by counting from one end of its parent, and the nested lists' rows on both sides leave no count, so the row ships no markup to patch and keeps every value the server rendered.",
+			'The browser updates a @for row from one row of markup the payload carries. A row this cannot address or rebuild ships no markup, so every value in it stays as the server rendered it.',
+			'Wrap one of the two nested @for lists in its own element, so every element with a value in the row has nested rows on one side only.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -8117,6 +8140,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/web/src/fns/row-item-path.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-item-path.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'A @for row value reads a component-body local the compiler cannot follow: a Markless build error.',
+		printed: [
+			'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED: `<value>` in a @for row reads `<localName>`, and the compiler cannot find the definition that says which state it reads, so the row would keep the value it first rendered.',
+			"A row value repaints when a state or computed it reads changes. Reads through a helper are followed into the helper's definition; a local with no single definition the compiler can read has no reads to follow.",
+			'Declare `<localName>` once as a `const` or a function in the component body, or read the state through a `computed()`.',
+			'https://markless.dev/errors/MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
 			},
 		],
 		moreSources: 0,

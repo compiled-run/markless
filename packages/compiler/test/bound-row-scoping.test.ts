@@ -19,7 +19,9 @@ function claimManifest(file: string, result: Compiled): LinkedSymbolClaimManifes
 }
 
 // Compiles each module after the ones it imports, linking every edge into an earlier module.
-async function compileLinked(modules: ReadonlyArray<Module & { readonly edges?: Readonly<Record<string, string>> }>) {
+async function compileLinked(
+	modules: ReadonlyArray<Module & { readonly edges?: Readonly<Record<string, string>> }>,
+) {
 	const metadata = new Map<string, CaptureAnalysisArtifact>();
 	const manifests = new Map<string, LinkedSymbolClaimManifest>();
 	const compiled = new Map<string, Compiled>();
@@ -37,7 +39,11 @@ async function compileLinked(modules: ReadonlyArray<Module & { readonly edges?: 
 			symbolClaimsForSource: (source) => manifests.get(source),
 			claimsPublished: () => true,
 		});
-		const result = await compileTsrxModule({ filename: module.file, source: module.source, symbols: links.symbols });
+		const result = await compileTsrxModule({
+			filename: module.file,
+			source: module.source,
+			symbols: links.symbols,
+		});
 		metadata.set(module.file, result.captureAnalysis);
 		manifests.set(module.file, claimManifest(module.file, result));
 		compiled.set(module.file, result);
@@ -82,7 +88,10 @@ export default function Page() @{
 	<main><Frame><${items} list={list} /></Frame></main>
 }
 `,
-				edges: { 'component-edge:0': `/k/${part}.tsrx`, 'component-edge:1': `/k/${part}.tsrx` },
+				edges: {
+					'component-edge:0': `/k/${part}.tsrx`,
+					'component-edge:1': `/k/${part}.tsrx`,
+				},
 			},
 		]);
 		const page = compiled.get(`/k/page-${part}.tsrx`)!;
@@ -110,12 +119,26 @@ test('only a resolver holding a keyed bound row places rows per dispatch', () =>
 	const symbols = [{ id: 'symbol:0', chunk: 'virtual:markless:symbol:0', exportName: 'own' }];
 	const keyed = emitSymbolResolverModule({
 		symbols,
-		boundSymbols: [{ ...row, rowPieces: [['c1:', 'c1:p2:', 0], ['c0:', 'c0:', 1]] }],
+		boundSymbols: [
+			{
+				...row,
+				rowPieces: [
+					['c1:', 'c1:p2:', 0],
+					['c0:', 'c0:', 1],
+				],
+			},
+		],
 	});
 	const flat = emitSymbolResolverModule({ symbols, boundSymbols: [row] });
 
-	expect(keyed).toContain("import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';");
+	expect(keyed).toContain(
+		"import { marklessRowBoundCallbackId, marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';",
+	);
 	expect(keyed).toContain('marklessRowBoundPath(bound, context.graph)');
+	expect(keyed).toContain(
+		'marklessRowBoundCallbackId(bound, context.graph, route.callbackSymbolId)',
+	);
+	expect(flat).toContain('(context.graph?.marklessInstancePath || "") + route.callbackSymbolId');
 	expect(keyed).toContain('"rowPieces":[["c1:","c1:p2:",0],["c0:","c0:",1]]');
 	expect(flat).not.toContain('row-bound-path');
 	expect(flat).not.toContain('rowedPath');
@@ -147,7 +170,11 @@ export default function Outer({ seed }) @{
 		(symbol) => symbol.kind === 'sync-computed-derive' && symbol.source.includes('twice(seed)'),
 	)!;
 	expect(derive.captureSlots.map((slot) => slot.owner.componentName)).toEqual(['Outer']);
-	expect(chain.captureAnalysis.boundResolverRows!.some((row) => row.baseSymbolId === derive.symbolId)).toBe(false);
+	expect(
+		chain.captureAnalysis.boundResolverRows!.some(
+			(row) => row.baseSymbolId === derive.symbolId,
+		),
+	).toBe(false);
 });
 
 test('a derive whose prop passes through a module is bound by the module that owns the value', async () => {
@@ -197,14 +224,18 @@ export default function Page() @{
 		.get('/p/page.tsrx')!
 		.symbols.filter((claim) => claim.id.includes(':bound:'));
 	// Both derives reach the page as rows the relay republished, owned by the relay's root.
-	expect(republished.map((claim) => [claim.captureSymbol?.kind, claim.ownerComponentName])).toEqual([
+	expect(
+		republished.map((claim) => [claim.captureSymbol?.kind, claim.ownerComponentName]),
+	).toEqual([
 		['sync-computed-derive', 'Relay'],
 		['sync-computed-derive', 'Relay'],
 	]);
 	// Hop's own claim is not the page's to bind: the edge places Relay, which renders Hop.
 	const rows = page.captureAnalysis.boundResolverRows!.map((row) => [
 		row.instancePath,
-		row.captureSlots.map((slot) => ('graphNodeId' in slot.route ? slot.route.graphNodeId : slot.route.kind)),
+		row.captureSlots.map((slot) =>
+			'graphNodeId' in slot.route ? slot.route.graphNodeId : slot.route.kind,
+		),
 	]);
 	expect(rows).toEqual([
 		['c0:c1:', ['state:seed']],
@@ -252,9 +283,9 @@ export default function Page() @{
 		},
 	]);
 	const page = compiled.get('/m/page.tsrx')!;
-	expect(linked.get('/m/page.tsrx')!.symbols.find((claim) => claim.ownerComponentName === 'Knob')).toEqual(
-		expect.objectContaining({ moduleComponentNames: ['Knob', 'Panel', 'Badge'] }),
-	);
+	expect(
+		linked.get('/m/page.tsrx')!.symbols.find((claim) => claim.ownerComponentName === 'Knob'),
+	).toEqual(expect.objectContaining({ moduleComponentNames: ['Knob', 'Panel', 'Badge'] }));
 	// Knob renders only inside Panel: its claim binds as Panel's republished row, under Knob's place in Panel, and never on Badge's edge.
 	expect(
 		page.captureAnalysis.boundResolverRows!.map((row) => [
@@ -266,5 +297,7 @@ export default function Page() @{
 		['component-edge:0', 'symbol:1', 'c0:'],
 		['component-edge:1', 'bound:symbol%3A0:0', 'c1:c0:'],
 	]);
-	expect(page.captureAnalysis.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	expect(
+		page.captureAnalysis.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
+	).toEqual([]);
 });

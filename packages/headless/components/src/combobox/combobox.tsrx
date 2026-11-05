@@ -212,8 +212,8 @@ export function ComboboxInput({
 		aria-describedby={[combobox.errorEl, combobox.descriptionEl]}
 		aria-invalid={combobox.invalid ? 'true' : 'false'}
 		// An inline list is part of the page, so neither word is written; `false` removes the attribute where `undefined` writes no record at all.
-		aria-expanded={combobox.inline === true ? false : combobox.open === true ? 'true' : 'false'}
-		aria-haspopup={combobox.inline === true ? false : 'listbox'}
+		aria-expanded={combobox.inline === true ? undefined : combobox.open === true ? 'true' : 'false'}
+		aria-haspopup={combobox.inline === true ? undefined : 'listbox'}
 		ui-open={combobox.open}
 		ui-closed={combobox.open !== true}
 		onInput={(event) => {
@@ -304,7 +304,7 @@ export function ComboboxTrigger({ children, onClick, ...rest }: ComboboxTriggerP
 		type="button"
 		tabindex={-1}
 		aria-controls={combobox.contentEl}
-		aria-expanded={combobox.inline === true ? false : combobox.open === true ? 'true' : 'false'}
+		aria-expanded={combobox.inline === true ? undefined : combobox.open === true ? 'true' : 'false'}
 		aria-label="Show options"
 		disabled={combobox.disabled}
 		ui-open={combobox.open}
@@ -336,7 +336,7 @@ export function ComboboxContent({
 		overlay
 		role="listbox"
 		aria-labelledby={combobox.labelEl}
-		aria-multiselectable={combobox.multiple === true ? 'true' : false}
+		aria-multiselectable={combobox.multiple === true ? 'true' : undefined}
 		hidden={isShowing !== true}
 		ui-open={isShowing}
 		ui-closed={isShowing !== true}

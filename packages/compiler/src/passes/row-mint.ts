@@ -450,6 +450,17 @@ export function expressionSlotValue(
 	for (const name of names.names) {
 		if (rowNames.has(name)) continue;
 		const resolved = resolveGraphPath(name, bindings, aliases);
+		const local = resolved
+			? undefined
+			: graph.rowLocalReads?.find(
+					(entry) => entry.componentName === componentName && entry.name === name,
+				);
+		if (local) {
+			if (local.unfollowed) return null;
+			for (const read of local.reads)
+				reads.push({ graphNodeId: read.graphNodeId, path: read.path });
+			continue;
+		}
 		if (!resolved) {
 			const instance = graph.sharedInstances.find(
 				(candidate) =>
@@ -480,7 +491,15 @@ export function expressionSlotValue(
 		}
 		reads.push({ graphNodeId: resolved.binding.id, path: resolved.path });
 	}
-	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
+	const distinct = reads.filter(
+		(read, index) =>
+			reads.findIndex(
+				(other) =>
+					other.graphNodeId === read.graphNodeId &&
+					JSON.stringify(other.path) === JSON.stringify(read.path),
+			) === index,
+	);
+	return { source: slot.residue.source, ...(distinct.length > 0 ? { reads: distinct } : {}) };
 }
 
 // A shared() instance's members are its definition's graph nodes; the row reader qualifies a widget's per root.
@@ -540,4 +559,55 @@ function childIsMintable(
 		if (!entry) return false;
 	}
 	return childConstructReach(input, edge, childTemplateId, seen) !== 'unknown';
+}
+
+// A nested list's rows stand in front of what follows its anchor, so a patch counts those steps from the parent's end; lists on both sides leave no count.
+export function stepsAfterNestedRows(
+	chunk: SemanticMarkupChunk,
+	path: ReadonlyArray<number>,
+	text: boolean,
+): number[] | null {
+	// A component a row wraps renders its own nodes in place of its marker, as nested rows do.
+	const anchors = chunk.slots.flatMap((slot) =>
+		slot.kind === 'repeat' || slot.kind === 'child-component' ? [slot.coordinate.path] : [],
+	);
+	const fromEnd: number[] = [];
+	for (let depth = 1; depth < path.length - (text ? 1 : 0); depth++) {
+		const siblings = anchors.filter(
+			(anchor) =>
+				anchor.length === depth + 1 &&
+				anchor.slice(0, depth).every((step, at) => step === path[at]),
+		);
+		const before = siblings.some((anchor) => anchor[depth]! < path[depth]!);
+		if (before && siblings.some((anchor) => anchor[depth]! > path[depth]!)) return null;
+		if (before) fromEnd.push(depth);
+	}
+	return fromEnd;
+}
+
+// A computed over computeds only, with no storage, async or shared() node, never changes in the browser.
+export function constantInBrowser(
+	graph: SemanticGraphArtifact,
+	component: string,
+	graphNodeId: string,
+	seen = new Set<string>(),
+): boolean {
+	if (seen.has(graphNodeId)) return true;
+	seen.add(graphNodeId);
+	const binding = graph.graphBindings.find(
+		(candidate) =>
+			candidate.id === graphNodeId && (candidate.componentName ?? component) === component,
+	);
+	if (
+		!binding ||
+		binding.kind !== 'computed' ||
+		binding.storage ||
+		binding.async ||
+		binding.asyncCapable ||
+		binding.sharedDefinitionId !== undefined
+	)
+		return false;
+	return (binding.dependencies ?? []).every((dependency) =>
+		constantInBrowser(graph, component, dependency.graphNodeId, seen),
+	);
 }

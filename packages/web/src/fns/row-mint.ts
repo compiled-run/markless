@@ -343,7 +343,7 @@ function focusAt(row: ResumeDomElement, path: ReadonlyArray<number>): boolean {
 export function shownRowGraph(
 	graph: RuntimeGraph,
 	repeat: ResumeKeyedRepeatRecord,
-	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
+	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path?: ReadonlyArray<string> }>,
 ): RuntimeGraph | false {
 	const read = graph.shownRead?.([
 		{ graphNodeId: repeat.collectionGraphNodeId!, path: repeat.collectionPath },

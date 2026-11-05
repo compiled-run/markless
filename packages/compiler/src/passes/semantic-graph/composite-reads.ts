@@ -12,6 +12,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	expressionReadNames,
 	hasOptionalLink,
 	rootBindsInsideRegion,
 	rootIdentifierOffset,
@@ -82,7 +83,7 @@ export function isCompositeTemplateExpression(
 }
 
 // `a?.b.c` is the plain graph read `a.b.c` (optionalMemberReadSource); only other chains need a computed.
-function isDottedPath(node: AnyNode | undefined): boolean {
+export function isDottedPath(node: AnyNode | undefined): boolean {
 	if (node?.type === 'Identifier') return true;
 	return (
 		node?.type === 'MemberExpression' &&
@@ -471,15 +472,11 @@ export function freeReadSources(
 				((parent.type === 'Property' || parent.type === 'ObjectProperty') &&
 					parent.key === node &&
 					parent.computed !== true));
-		if (
-			!isName &&
-			(node.type === 'MemberExpression' || (identifiers && node.type === 'Identifier'))
-		) {
-			if (!rootBindsInsideRegion(node, state, region))
-				sources.push(expressionSource(node, state.source));
-		}
+		if (!isName && node.type === 'MemberExpression' && !rootBindsInsideRegion(node, state, region))
+			sources.push(expressionSource(node, state.source));
 		for (const child of childNodes(node)) visit(child, node);
 	};
 	visit(expression, null);
+	if (identifiers) sources.push(...expressionReadNames(expression, state));
 	return sources;
 }

@@ -150,7 +150,7 @@ test('sibling blocks in one element mark only the refreshing block busy', async 
 	expect(container.querySelector('[data-pair]')?.hasAttribute('aria-busy')).toBe(false);
 	expect(container.querySelector('[data-pending]')).toBeNull();
 	await expect.poll(() => container.querySelector('[data-left-value]')?.textContent, { timeout: 5_000 }).toBe('Left b');
-	expect(container.querySelectorAll('[aria-busy]')).toHaveLength(0);
+	await expect.poll(() => container.querySelectorAll('[aria-busy]').length, { timeout: 5_000 }).toBe(0);
 });
 
 test('a nested block keeps its own content unmarked while the outer block refreshes', async () => {
@@ -167,7 +167,7 @@ test('a nested block keeps its own content unmarked while the outer block refres
 	expect(container.querySelector('[data-pending]')).toBeNull();
 	await expect.poll(() => container.querySelector('[data-name]')?.textContent, { timeout: 5_000 }).toBe('User 2');
 	await expect.poll(() => container.querySelector('[data-count]')?.textContent, { timeout: 5_000 }).toBe('3');
-	expect(container.querySelectorAll('[aria-busy]')).toHaveLength(0);
+	await expect.poll(() => container.querySelectorAll('[aria-busy]').length, { timeout: 5_000 }).toBe(0);
 });
 
 test('a server-rendered block resumes and marks its host busy through a refresh', async () => {

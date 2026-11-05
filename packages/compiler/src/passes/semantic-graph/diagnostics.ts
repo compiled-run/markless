@@ -414,6 +414,27 @@ export function childRepeatWithoutElementDiagnostic(input: {
 	});
 }
 
+export function rowValueLocalUnfollowedDiagnostic(input: {
+	readonly localName: string;
+	readonly expression: AnyNode;
+	readonly source: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const value = expressionSource(input.expression, input.source);
+	return {
+		...semanticGraphDiagnostic({
+			code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+			title: 'A @for row value reads a component-body local the compiler cannot follow',
+			message: `\`${value}\` in a @for row reads \`${input.localName}\`, and the compiler cannot find the definition that says which state it reads, so the row would keep the value it first rendered.`,
+			why: "A row value repaints when a state or computed it reads changes. Reads through a helper are followed into the helper's definition; a local with no single definition the compiler can read has no reads to follow.",
+			span: sourceSpan(input.expression, input.filename),
+			suggestion: `Declare \`${input.localName}\` once as a \`const\` or a function in the component body, or read the state through a \`computed()\`.`,
+			docsUrl: 'https://markless.dev/errors/MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		}),
+		severity: 'warning',
+	};
+}
+
 function semanticGraphDiagnostic(input: {
 	readonly code: SemanticGraphDiagnostic['code'];
 	readonly title: string;
