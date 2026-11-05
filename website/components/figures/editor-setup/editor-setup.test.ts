@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { drawing, EXTENSION, HEADING, LINES, TYPO } from './editor.ts';
+import { drawing, EXTENSION, HEADING, HINTS, LINES, MATCHES, TYPO } from './editor.ts';
 
 const art = drawing();
 const D = (ts as unknown as { Diagnostics: Record<string, { code: number; message: string }> }).Diagnostics;
@@ -26,7 +26,16 @@ export const art: ReturnType<typeof drawing> = ${JSON.stringify(art, null, '\t')
 	it('lists the extension a new app recommends', () => {
 		expect(recommended.recommendations).toContain(EXTENSION.id);
 		expect(EXTENSION.id.startsWith(EXTENSION.publisher + '.')).toBe(true);
-		expect(texts(art.base)).toEqual(expect.arrayContaining([EXTENSION.name, EXTENSION.publisher, 'profile.tsrx']));
+		expect(texts(art.base)).toContain('profile.tsrx');
+		expect(texts(art.listing)).toEqual(expect.arrayContaining([EXTENSION.name, EXTENSION.publisher, EXTENSION.installs, EXTENSION.description.slice(0, 21) + '…']));
+		expect(texts(art.empty)).toEqual(['No extensions found.']);
+	});
+
+	it('matches searches the way the listing does: ts and tsrx find it, other words do not', () => {
+		for (const q of ['ts', 'tsrx', 'TSRX', 'ripple']) expect(MATCHES.includes(q.toLowerCase())).toBe(true);
+		for (const q of ['python', 'vue', 'zzz']) expect(MATCHES.includes(q)).toBe(false);
+		expect(Object.keys(HINTS)).toEqual(['search', 'install', 'hover', 'typo']);
+		expect(art.rings.search.layers.length).toBeGreaterThan(0);
 	});
 
 	// TYPO came from running packages/typescript-plugin/src/tsc.ts on this profile.tsrx with {nmae}.

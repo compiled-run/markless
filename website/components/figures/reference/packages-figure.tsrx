@@ -11,7 +11,7 @@ export default function PackagesFigure() @{
 	let hovered = state(-1);
 	const hint = computed(() => (hovered >= 0 ? '@markless/' + art.rows[hovered]!.name + ': ' + art.rows[hovered]!.does : 'Hover a package to see what it does.'));
 	let said = state('');
-	const gone = computed(() => (deleted >= 0 ? art.rows[deleted]!.name : ''));
+	const missAt = (row: (typeof art.rows)[number]) => (deleted >= 0 ? row.missing.findIndex((miss) => miss.dep === art.rows[deleted]!.name) : -1);
 
 	const install = () => {
 		deleted = -1;
@@ -99,7 +99,7 @@ export default function PackagesFigure() @{
 			<path class="hit run" d={art.run} />
 			<g>
 				@for (const row of art.rows; key row.key) {
-					<g class={'row' + (installed > row.key ? ' in' : '') + (deleted === row.key ? ' del' : '') + (row.missing.some((miss) => miss.dep === gone) ? ' red' : '')} data-row={row.key}>
+					<g class={'row' + (installed > row.key ? ' in' : '') + (deleted === row.key ? ' del' : '') + (missAt(row) >= 0 ? ' red' : '')} data-row={row.key}>
 						<path class="hit" d={row.hit} />
 						<g class="hover fade overlay">
 							<g>
@@ -139,7 +139,7 @@ export default function PackagesFigure() @{
 						</g>
 						<g>
 							@for (const miss of row.missing; key miss.key) {
-								<g class={'miss fade overlay' + (miss.dep === gone ? ' on' : '')}>
+								<g class={'miss fade overlay' + (missAt(row) === miss.key ? ' on' : '')}>
 									<g>
 										@for (const item of miss.part.paths; key item.key) {
 											<path class={item.cls} d={item.d} />
