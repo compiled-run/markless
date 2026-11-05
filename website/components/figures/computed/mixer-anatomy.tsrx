@@ -54,6 +54,7 @@ export default function MixerAnatomy() @{
 				onPointerUp={() => {
 					dragging = '';
 				}}
+				onTouchMove={(event) => event.preventDefault()}
 				onWheel={(event) => {
 					event.preventDefault();
 					red = clamp(red + (event.deltaY < 0 ? 1 : -1));
@@ -99,6 +100,7 @@ export default function MixerAnatomy() @{
 				onPointerUp={() => {
 					dragging = '';
 				}}
+				onTouchMove={(event) => event.preventDefault()}
 				onWheel={(event) => {
 					event.preventDefault();
 					blue = clamp(blue + (event.deltaY < 0 ? 1 : -1));
@@ -160,7 +162,7 @@ export default function MixerAnatomy() @{
 				width: 100%;
 				height: auto;
 				overflow: visible;
-				touch-action: none;
+				touch-action: pan-y;
 				user-select: none;
 				--shade: color-mix(in oklch, var(--ink) 20%, transparent);
 				--sheet: color-mix(in oklch, var(--paper) 55%, white);

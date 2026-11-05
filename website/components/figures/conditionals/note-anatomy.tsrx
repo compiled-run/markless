@@ -99,6 +99,7 @@ export default function NoteAnatomy() @{
 						dragX = 0;
 						dragY = 0;
 					}}
+					onTouchMove={(event) => event.preventDefault()}
 					onFocus={() => {
 						focused = true;
 					}}
@@ -156,7 +157,7 @@ export default function NoteAnatomy() @{
 				width: 100%;
 				height: auto;
 				overflow: visible;
-				touch-action: none;
+				touch-action: pan-y;
 				user-select: none;
 				--shade: color-mix(in oklch, var(--ink) 20%, transparent);
 				--sheet: color-mix(in oklch, var(--paper) 55%, white);

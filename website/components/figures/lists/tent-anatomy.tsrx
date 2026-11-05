@@ -255,7 +255,7 @@ export default function TentAnatomy() @{
 				position: relative;
 				width: 100%;
 				aspect-ratio: 680 / 300;
-				touch-action: none;
+				touch-action: pan-y;
 				user-select: none;
 				--shade: color-mix(in oklch, var(--ink) 20%, transparent);
 				--sheet: color-mix(in oklch, var(--paper) 55%, white);
