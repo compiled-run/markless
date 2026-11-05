@@ -38,21 +38,21 @@ A *job* is one named block in `.github/workflows/ci.yml`, and a *step* is one co
 
 A new job with check steps but no entry in the script's mode table makes it stop with an error naming the job.
 
-## Required checks gate the merge
+## Every check runs at home, with the same command
 
-The *merge queue* tests the exact commit it lands on `main`. Press the header to run the checks, click one to make it fail, then press **Merge when ready**:
+The *merge queue* tests the exact commit it lands on `main`. Click a check to make it fail, press its ›_ to run that job at home, then press **Merge when ready**:
 
 <ChecksFigure />
 
-- The required checks are `test`, `typecheck` and `agent-files`.
-- `main` takes a change only from the merge queue.
-- `test` is the gate: it fails unless every lane passed or hit its cache.
+- The hook marks the fast jobs, which also run before every commit. The cloud marks jobs that run on GitHub.
+- `main` takes a change only from the merge queue, once `test`, `typecheck` and `agent-files` pass.
+- At home, `test` checks only the analyzer receipts. On GitHub it is the gate, and it fails when any lane fails.
 
-| Mode | Jobs |
-| --- | --- |
-| fast | `agent-files`, `typecheck`, `typecheck-ts7`, `unit` |
-| full | `browser`, `completion-matrix`, the `boxes-*` jobs, `website-boxes`, `demo-boxes`, `perf-guards`, `build-scale`, `build-warnings`, `package-manager-matrix`, `test` |
-| CI only | `benchmark`, `benchmark-guard` |
+`ci:local` sorts every job into a mode:
+
+- **fast:** `agent-files`, `typecheck`, `typecheck-ts7` and `unit`.
+- **full:** the browser, box, build and perf jobs, and `test`.
+- **CI only:** `benchmark` and `benchmark-guard`.
 
 ## You pick which jobs run
 

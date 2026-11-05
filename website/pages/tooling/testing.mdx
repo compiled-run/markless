@@ -16,17 +16,18 @@ import RunnerFigure from '../../components/figures/testing/runner-figure.tsrx';
 ```ts title="todo.browser.ts"
 import { render } from '@markless/vitest-browser';
 import { expect, test } from 'vite-plus/test';
+import { page } from 'vite-plus/test/browser';
 import TodoItem from './TodoItem.tsrx';
 
 test('a click marks it done', async () => {
 	await render(TodoItem);
-	const button = document.querySelector('button')!;
-	button.click();
-	await expect.poll(() => button.textContent).toBe('Buy milk: done');
+	const item = page.getByRole('button', { name: /buy milk/i });
+	await item.click();
+	await expect.element(item).toHaveTextContent('Buy milk: done');
 });
 ```
 
-**`render(TodoItem)`** puts the component on a real page. **`button.click()`** presses it, and **`expect.poll`** waits until the text reads `Buy milk: done`.
+**`render(TodoItem)`** puts the component on a real page. **`page.getByRole`** finds the button the way a visitor would, by its role and name. **`click()`** presses it, and **`expect.element`** waits until it reads `Buy milk: done`.
 
 ## A test clicks a real button
 
@@ -35,7 +36,7 @@ A *browser test* runs in Chromium, so a click runs your real handler. Press **Ru
 <RunnerFigure />
 
 - With the handler working, the row goes green.
-- With it broken, the text never changes and the test fails at its `expect`.
+- With it broken, the text never changes and the test fails at its `expect`, printing what it expected and what it found.
 
 ## The component is plain Markless
 
@@ -62,11 +63,12 @@ Rename it, and the test above fails too: it still expects `Buy milk: done`.
 The starters don't include this yet. In an app from `npm create markless`, add the packages and a browser:
 
 ```bash
-npm install -D @markless/vitest-browser playwright @vitest/browser-playwright@<vitest version>
+npm install -D @markless/vitest-browser playwright \
+  @vitest/browser-playwright@5.0.5
 npx playwright install chromium
 ```
 
-`npx vp --version` prints the Vitest version your app already has. Use that same version for `@vitest/browser-playwright`, or npm refuses the install.
+A new app's `vite-plus` 1.3.0 runs Vitest 5.0.5, and `@vitest/browser-playwright` must match it exactly.
 
 ```ts title="vitest.config.ts"
 import { markless } from '@markless/core/vite';
@@ -90,7 +92,7 @@ export default defineProject({
 
 Put both files in `src/`, and run `npx vp test run --config vitest.config.ts`.
 
-- Wait with `expect.poll`. A click's change can land a moment after `click()` returns.
+- `expect.element` keeps checking until the text matches or it times out, so a change that lands a moment after the click still passes.
 - Each test starts on an empty page: the package removes what it mounted after every test.
 
 ## Server pages use `renderSSR`

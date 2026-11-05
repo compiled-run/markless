@@ -1,20 +1,10 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { drawing, PACKAGES } from './tree.ts';
+import { drawing, SIDES, STOPS } from './tour.ts';
 
 const art = drawing();
-const root = new URL('../../../../', import.meta.url);
-const imports = (name: string) => {
-	const found = new Set<string>();
-	const walk = (dir: URL) => {
-		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			if (entry.isDirectory()) walk(new URL(entry.name + '/', dir));
-			else if (/\.(ts|tsrx)$/.test(entry.name)) for (const m of readFileSync(new URL(entry.name, dir), 'utf8').matchAll(/from '@markless\/([a-z-]+)/g)) found.add(m[1]!);
-		}
-	};
-	walk(new URL('packages/' + name + '/src/', root));
-	return found;
-};
+const repo = new URL('../../../../', import.meta.url);
+const deps = (name: string) => Object.keys(JSON.parse(readFileSync(new URL(`packages/${name}/package.json`, repo), 'utf8')).dependencies ?? {}).filter((d) => d.startsWith('@markless/')).map((d) => d.slice('@markless/'.length));
 
 describe('repo tour figure', () => {
 	it('draws the same scene twice', () => {
@@ -22,28 +12,39 @@ describe('repo tour figure', () => {
 	});
 
 	it('is frozen (refresh with -u after a geometry change)', async () => {
-		const module = `// Written by repo-tour.test.ts from tree.ts. Refresh with the figure tests and -u.
-import type { drawing } from './tree.ts';
+		const module = `// Written by repo-tour.test.ts from tour.ts. Refresh with the figure tests and -u.
+import type { drawing } from './tour.ts';
 
 export const art: ReturnType<typeof drawing> = ${JSON.stringify(art, null, '\t')};
 `;
-		await expect(module).toMatchFileSnapshot('./tree.art.ts');
+		await expect(module).toMatchFileSnapshot('./tour.art.ts');
 	});
 
-	it('lists packages/ exactly as it is in the repo', () => {
-		const dirs = readdirSync(new URL('packages/', root), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
-		expect(PACKAGES.map((p) => p.name)).toEqual(dirs);
+	it('names real folders and files at every package stop', () => {
+		for (const stop of STOPS.filter((s) => s.name !== 'browser')) {
+			expect(existsSync(new URL(stop.path, repo))).toBe(true);
+			for (const file of stop.files) expect(existsSync(new URL(stop.path + file, repo)), stop.path + file).toBe(true);
+		}
 	});
 
-	it('names imports each pipeline package really has, and web never imports core', () => {
-		for (const name of ['bundler', 'web', 'runtime', 'core']) for (const dep of PACKAGES.find((p) => p.name === name)!.imports) expect(imports(name)).toContain(dep);
-		expect(imports('serializer').size).toBe(0);
-		expect(imports('web')).not.toContain('core');
-		expect(PACKAGES.find((p) => p.name === 'core')!.imports).toContain('web');
+	it('follows the real wiring: core takes the bundler plugin, the bundler and router call the compiler, web and serializer feed the browser, runtime sits under web', () => {
+		expect(readFileSync(new URL('packages/core/src/vite.ts', repo), 'utf8')).toContain("from '@markless/bundler/vite'");
+		expect(deps('bundler')).toContain('compiler');
+		expect(deps('router')).toEqual(expect.arrayContaining(['bundler', 'compiler', 'web']));
+		expect(deps('web')).toEqual(expect.arrayContaining(['runtime', 'serializer']));
+		expect(deps('runtime')).toEqual(['serializer']);
+		expect(STOPS.map((s) => s.name)).toEqual(['core', 'compiler', 'bundler', 'router', 'serializer', 'web', 'runtime', 'browser']);
 	});
 
-	it('is not a counter', () => {
-		const words = JSON.stringify(art);
-		expect(words).not.toMatch(/count|Count/);
+	it('hangs every side package off the route, and each one exists', () => {
+		const dirs: Record<string, string> = { 'create-markless': 'packages/cli', ui: 'packages/headless/components', 'typescript-plugin': 'packages/typescript-plugin', 'vitest-browser': 'packages/vitest-browser', analyzer: 'packages/analyzer' };
+		for (const side of SIDES) expect(existsSync(new URL(dirs[side.name]!, repo)), side.name).toBe(true);
+		expect(art.sides).toHaveLength(SIDES.length);
+	});
+
+	it('moves the file card to each stop, and is not a counter', () => {
+		expect(art.stops.map((s) => s.move)[0]).toBe('translate(0px, 0px)');
+		expect(new Set(art.stops.map((s) => s.move)).size).toBe(STOPS.length);
+		expect(JSON.stringify(art)).not.toMatch(/count/i);
 	});
 });

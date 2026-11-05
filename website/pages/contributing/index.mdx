@@ -2,7 +2,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import TreeFigure from '../../components/figures/repo-tour/tree-figure.tsrx';
+import TourFigure from '../../components/figures/repo-tour/tour-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -19,40 +19,17 @@ analyzer  bundler  cli  compiler  core  headless  router
 runtime  serializer  typescript-plugin  vitest-browser  web
 ```
 
-**`compiler`** and **`bundler`** turn a `.tsrx` file into code before your app runs. **`web`**, **`runtime`** and **`serializer`** run that code, and **`core`** is the one package an app imports.
+**`core`** is the one package an app imports. The rest either turn a `.tsrx` file into code before your app runs, or run that code.
 
-## A .tsrx file moves through the packages one way
+## Follow one file through the repo
 
-A *pipeline* is a chain where each package hands its output to the next. Press `map.tsrx` to follow it through `packages/`, then click `web` to add an import of `core`:
+A *pipeline* is a chain where each package hands its output to the next. Press **Next stop**, or use the arrow keys, to follow `map.tsrx` from the code you write to a live page:
 
-<TreeFigure />
+<TourFigure />
 
-- The compiler and bundler work before your app runs, and `web` runs the result.
-- No package imports one that depends on it, so the import from `web` would close a cycle.
-
-## Three packages work before your app runs
-
-- **`@markless/compiler`** reads `.tsrx` and plans it: semantic graph, state lowering, payload planning, emit. Imports `serializer` and `web`.
-- **`@markless/bundler`** runs the compiler inside Vite or Rolldown. Build-time prerendering lives here too, as a preview. Imports `compiler`, `serializer` and `web`.
-- **`@markless/typescript-plugin`** gives editors `.tsrx` support, and holds the repo's `src/tsc.ts` checker. Imports `compiler`.
-
-The compiler imports one rule from `web`, how an attribute's value is written, and the code it writes imports helpers from `@markless/web/fns/*`.
-
-## Four packages run the result
-
-- **`@markless/web`** renders and resumes for the web: `render` in a browser, `renderToString` and `renderToStream` for HTML. Imports `runtime` and `serializer`.
-- **`@markless/runtime`** is the state graph: reads, writes, computed values and the flush journal. Imports `serializer`.
-- **`@markless/serializer`** holds value serialization and the payload protocol types. Imports nothing.
-- **`@markless/core`** is the one import for apps: `state`, `computed`, `shared`, `element` and `storage`, plus `render`, `renderToString` and the Vite plugin. Imports `web`, `bundler` and `router`.
-
-A server render and a browser render are two phases of one runtime in `web`, so there's no `packages/server`.
-
-## Other packages sit around the pipeline
-
-- **`@markless/router`** (`packages/router`): file routes, navigation and streaming, built on Nitro.
-- **`create-markless`** (`packages/cli`): creates apps from the four starters.
-- **`@markless/vitest-browser`**, **`@markless/analyzer`**: browser tests, and checks of a running app.
-- **`@markless/ui`**, **`@markless/icons`**, **`@markless/ui-tools`** (`packages/headless/`): UI components, icon packs and their build tools.
+- Each stop opens the package's real folder, so you know where to read next.
+- Hover a branch to see the packages beside the route: tools for your editor, your tests and new apps.
+- No package imports one that depends on it, so the route only runs one way.
 
 ## The rest of the repo holds specs, demos and this site
 

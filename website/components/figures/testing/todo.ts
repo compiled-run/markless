@@ -5,7 +5,7 @@ export const COMPONENT = ['TodoItem.tsrx', "import { state } from '@markless/cor
 /** The handler on the button's line, as written and as broken by a click. */
 export const HANDLER = { ok: '(done = !done)', broken: '(done = false)' };
 
-export const TEST = ['todo.browser.ts', "import { render } from '@markless/vitest-browser';", "import { expect, test } from 'vite-plus/test';", "import TodoItem from './TodoItem.tsrx';", '', "test('a click marks it done', async () => {", '\tawait render(TodoItem);', "\tconst button = document.querySelector('button')!;", '\tbutton.click();', "\tawait expect.poll(() => button.textContent).toBe('Buy milk: done');", '});'];
+export const TEST = ['todo.browser.ts', "import { render } from '@markless/vitest-browser';", "import { expect, test } from 'vite-plus/test';", "import { page } from 'vite-plus/test/browser';", "import TodoItem from './TodoItem.tsrx';", '', "test('a click marks it done', async () => {", '\tawait render(TodoItem);', "\tconst item = page.getByRole('button', { name: /buy milk/i });", '\tawait item.click();', "\tawait expect.element(item).toHaveTextContent('Buy milk: done');", '});'];
 
-/** What Vitest printed for this expectation when the text never changed (a real run). */
-export const FAILURE = "AssertionError: expected 'Buy milk: to do' to be 'Buy milk: done' // Object.is equality";
+/** What Vitest printed for this expectation when the text never changed (a real run, Vitest 5.0.5 in Chromium). */
+export const FAILURE = 'Error: expect(element).toHaveTextContent()\nExpected element to have text content:\n  Buy milk: done\nReceived:\n  Buy milk: to do';

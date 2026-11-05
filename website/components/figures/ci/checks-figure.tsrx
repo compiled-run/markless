@@ -1,6 +1,7 @@
-// A pull request's checks box in ink: run the checks and they tick in; click a check to make it fail; Merge refuses while any check is running or red, and points at it.
+// A pull request's checks box in ink: run the checks and they tick in; click a check to make it fail; run any check at home and the same job runs in a terminal below; Merge refuses while any check is running or red, and points at it.
 import { computed, state } from '@markless/core';
 import { art } from './checks.art.ts';
+import { FIXES } from './fixes.ts';
 
 /** When each check finishes after a run starts, in ms; the gate, test, waits for the rest. */
 const DONE_AT = [500, 1100, 2100, 2400];
@@ -19,7 +20,20 @@ export default function ChecksFigure() @{
 	let touched = state(false);
 	let said = state('');
 	let hovered = state(-1);
-	const hint = computed(() => (hovered >= 0 ? art.rows[hovered]!.job + ': ' + RUNS[hovered]!.replaceAll('`', '') : 'Hover a check to see what it runs.'));
+	let home = state(-1);
+	let homeFail = state(false);
+	let homeDone = state(false);
+	let runBeat = state('rest');
+	let sel = state(0);
+	let ticket = state(0);
+	const where = (i: number) => (art.rows[i]!.fast ? 'Also runs before every commit.' : 'Runs on GitHub; at home only when you ask.');
+	const hint = computed(() => {
+		if (hovered >= 0) return art.rows[hovered]!.job + ': ' + RUNS[hovered]!.replaceAll('`', '') + '. ' + where(hovered);
+		if (home >= 0 && !homeDone) return 'Running ' + art.rows[home]!.job + ' at home, with the same command CI runs.';
+		if (home === GATE) return homeFail ? FIXES[home] : 'At home, test only checks the analyzer receipts; on GitHub it also fails when any lane fails.';
+		if (home >= 0) return homeFail ? FIXES[home] : art.rows[home]!.job + ' passed at home, so it passes in CI too.';
+		return "Press a check's ›_ to run it at home.";
+	});
 	const phase = computed(() => (merged ? 3 : status.includes('0') ? 0 : status.includes('2') ? 2 : 1));
 	const dials = computed(() => {
 		return '--ph:' + phase + ';--merged:' + (merged ? 1 : 0);
@@ -58,6 +72,28 @@ export default function ChecksFigure() @{
 		}
 		said = fails[i] === '1' ? art.rows[i]!.job + ' will fail.' : art.rows[i]!.job + ' is fixed.';
 	};
+	const runHome = (i: number) => {
+		const mine = ticket + 1;
+		ticket = mine;
+		sel = i;
+		home = i;
+		homeFail = fails[i] === '1';
+		homeDone = false;
+		runBeat = runBeat === 'a' ? 'b' : 'a';
+		said = 'Running ' + art.rows[i]!.job + ' at home.';
+		setTimeout(() => {
+			if (ticket !== mine) return;
+			homeDone = true;
+			if (i !== GATE) {
+				const next = status.slice(0, i) + (homeFail ? '2' : '1') + status.slice(i + 1, GATE);
+				const gate = next.includes('0') ? '0' : next.includes('2') || fails[GATE] === '1' ? '2' : '1';
+				status = next + gate;
+			}
+			merged = false;
+			point = -1;
+			said = art.rows[i]!.job + (homeFail ? ' failed at home. ' + FIXES[i] : ' passed at home.');
+		}, homeFail ? art.rows[i]!.failMs : art.rows[i]!.passMs);
+	};
 	const merge = () => {
 		const waiting = status.indexOf('0');
 		const red = status.indexOf('2');
@@ -76,7 +112,7 @@ export default function ChecksFigure() @{
 	<figure
 		class="anatomy toy"
 		tabindex={0}
-		aria-label="A pull request's checks. Press Enter to run them, keys 1 to 5 make a check fail, M presses Merge when ready, Escape resets."
+		aria-label="A pull request's checks. Press Enter to run them, keys 1 to 5 make a check fail or pass, R runs the last check you picked at home, M presses Merge when ready, Escape resets."
 		onVisible={() => {
 			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 			const hint = setTimeout(() => {
@@ -90,15 +126,21 @@ export default function ChecksFigure() @{
 				event.preventDefault();
 				run();
 			} else if (event.key === 'm' || event.key === 'M') merge();
+			else if (event.key === 'r' || event.key === 'R') runHome(sel);
 			else if (event.key === 'Escape') {
 				status = START;
 				fails = '00000';
 				merged = false;
 				point = -1;
+				home = -1;
+				ticket = ticket + 1;
 				said = 'Reset.';
 			} else {
 				const n = Number(event.key);
-				if (n >= 1 && n <= art.rows.length) toggle(n - 1);
+				if (n >= 1 && n <= art.rows.length) {
+					sel = n - 1;
+					toggle(n - 1);
+				}
 			}
 		}}
 	>
@@ -111,14 +153,19 @@ export default function ChecksFigure() @{
 			onClick={(event) => {
 				touched = true;
 				const target = event.target as Element;
+				const runAt = target.closest('[data-run]');
+				if (runAt) return runHome(Number(runAt.getAttribute('data-run')));
 				const row = target.closest('[data-row]');
-				if (row) return toggle(Number(row.getAttribute('data-row')));
+				if (row) {
+					sel = Number(row.getAttribute('data-row'));
+					return toggle(sel);
+				}
 				if (target.closest('.press')) return merge();
 				if (target.closest('.head-hit')) return run();
 			}}
 			onPointerOver={(event) => {
-				const row = (event.target as Element).closest('[data-row]');
-				hovered = row ? Number(row.getAttribute('data-row')) : -1;
+				const row = (event.target as Element).closest('[data-row]') ?? (event.target as Element).closest('[data-run]');
+				hovered = row ? Number(row.getAttribute('data-row') ?? row.getAttribute('data-run')) : -1;
 			}}
 			onPointerLeave={() => {
 				hovered = -1;
@@ -229,6 +276,42 @@ export default function ChecksFigure() @{
 					}
 				</g>
 				<path class="press-hit" d={art.pressAt} />
+			</g>
+			<g>
+				@for (const row of art.rows; key row.key) {
+					<path class={'run-hit' + (home === row.key ? ' active' : '')} data-run={row.key} d={row.runHit} />
+				}
+			</g>
+			<g class={home < 0 ? 'idle on' : 'idle'}>
+				@for (const text of art.prompt.texts; key text.key) {
+					<text class={text.cls} transform={text.matrix}>{text.text}</text>
+				}
+			</g>
+			<g data-run-beat={runBeat}>
+				@for (const row of art.rows; key row.key) {
+					<g class={'home' + (home === row.key ? ' on' : '')}>
+						<g>
+							@for (const text of row.home.cmd.texts; key text.key) {
+								<text class={text.cls} transform={text.matrix}>{text.text}</text>
+							}
+						</g>
+						<g>
+							@for (const text of row.home.steps.texts; key text.key) {
+								<text class={text.cls} style={text.style} transform={text.matrix}>{text.text}</text>
+							}
+						</g>
+						<g class={homeFail ? 'result' : 'result on'}>
+							@for (const text of row.home.pass.texts; key text.key) {
+								<text class={text.cls} style={text.style} transform={text.matrix}>{text.text}</text>
+							}
+						</g>
+						<g class={homeFail ? 'result on' : 'result'}>
+							@for (const text of row.home.fail.texts; key text.key) {
+								<text class={text.cls} style={text.style} transform={text.matrix}>{text.text}</text>
+							}
+						</g>
+					</g>
+				}
 			</g>
 		</svg>
 		<p class="hint" aria-hidden="true">{hint}</p>
@@ -479,6 +562,54 @@ export default function ChecksFigure() @{
 				font-size: var(--step--1, 0.85rem);
 				color: color-mix(in oklch, var(--ink) 70%, transparent);
 				text-align: center;
+			}
+
+			.run-hit {
+				fill: transparent;
+				cursor: pointer;
+			}
+
+			.run-hit:hover,
+			.run-hit.active {
+				fill: color-mix(in oklch, var(--yellow) 40%, transparent);
+			}
+
+			.home,
+			.idle,
+			.result {
+				opacity: 0;
+				pointer-events: none;
+			}
+
+			.home.on,
+			.idle.on,
+			.result.on {
+				opacity: 1;
+			}
+
+			.ok-text {
+				fill: var(--ok);
+				font-weight: 700;
+			}
+
+			[data-run-beat='a'] .home.on .show {
+				animation: line-a 220ms var(--at) ease-out both;
+			}
+
+			[data-run-beat='b'] .home.on .show {
+				animation: line-b 220ms var(--at) ease-out both;
+			}
+
+			@keyframes line-a {
+				from {
+					opacity: 0;
+				}
+			}
+
+			@keyframes line-b {
+				from {
+					opacity: 0;
+				}
 			}
 
 			.row-hit,

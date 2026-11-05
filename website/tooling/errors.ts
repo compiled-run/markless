@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Plugin } from 'vite';
 import { guides, type GuideSource } from '../components/docs/errors/guides.ts';
+import { AREA_ORDER, AREAS, areaOf, TITLES } from '../components/docs/errors/titles.ts';
 import type {
 	CodeLine,
 	ErrorData,
@@ -798,19 +799,6 @@ function stageOf(site: Site, sites: readonly Site[]): ErrorStage {
 	return 'runtime';
 }
 
-const PACKAGE_ORDER = [
-	'@markless/compiler',
-	'@markless/core',
-	'@markless/bundler',
-	'@markless/router',
-	'@markless/web',
-	'@markless/serializer',
-	'@markless/runtime',
-	'@markless/typescript-plugin',
-	'@markless/analyzer',
-	'create-markless',
-	'@markless/vitest-browser',
-];
 const MAX_SOURCES = 6;
 
 const oneLine = (s: string) => s.replace(/\s*\n\s*/g, ' ').trim();
@@ -835,6 +823,12 @@ export function printedLines(e: ScannedCode): string[] {
 	if (e.suggestion) lines.push(oneLine(e.suggestion));
 	if (e.printsDocsLink) lines.push(`${DOCS_URL}${e.code}`);
 	return lines;
+}
+
+/** The reader's title: a hand-written one, else the diagnostic's own, else none (the titles test fails). */
+function plainTitle(e: ScannedCode, guide: GuideSource | undefined): string {
+	const own = e.title ? oneLine(e.title).replace(/[.]$/, '') : '';
+	return TITLES[e.code] ?? (own ? own.charAt(0).toUpperCase() + own.slice(1) : guide ? guide.summary.replace(/[.]$/, '') : '');
 }
 
 function description(e: ScannedCode, guide: GuideSource | undefined): string {
@@ -889,6 +883,7 @@ export async function buildErrorData(
 	for (const e of scanned) {
 		const guide = written[e.code];
 		const example = guide?.example ? await highlight(guide.example.join('\n')) : [];
+		const before = guide?.before ? await highlight(guide.before.join('\n')) : [];
 		const warns = e.stage === 'compile' && e.severities.includes('warning');
 		const exampleAllows =
 			guide?.example?.some((line) => line.includes('markless-allow')) ?? false;
@@ -899,12 +894,16 @@ export async function buildErrorData(
 		}));
 		entries.push({
 			code: e.code,
+			title: plainTitle(e, guide),
+			area: areaOf(e.code, e.stage, Boolean(guide)),
 			packageName: e.pkg,
 			stage: e.stage,
 			severity: e.severity,
 			description: description(e, guide),
 			printed: e.message || e.title ? printedLines(e) : [],
 			structured: e.structured,
+			...(e.why ? { why: oneLine(e.why) } : {}),
+			...(e.suggestion ? { suggestion: oneLine(e.suggestion) } : {}),
 			...(guide
 				? {
 						guide: {
@@ -912,6 +911,7 @@ export async function buildErrorData(
 							what: segments(guide.what),
 							how: segments(guide.how),
 							example,
+							before,
 						},
 					}
 				: {}),
@@ -926,22 +926,23 @@ export async function buildErrorData(
 			moreSources: Math.max(0, e.sourceFiles.length - MAX_SOURCES),
 		});
 	}
-	const byPackage = new Map<string, ErrorEntry[]>();
-	for (const entry of entries) {
-		const list = byPackage.get(entry.packageName) ?? [];
-		byPackage.set(entry.packageName, list);
-		list.push(entry);
-	}
-	const rank = (name: string) => PACKAGE_ORDER.indexOf(name) + 1 || 99;
-	const groups: ErrorGroup[] = [...byPackage]
-		.sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
-		.map(([packageName, list]) => ({
-			packageName,
-			codes: list.map((entry) => ({
-				code: entry.code,
-				kind: kindLabel(entry.stage, entry.severity),
-				guided: Boolean(entry.guide),
-			})),
+	const groups: ErrorGroup[] = AREA_ORDER.map((area) => ({ area, list: entries.filter((entry) => entry.area === area) }))
+		.filter(({ list }) => list.length > 0)
+		.map(({ area, list }) => ({
+			area,
+			label: AREAS[area].label,
+			icon: AREAS[area].icon,
+			blurb: AREAS[area].blurb,
+			codes: [...list]
+				.sort((x, y) => Number(Boolean(y.guide)) - Number(Boolean(x.guide)) || x.title.localeCompare(y.title))
+				.map((entry) => ({
+					code: entry.code,
+					title: entry.title,
+					chip: entry.severity === 'warning' ? 'warning' : entry.severity === 'info' ? 'info' : 'error',
+					kind: kindLabel(entry.stage, entry.severity),
+					guided: Boolean(entry.guide),
+					words: (entry.title + ' ' + entry.code + ' ' + entry.description).toLowerCase(),
+				})),
 		}));
 	return {
 		entries,

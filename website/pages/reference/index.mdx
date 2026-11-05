@@ -3,6 +3,7 @@ import ReleaseVersion from '../../components/docs/release-version.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import InkCards from '../../components/docs/ink-cards.tsrx';
 import PackagesFigure from '../../components/figures/reference/packages-figure.tsrx';
 
 <SiteNavbar />
@@ -38,31 +39,31 @@ A *dependency* is a package another package needs, which npm installs along with
 - Each package lands after the package that needs it.
 - Delete one, and every package that needs it turns red.
 
-| Package | What it gives you |
-| --- | --- |
-| `@markless/core` | `state`, `computed`, `shared`, `element` and `storage`. Also `render()` for the browser, `renderToString()` for HTML, and the Vite plugin at `@markless/core/vite`. |
-| `@markless/router` | Apps with many pages: file routes in `pages/`, `Html`, `Link`, `navigate()`, and the Vite plugin at `@markless/router/vite`. It builds through Nitro, which deploys to many hosts. |
-| `@markless/typescript-plugin` | Editor support for `.tsrx` files. See [Editor setup](/tooling/editor-setup). |
-| `@markless/vitest-browser` | `render()` and `renderSSR()` for tests in a real browser. See [Testing](/tooling/testing). |
-| `@markless/analyzer` | Checks a running app in the browser: console errors, network requests, event wiring and JavaScript budgets you set. The Playwright driver is at `@markless/analyzer/playwright`. |
-| `create-markless` | Creates a new app. See [CLI](/reference/cli). |
+## You install core, and router for an app with pages
 
-## The packages you never import
+<InkCards label="What you install" cards={[
+	{ icon: 'markless-mug', name: '@markless/core', line: 'Every app needs it: state, computed, render() and the Vite plugin.', command: 'npm install @markless/core' },
+	{ icon: 'map', name: '@markless/router', line: 'Add it for an app with pages: file routes, Link and server rendering through Nitro.', command: 'npm install @markless/router' },
+]} />
 
-These come along as dependencies. You don't import them yourself.
+## Add the rest when you need it
 
-| Package | What it does |
-| --- | --- |
-| `@markless/compiler` | Reads `.tsrx` files and plans the state, the updates and the code each event runs, before your app runs. |
-| `@markless/bundler` | Runs the compiler inside Vite and Rolldown. |
-| `@markless/runtime` | Keeps state: reads, writes and computed updates. |
-| `@markless/serializer` | The format for the state and page data that travel with rendered HTML. |
-| `@markless/web` | The render code behind `render()` in the browser and `renderToString()` for HTML. |
+<InkCards label="Add when you need it" cards={[
+	{ icon: 'terminal', name: 'create-markless', line: 'Starts a new app with core, router and the two dev packages below already in it.', command: 'npm create markless@latest my-app', href: '/reference/cli' },
+	{ icon: 'typecheck', name: '@markless/typescript-plugin', line: 'Lets your editor read .tsrx files: colours, hovers and red lines.', command: 'npm install -D @markless/typescript-plugin', href: '/tooling/editor-setup' },
+	{ icon: 'flask', name: '@markless/vitest-browser', line: 'Tests a component in a real browser with render() and renderSSR().', command: 'npm install -D @markless/vitest-browser', href: '/tooling/testing' },
+	{ icon: 'lens', name: '@markless/analyzer', line: 'Checks a running app for console errors, requests, event wiring and JavaScript budgets.', command: 'npm install -D @markless/analyzer' },
+	{ icon: 'shapes', name: '@markless/ui', line: 'Headless, accessible UI components. Not on npm yet: npm still holds an old 0.4.0.', href: '/ui' },
+]} />
 
-## Three packages aren't on npm yet
+## These come along, and you never import them
 
-- **`@markless/ui`**: headless, accessible UI components. See [UI components](/ui). It waits on the two packages below. npm still holds an old `0.4.0` from before these pages.
-- **`@markless/icons`**: icon packs as `<pack.icon />` tags, inlined at build time.
-- **`@markless/ui-tools`**: the build tools behind `@markless/ui`.
+<InkCards label="Comes along, never imported" cards={[
+	{ icon: 'braces', name: '@markless/compiler', line: 'Reads .tsrx files and plans the state, the updates and the code each event runs.', muted: true },
+	{ icon: 'box-arrow', name: '@markless/bundler', line: 'Runs the compiler inside Vite and Rolldown.', muted: true },
+	{ icon: 'click', name: '@markless/web', line: 'The render code behind render() in the browser and renderToString() for HTML.', muted: true },
+	{ icon: 'graph', name: '@markless/runtime', line: 'Keeps state: reads, writes and computed updates.', muted: true },
+	{ icon: 'parcel', name: '@markless/serializer', line: 'The format for the state and page data that travel with rendered HTML.', muted: true },
+]} />
 
 [The glossary](/reference/glossary) gives one meaning for each word these packages use.

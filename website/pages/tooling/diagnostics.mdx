@@ -71,7 +71,7 @@ Delete the key from the `@for` line, and the error shows under the result.
 A *warning* is a wavy line in your editor, and the page still builds. To accept one on purpose, write `// markless-allow CODE: reason` above it:
 
 ```tsrx
-// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: a fixed list, its order never changes
+// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: a fixed list
 @for (const item of items; index i; key i) {
 ```
 

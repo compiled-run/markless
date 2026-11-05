@@ -7,7 +7,7 @@ import { COMPONENT, FAILURE, HANDLER, TEST } from './todo.ts';
 const rows = (lines: readonly string[], from: number) => lines.map((text, i) => ({ key: from + i, text }));
 const HEAD = rows(COMPONENT.slice(1, 6), 1);
 const TAIL = rows(COMPONENT.slice(7), 7);
-const EXPECT = TEST.findIndex((text) => text.includes('expect.poll'));
+const EXPECT = TEST.findIndex((text) => text.includes('expect.element'));
 const TEST_HEAD = rows(TEST.slice(1, EXPECT), 1);
 const TEST_LINE = TEST[EXPECT]!;
 const TEST_TAIL = rows(TEST.slice(EXPECT + 1), EXPECT + 1);
@@ -310,6 +310,7 @@ export default function RunnerFigure() @{
 				font-family: var(--font-mono);
 				font-size: 0.75rem;
 				line-height: 1.4;
+				white-space: pre-wrap;
 				color: #cb2431;
 			}
 
@@ -328,12 +329,13 @@ export default function RunnerFigure() @{
 
 			.rendered {
 				visibility: hidden;
-				padding: 0.25rem 0.8rem;
-				border: 1.5px solid currentColor;
-				border-radius: 4px;
-				background: white;
-				color: oklch(28% 0.015 90);
-				font: 0.95rem system-ui, sans-serif;
+				padding: 0.3rem 0.9rem 0.35rem;
+				border: 2px solid var(--screen-ink, var(--ink));
+				border-radius: 14px 18px 12px 16px / 16px 12px 18px 14px;
+				background: var(--screen-paper, var(--paper));
+				box-shadow: 1px 2px 0 var(--screen-ink, var(--ink));
+				color: var(--screen-ink, var(--ink));
+				font: 700 0.95rem 'Shantell Sans', system-ui, sans-serif;
 				cursor: pointer;
 				transition: transform 120ms ease;
 			}

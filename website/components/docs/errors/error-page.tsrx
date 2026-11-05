@@ -1,41 +1,46 @@
+// One error code's page: its plain title, the message as the terminal prints it, why it happens, the fix as a before and after, and related pages.
 import { Link } from '@markless/core/router';
 import Sidebar from '../sidebar.tsrx';
 import SiteNavbar from '../navbar/site-navbar.tsrx';
 import Sprite from '../../sprite.tsrx';
 import CodeLines from './code-lines.tsrx';
 import Segments from './segments.tsrx';
+import { errorIndex } from './errors-index.ts';
 import { findError } from './lookup.ts';
+import { AREAS } from './titles.ts';
 import type { ErrorEntry } from './types.ts';
 
 const SEVERITY: Readonly<Record<ErrorEntry['severity'], string>> = {
-	error: 'Error',
-	warning: 'Warning',
-	info: 'Info',
-	'error-or-warning': 'Error or warning',
+	error: 'error',
+	warning: 'warning',
+	info: 'info',
+	'error-or-warning': 'error or warning',
 };
 const STAGE: Readonly<Record<ErrorEntry['stage'], string>> = {
-	compile: 'Markless reports this while it builds your .tsrx files.',
-	build: 'Markless reports this while Vite builds or serves your app.',
-	runtime: 'Markless reports this while a page renders or runs.',
+	compile: 'while it builds your .tsrx files',
+	build: 'while Vite builds or serves your app',
+	runtime: 'while a page runs',
 };
+
+/** Up to three other codes in the same area that have a written fix. */
+function relatedTo(entry: ErrorEntry) {
+	const group = errorIndex.groups.find((g) => g.area === entry.area);
+	return (group ? group.codes : []).filter((code) => code.guided && code.code !== entry.code).slice(0, 3);
+}
 
 export default function ErrorPage({ code }: { readonly code: string }) @{
 	const entry = findError(code);
 	const missing = entry ? '' : code;
-	const severity = entry ? SEVERITY[entry.severity] : '';
-	const stage = entry ? STAGE[entry.stage] : '';
-	const tone = entry?.severity === 'warning' ? 'tag warning' : 'tag';
+	const area = entry ? AREAS[entry.area] : AREAS.build;
 	const printed = entry ? entry.printed.join('\n') : '';
 	const varies = entry ? entry.printed.some((line) => /<\w+>/.test(line)) : false;
-	const intro = entry?.structured
-		? 'Markless prints the message, the reason, and a suggestion:'
-		: 'The error carries this text:';
 	const guide = entry?.guide;
+	const internal = entry?.area === 'internal';
+	const suggestion = entry?.suggestion ?? '';
+	const related = entry ? relatedTo(entry) : [];
 	const sources = entry ? entry.sources : [];
 	const more = entry ? entry.moreSources : 0;
-	const words = (entry ? entry.code : '')
-		.split('_')
-		.map((text, index, all) => ({ id: 'w' + index, text: index < all.length - 1 ? text + '_' : text }));
+	const learn = area.learn;
 
 	<div class="error-page">
 		<SiteNavbar pathname="/errors" />
@@ -45,86 +50,113 @@ export default function ErrorPage({ code }: { readonly code: string }) @{
 				<p class="crumb">
 					<Link href="/errors">Error codes</Link>
 					<span aria-hidden="true">/</span>
-					<span>{entry.packageName}</span>
+					<a href={'/errors#' + entry.area}>{area.label}</a>
 				</p>
-				<h1 class="code-title">
-					@for (const word of words; key word.id) {
-						<>
-						<span>{word.text}</span>
-							<wbr />
-					</>
-					}
-				</h1>
-				<p class="summary">{entry.description}</p>
+				<h1>{entry.title}</h1>
 				<p class="meta">
-					<span class={tone}>{severity}</span>
-					<span>{stage}</span>
+					<code class="code">{entry.code}</code>
+					<span class={'chip ' + entry.severity}>{SEVERITY[entry.severity]}</span>
+					<span class="when">Markless raises it {STAGE[entry.stage]}.</span>
 				</p>
 
-				<h2 id="what-happened">What happened</h2>
-				@if (guide) {
-					<p>
-						<Segments parts={guide.what} />
-					</p>
-				}
+				<h2 id="message">The message</h2>
 				@if (printed) {
 					<>
-					<p>{intro}</p>
 						<pre class="printed">
 							<code>{printed}</code>
 						</pre>
 						@if (varies) {
 							<p class="note">Words in angle brackets change from case to case.</p>
 						}
-				</>
-				} @else if (!guide) {
-					<p>This error has no message text. The code is the whole message.</p>
+					</>
+				} @else {
+					<p>This error prints its code and nothing else.</p>
 				}
 
-				<h2 id="how-to-fix-it">How to fix it</h2>
+				<h2 id="why">Why</h2>
+				@if (guide) {
+					<p>
+						<Segments parts={guide.what} />
+					</p>
+				} @else if (internal) {
+					<p>Markless checks its own work as it builds and runs your app. This check failed, which means a bug in Markless, not in your code.</p>
+				} @else if (entry.why) {
+					<p>{entry.why}</p>
+				} @else {
+					<p>{entry.description}</p>
+				}
+
+				<h2 id="fix">Fix</h2>
 				@if (guide) {
 					<>
-					<p>
+						<p>
 							<Segments parts={guide.how} />
 						</p>
-						@if (guide.example.length) {
+						@if (guide.before.length) {
+							<div class="pair">
+								<div class="side">
+									<p class="label broken">Before</p>
+									<CodeLines lines={guide.before} />
+								</div>
+								<div class="side">
+									<p class="label fixed">After</p>
+									<CodeLines lines={guide.example} />
+								</div>
+							</div>
+						} @else if (guide.example.length) {
 							<CodeLines lines={guide.example} />
 						}
-				</>
+					</>
+				} @else if (internal) {
+					<p>
+						<a href="https://github.com/compiled-run/markless/issues">Open an issue</a>
+						<span> with the message above and the steps that cause it.</span>
+					</p>
+				} @else if (suggestion) {
+					<p>{suggestion}</p>
 				} @else {
 					<p>
-						@if (printed && entry.structured) {
-							<span>Start with the suggestion in the message above.</span>
-						} @else {
-							<span>Read the message above. It names the value or file involved.</span>
-						}
-						<span> This code has no written guide yet. If the message does not help, </span>
+						<span>Read the message above: it names the value or file involved. If it does not help, </span>
 						<a href="https://github.com/compiled-run/markless/issues">open an issue</a>
 						<span> with the steps that cause it.</span>
 					</p>
 				}
 				@if (entry.allow) {
 					<>
-					<p>If you accept the warning on purpose, put this comment on the line above it:</p>
+						<p>If you accept the warning on purpose, put this comment on the line above it:</p>
 						<CodeLines lines={entry.allow} />
-				</>
+					</>
 				}
 
-				<h2 id="where-it-comes-from">Where it comes from</h2>
-				<p>
-					<code>{entry.packageName}</code>
-					<span> raises this code, in these files:</span>
-				</p>
-				<ul class="sources">
-					@for (const source of sources; key source.id) {
+				<h2 id="related">Related</h2>
+				<ul class="related">
+					@if (learn) {
 						<li>
-							<a href={source.url}>{source.file}</a>
+							<a href={learn.href}>{learn.title}</a>
 						</li>
 					}
+					@for (const item of related; key item.code) {
+						<li>
+							<a href={'/errors/' + item.code}>{item.title}</a>
+						</li>
+					}
+					<li>
+						<Link href="/tooling/diagnostics">How to read a Markless error</Link>
+					</li>
 				</ul>
-				@if (more) {
-					<p class="note">And {more} more files.</p>
-				}
+				<details class="sources">
+					<summary>Where Markless raises it</summary>
+					<ul>
+						@for (const source of sources; key source.id) {
+							<li>
+								<a href={source.url}>{source.file}</a>
+							</li>
+						}
+					</ul>
+					@if (more) {
+						<p class="note">And {more} more files.</p>
+					}
+				</details>
 			</>
 		} @else {
 			<div class="missing">
@@ -138,8 +170,6 @@ export default function ErrorPage({ code }: { readonly code: string }) @{
 			</div>
 		}
 		<p class="back">
-			<Link href="/tooling/diagnostics">How to read a Markless error</Link>
-			<span aria-hidden="true">·</span>
 			<Link href="/errors">All error codes</Link>
 		</p>
 
@@ -148,54 +178,86 @@ export default function ErrorPage({ code }: { readonly code: string }) @{
 				overflow-wrap: anywhere;
 			}
 
-			.code-title {
-				font-size: var(--step-3);
-			}
-
 			.crumb {
 				display: flex;
 				flex-wrap: wrap;
 				gap: 0.4em;
 				margin-bottom: var(--space-xs);
-				font-size: var(--step--1);
-				opacity: 0.8;
-			}
-
-			.summary {
-				max-width: 46ch;
-				font-size: var(--step-1);
-				line-height: 135%;
 				opacity: 0.8;
 			}
 
 			.meta {
 				display: flex;
 				flex-wrap: wrap;
-				gap: 0.6em;
+				gap: 0.4em 0.7em;
 				align-items: baseline;
 			}
 
-			.tag {
-				padding: 0.1em 0.6em;
-				border: 2px solid var(--ink);
-				border-radius: 999px;
-				background: var(--pink);
-				color: var(--on-accent);
-				font-weight: 700;
+			.code {
+				font-family: var(--font-mono);
+				font-size: 0.85rem;
+				overflow-wrap: anywhere;
 			}
 
-			.tag.warning {
-				background: var(--yellow);
+			.chip {
+				padding: 0 0.45em;
+				border: 1.5px solid currentColor;
+				border-radius: 5px 7px 6px 8px;
+				font: 600 0.85rem/1.5 'Joy Elia', system-ui, sans-serif;
+				letter-spacing: 0.05em;
+			}
+
+			.chip.error,
+			.chip.error-or-warning {
+				color: color-mix(in oklch, var(--pink) 55%, var(--ink));
+			}
+
+			.when {
+				color: color-mix(in oklch, var(--ink) 75%, transparent);
 			}
 
 			.printed code {
+				display: block;
 				white-space: pre-wrap;
+				text-indent: 2ch hanging each-line;
 				overflow-wrap: anywhere;
+			}
+
+			.pair {
+				display: grid;
+				gap: var(--space-xs);
+			}
+
+			.side {
+				min-width: 0;
+			}
+
+			.label {
+				margin: 0 0 0.2rem;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 1.05rem;
+				letter-spacing: 0.05em;
+			}
+
+			.label.broken {
+				color: color-mix(in oklch, var(--pink) 55%, var(--ink));
+			}
+
+			.related {
+				padding-left: 1.2em;
 			}
 
 			.note {
 				font-size: var(--step--1);
 				opacity: 0.8;
+			}
+
+			.sources {
+				margin-top: var(--space-m);
+			}
+
+			.sources summary {
+				cursor: pointer;
 			}
 
 			.sources a {
@@ -207,9 +269,6 @@ export default function ErrorPage({ code }: { readonly code: string }) @{
 			}
 
 			.back {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.6em;
 				margin-top: var(--space-l);
 				padding-top: var(--space-s);
 				border-top: 2px dashed var(--code-edge);

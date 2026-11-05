@@ -1,260 +1,270 @@
-// A terminal in the repo: pnpm install points git at .githooks, and from then on git commit runs lint and CI's fast jobs first. Commit before installing and nothing is checked; leave an unused import and the commit stops with the fix.
+// A contributor's first hour as a step-through: a real terminal, and a file panel once there is a change. The hook stops a commit with an unused import; click the red line to remove it.
 import { computed, state } from '@markless/core';
 import InkButton from '../ink/ink-button.tsrx';
 import InkScreen from '../ink/ink-screen.tsrx';
-import { BARE, COMMIT, INSTALL, LINT_FAIL } from './terminal.ts';
+import { FILE, LINES, PANEL, RAIL, STEPS } from './terminal.ts';
+
+const LAST = STEPS.length - 1;
+const REST = PANEL.slice(2);
 
 export default function TerminalFigure() @{
-	let hooks = state(false);
-	let unused = state(false);
-	let last = state('');
-	let beat = state(0);
-	let said = state('');
-	const typed = computed(() => (last === 'install' ? 'pnpm install' : last === '' ? '' : 'git commit -m "Start the calendar week on Monday"'));
-	const shown = (block: string) => (last === block ? (beat % 2 ? 'block on odd' : 'block on even') : 'block');
-	const installClass = computed(() => shown('install'));
-	const commitClass = computed(() => shown('commit'));
-	const failClass = computed(() => shown('fail'));
-	const bareClass = computed(() => shown('bare'));
-
-	const install = () => {
-		hooks = true;
-		last = 'install';
-		beat = beat + 1;
-		said = 'pnpm install ran the prepare script: git config core.hooksPath .githooks.';
+	let step = state(0);
+	let downX = state(-1);
+	const caption = computed(() => STEPS[step]!.caption);
+	const nextLabel = computed(() => (step === LAST ? 'Start over' : 'Next'));
+	const go = (to: number) => {
+		step = Math.max(0, Math.min(LAST, to));
 	};
-	const commit = () => {
-		beat = beat + 1;
-		if (!hooks) {
-			last = 'bare';
-			said = 'Committed with no checks: git has no hooks until pnpm install sets core.hooksPath.';
-			return;
-		}
-		if (unused) {
-			last = 'fail';
-			said = 'The pre-commit hook stopped the commit: vp lint failed. It printed the fix command.';
-			return;
-		}
-		last = 'commit';
-		said = 'The pre-commit hook ran lint, then the four fast jobs, and the commit went through.';
-	};
+	const next = () => go(step === LAST ? 0 : step + 1);
 
 	<figure
-		class="terminal-toy"
+		class="first-hour"
+		tabindex={0}
+		aria-label="A contributor's first hour, step by step. Next or the right arrow moves on, the left arrow goes back, Home or Escape starts over."
 		onKeyDown={(event) => {
-			if (event.key !== 'Escape') return;
-			hooks = false;
-			unused = false;
-			last = '';
-			said = 'A fresh clone: no hooks yet.';
+			if ((event.target as Element).tagName === 'INPUT') return;
+			if (event.key === 'ArrowRight') {
+				event.preventDefault();
+				go(step + 1);
+			} else if (event.key === 'ArrowLeft') {
+				event.preventDefault();
+				go(step - 1);
+			} else if (event.key === 'Home' || event.key === 'Escape') go(0);
+			else if (event.key === 'End') go(LAST);
+		}}
+		onPointerDown={(event) => {
+			downX = (event.target as Element).closest('button') ? -1 : event.clientX;
+		}}
+		onPointerUp={(event) => {
+			if (downX < 0) return;
+			const dx = event.clientX - downX;
+			downX = -1;
+			if (dx < -40) go(step + 1);
+			else if (dx > 40) go(step - 1);
 		}}
 	>
-		<InkScreen url="~/markless" tone="dark" label="A terminal in the markless repo">
+		<div class="stage" data-step={step}>
 			<div class="term">
-				<p class="prompt">
-					<span class="sigil">$</span> {typed}
-					<span class="caret" aria-hidden="true">▍</span>
-				</p>
-				<div class={installClass}>
-					@for (const line of INSTALL; key line) {
-						<p class={line.startsWith('. prepare$') ? 'out key' : 'out'}>{line}</p>
-					}
-				</div>
-				<div class={commitClass}>
-					@for (const line of COMMIT; key line) {
-						<p class={line.includes('passed') || line.startsWith('pass:') ? 'out ok' : 'out'}>{line}</p>
-					}
-				</div>
-				<div class={failClass}>
-					@for (const line of LINT_FAIL; key line) {
-						<p class={line.startsWith('Fix with') ? 'out key' : 'out bad'}>{line}</p>
-					}
-				</div>
-				<div class={bareClass}>
-					@for (const line of BARE; key line) {
-						<p class="out">{line}</p>
-					}
-					<p class="out quiet"># no hook ran: nothing was checked</p>
-				</div>
-				<div class="keys" role="group" aria-label="Commands">
-					<InkButton onClick={() => install()}>pnpm install</InkButton>
-					<InkButton alt onClick={() => commit()}>git commit</InkButton>
-				</div>
+				<InkScreen url="~/markless" tone="dark" label="Terminal">
+					<div class="lines">
+						@for (const line of LINES; key line.key) {
+							<p class={'ln s' + line.step + ' ' + line.kind}>{line.text}</p>
+						}
+					</div>
+				</InkScreen>
 			</div>
-		</InkScreen>
-		<label class="slip">
-			<input
-				type="checkbox"
-				checked={unused}
-				onChange={(event) => {
-					unused = (event.target as HTMLInputElement).checked;
-					said = unused ? 'calendar.tsrx now has an unused import.' : 'The unused import is gone.';
-				}}
-			/>
-			<span>
-				Leave an unused <code>import</code> in <code>calendar.tsrx</code>
-			</span>
-		</label>
-		<p class="sr" aria-live="polite">{said}</p>
+			<div class="file">
+				<InkScreen url={FILE} label="The file you change">
+					<div class="code">
+						<p class="row">{PANEL[0]!.text}</p>
+						<p class="row slip">
+							<button type="button" class="slip-fix" aria-label="Remove the unused import" onClick={() => go(5)}>
+								{PANEL[1]!.text}
+							</button>
+						</p>
+						<div>
+							@for (const row of REST; key row.key) {
+								<p class={'row ' + row.kind}>{row.text}</p>
+							}
+						</div>
+					</div>
+				</InkScreen>
+			</div>
+		</div>
+		<div class="controls">
+			<ol class="rail">
+				@for (const dot of RAIL; key dot.key) {
+					<li>
+						<button type="button" class={dot.key === step ? 'pip now' : dot.key < step ? 'pip past' : 'pip'} aria-label={'Step ' + dot.n + ': ' + dot.caption} aria-current={dot.key === step ? 'step' : 'false'} onClick={() => go(dot.key)}>
+							{dot.n}
+						</button>
+					</li>
+				}
+			</ol>
+			<InkButton onClick={() => next()}>{nextLabel}</InkButton>
+		</div>
+		<p class="caption" aria-live="polite">{caption}</p>
 		<style>
-			.terminal-toy {
+			.first-hour {
+				container-type: inline-size;
 				margin: var(--space-m) 0;
+				border-radius: 12px;
+				touch-action: pan-y;
 			}
 
-			.term {
-				padding: 0.6rem 1rem 0.9rem;
-				font-size: 0.86rem;
-				line-height: 1.5;
-				min-height: 13rem;
+			.first-hour:focus-visible {
+				outline: 2px dashed var(--ink);
+				outline-offset: 4px;
 			}
 
-			.prompt,
-			.out {
+			.stage {
+				display: grid;
+				gap: 0.8rem;
+				grid-template-columns: minmax(0, 1fr);
+			}
+
+			@container (min-width: 760px) {
+				.stage:not([data-step='0']):not([data-step='1']):not([data-step='2']) {
+					grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+				}
+			}
+
+			.lines,
+			.code {
+				padding: 0.6rem 0.9rem 0.9rem;
+				min-height: 9.5em;
 				font-family: var(--font-mono);
+				font-size: 0.82rem;
+				line-height: 1.55;
+				font-weight: 500;
 			}
 
-			.term p {
+			.lines p,
+			.code p {
+				font-family: var(--font-mono);
+				font-size: 0.82rem;
+				line-height: 1.55;
 				margin: 0;
 				white-space: pre-wrap;
 				overflow-wrap: anywhere;
 			}
 
-			.prompt {
-				font-weight: 700;
-			}
-
-			.sigil {
-				opacity: 0.6;
-			}
-
-			.caret {
-				animation: blink 1s steps(1) infinite;
-			}
-
-			@keyframes blink {
-				50% {
-					opacity: 0;
-				}
-			}
-
-			.block {
+			.ln {
 				display: none;
 			}
 
-			.block.on {
+			.stage[data-step='0'] .s0,
+			.stage[data-step='1'] .s1,
+			.stage[data-step='2'] .s2,
+			.stage[data-step='3'] .s3,
+			.stage[data-step='4'] .s4,
+			.stage[data-step='5'] .s5,
+			.stage[data-step='6'] .s6 {
 				display: block;
+				animation: type-in 260ms ease both;
 			}
 
-			.out {
-				border-radius: 4px;
-				transition: background 160ms ease;
-			}
-
-			.out:hover {
-				background: color-mix(in oklch, var(--yellow) 22%, transparent);
-			}
-
-			.on .out {
-				animation: type-a 260ms ease-out both;
-			}
-
-			.on.even .out {
-				animation-name: type-b;
-			}
-
-			.on .out:nth-child(2) {
-				animation-delay: 180ms;
-			}
-
-			.on .out:nth-child(3) {
-				animation-delay: 360ms;
-			}
-
-			.on .out:nth-child(4) {
-				animation-delay: 540ms;
-			}
-
-			.on .out:nth-child(5) {
-				animation-delay: 720ms;
-			}
-
-			.on .out:nth-child(6) {
-				animation-delay: 900ms;
-			}
-
-			.on .out:nth-child(7) {
-				animation-delay: 1080ms;
-			}
-
-			@keyframes type-a {
+			@keyframes type-in {
 				from {
 					opacity: 0;
 					transform: translateY(3px);
 				}
 			}
 
-			@keyframes type-b {
-				from {
-					opacity: 0;
-					transform: translateY(3px);
-				}
-			}
-
-			.key {
-				background: color-mix(in oklch, var(--yellow) 30%, transparent);
+			.cmd {
+				font-weight: 800;
 			}
 
 			.ok {
-				opacity: 0.85;
+				color: oklch(78% 0.13 150);
 			}
 
 			.bad {
-				color: color-mix(in oklch, #cb2431 70%, var(--screen-ink));
-				font-weight: 700;
+				color: oklch(72% 0.17 25);
 			}
 
-			.quiet {
-				opacity: 0.55;
-				font-style: italic;
+			.dim {
+				opacity: 0.6;
 			}
 
-			.keys {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.6rem;
-				margin-top: 0.9rem;
-				font-family: var(--font-mono);
+			.file {
+				display: none;
 			}
 
-			.slip {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.5rem;
-				margin: 0 0 0 0.4rem;
-				font-size: 0.95rem;
+			.stage[data-step='3'] .file,
+			.stage[data-step='4'] .file,
+			.stage[data-step='5'] .file,
+			.stage[data-step='6'] .file {
+				display: block;
+			}
+
+			.row.added {
+				background: color-mix(in oklch, oklch(70% 0.14 150) 22%, transparent);
+			}
+
+			.row.slip {
+				background: color-mix(in oklch, var(--yellow) 45%, transparent);
+			}
+
+			.stage[data-step='5'] .row.slip,
+			.stage[data-step='6'] .row.slip {
+				display: none;
+			}
+
+			.slip-fix {
+				all: unset;
+				white-space: pre-wrap;
 				cursor: pointer;
 			}
 
-			.slip input {
-				accent-color: var(--ink);
-				width: 1.05rem;
-				height: 1.05rem;
+			.stage[data-step='4'] .slip-fix {
+				text-decoration: underline wavy oklch(55% 0.19 25);
+				text-underline-offset: 3px;
+			}
+
+			.slip-fix:hover {
+				text-decoration: line-through;
+			}
+
+			.slip-fix:focus-visible {
+				outline: 2px dashed currentColor;
+				outline-offset: 2px;
+			}
+
+			.controls {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				justify-content: center;
+				gap: 0.8rem 1.2rem;
+				margin-top: 0.7rem;
+			}
+
+			.rail {
+				display: flex;
+				gap: 0.35rem;
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+
+			.pip {
+				width: 1.9rem;
+				height: 1.9rem;
+				border: 1.5px solid var(--ink);
+				border-radius: 50% 46% 52% 48%;
+				background: transparent;
+				color: var(--ink);
+				font: 700 0.85rem/1 'Shantell Sans', system-ui, sans-serif;
+				cursor: pointer;
+			}
+
+			.pip.past {
+				background: color-mix(in oklch, var(--ink) 12%, transparent);
+			}
+
+			.pip.now {
+				background: var(--pink);
+				color: oklch(28% 0.015 90);
+			}
+
+			.pip:hover {
+				background: color-mix(in oklch, var(--pink) 40%, transparent);
+			}
+
+			.caption {
+				min-height: 2.8em;
+				margin: 0.6rem auto 0;
+				max-width: 34rem;
+				text-align: center;
+				font-size: 1rem;
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.terminal-toy * {
+				.first-hour * {
 					animation: none !important;
 					transition: none !important;
 				}
-			}
-
-			.sr {
-				position: absolute;
-				width: 1px;
-				height: 1px;
-				overflow: hidden;
-				clip-path: inset(50%);
-				white-space: nowrap;
 			}
 		</style>
 	</figure>

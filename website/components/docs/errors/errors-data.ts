@@ -4,6 +4,8 @@ import type { ErrorEntry } from './types.ts';
 export const errorEntries: readonly ErrorEntry[] = [
 	{
 		code: 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE',
+		title: 'markless-allow cannot silence an error',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -15,6 +17,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE',
 		],
 		structured: true,
+		why: 'markless-allow is a per-site escape hatch for warning diagnostics only; it must stay readable and current for the next person editing the site.',
+		suggestion: 'Fix the diagnostic or remove the markless-allow comment.',
 		guide: {
 			summary: 'A markless-allow comment tries to silence an error.',
 			what: [
@@ -44,6 +48,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		allow: [
 			{
@@ -68,6 +73,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ALLOW_REASON_REQUIRED',
+		title: 'markless-allow needs a reason',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -79,6 +86,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ALLOW_REASON_REQUIRED',
 		],
 		structured: true,
+		why: 'markless-allow is a per-site escape hatch for warning diagnostics only; it must stay readable and current for the next person editing the site.',
+		suggestion: '// markless-allow CODE: reason',
 		guide: {
 			summary: 'A markless-allow comment has no reason after the colon.',
 			what: [
@@ -114,6 +123,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -126,6 +136,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ALLOW_STALE',
+		title: 'markless-allow names a warning that no longer fires',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -137,6 +149,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ALLOW_STALE',
 		],
 		structured: true,
+		why: 'markless-allow is a per-site escape hatch for warning diagnostics only; it must stay readable and current for the next person editing the site.',
+		suggestion: 'Fix the diagnostic or remove the markless-allow comment.',
 		guide: {
 			summary: 'A markless-allow comment names a code that no longer fires on that line.',
 			what: [
@@ -170,6 +184,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		allow: [
 			{
@@ -194,6 +209,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ARM_COMMIT_ANCHORS_MISSING',
+		title: 'An @try lost its place on the page',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -213,6 +230,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ARM_COMMIT_RENDERER_MISSING',
+		title: 'An @try has nothing to render with',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -232,6 +251,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ARTIFACT_CHILD_PROP_NOT_BUILD_KNOWN',
+		title: 'A child prop is not known at build time',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -243,6 +264,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ARTIFACT_CHILD_PROP_NOT_BUILD_KNOWN',
 		],
 		structured: true,
+		why: 'A delegate is rendered once at build time, so every prop it reads must be a value the compiler can read at build time.',
+		suggestion: 'Pass a static value, or compose the child as TSRX source.',
 		sources: [
 			{
 				id: 'f0',
@@ -254,6 +277,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ARTIFACT_CHILD_RENDER_INVALID',
+		title: 'A child rendered no HTML at build time',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -265,6 +290,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ARTIFACT_CHILD_RENDER_INVALID',
 		],
 		structured: true,
+		why: 'The materialized edge is the delegate rendered output, so an output without HTML leaves nothing to inline.',
+		suggestion: 'Return an object with a string `html` field from renderSsr.',
 		sources: [
 			{
 				id: 'f0',
@@ -276,6 +303,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_ARM_ORDER',
+		title: 'An `@pending` arm is written after `@catch`',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -287,6 +316,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ASYNC_ARM_ORDER',
 		],
 		structured: true,
+		why: 'TSRX defines the order of the arms, and the parser has no @try left to attach a later `@pending` to. Building it anyway would put the word "@pending" and the arm\'s source on the page, with no waiting state.',
+		suggestion:
+			'Move the `@pending { ... }` arm before `@catch`: `@try { ... } @pending { ... } @catch (error) { ... }`.',
 		sources: [
 			{
 				id: 'f0',
@@ -303,6 +335,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
+		title: 'The settled @try content cannot render in the browser yet',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -314,6 +348,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'The compiler emits a browser-side render module for @try/@catch content so it can update after the data settles. A shape the module cannot render would silently stay frozen, so the compiler reports it instead.',
 		allow: [
 			{
 				id: 'l0',
@@ -337,6 +372,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED',
+		title: 'An async value is read outside @try',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -348,6 +385,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ASYNC_BOUNDARY_REQUIRED',
 		],
 		structured: true,
+		why: 'Async computed values can be pending or rejected during initial render and resume. The runtime needs an explicit TSRX async boundary to render pending and error UI.',
+		suggestion:
+			'Wrap this template read in @try with @pending and @catch branches, or read a sync computed that is already guarded by an async boundary.',
 		guide: {
 			summary: 'The markup reads an async computed() outside an @try block.',
 			what: [
@@ -555,6 +595,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -567,6 +608,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
+		title: 'An async value looks something up after an await',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -578,6 +621,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ASYNC_POST_AWAIT_READ',
 		],
 		structured: true,
+		why: 'Reads after an await join the dependency key, which is fixed before the await starts. This path is only known after the await, so the key could only hold the whole collection, and every write anywhere in it would rerun the awaited work.',
+		suggestion:
+			'Return what "<awaitedSegment>" comes from in this computed\'s result, and do the lookup "<source>" in a sync computed() that reads it.',
 		guide: {
 			summary: 'An async computed() looks a value up with a key that comes from an await.',
 			what: [
@@ -779,6 +825,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -791,6 +838,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_SETTLE_RECORDS_MISSING',
+		title: 'A settled @try has no records',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -808,6 +857,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_SETTLE_SOURCE_AMBIGUOUS',
+		title: 'A settled @try has two sources',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -825,6 +876,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED',
+		title: 'Attach can only be bound to host elements',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -836,6 +889,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED',
 		],
 		structured: true,
+		why: 'Element behaviors are resumed by locating the owning DOM element. A component is not a DOM locator and may render zero, one, or many host nodes.',
+		suggestion:
+			'Move attach={...} to a host element such as <canvas>, or make the component forward behavior to a known host element in its own TSRX body.',
 		sources: [
 			{
 				id: 'f0',
@@ -847,6 +903,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ATTACH_NO_START_TRIGGER',
+		title: 'Nothing starts this attach function',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -858,6 +916,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ATTACH_NO_START_TRIGGER',
 		],
 		structured: true,
+		why: 'A server-rendered page ships no code until something asks for it. attach starts the first time an event handler on its element or inside it runs, or when onVisible or onIdle on the same element fires. On a page rendered in the browser it runs as soon as the element is created.',
+		suggestion:
+			'Add onVisible={() => {}} to <<tagName>> to start it when the element scrolls into view, or onIdle={() => {}} to start it once the page is idle.',
 		guide: {
 			summary: 'Nothing on a server-rendered page starts this attach function.',
 			what: [
@@ -1034,6 +1095,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -1046,6 +1108,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ATTRIBUTE_DUPLICATE',
+		title: 'Duplicate attribute on one element',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1056,6 +1120,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'Keep one `<attributeName>` attribute on this element.',
 		],
 		structured: true,
+		why: 'Duplicate attributes ship invalid HTML and make the element depend on parser and update semantics instead of one authored value.',
+		suggestion: 'Keep one `<attributeName>` attribute on this element.',
 		sources: [
 			{
 				id: 'f0',
@@ -1067,6 +1133,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE',
+		title: 'An on* attribute is plain HTML, not a handler',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1077,6 +1145,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'Use the event prop casing, for example `<eventSuggestion>={...}`, or serialize a string deliberately.',
 		],
 		structured: true,
+		why: 'Attribute bindings serialize to plain text in HTML and DOM updates; only graph cells keep structured values across resume.',
+		suggestion:
+			'Use the event prop casing, for example `<eventSuggestion>={...}`, or serialize a string deliberately.',
 		sources: [
 			{
 				id: 'f0',
@@ -1088,6 +1159,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_BARE_ARM_INTERPOLATION',
+		title: 'A branch shows a bare value, not markup',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1100,6 +1173,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_BARE_ARM_INTERPOLATION',
 		],
 		structured: true,
+		why: 'Template output is an element, a fragment, or a control-flow construct. A statement container that needs to render text says so with a fragment, which gives the text its own marker range inside the arm.',
+		suggestion: 'Wrap it in a fragment: <wrapped>',
 		sources: [
 			{
 				id: 'f0',
@@ -1111,6 +1186,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
+		title: 'This element behavior cannot run in the browser yet',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1121,6 +1198,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'Element behavior symbols run after browser resume. Behavior factories may use module functions, graph inputs, element handles, props/shared values, or serializable capture-plane inputs; unsupported body locals would otherwise become missing behavior code.',
 		sources: [
 			{
 				id: 'f0',
@@ -1132,6 +1210,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_BRANCH_ARM_EMPTY',
+		title: 'An @if branch rendered nothing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -1151,6 +1231,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
+		title: 'This <label> renders <shown> in the browser when it changes',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -1163,6 +1245,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
 		],
 		structured: true,
+		why: 'A flip rebuilds plain markup and value reads without running anything. Content that only running a component can produce is rendered in the browser the way the server rendered it, which loads that component and its records on the first flip.',
+		suggestion:
+			'To keep <shown> and what it holds across changes, render it outside the <label> and hide it with an attribute instead.',
 		allow: [
 			{
 				id: 'l0',
@@ -1186,6 +1271,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		title: 'Changing this <label> cannot rebuild what it shows',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error-or-warning',
@@ -1197,6 +1284,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+		suggestion:
+			'Move the component outside the <label> and hide it with an attribute, lift its state up to the component that owns the <label>, or keep the <label> content to plain elements, text, and state reads.',
 		allow: [
 			{
 				id: 'l0',
@@ -1225,6 +1315,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_BRANCH_ELSE_SPELLING',
+		title: 'else is missing its @',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1236,6 +1328,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_BRANCH_ELSE_SPELLING',
 		],
 		structured: true,
+		why: 'Markless branches are spelled with the `@` sigil — `@if`, `@else if`, `@else` — because that sigil is what tells the parser a construct starts here. Without it the parser has no branch to attach the alternative to, and the mistake is silent: the module compiles and ships visible garbage instead of failing.',
+		suggestion: 'Write the alternative as `@else { ... }`.',
 		guide: {
 			summary: 'An @if branch uses else without the @ sign.',
 			what: [
@@ -1393,6 +1487,261 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Menu',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' open ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'false',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r8',
+							text: ');',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@if',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' (open) {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>Open</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t} ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'else',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l8',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>Closed</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l9',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l10',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
 		},
 		sources: [
 			{
@@ -1410,6 +1759,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CALL_WRITES_ASSUMED',
+		title: 'This call is assumed to change the state it is passed',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1422,6 +1773,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CALL_WRITES_ASSUMED',
 		],
 		structured: true,
+		why: 'The called function is looked up at run time, comes from a package, or passes the value on to code the compiler cannot read. Changes it makes before returning still reach the page; everything that reads the value updates, not only what changed.',
+		suggestion:
+			'Call a function from a .ts or .tsrx file in this project so Markless can read which paths it writes, or write the state in the handler itself.',
 		sources: [
 			{
 				id: 'f0',
@@ -1433,6 +1787,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
+		title: 'Callback props accept at most one parameter',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1444,6 +1800,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'The callback transport carries one callback value across the lazy-symbol boundary. Multiple parameters, defaults, and rest bindings do not have supported parameter semantics when the symbol runs.',
+		suggestion:
+			'Pass a single object instead — change `(kind, payload) => ...` to `({ kind, payload }) => ...` and invoke the callback with one object value; remove parameter defaults and rest bindings.',
 		sources: [
 			{
 				id: 'f0',
@@ -1455,6 +1814,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED',
+		title: 'A callback slot can only be filled by the widget root’s own callback prop',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1467,6 +1828,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'A callback slot is a compile-time route, not a stored value: the build records that this widget root’s callback prop answers the slot, and a part invoking the slot dispatches straight to the consumer’s handler. A local function has no consumer to route to, so nothing could be recorded and the call would silently do nothing.',
+		suggestion:
+			'Declare the handler as a prop of <componentName> and assign that prop: <slotName> = <thatProp>.',
 		sources: [
 			{
 				id: 'f0',
@@ -1478,6 +1842,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CALLBACK_SLOT_UNBOUND',
+		title: 'A callback slot is invoked but no component fills it',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -1490,6 +1856,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CALLBACK_SLOT_UNBOUND',
 		],
 		structured: true,
+		why: 'Without an assignment there is no widget root to route the call to, so the invocation can never reach a consumer and does nothing at runtime.',
+		suggestion:
+			"Assign the widget root's callback prop into the slot: <instance>.<slotName> = <thatProp>.",
 		allow: [
 			{
 				id: 'l0',
@@ -1513,6 +1882,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CALLBACK_SLOT_UNRESOLVED',
+		title: 'A callback came from a part no widget owns',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -1533,6 +1904,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CANONICAL_CLIENT_ROOT_MISSING',
+		title: 'The page’s root component is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -1550,6 +1923,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CANONICAL_SYMBOL_MISSING',
+		title: 'A piece of the page’s code is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -1567,6 +1942,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CAPTURE_METADATA_MISSING',
+		title: 'An imported component was built by an older Markless',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1578,6 +1955,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CAPTURE_METADATA_MISSING',
 		],
 		structured: true,
+		why: 'Composing a child whose capture metadata is stale or absent would link captures against an artifact this compiler did not produce.',
+		suggestion:
+			'Rebuild the child with the current Markless compiler and clear any stale build cache.',
 		sources: [
 			{
 				id: 'f0',
@@ -1589,6 +1969,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CAPTURE_OPAQUE_PROP',
+		title: 'A handler uses a prop the browser cannot get back',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1600,6 +1982,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
 		],
 		structured: true,
+		why: 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.',
+		suggestion:
+			'Call it optionally as <propName>?.(…), guard it with if (<propName>), or pass <propName> where "<componentName>" is rendered.',
 		guide: {
 			summary: 'An event handler uses a prop whose value the browser cannot get back.',
 			what: [
@@ -1836,6 +2221,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -1848,6 +2234,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CAPTURE_SLOT_UNBINDABLE',
+		title: 'A captured value has nowhere to go',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -1865,6 +2253,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
+		title: 'A handler captures a value the browser cannot rebuild',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1876,6 +2266,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 		],
 		structured: true,
+		why: 'Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.',
 		sources: [
 			{
 				id: 'f0',
@@ -1887,6 +2278,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT',
+		title: 'This component renders a list with no element around it',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1899,6 +2292,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CHILD_REPEAT_WITHOUT_ELEMENT',
 		],
 		structured: true,
+		why: 'A keyed repeat records one parent element: resume keys the served rows under it and inserts new rows into it. Inside another component the rows land in an element the child never wrote, at a position the child cannot know.',
+		suggestion:
+			'Wrap the @for in <child> in an element, for example <ul>@for (...) { <li>...</li> }</ul>.',
 		sources: [
 			{
 				id: 'f0',
@@ -1910,6 +2306,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CHILD_SYMBOL_MISSING',
+		title: 'A linked component is missing a piece',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -1929,6 +2327,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CHILDREN_OPAQUE',
+		title: 'Code maps or counts children',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -1940,6 +2340,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CHILDREN_OPAQUE',
 		],
 		structured: true,
+		why: 'The compiler owns children projection; there is no render-output array to inspect, so React-style children access would silently misbehave.',
+		suggestion: 'Render {children} directly or move per-item rendering to the parent.',
 		guide: {
 			summary: 'Code maps, counts, indexes, or changes children.',
 			what: [
@@ -1973,6 +2375,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -1985,6 +2388,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CLIENT_BUILD_FAILED',
+		title: 'The browser build failed',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -2004,6 +2409,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CLIENT_BUILD_PROCESS',
+		title: 'The browser build’s own process failed',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -2023,6 +2430,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPILE_BLOCKED',
+		title: 'A .tsrx file has errors, so the build stopped',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -2053,6 +2462,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -2065,6 +2475,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPILER_PASS_GRAPH_INVALID',
+		title: 'The compiler’s own passes are out of order',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -2085,6 +2497,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_BARREL_UNRESOLVED',
+		title: 'A component re-export points nowhere',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2096,6 +2510,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPONENT_BARREL_UNRESOLVED',
 		],
 		structured: true,
+		why: 'A barrel names the parts module rather than the components, so a re-export that resolves to nothing would silently drop every component behind it.',
+		suggestion:
+			"Check that <source> exists next to <filename> and is reachable by this build's resolver.",
 		sources: [
 			{
 				id: 'f0',
@@ -2112,6 +2529,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_EXPORT_NAME_RESERVED',
+		title: 'A component uses a name Markless reserves',
+		area: 'components',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -2129,6 +2548,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_IMPORT_CYCLE',
+		title: 'Two files render each other',
+		area: 'components',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -2515,6 +2936,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -2527,6 +2949,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_PART_AS_PAGE',
+		title: 'A component part was served as a page',
+		area: 'components',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -2546,6 +2970,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED',
+		title: 'A prop expression that reads state needs a route the child can follow',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2558,6 +2984,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'A child reads a prop through the graph node the parent named. An expression with no node behind it can only be seeded once, from whatever the value happened to be at render - so the child would show a stale value forever and nothing would say so.',
+		suggestion:
+			'Pass a value the compiler can follow: a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads (`group.value.includes(item.value)`). If the value needs a function of your own, put that function inside a `computed()` and pass the computed.',
 		sources: [
 			{
 				id: 'f0',
@@ -2569,6 +2998,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
+		title: 'A component returns markup from two places',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2580,6 +3011,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 		],
 		structured: true,
+		why: 'Initial render executes component bodies, but resume needs one planned root with stable locators. Multiple or conditional template returns need branch records before they can render.',
+		suggestion:
+			'Use a single root with @if/@else inside it, or return null before the one root for a guard clause.',
 		guide: {
 			summary: 'A component returns markup from more than one place.',
 			what: [
@@ -2622,6 +3056,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -2634,6 +3069,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
+		title: 'Only the props rest binding can be spread onto a component',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2646,6 +3083,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'What a spread carries onto a child component is decided at build time, from the signature that produced it. An object assembled anywhere else has no build-time contents, so the child would render without the entries and nothing would say so.',
+		suggestion:
+			"Spread the rest binding of this component's own props (`function Part({ known, ...rest })` then `<Child {...rest} />`), or write the props you mean out by name on the tag.",
 		sources: [
 			{
 				id: 'f0',
@@ -2657,6 +3097,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPONENT_TAG_UNRESOLVED',
+		title: 'A component tag like <ui.Tabs> is not imported',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2668,6 +3110,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPONENT_TAG_UNRESOLVED',
 		],
 		structured: true,
+		why: 'The compiler links a child component to the module it comes from at build time. Without an import it cannot find the component to render, and dropping the tag silently would delete the subtree.',
+		suggestion:
+			"Import the object that holds the component, for example `import * as <rootName> from './<rootName>.tsrx';` or `import { <rootName> } from './<rootName>.ts';`.",
 		sources: [
 			{
 				id: 'f0',
@@ -2679,6 +3124,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPOSED_DOM_UPDATE_UNMAPPED',
+		title: 'An update reads a prop with no route',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -2698,6 +3145,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED',
+		title: 'A value belongs to neither a component nor the page',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -2717,6 +3166,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPOSED_READ_UNMAPPED',
+		title: 'A read has no route through its component',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -2739,6 +3190,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
+		title: 'A computed() reads itself',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2750,6 +3203,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPUTED_DEPENDENCY_CYCLE',
 		],
 		structured: true,
+		why: 'A derive is a pull-based graph node; a cycle in its dependencies means there is no order in which the graph can produce the value.',
+		suggestion:
+			'Reference the source binding you meant to derive from, or rename one of the two values if this was a shadowing typo.',
 		guide: {
 			summary: 'A computed() value reads itself.',
 			what: [
@@ -2774,6 +3230,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -2786,6 +3243,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPUTED_READ_CALLED',
+		title: 'A computed() is called like a function',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2797,6 +3256,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPUTED_READ_CALLED',
 		],
 		structured: true,
+		why: "computed() answers with the derived VALUE rather than a handle to call - its declared type is the value's own type - so the compiler lowers every read of a computed into a read of its cell. Parentheses written around that read are applied to the value the read answers with, not to the expression that produced it, and nothing at build time pointed at the difference.",
+		suggestion:
+			'Drop the parentheses: write "<called>" where the expression writes "<called>()".',
 		guide: {
 			summary: 'A computed() value is called like a function.',
 			what: [
@@ -2839,6 +3301,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -2856,6 +3319,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPUTED_READS_RENDER_LOCAL',
+		title: 'A computed reads a component-body local the browser cannot recompute',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2868,6 +3333,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPUTED_READS_RENDER_LOCAL',
 		],
 		structured: true,
+		why: 'A computed re-derives in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
+		suggestion:
+			'Declare `<localName>` as `const <localName> = ...` built only from module values, props, and state; move it to module scope; or make it state: `const <localName> = state(...)`.',
 		sources: [
 			{
 				id: 'f0',
@@ -2879,6 +3347,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_COMPUTED_ROW_WRITE',
+		title: 'Rows of a computed() list are read-only',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2890,6 +3360,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_COMPUTED_ROW_WRITE',
 		],
 		structured: true,
+		why: 'A computed() value is derived from other state every time that state changes, so a change written into one of its rows would have no owner: the next recompute would replace it, and the serialized graph could not say where it belongs after resume.',
+		suggestion:
+			'Write the change to <sourceHint> instead, for example by mapping it to a new array: `<list> = <list>.map((item) => (item.id === <itemName>.id ? { ...item, field: value } : item))`. "<name>" recomputes and the row updates.',
 		sources: [
 			{
 				id: 'f0',
@@ -2901,6 +3374,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CSR_BEHAVIOR_HOST_MISSING',
+		title: 'A behavior’s element is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -2918,6 +3393,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED',
+		title: 'An event found no handler',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -2935,6 +3412,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CSR_DOM_JOURNAL_TARGET_MISSING',
+		title: 'An update’s element is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -2955,6 +3434,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CSR_GRAPH_NOT_DEMANDED',
+		title: 'The page’s state was not loaded',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -2972,6 +3453,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CSR_ROOT_DECLARATION_MISSING',
+		title: 'The root component is not declared',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -2989,6 +3472,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CSS_ANCHOR_ATTRIBUTE',
+		title: 'CSS anchoring is regular CSS',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3000,6 +3485,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CSS_ANCHOR_ATTRIBUTE',
 		],
 		structured: true,
+		why: 'An element takes the attributes HTML defines. anchor-name and position-anchor are CSS properties with no HTML attribute of the same name, so nothing on the page would read them.',
+		suggestion:
+			'Declare the anchor in a <style> block in this file, or in your stylesheet, and select the element the way you select it for any other style.',
 		sources: [
 			{
 				id: 'f0',
@@ -3011,6 +3499,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEBUG_DEFINE_CONFLICT',
+		title: 'Your config sets a debug flag Markless owns',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -3030,6 +3520,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEBUG_DETAILS_DROPPED',
+		title: 'Debug details could not be saved',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -3049,6 +3541,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEBUG_EVENT_HOST_MISSING',
+		title: 'A debug event’s element is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -3068,6 +3562,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DECIDED_BRANCH_ARM_UNKNOWN',
+		title: 'An @if branch is unknown',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -3085,6 +3581,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DELEGATE_ARTIFACT_MISSING',
+		title: 'A child produced nothing at build time',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'info',
@@ -3096,6 +3594,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_DELEGATE_ARTIFACT_MISSING',
 		],
 		structured: true,
+		why: 'A delegate is materialized from the rendering its own compiled module produced; without one there is nothing to inline.',
+		suggestion:
+			'Publish the dependency with a build-time renderSsr export if its markup should be inlined at build time.',
 		sources: [
 			{
 				id: 'f0',
@@ -3107,6 +3608,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEPRECATED_OPTION',
+		title: 'A config option is deprecated',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'warning',
@@ -3126,6 +3629,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DETACHED_CONTENT_DYNAMIC',
+		title: 'Content inside a <template> or a raw-text element must be static',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3138,6 +3643,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_DETACHED_CONTENT_DYNAMIC',
 		],
 		structured: true,
+		why: 'The browser resumes a server-rendered page by counting its elements in document order. The HTML parser keeps what a <template> or a raw-text element such as <noscript> holds out of that order, so nothing inside one can be located, and a handler or binding there would be silently dead.',
+		suggestion:
+			'Keep the <<ownerTagName>> content to plain elements, text, and literal attribute values. Move anything interactive outside it, and clone the template content from a handler or attach if it must become live.',
 		sources: [
 			{
 				id: 'f0',
@@ -3149,6 +3657,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEV_DEFINE_CONFLICT',
+		title: 'Your config sets a dev flag Markless owns',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -3168,6 +3678,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEV_MODULE_RUNNER_UNAVAILABLE',
+		title: 'The dev server cannot run modules',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -3185,6 +3697,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEV_PRERENDER_ENVIRONMENT_MISSING',
+		title: 'The dev server has no server environment',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -3202,6 +3716,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEV_RUNTIME_ERROR',
+		title: 'A page threw while the dev server rendered it',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -3224,6 +3740,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DIRECT_EVAL_UNSUPPORTED',
+		title: 'eval() reads the component’s names',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3235,6 +3753,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_DIRECT_EVAL_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'The compiler moves handlers and derived values into separate modules and rewrites every read and write of state it can see in the source. Code inside an eval string is invisible to it, so it would throw a ReferenceError or change state without updating the page.',
+		suggestion:
+			"Write the code directly (before: `eval('count++')`, after: `count++`). To run code that only needs globals, call `new Function(code)()` or `(0, eval)(code)` instead.",
 		guide: {
 			summary: "eval() inside a component runs code that reads the component's names.",
 			what: [
@@ -3259,7 +3780,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's1',
-					text: 'count++',
+					text: 'total++',
 					code: true,
 				},
 				{
@@ -3268,7 +3789,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's3',
-					text: "eval('count++')",
+					text: "eval('total++')",
 					code: true,
 				},
 				{
@@ -3295,6 +3816,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -3307,6 +3829,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DYNAMIC_TAG_INVALID',
+		title: 'A dynamic tag name is not a valid element',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -3329,6 +3853,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_GUARD_RETURN_UNSUPPORTED',
+		title: 'A guard returns an element',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3340,6 +3866,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_GUARD_RETURN_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'The public render module needs one planned component root with stable locators. An earlier element-valued return creates another root whose conditional statement flow is not represented by that plan.',
+		suggestion:
+			'Rewrite the two outcomes as a root-level @if/@else template, or use return null when the guard should render nothing.',
 		sources: [
 			{
 				id: 'f0',
@@ -3351,6 +3880,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_DUPLICATE',
+		title: 'Element() handle is bound more than once',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3362,6 +3893,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_DUPLICATE',
 		],
 		structured: true,
+		why: 'Each repeated row has its own DOM locator, so one handle declared as a single element cannot say which row it means.',
+		suggestion:
+			'Declare the handle as an ordered set by widening its type argument to an array - element<HTMLElement[]>() - written literally as T[], Array<T> or readonly T[]. Reads then answer every bound element in document order. Otherwise create a separate element() handle for each host element.',
 		sources: [
 			{
 				id: 'f0',
@@ -3373,6 +3907,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',
+		title: 'One element() handle per IDREF attribute',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3384,6 +3920,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',
 		],
 		structured: true,
+		why: 'The compiler resolves the relationship and the emitter mints the id. Combining handles would require the compiler to spell and order ids it cannot see, and id spelling is not something this record owns.',
+		suggestion: 'Reference one element() handle directly, as <attributeName>={handle}.',
 		sources: [
 			{
 				id: 'f0',
@@ -3395,6 +3933,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
+		title: 'An element named by an IDREF cannot also declare an id',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3407,6 +3947,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
 		],
 		structured: true,
+		why: 'An IDREF position is written from the id the compiler mints for the bound element. A second, authored id on the same element would emit two id attributes and leave the relationship pointing at whichever one the HTML parser kept.',
+		suggestion:
+			'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
 		sources: [
 			{
 				id: 'f0',
@@ -3418,6 +3961,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED',
+		title: 'A repeated element() handle cannot be named by an IDREF',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3430,6 +3975,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED',
 		],
 		structured: true,
+		why: 'Every row owns its own element and would need its own id. One authored handle cannot name one of them, and picking a row silently would make the relationship point at whichever row happened to render first.',
+		suggestion:
+			'Bind a separate element() handle outside the repeat for the element this attribute names, or move the relationship inside the row so each row names its own element.',
 		sources: [
 			{
 				id: 'f0',
@@ -3441,6 +3989,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND',
+		title: 'Element() handle is referenced but never bound',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3452,6 +4002,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND',
 		],
 		structured: true,
+		why: 'An IDREF position names another element. With no el={handle} binding there is no element to name, so the compiler would emit an attribute pointing at nothing - a silently broken relationship that renders correctly and helps nobody.',
+		suggestion:
+			'Bind the handle to the element it names with el={<handleName>}, or remove the <attributeName> attribute.',
 		sources: [
 			{
 				id: 'f0',
@@ -3463,6 +4016,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
+		title: 'This shared() element() handle cannot be named by an IDREF here',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3475,6 +4030,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 		],
 		structured: true,
+		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
+		suggestion:
+			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
 		sources: [
 			{
 				id: 'f0',
@@ -3486,6 +4044,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_INSTANCE_AMBIGUOUS',
+		title: 'An element() handle belongs to more than one widget',
+		area: 'state',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -3505,6 +4065,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF',
+		title: 'An array-typed element() handle cannot fill this position',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3517,6 +4079,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF',
 		],
 		structured: true,
+		why: 'This attribute points at exactly one element. A handle declared with an array type argument may be bound on many elements, and an IDREF carries no order to say which member it means, so the compiler would have to pick one silently.',
+		suggestion:
+			'Declare a second, single element() handle for the one element this attribute points at and bind it there, leaving "<handleName>" for the set.',
 		sources: [
 			{
 				id: 'f0',
@@ -3528,6 +4093,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
+		title: 'Nested prop-forwarded element handles are not supported yet',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3540,6 +4107,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'Direct prop forwarding has one parent-owned element() handle for one child prop. Array and nested object containers need deeper edge tracking before the compiler can prove the owning handle.',
+		suggestion:
+			'Pass the element() handle as its own component prop for now, or bind it in the component that renders the host element.',
 		sources: [
 			{
 				id: 'f0',
@@ -3551,6 +4121,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_RENDER_READ',
+		title: 'The markup reads an element() handle',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3562,6 +4134,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_RENDER_READ',
 		],
 		structured: true,
+		why: 'During initial render the browser DOM element does not exist, and browser resume does not rerun component bodies. Element handles are available to lazy event or behavior code after resume locates the host node.',
+		suggestion:
+			'Read DOM properties inside an event handler or attach behavior, and render serializable state() or computed() data instead.',
 		guide: {
 			summary: 'The markup reads an element() handle while the page renders.',
 			what: [
@@ -3595,6 +4170,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -3607,6 +4183,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_REQUIRED',
+		title: 'el gets something that is not element()',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3618,6 +4196,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_REQUIRED',
 		],
 		structured: true,
+		why: 'DOM elements are host resources. el can only bind element() handles so resume can recover the current DOM locator without serializing a DOM node.',
+		suggestion:
+			'Create a handle with element<T>() and bind that handle with el={handle}. Keep DOM-backed resources in attach={...}.',
 		guide: {
 			summary: 'The el prop gets something other than an element() handle.',
 			what: [
@@ -3764,6 +4345,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -3776,6 +4358,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+		title: 'Element() handle is read before it is bound',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error-or-warning',
@@ -3787,6 +4371,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_UNBOUND',
 		],
 		structured: true,
+		why: 'element() handles are DOM locator references, not state. A read is only useful after the handle has a host element binding that resume can locate.',
+		suggestion:
+			'Bind the handle to one host element with el={handle}, or remove the read if undefined is intentional.',
 		allow: [
 			{
 				id: 'l0',
@@ -3810,6 +4397,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING',
+		title: 'An element() handle has no widget',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -3827,6 +4416,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_MODULE_SCOPE',
+		title: 'Element() cannot be created at module scope',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3838,6 +4429,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_MODULE_SCOPE',
 		],
 		structured: true,
+		why: 'Element handles are per-render DOM locators. A module-scope handle would be shared across requests and cannot point at one document-owned host element.',
+		suggestion:
+			'Move element() creation into the component that owns the host element and bind it with el={handle}.',
 		sources: [
 			{
 				id: 'f0',
@@ -3849,6 +4443,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED',
+		title: 'prefetch={false} sits on something that is not a link',
+		area: 'router',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -3860,6 +4456,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED',
 		],
 		structured: true,
+		why: 'Only an <tag> acts on `<authored>`. On a component, it works when the component spreads its props (`{...rest}`) onto an <tag> that does not set it itself; anywhere else nothing would act on it and the page would behave as if it were not there.',
+		suggestion:
+			'Put `<authored>` on the <tag> itself, or on a component that spreads its props onto one.',
 		guide: {
 			summary: 'prefetch={false} sits on something that never renders the link.',
 			what: [
@@ -4163,6 +4762,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -4180,6 +4780,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ELEMENT_UNADDRESSABLE',
+		title: 'The browser cannot find this element',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -4191,6 +4793,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ELEMENT_UNADDRESSABLE',
 		],
 		structured: true,
+		why: 'After the page loads, the browser finds an element inside an arm or a row by counting its parent’s child elements, with each @if, @switch or @try block as one, from the start or from the end. That count needs every sibling on at least one side to be an element, text, a block, or a component of fixed size.',
+		suggestion:
+			'Wrap this element, or the construct beside it, in its own element, so one side of it holds only plain elements and text.',
 		sources: [
 			{
 				id: 'f0',
@@ -4202,6 +4807,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EMIT_CODEGEN_FAILED',
+		title: 'The compiler could not write code',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -4219,6 +4826,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EMIT_NONDETERMINISTIC',
+		title: 'The compiler wrote different code twice',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -4236,6 +4845,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EMIT_SOURCE_MAP_MISSING',
+		title: 'The compiler wrote no source map',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -4253,6 +4864,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EMIT_TSRX_NODE_UNSUPPORTED',
+		title: 'The compiler met syntax it cannot write',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -4270,6 +4883,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EVENT_DISPATCH_UNMATCHED',
+		title: 'An event found no handler',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -4289,6 +4904,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
+		title: 'A handler reads something the browser does not have',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -4299,6 +4916,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'Lazy handler symbols run after browser resume. Handler bodies may use graph references, element handles, props/shared values, module imports, or serializable capture-plane inputs; unsupported body locals would otherwise become silent no-op code.',
 		guide: {
 			summary: 'An event handler reads a local variable that does not exist in the browser.',
 			what: [
@@ -4359,6 +4977,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -4371,6 +4990,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
+		title: 'onClick gets a value, not a function',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -4382,6 +5003,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION',
 		],
 		structured: true,
+		why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function can be that handler.',
+		suggestion: 'Wrap it in a function, for example <attributeName>={() => <source>}.',
 		guide: {
 			summary: 'An event prop like onClick gets a value instead of a function.',
 			what: [
@@ -4437,17 +5060,227 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r7',
-							text: ' count',
+							text: ' (saved ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
 							id: 'r8',
-							text: '++',
+							text: '=',
 							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 						{
 							id: 'r9',
-							text: '}>Add</',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'true',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r11',
+							text: ')}>Save</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Save',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' saved ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'false',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r8',
+							text: ');',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '{(saved ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'true',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r9',
+							text: ')}>Save</',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
@@ -4459,6 +5292,16 @@ export const errorEntries: readonly ErrorEntry[] = [
 							id: 'r11',
 							text: '>',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 					],
 				},
@@ -4475,6 +5318,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_EVENT_SPREAD_UNSUPPORTED',
+		title: 'Event handlers cannot be spread onto an element',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -4485,6 +5330,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'Write event props directly, for example <input onClick={handlers.onClick} onInput={handlers.onInput} />, and keep spreads for plain static attributes.',
 		],
 		structured: true,
+		why: 'The compiler owns event discovery so the browser can resume without scanning markup; a runtime spread hides which events exist from the compiler.',
+		suggestion:
+			'Write event props directly, for example <input onClick={handlers.onClick} onInput={handlers.onInput} />, and keep spreads for plain static attributes.',
 		sources: [
 			{
 				id: 'f0',
@@ -4496,6 +5344,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED',
+		title: 'state() was copied into a variable',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -4507,6 +5357,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED',
 		],
 		structured: true,
+		why: '<apiName>() is compiled away into graph cells; it has no runtime function value that an alias could call.',
+		suggestion:
+			'Call the imported API directly — before: `const makeState = state; let x = makeState(5);` — after: `let x = state(5);`. For a reusable initialization pattern, wrap the VALUE, not the API (`const defaults = () => ({ open: false }); const menu = state(defaults());`).',
 		guide: {
 			summary: 'A Markless function was copied into a variable or passed around as a value.',
 			what: [
@@ -4820,6 +5673,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -4832,6 +5686,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_FRAMEWORK_API_RUNTIME_CALL',
+		title: 'state() ran outside a .tsrx file',
+		area: 'components',
 		packageName: '@markless/core',
 		stage: 'runtime',
 		severity: 'error',
@@ -4842,6 +5698,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_FRAMEWORK_API_RUNTIME_CALL',
 		],
 		structured: false,
+		why: '<apiName>() is an markless framework API that must be rewritten by the .tsrx compiler before runtime execution.',
 		guide: {
 			summary: 'A Markless function like state() ran without Markless rewriting it first.',
 			what: [
@@ -4902,6 +5759,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -4914,6 +5772,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
+		title: 'state() is used without importing it',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -4926,6 +5786,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_FRAMEWORK_IMPORT_REQUIRED',
 		],
 		structured: true,
+		why: 'The compiler recognizes `state`/`computed`/`element`/`shared`/`storage` by name in `.tsrx` reactive scopes so that graph ownership stays unambiguous for readers and tools.',
+		suggestion:
+			"Rename the helper (before: `function <apiName>(value) { ... }` — after: `function doubleValue(value) { ... }`), or, if graph state was intended, delete the helper and add `import { <apiName> } from '@markless/core';`.",
 		guide: {
 			summary:
 				'A .tsrx file calls state() or another Markless function without importing it.',
@@ -5041,6 +5904,142 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Profile',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' name ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: "'Ada'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r8',
+							text: ');',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'h2',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>{name}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'h2',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
 		},
 		sources: [
 			{
@@ -5053,6 +6052,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
+		title: 'A handler reads a value the browser cannot rebuild',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5065,6 +6066,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_HANDLER_READS_RENDER_LOCAL',
 		],
 		structured: true,
+		why: 'A handler runs in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
+		suggestion:
+			'Declare `<localName>` as `const <localName> = ...` built only from module values, props, and state; move it to module scope; or make it state: `const <localName> = state(...)`.',
 		guide: {
 			summary:
 				'An event handler reads a local from the component body that the browser cannot rebuild.',
@@ -5090,6 +6094,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -5102,6 +6107,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
+		title: 'A handler changes a value that is not state',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5114,6 +6121,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_HANDLER_WRITES_RENDER_LOCAL',
 		],
 		structured: true,
+		why: 'The component body runs only during the initial render. A handler that reads a body const carries its definition and builds a fresh copy when it runs; only state() keeps a value between runs. A method the compiler cannot prove only reads the value counts as a change.',
+		suggestion:
+			'Keep data that changes in state(): `const <localName> = state(...)`, and assign a new value to it, for example a copy with the change applied.',
 		guide: {
 			summary:
 				'An event handler changes a value from the component body, and the change would be lost.',
@@ -5336,6 +6346,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -5348,6 +6359,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING',
+		title: 'An imported component was built by an older Markless',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5359,6 +6372,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_IMPORTED_SYMBOL_CLAIMS_MISSING',
 		],
 		structured: true,
+		why: 'Linking without the child claims silently drops the parent-bound symbol rows, so the child handlers would not resolve after resume.',
+		suggestion:
+			'This is a linker ordering defect: the child must finish compiling in this environment before its parent links it.',
 		sources: [
 			{
 				id: 'f0',
@@ -5370,6 +6386,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_IMPORTED_SYMBOL_CLAIMS_UNREADY',
+		title: 'An imported component was not ready',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -5389,6 +6407,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_INLINE_DEFER_FACTORY_UNWRAPPABLE',
+		title: 'The inline loader could not be wrapped',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -5406,6 +6426,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_INLINE_RESUMER_DEBUG_SOURCE_REQUIRED',
+		title: 'The inline loader needs its debug source',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -5423,6 +6445,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_INLINE_RESUMER_MINIFY_FAILED',
+		title: 'The inline loader could not be minified',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -5440,6 +6464,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_INLINE_RESUMER_PAGE_TOKEN_FOLDED',
+		title: 'The inline loader lost its page token',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -5457,6 +6483,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_INLINE_RESUMER_PAGE_TOKEN_MISSING',
+		title: 'The inline loader has no page token',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -5474,6 +6502,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_INLINE_RESUMER_TRANSFORM_FAILED',
+		title: 'The inline loader could not be built',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -5491,6 +6521,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
+		title: 'Each row of this list must render an element',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5502,6 +6534,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_CAN_BE_EMPTY',
 		],
 		structured: true,
+		why: 'The browser adds, moves and removes a list’s rows by counting the parent’s child elements, one element per row. A row that renders nothing has no element to count, so the browser cannot tell which rows are which.',
+		suggestion:
+			'Filter the list before the @for instead: `<filter>` and `@for (const <itemName> of shown; ...)`. Or give the @if an @else that renders one element.',
 		sources: [
 			{
 				id: 'f0',
@@ -5513,6 +6548,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
+		title: 'This list can never grow in the browser',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error-or-warning',
@@ -5523,6 +6560,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text and attributes read off the row item or off a state cell the page holds, and nothing else, so a row needing anything more ships no template at all.',
 		allow: [
 			{
 				id: 'l0',
@@ -5551,6 +6589,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+		title: 'Each row of this list must be one element',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5562,6 +6602,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
 		],
 		structured: true,
+		why: 'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+		suggestion:
+			'Wrap each row in one element, such as `<span>...</span>`, so every row of <itemName> is a single element.',
 		sources: [
 			{
 				id: 'f0',
@@ -5573,6 +6616,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
+		title: 'This value in a @for row never updates in the browser',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5585,6 +6630,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
 		],
 		structured: true,
+		why: 'The browser updates a @for row from one row of markup the payload carries. A row this cannot address or rebuild ships no markup, so every value in it stays as the server rendered it.',
+		suggestion:
+			'Wrap one of the two nested @for lists in its own element, so every element with a value in the row has nested rows on one side only.',
 		sources: [
 			{
 				id: 'f0',
@@ -5596,6 +6644,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
+		title: 'The browser cannot find this list’s rows',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5607,6 +6657,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
 		],
 		structured: true,
+		why: 'After the page loads, the browser finds a list’s rows by counting the parent’s child elements from its start or from its end. That count needs every sibling on at least one side to be a plain element or text.',
+		suggestion:
+			'Wrap this @for, or the construct beside it, in its own element, so one side of the rows holds only plain elements and text.',
 		sources: [
 			{
 				id: 'f0',
@@ -5618,6 +6671,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_LEAN_PAYLOAD_MISSING',
+		title: 'The page’s state data is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -5640,6 +6695,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_LINKED_RENDER_DATA_PAYLOAD_ACCESS',
+		title: 'Linked data read the page’s state scripts',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -5659,6 +6716,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_MDX_RENDER_DATA_CHILD_MISSING',
+		title: 'An MDX component is missing its data',
+		area: 'internal',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -5676,6 +6735,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_MDX_RENDER_DATA_ROOT_MISSING',
+		title: 'An MDX page is missing its data',
+		area: 'internal',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -5693,6 +6754,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS',
+		title: 'This module-scope instance would become one instance per handler',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5705,6 +6768,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS',
 		],
 		structured: true,
+		why: 'Every handler symbol module is loaded on its own when its handler first fires, so a declaration in the authoring file has to be copied into each one that names it. One handler gets the intended browser-side instance. Two or more get a copy each, and nothing at runtime reveals that they have drifted apart.',
+		suggestion:
+			'Move "<name>" and its class into their own module and import it. An import resolves to one module instance that every handler module shares, so the handlers agree.',
 		sources: [
 			{
 				id: 'f0',
@@ -5716,6 +6782,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_NODE_IN_BROWSER',
+		title: 'Node-only code reaches the browser',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -5900,6 +6968,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -5912,6 +6981,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED',
+		title: 'Overlay can only be marked on host elements',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5923,6 +6994,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED',
 		],
 		structured: true,
+		why: 'Elevation is applied to a DOM element. A component is not a DOM locator and may render zero, one, or many host nodes, and overlay cannot be forwarded to one as a prop because its value must be a literal.',
+		suggestion:
+			'Move overlay onto the host element that should be elevated, inside the component TSRX body.',
 		sources: [
 			{
 				id: 'f0',
@@ -5934,6 +7008,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED',
+		title: 'Overlay accepts only a literal',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5945,6 +7021,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_OVERLAY_VALUE_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'Elevation is structural, not reactive. The overlay record carries no inputs, so it has no dependencies and can never re-run; a value that varies at runtime would have nothing to re-elevate the element.',
+		suggestion:
+			'Let `@if` decide whether the element exists and keep `overlay` a literal on the element inside the branch.',
 		sources: [
 			{
 				id: 'f0',
@@ -5956,6 +7035,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PARSE_ERROR',
+		title: 'A .tsrx file does not parse',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -5967,6 +7048,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PARSE_ERROR',
 		],
 		structured: true,
+		why: 'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
+		suggestion:
+			'Check the TSRX syntax rules at https://tsrx.dev/specification and rewrite this source into supported TSRX syntax.',
 		guide: {
 			summary: 'Markless could not read a .tsrx file.',
 			what: [
@@ -5991,6 +7075,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -6003,6 +7088,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PAYLOAD_INVALID',
+		title: 'The page’s state data is broken',
+		area: 'internal',
 		packageName: '@markless/serializer',
 		stage: 'runtime',
 		severity: 'error',
@@ -6014,6 +7101,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PAYLOAD_INVALID',
 		],
 		structured: true,
+		why: 'The markless/state payload did not match the resumability protocol shape required by this runtime.',
+		suggestion:
+			'Regenerate the markless/state payload with the matching markless compiler/runtime version.',
 		sources: [
 			{
 				id: 'f0',
@@ -6050,6 +7140,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_BOUNDARY_MISSING',
+		title: 'A prerendered @try is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6067,6 +7159,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_BRANCH_MISSING',
+		title: 'A prerendered @if is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6084,6 +7178,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_CAPTURE_UNBOUND',
+		title: 'A prerendered value has nowhere to go',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6101,6 +7197,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_CHILD_MISSING',
+		title: 'A prerendered component is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6123,6 +7221,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_CONTAINER_MISSING',
+		title: 'The page has no #app placeholder to prerender into',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6145,6 +7245,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_DATA_COMPONENT_MISSING',
+		title: 'Prerender data is missing a component',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6167,6 +7269,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_DATA_ROOT_MISSING',
+		title: 'Prerender data is missing its root',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6184,6 +7288,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_DATA_SYMBOL_MISSING',
+		title: 'Prerender data is missing a piece of code',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6206,6 +7312,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_ENTRY_MISSING',
+		title: 'Prerender has no entry',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6228,6 +7336,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_INLINE_RESUMER_EVENT_NAMES_TOKEN_LOST',
+		title: 'The inline loader lost its event names',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6245,6 +7355,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_INLINE_RESUMER_EVENT_NAMES_UNPLACEABLE',
+		title: 'The inline loader’s event names have no place',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6262,6 +7374,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_PROJECTED_PROP_READ',
+		title: 'A browser-built row reads its owner’s prop',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6281,6 +7395,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_PROP_UNDERIVABLE',
+		title: 'A prerendered prop cannot be worked out',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6303,6 +7419,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_RENDER_DATA_MISSING',
+		title: 'An imported component has no build data',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6322,6 +7440,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_RESIDUE_MISSING',
+		title: 'Prerender left out part of the page',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6349,6 +7469,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING',
+		title: 'A prerendered page has nothing to load its code',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6361,6 +7483,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING',
 		],
 		structured: true,
+		why: 'A wake variant that carries symbols must hand its symbol routes to a generated resolver; without one the routes would have no owner.',
+		suggestion: 'Emit the generated symbol resolver alongside the wake variant.',
 		sources: [
 			{
 				id: 'f0',
@@ -6372,6 +7496,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE',
+		title: 'This route cannot be prerendered',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6389,6 +7515,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED',
+		title: 'This list is projected into a hole that repeats',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6400,6 +7528,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED',
 		],
 		structured: true,
+		why: 'A keyed repeat records one parent element: resume keys the served rows under it and inserts new rows into it. A hole inside a repeated row renders the projection once per row, so there is no one element the record could name, and the rows would silently never update.',
+		suggestion:
+			"Move the @for into a component of its own and render that component inside <child>'s row, or lift the list above <child>.",
 		sources: [
 			{
 				id: 'f0',
@@ -6411,6 +7542,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PROJECTION_NOT_RENDERED',
+		title: 'A component never rendered the children it was given',
+		area: 'components',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6431,6 +7564,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PROTOCOL_VERSION_MISMATCH',
+		title: 'The page was rendered by a different Markless version',
+		area: 'internal',
 		packageName: '@markless/serializer',
 		stage: 'runtime',
 		severity: 'error',
@@ -6442,6 +7577,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PROTOCOL_VERSION_MISMATCH',
 		],
 		structured: true,
+		why: 'The <type> payload must use a supported protocol version.',
+		suggestion: 'Serve a <type> payload generated by this runtime.',
 		sources: [
 			{
 				id: 'f0',
@@ -6458,6 +7595,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
+		title: 'A component passed its checks but has no render plan',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6469,6 +7608,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
 		],
 		structured: true,
+		why: 'The public render gate admitted this authored construct, so silently omitting its render plan would produce output that can fail or remain permanently unsettled at request time.',
 		sources: [
 			{
 				id: 'f0',
@@ -6480,6 +7620,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+		title: 'This component root cannot be rendered yet',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error-or-warning',
@@ -6491,6 +7633,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
 		],
 		structured: true,
+		why: "Markless anchors each component's HTML and interactivity to a single root element. Without a supported root the component would silently render nothing, so the compiler stops with an error instead.",
+		suggestion:
+			'Export a TSRX component with an @{...} template body, or pass an explicit compiled component artifact when multiple roots exist.',
 		allow: [
 			{
 				id: 'l0',
@@ -6514,6 +7659,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+		title: '<label> is not rendered by the public render path yet',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6525,6 +7672,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 		],
 		structured: true,
+		why: 'The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.',
 		sources: [
 			{
 				id: 'f0',
@@ -6536,6 +7684,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RENDER_BODY_UNSUPPORTED',
+		title: 'Component body statement is not supported by the render module',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6547,6 +7697,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_RENDER_BODY_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'Component bodies execute during initial render. A body statement the emitter cannot represent would otherwise be deleted from CSR and SSR output.',
 		sources: [
 			{
 				id: 'f0',
@@ -6558,6 +7709,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RENDER_DATA_READER_SPECIFIER_UNRESOLVABLE',
+		title: 'A build data path is not absolute',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6577,6 +7730,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RENDER_DATA_STYLE_UNLINKED',
+		title: 'A scoped style is missing from the build',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6589,6 +7744,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_RENDER_DATA_STYLE_UNLINKED',
 		],
 		structured: true,
+		why: 'A scoped style that is compiled but never linked ships a component whose markup renders unstyled in the consuming app, with nothing at build time to show it went missing.',
+		suggestion:
+			'Register the scoped style virtual module alongside the render-data module it belongs to before the link is read.',
 		sources: [
 			{
 				id: 'f0',
@@ -6600,6 +7758,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RENDER_DATA_UNPUBLISHED',
+		title: 'Build data was read before it was ready',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -6619,6 +7779,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
+		title: 'Two @for loops give the same name two different meanings',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6631,6 +7793,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
 		],
 		structured: true,
+		why: 'Every @for expression in a component is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
+		suggestion:
+			"Rename this loop's binding - two loops may reuse a name freely as long as both use it the same way (both items, or both indexes).",
 		sources: [
 			{
 				id: 'f0',
@@ -6642,6 +7807,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		title: 'This @for collection reaches no cell on its shared instance',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -6654,6 +7821,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
 		],
 		structured: true,
+		why: 'Rows come from a reactive graph read; a shared-instance path that resolves to no cell leaves the repeat with an authored expression whose receiver is undeclared in the emitted scope, which throws on the first server render.',
+		suggestion:
+			'Return the cell as a property of a spread object from the shared factory, so `<collectionSource>` names a graph cell. Before: `shared(() => { const box = state({ items: [] }); return box; })`; after: `shared(() => { const box = state({ items: [] }); return { ...box }; })`.',
 		sources: [
 			{
 				id: 'f0',
@@ -6670,6 +7840,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_EMPTY_ARM_EMPTY',
+		title: 'An @empty branch rendered nothing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6689,6 +7861,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
+		title: 'An @empty branch has nothing to render with',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6708,6 +7882,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_EMPTY_ARM_UNMATCHED',
+		title: 'A list cannot find its @empty branch',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6727,6 +7903,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
+		title: 'Two rows of a list have the same key',
+		area: 'lists',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -6737,6 +7915,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE',
 		],
 		structured: false,
+		why: 'The key is each row identity across reorder, insert, delete, and resume; duplicate identities make row state and DOM ownership ambiguous.',
 		guide: {
 			summary: 'Two items in an @for list produced the same key.',
 			what: [
@@ -6752,6 +7931,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -6779,6 +7959,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
+		title: 'A list is keyed by position',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -6791,6 +7973,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_KEY_IS_INDEX',
 		],
 		structured: true,
+		why: 'The key is the identity root for a repeated graph scope; a positional key pins that scope to the slot, which is only correct when state genuinely belongs to the position.',
+		suggestion:
+			'Key by a stable field of the item when state belongs to the item, such as `@for (const <itemName> of <collectionSource>; key <itemName>.id)`. Keep `key <indexName>` when state should follow the slot.',
 		guide: {
 			summary:
 				'An @for loop is keyed by its index, so row state follows the position and not the item.',
@@ -6985,6 +8170,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -6997,6 +8183,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_KEY_REQUIRED',
+		title: 'A list needs a key',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -7008,6 +8196,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_KEY_REQUIRED',
 		],
 		structured: true,
+		why: 'A keyed loop item keeps its state, events, and DOM attached to the same logical item across reorder, insert, and delete; without a key there is no stable identity root.',
+		suggestion:
+			'Add a stable domain key such as `@for (const <itemName> of <collectionSource>; key <itemName>.id)`, or key by position with `index i; key i` when state should follow the slot.',
 		guide: {
 			summary: 'An @for loop has no key.',
 			what: [
@@ -7052,7 +8243,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r3',
-							text: ' item ',
+							text: ' guest ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
@@ -7062,7 +8253,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r5',
-							text: ' items; ',
+							text: ' guests; ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
@@ -7072,7 +8263,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r7',
-							text: ' item.id) {',
+							text: ' guest.id) {',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 					],
@@ -7092,7 +8283,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r2',
-							text: '>{item.name}</',
+							text: '>{guest.name}</',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
@@ -7118,6 +8309,281 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Guests',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' guests ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '([{ id: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: '1',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r8',
+							text: ', name: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r9',
+							text: "'Ada'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r10',
+							text: ' }]);',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@for',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' (',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' guest ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'of',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r6',
+							text: ' guests) {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>{guest.name}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l8',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l9',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l10',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
 		},
 		sources: [
 			{
@@ -7130,6 +8596,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_KEY_UNSTABLE',
+		title: '@for key must identify the item stably',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -7141,6 +8609,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_KEY_UNSTABLE',
 		],
 		structured: true,
+		why: 'The key is the stable identity root for a repeated graph scope across reorder, insert, delete, and resume; a value that is not derived from the item or its position cannot identify anything.',
+		suggestion:
+			'Key by a stable field of <itemName>, such as `key <itemName>.id`, or key by position with `index i; key i` when state should follow the slot.',
 		sources: [
 			{
 				id: 'f0',
@@ -7152,6 +8623,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING',
+		title: 'A list row lost its place',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7171,6 +8644,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_EMPTY',
+		title: 'A list row built nothing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7190,6 +8665,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_LOCATOR_MISMATCH',
+		title: 'A list row built the wrong element',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7209,6 +8686,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_LOCATOR_MISSING',
+		title: 'A list row is missing an element',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7228,6 +8707,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_RENDERER_MISSING',
+		title: 'A list row has nothing to render with',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7247,6 +8728,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_SLOT_MISSING',
+		title: 'A list row has no place for its component',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7266,6 +8749,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING',
+		title: 'A list row has no build data',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7285,6 +8770,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
+		title: 'A new list row holds @try',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7304,6 +8791,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_COLLISION',
+		title: 'Two list rows claim one widget',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7323,6 +8812,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_UNRESOLVED',
+		title: 'A list row reads a widget no one owns',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7342,6 +8833,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED',
+		title: 'This @for row has an event handler the browser cannot wire',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -7353,6 +8846,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED',
 		],
 		structured: true,
+		why: 'A row handler receives its item from a collection the browser can read again: one on the graph, or a property path on the item of an enclosing keyed row.',
 		sources: [
 			{
 				id: 'f0',
@@ -7364,6 +8858,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_MINT_EMPTY',
+		title: 'A new list row is empty',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7386,6 +8882,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_MINT_RENDERER_MISSING',
+		title: 'A new list row has nothing to render with',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7405,6 +8903,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROW_SLOT_READER_MISSING',
+		title: 'A list row cannot read its value',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7427,6 +8927,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_REPEAT_ROWS_FROZEN',
+		title: 'This @for renders its rows once and never updates them',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -7439,6 +8941,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN',
 		],
 		structured: true,
+		why: 'A keyed repeat updates its rows through the graph node its collection resolves to. A module constant or a `const` built from props, state and module values is turned into one automatically; a collection the browser cannot rebuild renders its rows once, so any reactive read inside a row would freeze at its first-render value.',
+		suggestion:
+			'Build the rows from values the browser can recompute: a module-level `const <rootName> = [...]`, `const <rootName> = state([...])`, or `const <rootName> = computed(() => ...)` inside the component<value>; or keep the rows static by reading only `<itemName>` inside them.',
 		sources: [
 			{
 				id: 'f0',
@@ -7450,6 +8955,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESOLVER_CLAIMS_DIVERGED',
+		title: 'Two builds of one file disagree',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -7461,6 +8968,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_RESOLVER_CLAIMS_DIVERGED',
 		],
 		structured: true,
+		why: 'Neither claim set contains the other, so accepting either would drop symbol routes the resolver still owns.',
+		suggestion: 'Rebuild the owning module so both publications claim the same set.',
 		sources: [
 			{
 				id: 'f0',
@@ -7472,6 +8981,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESOLVER_UNPUBLISHED',
+		title: 'Code was loaded before it was ready',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -7491,6 +9002,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_ALREADY_RESUMED',
+		title: 'This container was already resumed',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'warning',
@@ -7502,6 +9015,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_RESUME_ALREADY_RESUMED',
 		],
 		structured: true,
+		why: 'Resume attaches graph and event wiring once per payload container.',
+		suggestion: 'Resume each served container once, or dispose before resuming again.',
 		sources: [
 			{
 				id: 'f0',
@@ -7513,6 +9028,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_DISPATCH_EXPORT_MISSING',
+		title: 'A handler’s code is missing an export',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -7530,6 +9047,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_LOCATOR_MISMATCH',
+		title: 'The page has a different element than the server sent',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7554,6 +9073,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_LOCATOR_MISSING',
+		title: 'An element the server sent is gone',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7598,6 +9119,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_RECORD_DELTA_DUPLICATE_KEY',
+		title: 'An update repeats a key',
+		area: 'internal',
 		packageName: '@markless/serializer',
 		stage: 'runtime',
 		severity: 'error',
@@ -7620,6 +9143,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_RECORD_DELTA_PARITY_MISMATCH',
+		title: 'An update does not match the page',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7637,6 +9162,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_RECORD_DELTA_REMOVAL_UNSUPPORTED',
+		title: 'An update tries to remove a record',
+		area: 'internal',
 		packageName: '@markless/serializer',
 		stage: 'runtime',
 		severity: 'error',
@@ -7654,6 +9181,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_RECORD_DELTA_VERSION_MISMATCH',
+		title: 'An update is for another version of the page',
+		area: 'internal',
 		packageName: '@markless/serializer',
 		stage: 'runtime',
 		severity: 'error',
@@ -7678,6 +9207,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_RECORD_DIVERGENCE_UNSERIALIZABLE',
+		title: 'An update holds a value that cannot be sent',
+		area: 'internal',
 		packageName: '@markless/serializer',
 		stage: 'runtime',
 		severity: 'error',
@@ -7695,6 +9226,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROSTER_COUNT_NOT_A_NUMBER',
+		title: 'Roster count is spent as a number before the page can answer it',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -7707,6 +9240,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ROSTER_COUNT_NOT_A_NUMBER',
 		],
 		structured: true,
+		why: 'A count is how many parts END UP in the family instance, and a single forward render pass cannot know that when the asker renders. The render writes a placeholder and the served page answers every one it wrote, which a printed value carries and an operation destroys - the comparison or the arithmetic runs against the placeholder string and paints a wrong value silently.',
+		suggestion:
+			'Print <computedName> on its own - {<computedName>}, an attribute value, or a ${<computedName>} slot in a template literal - and do the arithmetic in an event handler or in CSS, where the count is a number.',
 		sources: [
 			{
 				id: 'f0',
@@ -7718,6 +9254,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROSTER_COUNT_UNRESOLVED',
+		title: 'A list count has no answer',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -7760,6 +9298,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE',
+		title: 'A route’s code was registered too late',
+		area: 'router',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -7772,6 +9312,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE',
 		],
 		structured: true,
+		why: 'The primary module has already been compiled without knowing it composes a route artifact, so its emitted graph would be wrong.',
+		suggestion: 'Register every production route artifact before transformation begins.',
 		sources: [
 			{
 				id: 'f0',
@@ -7783,6 +9325,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED',
+		title: 'document.tsrx has an event handler',
+		area: 'router',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -7802,6 +9346,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED',
+		title: 'document.tsrx uses storage()',
+		area: 'router',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -7821,6 +9367,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_FRAGMENT_MINIFY_FAILED',
+		title: 'A page fragment could not be minified',
+		area: 'build',
 		packageName: '@markless/router',
 		stage: 'build',
 		severity: 'error',
@@ -7838,6 +9386,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_FRAGMENT_OFF_ORIGIN',
+		title: 'A page fragment points to another site',
+		area: 'build',
 		packageName: '@markless/router',
 		stage: 'build',
 		severity: 'error',
@@ -7855,6 +9405,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_FRAGMENT_OVER_IDLE_BUDGET',
+		title: 'A page fragment is too big to load while idle',
+		area: 'build',
 		packageName: '@markless/router',
 		stage: 'build',
 		severity: 'error',
@@ -7872,6 +9424,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_FRAGMENT_UNAVAILABLE',
+		title: 'A page fragment could not be fetched',
+		area: 'build',
 		packageName: '@markless/router',
 		stage: 'build',
 		severity: 'error',
@@ -7889,6 +9443,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_NAVIGATE_SERVER',
+		title: 'navigate() ran on the server',
+		area: 'router',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -7908,6 +9464,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_RENDER_DATA_MISSING',
+		title: 'A page has no build data',
+		area: 'router',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -7927,6 +9485,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_RESPONSE_COMMITTED',
+		title: 'A page changed its status after streaming began',
+		area: 'router',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -7968,6 +9528,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -7980,6 +9541,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROUTER_UNKNOWN_HASH_ROUTE',
+		title: 'A link points to a page that does not exist',
+		area: 'router',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -7999,6 +9562,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
+		title: 'This <branchLabel> in a @for row never changes in the browser',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error-or-warning',
@@ -8010,6 +9575,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED',
 		],
 		structured: true,
+		why: "A row flips its own <branchLabel> from the row markup the payload carries: the test read per row, and each arm's elements, text and attributes. A row needing anything more ships no markup at all, so nothing can rebuild an arm in it.",
 		allow: [
 			{
 				id: 'l0',
@@ -8038,6 +9604,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROW_COMPONENT_INTERACTIVE',
+		title: 'A component in a position-keyed row has its own state',
+		area: 'lists',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8058,6 +9626,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
+		title: 'This is not a row-ownable element() handle',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8069,6 +9639,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'The keyed row record owns one host slot per authored handle and repeat key. Forwarded props, deeper paths, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
+		suggestion:
+			'Declare the handle with const row = element<HTMLElement[]>() in this component or in the shared() factory the row reads, then bind el={row} - or el={family.row} - directly on the keyed row host.',
 		sources: [
 			{
 				id: 'f0',
@@ -8080,6 +9653,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROW_ITEM_MISSING',
+		title: 'A list row has no item',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8097,6 +9672,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		title: 'A @for row value reads a component-body local the compiler cannot follow',
+		area: 'lists',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8109,6 +9686,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
 		],
 		structured: true,
+		why: "A row value repaints when a state or computed it reads changes. Reads through a helper are followed into the helper's definition; a local with no single definition the compiler can read has no reads to follow.",
+		suggestion:
+			'Declare `<localName>` once as a `const` or a function in the component body, or read the state through a `computed()`.',
 		sources: [
 			{
 				id: 'f0',
@@ -8120,6 +9700,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RUNTIME_ERROR',
+		title: 'Markless failed while the page ran',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8137,6 +9719,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_LEAN_ESCALATE',
+		title: 'A simple update needed the full runtime',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8159,6 +9743,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_PLAN_MISMATCH',
+		title: 'A simple update does not match its plan',
+		area: 'internal',
 		packageName: '@markless/router',
 		stage: 'runtime',
 		severity: 'error',
@@ -8176,6 +9762,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_SPECIALIZED_ESCALATE',
+		title: 'A fast update needed the full runtime',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8203,6 +9791,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_SPECIALIZED_FALLBACK',
+		title: 'A fast update fell back to the full runtime',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'warning',
@@ -8220,6 +9810,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_SPECIALIZED_HOST_MISS',
+		title: 'A fast update has no element',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -8237,6 +9829,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_WRITE_CELL_MISSING',
+		title: 'A write has no state to change',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8254,6 +9848,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_WRITE_GRAPH_MISSING',
+		title: 'A write has no state graph',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8271,6 +9867,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SCALAR_WRITE_SHAPE',
+		title: 'A write has the wrong shape',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8288,6 +9886,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SEED_CHILDREN_UNAVAILABLE',
+		title: 'These children cannot be seeded into shared state',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8299,6 +9899,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SEED_CHILDREN_UNAVAILABLE',
 		],
 		structured: true,
+		why: 'Shared state is seeded before the projected children render, because those children render from what the seed wrote. Only children the consumer passes as a prop, and children the compiler already spells in full - text, or markup with no expression in it - are known that early.',
+		suggestion:
+			'Write the value as a prop (children={...}), or put text between the tags with no expression in it, or move the write into an event handler where the shared instance is already live.',
 		sources: [
 			{
 				id: 'f0',
@@ -8310,6 +9913,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
+		title: 'State holds a value the server cannot send',
+		area: 'state',
 		packageName: '@markless/serializer',
 		stage: 'runtime',
 		severity: 'error',
@@ -8322,6 +9927,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SERIALIZE_UNSUPPORTED_VALUE',
 		],
 		structured: true,
+		why: 'Serialization is for durable graph state. Functions and host/runtime resources cannot be restored during resume.',
+		suggestion:
+			'Move runtime resources into attach={...}, make the value serializable state, or derive it with computed().',
 		guide: {
 			summary:
 				'State holds a value that Markless cannot send from the server to the browser.',
@@ -8356,6 +9964,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -8373,6 +9982,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SERVER_DERIVE_UNREACHABLE',
+		title: 'This computed value cannot be worked out on the server',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8385,6 +9996,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SERVER_DERIVE_UNREACHABLE',
 		],
 		structured: true,
+		why: 'Server rendering works each computed value out once and puts it in the state the page is served with. A value it cannot work out reads as undefined, and every attribute and piece of text built from it silently disappears from the HTML.',
+		suggestion: 'cycle',
 		sources: [
 			{
 				id: 'f0',
@@ -8396,6 +10009,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SERVER_ONLY_PROP_BROWSER_READ',
+		title: 'Browser code reads the page’s http prop',
+		area: 'router',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8407,6 +10022,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SERVER_ONLY_PROP_BROWSER_READ',
 		],
 		structured: true,
+		why: '"<propName>" exists only while "<componentName>" renders on the server. Everything browser code reads is serialized into the page\'s HTML, so this read would send <description> to the browser, where anyone viewing the page can read it.',
+		suggestion:
+			'Read "<propName>" in the component body, which runs only on the server, and hand the browser just the plain value it needs, for example `let value = state(<propName>.someField)`. The state() copy is serialized, and nothing else of "<propName>" is.',
 		guide: {
 			summary: "Code that runs in the browser reads a page's http prop.",
 			what: [
@@ -8707,6 +10325,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -8719,6 +10338,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SETTLE_KERNEL_UNSUPPORTED',
+		title: 'A settled @try cannot be applied',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8736,6 +10357,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SETTLE_PLAN_UNSUPPORTED',
+		title: 'A settled @try has no plan',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8753,6 +10376,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SETTLE_SLOT_UNKNOWN',
+		title: 'A settled @try has an unknown slot',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -8770,6 +10395,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_CALL_UNBOUND',
+		title: 'A shared() call must be bound to a name',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8781,6 +10408,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNBOUND',
 		],
 		structured: true,
+		why: 'Reads and writes of a shared instance resolve through the name the call was bound to. An unbound call names nothing, so it lowers to no client behavior while the server render still tries to run it and throws.',
+		suggestion: 'Bind the call and read through the name: `<binding>`.',
 		sources: [
 			{
 				id: 'f0',
@@ -8797,6 +10426,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_CALL_UNCOMPILED',
+		title: 'shared() is called from a file Markless did not build',
+		area: 'state',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -8816,6 +10447,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_CALL_UNRESOLVED',
+		title: 'Shared definition call does not resolve',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8827,6 +10460,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNRESOLVED',
 		],
 		structured: true,
+		why: 'A call the compiler cannot resolve to a shared() definition creates no graph instance, so every read of it would render a dead value and every write would go nowhere — silently, at runtime.',
+		suggestion:
+			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 		sources: [
 			{
 				id: 'f0',
@@ -8838,6 +10474,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_COMPUTED_CROSS_MODULE',
+		title: 'A shared() computed cannot be read from another module yet ("<name>")',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8850,6 +10488,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_COMPUTED_CROSS_MODULE',
 		],
 		structured: true,
+		why: "A shared() factory has no instance on the server to ask for a computed value, so the server works the value out by copying the factory's own expression into the module of every page that reads it. The imports and module-scope constants that expression names travel with the definition and are emitted beside the copy, but a name this file already binds from somewhere else cannot be: the emitted module would bind it twice, and matching by name alone would build the served value from this module's value instead.",
+		suggestion:
+			'Rename this module\'s "<name>", or import it under another local name, so the one <definedIn> means can be carried in beside the copy.',
 		sources: [
 			{
 				id: 'f0',
@@ -8866,6 +10507,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_DEFINITION_CYCLE',
+		title: 'Shared definitions cannot depend on each other circularly',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8878,6 +10521,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_DEFINITION_CYCLE',
 		],
 		structured: true,
+		why: 'shared() instances are created from graph context during initial render and resume. A cycle would require one shared instance before its own dependency graph can be created.',
+		suggestion:
+			'Break the shared() dependency cycle by passing plain data between definitions or by moving the shared read into an event method that runs after instance creation.',
 		sources: [
 			{
 				id: 'f0',
@@ -8889,6 +10535,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_EXPORT_NAME_RESERVED',
+		title: 'A shared() uses a name Markless reserves',
+		area: 'state',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -8906,6 +10554,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_FACTORY_CLASS_INSTANCE',
+		title: 'A shared() factory cannot return a class instance',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -8917,6 +10567,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_FACTORY_CLASS_INSTANCE',
 		],
 		structured: true,
+		why: 'A shared() factory declares the graph fields the payload carries and the server render rebuilds. A class instance declares none, so every read of it is a reference to a binding that does not exist in the module doing the reading.',
+		suggestion:
+			'Return a plain object instead: the durable data becomes fields, and the behaviour becomes methods on the same object (`shared(() => ({ index: 0, next() { ... } }))`).',
 		sources: [
 			{
 				id: 'f0',
@@ -8928,6 +10581,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
+		title: 'A shared() has no scope',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -8939,6 +10594,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
 		],
 		structured: true,
+		why: 'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+		suggestion: "Add { scope: 'widget' } to give each rendered widget its own graph.",
 		guide: {
 			summary: 'Several components share a shared() definition that has no scope.',
 			what: [
@@ -8981,6 +10638,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		allow: [
 			{
@@ -9005,6 +10663,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION',
+		title: 'The exported function "<name>" resolves a shared() definition at module scope',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9017,6 +10677,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION',
 		],
 		structured: true,
+		why: 'A shared() definition is graph data, not module code: its factory is compiled into payload nodes and the runtime resolves a property of it only for a component instance that asked for one. That makes a component body the only place a resolving call means anything. An exported plain function is neither carried with its definition nor reachable as a part, so the compiler would have to silently publish less than the file says it publishes.',
+		suggestion:
+			'Make "<name>" a part this family publishes — a component whose body resolves `<definitionName>()` — and compose it where the behavior is wanted.',
 		sources: [
 			{
 				id: 'f0',
@@ -9028,6 +10691,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_MEMBER_UNKNOWN',
+		title: 'Shared state has no such member',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9039,6 +10704,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_MEMBER_UNKNOWN',
 		],
 		structured: true,
+		why: 'A member read is lowered into a path subscription on a declared graph node. A path the node never declares reads undefined on every render and after resume, so the code that depends on it silently does nothing.',
+		suggestion:
+			'Declare "<member>" in the state() initial value of <definitionName>(), or read a member the definition already declares.',
 		sources: [
 			{
 				id: 'f0',
@@ -9050,6 +10718,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_METHOD_CROSS_MODULE',
+		title: 'A shared() method cannot be called from another module yet (<shared>)',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9062,6 +10732,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_METHOD_CROSS_MODULE',
 		],
 		structured: true,
+		why: "Calling a shared() method compiles to copying the method's authored body into the calling handler, because no shared instance exists inside a handler module to call the method on. Copying text moves the statements but not the scope they were written in, so the copy only means what the author wrote while the definition and the call are in one file. Across files the definition module's imports and module-scope declarations do not travel, and the calling module's imports are matched against the copied text by name, which can capture a same-named binding that means something else entirely. Both failures are invisible until the gesture runs, so this build refuses instead.",
+		suggestion:
+			'Call <value> from a part the family itself publishes, in <files>, and compose that part here. Inside its own module the same call compiles and runs today.',
 		sources: [
 			{
 				id: 'f0',
@@ -9073,6 +10746,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_RETURN_UNNAMED',
+		title: 'A shared() factory must return named state',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9084,6 +10759,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_RETURN_UNNAMED',
 		],
 		structured: true,
+		why: 'A shared() cell is serialized under an id spelled from the name it was declared with, and every read of the instance resolves through that id. An inline call in return position declares no name, so no node exists, and each read of the instance falls back to the authored text and throws at render.',
+		suggestion: 'Name the cells and return the name: `const s = <apiName>(...); return s;`.',
 		sources: [
 			{
 				id: 'f0',
@@ -9095,6 +10772,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_SCOPE_INVALID',
+		title: 'Shared() scope must be valid',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9106,6 +10785,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
 		],
 		structured: true,
+		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
+		suggestion:
+			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
 		sources: [
 			{
 				id: 'f0',
@@ -9117,6 +10799,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_SEED_UNKNOWN_FIELD',
+		title: 'Shared instance has no such field to seed',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9128,6 +10812,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_SEED_UNKNOWN_FIELD',
 		],
 		structured: true,
+		why: 'A component body seed is lowered into an initial value for a graph node the shared definition declared. With no matching node there is nothing to seed, and the authored assignment cannot run on the server because the emitted body keeps no local for the shared instance.',
+		suggestion:
+			'Return "<field>" from the <definitionName>() factory as state() or computed() graph data, or pass the callback to the component as a prop and call it from an event handler.',
 		sources: [
 			{
 				id: 'f0',
@@ -9139,6 +10826,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_SEED_UNRESOLVED_VALUE',
+		title: 'A shared() seed value has nothing to bind to',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9150,6 +10839,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_SEED_UNRESOLVED_VALUE',
 		],
 		structured: true,
+		why: "A factory seed is re-evaluated in a module of its own, carrying only this file's module scope and imports. A name that is none of those has nothing to bind to there, so the seed throws a ReferenceError and the whole shape loses its fields — which then reads as an error at every consumer of the shape rather than here.",
+		suggestion:
+			'Seed "<fieldName>" with a literal, or with a module-scope `const` of this file that "<freeName>" can resolve to.',
 		sources: [
 			{
 				id: 'f0',
@@ -9161,6 +10853,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_SEED_UNSUPPORTED',
+		title: 'Cannot seed shared state from this expression',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9172,6 +10866,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SHARED_SEED_UNSUPPORTED',
 		],
 		structured: true,
+		why: "A component body runs once during initial render. The compiler turns a shared-state assignment there into a per-instance initial value, which it can only build from values the render already has: this component's props and constants.",
+		suggestion:
+			'Assign a prop or a constant, or move the write into an event handler where the shared instance is already live.',
 		sources: [
 			{
 				id: 'f0',
@@ -9183,6 +10880,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SHARED_SHAPE_MISMATCH',
+		title: 'Two shared() definitions with one name differ',
+		area: 'state',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9202,6 +10901,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED',
+		title: 'Two builds of one file disagree',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9213,6 +10914,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED',
 		],
 		structured: true,
+		why: 'Merging contradictory claims would let one emitted sibling silently redefine a symbol another sibling already routes to.',
+		suggestion:
+			'Rebuild the source so every emitted sibling publishes the same rows for a shared symbol, and clear any stale build cache.',
 		sources: [
 			{
 				id: 'f0',
@@ -9224,6 +10928,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SOURCE_SYMBOL_CLAIMS_FINAL_WITHOUT_START',
+		title: 'A file finished building before it started',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -9243,6 +10949,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
+		title: 'A file’s code was read before it finished building',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -9262,6 +10970,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SPREAD_STATIC_SNAPSHOT',
+		title: 'Spread attributes render once',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -9272,6 +10982,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'Bind attributes that change individually, such as <div id={menu.id} data-open={menu.open} />, and keep the spread only for initial attributes.',
 		],
 		structured: true,
+		why: 'The compiler plans DOM-update records for graph-backed attributes it can see; a spread hides which attributes exist, so no update records are planned for it.',
+		suggestion:
+			'Bind attributes that change individually, such as <div id={menu.id} data-open={menu.open} />, and keep the spread only for initial attributes.',
 		allow: [
 			{
 				id: 'l0',
@@ -9295,6 +11008,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_ANCHOR_MISSING',
+		title: 'A server-rendered @try lost its place',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9312,6 +11027,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_ANCHOR_START_MISSING',
+		title: 'A server-rendered @try lost its start',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9329,6 +11046,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_BOUNDARY_MISSING',
+		title: 'Server data is missing an @try',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9351,6 +11070,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_BRANCH_MISSING',
+		title: 'Server data is missing an @if',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9368,6 +11089,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_BRANCH_SELECTOR_MISSING',
+		title: 'Server data cannot tell which @if branch showed',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9385,6 +11108,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_CHILD_MISSING',
+		title: 'Server data is missing a component',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9402,6 +11127,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_CHILD_RENDER_MISSING',
+		title: 'Server data is missing a component’s render',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9419,6 +11146,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING',
+		title: 'A component has nothing to render with',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9436,6 +11165,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING',
+		title: 'A component’s structure is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9453,6 +11184,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_CHUNK_MISSING',
+		title: 'A piece of server data is missing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9470,6 +11203,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_HOST_MISSING',
+		title: 'Server data is missing an element',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9487,6 +11222,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_REPEAT_MISSING',
+		title: 'Server data is missing a list',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9504,6 +11241,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_RESIDUE_MISSING',
+		title: 'Server data left out part of the page',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9521,6 +11260,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_DATA_SERVED_ARM_INVALID',
+		title: 'The server sent an @if branch that does not exist',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -9538,6 +11279,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_ROSTER_COUNT_UNANSWERED',
+		title: 'The server could not count a list',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9560,6 +11303,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_ROSTER_POSITION_UNANSWERED',
+		title: 'The server could not place a list row',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9577,6 +11322,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SSR_STRIP_FAILED',
+		title: 'Server-only code could not be removed',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -9594,6 +11341,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_CONST_REASSIGNMENT',
+		title: 'Code reassigns state declared with const',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9605,6 +11354,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_CONST_REASSIGNMENT',
 		],
 		structured: true,
+		why: 'state() removes marker syntax, but it does not change JavaScript binding rules. A const binding cannot be reassigned during resume or initial render.',
+		suggestion:
+			'Use let for scalar state you reassign, or mutate a property path on object state such as menu.open.',
 		guide: {
 			summary: 'Code assigns a new value to state that was declared with const.',
 			what: [
@@ -9675,7 +11427,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r1',
-							text: ' count ',
+							text: ' theme ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
@@ -9700,8 +11452,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r6',
-							text: '0',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							text: "'light'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
 						},
 						{
 							id: 'r7',
@@ -9766,6 +11518,236 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Settings',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'theme',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r6',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r8',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r9',
+							text: "'light'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r10',
+							text: ');',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' (theme ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: "'dark'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r11',
+							text: ')}>Theme: {theme}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
 		},
 		sources: [
 			{
@@ -9778,6 +11760,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		title: 'state() is created inside a branch, loop or handler',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9789,6 +11773,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_CREATION_SITE_UNSTABLE',
 		],
 		structured: true,
+		why: '<why> Graph cells are planned into the payload before rendering, so each authored declaration needs one stable component-body or shared owner.',
 		guide: {
 			summary:
 				'state() or computed() is created inside an @if, a loop, a handler, or another computed.',
@@ -9832,6 +11817,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -9844,6 +11830,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_CROSS_MODULE_IMPORT',
+		title: 'Imported module-scope state is not resumable',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9855,6 +11843,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_CROSS_MODULE_IMPORT',
 		],
 		structured: true,
+		why: 'Module-scope state has no per-request graph ownership. Importing it would compile reads as dead snapshots and writes as plain module mutation instead of connecting to this document payload.',
+		suggestion:
+			'Move the state() call into the component that owns it, or expose request/container/page lifetime data with shared() and import that shared() definition instead.',
 		sources: [
 			{
 				id: 'f0',
@@ -9866,6 +11857,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+		title: 'A destructured prop or state has a default',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9877,6 +11870,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'A destructuring default must run only when the property value is undefined. The current graph alias artifact can represent a graph path, but not a fallback expression without changing JavaScript semantics.',
+		suggestion:
+			'Use an explicit computed() for fallback logic, or read the graph path directly without a destructuring default.',
 		sources: [
 			{
 				id: 'f0',
@@ -9893,6 +11889,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_DYNAMIC_PATH_READ',
+		title: 'State is read with a computed key',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9904,6 +11902,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_DYNAMIC_PATH_READ',
 		],
 		structured: true,
+		why: 'The resumable state graph records path-level subscriptions in the payload. A dynamic property expression cannot be represented as a stable graph subscription by the current compiler pass.',
+		suggestion:
+			'Use a statically named property path, a literal array index, or model the dynamic lookup as a computed() with explicit compiler support.',
 		sources: [
 			{
 				id: 'f0',
@@ -9915,6 +11916,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_DYNAMIC_PATH_WRITE',
+		title: 'State is written with a computed key',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9926,6 +11929,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_DYNAMIC_PATH_WRITE',
 		],
 		structured: true,
+		why: 'The resumable state graph records path-level writes in the payload and runtime journal. A dynamic property expression cannot be represented as a stable graph path by the current compiler pass.',
+		suggestion:
+			'Use a statically named property path, a literal array index, or a collection method with compiler coverage for this state update.',
 		sources: [
 			{
 				id: 'f0',
@@ -9937,6 +11943,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
+		title: 'Element() handles cannot be stored in state',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9948,6 +11956,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE',
 		],
 		structured: true,
+		why: 'state() values are serialized into markless/state and resumed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.',
+		suggestion:
+			'Keep element handles in element() bindings and bind them with el={handle}. Store serializable ids, flags, or data in state() instead.',
 		sources: [
 			{
 				id: 'f0',
@@ -9964,6 +11975,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
+		title: 'A function cannot be stored in state',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9975,6 +11988,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_FUNCTION_UNSERIALIZABLE',
 		],
 		structured: true,
+		why: 'state() values are serialized into the page and the browser resumes from them without running the component body, so only data (strings, numbers, booleans, null, arrays and plain objects) survives the trip.',
+		suggestion:
+			'Keep the function outside state(): declare it in the component body or at module scope, and store only the data it needs, for example a name to pick it by.',
 		sources: [
 			{
 				id: 'f0',
@@ -9986,6 +12002,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
+		title: 'A helper returns state in a shape Markless cannot follow',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -9997,6 +12015,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'The compiler supports same-module direct helper returns and compiled imported helpers. This gate remains for residual helper shapes such as object returns, nested return chains, or imported helpers without module graph interface data.',
+		suggestion:
+			'Return the graph binding directly from the helper, compile the imported helper with interface output, or declare the state in the component body.',
 		sources: [
 			{
 				id: 'f0',
@@ -10008,6 +12029,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
+		title: 'Write through a local changes state Markless cannot track',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10019,6 +12042,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_LOCAL_WRITE_UNTRACKED',
 		],
 		structured: true,
+		why: 'Markless has no runtime proxies: a change reaches the page only when the compiler can name the state path it writes. This write would change the state object in place and the page would keep showing the old value.',
 		sources: [
 			{
 				id: 'f0',
@@ -10030,6 +12054,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_MODULE_ESCAPE',
+		title: 'Module-scope storage cannot be written from render or handlers',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10042,6 +12068,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_MODULE_ESCAPE',
 		],
 		structured: true,
+		why: 'Module-scope storage outlives a single server render. A handler could read or overwrite data from another user because the value is not part of this document payload.',
+		suggestion:
+			'Keep per-document values inside state(), or use shared() for named request/container/page dataflow instead of module variables.',
 		sources: [
 			{
 				id: 'f0',
@@ -10053,6 +12082,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_MODULE_SCOPE',
+		title: 'state() sits outside a component',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10065,6 +12096,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_MODULE_SCOPE',
 		],
 		structured: true,
+		why: 'Module-scope graph state would be shared across requests and has no per-document serialization payload.',
+		suggestion:
+			'Move state() or computed() creation into a component or declare request/container/page state with shared().',
 		guide: {
 			summary:
 				'state() or computed() sits at the top of a file instead of inside a component.',
@@ -10133,7 +12167,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r4',
-							text: 'Counter',
+							text: 'Settings',
 							style: 'color:#6f42c1;--shiki-dark:#b392f0',
 						},
 						{
@@ -10163,7 +12197,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r2',
-							text: ' count ',
+							text: ' theme ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
@@ -10188,8 +12222,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r7',
-							text: '0',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							text: "'light'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
 						},
 						{
 							id: 'r8',
@@ -10212,56 +12246,21 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r1',
-							text: 'button',
+							text: 'p',
 							style: 'color:#22863a;--shiki-dark:#85e89d',
 						},
 						{
 							id: 'r2',
-							text: ' ',
+							text: '>Theme: {theme}</',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
 							id: 'r3',
-							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
-						},
-						{
-							id: 'r4',
-							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
-						},
-						{
-							id: 'r5',
-							text: '{() ',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r6',
-							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
-						},
-						{
-							id: 'r7',
-							text: ' count',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r8',
-							text: '++',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
-						},
-						{
-							id: 'r9',
-							text: '}>{count}</',
-							style: 'color:var(--ink);--shiki-dark:var(--ink)',
-						},
-						{
-							id: 'r10',
-							text: 'button',
+							text: 'p',
 							style: 'color:#22863a;--shiki-dark:#85e89d',
 						},
 						{
-							id: 'r11',
+							id: 'r4',
 							text: '>',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
@@ -10269,6 +12268,176 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' { state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' theme ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: "'light'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r7',
+							text: ');',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Settings',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>Theme: {theme}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
 					runs: [
 						{
 							id: 'r0',
@@ -10290,6 +12459,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_NESTED_CREATION',
+		title: 'state() starts with another state()',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10301,6 +12472,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_NESTED_CREATION',
 		],
 		structured: true,
+		why: 'A graph cell serializes plain data across the resume boundary; a state() call declares a cell and has no serializable value form.',
+		suggestion: 'Before: `const x = state(state(5));` — After: `const x = state(5);`.',
 		guide: {
 			summary: 'state() gets another state() call as its start value.',
 			what: [
@@ -10390,6 +12563,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		sources: [
 			{
@@ -10402,6 +12576,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_OPTIONAL_CHAIN_WRITE',
+		title: 'Code writes to state through ?.',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10413,6 +12589,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_OPTIONAL_CHAIN_WRITE',
 		],
 		structured: true,
+		why: 'Optional chaining can skip the method call and its arguments at runtime. The current graph write artifact cannot preserve that short-circuit behavior safely across resume.',
+		suggestion:
+			'Guard explicitly before mutating graph state, or initialize the state path so the collection method call always has a definite target.',
 		guide: {
 			summary: 'Code writes to state through optional chaining, like a?.b = 1.',
 			what: [
@@ -10437,6 +12616,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -10449,6 +12629,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE',
+		title: 'A class instance cannot be a field of a shared() or state() value',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10461,6 +12643,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_PROPERTY_CLASS_INSTANCE',
 		],
 		structured: true,
+		why: 'Only declared graph fields cross the boundary. A class instance is not one, so the rebuilt object has a hole where the field was, and any method reached through the graph arrives unbound.',
+		suggestion:
+			'Make the durable data plain fields on the same object, and put the behaviour beside them as methods (`{ index: 0, next() { ... } }`).',
 		sources: [
 			{
 				id: 'f0',
@@ -10472,6 +12657,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_READ_ONLY_WRITE',
+		title: 'Code writes to a computed() or a prop',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10514,6 +12701,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -10526,6 +12714,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
+		title: 'Per-row state in keyed repeats is not supported yet',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10537,6 +12727,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'Keys give rows identity, but each row would need its own cell keyed by row identity across reorder and resume. The current graph payload can only plan stable component-owned cells.',
+		suggestion:
+			'Lift the state to a collection on the parent: use one state() holding per-row data keyed by the row key.',
 		sources: [
 			{
 				id: 'f0',
@@ -10548,6 +12741,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH',
+		title: 'Cannot write through an object-rest excluded path',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10559,6 +12754,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH',
 		],
 		structured: true,
+		why: 'Object rest destructuring creates an alias for the remaining graph paths only. Paths explicitly destructured out of the source object are not owned by the rest alias.',
+		suggestion:
+			'Write through the original graph path, or use the explicit destructured alias for the excluded property.',
 		sources: [
 			{
 				id: 'f0',
@@ -10570,6 +12768,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_STALE_LOCAL_WRITE',
+		title: 'A handler changes a plain variable the page shows',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10582,6 +12782,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_STALE_LOCAL_WRITE',
 		],
 		structured: true,
+		why: 'Component bodies run for initial render only. Template reads re-render after events only when they subscribe through state(), so this handler write would leave the UI stale after resume.',
+		suggestion:
+			'Move "<name>" into state(), then write <name>++ so Markless can serialize the cell and update subscribed DOM.',
 		guide: {
 			summary:
 				'An event handler writes a plain variable that the markup reads, so the page never changes.',
@@ -10626,7 +12829,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r1',
-							text: ' count ',
+							text: ' theme ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
@@ -10651,8 +12854,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r6',
-							text: '0',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							text: "'light'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
 						},
 						{
 							id: 'r7',
@@ -10705,28 +12908,209 @@ export const errorEntries: readonly ErrorEntry[] = [
 						},
 						{
 							id: 'r7',
-							text: ' count',
+							text: ' (theme ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
 							id: 'r8',
-							text: '++',
+							text: '=',
 							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 						{
 							id: 'r9',
-							text: '}>{count}</',
+							text: ' ',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
 						},
 						{
 							id: 'r10',
+							text: "'dark'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r11',
+							text: ')}>Theme: {theme}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
 							text: 'button',
 							style: 'color:#22863a;--shiki-dark:#85e89d',
 						},
 						{
-							id: 'r11',
+							id: 'r13',
 							text: '>',
 							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'Settings',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r5',
+							text: '() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'let',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' theme ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: "'light'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r6',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '{() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' (theme ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: "'dark'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r11',
+							text: ')}>Theme: {theme}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r13',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
 						},
 					],
 				},
@@ -10743,6 +13127,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_UNRESOLVED_WRITE',
+		title: 'A write to an outside object is not tracked',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -10754,6 +13140,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_UNRESOLVED_WRITE',
 		],
 		structured: true,
+		why: 'Member-expression writes can update host objects at runtime, but they do not produce resumable state graph updates.',
+		suggestion:
+			'Declare the local before writing it, or move UI-changing values into state() so Markless can serialize and resume the update.',
 		allow: [
 			{
 				id: 'l0',
@@ -10777,6 +13166,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_WRITE_IN_COMPUTED',
+		title: 'A computed() writes to state',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10788,6 +13179,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_COMPUTED',
 		],
 		structured: true,
+		why: 'A computed is a demand-driven read in the graph; the only effects in the system are compiler-generated DOM updates, so a write inside a derive is a self-waking cycle that cannot resume.',
+		suggestion:
+			'Keep computed() pure. Move graph writes to an event handler and derive only from graph reads.',
 		guide: {
 			summary: 'A computed() body writes to state.',
 			what: [
@@ -10821,6 +13215,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -10833,6 +13228,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STATE_WRITE_IN_TEMPLATE',
+		title: 'The markup writes to state',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10844,6 +13241,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STATE_WRITE_IN_TEMPLATE',
 		],
 		structured: true,
+		why: 'DOM updates are the only effects in the demand-driven graph; a write inside a branch test creates a self-waking cycle that cannot resume.',
+		suggestion:
+			'Render the value directly and move the mutation to an event handler or another explicit write site.',
 		guide: {
 			summary: 'An expression in the markup writes to state.',
 			what: [
@@ -10859,6 +13259,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -10871,6 +13272,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STORAGE_KEY_STATIC',
+		title: 'storage() needs a string key',
+		area: 'state',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -10882,6 +13285,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_STORAGE_KEY_STATIC',
 		],
 		structured: true,
+		why: 'The compiler bakes the key into a stable graph identity and storage key at compile time; it cannot be a runtime value.',
+		suggestion:
+			"Pass a string literal, for example `storage('theme', 'light')`, or omit the key: `storage('light')`.",
 		guide: {
 			summary: 'storage() gets a key or fallback that is not a string literal.',
 			what: [
@@ -10924,6 +13330,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -10936,6 +13343,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STORAGE_SEED_FALLBACK_MISSING',
+		title: 'storage() needs a string fallback',
+		area: 'state',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -10955,6 +13364,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STREAM_ARM_ANCHORS_MISSING',
+		title: 'A streamed @try lost its place',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -10972,6 +13383,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STREAM_ARM_RENDER_MISSING',
+		title: 'A streamed @try rendered nothing',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -10992,6 +13405,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STREAM_ARM_TEMPLATE_MISSING',
+		title: 'A streamed @try has no template',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -11009,6 +13424,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_STYLE_OBJECT_UNSUPPORTED',
+		title: 'This style object shape is not supported',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11019,6 +13436,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'Write the declarations directly on the element, such as style={{ color: theme, marginTop: 8 }}, move the object into an unmodified same-file const, or pass a CSS string.',
 		],
 		structured: true,
+		why: 'A style object is turned into CSS text while compiling, so every key must be readable from the source and every value must be one the compiler can recombine into the same text the server renders and the browser rewrites. Objects that are imported, held in state, mutated, aliased, or built at runtime cannot be frozen that way.',
+		suggestion:
+			'Write the declarations directly on the element, such as style={{ color: theme, marginTop: 8 }}, move the object into an unmodified same-file const, or pass a CSS string.',
 		sources: [
 			{
 				id: 'f0',
@@ -11030,6 +13450,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SUBMODULE_UNSUPPORTED',
+		title: 'TSRX submodules are not supported by this host yet',
+		area: 'build',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11041,6 +13463,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SUBMODULE_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'TSRX defines submodule syntax but defers boundary semantics to the host. Until markless implements splitting, treating this as supported would silently ship server-intended code to the client.',
+		suggestion:
+			'Move the code into a separate module with a string import specifier, or wait for the submodule host boundary decision in specs/framework/08-deferred-decisions.md.',
 		sources: [
 			{
 				id: 'f0',
@@ -11052,6 +13477,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE',
+		title: 'An expression reads a name in a shape Markless cannot follow',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11064,6 +13491,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE',
 		],
 		structured: true,
+		why: 'A handler is compiled into a module of its own and every read of state has to be rewritten into a graph read. When an expression nests a state read under a call — `s.text.slice(0, 3).length` — the rewrite has no name for the value it would read, so nothing is rewritten and the authored text is emitted as it stands. Shipping that module would move a build-time gap into a runtime crash on the first click.',
+		suggestion:
+			'Read the state into a local first, then use the local: `const value = <name>.<field>;` on its own line, and build the expression out of `value`. A local read is lowered, and everything after it is plain JavaScript.',
 		sources: [
 			{
 				id: 'f0',
@@ -11075,6 +13505,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SYMBOL_UNKNOWN',
+		title: 'A piece of code is unknown',
+		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -11092,6 +13524,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SYMBOL_UNPUBLISHED',
+		title: 'Code was loaded before it was ready',
+		area: 'internal',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -11111,6 +13545,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SYNC_POLICY_SECOND_CANCEL',
+		title: 'This cancel cannot run before the handler loads',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11121,6 +13557,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SYNC_POLICY_SECOND_CANCEL',
 		],
 		structured: true,
+		why: 'preventDefault() and stopPropagation() take effect only while the event is dispatching. Each top-level `if (...) event.preventDefault()` in a handler becomes a policy the page applies before the handler symbol loads; a cancel the compiler cannot place there would run after the event has finished.',
 		sources: [
 			{
 				id: 'f0',
@@ -11132,6 +13569,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
+		title: 'A handler’s preventDefault cannot run before it loads',
+		area: 'events',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11143,6 +13582,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
 		],
 		structured: true,
+		why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load; a detached reference hides which action runs and under what condition.',
+		suggestion: 'Call it directly on the event parameter instead of detaching <action>.',
 		sources: [
 			{
 				id: 'f0',
@@ -11154,6 +13595,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_TEMPLATE_AS_VALUE',
+		title: 'Markup is stored in a variable',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11165,6 +13608,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_TEMPLATE_AS_VALUE',
 		],
 		structured: true,
+		why: 'Markless has no VDOM. Templates compile to DOM structure and resume locators, so there is no render-output object that can live in state, a computed value, a local variable, or an array.',
+		suggestion:
+			'Keep templates in the tree. Use @if/@for for conditional or repeated structure, extract child components for reusable structure, or pass nested content through children projection.',
 		guide: {
 			summary: 'Markup is stored in a variable, in state, or in an array.',
 			what: [
@@ -11198,6 +13644,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		sources: [
 			{
@@ -11210,6 +13657,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
+		title: 'This text never updates',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error-or-warning',
@@ -11221,6 +13670,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		],
 		structured: true,
+		why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
+		suggestion:
+			"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
 		guide: {
 			summary: 'A markup expression assigns a value, so its text never updates.',
 			what: [
@@ -11384,6 +13836,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					],
 				},
 			],
+			before: [],
 		},
 		allow: [
 			{
@@ -11413,6 +13866,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
+		title: 'A markup expression that reads state needs a route the page can follow',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11425,6 +13880,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED',
 		],
 		structured: true,
+		why: 'An expression with no graph node behind it renders once, from whatever the value was at render, and a later write never reaches it - so the page would show a stale value and nothing would say so.',
+		suggestion:
+			'Write a plain read (`group.value`), an expression built from reads, operators and method calls, or a call to a function declared with `function` or `const` that does not change state. A function held in a `let`, or one that writes state, cannot be followed: move the write into an event handler.',
 		sources: [
 			{
 				id: 'f0',
@@ -11436,6 +13894,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_TEMPLATE_READ_UNDECLARED',
+		title: 'The markup reads a name it cannot see',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11447,6 +13907,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED',
 		],
 		structured: true,
+		why: 'Public CSR and SSR render modules execute template expressions directly during initial render. An identifier that is not declared in the emitted render scope would crash instead of rendering HTML.',
+		suggestion:
+			'Declare <name> in the component body, pass it as a prop, import it, or hoist it to a module-scope declaration before reading it in the template.',
 		sources: [
 			{
 				id: 'f0',
@@ -11458,6 +13921,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_TEXT_UPDATE_RECORD_MISSING',
+		title: 'A text update has no record',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',
@@ -11475,6 +13940,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
+		title: 'An @if re-renders its whole @try',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -11486,6 +13953,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
 		],
 		structured: true,
+		why: 'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
+		suggestion:
+			'Move the component outside the <branchLabel>, or keep the <branchLabel> content to plain elements, text, and state reads.',
 		guide: {
 			summary: 'Toggling an @if that holds a component re-renders the whole @try block.',
 			what: [
@@ -11555,6 +14025,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 			],
 			example: [],
+			before: [],
 		},
 		allow: [
 			{
@@ -11579,6 +14050,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_TYPE_STRIP_FAILED',
+		title: 'TypeScript syntax could not be removed',
+		area: 'build',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',
@@ -11598,6 +14071,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_UI_IMPORT_SHAPE',
+		title: '@markless/ui value imports must use named exports from the package root',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -11610,6 +14085,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_UI_IMPORT_SHAPE',
 		],
 		structured: true,
+		why: 'Application value imports from a family subpath or a namespace can expose source files to dependency optimization instead of using the package root export surface.',
+		suggestion: 'Replace this declaration: <fix>.',
 		sources: [
 			{
 				id: 'f0',
@@ -11621,6 +14098,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_WIDGET_INSTANCE_UNRESOLVED',
+		title: 'A read came from a part no widget owns',
+		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
 		severity: 'error',

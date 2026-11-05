@@ -50,13 +50,12 @@ pnpm exec vp test packages/compiler/test/semantic-graph.test.ts
 
 ## Every finding needs an answer
 
-A *finding* is a review comment, from a person or from the CodeRabbit bot. Open the pull request from your own branch, and say which `ci:local` mode you ran, on which commit, and the result line it printed. Press **Merge when ready** before you answer anything:
+A *finding* is a review comment on one line, from a person or from Macroscope, the review bot this repo runs. Step through a pull request from open to merged:
 
 <ReviewFigure />
 
-- Fix the findings that are right.
-- Reply with your reason on the ones that are stale or wrong.
-- `main` takes changes only through its merge queue, once `test`, `typecheck` and `agent-files` pass.
+- Fix the findings that are right, and reply with your reason on the ones that are stale or wrong.
+- In the pull request, say which `ci:local` mode you ran, on which commit, and the result line it printed.
 - A merge or a push to a shared branch needs the owner's go-ahead for that one change set.
 
 <MugSpot mood="bow" at="perch" from="left" />
