@@ -767,7 +767,7 @@ function binder(card: string): string {
 	return `			${card} {
 				--pg-band: color-mix(in oklch, var(--ink) 70%, transparent);
 				border: 2px solid transparent;
-				border-image: url('/notebook/frame.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
+				border-image: url('/notebook/frame-plain.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
 				border-radius: 0;
 				box-shadow: none;
 				background: var(--paper);
@@ -776,7 +776,7 @@ function binder(card: string): string {
 
 			html.dark ${card} {
 				--paper: var(--raised);
-				border-image-source: url('/notebook/frame-dark.png');
+				border-image-source: url('/notebook/frame-dark-plain.png');
 			}
 
 			@media (max-width: 600px) {
@@ -784,6 +784,30 @@ function binder(card: string): string {
 					border-radius: 0;
 					box-shadow: none;
 					padding-left: 1.5rem;
+				}
+			}
+
+			${card}::before {
+				position: absolute;
+				inset-block: 0;
+				inset-inline-start: -2px;
+				width: 51.4px;
+				background: url('/notebook/frame-ring.png') 0 6% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 20% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 35% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 50% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 65% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 80% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				content: '';
+				pointer-events: none;
+			}
+
+			html.dark ${card}::before {
+				background: url('/notebook/frame-dark-ring.png') 0 6% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 20% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 35% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 50% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 65% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 80% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+			}
+
+			@media (max-width: 600px) {
+				${card}::before {
+					background: url('/notebook/frame-ring.png') 0 8% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 30% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 52% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 74% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				}
+
+				html.dark ${card}::before {
+					background: url('/notebook/frame-dark-ring.png') 0 8% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 30% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 52% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 74% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 94% / 51.4px 41.4px no-repeat;
 				}
 			}
 
@@ -800,10 +824,7 @@ function binder(card: string): string {
 				gap: 0.9em 2em;
 			}
 
-			${card} .pg-clamp[ui-open] .pg-code-body {
-				max-height: 20rem;
-				overflow: auto;
-			}
+
 
 			${card} .pg-clamp {
 				border-block-start: 2px dashed var(--pg-band);

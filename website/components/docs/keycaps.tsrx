@@ -42,7 +42,7 @@ export default function KeyCaps({ family, lit }: {
 	<div class="keycaps" data-lit={lit ?? ''}>
 		<ul class="caps">
 			@for (const row of rows; key row.id) {
-				<li class="row" data-row={row.id} data-keys={row.keys} data-does={row.does}>
+				<li class={row.caps.length > 1 ? 'row wide' : 'row'} data-row={row.id} data-keys={row.keys} data-does={row.does}>
 					<span class="keys">
 						@for (const cap of row.caps; key cap.id) {
 							<span class="pair">
@@ -70,7 +70,8 @@ export default function KeyCaps({ family, lit }: {
 		<style>
 			.caps {
 				display: grid;
-				gap: 1rem;
+				grid-template-columns: repeat(auto-fill, minmax(6.4rem, 1fr));
+				gap: 1rem 1.2rem;
 				margin: 0;
 				padding: 0;
 				list-style: none;
@@ -79,6 +80,11 @@ export default function KeyCaps({ family, lit }: {
 			.row {
 				display: grid;
 				gap: 0.25rem;
+				align-content: start;
+			}
+
+			.wide {
+				grid-column: span 2;
 			}
 
 			.keys {
