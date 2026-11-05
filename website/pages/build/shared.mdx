@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import InkCards from '../../components/docs/ink-cards.tsrx';
 import PlayerAnatomy from '../../components/figures/player/player-anatomy.tsrx';
 
 <SiteNavbar />
@@ -82,12 +83,12 @@ export default function NowPlaying() @{
 
 The second argument is the *scope*: who shares one copy.
 
-| Scope | Who shares one copy |
-| --- | --- |
-| `'page'`, the default | every component on the page |
-| `'request'` | the same as `'page'` in the browser |
-| `'container'` | one Markless app on the page |
-| `'widget'` | the pieces of one rendered widget |
+<InkCards label="The four scopes" cards={[
+	{ icon: 'book', name: "'page'", line: 'Every component on the page shares one copy. This is the default.' },
+	{ icon: 'envelope', name: "'request'", line: "One copy per request on the server; the same as 'page' in the browser." },
+	{ icon: 'parcel', name: "'container'", line: 'One copy per Markless app on the page, not shared with the others.' },
+	{ icon: 'puzzle', name: "'widget'", line: 'One copy per rendered widget, like each player or each menu.' },
+]} />
 
 The scope is one of these four words, and the player above shows what happens with any other. A widget is the first component that calls the definition, plus everything inside it. The volume knobs above are `'widget'`, and so are the [UI components](/ui), so two menus open and close on their own.
 
