@@ -259,6 +259,80 @@ function importedCaptureSymbols(
 				},
 			];
 		}
+		const captureSlots = symbol.captureSymbol.captureSlots
+			.map((slot) => ({
+				...slot,
+				routes: slot.routes.some((route) => route.kind === 'widget-callback-route')
+					? slot.routes.map((route) =>
+							route.kind === 'widget-callback-route'
+								? resolveWidgetCallbackRoute(route, edge, input)
+								: route,
+						)
+					: slot.routes.some((route) => route.kind === 'passthrough-route')
+						? slot.routes.flatMap((route) =>
+								route.kind === 'passthrough-route'
+									? edgePaths.map((path) =>
+											propCaptureRoute(
+												path,
+												route.propName,
+												[...route.path, ...slot.path],
+												input,
+												absentPropIsUndefined(slot),
+											),
+										)
+									: [],
+							)
+						: slot.propName && !republished
+							? keepConstantFields(
+									edgePaths.map((path) =>
+										propCaptureRoute(
+											path,
+											slot.propName as string,
+											slot.path,
+											input,
+											absentPropIsUndefined(slot),
+										),
+									),
+									slot.fieldPaths ?? [slot.path],
+								)
+							: slot.routes.flatMap((route): CaptureSlotRoute[] =>
+									route.kind === 'graph-reference' ||
+									(republished && route.kind === 'compiler-known-constant')
+										? edgePaths.map((path) => ({
+												...route,
+												...(route.kind === 'graph-reference' && republished
+													? republishedGraphNodeId(
+															route.graphNodeId,
+															path,
+															input,
+														)
+													: {}),
+												componentEdgeId: edge.id,
+												componentEdgePath: path.map((step) => step.id),
+											}))
+										: [route],
+								),
+			}))
+			.filter((slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge))
+			// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
+			// A row's value is rendered with the row, and a changed item rebuilds it, so only a callback needs it later.
+			.flatMap((slot) => {
+				if (
+					captureSymbol.kind === 'event-handler' ||
+					captureSymbol.kind === 'callback-prop'
+				)
+					return [slot];
+				const routes = slot.routes.filter(
+					(route) =>
+						route.kind !== 'row-local' &&
+						(route.kind !== 'unsupported-opaque' ||
+							(captureSymbol.kind !== 'sync-computed-derive' &&
+								route.rowValue !== true)),
+				);
+				return routes.length > 0 ? [{ ...slot, routes }] : [];
+			});
+		// A forwarded prop this module cannot route (a row's own value) leaves the claim to the child's binding, which reads it.
+		if (republished && captureSlots.length < captureSymbol.captureSlots.length) return [];
 		return [
 			{
 				...symbol.captureSymbol,
@@ -266,85 +340,7 @@ function importedCaptureSymbols(
 				owner: { componentName: edge.parentComponentName },
 				loaderSymbolId: symbol.id,
 				...forwarded,
-				captureSlots: symbol.captureSymbol.captureSlots
-					.map((slot) => ({
-						...slot,
-						routes: slot.routes.some((route) => route.kind === 'widget-callback-route')
-							? slot.routes.map((route) =>
-									route.kind === 'widget-callback-route'
-										? resolveWidgetCallbackRoute(route, edge, input)
-										: route,
-								)
-							: slot.routes.some((route) => route.kind === 'passthrough-route')
-								? slot.routes.flatMap((route) =>
-										route.kind === 'passthrough-route'
-											? edgePaths.map((path) =>
-													propCaptureRoute(
-														path,
-														route.propName,
-														[...route.path, ...slot.path],
-														input,
-														absentPropIsUndefined(slot),
-													),
-												)
-											: [],
-									)
-								: slot.propName && !republished
-									? keepConstantFields(
-											edgePaths.map((path) =>
-												propCaptureRoute(
-													path,
-													slot.propName as string,
-													slot.path,
-													input,
-													absentPropIsUndefined(slot),
-												),
-											),
-											slot.fieldPaths ?? [slot.path],
-										)
-									: slot.routes.flatMap((route): CaptureSlotRoute[] =>
-											route.kind === 'graph-reference' ||
-											(republished &&
-												route.kind === 'compiler-known-constant')
-												? edgePaths.map((path) => ({
-														...route,
-														...(route.kind === 'graph-reference' &&
-														republished
-															? republishedGraphNodeId(
-																	route.graphNodeId,
-																	path,
-																	input,
-																)
-															: {}),
-														componentEdgeId: edge.id,
-														componentEdgePath: path.map(
-															(step) => step.id,
-														),
-													}))
-												: [route],
-										),
-					}))
-					.filter(
-						(slot) =>
-							republished || !wasProjectedThroughComponentEdge(slot.propName, edge),
-					)
-					// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
-					// A row's value is rendered with the row, and a changed item rebuilds it, so only a callback needs it later.
-					.flatMap((slot) => {
-						if (
-							captureSymbol.kind === 'event-handler' ||
-							captureSymbol.kind === 'callback-prop'
-						)
-							return [slot];
-						const routes = slot.routes.filter(
-							(route) =>
-								route.kind !== 'row-local' &&
-								(route.kind !== 'unsupported-opaque' ||
-									(captureSymbol.kind !== 'sync-computed-derive' &&
-										route.rowValue !== true)),
-						);
-						return routes.length > 0 ? [{ ...slot, routes }] : [];
-					}),
+				captureSlots,
 			},
 		];
 	});

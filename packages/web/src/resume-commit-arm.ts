@@ -226,7 +226,8 @@ export async function registerArmRecordSet(
 	if (computedRefreshes.length) {
 		if (!deps.registerComputedRefreshes)
 			throw new Error('Markless async arm computed-refresh registration is unavailable.');
-		await deps.registerComputedRefreshes(computedRefreshes);
+		// The async records ride along: a derive over an unsettled async value waits for it instead of running.
+		await deps.registerComputedRefreshes(update.computed!);
 	}
 	registerArmDomUpdates(deps, materialized.domUpdates);
 	if (materialized.keyedRepeats.length)

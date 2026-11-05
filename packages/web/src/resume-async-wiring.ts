@@ -427,21 +427,24 @@ export async function settleAsyncBoundaryRange(
 			const { computed, cells, renderedBoundaryId } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'> & {
 				readonly renderedBoundaryId?: string;
 			};
+			const own = { ...(computed && { computed }), ...(cells && { cells }), armRecords };
 			await commit(
 				{
-					...(computed && { computed }),
-					...(cells && { cells }),
+					...(composedArmRecordQualifier()?.boundaryUpdate?.(boundary, own, input.graph, renderedBoundaryId) ?? own),
 					html: update.html,
-					armRecords: (composedArmRecordQualifier()?.(boundary, armRecords, input.graph, undefined, renderedBoundaryId) ?? armRecords),
 				},
 				rawArmRecords !== undefined,
 			);
 			return;
 		}
+		// A failure over shown @try content keeps it, which only a commit can draw: the journal swap replaces the range.
+		const keepsShown =
+			arm === ASYNC_BOUNDARY_ARM.catch &&
+			(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try;
 		if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
 		else shownArms.set(boundary, arm);
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
-		if (input.root.__marklessBranchArms?.has(boundary.id)) {
+		if (keepsShown || input.root.__marklessBranchArms?.has(boundary.id)) {
 			if (claim?.() === false) return;
 			await commit(
 				{
