@@ -519,10 +519,7 @@ function SearchButton() @{
 		aria-keyshortcuts="Meta+K Control+K"
 		title="Search the docs (⌘K or Ctrl K)"
 		aria-haspopup="dialog"
-		onClick={(event) => {
-			// Same guard as ThemeButton: a navbar.trigger's click can reach another trigger's handler.
-			if ((event.target as Element).closest('.search-button')) openDocsSearch();
-		}}
+		onClick={() => openDocsSearch()}
 		onPointerenter={() => warmDocsSearch()}
 		onFocus={() => warmDocsSearch()}
 	>
