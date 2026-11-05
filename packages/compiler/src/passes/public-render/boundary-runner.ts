@@ -159,6 +159,9 @@ function collectBoundaryGateReads(
 		...semanticGraph.keyedRepeats.map((repeat) => ({
 			source: repeat.collectionSource,
 			asyncBoundaryId: repeat.asyncBoundaryId,
+			...(repeat.collectionGraphNodeId
+				? { graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath }
+				: {}),
 		})),
 		...semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>

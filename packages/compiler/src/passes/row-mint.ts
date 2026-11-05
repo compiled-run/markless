@@ -14,6 +14,11 @@ import { childConstructReach, type ConstructReachInput } from './construct-reach
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
 
+// A row's root is its one element, which a bare @try replaces whenever its arm changes.
+export function templateHasBareTryRoot(chunk: SemanticMarkupChunk | undefined): boolean {
+	return !!chunk?.slots.some((slot) => slot.kind === 'async' && slot.coordinate.path.length === 1);
+}
+
 export type RowComponentMint = {
 	/** Absent when `rowChunkId` names the row's own markup instead of one edge. */
 	readonly componentEdgeId?: string;

@@ -406,6 +406,8 @@ export type ModuleGraphInterfaceArtifact = {
 			 * rows need the container as their parent.
 			 */
 			readonly containerRepeat?: true;
+			/** Present when the template's top level is an @try with no element around it. */
+			readonly bareTryRoot?: true;
 			/**
 			 * Present when this component's tree holds a keyed repeat whose rows fill
 			 * expression slots through a render-data reader, so a page placing it
