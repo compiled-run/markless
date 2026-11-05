@@ -228,10 +228,7 @@ export function patchRow(
 		if (Object.is(value, before[at])) continue;
 		const [path, source] = targets[at] ?? [];
 		let node: ResumeDomNode | undefined = path && row;
-		for (const index of path ?? []) {
-			const kids = childElements(node);
-			node = kids[index < 0 ? kids.length + index : index];
-		}
+		for (const index of path ?? []) node = childElements(node).at(index);
 		const element = node as (AttributableNode & Record<string, unknown>) | undefined;
 		if (!element) return false;
 		if (at < texts.length) {
