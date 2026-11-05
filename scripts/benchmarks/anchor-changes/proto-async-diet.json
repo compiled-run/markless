@@ -1,0 +1,280 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-graph-construct"
+			],
+			"delta": -1508,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": -208,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-computed"
+			],
+			"delta": -417,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "the benchmark app serves no async value, so it no longer emits runtime/graph-async",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -55,
+			"reason": "pages without @try no longer download the async runtime: 89,115 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -55,
+			"reason": "pages without @try no longer download the async runtime: 89,115 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -55,
+			"reason": "pages without @try no longer download the async runtime: 89,115 B gzip on this Mac, where origin/main b2e978d2d measures 89,743 B; lowest of three loads",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": -1903,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": -1589,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": -679,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": -598,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": -1051,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-refresh-busy"
+			],
+			"delta": -2475,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": -631,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-async"
+			],
+			"delta": -10570,
+			"reason": "a fixture without async values no longer emits runtime/graph-async",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": -1903,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": -1589,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": -679,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": -598,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": -1051,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-refresh-busy"
+			],
+			"delta": -2475,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": -631,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-async"
+			],
+			"delta": -10570,
+			"reason": "a fixture without async values no longer emits runtime/graph-async",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -469,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -472,
+			"reason": "async values load as a plane only where a page serves them (runtime/graph-async, web/fns/async-plane); async record decoding, busy marks, the @catch-after range and the async-ancestor walks moved there",
+			"date": "2026-11-05"
+		}
+	]
+}

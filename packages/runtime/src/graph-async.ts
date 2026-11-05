@@ -246,21 +246,6 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node);
 	};
 
-	const retry = (graphNodeId: string, seen: Set<string>): boolean => {
-		if (seen.has(graphNodeId)) return false;
-		seen.add(graphNodeId);
-		const node = nodes.get(graphNodeId);
-		let retried = false;
-		for (const dependency of (node ?? computedNodes.get(graphNodeId))?.dependencies ?? [])
-			retried = retry(dependency.graphNodeId, seen) || retried;
-		// A retried input re-runs this value itself once it answers.
-		if (retried || node?.snapshot.status !== 'rejected') return retried;
-		// A reset re-runs a rejected value even though its key has not changed.
-		node.gate = 1;
-		advance(node);
-		return true;
-	};
-
 	return {
 		nodes,
 		read(node, path) {
@@ -273,7 +258,14 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			nodes.set(node.graphNodeId, node);
 			context.held?.seed(node);
 		},
-		retry: (graphNodeId) => retry(graphNodeId, new Set()),
+		rerun(graphNodeId) {
+			const node = nodes.get(graphNodeId);
+			if (node?.snapshot.status !== 'rejected') return false;
+			// A reset re-runs a rejected value even though its key has not changed.
+			node.gate = 1;
+			advance(node);
+			return true;
+		},
 		holdInputs(factory) {
 			if (context.held) return;
 			context.held = factory(context);

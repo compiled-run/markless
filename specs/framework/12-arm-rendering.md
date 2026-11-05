@@ -187,8 +187,9 @@ across all three cases:
 - Reset: `@catch (error, reset)` binds `reset` to a function an event handler
   in that arm may name or call (`onClick={reset}`, `() => reset()`). The
   compiler lowers it to a call that retries the boundary's async reads with
-  their current keys (`graph.retry`): a rejected value re-runs, or, when it
-  is rejected because an async input is, that input re-runs instead. It is
+  their current keys: it lists them upstream first, each with the async values
+  it reads, and a rejected value re-runs, or, when it is rejected because an
+  async input is, that input re-runs instead. It is
   not a closure over the body, so it survives server render and resume.
   While the retry runs the shown content is held busy under the same rule as
   any refresh. Handlers outside a DOM event (callback props) still refuse it

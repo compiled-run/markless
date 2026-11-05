@@ -134,8 +134,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				? {
 						catchResets: event.handlerCatchResets.map((reset) => ({
 							name: reset.name,
-							graphNodeIds: (boundaryRunners.get(reset.boundaryId)?.reads ?? []).map(
-								(read) => read.graphNodeId,
+							resets: resetOrder(
+								(boundaryRunners.get(reset.boundaryId)?.reads ?? []).map(
+									(read) => read.graphNodeId,
+								),
+								input.semanticGraph.graphBindings,
 							),
 						})),
 					}
@@ -1014,6 +1017,39 @@ function behaviorGraphAccess(
 			writes,
 		},
 	};
+}
+
+// The async values a reset may re-run, each after the async values it reads (directly or through sync
+// computeds), which follow it in its entry: a rejected input re-runs in place of the values reading it.
+function resetOrder(
+	reads: ReadonlyArray<string>,
+	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],
+): ReadonlyArray<ReadonlyArray<string>> {
+	const byId = new Map(bindings.map((binding) => [binding.id, binding]));
+	const isAsync = (graphNodeId: string) => byId.get(graphNodeId)?.async === true;
+	const asyncInputs = (graphNodeId: string): string[] => {
+		const found = new Set<string>();
+		const seen = new Set<string>();
+		const visit = (id: string): void => {
+			if (seen.has(id)) return;
+			seen.add(id);
+			if (isAsync(id)) found.add(id);
+			else for (const dependency of byId.get(id)?.dependencies ?? []) visit(dependency.graphNodeId);
+		};
+		for (const dependency of byId.get(graphNodeId)?.dependencies ?? []) visit(dependency.graphNodeId);
+		return [...found];
+	};
+	const order: string[][] = [];
+	const placed = new Set<string>();
+	const place = (graphNodeId: string): void => {
+		if (placed.has(graphNodeId)) return;
+		placed.add(graphNodeId);
+		const inputs = asyncInputs(graphNodeId);
+		for (const input of inputs) place(input);
+		order.push([graphNodeId, ...inputs]);
+	};
+	for (const read of reads) for (const value of isAsync(read) ? [read] : asyncInputs(read)) place(value);
+	return order;
 }
 
 // Reads a handler pairs with an async-backed value; an input it writes stays live so a second click builds on the first.

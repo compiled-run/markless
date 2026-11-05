@@ -116,3 +116,34 @@ test('a handler in @catch still refuses a body local the browser cannot recomput
 	expect(error.codes).toContain(RENDER_LOCAL);
 	expect(error.messages.join('\n')).toContain('reads `error`');
 });
+
+test('reset lists the async values a block reads upstream first, each with the async values it reads', async () => {
+	const { handlers } = await compile(`import { computed, state } from '@markless/core';
+
+export function Team() @{
+	let team = state('core');
+	const members = computed(async () => {
+		const which = team;
+		await null;
+		return [which];
+	});
+	const count = computed(() => members.length);
+	const roster = computed(async () => {
+		const size = count;
+		await null;
+		return { size };
+	});
+
+	<div>
+		@try {
+			<output>{roster.size}</output>
+		} @catch (error, reset) {
+			<button onClick={reset}>Retry</button>
+		}
+	</div>
+}`);
+	const handler = handlers.find((source) => source.includes(RESET_IMPORT))!;
+	expect(handler.replace(/\s+/g, '')).toContain(
+		'[["computed:members"],["computed:roster","computed:members"]]',
+	);
+});

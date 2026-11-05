@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 305,
+	total: 306,
 	guided: 46,
 	groups: [
 		{
@@ -1105,6 +1105,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ARM_COMMIT_RENDERER_MISSING',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ASYNC_PLANE_MISSING',
 					kind: 'runtime error',
 					guided: false,
 				},

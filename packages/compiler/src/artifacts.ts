@@ -1852,10 +1852,11 @@ export type PlannedSymbol =
 				readonly graphNodeId: string;
 				readonly path: ReadonlyArray<string>;
 			}>;
-			// `@catch (error, reset)` names the handler calls, with the async values each re-runs.
+			// `@catch (error, reset)` names the handler calls, each with the async values its block
+			// reads, upstream first, every one followed by the async values it reads itself.
 			readonly catchResets?: ReadonlyArray<{
 				readonly name: string;
-				readonly graphNodeIds: ReadonlyArray<string>;
+				readonly resets: ReadonlyArray<ReadonlyArray<string>>;
 			}>;
 	  }
 	| {

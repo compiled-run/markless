@@ -593,6 +593,23 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_PLANE_MISSING',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: ['MARKLESS_ASYNC_PLANE_MISSING: no compiled module installed it'],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/payload-graph-construct.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/payload-graph-construct.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
 		packageName: '@markless/compiler',
 		stage: 'compile',

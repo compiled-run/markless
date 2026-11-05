@@ -63,7 +63,8 @@ export type AsyncComputedPlane = {
 	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
-	readonly retry: (graphNodeId: string) => boolean;
+	/** Re-runs a rejected async value with the key it already has; false when it is not rejected. */
+	readonly rerun: (graphNodeId: string) => boolean;
 	/** Installs matched values, from `@markless/runtime/graph-held`. */
 	readonly holdInputs: (factory: HeldInputsPlaneFactory) => void;
 	readonly shownRead: (
@@ -339,11 +340,8 @@ export type RuntimeGraph = {
 		plane: AsyncComputedPlaneFactory,
 		held?: HeldInputsPlaneFactory,
 	) => boolean;
-	/**
-	 * Re-runs the rejected async values `graphNodeId` reads (itself, or the nearest
-	 * rejected ones it derives from) with the keys they already have.
-	 */
-	readonly retry?: (graphNodeId: string) => boolean | undefined;
+	/** Re-runs a rejected async value with the key it already has; false or undefined when it is not rejected. */
+	readonly rerun?: (graphNodeId: string) => boolean | undefined;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -715,7 +713,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
 		shownRead: (dependencies) => asyncPlane?.shownRead(dependencies),
-		retry: (graphNodeId) => asyncPlane?.retry(graphNodeId),
+		rerun: (graphNodeId) => asyncPlane?.rerun(graphNodeId),
 		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;

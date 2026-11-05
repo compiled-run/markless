@@ -7572,10 +7572,12 @@ function shownReadsStatement(
 	};
 }
 
-function catchResetCall(reset: { readonly graphNodeIds: ReadonlyArray<string> }): EmissionNode {
+function catchResetCall(reset: {
+	readonly resets: ReadonlyArray<ReadonlyArray<string>>;
+}): EmissionNode {
 	return callNode(identifierNode(CATCH_RESET_FN), [
 		memberChainNode('context.graph'),
-		stringArrayNode(reset.graphNodeIds),
+		jsonValueNode(reset.resets),
 	]);
 }
 
