@@ -88,7 +88,11 @@ const ASYNC_BOUNDARY = [
 	'web/resume-async-wiring',
 	'web/resume-resettle-hold',
 	'web/resume-stream-patches',
+	'web/resume-refresh-busy',
+	'web/fns/async-plane',
 ];
+// Matched values load only where a reader pairs an async value with an input of its key.
+const HELD_INPUTS = ['web/fns/held-inputs-plane'];
 const BEHAVIOR = ['web/resume-behaviors'];
 // A shared() instance that outlives the page: its binding at wake.
 const SHARED_INSTANCES = ['web/fns/shared-instances'];
@@ -98,6 +102,7 @@ const SHARED_SWAP = ['web/shared-swap'];
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,
 	...ASYNC_BOUNDARY,
+	...HELD_INPUTS,
 	...SHARED_INSTANCES,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
@@ -303,6 +308,7 @@ export function createRuntimeDemandMap(
 			...KEYED_REPEAT,
 			...BRANCH,
 			...ASYNC_BOUNDARY,
+			...HELD_INPUTS,
 			...BEHAVIOR,
 			...SHARED_INSTANCES,
 			...SHARED_SWAP,
@@ -422,6 +428,7 @@ function capabilityModuleIds(
 	return [
 		...(behavior ? BEHAVIOR : []),
 		...(asyncBoundary ? ASYNC_BOUNDARY : []),
+		...(state.computed.some((computed) => computed.holds) ? HELD_INPUTS : []),
 		...(hasLiveSharedDefinitions(state) ? SHARED_INSTANCES : []),
 	];
 }

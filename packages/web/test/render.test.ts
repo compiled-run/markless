@@ -19,6 +19,10 @@ import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
 import { renderCsrRuntime } from '../src/render-csr.ts';
 import { INLINE_RESUMER_PAGE_TOKEN } from '../src/inline/resumer.ts';
 import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+
+// Each module serving async values installs their plane; these tests build such graphs by hand.
+installMarklessAsyncPlane();
 
 type FakeElement = {
 	readonly nodeType: 1;

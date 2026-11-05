@@ -54,6 +54,7 @@ import {
 	resumeVirtualModuleId,
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
+	payloadAsyncPlanes,
 	settleVirtualModuleId,
 	symbolGroupVirtualModuleId,
 	symbolVirtualModuleId,
@@ -470,6 +471,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		compiled.publicRenderPlan.styleScopes.length > 0
 			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedModuleId}.css`
 			: null;
+	const asyncPlanes = payloadAsyncPlanes(
+		compiled.payloadScripts.state,
+		compiled.moduleGraphInterface.asyncPlanes,
+	);
 	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.rosterDerivation === true,
 	);
@@ -654,6 +659,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				payloadId,
 				resolverId,
 				payloadState: compiled.payloadScripts.state,
+				asyncPlanes,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 				streamsArms: authorsPendingArm(compiled.semanticGraph.markup),
@@ -707,6 +713,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							payloadId,
 							resolverId,
 							payloadState: compiled.payloadScripts.state,
+							asyncPlanes,
 							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 							hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 							runtimeDemandMap: compiled.runtimeDemandMap,
@@ -883,6 +890,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					prerenderRecords: input.prerenderRecords,
 					directCsr: input.directCsr,
 					hasComputedState: compiled.payloadScripts.state.computed.length > 0,
+					asyncPlanes,
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),

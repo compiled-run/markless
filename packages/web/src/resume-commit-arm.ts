@@ -2,7 +2,6 @@ import { runtimeResumeError } from './inline/resume-errors.ts';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import { boundaryArmRecordSet, materializeArmRecords } from './resume-arm-records.ts';
 import type { AsyncBoundaryWiring } from './resume-async-wiring.ts';
-import { rememberAfterRange, rememberArmBindings } from './resume-refresh-busy.ts';
 import {
 	containsElement,
 	elementsBetweenAnchors,
@@ -58,6 +57,8 @@ type CommitParent = {
 type CommitAnchor = ResumeDomNode & {
 	readonly parentNode?: CommitParent | null;
 	readonly parentElement?: CommitParent | null;
+	// Busy marks read the records an arm registered.
+	__marklessArmRecords?: unknown;
 };
 type FocusableElement = ResumeDomElement & {
 	readonly focus?: () => void;
@@ -128,19 +129,11 @@ export function createArmCommitter(
 	installEventType: (eventType: string) => void,
 ) {
 	return async function commitArm(
-		target: ResumeArmRange,
+		boundary: ResumeArmRange,
 		update: ArmCommitUpdate,
 	): Promise<void> {
 		if (!update.nodes && (!deps.renderHtml || update.html === undefined))
-			throw armCommitRendererMissingError(target);
-		const end = target.endAnchor as CommitAnchor;
-		let anchor = afterAnchors.get(end);
-		if (update.after && (anchor as CommitAnchor | undefined)?.parentNode !== end.parentNode)
-			afterAnchors.set(end, (anchor = openAfterAnchor(end)));
-		if (update.after) rememberAfterRange(end, anchor!);
-		const boundary = update.after
-			? { id: `${target.id}:after`, startAnchor: anchor!, endAnchor: target.endAnchor }
-			: target;
+			throw armCommitRendererMissingError(boundary);
 		const fresh =
 			update.nodes ??
 			deps.renderHtml!(
@@ -213,7 +206,7 @@ export async function registerArmRecordSet(
 		deps.disposedHosts.delete(hostNodeId);
 		deps.elementsByHostId.set(hostNodeId, element);
 	}
-	rememberArmBindings(boundary, materialized);
+	if (boundary.startAnchor) (boundary.startAnchor as CommitAnchor).__marklessArmRecords = materialized;
 	for (const record of materialized.events) {
 		const element = materialized.elementsByHostId.get(record.hostNodeId);
 		if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
@@ -337,16 +330,6 @@ function registerArmDomUpdates(
 
 function armRecordHostMissingError(hostNodeId: string, kind: string): Error {
 	return new Error(`Markless async arm ${kind} record expected live host ${hostNodeId}.`);
-}
-
-// Keyed by the boundary's end anchor, so every committer of one page finds the same range; a full commit removes it.
-const afterAnchors = new WeakMap<object, ResumeDomComment>();
-
-// The arm-branch prefix keeps page-level comment walks from counting it.
-function openAfterAnchor(end: CommitAnchor): ResumeDomComment {
-	const anchor = (end as unknown as ChildNode).ownerDocument!.createComment('markless:arm-branch:after');
-	(end as unknown as ChildNode).before(anchor);
-	return anchor as unknown as ResumeDomComment;
 }
 
 // Both anchors must be live siblings under one parent BEFORE anything is
@@ -523,14 +506,16 @@ async function registerNestedAsyncBoundaries(
 	for (const record of computed ?? []) {
 		const runnerSymbolId = runners.get(record.graphNodeId);
 		if (record.async !== true || !runnerSymbolId) continue;
-		const { asyncComputedFromRecord } = await import('./payload-graph-construct.ts');
+		const planes = (await import('./payload-graph-construct.ts')).asyncPlaneFactories();
 		graph.defineAsyncComputed?.(
-			await asyncComputedFromRecord(
+			await planes.fromRecord(
 				record,
 				runnerSymbolId,
 				{ root: deps.root, loadSymbol: deps.loadSymbol as ResumeRuntimeInput['loadSymbol'] },
 				() => graph,
 			),
+			planes.async,
+			planes.held,
 		);
 	}
 	const shown = new Map(

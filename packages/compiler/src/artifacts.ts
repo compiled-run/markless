@@ -332,6 +332,8 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly reexports?: ReadonlyArray<ModuleGraphInterfaceReexport>;
 	readonly linkedComponents?: ReadonlyArray<ModuleGraphInterfaceLinkedComponent>;
 	readonly sharedDefinitions?: ReadonlyArray<ModuleGraphInterfaceSharedDefinition>;
+	/** This module or one it imports serves async computeds; `held` when a reader pairs one with an input of its key. */
+	readonly asyncPlanes?: ModuleAsyncPlanes;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{
@@ -530,6 +532,8 @@ export type ModuleGraphInterfaceElementCount = number | 'unknown';
  * importer that cannot see a component's tree must refuse rather than assume -
  * an unseen chunk could hold a boundary, so `'unknown'` outranks `'branches'`.
  */
+export type ModuleAsyncPlanes = { readonly async?: true; readonly held?: true };
+
 export type ModuleGraphInterfaceConstructReach =
 	| 'free'
 	| 'branches'

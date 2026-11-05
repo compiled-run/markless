@@ -1,5 +1,9 @@
 import { expect, test, vi } from 'vitest';
-import { createRuntimeGraph } from '@markless/runtime';
+import { createRuntimeGraph as createGraph } from '@markless/runtime';
+import { createAsyncComputedPlane } from '@markless/runtime/graph-async';
+import { createHeldInputsPlane } from '@markless/runtime/graph-held';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+
 import {
 	ASYNC_BOUNDARY_ARM,
 	createProtocolStatePayload,
@@ -18,6 +22,11 @@ import type {
 	ResumeKeyedRepeatRowEvent,
 	ResumeViewRecord,
 } from '../src/index.ts';
+
+// Each module serving async values installs their plane; these tests build such graphs by hand.
+installMarklessAsyncPlane();
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 type FakeElement = {
 	readonly nodeType: 1;

@@ -2,6 +2,8 @@ import { parseModule } from '../../js-ast.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
+	ModuleAsyncPlanes,
+	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceElementCount,
 	SemanticGraphArtifact,
 	SemanticGraphInput,
@@ -29,6 +31,7 @@ import { spreadHostsField } from './spread-hosts.ts';
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach } from '../construct-reach.ts';
+import { componentEdgeReads, pairedAsyncValues } from '../paired-async-values.ts';
 import {
 	chunkElementCount,
 	componentAddressSteps,
@@ -245,9 +248,11 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	// knows what its own components do with the value once it lands.
 	const propSpends = collectComponentPropSpends(state);
 	const handlerProps = moduleHandlerProps(state);
+	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
+		...(planes ? { asyncPlanes: planes } : {}),
 		render: {
 			version: 1,
 			components: graph.components.flatMap((component) => {
@@ -809,4 +814,24 @@ function addressStepsField(steps: ModuleGraphInterfaceElementCount): {
 	readonly addressSteps?: number;
 } {
 	return typeof steps === 'number' ? { addressSteps: steps } : {};
+}
+
+// Read by the bundler, which installs the async planes in every module that serves or composes async values.
+function moduleAsyncPlanes(
+	graph: SemanticGraphArtifact,
+	imported: Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined,
+): ModuleAsyncPlanes | undefined {
+	const computed = graph.graphBindings.filter((binding) => binding.kind === 'computed');
+	const fromImports = Object.values(imported ?? {}).map((module) => module?.asyncPlanes ?? {});
+	const async =
+		computed.some((binding) => binding.async === true) ||
+		fromImports.some((planes) => planes.async);
+	if (!async) return undefined;
+	const held =
+		fromImports.some((planes) => planes.held) ||
+		pairedAsyncValues(new Map(computed.map((binding) => [binding.id, binding])), [
+			...computed.map((binding) => (binding.dependencies ?? []).map((read) => read.graphNodeId)),
+			...componentEdgeReads(graph.componentEdges),
+		]).size > 0;
+	return { async: true, ...(held ? { held: true as const } : {}) };
 }

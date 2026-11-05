@@ -1,5 +1,10 @@
 import { expect, test, vi } from 'vitest';
-import { createRuntimeGraph } from '../src/index.ts';
+import { createRuntimeGraph as createGraph } from '../src/index.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
+
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 test('lazy cells initialize exactly once on the first read', async () => {
 	const initialize = vi.fn(() => 'stored');

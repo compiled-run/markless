@@ -198,6 +198,10 @@ export type ProtocolStatePayload = {
 		// Only subscriptions and other such computeds read it, so resume re-derives it
 		// when it is read rather than on every dependency write.
 		readonly deriveOnRead?: true;
+		// Async only: some reader pairs this value with an input of its key, so the page loads matched values.
+		readonly holds?: true;
+		// Sync only: the nearest async values it derives from, through other sync computeds of its module.
+		readonly asyncFrom?: ReadonlyArray<string>;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which

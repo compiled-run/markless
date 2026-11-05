@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest';
-import { createRuntimeGraph } from '../src/index.ts';
+import { createRuntimeGraph as createGraph } from '../src/index.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
+
 import { createDerivedReconcilePlane } from '../src/graph-reconcile.ts';
+
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 

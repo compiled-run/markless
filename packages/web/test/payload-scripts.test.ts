@@ -16,6 +16,10 @@ import {
 } from '../src/index.ts';
 import type { ProtocolViewPayload } from '@markless/serializer';
 import { resumePrerenderTriggerGroup } from '../src/fns/prerender-trigger-resume.ts';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+
+// Each module serving async values installs their plane; these tests build such graphs by hand.
+installMarklessAsyncPlane();
 
 type FakeElement = {
 	readonly nodeType: 1;

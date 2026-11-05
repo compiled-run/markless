@@ -2,7 +2,8 @@ import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
-import { applyBusy, noteBoundaryReadStatus, setBoundaryBusy } from './resume-refresh-busy.ts';
+import { asyncPlanes } from './reconcile-plane-slot.ts';
+import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
@@ -23,10 +24,7 @@ import type {
 //   racing settle commit always waits it out — one ordering mechanism.
 export type AsyncBoundarySettleTracker = {
 	readonly hasSettledContent: (boundaryId: string) => boolean;
-	readonly markSettled: (boundaryId: string, arm?: number) => void;
-	/** Which arm the boundary's range shows, as far as the settle path committed it. */
-	readonly shownArm: (boundaryId: string) => number | undefined;
-	readonly markShown: (boundaryId: string, arm: number) => void;
+	readonly markSettled: (boundaryId: string) => void;
 	readonly track: (boundary: ResumeAsyncBoundaryRecord) => void;
 	readonly forget: (boundaryId: string) => void;
 	readonly whenAllSettled: () => Promise<void>;
@@ -54,15 +52,12 @@ export function createAsyncBoundarySettleTracker(input: {
 }): AsyncBoundarySettleTracker {
 	const now = input.clock?.now ?? Date.now;
 	const settledById = new Map<string, boolean>();
-	const shownArmById = new Map<string, number>();
-	const track = (boundary: ResumeAsyncBoundaryRecord) => {
-		settledById.set(
+	const track = (boundary: ResumeAsyncBoundaryRecord) =>
+		void settledById.set(
 			boundary.id,
 			boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.try ||
 				boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.catch,
 		);
-		shownArmById.set(boundary.id, boundary.initiallyServedArm);
-	};
 	for (const boundary of input.boundaries) track(boundary);
 	let commitFloor = 0;
 	let allSettled: Promise<void> | undefined;
@@ -75,10 +70,7 @@ export function createAsyncBoundarySettleTracker(input: {
 	};
 	return {
 		hasSettledContent: (boundaryId) => settledById.get(boundaryId) === true,
-		shownArm: (boundaryId) => shownArmById.get(boundaryId),
-		markShown: (boundaryId, arm) => void shownArmById.set(boundaryId, arm),
-		markSettled(boundaryId, arm) {
-			if (arm !== undefined) shownArmById.set(boundaryId, arm);
+		markSettled(boundaryId) {
 			if (settledById.get(boundaryId) !== false) return;
 			settledById.set(boundaryId, true);
 			announceIfAllSettled();
@@ -86,7 +78,6 @@ export function createAsyncBoundarySettleTracker(input: {
 		track,
 		forget(boundaryId) {
 			settledById.delete(boundaryId);
-			shownArmById.delete(boundaryId);
 			announceIfAllSettled();
 		},
 		whenAllSettled() {
@@ -173,7 +164,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 						input.settleTracker?.forget(boundary.id);
 						return release(boundary.id);
 					}
-					noteBoundaryReadStatus(
+					asyncPlanes.busy?.note(
 						boundary,
 						asyncRead.graphNodeId,
 						snapshot,
@@ -211,7 +202,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
-						applyBusy(boundary);
+						asyncPlanes.busy?.apply(boundary);
 						return result;
 					});
 				},
@@ -356,12 +347,13 @@ export async function settleAsyncBoundaryRange(
 	const source = resolveBoundarySettleSource(input, boundary);
 	const arm = status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try;
 	const commit = async (update: Omit<ArmCommitUpdate, 'arm' | 'after'>) => {
-		// A failed refresh over shown @try content keeps it and renders the @catch arm after it.
-		const after =
-			arm === ASYNC_BOUNDARY_ARM.catch &&
-			input.settleTracker?.shownArm(boundary.id) === ASYNC_BOUNDARY_ARM.try;
-		await input.commitArm!(boundary, { ...update, arm, ...(after && { after }) });
-		input.settleTracker?.markSettled(boundary.id, after ? ASYNC_BOUNDARY_ARM.try : arm);
+		const after = asyncPlanes.busy?.settleRange(boundary, arm);
+		await input.commitArm!((after ?? boundary) as ResumeAsyncBoundaryRecord, {
+			...update,
+			arm,
+			...(after && { after: true }),
+		});
+		input.settleTracker?.markSettled(boundary.id);
 	};
 	// A composed child's arm records are minted in the child's own id space; the
 	// qualifier that re-spells them in page space is installed only by pages the
@@ -419,7 +411,8 @@ export async function settleAsyncBoundaryRange(
 	}
 	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-	input.settleTracker?.markSettled(boundary.id, arm);
+	asyncPlanes.busy?.shown(boundary, arm);
+	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
 }
 

@@ -6,11 +6,22 @@ import {
 } from '../src/resume-async-wiring.ts';
 import type { ArmCommitUpdate } from '../src/resume-commit-arm.ts';
 import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+import { busyMarks } from '../src/fns/busy-marks.ts';
+
+installMarklessAsyncPlane();
 
 // A rejection paints @catch after the content only while that content is the @try arm.
 function harness(servedArm: number) {
+	const parent = {};
+	const endAnchor = {
+		parentNode: parent,
+		ownerDocument: { createComment: () => ({ parentNode: parent }) },
+		before() {},
+	};
 	const boundary = {
 		id: 'invoice',
+		endAnchor,
 		runnerGraphNodeId: null,
 		initiallyServedArm: servedArm,
 		updateSymbolId: 'symbol:update',
@@ -37,7 +48,7 @@ function harness(servedArm: number) {
 			boundary,
 			{ status },
 		);
-	return { tracker, commits, settle };
+	return { boundary, commits, settle };
 }
 
 test('a rejection over shown @try content commits @catch after it, again and again, until a fulfil replaces the range', async () => {
@@ -61,7 +72,7 @@ test('a rejection over @catch, @pending, or a stalled refresh replaces the range
 		expect(commits.map((update) => update.after === true)).toEqual([false]);
 	}
 	const stalled = harness(ASYNC_BOUNDARY_ARM.try);
-	stalled.tracker.markShown('invoice', ASYNC_BOUNDARY_ARM.pending);
+	busyMarks.shown(stalled.boundary, ASYNC_BOUNDARY_ARM.pending);
 	await stalled.settle('rejected');
 	expect(stalled.commits.map((update) => update.after === true)).toEqual([false]);
 });

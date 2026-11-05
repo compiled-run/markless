@@ -44,13 +44,15 @@ export function readComputedNode(
 	readGraph: RuntimeGraphRead,
 	path: ReadonlyArray<string>,
 	reconcile?: ReconcileComputed,
-	shownRead?: (computed: RuntimeComputedNode) => RuntimeGraphRead | false | undefined,
+	shownRead?: (
+		dependencies: RuntimeComputedNode['dependencies'],
+	) => RuntimeGraphRead | false | undefined,
 ): unknown {
 	// Dependency-only nodes carry no compute; callers already gate on it.
 	const { compute } = computed;
 	if (computed.dirty && compute) {
 		const previous = computed.value;
-		const read = shownRead?.(computed);
+		const read = shownRead?.(computed.dependencies);
 		// `false`: it would mix old and new data, so it keeps its last value until the refresh lands.
 		if (read !== false) computed.value = compute(read ?? readGraph);
 		computed.dirty = false;
@@ -73,7 +75,7 @@ export type RuntimeDependents = ReadonlyMap<string, ReadonlyArray<Dependent>>;
 
 export function indexRuntimeDependents(
 	computedNodes: ReadonlyMap<string, RuntimeComputedNode>,
-	asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>,
+	asyncComputedNodes?: ReadonlyMap<string, RuntimeAsyncComputedNode>,
 ): RuntimeDependents {
 	const index = new Map<string, Dependent[]>();
 	const add = (node: RuntimeComputedNode | RuntimeAsyncComputedNode, isAsync: boolean) => {
@@ -84,7 +86,7 @@ export function indexRuntimeDependents(
 		}
 	};
 	for (const computed of computedNodes.values()) if (computed.compute) add(computed, false);
-	for (const asyncComputed of asyncComputedNodes.values()) add(asyncComputed, true);
+	for (const asyncComputed of asyncComputedNodes?.values() ?? []) add(asyncComputed, true);
 	return index;
 }
 

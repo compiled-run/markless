@@ -12,3 +12,5 @@ export function appendJournalResult(
 	if (Array.isArray(result)) journal.push(...(result as ReadonlyArray<DomJournalEntry>));
 	else if (result) journal.push(result as DomJournalEntry);
 }
+
+export const ASYNC_SNAPSHOT_META_KEYS = new Set('status version key error value'.split(' '));

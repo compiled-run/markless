@@ -316,6 +316,8 @@ export function emitSourceModule(input: {
 	readonly lazyFullRenderDataId?: string;
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
+	/** Whether it serves async computeds, and whether a reader pairs one with an input of its key. */
+	readonly asyncPlanes?: AsyncPlanesDemand;
 	readonly hasOverlayMarks?: boolean;
 	readonly hasLiveSharedState?: boolean;
 	readonly hasIdleEvents?: boolean;
@@ -391,6 +393,11 @@ export function emitSourceModule(input: {
 					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
 					'installMarklessDerivedReconcile();',
 				].join('\n')
+			: null,
+		// Every client module serving or composing async values installs their planes; installing twice is one assignment.
+		input.environment === 'client' &&
+		input.asyncPlanes?.async === true
+			? emitAsyncPlanesInstall(input.asyncPlanes)
 			: null,
 		// Same split for the live roster: a CSR mount reaches the runtime's start
 		// through THIS module, so without the loader here a row added after mount
@@ -565,6 +572,37 @@ function payloadHasComputed(payloadState: unknown): boolean {
 	const computed = (payloadState as { readonly computed?: ReadonlyArray<unknown> } | undefined)
 		?.computed;
 	return Array.isArray(computed) && computed.length > 0;
+}
+
+export type AsyncPlanesDemand = { readonly async: boolean; readonly held: boolean };
+
+// The only place the async and matched-value planes are named, so an app that serves neither emits neither.
+// A module installs them for the components it composes too, whose own modules may never load.
+export function payloadAsyncPlanes(
+	payloadState: unknown,
+	composed?: { readonly async?: boolean; readonly held?: boolean },
+): AsyncPlanesDemand {
+	const computed =
+		(payloadState as { readonly computed?: ReadonlyArray<{ async?: boolean; holds?: boolean }> })
+			?.computed ?? [];
+	return {
+		async: !!composed?.async || computed.some((record) => record.async === true),
+		held: !!composed?.held || computed.some((record) => record.holds === true),
+	};
+}
+
+function emitAsyncPlanesInstall(planes: AsyncPlanesDemand | undefined): string | null {
+	if (!planes?.async) return null;
+	return [
+		"import { installMarklessAsyncPlane } from '@markless/web/fns/async-plane';",
+		'installMarklessAsyncPlane();',
+		...(planes.held
+			? [
+					"import { installMarklessHeldInputs } from '@markless/web/fns/held-inputs-plane';",
+					'installMarklessHeldInputs();',
+				]
+			: []),
+	].join('\n');
 }
 
 export function emitIdleTriggerInstall(): string {
@@ -795,6 +833,7 @@ export function emitResumeModule(input: {
 	readonly payloadId: string;
 	readonly resolverId: string;
 	readonly payloadState?: unknown;
+	readonly asyncPlanes?: AsyncPlanesDemand;
 	readonly payloadView?: unknown;
 	readonly runtimeDemandMap?: unknown;
 	// Scalar plans of a module compiled for the conservative demand class, for payload-document containers.
@@ -916,6 +955,7 @@ export function emitResumeModule(input: {
 		// evaluation so the plane is in place before any resume entry builds the
 		// graph. The call is explicit because `@markless/web` declares
 		// `sideEffects: false`, which would drop a bare side-effect import.
+		emitAsyncPlanesInstall(input.asyncPlanes ?? payloadAsyncPlanes(input.payloadState)),
 		payloadHasComputed(input.payloadState)
 			? [
 					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",

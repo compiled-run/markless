@@ -23,6 +23,14 @@
 			"./graph-reconcile": {
 				"types": "./dist/graph-reconcile.d.ts",
 				"default": "./dist/graph-reconcile.js"
+			},
+			"./graph-async": {
+				"types": "./dist/graph-async.d.ts",
+				"default": "./dist/graph-async.js"
+			},
+			"./graph-held": {
+				"types": "./dist/graph-held.d.ts",
+				"default": "./dist/graph-held.js"
 			}
 		}
 	},
@@ -31,7 +39,9 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./graph": "./src/graph.ts",
-		"./graph-reconcile": "./src/graph-reconcile.ts"
+		"./graph-reconcile": "./src/graph-reconcile.ts",
+		"./graph-async": "./src/graph-async.ts",
+		"./graph-held": "./src/graph-held.ts"
 	},
 	"dependencies": {
 		"@markless/serializer": "workspace:*"

@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { createRuntimeGraph } from '../src/index.ts';
+import { createRuntimeGraph as createGraph } from '../src/index.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
+
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 // Spec D8 (12-arm-rendering): "the prior value is always addressable". When a
 // settled async computed re-runs (a mutation bumps its dependency), reads

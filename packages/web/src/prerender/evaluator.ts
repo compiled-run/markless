@@ -46,6 +46,7 @@ import {
 	sharedSeedPass,
 } from './shared-seed-slot.ts';
 import { branchArmIdrefResolution } from '../ssr-data/branch-arm-idrefs.ts';
+import { asyncPlanes } from '../reconcile-plane-slot.ts';
 
 // This evaluator is the seam where a SERIALIZED protocol payload meets the
 // mutable draft the SSR composer works on. They describe the same records; the
@@ -843,24 +844,6 @@ export function evaluatePrerenderDataComponent(input: {
 		marklessRosterPositions(marklessRosterPositionSeeds())!;
 	const rosterPositionContext = marklessRosterRenderContext(positions, input.sharedSeeds);
 	const initials = definition.initialValues ?? [];
-	const records = new Map(definition.state.computed.map((computed) => [computed.graphNodeId, computed]));
-	const awaitsAsyncValue = (graphNodeId: string, seen = new Set<string>()): boolean => {
-		for (const { graphNodeId: dependencyId } of records.get(graphNodeId)?.dependencies ?? []) {
-			if (seen.has(dependencyId)) continue;
-			seen.add(dependencyId);
-			const record = records.get(dependencyId);
-			if (record?.async === true) {
-				const snapshot = symbolRead(dependencyId, []) as { readonly status?: unknown; readonly value?: unknown } | undefined;
-				if (
-					snapshot === undefined ||
-					((snapshot.status === 'idle' || snapshot.status === 'pending' || snapshot.status === 'rejected') &&
-						snapshot.value === undefined)
-				)
-					return true;
-			} else if (record && awaitsAsyncValue(dependencyId, seen)) return true;
-		}
-		return false;
-	};
 	const derived = marklessWalk(initials.length, (index) => {
 		const initial = initials[index]!;
 		const symbolValue = initial.value;
@@ -873,8 +856,8 @@ export function evaluatePrerenderDataComponent(input: {
 		// derive reaches it unbound and dies on the capture context it never got.
 		if (!marklessOwnsDerivedNode(input.surface, input.componentName, initial.graphNodeId))
 			return undefined;
-		// Spec 03: a sync computed over an async value with nothing to read yet stays pending instead of running.
-		if (awaitsAsyncValue(initial.graphNodeId)) return undefined;
+		if (asyncPlanes.awaits?.(definition.state, initial.graphNodeId, symbolRead))
+			return undefined;
 		const symbolId = symbolValue.symbolId;
 		const initializer = definition.initializerResidues?.[symbolId];
 		if (initializer && definition.readResidue) {

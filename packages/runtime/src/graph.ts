@@ -11,24 +11,19 @@ import {
 	collectionCallMutated,
 	collectionMutationSnapshot,
 } from './graph-collections.ts';
-import {
-	createRuntimeAsyncComputedNodes,
-	demandAsyncComputed as demandRuntimeAsyncComputed,
-	invalidateAsyncComputed as invalidateRuntimeAsyncComputed,
-	retryAsyncComputed as retryRuntimeAsyncComputed,
-	readAsyncComputedNode,
-	seedValueInputs,
-	shownReadFor,
-	type RuntimeAsyncComputedNode,
-} from './graph-async.ts';
+import type { RuntimeAsyncComputedNode } from './graph-async.ts';
+import type { HeldInputsPlaneFactory } from './graph-held.ts';
 import {
 	createRuntimeComputedNodes,
 	indexRuntimeDependents,
 	markDirtyComputedDependencies,
 	readComputedNode,
+	type RuntimeComputedNode,
+	type RuntimeDependents,
 } from './graph-computed.ts';
 import type {
 	DerivedReconcileInternals,
+	DerivedReconcilePlane,
 	DerivedReconcilePlaneFactory,
 	RuntimeGraphReconcileOptions,
 } from './graph-reconcile.ts';
@@ -48,6 +43,35 @@ export type {
 	RuntimeGraphReconcileOptions,
 	WriteTouchedRecord,
 } from './graph-reconcile.ts';
+export type { HeldInputsPlane, HeldInputsPlaneFactory } from './graph-held.ts';
+export type { RuntimeAsyncComputedNode } from './graph-async.ts';
+
+/** What a graph hands its async plane. */
+export type AsyncComputedPlaneInternals = {
+	readonly asyncComputed?: ReadonlyArray<RuntimeGraphAsyncComputed>;
+	readonly cells: ReadonlyMap<string, unknown>;
+	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
+	readonly readGraph: RuntimeGraphRead;
+	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly scheduleFlush: () => void;
+	readonly reconcile?: Pick<DerivedReconcilePlane, 'publishAsync'>;
+};
+
+/** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
+export type AsyncComputedPlane = {
+	readonly nodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
+	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
+	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
+	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
+	readonly retry: (graphNodeId: string) => boolean;
+	/** Installs matched values, from `@markless/runtime/graph-held`. */
+	readonly holdInputs: (factory: HeldInputsPlaneFactory) => void;
+	readonly shownRead: (
+		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
+	) => RuntimeGraphRead | false | undefined;
+};
+
+export type AsyncComputedPlaneFactory = (internals: AsyncComputedPlaneInternals) => AsyncComputedPlane;
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;
@@ -168,6 +192,10 @@ export type RuntimeGraphInput = {
 	 * dirties the whole node and an async commit dirties the whole snapshot.
 	 */
 	readonly reconcile?: DerivedReconcilePlaneFactory;
+	/** Required when `asyncComputed` is non-empty; `@markless/runtime/graph-async`. */
+	readonly async?: AsyncComputedPlaneFactory;
+	/** Matched values for async computeds; `@markless/runtime/graph-held`. */
+	readonly held?: HeldInputsPlaneFactory;
 };
 
 export type RuntimeGraphWrite = {
@@ -306,12 +334,16 @@ export type RuntimeGraph = {
 		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
 	) => RuntimeGraphRead | false | undefined;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
-	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
+	readonly defineAsyncComputed?: (
+		asyncComputed: RuntimeGraphAsyncComputed,
+		plane: AsyncComputedPlaneFactory,
+		held?: HeldInputsPlaneFactory,
+	) => boolean;
 	/**
 	 * Re-runs the rejected async values `graphNodeId` reads (itself, or the nearest
 	 * rejected ones it derives from) with the keys they already have.
 	 */
-	readonly retry?: (graphNodeId: string) => boolean;
+	readonly retry?: (graphNodeId: string) => boolean | undefined;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -337,8 +369,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
 	const readInitializers = new Map<string, () => unknown>();
 	const computedNodes = createRuntimeComputedNodes(input.computed);
-	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
-	let dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
+	let asyncPlane: AsyncComputedPlane | undefined;
+	let dependents!: RuntimeDependents;
 	// Per node, in subscribe order; the sequence number restores that order across nodes.
 	const subscriptionsByNode = new Map<string, RuntimeGraphSubscription[]>();
 	const subscriptionOrder = new Map<RuntimeGraphSubscription, number>();
@@ -361,17 +393,17 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
 		if (computed?.compute) {
-			return readComputedNode(computed, readGraph, path, plane?.reconcileComputed, (node) =>
-				shownRead(node.dependencies),
+			return readComputedNode(
+				computed,
+				readGraph,
+				path,
+				plane?.reconcileComputed,
+				asyncPlane?.shownRead,
 			);
 		}
 
-		const asyncComputed = asyncComputedNodes.get(graphNodeId);
-		if (asyncComputed) {
-			return readAsyncComputedNode(asyncComputed, path, () =>
-				demandAsyncComputed(asyncComputed),
-			);
-		}
+		const asyncComputed = asyncPlane?.nodes.get(graphNodeId);
+		if (asyncComputed) return asyncPlane!.read(asyncComputed, path);
 
 		const initialize = readInitializers.get(graphNodeId);
 		if (initialize) {
@@ -395,7 +427,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			dependents,
 			dirtyPaths,
 			plane,
-			invalidateAsyncComputed,
+			(node) => asyncPlane!.invalidate(node),
 		);
 		// Last, so an observer that reads back finds every computed this write
 		// invalidated already marked and answering afresh.
@@ -497,47 +529,25 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	// Without a plane a graph behaves as it did before reconciliation existed.
 	const plane = input.reconcile?.(internals);
 
-	const asyncComputedInput = () => ({
-		computedNodes,
-		asyncComputedNodes,
-		demandAsyncComputed,
-		readGraph,
-		markDirtyPath,
-		scheduleFlush,
-		reconcile: plane,
-	});
-	const shownRead = (dependencies: ReadonlyArray<RuntimeGraphComputedDependency>) =>
-		asyncComputedNodes.size === 0
-			? undefined
-			: shownReadFor(dependencies, { computedNodes, asyncComputedNodes, readGraph });
-	// What the page was served with: no initializer runs and no async value starts.
-	const peek: RuntimeGraphRead = (graphNodeId, path = []) => {
-		const asyncNode = asyncComputedNodes.get(graphNodeId);
-		return asyncNode
-			? readAsyncComputedNode(asyncNode, path, () => {})
-			: readPath(cells.get(graphNodeId), path);
+	const installAsync = (
+		factory?: AsyncComputedPlaneFactory,
+		held?: HeldInputsPlaneFactory,
+		asyncComputed?: RuntimeGraphAsyncComputed,
+	) => {
+		asyncPlane ??= factory?.({
+			asyncComputed: input.asyncComputed,
+			cells,
+			computedNodes,
+			readGraph,
+			markDirtyPath,
+			scheduleFlush,
+			reconcile: plane,
+		});
+		if (held) asyncPlane!.holdInputs(held);
+		if (asyncComputed) asyncPlane!.define(asyncComputed);
+		dependents = indexRuntimeDependents(computedNodes, asyncPlane?.nodes);
 	};
-	for (const node of asyncComputedNodes.values())
-		seedValueInputs(node, { computedNodes, asyncComputedNodes }, peek);
-
-	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
-		demandRuntimeAsyncComputed({ node, ...asyncComputedInput() });
-
-	const invalidateAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
-		invalidateRuntimeAsyncComputed({ node, ...asyncComputedInput() });
-
-	const retry = (graphNodeId: string, seen: Set<string>): boolean => {
-		if (seen.has(graphNodeId)) return false;
-		seen.add(graphNodeId);
-		const asyncNode = asyncComputedNodes.get(graphNodeId);
-		let retried = false;
-		for (const dependency of (asyncNode ?? computedNodes.get(graphNodeId))?.dependencies ?? [])
-			retried = retry(dependency.graphNodeId, seen) || retried;
-		// A retried input re-runs this value itself once it answers.
-		if (retried || asyncNode?.snapshot.status !== 'rejected') return retried;
-		retryRuntimeAsyncComputed({ node: asyncNode, ...asyncComputedInput() });
-		return true;
-	};
+	installAsync(input.async, input.held);
 
 	const sharedGraph = createSharedGraphPlane({
 		cells,
@@ -649,7 +659,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? {
 					peekAsyncSnapshot: (graphNodeId: string) =>
-						asyncComputedNodes.get(graphNodeId)?.snapshot,
+						asyncPlane?.nodes.get(graphNodeId)?.snapshot,
 				}
 			: {}),
 		readShared: sharedGraph.readShared,
@@ -704,15 +714,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return outcome.result;
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
-		shownRead,
-		retry: (graphNodeId) => retry(graphNodeId, new Set()),
-		defineAsyncComputed(asyncComputed) {
+		shownRead: (dependencies) => asyncPlane?.shownRead(dependencies),
+		retry: (graphNodeId) => asyncPlane?.retry(graphNodeId),
+		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
-			if (asyncComputedNodes.has(id) || cells.has(id)) return false;
-			const node = createRuntimeAsyncComputedNodes([asyncComputed]).get(id)!;
-			asyncComputedNodes.set(id, node);
-			dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
-			seedValueInputs(node, { computedNodes, asyncComputedNodes }, peek);
+			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;
+			installAsync(factory, held, asyncComputed);
 			return true;
 		},
 		subscribe(subscription) {
