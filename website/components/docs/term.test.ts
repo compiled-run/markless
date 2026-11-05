@@ -18,6 +18,19 @@ const render = (component: unknown, props: Record<string, unknown>) =>
 const tag = (html: string, pattern: RegExp) => html.match(pattern)?.[0] ?? '';
 
 describe('Term', () => {
+	it('explains a word that has no sketch with its caption alone', async () => {
+		const html = await render(Term, { word: 'state' });
+		expect(html).toContain(GLOSSARY.state);
+		expect(html).not.toContain('class="sketch');
+	});
+
+	it('defines every glossary word in one plain sentence', () => {
+		for (const [word, caption] of Object.entries(GLOSSARY)) {
+			expect(caption.length, word).toBeLessThan(120);
+			expect(caption.trim().endsWith('.'), word).toBe(true);
+		}
+	});
+
 	it('is a focusable button in the text that points at its caption as its description', async () => {
 		const html = await render(Term, { word: 'elements' });
 		const button = tag(html, /<button[^>]*>elements<\/button>/);

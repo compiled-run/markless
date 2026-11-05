@@ -10,6 +10,12 @@ Run Vite commands through `vp` (Vite+), as the scripts in `package.json` do: `vp
 `vite build`. The app aliases `vite` to `@voidzero-dev/vite-plus-core`, so that plugins get
 Vite+, and that package has no `vite` command.
 
+## Type checking
+
+The `check` script formats and lints with `vp check`, then type-checks every `.tsrx` and `.ts`
+file with `markless-tsc`, the TypeScript command line with `.tsrx` support. Each error prints as
+`pages/index.tsrx(9,24): error TS2322: ...`, and the script exits non-zero, so CI can run it.
+
 ## Editor support
 
 `tsconfig.json` carries the editor wiring: the `plugins` entries load the Markless

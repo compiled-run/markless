@@ -11,7 +11,7 @@ import {
 } from '../route-types.ts';
 
 export type RouteTypegenFileSystem = {
-	mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
+	mkdir(path: string, options?: { recursive?: boolean }): Promise<unknown>;
 	readdir(path: string, options?: { withFileTypes?: true }): Promise<RouteTypegenDirent[]>;
 	readFile(path: string, options: { encoding: 'utf8' }): Promise<string>;
 	writeFile(path: string, data: string, options?: { encoding?: 'utf8' }): Promise<void>;
