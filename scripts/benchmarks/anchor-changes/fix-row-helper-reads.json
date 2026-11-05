@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 29,
+			"reason": "the docs home downloads the in-browser compile worker, which now carries the compiler's row helper-read tracking (row-local-reads.ts and its diagnostic); executed at load +29 chars",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1732,
+			"reason": "the docs home downloads the in-browser compile worker, which now carries the compiler's row helper-read tracking (row-local-reads.ts and its diagnostic); executed at load +29 chars",
+			"date": "2026-11-05"
+		}
+	]
+}
