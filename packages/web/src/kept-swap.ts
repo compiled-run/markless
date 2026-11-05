@@ -36,9 +36,11 @@ export async function carryKeptParts(input: {
 		region.hasAttribute(input.containerAttribute)
 			? region
 			: region.querySelector(`[${input.containerAttribute}]`);
-	const live = (containerOf(input.outgoing) as LiveValues | null)?.__marklessEventOnlyGraph;
+	const leavingContainer = containerOf(input.outgoing) as LiveValues | null;
+	// The leaving runtime may start its full graph mid-carry and replace this map, so every read asks the container.
+	const store = () => leavingContainer?.__marklessEventOnlyGraph;
 	// Nothing resumed on the leaving page, so every kept part still shows what it was served.
-	if (!live) return undefined;
+	if (!store()) return undefined;
 	const { pairs } = input;
 	if (pairs.length === 0) return undefined;
 	const leaving = decoded(input.outgoing);
@@ -59,9 +61,10 @@ export async function carryKeptParts(input: {
 	const values = new Map<string, unknown>();
 	const read = new Map<string, unknown>();
 	// A started runtime answers every cell from its graph; a lean map holds only the cells it has read.
-	const graphBacked = live.get !== Map.prototype.get;
-	const now = (id: string, served: unknown) =>
-		live.has(id) || graphBacked ? live.get(id) : served;
+	const now = (id: string, served: unknown) => {
+		const live = store();
+		return live && (live.has(id) || live.get !== Map.prototype.get) ? live.get(id) : served;
+	};
 	for (const cell of cells) {
 		const pair = pairs.find(({ to }) => cell.graphNodeId.startsWith(to));
 		if (!pair || outsideInstances.has(cell.graphNodeId) || !ownState(cell.graphNodeId))
@@ -115,9 +118,8 @@ export async function carryKeptParts(input: {
 		]);
 	};
 	// Document-wide shared() state the part also reads paints with its live value, as the shared() swap paints it.
-	const outgoing = containerOf(input.outgoing) ?? undefined;
 	const { bound } = bindDefinitions(
-		{ document: input.outgoing.ownerDocument, container: outgoing },
+		{ document: input.outgoing.ownerDocument, container: leavingContainer },
 		arriving.state,
 		cells,
 		root,
