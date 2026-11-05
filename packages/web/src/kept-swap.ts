@@ -16,6 +16,8 @@ export type KeptCarry = {
 	readonly moved: () => boolean;
 	// Gives the container the carried values once the leaving page is gone.
 	readonly install: (container: Element) => void;
+	// Puts back what the carry painted over on the next page, before it carries again.
+	readonly restore: () => void;
 };
 
 /**
@@ -103,6 +105,7 @@ export async function carryKeptParts(input: {
 		install: (container) => {
 			(container as LiveValues).__marklessEventOnlyGraph = adopted;
 		},
+		restore: painted.restore,
 	};
 }
 

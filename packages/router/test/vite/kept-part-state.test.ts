@@ -220,6 +220,38 @@ test('a part the next page places at another instance path keeps its state there
 	await page.close();
 });
 
+test('a press on the kept part while the swap paints the next page is carried, and nothing it painted before stays', async () => {
+	const fragment = await fetchText('/_markless/fragment/reference');
+	const route = JSON.parse(
+		/<script type="@markless\/core\/route">([^<]*)<\/script>/.exec(fragment)![1]!,
+	) as { readonly resume: readonly string[] };
+	const page = await browser!.newPage({ viewport: { width: 1000, height: 700 } });
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	let release!: () => void;
+	const held = new Promise<void>((done) => (release = done));
+	// Held from the start: the page fetches the next page's code at idle, before any press.
+	await page.route(`**${route.resume[0]}`, async (request) => {
+		await held;
+		await request.continue();
+	});
+	await page.goto(`${server!.origin}/guide`);
+	await toggle(page, '1');
+	await page.click('[data-nav="reference"]');
+	// The navigation waits at most 3 s for the next page's code, then the swap loads it to paint.
+	await page.waitForTimeout(3500);
+	expect(await page.textContent('[data-title]')).toBe('Guide page');
+	await page.evaluate(() => document.querySelector<HTMLButtonElement>('[data-toggle]')!.click());
+	await page.waitForFunction(() => document.querySelector('[data-count]')?.textContent === '2');
+	release();
+	await shows(page, 'Reference page');
+	expect(await sideNav(page)).toMatchObject({ shown: 'closed', count: '2', marked: 'reference' });
+	await toggle(page, '3');
+	expect(await sideNav(page)).toMatchObject({ shown: 'open', marked: 'open reference' });
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('Back and Forward keep the part and its state', async () => {
 	const { page, errors } = await open('/guide');
 	await toggle(page, '1');

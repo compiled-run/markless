@@ -1194,7 +1194,8 @@ export async function navigate(
 	const pairs = keptSwap ? keptPairs(outgoing, incoming, keepAttribute, instanceAttribute) : [];
 	if (keptSwap && pairs.length > 0) {
 		try {
-			for (let tries = 0; tries < 3 && (!adoptKept || adoptKept.moved()); tries++) {
+			for (let tries = 0; tries < 3; tries++) {
+				adoptKept?.restore();
 				adoptKept = await keptSwap.carryKeptParts({
 					outgoing,
 					incoming,
@@ -1203,7 +1204,7 @@ export async function navigate(
 					pairs,
 				});
 				if (stale()) return abandon();
-				if (!adoptKept) break;
+				if (!adoptKept?.moved()) break;
 			}
 		} catch (error) {
 			reportAsync(error);
