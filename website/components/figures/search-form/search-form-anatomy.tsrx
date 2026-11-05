@@ -4,7 +4,7 @@ import { BUTTON, CALL, describePress, describeToggle, GONE, HANDLE } from './mod
 import { art } from './search-form.art.ts';
 
 export default function SearchFormAnatomy() @{
-	const searchInput = element<HTMLInputElement>();
+	const field = element<HTMLInputElement>();
 	let present = state(true);
 	let focused = state(false);
 	let hint = state('');
@@ -24,7 +24,7 @@ export default function SearchFormAnatomy() @{
 				touched = true;
 				present = true;
 				beat = 'rest';
-				if (searchInput) searchInput.value = '';
+				if (field) field.value = '';
 				said = describeToggle(true);
 			}
 		}}
@@ -72,7 +72,7 @@ export default function SearchFormAnatomy() @{
 				</g>
 			</svg>
 			<input
-				el={searchInput}
+				el={field}
 				class="real-input"
 				type="search"
 				aria-label="Search"
@@ -111,7 +111,7 @@ export default function SearchFormAnatomy() @{
 				onClick={() => {
 					touched = true;
 					beat = beat === 'odd' ? 'even' : 'odd';
-					if (present) searchInput?.focus();
+					if (present) field?.focus();
 					said = describePress(present);
 				}}
 			>

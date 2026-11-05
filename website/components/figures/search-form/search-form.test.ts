@@ -19,9 +19,9 @@ describe('the search form and its handle', () => {
 	});
 
 	it('uses a real input bound by element(), and the button calls focus on the handle', () => {
-		expect(piece).toContain('const searchInput = element<HTMLInputElement>();');
-		expect(piece).toContain('el={searchInput}');
-		expect(piece).toContain('if (present) searchInput?.focus();');
+		expect(piece).toContain('const field = element<HTMLInputElement>();');
+		expect(piece).toContain('el={field}');
+		expect(piece).toContain('if (present) field?.focus();');
 	});
 
 	it('has three objects and about five words', () => {

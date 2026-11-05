@@ -18,7 +18,7 @@ export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.ma
 export const STICKER_TOUR = ['place', 'place', 'dial', 'dial', 'rest', 'reset', 'rest'] as const;
 
 export const describePlace = (count: number, who: number) =>
-	`Placed an ${CHILD}. ${count === 1 ? 'It shows' : `All ${count} show`} ${nameOf(who)}, read from the page's ${PROP}.`;
+	`Placed an ${CHILD}. ${count === 1 ? 'It shows' : count === 2 ? 'Both show' : `All ${count} show`} ${nameOf(who)}, read from the page's ${PROP}.`;
 export const describeDial = (who: number, count: number) =>
 	count === 0
 		? `The page's ${PROP} is now ${nameOf(who)}. Place an ${CHILD} to see it.`
