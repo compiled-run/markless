@@ -829,7 +829,6 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									)
 								: [],
 					(collection): Awaitable<RenderedPart> => {
-						// A Set or Map gives one row per value a `for...of` visits.
 						const items = Array.isArray(collection)
 							? collection
 							: typeof (collection as Iterable<unknown> | null)?.[Symbol.iterator] === 'function'
