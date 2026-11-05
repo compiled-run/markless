@@ -173,6 +173,7 @@ export default function MixerAnatomy() @{
 			}
 
 			.dab {
+				touch-action: none;
 				cursor: ns-resize;
 				outline: none;
 			}

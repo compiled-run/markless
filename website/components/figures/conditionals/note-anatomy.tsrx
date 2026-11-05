@@ -1,7 +1,7 @@
 // A sheet, a sticky note and a bin: close the note (drag it to the bin, its ×, or Delete) and it is gone with what you wrote; click the sheet and a fresh blank note is built.
 import { computed, state } from '@markless/core';
 import { capture } from '../ink/pointer.ts';
-import { addLetter, BIN_REACH, describeNote, MAX_TEXT, onClose, WRITE_FIRST } from './note-model.ts';
+import { addLetter, BIN_REACH, describeNote, MAX_TEXT, WRITE_FIRST } from './note-model.ts';
 import { art } from './note.art.ts';
 
 export default function NoteAnatomy() @{
@@ -70,14 +70,7 @@ export default function NoteAnatomy() @{
 					tabindex="0"
 					role="textbox"
 					aria-label="A note. Type on it; drag it to the bin, or press Delete, to close it."
-					onClick={(event) => {
-						if (!onClose(event.target)) return;
-						open = false;
-						binned = binned + 1;
-						said = describeNote('binned');
-					}}
 					onPointerDown={(event) => {
-						if (onClose(event.target)) return;
 						capture(event);
 						scale = art.width / event.currentTarget.ownerSVGElement!.getBoundingClientRect().width;
 						fromX = event.clientX;
@@ -131,7 +124,17 @@ export default function NoteAnatomy() @{
 					</text>
 					<text class={text === '' ? 'prompt' : 'prompt gone'} x={art.note.textX + 14} y={art.note.textY}>write here</text>
 					<text class={hint && text === '' ? 'hint on' : 'hint'} x={art.note.textX} y={art.note.textY + 60}>write first?</text>
-					<g class="close">
+					<g
+						class="close"
+						onPointerDown={(event) => event.stopPropagation()}
+						onPointerUp={(event) => event.stopPropagation()}
+						onClick={(event) => {
+							event.stopPropagation();
+							open = false;
+							binned = binned + 1;
+							said = describeNote('binned');
+						}}
+					>
 						<path class="ink" d={art.note.close} />
 					</g>
 				</g>
@@ -175,6 +178,7 @@ export default function NoteAnatomy() @{
 			}
 
 			.note {
+				touch-action: none;
 				cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M3 21l3-1 13-13-2-2L4 18z' fill='%23222' stroke='%23fff' stroke-width='1'/%3E%3C/svg%3E") 2 22, text;
 				outline: none;
 				transform-box: fill-box;

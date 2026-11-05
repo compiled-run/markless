@@ -277,6 +277,7 @@ export default function TentAnatomy() @{
 				position: absolute;
 				top: 10%;
 				width: 36.76%;
+				touch-action: none;
 				cursor: grab;
 				outline: none;
 				transition: left 700ms cubic-bezier(0.4, 0, 0.2, 1);

@@ -11,6 +11,3 @@ export function describeNote(what: 'open' | 'binned'): string {
 }
 
 export const WRITE_FIRST = 'Write on the note first? Drag it again to throw it away.';
-
-/** True when a pointer landed on the note's little cross. */
-export const onClose = (target: unknown) => Boolean((target as Element | null)?.closest?.('.close'));

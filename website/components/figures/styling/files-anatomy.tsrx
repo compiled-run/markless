@@ -303,6 +303,7 @@ export default function FilesAnatomy() @{
 				display: inline-flex;
 				align-items: center;
 				gap: 0.2rem;
+				touch-action: none;
 				cursor: ew-resize;
 				outline: none;
 				border-radius: 4px;
