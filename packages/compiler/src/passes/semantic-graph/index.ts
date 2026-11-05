@@ -26,6 +26,7 @@ import { collectComponentProps } from './collect-components.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
+import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callback-relays.ts';
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach } from '../construct-reach.ts';
@@ -183,6 +184,12 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	}
 
 	collectSharedCallbackBindings(state);
+	relayWidgetCallbackProps({
+		componentEdges: graph.componentEdges,
+		componentPropBindings: graph.componentPropBindings,
+		sharedCallbackBindings: graph.sharedCallbackBindings,
+		importedModuleInterfaces: state.importedModuleInterfaces,
+	});
 	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
@@ -290,6 +297,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						),
 						constructReach: componentConstructReach(constructReachInput, root.id),
 						...spreadHostsField(chunks),
+						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,
 							branchSites: graph.branchSites,

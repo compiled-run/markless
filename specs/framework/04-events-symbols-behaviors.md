@@ -283,6 +283,27 @@ same name, a component-local function, or any other expression keeps its own
 meaning. Validated by `packages/vitest-browser/browser/direct-callback.test.ts`
 (CSR and SSR resume) and `packages/compiler/test/direct-callback-prop.test.ts`.
 
+### Callbacks a component hands on through its props
+
+A component's props reach a child through a spread in either signature form:
+`function Pad({ children, ...rest })` spreading `rest`, or `function Pad(props)`
+spreading `props`. Both carry every prop the consumer passed (the rest form less
+what the signature took out), so a consumer's `onClick` on `<Pad>` becomes an
+event record on the element `Pad` spreads onto, and a child component's handler
+that calls a prop it got through the spread runs the consumer's callback.
+
+A widget root files the callback it is handed into a callback slot. When a
+component hands a root a callback it only received, by name
+(`<toggle.root onChange={onChange}>`) or inside its props spread
+(`<toggle.root {...rest}>`), the semantic graph pass reads that prop as the
+component's own `(value) => onChange?.(value)`, the same lowering as a received
+handler above. The family's module graph interface lists the props each root
+files into a slot (`callbackSlotProps`), which is how a consumer in another
+module knows to lower them. Each instance then runs the callback its own parent
+passed, and an instance whose parent passed none runs nothing. Validated by
+`packages/vitest-browser/browser/callback-spread.test.ts` (CSR and SSR resume) and
+`packages/compiler/test/callback-spread.test.ts`.
+
 ### Event handler arrays and sync policy
 
 Event and behavior props accept either one expression or an array of expressions:
