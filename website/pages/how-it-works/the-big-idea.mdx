@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import PatternAnatomy from '../../components/figures/big-idea/pattern-anatomy.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 <SiteNavbar />
@@ -9,7 +10,7 @@ import MugSpot from '../../components/mascot/mug-spot.tsrx';
 
 # One plan, rendered anywhere
 
-<PageMeta time="3 min" assumes="state, events" />
+<PageMeta time="2 min" assumes="state, events" />
 
 <Subtitle text="Markless reads a component while it builds, so the plan for every update is written before the component runs anywhere." />
 
@@ -44,7 +45,9 @@ The same compile writes two render modules: one builds the cart in a browser, th
 
 ## Rendered where you need it
 
-The compiled component is the same in each environment:
+<PatternAnatomy />
+
+Press the drawing to cut. The compiled component is one pattern, and each environment cuts the same shape from its own cloth:
 
 | Environment | How you call it | What it is good for |
 | --- | --- | --- |
@@ -68,10 +71,8 @@ await render(App, { target: document.querySelector('#app')! });
 
 ## What stays the same
 
-- **Setup runs once.** In the browser the component builds its elements one time. On a server the body runs there, and the browser never runs it.
-- **No handler runs before its event.** A build may fetch the click code early, but fetching is not running. [Lazy chunks](/how-it-works/lazy-chunks) explains the difference.
-- **A write updates its readers and nothing else.** After `bags++`, only the text that reads `bags` changes. Nothing compares an old page with a new one.
-
-A server page with nothing that can react, such as `<p>In your cart: {bags} bags</p>` with no button, ships no script at all: `renderToString()` sends the HTML in a container `div` and nothing else.
+- **Setup runs once.** On a server the body runs there, and the browser never runs it.
+- **No handler runs before its event.** Fetching code early is not running it.
+- **A write updates its readers and nothing else.** Nothing compares an old page with a new one.
 
 [The compiler](/how-it-works/compiler) shows what it wrote for the cart.

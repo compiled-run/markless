@@ -45,6 +45,12 @@ function board(desk: Desk) {
 		desk.put('paper', pathOf(peg, true));
 		desk.put('ink', outline(peg, { w: 0.9, seed: 7110 + i }));
 	}
+	for (const [i, f] of FRAMES.entries()) {
+		const ghost = desk.upright([pegs[i]! + 0.4, 0.3, 2.0]);
+		const box = ghost.on([[0, 0], [FRAME.w, 0], [FRAME.w, FRAME.h + 0.9], [0, FRAME.h + 0.9]]);
+		desk.put('pencil', desk.pencilLine([...box, box[0]!], 7150 + i));
+		desk.say('pencil-text', ghost.matrix(0.35, 2.7), f.id + '?');
+	}
 	return desk.group(() => {
 		FRAMES.forEach((f, i) => {
 			const card = desk.upright([pegs[i]! + 0.4, 0.3, 2.0]);

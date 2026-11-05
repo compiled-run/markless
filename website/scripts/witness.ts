@@ -2604,8 +2604,14 @@ try {
 
 		// Each How it works page opens on its ink figure; a press must change what its live line says.
 		for (const [path, said] of [
-			['state-graph', 'Papers went to the two houses on its rounds'],
+			['', 'The survey is inked and stamped at build time'],
+			['the-big-idea', 'The same pattern was cut from all three fabrics'],
+			['compiler', 'The file was cut into frames before anything ran'],
+			['payload', 'That is everything the server added'],
 			['resuming', 'nobody replayed the game from move one'],
+			['state-graph', 'Papers went to the two houses on its rounds'],
+			['lazy-chunks', 'Only that tub was opened and cooked'],
+			['native-targets', 'both the iOS and the macOS button now read Count 1'],
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
 			const figure = page.locator('figure.anatomy').first();
