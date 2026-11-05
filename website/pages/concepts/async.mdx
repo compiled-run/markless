@@ -4,7 +4,7 @@ import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import WaitAnatomy from '../../components/figures/async/wait-anatomy.tsrx';
+import DevelopAnatomy from '../../components/figures/async/develop-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -35,11 +35,13 @@ rule in your head about which one wins. Only the data is what the page is about.
 Write them in that order. An `@pending` after `@catch` stops the build with
 `MARKLESS_ASYNC_ARM_ORDER`.
 
-## Watch a spot wait
+## Watch a spot develop
 
-The parcel is `arrives`, a value still on its way. Until it lands, the `@pending` words hold its spot in pencil, and the rest of the page is already there. When the answer comes back down the wire, only that spot is inked in.
+The page is a print in the tray, and `arrives` is the date that is still on its way. Press reload.
 
-<WaitAnatomy />
+<DevelopAnatomy />
+
+The rest of the page stays sharp. Only the date shows the `@pending` words in pencil, then develops when the answer comes back.
 
 ## Pick a mug
 

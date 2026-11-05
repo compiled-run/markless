@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ARRIVES, CHECKING, describeWait, flip, WAIT_TOUR } from './model.ts';
-import { drawing } from './wait.ts';
+import { drawing } from './develop.ts';
 
 const waitArt = drawing();
 
 const page = readFileSync(new URL('../../../pages/concepts/async.mdx', import.meta.url), 'utf8');
-const piece = readFileSync(new URL('./wait-anatomy.tsrx', import.meta.url), 'utf8');
+const piece = readFileSync(new URL('./develop-anatomy.tsrx', import.meta.url), 'utf8');
 
 describe('the parcel and the waiting spot', () => {
 	it('holds the spot in pencil while the date is on its way, then inks it in', () => {
@@ -19,8 +19,8 @@ describe('the parcel and the waiting spot', () => {
 		expect(flip('odd')).toBe('even');
 	});
 
-	it('wires only the arrival spot; the shop name, product and price never move', () => {
-		expect(piece.match(/class="pulse to-page"/g)).toHaveLength(1);
+	it('develops only the arrival spot; the shop name, product and price stay sharp', () => {
+		expect(piece).not.toMatch(/class="cord"|art\.wires|art\.parcel/);
 		const start = piece.indexOf('class="once"');
 		const once = piece.slice(start, piece.indexOf('</g>', start));
 		expect(once).toContain('{SHOP}');
@@ -29,7 +29,7 @@ describe('the parcel and the waiting spot', () => {
 
 	it('has one margin note, no motion under reduced motion, and a tour that stops on touch', () => {
 		expect(piece.match(/class="hand/g)).toHaveLength(1);
-		expect(piece).toContain('WIRED BEFORE THE PAGE RAN');
+		expect(piece).toContain('STILL DEVELOPING');
 		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
 		expect(piece).toContain('if (!seen || touched) return;');
 		expect(piece).toContain("event.key === 'Escape'");
@@ -37,25 +37,23 @@ describe('the parcel and the waiting spot', () => {
 	});
 
 	it('inks every part fully and draws the same scene every time', () => {
-		expect(waitArt.parcel.ink.length).toBeGreaterThan(300);
-		expect(waitArt.wires.main.length).toBeGreaterThan(50);
-		expect(waitArt.wires.thin.length).toBeGreaterThan(50);
+		expect(waitArt.tray.ink.length).toBeGreaterThan(300);
 		expect(JSON.stringify(drawing())).toBe(JSON.stringify(waitArt));
 	});
 
 	it('is on the Async page under its own heading', () => {
-		expect(page).toContain("import WaitAnatomy from '../../components/figures/async/wait-anatomy.tsrx';");
-		expect(page.indexOf('## Watch a spot wait')).toBeLessThan(page.indexOf('<WaitAnatomy />'));
+		expect(page).toContain("import DevelopAnatomy from '../../components/figures/async/develop-anatomy.tsrx';");
+		expect(page.indexOf('## Watch a spot develop')).toBeLessThan(page.indexOf('<DevelopAnatomy />'));
 	});
 });
 
 describe('frozen art', () => {
 	it('freezes the drawing into a plain-data module the compiler can read (run with -u after editing)', async () => {
-		const module = `// Written by async.test.ts from wait.ts. Run \`vp test -u\` to refresh.
-import type { drawing } from './wait.ts';
+		const module = `// Written by async.test.ts from develop.ts. Run \`vp test -u\` to refresh.
+import type { drawing } from './develop.ts';
 
 export const art: ReturnType<typeof drawing> = ${JSON.stringify(waitArt, null, '\t')};
 `;
-		await expect(module).toMatchFileSnapshot('./wait.art.ts');
+		await expect(module).toMatchFileSnapshot('./develop.art.ts');
 	});
 });

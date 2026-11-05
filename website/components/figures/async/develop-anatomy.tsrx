@@ -1,9 +1,9 @@
-// The shop page on the desk with the `arrives` parcel: reload, and the arrival spot holds pencil words until the date comes back down the wire.
+// The shop page as a print developing in a darkroom tray: reload, and only the arrival date fades back to pencil, then develops while the rest of the print stays sharp.
 import { computed, state } from '@markless/core';
 import { ARRIVE_SLOT, ARRIVES, CHECKING, describeWait, flip, PRICE, PRODUCT, RETURNS, ROASTED, SHOP, WAIT_TOUR } from './model.ts';
-import { art } from './wait.art.ts';
+import { art } from './develop.art.ts';
 
-export default function WaitAnatomy() @{
+export default function DevelopAnatomy() @{
 	let beat = state('rest');
 	let touched = state(false);
 	const said = computed(() => describeWait(beat !== 'rest'));
@@ -48,14 +48,16 @@ export default function WaitAnatomy() @{
 		>
 			<svg class="scene" data-beat={beat} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="pencil" d={art.sheet.pencil} />
-				<path class="pencil" d={art.parcel.pencil} />
 				<path class="shadow-wash" d={art.sheet.curl.shadow} />
 				<path class="hatch deep" d={art.sheet.curl.hatch} />
 				<path class="shadow-wash light" d={art.sheet.contactWash} />
 				<path class="hatch deep" d={art.sheet.contact} />
 				<path class="hatch deep light" d={art.sheet.desk} />
-				<path class="shadow-wash" d={art.parcel.cast.wash} />
-				<path class="hatch deep light" d={art.parcel.cast.hatch} />
+				<path class="shadow-wash" d={art.tray.cast} />
+				<path class="tray" d={art.tray.wall} />
+				<path class="hatch light" d={art.tray.wallHatch} />
+				<path class="tray-floor" d={art.tray.floor} />
+				<path class="wash liquid" d={art.tray.liquid} />
 
 				<g class="sheet">
 					<path class="sheet-paper" d={art.sheet.paper} />
@@ -102,62 +104,17 @@ export default function WaitAnatomy() @{
 					<text class="digit now" x={ARRIVE_SLOT}>{ARRIVES}</text>
 				</g>
 
-				<path class="shadow-ink" d={art.wires.thin.shadow} />
-				<path class="hatch deep" d={art.wires.thin.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.main.shadow} />
-				<path class="hatch deep" d={art.wires.main.shadowHatch} />
-				<path class="shadow-wash" d={art.wires.clip.cast} />
-
-				<path class="box-paper" d={art.parcel.paper} />
-				<path class="wash kraft-wash" d={art.parcel.kraft} />
-				<path class="hatch" d={art.parcel.shade} />
-				<path class="tape" d={art.parcel.tape} />
-				<path class="hatch light" d={art.parcel.tapeHatch} />
-				<path class="tag-paper" d={art.parcel.label} />
-				<path class="tag-ink" d={art.parcel.labelInk} />
-				<path class="jar-ink" d={art.parcel.ink} />
-				<g class="stamp">
-					<path class="tag-paper" d={art.parcel.stamp.paper} />
-					<path class="wash yellow" d={art.parcel.stamp.wash} />
-					<path class="jar-ink" d={art.parcel.stamp.ink} />
-					<text class="stamp-text" transform={art.parcel.stamp.matrix}>TUE</text>
-				</g>
-				<path class="jar-ink" d={art.parcel.tag.string} />
-				<path class="tag-paper" d={art.parcel.tag.paper} />
-				<path class="tag-hatch" d={art.parcel.tag.shade} />
-				<path class="tag-ink" d={art.parcel.tag.ink} />
-				<text class="tag-text" transform={art.parcel.tag.matrix}>arrives</text>
-
-				<path class="cord" d={art.wires.thin.paper} />
-				<path class="jar-ink" d={art.wires.thin.tone} />
-				<path class="jar-ink" d={art.wires.thin.ink} />
-				<path class="boot" d={art.wires.socket.paper} />
-				<path class="jar-ink" d={art.wires.socket.ink} />
-				<path class="cord" d={art.wires.main.paper} />
-				<path class="jar-ink" d={art.wires.main.tone} />
-				<path class="jar-ink" d={art.wires.main.ink} />
-				<path class="boot" d={art.wires.clip.boot} />
-				<path class="hatch" d={art.wires.clip.bootTone} />
-				<path class="brass" d={art.wires.clip.paper} />
-				<path class="wash brass-wash" d={art.wires.clip.wash} />
-				<path class="hatch" d={art.wires.clip.side} />
-				<path class="jar-ink" d={art.wires.clip.ink} />
-
-				<path class="pulse to-parcel" d={art.wires.thin.centre} style={'--len:' + art.wires.thin.length} />
-				<path class="pulse to-page" d={art.wires.main.centre} style={'--len:' + art.wires.main.length} />
+				<path class="jar-ink" d={art.tray.ink} />
 
 				<path class="jar-ink" d={art.note.arrow} />
-				<text class="hand" x={art.note.x} y={art.note.y}>WIRED BEFORE THE PAGE RAN</text>
+				<text class="hand" x={art.note.x} y={art.note.y}>STILL DEVELOPING</text>
 			</svg>
 		</button>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a desk. A sheet of paper on it is drawn as a shop page at beanshop.dev, with a pink reload button in its
-			browser bar: the shop name {SHOP}, a bag of coffee beans sold as {PRODUCT} for {PRICE}, the line "Arrives: {ARRIVES}" with the
-			date in a yellow wash, and two plain lines, "{ROASTED}" and "{RETURNS}". Beside the sheet sits a parcel tagged arrives, with a date stamp on its label. A wire runs from the parcel to a
-			clip on the date, and a thin wire runs from the reload button to the parcel. Nothing else on the page is wired. Press the drawing, or
-			Enter or Space, to reload: the date gives way to the pencilled words "{CHECKING}", the request runs to the parcel, the parcel is
-			stamped, and the date runs back down the wire, crosses out the pencil and is inked in. The rest of the page stays as it is the whole
-			time. Escape stops it.
+			A pen-and-ink drawing of a photo print lying in a darkroom developing tray. The print is a shop page at beanshop.dev, with a pink
+			reload button in its browser bar: the shop name {SHOP}, a bag of coffee sold as {PRODUCT} for {PRICE}, the line "Arrives:
+			{ARRIVES}", and two plain lines, "{ROASTED}" and "{RETURNS}". Press the drawing, or Enter or Space, to reload: the date fades back
+			to the pencilled words "{CHECKING}" while the rest of the print stays sharp, then the date slowly develops in again. Escape stops it.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -451,6 +408,24 @@ export default function WaitAnatomy() @{
 				opacity: 0;
 			}
 
+			.tray {
+				fill: color-mix(in oklch, var(--paper) 70%, white);
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--paper) 40%, var(--ink));
+				}
+			}
+
+			.tray-floor {
+				fill: color-mix(in oklch, var(--paper) 82%, oklch(70% 0.04 220));
+			}
+
+			.liquid {
+				fill: oklch(70% 0.05 220);
+				stroke: none;
+				opacity: 0.25;
+			}
+
 			.tape {
 				fill: color-mix(in oklch, var(--paper) 70%, oklch(80% 0.05 80));
 			}
@@ -471,45 +446,28 @@ export default function WaitAnatomy() @{
 				fill: var(--sheet-ink);
 			}
 
-			.stamp {
-				transform-box: fill-box;
-				transform-origin: center;
-			}
-
 			.waiting {
 				opacity: 0;
 			}
 
 			.scene[data-beat='odd'] {
 				--sink: sink-a;
-				--travel: travel-a;
 				--strike: strike-a;
 				--wait: wait-a;
 				--come: come-a;
 				--wash-back: wash-back-a;
-				--stamp: stamp-a;
 			}
 
 			.scene[data-beat='even'] {
 				--sink: sink-b;
-				--travel: travel-b;
 				--strike: strike-b;
 				--wait: wait-b;
 				--come: come-b;
 				--wash-back: wash-back-b;
-				--stamp: stamp-b;
 			}
 
 			.press {
 				animation: var(--sink) 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
-			}
-
-			.to-parcel {
-				animation: var(--travel) 800ms 300ms ease-in-out both;
-			}
-
-			.to-page {
-				animation: var(--travel) 700ms 1650ms ease-in-out both;
 			}
 
 			.waiting {
@@ -521,18 +479,11 @@ export default function WaitAnatomy() @{
 			}
 
 			.now {
-				stroke: var(--sheet-ink);
-				stroke-width: 0.3;
-				stroke-dasharray: 60;
 				animation: var(--come) 3300ms linear both;
 			}
 
 			.spot {
 				animation: var(--wash-back) 3300ms linear both;
-			}
-
-			.stamp {
-				animation: var(--stamp) 3300ms linear both;
 			}
 
 			@keyframes sink-a {
@@ -544,38 +495,6 @@ export default function WaitAnatomy() @{
 			@keyframes sink-b {
 				35% {
 					transform: translate(var(--sink-x), var(--sink-y));
-				}
-			}
-
-			@keyframes travel-a {
-				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes travel-b {
-				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
 				}
 			}
 
@@ -637,22 +556,17 @@ export default function WaitAnatomy() @{
 				}
 
 				5%,
-				77% {
+				62% {
 					opacity: 0;
-					stroke-dashoffset: 60;
-					fill-opacity: 0;
+					fill-opacity: 0.1;
 				}
 
-				78% {
+				63% {
 					opacity: 1;
-				}
-
-				88% {
-					fill-opacity: 0;
+					fill-opacity: 0.1;
 				}
 
 				100% {
-					stroke-dashoffset: 0;
 					fill-opacity: 1;
 				}
 			}
@@ -663,22 +577,17 @@ export default function WaitAnatomy() @{
 				}
 
 				5%,
-				77% {
+				62% {
 					opacity: 0;
-					stroke-dashoffset: 60;
-					fill-opacity: 0;
+					fill-opacity: 0.1;
 				}
 
-				78% {
+				63% {
 					opacity: 1;
-				}
-
-				88% {
-					fill-opacity: 0;
+					fill-opacity: 0.1;
 				}
 
 				100% {
-					stroke-dashoffset: 0;
 					fill-opacity: 1;
 				}
 			}
@@ -702,40 +611,6 @@ export default function WaitAnatomy() @{
 				5%,
 				80% {
 					opacity: 0;
-				}
-			}
-
-			@keyframes stamp-a {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				36% {
-					opacity: 0;
-					transform: scale(1.6);
-				}
-
-				44% {
-					opacity: 1;
-					transform: none;
-				}
-			}
-
-			@keyframes stamp-b {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				36% {
-					opacity: 0;
-					transform: scale(1.6);
-				}
-
-				44% {
-					opacity: 1;
-					transform: none;
 				}
 			}
 
