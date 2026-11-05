@@ -1,6 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import MixerAnatomy from '../../components/figures/computed/mixer-anatomy.tsrx';
+import WatchAnatomy from '../../components/figures/computed/watch-anatomy.tsrx';
+import ThermometerAnatomy from '../../components/figures/computed/thermometer-anatomy.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -10,83 +11,135 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Computed values
 
-<PageMeta time="2 min" assumes="state" />
+<PageMeta time="4 min" assumes="state, events" />
 
 <Subtitle text="A computed is one of your values, worked out from other values and kept up to date." terms="computed values" />
 
-```tsrx title="mixer.tsrx"
+```tsrx title="pace.tsrx"
 import { computed, state } from '@markless/core';
 
-export default function Mixer() @{
-	let red = state(60);
-	let blue = state(40);
-	const mix = computed(
-		() => `color-mix(in oklab, red ${red}%, blue ${blue}%)`,
-	);
+export default function Pace() @{
+	let km = state(5);
+	let minutes = state(25);
+	const pace = computed(() => minutes / km);
 
-	<p style={'background: ' + mix}>Mix</p>
+	<section>
+		<p>{km} km in {minutes} min</p>
+		<p>Pace: {pace} min/km</p>
+		<button onClick={() => (minutes -= 1)}>
+			Run faster
+		</button>
+	</section>
 }
 ```
 
-**`state()`** holds `red` and `blue`. **`computed()`** works out `mix` from them, and works it out again whenever either one changes.
+**`state()`** holds `km` and `minutes`. **`computed()`** works out `pace` from them, and works it out again whenever either one changes.
 
 ## A computed follows what it reads
 
-The function you pass is the *recipe*. Markless reads it and finds `red` and `blue`, so you never list them.
+The function you pass is the *recipe*. Markless reads it and finds `minutes` and `km`, so you never list them.
 
-- Change `red` or `blue`, and `mix` follows.
+- Change `minutes` or `km`, and `pace` follows.
 - Nothing else has to remember to update it.
-- You can't set `mix` yourself.
+- You can't set `pace` yourself.
 
-Drag either paint up or down, then try to paint the swatch.
+Turn the minutes on the watch, then try to set the pace.
 
-<MixerAnatomy />
+<WatchAnatomy />
 
-<Code steps={[{ label: 'Drag Red all the way up.', shows: 'Red 100' }, { label: 'Add `<p>{mix}</p>` under the swatch, and drag again. The text follows too.', source: '<p>{mix}</p>' }, { label: "Try breaking it: in the Red slider's handler, write `mix = 'white'` instead. The build stops, because a computed can't be set.", fails: 'MARKLESS_STATE_READ_ONLY_WRITE' }]}>
-```tsrx title="paint-mixer.tsrx"
+<Code steps={[{ label: 'Press Run faster.', shows: 'Pace: 4.8 min/km' }, { label: 'Add a Run further button that runs `km++`.', source: 'km++' }, { label: 'Try breaking it: make Run faster set `pace = 4` instead. The build stops, because a computed only reads.', fails: 'MARKLESS_STATE_READ_ONLY_WRITE' }]}>
+```tsrx title="pace.tsrx"
 import { computed, state } from '@markless/core';
 
-export default function PaintMixer() @{
-	let red = state(60);
-	let blue = state(40);
-	const mix = computed(
-		() =>
-			`color-mix(in oklab, red ${red}%, ` +
-			`blue ${blue}%)`,
-	);
+export default function Pace() @{
+	let km = state(5);
+	let minutes = state(25);
+	const pace = computed(() => minutes / km);
 
 	<section>
-		<label>
-			Red {red}
-			<input
-				type="range"
-				value={red}
-				onInput={(event) =>
-					(red = Number(
-						event.currentTarget.value,
-					))
-				}
-			/>
-		</label>
-		<label>
-			Blue {blue}
-			<input
-				type="range"
-				value={blue}
-				onInput={(event) =>
-					(blue = Number(
-						event.currentTarget.value,
-					))
-				}
-			/>
-		</label>
-		<p style={'background: ' + mix}>Mix</p>
+		<p>{km} km in {minutes} min</p>
+		<p>Pace: {pace} min/km</p>
+		<button onClick={() => (minutes -= 1)}>
+			Run faster
+		</button>
 	</section>
 }
 ```
 </Code>
 
-A computed only reads; it never writes. Saving or logging goes in the handler that made the change.
+## A computed can read other computeds
+
+`advice` reads `fahrenheit`, which reads `celsius`. Change `celsius`, and both follow. The advice only flips when the temperature crosses 50°F.
+
+<ThermometerAnatomy />
+
+<Code steps={[{ label: 'Press Warmer until the advice changes.', shows: 'No coat' }, { label: "Add a third computed that reads `advice`, like `computed(() => advice + '!')`, and show it.", source: 'advice +' }]}>
+```tsrx title="weather.tsrx"
+import { computed, state } from '@markless/core';
+
+export default function Weather() @{
+	let celsius = state(5);
+	const fahrenheit = computed(
+		() => celsius * 1.8 + 32,
+	);
+	const advice = computed(() =>
+		fahrenheit < 50 ? 'Bring a coat' : 'No coat',
+	);
+
+	<section>
+		<p>{celsius}°C is {fahrenheit}°F.</p>
+		<p>{advice}</p>
+		<button onClick={() => (celsius += 5)}>
+			Warmer
+		</button>
+	</section>
+}
+```
+</Code>
+
+## Give a long expression a name
+
+Short expressions like `{minutes * 60}` or `{done ? 'yes' : 'no'}` work right in the markup. One with an arrow function or a spread, like `[...tags].join(', ')`, can't stay up to date there. Give it a name with `computed`.
+
+<Code steps={[{ label: 'Press Add swing.', shows: 'jazz, bebop, swing' }, { label: "Try breaking it: replace `{line}` with `{[...tags].join(', ')}`. The build stops, because the page can't keep that expression up to date.", fails: 'MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED' }]}>
+```tsrx title="tag-line.tsrx"
+import { computed, state } from '@markless/core';
+
+export default function TagLine() @{
+	let tags = state(new Set(['jazz', 'bebop']));
+	const line = computed(() =>
+		[...tags].join(', '),
+	);
+
+	<section>
+		<p>{line}</p>
+		<button onClick={() => tags.add('swing')}>
+			Add swing
+		</button>
+	</section>
+}
+```
+</Code>
+
+## Filter and sort a list with a computed
+
+A computed can return a new array, like the songs that match a search:
+
+```tsrx
+const shown = computed(() =>
+	songs.filter((song) => song.title.includes(query)),
+);
+```
+
+[Lists](/concepts/lists) shows each one on the page.
+
+## A computed only reads
+
+A computed works out a value. It never changes state. Saving or logging goes in the handler that made the change, where you already know what happened.
+
+## A computed can wait for data
+
+`computed(async () => ...)` waits for a fetch or any other promise. [Async values](/concepts/async) shows how the page looks while it waits.
 
 <Collapsible sprite="star-badge" summary="How do existing tools handle this?">
 
@@ -94,4 +147,4 @@ Many tools ask you to list a derived value's inputs in a dependency array, and t
 
 </Collapsible>
 
-[Events](/concepts/events) shows where every change starts.
+[Conditionals](/concepts/conditionals) shows parts of the page that come and go.

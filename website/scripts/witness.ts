@@ -399,22 +399,20 @@ try {
 
 		// --- the island still resumes -----------------------------------------
 		const stage = page.locator('.code-block [data-code-stage]').first();
-		const button = stage.getByRole('button', { name: 'Dark' });
-		const themeLine = stage.locator('h2').first();
+		const button = stage.getByRole('button', { name: 'Switch user' });
+		const nameLine = stage.locator('h2').first();
 		await button.waitFor();
 		await page.screenshot({ path: `${shotsDir}/T004-state-before.png`, fullPage: true });
 
-		const readTheme = async () => ((await themeLine.textContent()) ?? '').trim();
-		const before = await readTheme();
-		check(before === 'Theme: light', 'the settings demo renders its light theme from the server', before);
+		const readName = async () => ((await nameLine.textContent()) ?? '').trim();
+		const before = await readName();
+		check(before === 'Hello, Jack', 'the profile renders Jack from the server', before);
 
-		// The first click both wakes the island and assigns; wait for the text to settle before the next click.
+		// The first click both wakes the island and assigns; wait for the text to settle.
 		await button.click();
-		await settleText(themeLine, (text) => text === 'Theme: dark', 'the settings demo turns dark on the first click');
-		await stage.getByRole('button', { name: 'Light' }).click();
-		await settleText(themeLine, (text) => text === 'Theme: light', 'the settings demo turns light again');
-		const after = await readTheme();
-		check(after === 'Theme: light', 'the settings demo answers both buttons (island resumed)', after);
+		await settleText(nameLine, (text) => text === 'Hello, Ada', 'the profile switches to Ada on the first click');
+		const after = await readName();
+		check(after === 'Hello, Ada', 'the profile answers its button (island resumed)', after);
 		await page.screenshot({ path: `${shotsDir}/T004-state-after.png`, fullPage: true });
 
 		const heads: { href: string; title: string; description: string }[] = [];
@@ -569,16 +567,16 @@ try {
 			fullPage: true,
 		});
 
-		// --- widget: every spot that shows theme on the state page ----------------
+		// --- widget: the player on the state page ---------------------------------
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const themeStage = page.locator('.code-block [data-code-stage]').first();
-		await themeStage.getByRole('button', { name: 'Dark' }).waitFor();
-		await themeStage.getByRole('button', { name: 'Dark' }).click();
-		await settleText(themeStage.locator('h2').first(), (text) => text === 'Theme: dark', 'theme heading turns dark');
+		const playerStage = page.locator('.code-block [data-code-stage]').nth(1);
+		await playerStage.getByRole('button', { name: 'Skip 10s' }).waitFor();
+		await playerStage.getByRole('button', { name: 'Skip 10s' }).click();
+		await playerStage.getByRole('button', { name: 'Play or pause' }).click();
+		await settleText(playerStage.locator('p').first(), (text) => text === '10s, playing', 'player skips and plays');
 		check(
-			(await themeStage.locator('main').first().getAttribute('class'))?.split(/\s+/).includes('dark') === true &&
-				((await themeStage.locator('main p').first().textContent()) ?? '').includes('🌙'),
-			'one click changes the class and the picture along with the heading',
+			((await playerStage.locator('p').first().textContent()) ?? '').trim() === '10s, playing',
+			'a += and a ! assignment both reach the same line',
 		);
 		await page.screenshot({ path: `${shotsDir}/T005-theme-after.png`, fullPage: true });
 
@@ -797,29 +795,22 @@ try {
 		}
 
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
-		const orderStage = page.locator('.code-block [data-code-stage]').first();
-		const totalLine = orderStage.locator('p').nth(2);
-		const addMug = orderStage.getByRole('button', { name: 'Add a mug' });
-		const addCoaster = orderStage.getByRole('button', { name: 'Add a coaster' });
-		await addMug.waitFor();
+		const paceStage = page.locator('.code-block [data-code-stage]').first();
+		const paceLine = paceStage.locator('p').nth(1);
+		const faster = paceStage.getByRole('button', { name: 'Run faster' });
+		await faster.waitFor();
 		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 12',
-			'mug order total renders 12 from the server',
-			((await totalLine.textContent()) ?? '').trim(),
+			((await paceLine.textContent()) ?? '').trim() === 'Pace: 5 min/km',
+			'pace renders 5 from the server',
+			((await paceLine.textContent()) ?? '').trim(),
 		);
-		await addMug.click();
-		await settleText(totalLine, (text) => text === 'Total: 24', 'mug order total reaches 24');
+		await faster.click();
+		await settleText(paceLine, (text) => text === 'Pace: 4.8 min/km', 'pace reaches 4.8');
 		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 24',
-			'adding a mug re-derives the total with no line updating it',
+			((await paceLine.textContent()) ?? '').trim() === 'Pace: 4.8 min/km',
+			'running faster re-derives the pace with no line updating it',
 		);
-		await addCoaster.click();
-		await settleText(totalLine, (text) => text === 'Total: 27', 'mug order total reaches 27');
-		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 27',
-			'adding a coaster re-derives the same total',
-		);
-		await page.screenshot({ path: `${shotsDir}/T005-mug-order-after.png`, fullPage: true });
+		await page.screenshot({ path: `${shotsDir}/T005-pace-after.png`, fullPage: true });
 
 		// --- widgets on the reading-tsrx page ------------------------------------
 		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
@@ -1719,49 +1710,27 @@ try {
 			});
 		}
 
-		// --- widget: the mug label on the events page ---------------------------
+		// --- widget: the sign-up form on the events page ---------------------------
 		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
-		const echoStage = page.locator('.code-block [data-code-stage]').first();
-		const echoField = echoStage.locator('input').first();
-		const echoLine = echoStage.locator('p').first();
-		const printedLine = echoStage.locator('p').nth(1);
-		await echoField.waitFor();
-		check(
-			((await echoLine.textContent()) ?? '').trim() === 'Preview:',
-			'mug label renders its empty preview from the server',
-			((await echoLine.textContent()) ?? '').trim(),
-		);
-		await echoField.click();
-		await echoField.pressSequentially('Ada', { delay: 40 });
-		await settleText(
-			echoLine,
-			(text) => text === 'Preview: Ada',
-			'mug label preview follows the keystrokes',
-		);
-		check(
-			((await echoLine.textContent()) ?? '').trim() === 'Preview: Ada',
-			'typing into the field moves the preview under it',
-		);
+		const signupStage = page.locator('.code-block [data-code-stage]').nth(3);
+		const emailField = signupStage.locator('input[name="email"]').first();
+		const joinedLine = signupStage.locator('p').first();
+		await emailField.waitFor();
+		await emailField.fill('ada@example.com');
 		const urlBeforeSubmit = page.url();
-		await echoField.press('Enter');
-		await settleText(
-			printedLine,
-			(text) => text === 'Printed: Ada',
-			'pressing Enter runs the submit handler',
-		);
+		await emailField.press('Enter');
+		await settleText(joinedLine, (text) => text === 'ada@example.com', 'pressing Enter runs the submit handler');
 		check(
 			page.url() === urlBeforeSubmit,
 			'pressing Enter does not navigate, because the handler calls preventDefault',
 			`${urlBeforeSubmit} then ${page.url()}`,
 		);
 		check(
-			(await echoField.inputValue()) === 'Ada',
+			(await emailField.inputValue()) === 'ada@example.com',
 			'the field still holds what was typed after the submit',
-			await echoField.inputValue(),
+			await emailField.inputValue(),
 		);
-		await echoField.press('Escape');
-		await settleText(echoLine, (text) => text === 'Preview:', 'Escape clears the name');
-		await page.screenshot({ path: `${shotsDir}/T013-mug-label-after.png`, fullPage: true });
+		await page.screenshot({ path: `${shotsDir}/T013-signup-after.png`, fullPage: true });
 
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
@@ -1811,16 +1780,16 @@ try {
 
 		// --- concept previews: each one reports what the reader's action really did ---
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const settings = page.locator('.settings-demo').first();
-		await settings.getByRole('button', { name: 'Dark' }).focus();
+		const idCard = page.locator('figure.idcard').first();
+		await idCard.getByRole('button', { name: 'Birthday: person.age++' }).focus();
 		await page.keyboard.press('Enter');
-		await settleText(settings.locator('.heading span'), (text) => text === 'Theme: dark', 'state preview turns dark by key');
-		await settings.getByRole('button', { name: 'Light' }).click();
-		await settleText(settings.locator('.heading span'), (text) => text === 'Theme: light', 'state preview turns light by click');
+		await settleText(idCard.locator('.age-spot'), (text) => text === 'Age 25', 'state preview: the birthday reaches the page by key');
+		await idCard.getByRole('button', { name: 'Birthday: person.age++' }).click();
+		await settleText(idCard.locator('.age-spot'), (text) => text === 'Age 26', 'state preview: the birthday reaches the page by click');
 		check(
-			((await settings.locator('.tally').textContent()) ?? '').replace(/\s+/g, ' ').includes('The click handler ran 2 times'),
-			'state preview: the handler ran twice while Settings() ran once',
-			(await settings.locator('.tally').textContent()) ?? '',
+			((await idCard.locator('.name-spot').textContent()) ?? '').trim() === 'Jack',
+			'state preview: the name spot is untouched by the age change',
+			(await idCard.locator('.name-spot').textContent()) ?? '',
 		);
 
 		// --- widget: the shopping list on the lists page --------------------------

@@ -81,20 +81,20 @@ export const nav: readonly NavSection[] = [
 					'state() tells the page to watch a variable. You read it and assign to it like any other let.',
 			},
 			{
-				title: 'Computed',
-				href: '/concepts/computed',
-				icon: 'funnel',
-				number: '2',
-				description:
-					'A value you work out is never out of date. computed() derives one value from others and works it out again when one of them changes.',
-			},
-			{
 				title: 'Events',
 				href: '/concepts/events',
 				icon: 'click',
-				number: '3',
+				number: '2',
 				description:
 					'An event prop is on plus the DOM event name, and the browser hands your handler its own typed event object.',
+			},
+			{
+				title: 'Computed',
+				href: '/concepts/computed',
+				icon: 'funnel',
+				number: '3',
+				description:
+					'A value you work out is never out of date. computed() derives one value from others and works it out again when one of them changes.',
 			},
 			{
 				title: 'Conditionals',
