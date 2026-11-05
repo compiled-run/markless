@@ -4,10 +4,11 @@ import { drawing } from './accordion-anatomy.ts';
 const drawn = drawing();
 
 describe('accordion anatomy', () => {
-	it('keeps to two objects and about five words', () => {
+	it('keeps to two objects, and its words are only the demo value and aria-labelledby', () => {
 		const words = drawn.texts.flatMap((t) => t.text.split(/\s+/));
 		expect(words.length).toBeLessThanOrEqual(5);
-		expect(drawn.shapes.filter((s) => s.cls.startsWith('box'))).toHaveLength(2);
+		expect(drawn.texts.map((t) => t.text)).toEqual(['Do you ship overseas?', 'aria-labelledby']);
+		expect(drawn.shapes.filter((s) => s.cls.split(' ')[0] === 'box')).toHaveLength(2);
 	});
 
 	it('draws the same every time', () => {
