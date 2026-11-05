@@ -693,6 +693,8 @@ test('emitResumeModule keeps row actions behind the row lean entry', () => {
 	);
 	expect(resumeCode).not.toContain('@markless/web/event-only-lean/scalar-core');
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
+	// Its full-resume fallback walks after dispatch has reset the event's stop flag.
+	expect(resumeCode).toContain('propagationStopped: input.propagationStopped === true,');
 });
 
 test('emitResumeModule branches only for mixed scalar and row lean routes', () => {
