@@ -1,10 +1,13 @@
 import { computed, state } from '@markless/core';
 import { Link } from '@markless/router';
+import { visits } from './visits.tsrx';
 
 export default function SideNav({ path }: { readonly path: string }) @{
 	const nav = state({ open: false, count: 0, pinned: path === '/reference' });
 	const shown = computed(() => (nav.open ? 'open' : 'closed'));
 	const here = computed(() => (path === '/guide' ? 'Guide' : 'Reference'));
+	const seen = visits();
+	const total = computed(() => nav.count + seen.count);
 	const pin = computed(() => (nav.pinned ? 'pinned' : 'loose'));
 	const marked = computed(() => (nav.open ? 'open ' : '') + (path === '/guide' ? 'guide' : 'reference'));
 
@@ -18,6 +21,7 @@ export default function SideNav({ path }: { readonly path: string }) @{
 		<span data-count>{nav.count}</span>
 		<span data-here>{here}</span>
 		<span data-pin>{pin}</span>
+		<span data-total>{total}</span>
 		<nav class="side-links" aria-label="Pages">
 			<Link href="/guide" data-nav="guide">{'Guide'}</Link>
 			<Link href="/reference" data-nav="reference">{'Reference'}</Link>

@@ -302,9 +302,9 @@
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
-				"web/kept-swap"
+				"web/shared-swap"
 			],
-			"set": 6012,
+			"delta": 387,
 			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides, paints and can restore their live state; web/shared-swap's off-screen painter is shared with it",
 			"date": "2026-11-05"
 		},
@@ -312,10 +312,10 @@
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
-				"web/shared-swap"
+				"web/kept-swap"
 			],
-			"delta": 387,
-			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides, paints and can restore their live state; web/shared-swap's off-screen painter is shared with it",
+			"set": 6570,
+			"reason": "kept parts with state: web/kept-swap reads, decides, paints and can restore their live state, painting with the live value of document-wide shared() state they also read; loaded only by a navigation that leaves a kept part with state",
 			"date": "2026-11-05"
 		}
 	]

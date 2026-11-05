@@ -1,6 +1,7 @@
 import Banner from '../src/banner.tsrx';
 import SideNav from '../src/side-nav.tsrx';
 import PressCounter from '../src/press-counter.tsrx';
+import { VisitButton } from '../src/visits.tsrx';
 
 export default function Page() @{
 	<>
@@ -12,5 +13,6 @@ export default function Page() @{
 			<p>{'The reference page has one more paragraph than the guide page.'}</p>
 		</main>
 		<PressCounter />
+		<VisitButton />
 	</>
 }

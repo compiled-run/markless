@@ -1,7 +1,7 @@
 // Hands a kept part's live state to the next page of an in-place navigation, still off screen (see PROTOCOL_KEEP_INSTANCE_ATTRIBUTE).
 import { decodePayloadScriptsWithVersion } from '../../serializer/src/protocol-client.ts';
 import { marklessInstancePath } from './fns/instance-scope.ts';
-import { cloneValue, moduleHref, sameValue } from './fns/shared-instances.ts';
+import { bindDefinitions, cloneValue, moduleHref, sameValue } from './fns/shared-instances.ts';
 import { readPayloadScriptsFromDocument } from './payload-document-common.ts';
 import { decodeServedComputedValues, decodeStateCells } from './payload-graph-construct.ts';
 import { paintValues } from './shared-swap.ts';
@@ -58,8 +58,10 @@ export async function carryKeptParts(input: {
 	);
 	const values = new Map<string, unknown>();
 	const read = new Map<string, unknown>();
+	// A started runtime answers every cell from its graph; a lean map holds only the cells it has read.
+	const graphBacked = live.get !== Map.prototype.get;
 	const now = (id: string, served: unknown) =>
-		live.has(id) ? live.get(id) : (live.get(id) ?? served);
+		live.has(id) || graphBacked ? live.get(id) : served;
 	for (const cell of cells) {
 		const pair = pairs.find(({ to }) => cell.graphNodeId.startsWith(to));
 		if (!pair || outsideInstances.has(cell.graphNodeId) || !ownState(cell.graphNodeId))
@@ -112,7 +114,30 @@ export async function carryKeptParts(input: {
 			]),
 		]);
 	};
-	const painted = await paintValues({ root, load, ...arriving, cells, values, touched });
+	// Document-wide shared() state the part also reads paints with its live value, as the shared() swap paints it.
+	const outgoing = containerOf(input.outgoing) ?? undefined;
+	const { bound } = bindDefinitions(
+		{ document: input.outgoing.ownerDocument, container: outgoing },
+		arriving.state,
+		cells,
+		root,
+		false,
+	);
+	const shared = new Map<string, unknown>();
+	for (const binding of bound)
+		for (const id of binding.cellIds)
+			if (Object.hasOwn(binding.instance.cells, id))
+				shared.set(id, cloneValue(binding.instance.cells[id]));
+	const painted = await paintValues({
+		root,
+		load,
+		...arriving,
+		cells: cells.map((cell) =>
+			shared.has(cell.graphNodeId) ? { ...cell, value: shared.get(cell.graphNodeId) } : cell,
+		),
+		values,
+		touched,
+	});
 	if (!painted) {
 		restore();
 		return undefined;
@@ -124,7 +149,7 @@ export async function carryKeptParts(input: {
 		const id = computed.graphNodeId;
 		if (computed.async || !pairs.some(({ to }) => id.startsWith(to))) continue;
 		const value = painted.read(id);
-		if (value !== undefined && !sameValue(value, servedNext.get(id))) adopted.set(id, value);
+		if (!sameValue(value, servedNext.get(id))) adopted.set(id, value);
 	}
 	return {
 		moved: () => [...read].some(([id, value]) => !sameValue(now(id, served.get(id)), value)),

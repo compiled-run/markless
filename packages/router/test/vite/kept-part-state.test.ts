@@ -252,6 +252,30 @@ test('a press on the kept part while the swap paints the next page is carried, a
 	await page.close();
 });
 
+test('a kept part that also reads document-wide shared() state shows what the next page runtime holds', async () => {
+	const { page, errors } = await open('/guide');
+	for (const total of ['1', '2']) {
+		await page.click('[data-visit]');
+		await page.waitForFunction(
+			(expected) => document.querySelector('[data-total]')?.textContent === expected,
+			total,
+		);
+	}
+	await toggle(page, '1');
+	await page.click('[data-nav="reference"]');
+	await shows(page, 'Reference page');
+	const shown = Number(await page.textContent('[data-total]'));
+	await page.click('[data-visit]');
+	await page.waitForFunction(
+		(expected) => document.querySelector('[data-total]')?.textContent === expected,
+		String(shown + 1),
+	);
+	await toggle(page, '2');
+	expect(await page.textContent('[data-total]')).toBe(String(shown + 2));
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('Back and Forward keep the part and its state', async () => {
 	const { page, errors } = await open('/guide');
 	await toggle(page, '1');
