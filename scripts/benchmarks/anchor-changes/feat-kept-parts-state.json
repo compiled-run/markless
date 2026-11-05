@@ -173,6 +173,150 @@
 			"delta": 307,
 			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides and paints their live state; web/shared-swap's off-screen painter is shared with it",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 290,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 290,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 290,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 21,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 435,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 22,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 696,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 348,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +1.8 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI runs 42016683613 and 42014146870)",
+			"date": "2026-11-05"
 		}
 	]
 }
