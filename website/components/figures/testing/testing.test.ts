@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
-import * as clickTest from './click-test.ts';
-import * as twoWays from './two-ways.ts';
+import * as marionette from './marionette.ts';
 
-const figures = { 'click-test': clickTest, 'two-ways': twoWays };
+const figures = { marionette };
 
 describe('testing figures', () => {
 	for (const [name, figure] of Object.entries(figures)) {
@@ -16,9 +15,9 @@ describe('testing figures', () => {
 		});
 	}
 
-	it('strikes Count 0 and inks Count 1 on the button', () => {
-		const texts = clickTest.drawing().layers.flatMap((l) => l.texts);
-		expect(texts.find((t) => t.text === '0' && t.cls.includes('big'))?.cls).toContain('gone');
-		expect(texts.find((t) => t.text === '1' && t.cls.includes('big'))?.cls).toContain('show');
+	it('presses both pages to Count 1, one per way in', () => {
+		const texts = marionette.drawing().layers.flatMap((l) => l.texts.map((t) => t.text));
+		expect(texts.filter((t) => t === '1')).toHaveLength(2);
+		for (const way of marionette.WAYS) expect(texts).toContain(way.call);
 	});
 });

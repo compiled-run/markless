@@ -3,8 +3,8 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import SpecsFolderFigure from '../../components/figures/specs-rules/specs-folder-figure.tsrx';
-import RulerOutputsFigure from '../../components/figures/specs-rules/ruler-outputs-figure.tsrx';
+import StatuteBookFigure from '../../components/figures/specs-rules/statute-book-figure.tsrx';
+import StampFigure from '../../components/figures/specs-rules/stamp-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -17,11 +17,11 @@ import RulerOutputsFigure from '../../components/figures/specs-rules/ruler-outpu
 
 ## `specs/` holds the behavior contract
 
-Press the folder to mark it up:
+Press the book to open it at its marks:
 
-<SpecsFolderFigure />
+<StatuteBookFigure />
 
-`specs/router/` covers routing, typed routing and the router CLI.
+Read `specs/framework-design.md` first. `08-deferred-decisions.md` lists the topics that stay open on purpose, and `specs/router/` covers routing, typed routing and the router CLI.
 
 <Callout
 	sprite="cross"
@@ -41,9 +41,11 @@ Follow `.ruler/skills/markless-spec-maintenance/spec.md`:
 
 ## `.ruler/` is the one source for the rules
 
-<RulerOutputsFigure />
+`pnpm rules` runs `ruler apply`, which stamps `AGENTS.md`, `CLAUDE.md`, the skill copies and the MCP configuration out of `.ruler/`. Press the stamp:
 
-`.ruler/AGENTS.md` holds the rules for every agent, and `.ruler/skills/*/` holds the skills, such as `markless-implementation`. After you edit `.ruler/`, run `pnpm rules` and commit what it writes. The pre-commit hook checks the same when you stage a `.ruler/` file.
+<StampFigure />
+
+Never edit those outputs by hand: the `agent-files` CI job fails if they drift from `.ruler/`. After you edit `.ruler/`, run `pnpm rules` and commit what it writes.
 
 ## Rules to know
 

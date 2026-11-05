@@ -1,9 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
-import * as createCommand from './create-command.ts';
-import * as scripts from './scripts.ts';
+import * as questionnaire from './questionnaire.ts';
 
-const figures = { 'create-command': createCommand, scripts };
+const figures = { 'questionnaire': questionnaire };
 
 describe('cli figures', () => {
 	for (const [name, figure] of Object.entries(figures)) {
@@ -16,9 +16,12 @@ describe('cli figures', () => {
 		});
 	}
 
-	it('names every part of the command', () => {
-		const texts = createCommand.drawing().layers.flatMap((l) => l.texts.map((t) => t.text));
-		for (const part of createCommand.PARTS) expect(texts).toContain(part.note);
-		expect(createCommand.LINES.join(' ').replace(/\\\s+/, '')).toBe('npm create markless@latest my-app -- --yes --starter app --no-git');
+	it('asks the questions packages/cli asks, and the command matches the page', () => {
+		const source = readFileSync(new URL('../../../../packages/cli/src/index.ts', import.meta.url), 'utf8');
+		for (const { q, options } of questionnaire.QUESTIONS) {
+			expect(source).toContain("message: '" + q + "'");
+			for (const o of options) expect(source).toContain("label: '" + o + "'");
+		}
+		expect(questionnaire.LINES.join(' ').replace(/\\\s+/, '')).toBe('npm create markless@latest my-app -- --yes --starter app --no-git');
 	});
 });

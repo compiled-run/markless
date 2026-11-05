@@ -2,7 +2,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import CopyCheckFigure from '../../components/figures/type-checking/copy-check-figure.tsrx';
+import TracingFigure from '../../components/figures/type-checking/tracing-figure.tsrx';
 import WhereItRunsFigure from '../../components/figures/type-checking/where-it-runs-figure.tsrx';
 
 <SiteNavbar />
@@ -14,11 +14,15 @@ import WhereItRunsFigure from '../../components/figures/type-checking/where-it-r
 
 <Subtitle text="Markless hands TypeScript a TSX copy of each .tsrx file. TypeScript checks the copy, and every error points back to the line you wrote." />
 
-`Nav` takes `label: string`, and `app.tsrx` passes it `42`. Press the drawing, and follow the file to the checker and back:
+`Nav` takes `label: string`, and `app.tsrx` passes it `42`. Press the drawing to lay the copy over the file again:
 
-<CopyCheckFigure />
+<TracingFigure />
 
-The error lands on `label`, line 4, column 7 of your file. TSX is the file type TypeScript already understands: TypeScript with HTML-like tags. The copy exists only for the checker, and your own file stays exactly as you wrote it.
+TSX is the file type TypeScript already understands: TypeScript with HTML-like tags. The copy exists only for the checker, and the error lands on `label` in your own file:
+
+```text
+app.tsrx(4,7): error TS2322: Type 'number' is not assignable to type 'string'.
+```
 
 ## What gets checked
 

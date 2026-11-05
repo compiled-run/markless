@@ -2,8 +2,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import PipelineFigure from '../../components/figures/repo-tour/pipeline-figure.tsrx';
-import FoldersFigure from '../../components/figures/repo-tour/folders-figure.tsrx';
+import TransitMapFigure from '../../components/figures/repo-tour/transit-map-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -14,11 +13,11 @@ import FoldersFigure from '../../components/figures/repo-tour/folders-figure.tsr
 
 <Subtitle text="Most packages form one pipeline: one half reads your .tsrx files before your app runs, and the other half runs the result wherever you pick." />
 
-Press the drawing, and follow `Counter.tsrx` from folder to folder:
+Press the map, and ride `Counter.tsrx` from stop to stop:
 
-<PipelineFigure />
+<TransitMapFigure />
 
-Each folder is a package in `packages/`. The two on top work before your app runs. The three below run the result.
+Each stop is a package in `packages/`. The purple line works before your app runs, and the green line runs the result.
 
 ## Compile time
 
@@ -46,7 +45,8 @@ A server render and a browser render are two phases of one runtime in `web`, so 
 
 ## Everything else
 
-<FoldersFigure />
+- `specs/` holds the behavior contract, `.ruler/` the agent rules and skills, and `docs/` the CI process.
+- `demos/` holds demo apps, `poc/fixtures/proofs/` the proof fixtures, `scripts/` the CI, release and benchmark tools, and `website/` this site.
 
 Start at `specs/framework-design.md`. `CONTRIBUTING.md` lists `goals/`, `dist/` and `.witness/` as local or generated output, so skip them while you read.
 

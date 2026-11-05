@@ -310,6 +310,27 @@ export default function DeskFigure({
 				letter-spacing: 0.12em;
 			}
 
+			.stamp-job {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 8px;
+				letter-spacing: 0.08em;
+				fill: var(--sheet-ink);
+				opacity: 0.85;
+			}
+
+			.barcode {
+				fill: var(--sheet-ink);
+			}
+
+			.tunnel-dark {
+				fill: color-mix(in oklch, var(--sheet-ink) 22%, var(--sheet));
+			}
+
+			.dash {
+				stroke-dasharray: 3 4;
+				stroke-width: 1;
+			}
+
 			.desk-text {
 				fill: var(--ink);
 			}
@@ -391,6 +412,10 @@ export default function DeskFigure({
 			.flash {
 				opacity: 0;
 				animation: var(--flash) var(--for) var(--at) linear both;
+
+				html.dark & {
+					opacity: 0;
+				}
 			}
 
 			.pulse {

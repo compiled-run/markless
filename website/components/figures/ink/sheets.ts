@@ -359,7 +359,7 @@ export function desk(width: number, specs: readonly SheetSpec[], extra: Point3[]
 		path(pathOf(face, true), 'sheet-paper sink', st);
 		path(wash(on(sh, roundRect(u0 + 0.2, v0 + 0.2, u1 - 0.2, v1 - 0.2, 0.3, 3), 0.05), 985 + Math.round(u0), 0.4, 1.4), 'pink-wash sink', st);
 		path(outline(face, { w: 1.3, heavy: 1.3, centre: centreOf(face), seed: 990 + Math.round(u0 * 7) }), 'sheet-ink sink', st);
-		layer.texts.push({ text: label, cls: 'ui bold-ui sink', style: st, matrix: matrixAt(sh, u0 + 0.45, v1 - 0.42) });
+		layer.texts.push({ text: label, cls: 'ui bold-ui', style: '', matrix: matrixAt(sh, u0 + 0.45, v1 - 0.42) });
 	}
 
 	/** A hand-drawn rectangle on a sheet: a box round a block, a slot, a station. */

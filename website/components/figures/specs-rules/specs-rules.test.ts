@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
-import * as specs_folder from './specs-folder.ts';
-import * as ruler_outputs from './ruler-outputs.ts';
+import * as statute_book from './statute-book.ts';
+import * as stamp from './stamp.ts';
 
-const figures = { 'specs-folder': specs_folder, 'ruler-outputs': ruler_outputs };
+const figures = { 'statute-book': statute_book, 'stamp': stamp };
 
 describe('specs-rules figures', () => {
 	for (const [name, figure] of Object.entries(figures)) {

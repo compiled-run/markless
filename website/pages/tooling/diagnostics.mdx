@@ -3,8 +3,8 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import ReadErrorFigure from '../../components/figures/diagnostics/read-error-figure.tsrx';
-import AllowFigure from '../../components/figures/diagnostics/allow-figure.tsrx';
+import CitationFigure from '../../components/figures/diagnostics/citation-figure.tsrx';
+import PermitFigure from '../../components/figures/diagnostics/permit-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -44,11 +44,11 @@ export default function List() @{
 
 ## Read the error line by line
 
-An **error** stops the build. A **warning** shows as a wavy line in your editor, and the build goes on. Press the drawing to read what `npm run build` prints for the list with no key:
+An **error** stops the build. A **warning** shows as a wavy line in your editor, and the build goes on. Press the ticket to read what `npm run build` prints for the list with no key:
 
-<ReadErrorFigure />
+<CitationFigure />
 
-The first line counts the errors in the file. Each error then gets four lines, and the location in line 1 takes you to the code. The fix fits on one line, and line 3 suggested it.
+Each error gets four lines, in this order, and the location in line 1 takes you to the code. The fix fits on one line, and line 3 suggested it.
 
 <MugSpot mood="scared" react="duck" />
 
@@ -56,7 +56,7 @@ The first line counts the errors in the file. Each error then gets four lines, a
 
 If you accept a warning on purpose, write `// markless-allow CODE: reason` on the line above it, or on the same line:
 
-<AllowFigure />
+<PermitFigure />
 
 Break one of the comment's rules, and Markless raises a warning of its own:
 

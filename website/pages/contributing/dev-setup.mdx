@@ -2,7 +2,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import InstallFigure from '../../components/figures/dev-setup/install-figure.tsrx';
+import PegboardFigure from '../../components/figures/dev-setup/pegboard-figure.tsrx';
 import TypecheckFigure from '../../components/figures/dev-setup/typecheck-figure.tsrx';
 
 <SiteNavbar />
@@ -27,13 +27,13 @@ pnpm install
 - **pnpm 10.33.2.** The root `package.json` pins it in `packageManager`, and `corepack enable` picks it up.
 - **git**, and the **`gh`** command line if you ever push to `main`. The `pre-push` hook uses it.
 
-## `pnpm install` turns on the hooks
+## `pnpm install` hangs up every script and the hooks
 
-Press the drawing, and watch where `pnpm install` points git:
+Press the board to run `pnpm install` again:
 
-<InstallFigure />
+<PegboardFigure />
 
-The root `prepare` script sets `core.hooksPath`, so every commit runs lint and CI's fast jobs first.
+The root `prepare` script points git at `.githooks/`, so every commit runs lint and CI's fast jobs first.
 
 Some tests start real browsers. Install the ones CI uses:
 

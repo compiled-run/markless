@@ -3,8 +3,7 @@ import MarkedList from '../../components/docs/marked-list.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import CreateCommandFigure from '../../components/figures/cli/create-command-figure.tsrx';
-import ScriptsFigure from '../../components/figures/cli/scripts-figure.tsrx';
+import QuestionnaireFigure from '../../components/figures/cli/questionnaire-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -15,9 +14,9 @@ import ScriptsFigure from '../../components/figures/cli/scripts-figure.tsrx';
 
 <Subtitle text="create-markless makes a new app in one command. It asks a few questions, or takes flags instead." />
 
-This command makes the `app` starter in `my-app/`, installs its packages, and skips `git init`. Press the drawing to name each part:
+This command makes the `app` starter in `my-app/`, installs its packages, and skips `git init`. Press the card to watch the flags answer the CLI's questions before it asks them:
 
-<CreateCommandFigure />
+<QuestionnaireFigure />
 
 With npm, the flags go after `--`, or npm reads `--yes` as its own option. pnpm, Yarn and Bun pass flags through without it.
 
@@ -77,10 +76,6 @@ The CLI can put a Markless skill file in your coding agent's folder, like `~/.cl
 Add or remove it later with `create-markless agents <add|remove> [--agents <list|none>]`. Cursor's rules apply to every project, so the CLI doesn't write one.
 
 ## Scripts in a new app
-
-Two scripts do most of the work. Press the drawing to see where each one lands:
-
-<ScriptsFigure />
 
 | Script | Runs | What it does |
 | --- | --- | --- |

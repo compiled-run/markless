@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
-import * as allow from './allow.ts';
-import * as readError from './read-error.ts';
+import * as citation from './citation.ts';
+import * as permit from './permit.ts';
 
-const figures = { 'read-error': readError, allow };
+const figures = { 'citation': citation, 'permit': permit };
 
 describe('diagnostics figures', () => {
 	for (const [name, figure] of Object.entries(figures)) {
@@ -15,10 +15,4 @@ describe('diagnostics figures', () => {
 			await expect(frozen(name + '.ts', 'diagnostics.test.ts', figure.drawing())).toMatchFileSnapshot('./' + name + '.art.ts');
 		});
 	}
-
-	it('numbers the four lines of the error', () => {
-		const texts = readError.drawing().layers.flatMap((l) => l.texts.map((t) => t.text));
-		expect(texts.filter((t) => /^[1-4]$/.test(t))).toEqual(['1', '2', '3', '4']);
-		expect(texts).toContain('; key item');
-	});
 });

@@ -1,7 +1,7 @@
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import TypoNotes from '../../components/figures/docs-guide/typo-notes.tsrx';
-import PathUrlFigure from '../../components/figures/docs-guide/path-url-figure.tsrx';
-import PageShapeFigure from '../../components/figures/docs-guide/page-shape-figure.tsrx';
+import GalleyFigure from '../../components/figures/docs-guide/galley-figure.tsrx';
+import ComposingStickFigure from '../../components/figures/docs-guide/composing-stick-figure.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
@@ -26,7 +26,7 @@ Run these from the repo root, after `pnpm install`.
 
 ## A page's path is its address
 
-<PathUrlFigure />
+<GalleyFigure />
 
 A new page also needs its `nav.ts` entry, with a `title`, an `href`, an `icon` and a one-sentence `description`. The rest lives here:
 
@@ -37,7 +37,7 @@ A new page also needs its `nav.ts` entry, with a `title`, an `href`, an `icon` a
 
 ## Every page has the same shape
 
-<PageShapeFigure />
+<ComposingStickFigure />
 
 `time` comes from the formula in `website/README.md`, and `assumes` lists keys from the `concepts` map in `nav.ts`. Write for a reader who has never used a UI framework: short sentences, "you", and everyday examples.
 

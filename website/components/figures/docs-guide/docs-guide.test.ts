@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
-import * as path_url from './path-url.ts';
-import * as page_shape from './page-shape.ts';
+import * as galley from './galley.ts';
+import * as composing_stick from './composing-stick.ts';
 
-const figures = { 'path-url': path_url, 'page-shape': page_shape };
+const figures = { 'galley': galley, 'composing-stick': composing_stick };
 
 describe('docs-guide figures', () => {
 	for (const [name, figure] of Object.entries(figures)) {

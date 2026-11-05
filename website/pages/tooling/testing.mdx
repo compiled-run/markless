@@ -2,8 +2,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import ClickTestFigure from '../../components/figures/testing/click-test-figure.tsrx';
-import TwoWaysFigure from '../../components/figures/testing/two-ways-figure.tsrx';
+import MarionetteFigure from '../../components/figures/testing/marionette-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -14,19 +13,13 @@ import TwoWaysFigure from '../../components/figures/testing/two-ways-figure.tsrx
 
 <Subtitle text="@markless/vitest-browser puts your component in a real browser, and your test clicks it, the way a visitor would." />
 
-A type check never clicks a button. Press the drawing, and watch this test do it:
+A type check never clicks a button. Press the strings, and watch one check press two pages:
 
-<ClickTestFigure />
-
-The test shows `Counter`, clicks it, and waits for the new text.
+<MarionetteFigure />
 
 ## Two ways in
 
-A component can start in the browser, or arrive as HTML from a server. A bug can hide in one way and not the other, so the package gives you both:
-
-<TwoWaysFigure />
-
-`render(Counter)` mounts `Counter` in the browser, the way an app with no server does. `renderSSR(Counter)` renders it to HTML on the test server, then puts that HTML in the page. After that first step, both tests click the same button and read the same text.
+A component can start in the browser, or arrive as HTML from a server. A bug can hide in one way and not the other, so the package gives you both. `render(Counter)` mounts `Counter` in the browser, the way an app with no server does. `renderSSR(Counter)` renders it to HTML on the test server, then puts that HTML in the page. After that first step, both tests click the same button and read the same text.
 
 ## Set it up
 

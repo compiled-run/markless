@@ -1,19 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { frozen } from '../ink/freeze.ts';
-import * as packages from './packages.ts';
+import * as dolls from './dolls.ts';
+
+const figures = { 'dolls': dolls };
 
 describe('reference figures', () => {
-	it('packages draws the same scene twice', () => {
-		expect(JSON.stringify(packages.drawing())).toBe(JSON.stringify(packages.drawing()));
-	});
+	for (const [name, figure] of Object.entries(figures)) {
+		it(name + ' draws the same scene twice', () => {
+			expect(JSON.stringify(figure.drawing())).toBe(JSON.stringify(figure.drawing()));
+		});
 
-	it('packages is frozen', async () => {
-		await expect(frozen('packages.ts', 'reference.test.ts', packages.drawing())).toMatchFileSnapshot('./packages.art.ts');
-	});
-
-	it('names the four installed packages and the five that come along', () => {
-		const texts = packages.drawing().layers.flatMap((l) => l.texts.map((t) => t.text));
-		for (const row of packages.INSTALLED) expect(texts).toContain(packages.MANIFEST[row]);
-		for (const name of packages.INNER) expect(texts).toContain(name);
-	});
+		it(name + ' is frozen', async () => {
+			await expect(frozen(name + '.ts', 'reference.test.ts', figure.drawing())).toMatchFileSnapshot('./' + name + '.art.ts');
+		});
+	}
 });
