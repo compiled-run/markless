@@ -16,6 +16,7 @@ export async function wireArmKeyedRepeats(
 		readonly elementHandles: ElementHandleRegistry;
 		readonly storeHostSubscription: (hostNodeId: string, release: () => void) => void;
 	},
+	rowComponentHost?: import('./fns/row-component-mint.ts').RowComponentMintHost,
 ): Promise<void> {
 	const { primeKeyedRepeatCollections, wireKeyedRepeats } =
 		await import('./resume-keyed-repeats-lazy.ts');
@@ -28,17 +29,20 @@ export async function wireArmKeyedRepeats(
 		elementHandles: host.elementHandles,
 	});
 	for (const record of records)
-		await wireKeyedRepeats({
-			graph: runtime.graph,
-			view: {
-				...runtime.view,
-				keyedRepeats: [record, ...records.filter((each) => each.enclosingRow)],
+		await wireKeyedRepeats(
+			{
+				graph: runtime.graph,
+				view: {
+					...runtime.view,
+					keyedRepeats: [record, ...records.filter((each) => each.enclosingRow)],
+				},
+				elementsByHostId: host.elementsByHostId,
+				events: host.events,
+				storeContainerSubscription: (release) =>
+					host.storeHostSubscription(record.parentHostNodeId, release),
+				renderData: runtime.renderData,
+				pageRepeats: runtime.view.keyedRepeats,
 			},
-			elementsByHostId: host.elementsByHostId,
-			events: host.events,
-			storeContainerSubscription: (release) =>
-				host.storeHostSubscription(record.parentHostNodeId, release),
-			renderData: runtime.renderData,
-			pageRepeats: runtime.view.keyedRepeats,
-		});
+			rowComponentHost,
+		);
 }

@@ -306,12 +306,12 @@ export function createResumeRuntime(
 				);
 				await (
 					await import('./resume-arm-keyed-repeats.ts')
-				).wireArmKeyedRepeats(input, records, {
-					elementsByHostId,
-					events: eventWiring,
-					elementHandles,
-					storeHostSubscription,
-				});
+				).wireArmKeyedRepeats(
+					input,
+					records,
+					{ elementsByHostId, events: eventWiring, elementHandles, storeHostSubscription },
+					{ runtimeInput: input, armRegistrationDeps, installArmEventType, elementsByHostId },
+				);
 			},
 			addBehaviors: behaviors
 				? async (hostNodeId, records) => {

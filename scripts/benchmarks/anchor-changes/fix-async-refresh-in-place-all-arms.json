@@ -1,0 +1,138 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 36,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 26,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 187,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 109,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 14,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 44,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 36,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 26,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 187,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 109,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 14,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 57,
+			"reason": "a refresh updates every @try arm shape in place: nested blocks re-announce their arm range and define runners before their bindings register",
+			"date": "2026-11-05"
+		}
+	]
+}

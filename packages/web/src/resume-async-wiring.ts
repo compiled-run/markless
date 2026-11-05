@@ -195,7 +195,8 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
-						clearBusyUnlessRerun(input.graph, boundary);
+						// After the pass: what updates in place lands with the rest of this flush.
+						void input.graph.flush().then(() => clearBusyUnlessRerun(input.graph, boundary));
 						return result;
 					});
 				},
@@ -344,6 +345,7 @@ export async function settleAsyncBoundaryRange(
 	boundary: ResumeAsyncBoundaryRecord,
 	snapshot: unknown,
 	claim?: () => boolean,
+	rerender?: true,
 ): Promise<DomJournalResult | void> {
 	const status = (snapshot as { readonly status?: unknown } | null)?.status;
 	if (!isSettledStatus(status)) return;
@@ -358,9 +360,10 @@ export async function settleAsyncBoundaryRange(
 			: input.graph.read(boundary.runnerGraphNodeId, ['status']);
 	// A newer run that started while this settle waited or rendered owns the boundary: its own settle commits, and the hold keeps what is shown.
 	if ((await input.settleTracker?.waitOutCommitHold()) === true && runnerStatus() !== status) return;
+	// A refresh over the shown @try arm updates it in place: its bindings, branches, rows and nested blocks follow the graph.
 	if (
 		status === 'fulfilled' &&
-		boundary.refreshesInPlace &&
+		!rerender &&
 		input.commitArm &&
 		(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try
 	) {

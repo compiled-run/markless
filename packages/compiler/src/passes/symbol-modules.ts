@@ -210,6 +210,11 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	);
 
 	const asyncComputedNodeIds = asyncComputedGraphNodeIds(input.semanticGraph);
+	const refreshingGraphNodeIds = new Set(
+		(input.semanticGraph?.graphBindings ?? []).flatMap((binding) =>
+			binding.kind === 'computed' && binding.dependencies?.length ? [binding.id] : [],
+		),
+	);
 	const branchArms = renderBranchArms(input, asyncComputedNodeIds);
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
@@ -246,6 +251,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 							repeatPartCounts: arms.arms.map(
 								(arm) => arm.filter((part) => 'repeat' in part).length,
 							),
+							refreshingGraphNodeIds,
 						})
 					: null;
 				return [

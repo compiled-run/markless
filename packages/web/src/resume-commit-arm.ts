@@ -155,11 +155,7 @@ export function createArmCommitter(
 		const settled = registering.catch(() => undefined);
 		pending.add(settled);
 		const materialized = await registering.finally(() => pending.delete(settled));
-		const shown = update.arm === undefined ? undefined : deps.root.__marklessBranchArms?.get(boundary.id);
-		if (shown) {
-			Object.assign(shown, { arm: update.arm, start: boundary.startAnchor, end: boundary.endAnchor });
-			for (const paint of shown.listeners) paint();
-		}
+		if (update.arm !== undefined) announceArm(deps.root, boundary, update.arm);
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
 }
@@ -481,14 +477,6 @@ export async function registerNestedAsyncBoundaries(
 			);
 		return { ...record, startAnchor, endAnchor };
 	});
-	for (const nested of boundaries) {
-		const armRecords = boundaryArmRecordSet(nested.armRecords);
-		if (armRecords)
-			await registerArmRecordSet(deps, installEventType, nested, {
-				armRecords,
-				...(computed && { computed }),
-			});
-	}
 	const runners = new Map(
 		boundaries.flatMap((nested) =>
 			nested.asyncReads.flatMap((read) =>
@@ -509,6 +497,16 @@ export async function registerNestedAsyncBoundaries(
 				() => graph,
 			),
 		);
+		deps.graphNodeIds?.add?.(record.graphNodeId);
+	}
+	// After the runners: an arm's value bindings read them.
+	for (const nested of boundaries) {
+		const armRecords = boundaryArmRecordSet(nested.armRecords);
+		if (armRecords)
+			await registerArmRecordSet(deps, installEventType, nested, {
+				armRecords,
+				...(computed && { computed }),
+			});
 	}
 	const shown = new Map(
 		(computed ?? []).flatMap(({ async, graphNodeId, snapshot }) =>
@@ -517,7 +515,19 @@ export async function registerNestedAsyncBoundaries(
 				: [],
 		),
 	);
-	for (const nested of boundaries) wiring.add(nested, shown);
+	for (const nested of boundaries) {
+		// A refresh that lands in place commits nothing, so rows written straight into this fresh range follow it now.
+		if (range) announceArm(deps.root, nested, nested.initiallyServedArm);
+		wiring.add(nested, shown);
+	}
+}
+
+// Rows written straight into a boundary arm follow the arm its range shows.
+function announceArm(root: ResumeDomElement, boundary: ResumeArmRange, arm: number): void {
+	const shown = root.__marklessBranchArms?.get(boundary.id);
+	if (!shown) return;
+	Object.assign(shown, { arm, start: boundary.startAnchor, end: boundary.endAnchor });
+	for (const paint of shown.listeners) paint();
 }
 
 // The page comment census restricted to the range, so indexes count from the arm start.

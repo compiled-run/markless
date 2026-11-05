@@ -63,35 +63,30 @@ export default function Page() @{
 	expect(tryRecords?.branches).toBeUndefined();
 });
 
-test('a @try whose values are all wired keeps its elements on refresh; one with a nested construct does not', async () => {
-	const live = await compile(`
+const updateModule = (result: Awaited<ReturnType<typeof compile>>) =>
+	result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update')?.source ?? '';
+
+test('a @try whose value refreshes settles with the records that update it in place; one that never refreshes renders its value', async () => {
+	const refreshing = await compile(`
 import { computed, state } from '@markless/core';
-async function load(n: number) { return [{ sku: 'p', price: n }]; }
+async function load(n: number) { return { title: 't' + n }; }
 export default function Page() @{
 	let round = state(0);
-	const prices = computed(async () => await load(round));
+	const issue = computed(async () => await load(round));
 	<main>
-		<button onClick={() => round++}>reload</button>
-		@try {
-			<table><caption>{prices.length} rows</caption><tbody>
-				@for (const row of prices; key row.sku) { <tr data-sku={row.sku}><td>{row.price}</td></tr> }
-			</tbody></table>
-		} @pending { <p>wait</p> }
+		<button onClick={() => round++}>next</button>
+		@try { <h2>{issue.title}</h2> } @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(live.protocolView.asyncBoundaries[0]?.refreshesInPlace).toBe(true);
-	const branching = await compile(`
-import { computed, state } from '@markless/core';
-async function load(n: number) { return { open: n > 0, title: 't' }; }
+	expect(updateModule(refreshing)).toContain('armRecords: marklessBoundaryRecords[arm]');
+	const fixed = await compile(`
+import { computed } from '@markless/core';
+async function load() { return { title: 't' }; }
 export default function Page() @{
-	let round = state(0);
-	const panel = computed(async () => await load(round));
+	const issue = computed(async () => await load());
 	<main>
-		<button onClick={() => round++}>reload</button>
-		@try {
-			<section>@if (panel.open) { <h2>{panel.title}</h2> } @else { <p>shut</p> }</section>
-		} @pending { <p>wait</p> }
+		@try { <h2>{issue.title}</h2> } @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(branching.protocolView.asyncBoundaries[0]?.refreshesInPlace).toBeUndefined();
+	expect(updateModule(fixed)).not.toContain('armRecords');
 });

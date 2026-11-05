@@ -2933,11 +2933,15 @@ export function App() @{
 				: undefined,
 	};
 	// Fulfilled renders the @try arm from graph reads; rejected renders @catch.
+	// `details` re-runs when `query` changes, so each arm carries the records a refresh updates in place.
 	expect(run({ graph, status: 'fulfilled' })).toEqual({
 		arm: 0,
 		html: '<p>Result: markless</p>',
+		armRecords: expect.objectContaining({ domUpdates: [expect.objectContaining({ hostNodeId: 'h1' })] }),
 	});
-	expect(run({ graph, status: 'rejected' })).toEqual({ arm: 1, html: '<p>Broken</p>' });
+	expect(run({ graph, status: 'rejected' })).toEqual(
+		expect.objectContaining({ arm: 1, html: '<p>Broken</p>' }),
+	);
 });
 
 test('plain-content @try arms keep the cheap parts-based update module (no component machinery)', async () => {

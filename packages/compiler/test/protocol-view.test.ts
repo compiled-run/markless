@@ -262,7 +262,6 @@ test('createProtocolViewPayload links async boundary reads to runner symbols', a
 			id: 'boundary:0',
 			runnerGraphNodeId: 'computed:details',
 			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
-			refreshesInPlace: true,
 			armRecords: [
 				{
 					locators: [{ hostNodeId: 'h1', index: 0, tagName: 'p' }],

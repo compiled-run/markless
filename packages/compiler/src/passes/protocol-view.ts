@@ -137,7 +137,6 @@ export function createProtocolViewPayload(
 					wiredArmRecordSet(input, set, boundary.id, arm, keyedRepeats),
 				),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
-				...refreshesInPlaceField(input, boundary.id, keyedRepeats),
 				startAnchor: {
 					...boundary.startAnchor,
 					index: emittedPairRank(input, boundary.id) * 2,
@@ -593,47 +592,6 @@ function asyncArmField(
 		}
 	}
 	return {};
-}
-
-// A @try whose every value is wired to update in place keeps its elements, and so focus, when a refresh lands.
-function refreshesInPlaceField(
-	input: ProtocolViewPayloadInput,
-	boundaryId: string,
-	keyedRepeats: ReturnType<typeof resumableKeyedRepeats>,
-): { readonly refreshesInPlace?: true } {
-	const data = renderDataOf(input);
-	const tryChunkId = data.boundaries.find((boundary) => boundary.boundaryId === boundaryId)
-		?.armChunkIds.try;
-	const chunk = data.chunks.find((candidate) => candidate.id === tryChunkId);
-	if (!chunk) return {};
-	const hostAt = new Map(chunk.hosts.map((host) => [host.coordinate.path.join(), host.hostNodeId]));
-	const updated = new Set(
-		input.payloadArena.view.domUpdates.map(
-			({ hostNodeId, target }) =>
-				`${hostNodeId}:${target.kind === 'text' ? '' : 'name' in target ? target.name : target.kind}`,
-		),
-	);
-	const live = chunk.slots.every((slot) => {
-		if (slot.kind === 'repeat') {
-			const record = keyedRepeats.find((candidate) => candidate.id === slot.repeatId);
-			return (
-				record !== undefined &&
-				'rowTemplate' in record &&
-				record.rowTemplate !== undefined &&
-				!('rowComponent' in record && record.rowComponent) &&
-				!('branchArm' in record && record.branchArm) &&
-				!slot.emptyTemplateId
-			);
-		}
-		if (slot.kind !== 'text' && slot.kind !== 'attribute') return false;
-		if (slot.residue.kind === 'element-handle-id' || slot.residue.kind === 'element-handle-id-list')
-			return true;
-		const host = hostAt.get(
-			(slot.kind === 'text' ? slot.coordinate.path.slice(0, -1) : slot.coordinate.path).join(),
-		);
-		return host !== undefined && updated.has(`${host}:${slot.kind === 'text' ? '' : slot.name}`);
-	});
-	return live ? { refreshesInPlace: true } : {};
 }
 
 // A nested record's own parent renders once per enclosing row, so it names the outermost
