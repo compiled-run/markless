@@ -158,7 +158,7 @@ export function App() @{
 
 // The wrapper is minted from markup, so a wrapper slot markup cannot finish
 // refuses the whole row rather than shipping a half of each.
-test('a wrapper whose value only rendering produces ships neither half', async () => {
+test('a wrapper whose value the owner reads from page state ships both halves', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
 function shout(value: string) { return String(value).toUpperCase(); }
 function Row({ label }) @{
@@ -170,8 +170,10 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <li data-row={shout(title)}><Row label={row.label} /></li> }</ul>
 }
 `);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowComponent).toMatchObject({ slotPath: [0, 0] });
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.attributeSlots).toEqual([
+		expect.objectContaining({ name: 'data-row', source: 'shout(title)' }),
+	]);
 });
 
 // Two children in one row is two graphs to place, and the record names one.

@@ -80,7 +80,7 @@ export type SsrRenderOutput = {
 	readonly view?: ProtocolViewPayload;
 	readonly structure?: {
 		readonly anchors: ReadonlyArray<{
-			readonly kind: 'branch' | 'async';
+			readonly kind: 'branch' | 'async' | 'arm-branch';
 			readonly id: string;
 			readonly html: string;
 		}>;

@@ -1039,6 +1039,7 @@ function composedBoundaryArmRecords(
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
 	symbolPrefix?: string,
+	renderedBoundaryId?: string,
 ): ResumeArmRecordSet {
 	const exhaustive = {
 		locators: true,
@@ -1052,10 +1053,20 @@ function composedBoundaryArmRecords(
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
 	const local = /(?:boundary|branch-site):[^:]*$/.exec(boundary.id);
-	const prefix = local ? boundary.id.slice(0, local.index) : '';
+	// A helper in the page's own module renders with the page, so its records already carry the path its rendered id holds.
+	const drawn =
+		renderedBoundaryId && boundary.id.endsWith(renderedBoundaryId)
+			? renderedBoundaryId.slice(0, renderedBoundaryId.lastIndexOf('boundary:'))
+			: '';
+	const prefix = local ? boundary.id.slice(0, local.index - drawn.length) : '';
 	if (!prefix) return set;
 	// Host ids take the whole prefix; symbol ids the symbol prefix, which past one level of nesting differs; graph ids its instance-path part.
-	const symbols = symbolPrefix ?? boundary.composedSymbolPrefix ?? prefix;
+	const composedSymbols = boundary.composedSymbolPrefix;
+	const symbols =
+		symbolPrefix ??
+		(composedSymbols?.endsWith(drawn)
+			? composedSymbols.slice(0, composedSymbols.length - drawn.length)
+			: prefix);
 	const instancePath = marklessInstancePath(symbols);
 	const registry = marklessGraphWidgetRegistry(graph);
 	const routes = boundary.composedGraphProps ?? [];

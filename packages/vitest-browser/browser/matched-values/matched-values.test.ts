@@ -59,6 +59,7 @@ function watch(container: HTMLElement, read: Record<string, () => string | null>
 each('UC10: a figure never pairs the old total with the new range', { csr: () => render(Revenue), ssr: () => renderSSR(Revenue) }, async (container) => {
 	await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1000');
 	await expect.poll(() => text(container, '[data-profit]')).toBe('5000');
+	await expect.poll(() => text(container, '[data-inline]')).toBe('1000');
 	hold('revenue:20d', 'costs:20d');
 	const stop = watch(container, {
 		perDay: () => text(container, '[data-per-day]'),

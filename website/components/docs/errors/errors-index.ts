@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 305,
-	guided: 47,
+	total: 304,
+	guided: 46,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -807,11 +807,6 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_TEMPLATE_READ_UNDECLARED',
 					kind: 'compile error',
 					guided: false,
-				},
-				{
-					code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-					kind: 'compile warning',
-					guided: true,
 				},
 				{
 					code: 'MARKLESS_UI_IMPORT_SHAPE',

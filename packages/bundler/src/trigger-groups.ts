@@ -595,7 +595,9 @@ function collectEscalatedArmBranchIds(
 	branchIds: Set<string>,
 ): void {
 	for (const branch of arm.branches ?? []) {
-		if (!branch.symbolId && (branch.testReads?.length ?? 0) > 0) branchIds.add(branch.id);
+		// An escalated record ships no per-arm records: its flip renders the arm, components and all.
+		if ((!branch.symbolId || !branch.armRecords) && (branch.testReads?.length ?? 0) > 0)
+			branchIds.add(branch.id);
 		for (const nested of branch.armRecords ?? [])
 			collectEscalatedArmBranchIds(
 				nested as Parameters<typeof collectEscalatedArmBranchIds>[0],

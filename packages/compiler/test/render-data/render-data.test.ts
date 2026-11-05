@@ -176,7 +176,7 @@ export function App() @{
 	]);
 });
 
-test('renderData keeps a same-file child async chunk visible while the legacy emitter fails loudly', async () => {
+test('renderData keeps a same-file child async chunk visible, and the helper builds', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AsyncChildLandmine.tsrx',
 		source: `
@@ -190,12 +190,9 @@ export function App() @{ <main><Child /></main> }
 		symbols: [],
 	});
 
-	expect(result.symbolModules.diagnostics).toContainEqual(
-		expect.objectContaining({
-			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			severity: 'error',
-		}),
-	);
+	expect(
+		result.symbolModules.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
+	).toEqual([]);
 	expect(result.renderData.chunks).toContainEqual(
 		expect.objectContaining({
 			id: 'async:boundary:0:arm:try',

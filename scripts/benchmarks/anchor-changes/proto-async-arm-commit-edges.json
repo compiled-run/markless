@@ -1,0 +1,94 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 351,
+			"reason": "an @if holding a component inside a @try renders only its own range from the page render, and a same-file helper's @try settles from the instance the page draws it under (23737 -> 24088 B rendered, loaded only by settle and flip renders)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 277,
+			"reason": "an @if inside a @try whose range another commit replaced stops flipping that range (14974 -> 15251 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 288,
+			"reason": "a row wrapping a component patches the wrapper's own slots, and a refreshing collection's rows read the inputs it was fetched with (18975 -> 19263 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 351,
+			"reason": "an @if holding a component inside a @try renders only its own range from the page render, and a same-file helper's @try settles from the instance the page draws it under (23737 -> 24088 B rendered, loaded only by settle and flip renders)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 277,
+			"reason": "an @if inside a @try whose range another commit replaced stops flipping that range (14974 -> 15251 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 288,
+			"reason": "a row wrapping a component patches the wrapper's own slots, and a refreshing collection's rows read the inputs it was fetched with (18975 -> 19263 B rendered)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 51,
+			"reason": "the same three modules, emitted runtime gzip measured on this Mac against b78efbda3 (25328 -> 25379 B)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 42,
+			"reason": "the same three modules, emitted runtime gzip measured on this Mac against b78efbda3 (24815 -> 24857 B)",
+			"date": "2026-11-05"
+		}
+	]
+}

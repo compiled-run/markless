@@ -265,6 +265,8 @@ export type ComposedArmRecordQualifier = ((
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
 	symbolPrefix?: string,
+	/** The id the boundary's render spelled, when it already carries part of the page path. */
+	renderedBoundaryId?: string,
 ) => ResumeArmRecordSet) & {
 	/** The graph a composed part's settle symbol reads, its routed props answered from the caller's nodes. */
 	readonly graph?: (graph: RuntimeGraph, boundary: ComposedBoundary) => RuntimeGraph;

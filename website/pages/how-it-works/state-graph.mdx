@@ -136,7 +136,7 @@ Same result, fewer moving parts: only the text that reads the changed state chan
 <Callout
 	sprite="cross"
 	title="Why did my @if run a component again?"
-	text="An @if or @switch inside @try can hold a component. Then a toggle re-renders the whole @try block and runs the component again. The compiler warns with MARKLESS_TRY_BLOCK_TOGGLE_RERENDER, and the fix it suggests is to move the component outside the @if."
+	text="An @if or @switch can hold a component. Each time that content appears, the browser renders it fresh, so the component starts over and keeps nothing from the last time it was shown. Only the @if's own content is replaced. The compiler warns with MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER, and the fix it suggests is to render the component outside the @if and hide it with an attribute."
 />
 
 Next: [when click code downloads, and when it runs](/how-it-works/lazy-chunks).

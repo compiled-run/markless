@@ -24,9 +24,11 @@ import {
 	refocus,
 	renderEmptyArm,
 	servedEmptyArm,
+	shownRowGraph,
+	slotValue,
 	type RowMintGraph,
 } from './row-mint.ts';
-import { marklessRowSlotReader } from './row-slot-mint.ts';
+import { marklessRowSlotReader, type RowSlotReader } from './row-slot-mint.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS } from '../../../serializer/src/protocol-constants.ts';
 import type {
 	ResumeArmBranchRecord,
@@ -84,6 +86,7 @@ export type RowComponentMintApi = {
 	readonly focusPath: typeof focusPath;
 	readonly refocus: typeof refocus;
 	readonly patchRow: typeof patchRow;
+	readonly shownRowGraph: typeof shownRowGraph;
 	mintRow(
 		parent: ResumeDomElement,
 		repeat: ResumeKeyedRepeatRecord,
@@ -184,6 +187,7 @@ export function marklessRowComponentMint(
 		focusPath,
 		patchRow,
 		refocus,
+		shownRowGraph,
 		mintRow(parent, repeat, item, rowMintGraph, values) {
 			if (!repeat.rowComponent)
 				return mintTemplateRow(parent, repeat, item, rowMintGraph ?? graph, values);
@@ -204,6 +208,7 @@ export function marklessRowComponentMint(
 					rendered = renderedFor(repeat);
 				// A container with no page refuses even when nothing is due yet.
 				if (repeat.rowComponent && rowGraph && rowHost && !renderData) pageSurface(repeat);
+				let wrapperRead: RowSlotReader | undefined;
 				const renderedFrom = (rowKey: unknown) =>
 					rendered.has(rowKey) ? rendered.get(rowKey) : servedItems?.get(rowKey)?.[0];
 				const current = (item: unknown) => {
@@ -217,11 +222,17 @@ export function marklessRowComponentMint(
 					!readKeyedRepeatCollection(rowGraph, repeat).every(current)
 						? marklessThen(pageSurface(repeat), (pageSurfaceValue) =>
 								marklessThen(
-									enclosingWidgetsFor(
-										rowGraph,
-										repeat,
-										parent,
-										rowHost.elementsByHostId,
+									marklessThen(
+										wrapperSlotReader(renderData, repeat, rowGraph),
+										(read) => {
+											wrapperRead = read;
+											return enclosingWidgetsFor(
+												rowGraph,
+												repeat,
+												parent,
+												rowHost.elementsByHostId,
+											);
+										},
 									),
 									(enclosing) => {
 										const items = readKeyedRepeatCollection(rowGraph, repeat);
@@ -240,6 +251,13 @@ export function marklessRowComponentMint(
 												enclosing,
 												loadSymbol: settledSymbol(rowHost.runtimeInput.loadSymbol),
 												registration: rowHost,
+												wrapperValues: wrapperSlotValues(
+													repeat,
+													item,
+													rowIndex,
+													rowGraph,
+													wrapperRead,
+												),
 											};
 											const liveRow = live.get(rowKey);
 											return marklessThen(renderComponentRow(rowInput), (after) => {
@@ -253,6 +271,16 @@ export function marklessRowComponentMint(
 														rendered.set(rowKey, itemCopy(item));
 														if (before && !rowIsStale(parent, repeat, before, after, liveRow))
 															return followRowItem(rowGraph, after);
+														// A wrapped child is built again inside the row it stands in, so the row's own elements and focus stay.
+														const swap =
+															before && repeat.rowComponent?.slotPath
+																? placeMintedChild(rowInput, before, after, liveRow)
+																: undefined;
+														if (swap) {
+															preparedRows.set(rowKey, swap.row);
+															awaitingPlacement.push(swap.place);
+															return;
+														}
 														const row = placeMintedRow(rowInput, after);
 														preparedRows.set(rowKey, row);
 														awaitingPlacement.push(() =>
@@ -398,7 +426,34 @@ type ComponentRowInput = {
 	readonly enclosing: EnclosingWidgets;
 	readonly loadSymbol: (symbolId: string) => unknown;
 	readonly registration: RowRegistration;
+	/** The wrapper's slot values, text slots first, as the repeat runtime reads them. */
+	readonly wrapperValues?: ReadonlyArray<unknown>;
 };
+
+// A wrapper slot that reads page state is answered by the owning component's reader, as a template row's is.
+function wrapperSlotReader(
+	renderData: ResumeRenderDataThunk | undefined,
+	repeat: ResumeKeyedRepeatRecord,
+	graph: RuntimeGraph,
+): Awaitable<RowSlotReader | undefined> {
+	return repeat.rowComponent?.slotPath && repeat.rowTemplate?.componentName
+		? marklessRowSlotReader(renderData, repeat, graph)
+		: undefined;
+}
+
+function wrapperSlotValues(
+	repeat: ResumeKeyedRepeatRecord,
+	item: unknown,
+	index: number,
+	graph: RuntimeGraph,
+	read: RowSlotReader | undefined,
+): ReadonlyArray<unknown> | undefined {
+	if (!read) return undefined;
+	const template = repeat.rowTemplate!;
+	return [...(template.textSlots ?? []), ...(template.attributeSlots ?? [])].map((slot) =>
+		'source' in slot ? read(slot.source, item, index) : slotValue(slot, item, graph),
+	);
+}
 
 type RenderedComponentRow = {
 	readonly rowSegment: string;
@@ -602,13 +657,23 @@ function rowIsStale(
 	};
 	const old = parsed(before),
 		next = parsed(after);
-	// A wrapped row's live root is the wrapper, not the component's own root.
+	const slotPath = repeat.rowComponent?.slotPath;
 	return renderedSitesDiffer(
 		old.root,
 		next.root,
-		repeat.rowComponent?.slotPath ? undefined : (live as ComparableElement),
+		slotPath ? wrappedChildRoot(live, slotPath) : (live as ComparableElement),
 		new Set([...old.repeatParents, ...next.repeatParents]),
 	);
+}
+
+// The child's nodes stand where the wrapper's marker stood, so the marker's path below the row root reaches the child's root.
+function wrappedChildRoot(
+	live: ResumeDomElement,
+	slotPath: ReadonlyArray<number>,
+): ComparableElement | undefined {
+	let node: ResumeDomNode | undefined = live;
+	for (const index of slotPath.slice(1)) node = node?.childNodes?.[index];
+	return node?.nodeType === 1 ? (node as ComparableElement) : undefined;
 }
 
 // A nested @for keeps its own rows current, so the row's own render never decides they are stale.
@@ -860,6 +925,54 @@ function placeMintedRow(input: ComponentRowInput, render: RenderedComponentRow):
 	return row;
 }
 
+// The old child's nodes are the run the marker's place starts, as many as its render made.
+function placeMintedChild(
+	input: ComponentRowInput,
+	before: RenderedComponentRow,
+	after: RenderedComponentRow,
+	liveRow: ResumeDomElement,
+): { readonly row: MintedRow; readonly place: () => void } | undefined {
+	const slotPath = input.repeat.rowComponent!.slotPath!;
+	let holder: ResumeDomNode | undefined = liveRow;
+	for (const index of slotPath.slice(1, -1)) holder = holder?.childNodes?.[index];
+	const from = slotPath.at(-1)!,
+		count = parseRowNodes(input.parent, input.repeat, before.rendered.html).length,
+		outgoing = Array.from(holder?.childNodes ?? []).slice(from, from + count);
+	if (!holder || count === 0 || outgoing.length !== count) return undefined;
+	const { rendered, rowSegment } = after;
+	assertRowWidgetsResolved(input.repeat, rendered.state);
+	const childNodes = parseRowNodes(input.parent, input.repeat, rendered.html);
+	const elementsByHostId = resolveRowHosts(input.repeat, childNodes, rendered.view);
+	const branches = resolveRowBranches(input.repeat, childNodes, rendered.view);
+	const boundaries = resolveRowBoundaries(input.repeat, childNodes, rendered.view);
+	const row: MintedRow = {
+		rowRoot: liveRow,
+		nodes: [liveRow],
+		commit: () =>
+			commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat, {
+				branches,
+				boundaries,
+				rowKey: input.rowKey,
+				rowSegment,
+				outgoing,
+			}),
+	};
+	const place = () => {
+		(outgoing[0] as ReplaceableNode).replaceWith?.(...childNodes);
+		for (const node of outgoing.slice(1)) (node as ReplaceableNode).replaceWith?.();
+		for (
+			let node: ResumeDomElement | null | undefined = input.parent;
+			node;
+			node = node.parentElement
+		)
+			if (node.__marklessCensus) {
+				spliceCensus(node.__marklessCensus, outgoing, childNodes);
+				break;
+			}
+	};
+	return { row, place };
+}
+
 /**
  * The row element the author wrapped the component in, minted and filled.
  *
@@ -874,11 +987,18 @@ function placeInWrapper(
 		readonly repeat: ResumeKeyedRepeatRecord;
 		readonly item: unknown;
 		readonly graph: RuntimeGraph;
+		readonly wrapperValues?: ReadonlyArray<unknown>;
 	},
 	childNodes: ReadonlyArray<ResumeDomNode>,
 	slotPath: ReadonlyArray<number>,
 ): { readonly nodes: ReadonlyArray<ResumeDomNode>; readonly rowRoot: ResumeDomElement } {
-	const wrapper = mintRowNodes(input.parent, input.repeat, input.item, input.graph);
+	const wrapper = mintRowNodes(
+		input.parent,
+		input.repeat,
+		input.item,
+		input.graph,
+		input.wrapperValues,
+	);
 	const marker = nodeAtPath(wrapper.nodes, slotPath) as ReplaceableNode | undefined;
 	if (!marker?.replaceWith || childNodes.length === 0)
 		throw rowComponentError(
@@ -907,6 +1027,8 @@ async function commitMintedRow(
 		readonly rowKey: unknown;
 		readonly rowSegment: string;
 		readonly replaced?: ResumeDomElement;
+		/** A wrapped child built again: the nodes of the one it replaced. */
+		readonly outgoing?: ReadonlyArray<ResumeDomNode>;
 	},
 ): Promise<void> {
 	const armRecords: ResumeArmRecordSet = {
@@ -923,9 +1045,10 @@ async function commitMintedRow(
 	const deps = await registration.armRegistrationDeps(armRecords);
 	// A row built again under its key releases every host its old row registered.
 	const replaced = row.replaced;
-	if (replaced)
-		for (const [hostNodeId, element] of deps.elementsByHostId)
-			if (element === replaced || replaced.contains?.(element)) deps.disposeHost(hostNodeId);
+	const gone = row.outgoing ?? (replaced ? [replaced] : []);
+	for (const [hostNodeId, element] of deps.elementsByHostId)
+		if (gone.some((node) => node === element || (node as ResumeDomElement).contains?.(element)))
+			deps.disposeHost(hostNodeId);
 	await seedMintedGraphNodes(deps, rendered.state);
 	await mergeMintedWidgetRoots(deps, rendered.state, repeat, row.rowSegment);
 	const { registerArmRecordSet, registerNestedAsyncBoundaries } =

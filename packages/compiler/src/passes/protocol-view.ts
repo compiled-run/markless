@@ -649,7 +649,7 @@ function asyncArmField(
 	return {};
 }
 
-// A keyed list in the @try arm whose rows the browser cannot build or patch goes stale in place; a refresh re-renders the arm.
+// Rows the browser cannot build (a row holding two components, or an @if over page state around one) re-render the arm on refresh.
 function rerendersOnRefreshField(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,
@@ -818,13 +818,12 @@ function mintableRowTemplate(
 		return {};
 	const textSlots: Array<RowTemplateTextSlot> = [];
 	const attributeSlots: Array<RowTemplateAttributeSlot> = [];
-	// An expression slot is answered by the owning component's reader, so a row
-	// wrapping a component - rebuilt by that component's render - never takes one.
+	// An expression slot is answered by the owning component's reader, the wrapper of a component row's included.
 	const semanticRepeat = input.semanticGraph?.keyedRepeats.find(
 		(candidate) => candidate.id === render.repeatId,
 	);
 	const expressionScope =
-		!mint && chunk.componentName && input.semanticGraph && semanticRepeat
+		(!mint || mint.slotPath) && chunk.componentName && input.semanticGraph && semanticRepeat
 			? {
 					graph: input.semanticGraph,
 					componentName: chunk.componentName,
@@ -1032,8 +1031,9 @@ function stepsAfterNestedRows(
 	path: ReadonlyArray<number>,
 	text: boolean,
 ): number[] | null {
+	// A component a row wraps renders its own nodes in place of its marker, as nested rows do.
 	const anchors = chunk.slots.flatMap((slot) =>
-		slot.kind === 'repeat' ? [slot.coordinate.path] : [],
+		slot.kind === 'repeat' || slot.kind === 'child-component' ? [slot.coordinate.path] : [],
 	);
 	const fromEnd: number[] = [];
 	for (let depth = 1; depth < path.length - (text ? 1 : 0); depth++) {
@@ -1191,7 +1191,11 @@ function rowComponentMint(
 	const semanticRepeat = input.semanticGraph?.keyedRepeats.find(
 		(candidate) => candidate.id === render.repeatId,
 	);
-	const componentRow = resolveRowComponentMint({ ...rowMintInput, itemName: render.itemName });
+	const componentRow = resolveRowComponentMint({
+		...rowMintInput,
+		itemName: render.itemName,
+		...(semanticRepeat?.indexName ? { indexName: semanticRepeat.indexName } : {}),
+	});
 	if (componentRow) return componentRow;
 	// A rebuilt row loses its elements, so a row a template can patch in place never takes the chunk mint.
 	if (mintableRowTemplate(input, render, null).rowTemplate) return null;
@@ -1420,9 +1424,12 @@ function armScopedBranchHostIds(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,
 ): ReadonlySet<string> {
+	// A branch holding a component carries no records of its own; what its arm shows is the boundary's.
 	return new Set(
 		renderDataOf(input)
-			.branches.filter((branch) => branch.asyncBoundaryId === boundaryId)
+			.branches.filter(
+				(branch) => branch.asyncBoundaryId === boundaryId && branch.update !== 'boundary',
+			)
 			.flatMap((branch) =>
 				branch.armChunkIds.flatMap((chunkId) => hostIdsForChunkTree(input, chunkId)),
 			),
@@ -1472,11 +1479,19 @@ function armScopedBranchRecords(
 			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
 		),
 	);
+	const escalating = escalatingBranchIds(input);
 	return branches.map((branch, rank) =>
 		branch.update === 'boundary'
 			? {
 					id: branch.branchSiteId,
 					testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
+					// A component in the arm runs, so the flip renders its own range from the page.
+					...(escalating.has(branch.branchSiteId) && {
+						symbolId: branchSymbols.get(branch.branchSiteId)?.id,
+						startAnchor: { strategy: 'arm-branch-comment' as const, index: rank * 2 },
+						endAnchor: { strategy: 'arm-branch-comment' as const, index: rank * 2 + 1 },
+						...(branch.armTests && { armTests: branch.armTests }),
+					}),
 				}
 			: {
 					id: branch.branchSiteId,

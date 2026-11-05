@@ -237,8 +237,10 @@ export function wireKeyedRepeats(
 		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
 		const apply = (mint: RowMint | undefined): void => {
 			if (follow && !follow.showing(rowRootsByKey)) return;
+			const graph = mint?.shownRowGraph?.(input.graph, repeat, rowSlotReads(repeat)) ?? input.graph;
+			if (!graph) return;
 			applyKeyedRepeatRowOrder(
-				input.graph,
+				graph,
 				repeat,
 				parent,
 				rowRootsByKey,
@@ -405,11 +407,12 @@ function applyKeyedRepeatRowOrder(
 		const focus =
 			rowRoot &&
 			mint &&
-			!repeat.rowComponent &&
+			(!repeat.rowComponent || repeat.rowComponent.slotPath) &&
 			seen?.some((value, at) => !Object.is(value, values![at])) &&
 			!mint.patchRow?.(rowRoot, repeat, seen, values!, () =>
 				registerRowEvents?.(rowRoot!, rowKey, true),
-			)
+			) &&
+			!repeat.rowComponent
 				? (mint.focusPath?.(rowRoot) ?? [])
 				: undefined;
 		if (focus) rowRoot = undefined;
@@ -580,7 +583,7 @@ function readItemPath(item: unknown, path: ReadonlyArray<string>): unknown {
 	}
 	return cursor;
 }
-type RowSlotReader = (source: string, item: unknown, index: number) => unknown;
+type RowSlotReader = (source: string, item: unknown, index: number, graph?: RepeatReadableGraph) => unknown;
 type RowSlots = {
 	readonly values: Map<unknown, unknown[]>;
 	ready: boolean;
@@ -616,7 +619,7 @@ function rowSlotValues(
 		'itemPath' in slot
 			? readItemPath(item, slot.itemPath)
 			: 'source' in slot
-				? read?.(slot.source, item, index)
+				? read?.(slot.source, item, index, graph)
 				: graph.read(slot.graphNodeId, slot.graphPath),
 	);
 	return slots?.branches ? [...values, ...slots.branches(repeat, item, index, graph, read)] : values;

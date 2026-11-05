@@ -91,8 +91,24 @@ export default function Page() @{
 	expect(updateModule(fixed)).not.toContain('armRecords');
 });
 
-test('a @try whose keyed rows the browser cannot build re-renders on refresh; one with a row template updates in place', async () => {
-	const stale = await compile(`
+test('a @try whose keyed rows hold two components still re-renders on refresh; rows the browser builds update in place', async () => {
+	const twoChildren = await compile(`
+import { computed, state } from '@markless/core';
+async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
+function Tag({ row }: { row: { amount: number } }) @{ <em>{row.amount}</em> }
+function Note({ unit }: { unit: string }) @{ <small>{unit}</small> }
+export default function Page() @{
+	let unit = state('a');
+	const rows = computed(async () => await load(unit));
+	<main>
+		<button onClick={() => (unit = 'b')}>b</button>
+		@try {
+			<ol>@for (const row of rows; key row.sku) { <li><Tag row={row} /><Note unit={unit} /></li> }</ol>
+		} @pending { <p>wait</p> }
+	</main>
+}`);
+	expect(twoChildren.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBe(true);
+	const wrapped = await compile(`
 import { computed, state } from '@markless/core';
 async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
 function Tag({ row, unit }: { row: { amount: number }; unit: string }) @{ <em>{row.amount + unit}</em> }
@@ -106,19 +122,31 @@ export default function Page() @{
 		} @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(stale.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBe(true);
-	const templated = await compile(`
+	expect(wrapped.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBeUndefined();
+});
+
+test('keyed rows in a @try whose child and wrapper read page state are built by the browser', async () => {
+	const result = await compile(`
 import { computed, state } from '@markless/core';
-async function load(n: number) { return [{ sku: 'p', amount: n }]; }
+async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
+function Tag({ row, unit }: { row: { amount: number }; unit: string }) @{ <em>{row.amount + unit}</em> }
 export default function Page() @{
-	let round = state(0);
-	const rows = computed(async () => await load(round));
+	let unit = state('a');
+	const rows = computed(async () => await load(unit));
 	<main>
-		<button onClick={() => round++}>next</button>
+		<button onClick={() => (unit = 'b')}>b</button>
 		@try {
-			<ol>@for (const row of rows; key row.sku) { <li data-sku={row.sku}>{row.amount}</li> }</ol>
+			<ol>@for (const row of rows; key row.sku) { <li><i>{row.amount + unit}</i><Tag row={row} unit={unit} /></li> }</ol>
 		} @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(templated.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBeUndefined();
+	const [repeat] = result.protocolView.keyedRepeats ?? [];
+	expect(repeat?.rowComponent).toMatchObject({ itemPropName: 'row', slotPath: [0, 1] });
+	expect(repeat?.rowTemplate?.textSlots).toEqual([
+		{
+			path: [0, 0, 0],
+			source: 'row.amount + unit',
+			reads: [{ graphNodeId: 'state:unit', path: [] }],
+		},
+	]);
 });

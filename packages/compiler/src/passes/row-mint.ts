@@ -71,6 +71,7 @@ export function resolveRowComponentMint(
 		readonly rowChunkId: string;
 		readonly rowElementCount: number;
 		readonly itemName: string;
+		readonly indexName?: string;
 	},
 ): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
@@ -80,15 +81,21 @@ export function resolveRowComponentMint(
 	const slot = componentSlots[0]!;
 	if (slot.kind !== 'child-component') return null;
 	const wraps = input.rowElementCount > 0;
-	if (wraps) {
-		// The wrapper is minted from markup, so its own slots have to be ones that
-		// markup plus the item can finish - and the child needs a marker to land on.
-		if (slot.coordinate.kind !== 'comment-anchor') return null;
-		if (!chunk.slots.every((candidate) => candidate === slot || mintableSlotValue(candidate) !== null))
-			return null;
-	} else if (chunk.slots.length !== 1) return null;
 	const componentName = chunk.componentName;
 	if (!componentName) return null;
+	if (wraps) {
+		// The wrapper is minted from markup, so its own slots have to be ones that
+		// markup, the item and the owner's reader can finish - and the child needs a marker to land on.
+		if (slot.coordinate.kind !== 'comment-anchor') return null;
+		const rowNames = new Set([input.itemName, ...(input.indexName ? [input.indexName] : [])]);
+		const finishes = (candidate: SemanticMarkupSlot) =>
+			candidate === slot ||
+			mintableSlotValue(candidate) !== null ||
+			(!!input.semanticGraph &&
+				!isLoweredStyleObject(candidate) &&
+				expressionSlotValue(candidate, input.semanticGraph, componentName, rowNames) !== null);
+		if (!chunk.slots.every(finishes)) return null;
+	} else if (chunk.slots.length !== 1) return null;
 	const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
 	if (!edge || edge.parentComponentName !== componentName) return null;
 	if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return null;

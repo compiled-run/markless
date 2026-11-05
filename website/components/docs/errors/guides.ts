@@ -192,11 +192,6 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		how: 'Write `@else`, with the `@` sign.',
 		example: ['@if (open) {', '\t<p>Open</p>', '} @else {', '\t<p>Closed</p>', '}'],
 	},
-	MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: {
-		summary: 'Toggling an @if that holds a component re-renders the whole @try block.',
-		what: 'This `@if` sits inside `@try` and holds a component. When it toggles, Markless renders the whole `@try` block again, not only the `@if`.',
-		how: 'Move the component out of the `@if`. Or keep the `@if` content to plain elements, text, and state reads.',
-	},
 	MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: {
 		summary: 'Several components share a shared() definition that has no scope.',
 		what: 'Several components in one file use the same `shared()` value, and it has no scope. So every copy of the widget on the page shares one value.',

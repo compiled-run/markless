@@ -76,9 +76,9 @@ export default function Totals() @{
 	).toEqual([]);
 });
 
-test('a same-file helper whose @catch reads the error is refused by name', async () => {
-	const diagnostics = collectTsrxModuleDiagnostics(
-		await compile(`
+test('a same-file helper whose @catch reads the error builds', async () => {
+	expect(
+		await errorCodes(`
 import { computed } from '@markless/core';
 async function sum(label: string) { return label.length; }
 function Tally({ label }: { label: string }) @{
@@ -89,11 +89,7 @@ export default function Totals() @{
 	<main><Tally label="rent" /></main>
 }
 `),
-	).filter((diagnostic) => diagnostic.severity === 'error');
-	expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
-		'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-	]);
-	expect(diagnostics[0]?.message).toContain('<Tally> is a helper component in the same file');
+	).toEqual([]);
 });
 
 test('an async recipe reading a prop every caller passes the same constant reads that constant', async () => {

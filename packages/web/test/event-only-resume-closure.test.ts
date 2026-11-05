@@ -132,7 +132,10 @@ const resumeOnDemandEntries = [
 // list: 30,862 -> 31,139 raw, one guard in resume-keyed-repeats.ts; the fixture builds' rendered module stays inside its +128 B budget.
 // 2026-11-05: a row hands its nested repeats the elements its @if arms hold, so a list in an arm wires on every flip:
 // 31,139 -> 31,214 raw, one call in resume-keyed-repeats.ts; the fixture builds re-anchor the rendered module.
-const sourceByteLimit = 31214;
+// 2026-11-05: a row wrapping a component patches its wrapper's slots, and rows read the inputs a refreshing collection was
+// fetched with: 31,214 -> 31,426 raw, in resume-keyed-repeats.ts; minified 10,208 -> 10,308, gzip 4,140 -> 4,173 bytes
+// (rolldown, workspace packages external, same method both sides).
+const sourceByteLimit = 31426;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

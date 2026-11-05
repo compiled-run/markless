@@ -36,7 +36,6 @@ import {
 } from '@markless/serializer';
 import { marklessAttributeValue as attributeText } from '@markless/web/dom-attribute';
 import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
-import { sameModuleChildBoundaryDiagnostics } from './public-render/validation.ts';
 import type { SourceSpan } from '../diagnostics.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
@@ -123,10 +122,7 @@ import { captureSlotFoldsToConstant } from './symbol-resolver.ts';
  * without walking anything.
  */
 export function armEscalationCandidateSiteIds(input: SymbolModulesInput): ReadonlySet<string> {
-	const flippable = (input.renderData?.branches ?? []).some(
-		(branch) => branch.update !== 'boundary',
-	);
-	if (!flippable) return new Set();
+	if (!input.renderData?.branches?.length) return new Set();
 	return new Set(
 		renderBranchArms(
 			input,
@@ -305,7 +301,6 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			...branchArms.diagnostics,
 			...unaddressableElementDiagnostics(input),
 			...foreignScope.diagnostics,
-			...helperBoundaryRerenderDiagnostics(input, boundaryArmsById),
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
 			...sharedResolvingExportedFunctions(input.source).map(
 				sharedInstanceExportedFunctionDiagnostic,
@@ -1446,7 +1441,32 @@ function renderBranchArms(
 		),
 	);
 	for (const branch of renderData.branches ?? []) {
-		if (branch.update === 'boundary' || rowFlipped.has(branch.branchSiteId)) continue;
+		if (rowFlipped.has(branch.branchSiteId)) continue;
+		// A @try arm's branch holding a component flips its own range from a render of the page.
+		if (branch.update === 'boundary') {
+			const symbol =
+				branch.testReads.length > 0
+					? input.symbolResolver.symbols.find(
+							(candidate) =>
+								candidate.kind === 'branch-update' &&
+								candidate.branchSiteId === branch.branchSiteId,
+						)
+					: undefined;
+			if (symbol) {
+				escalationCandidates.push({
+					branchSiteId: branch.branchSiteId,
+					symbolId: symbol.id,
+				});
+				diagnostics.push(
+					branchArmRendersInBrowserDiagnostic(
+						branch,
+						armComponentNames(input, branch).map((name) => ({ detail: `<${name}>` })),
+						symbol.id,
+					),
+				);
+			}
+			continue;
+		}
 		const refusals: ArmRefusal[] = [];
 		const context: ArmPartsContext = {
 			renderData,
@@ -1587,34 +1607,14 @@ function readPropNames(
 
 const BRANCH_ARM_RENDERS_IN_BROWSER_CODE = 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER' as const;
 
-// A boundary whose arms have no compiled markup settles by rendering its module again, which only its root can.
-function helperBoundaryRerenderDiagnostics(
-	input: SymbolModulesInput,
-	boundaryArmsById: ReadonlyMap<string, PublicRenderPlanAsyncBoundaryArms>,
-) {
-	const root = input.renderData?.root?.componentName;
-	if (!input.renderData || !input.source || !root) return [];
-	const helpers = new Set(
-		input.renderData.boundaries.flatMap((boundary) => {
-			if (boundaryArmsById.has(boundary.boundaryId)) return [];
-			const owner = input.renderData!.chunks.find((chunk) =>
-				chunk.slots.some(
-					(slot) => slot.kind === 'async' && slot.boundaryId === boundary.boundaryId,
-				),
-			)?.componentName;
-			return owner && owner !== root ? [owner] : [];
-		}),
-	);
-	if (helpers.size === 0) return [];
-	const ast = parseJavaScriptModule(input.source.source, input.source.filename) as unknown as AnyNode;
-	return sameModuleChildBoundaryDiagnostics(ast, root, input.source.filename, helpers).map(
-		(diagnostic): SymbolModulesDiagnostic => ({
-			...diagnostic,
-			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			phase: 'public-render',
-			passId: 'symbol-modules',
-			artifactKeys: ['renderData', 'symbolModules'],
-		}),
+function armComponentNames(input: SymbolModulesInput, branch: RenderDataBranch): string[] {
+	const edges = input.semanticGraph?.componentEdges ?? [];
+	return branch.armChunkIds.flatMap((chunkId) =>
+		(input.renderData?.chunks.find((chunk) => chunk.id === chunkId)?.slots ?? []).flatMap((slot) =>
+			slot.kind === 'child-component'
+				? (edges.find((edge) => edge.id === slot.componentEdgeId)?.childComponentName ?? [])
+				: [],
+		),
 	);
 }
 

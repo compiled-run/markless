@@ -336,11 +336,13 @@ export async function renderPrerenderBoundary(
 	_status: 'fulfilled' | 'rejected',
 	graph: RuntimeGraph,
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
+	pageBoundaryId?: string,
 ): Promise<{
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	readonly renderedBoundaryId?: string;
 }> {
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
@@ -353,14 +355,22 @@ export async function renderPrerenderBoundary(
 			graph,
 			true,
 			servedPageProps(graph),
-			{ cellIds: freshCellIds },
+			{
+				cellIds: freshCellIds,
+				...(pageBoundaryId && {
+					settling: {
+						boundaryId,
+						ownerPath: pageBoundaryId.slice(0, pageBoundaryId.lastIndexOf(boundaryId)),
+					},
+				}),
+			},
 		);
-		const settled = await settledBoundaryResult(output, boundaryId);
+		const settled = await settledBoundaryResult(output, boundaryId, pageBoundaryId);
 		const cells = freshArmCells(output, freshCellIds);
 		return cells.length > 0 ? { ...settled, cells } : settled;
 	}
 	const output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
-	return settledBoundaryResult(output, boundaryId);
+	return settledBoundaryResult(output, boundaryId, pageBoundaryId);
 }
 
 /**
@@ -399,6 +409,13 @@ export async function renderPrerenderBranch(
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	}
 	const records = await prepareSsrResumeRecords(output);
+	const inArm = armBranchRange(output, records.view, branchSiteId);
+	if (inArm)
+		return {
+			...inArm,
+			computed: records.state.computed,
+			cells: freshArmCells(output, freshCellIds),
+		};
 	const arm = prerenderBranchArm({
 		structure: output.structure,
 		branchSiteId,
@@ -428,6 +445,66 @@ export async function renderPrerenderBranch(
 		computed: records.state.computed,
 		cells: freshArmCells(output, freshCellIds),
 	};
+}
+
+type StructureAnchor = SsrDataStructure['anchors'][number];
+
+// A branch inside a @try arm: its records left the flat streams with that arm's, arm-relative to the @try.
+function armBranchRange(
+	output: SsrRenderOutput,
+	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
+	branchSiteId: string,
+): { readonly html: string; readonly armRecords: ResumeArmRecordSet } | undefined {
+	const anchors = (output.structure as SsrDataStructure | undefined)?.anchors ?? [];
+	const range = anchors.find(
+		(candidate) => candidate.kind === 'arm-branch' && candidate.id === branchSiteId,
+	);
+	if (!range) return undefined;
+	let owner: StructureAnchor | undefined;
+	for (const candidate of anchors)
+		if (
+			candidate.kind === 'async' &&
+			candidate.startIndex < range.startIndex &&
+			candidate.endIndex >= range.endIndex &&
+			candidate.startIndex > (owner?.startIndex ?? -1)
+		)
+			owner = candidate;
+	const served = view.asyncBoundaries.find((boundary) => boundary.id === owner?.id)?.armRecords;
+	if (!owner || !served || Array.isArray(served))
+		throw new Error(`MARKLESS_PRERENDER_BRANCH_MISSING: ${branchSiteId}`);
+	const set = served as ResumeArmRecordSet;
+	const arm = prerenderBranchArm({
+		structure: { anchors: [{ ...range, kind: 'branch' }] },
+		branchSiteId,
+		view: {
+			...set,
+			locators: set.locators.map((locator) => ({
+				...locator,
+				index: locator.index + owner.elementStart,
+			})),
+		},
+	});
+	const nested = view.asyncBoundaries
+		.filter(
+			(boundary) =>
+				boundary.startAnchor.index >= range.startIndex &&
+				boundary.endAnchor.index < range.endIndex,
+		)
+		.map(({ armRecords: own, ...boundary }) => ({
+			...boundary,
+			...(own && !Array.isArray(own) && { armRecords: own as ResumeArmRecordSet }),
+			startAnchor: {
+				...boundary.startAnchor,
+				index: boundary.startAnchor.index - range.startIndex,
+			},
+			endAnchor: {
+				...boundary.endAnchor,
+				index: boundary.endAnchor.index - range.startIndex,
+			},
+		}));
+	return nested.length > 0
+		? { ...arm, armRecords: { ...arm.armRecords, asyncBoundaries: nested } }
+		: arm;
 }
 
 // @try blocks inside a range, re-addressed from its start anchor so the commit can wire them.
@@ -510,7 +587,11 @@ async function evaluatePrerenderDataSurface(
 	graph: RuntimeGraph | undefined,
 	requireHtml: boolean,
 	props: Readonly<Record<string, unknown>> = {},
-	fresh?: { readonly branchSiteId?: string; readonly cellIds: Set<string> },
+	fresh?: {
+		readonly branchSiteId?: string;
+		readonly cellIds: Set<string>;
+		readonly settling?: PrerenderSettling;
+	},
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName = branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
@@ -529,6 +610,7 @@ async function evaluatePrerenderDataSurface(
 		sharedSeeds,
 		...(fresh?.branchSiteId ? { freshBranchSiteId: fresh.branchSiteId } : {}),
 		...(fresh ? { freshCellIds: fresh.cellIds, mountedInstances: mountedNow } : {}),
+		...(fresh?.settling && { settling: fresh.settling }),
 	});
 	if (fresh && graph) mountedInstances.set(graph, mountedNow);
 	// A count is asked before the members it counts have rendered, so the page
@@ -673,6 +755,22 @@ function marklessChildNotYetLive(
 	return ids.length > 0 && ids.every((id) => graph.read(instancePrefix + id) === undefined);
 }
 
+// The boundary a settle renders, and the page path of the instance holding it.
+type PrerenderSettling = { readonly boundaryId: string; readonly ownerPath: string };
+
+// Only what renders inside the settling boundary can be new: everything else the render passes is on the page.
+function settlesInside(
+	settling: PrerenderSettling | undefined,
+	edge: { readonly asyncBoundaryId?: string },
+	parentPath: string,
+): boolean {
+	return (
+		!settling ||
+		(edge.asyncBoundaryId === settling.boundaryId &&
+			(!parentPath || settling.ownerPath.endsWith(parentPath)))
+	);
+}
+
 // The cells this component declares, as against the module's whole list: the
 // producer hands every component in a module all of them.
 function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayload['cells'] {
@@ -734,6 +832,7 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly freshInstance?: true;
 	readonly freshCellIds?: Set<string>;
 	readonly mountedInstances?: Set<string>;
+	readonly settling?: PrerenderSettling;
 	// The branch site whose arm this render brings in, forwarded to the renderer
 	// so it can mark that arm's subtree.
 	readonly freshBranchSiteId?: string;
@@ -1334,13 +1433,15 @@ export function evaluatePrerenderDataComponent(input: {
 									),
 									...(input.freshInstance ||
 									context.freshInstances ||
-									marklessChildNotYetLive(
+									(marklessChildNotYetLive(
 										input.freshCellIds && input.graph,
 										childSurface.components[edge.childComponentName],
 										input.symbolPrefix + symbolPrefix,
-									)
+									) &&
+										settlesInside(input.settling, edge, input.symbolPrefix))
 										? { freshInstance: true as const }
 										: {}),
+									...(input.settling && { settling: input.settling }),
 									...(input.freshCellIds
 										? { freshCellIds: input.freshCellIds }
 										: {}),
@@ -1450,11 +1551,24 @@ function runnerError(
 			return runnerError(next, computed, visited);
 }
 
-async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {
+// A helper component in the page's own module renders under its instance path, so its boundary is the one the page id ends with.
+async function settledBoundaryResult(
+	output: SsrRenderOutput,
+	moduleBoundaryId: string,
+	pageBoundaryId?: string,
+) {
 	const records = await prepareSsrResumeRecords(output);
-	const anchor = output.structure?.anchors.find(
-		(candidate) => candidate.kind === 'async' && candidate.id === boundaryId,
-	);
+	let anchor: NonNullable<SsrRenderOutput['structure']>['anchors'][number] | undefined;
+	for (const candidate of output.structure?.anchors ?? [])
+		if (
+			candidate.kind === 'async' &&
+			(candidate.id === moduleBoundaryId ||
+				(!!pageBoundaryId?.endsWith(candidate.id) &&
+					candidate.id.endsWith(`:${moduleBoundaryId}`))) &&
+			candidate.id.length > (anchor?.id.length ?? -1)
+		)
+			anchor = candidate;
+	const boundaryId = anchor?.id ?? moduleBoundaryId;
 	const boundary = records.view.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
 	const armRecords = boundary?.armRecords;
 	if (!anchor || !armRecords || Array.isArray(armRecords)) {
@@ -1467,6 +1581,7 @@ async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string
 		html: anchor.html,
 		armRecords: nested.length > 0 ? { ...set, asyncBoundaries: nested } : set,
 		computed: records.state.computed,
+		...(boundaryId !== moduleBoundaryId && { renderedBoundaryId: boundaryId }),
 	};
 }
 

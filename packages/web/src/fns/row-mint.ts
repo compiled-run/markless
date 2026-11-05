@@ -339,6 +339,19 @@ function focusAt(row: ResumeDomElement, path: ReadonlyArray<number>): boolean {
 }
 
 // A slot value when the repeat runtime handed none; a write to what it reads rebuilds the row.
+// While the collection refreshes, its rows read the inputs it was fetched with as the rows on screen show them; false holds them.
+export function shownRowGraph(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
+): RuntimeGraph | false {
+	const read = graph.shownRead?.([
+		{ graphNodeId: repeat.collectionGraphNodeId!, path: repeat.collectionPath },
+		...reads,
+	]);
+	return read === false ? false : read ? { ...graph, read } : graph;
+}
+
 export function slotValue(
 	slot: ProtocolRowTemplateSlotValue,
 	item: unknown,

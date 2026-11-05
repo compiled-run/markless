@@ -58,6 +58,7 @@ export async function renderPrerenderBoundary(
 	status: 'fulfilled' | 'rejected',
 	graph: { readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown },
 	propsOrLoadSymbol?: unknown,
+	pageBoundaryId?: string,
 ) {
 	if (isPrerenderDataSurface(page)) {
 		try {
@@ -86,6 +87,7 @@ export async function renderPrerenderBoundary(
 		status,
 		graph as never,
 		propsOrLoadSymbol,
+		pageBoundaryId,
 	);
 }
 

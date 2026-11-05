@@ -1,6 +1,5 @@
 import { parseModule } from '../../js-ast.ts';
-import { childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
-import { getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
+import { type AnyNode } from '../../ast/nodes.ts';
 import type {
 	PublicRenderPlanArtifact,
 	PublicRenderPlanInput,
@@ -9,7 +8,7 @@ import { collectModuleStyleScopes, collectStylesheetImports } from './style-scop
 import { moduleIdOf } from '../../module-id.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
 import { resolveBoundaryRunners } from './boundary-runner.ts';
-import { gatePlanDisagreementDiagnostic, tryBlockToggleRerenderDiagnostic } from './diagnostics.ts';
+import { gatePlanDisagreementDiagnostic } from './diagnostics.ts';
 import {
 	collectChildrenOpacityDiagnostics,
 	collectRepeatBindingConflictDiagnostics,
@@ -102,28 +101,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			];
 		},
 	);
-	const branchNodes: AnyNode[] = [];
-	walkNode(selectedRoot.root, (node) => {
-		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression')
-			branchNodes.push(node);
-	});
-	const armEscalationDiagnostics = input.semanticGraph.branchSites.flatMap((site, index) => {
-		if (!site.asyncBoundaryId) return [];
-		const branchNode = branchNodes[index];
-		const containsComponent = input.semanticGraph.markup.chunks
-			.filter((chunk) => chunk.id.startsWith(`branch:${site.id}:arm:`))
-			.some((chunk) => chunk.slots.some((slot) => slot.kind === 'child-component'));
-		const componentName = branchNode ? firstComponentName(branchNode) : null;
-		if (!branchNode || !containsComponent || !componentName) return [];
-		return [
-			tryBlockToggleRerenderDiagnostic({
-				branchLabel: site.kind === 'switch' ? '@switch' : '@if',
-				componentName,
-				node: branchNode,
-				filename: input.source.filename,
-			}),
-		];
-	});
 	const rowMintDiagnostics = collectKeyedRepeatRowMintDiagnostics({
 		...payloadRecordHosts(input.payloadArena.view),
 		root: ast,
@@ -143,22 +120,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			...collectUnsupportedConstructDiagnostics(selectedRoot.root, input.source.filename),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...boundaryRunnerDiagnostics,
-			...armEscalationDiagnostics,
 			...rowMintDiagnostics,
 		],
 	};
-}
-
-function firstComponentName(node: AnyNode): string | null {
-	if (node.type === 'Element' || node.type === 'JSXElement') {
-		const tagName = getElementTagName(node);
-		if (tagName && !isHostTagName(tagName)) return tagName;
-	}
-	for (const child of childNodes(node)) {
-		const found = firstComponentName(child);
-		if (found) return found;
-	}
-	return null;
 }
 
 export { firstComponentRoot, selectPublicRenderRoot } from './template.ts';

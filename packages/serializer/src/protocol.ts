@@ -801,7 +801,7 @@ export type ProtocolViewPayload = {
 		readonly runnerGraphNodeId: string | null;
 		readonly initiallyServedArm: ProtocolAsyncBoundaryArm;
 		readonly updateSymbolId?: string;
-		/** The @try arm holds keyed rows the browser cannot rebuild, so a refresh that lands re-renders the arm. */
+		/** The @try arm holds keyed rows the browser cannot build, so a refresh that lands re-renders the arm. */
 		readonly rerendersOnRefresh?: true;
 		// A single set is the armized truth for the arm the render actually
 		// served (SSR compose / arm-render modules); an array is the compiler's

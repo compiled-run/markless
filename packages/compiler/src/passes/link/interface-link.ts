@@ -296,7 +296,7 @@ function linkedRenderDataBoundarySymbolSource(input: {
 	return [
 		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBoundary'),
 		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol);`,
+		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol, context.asyncBoundary?.id);`,
 		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
 		'}',
 	].join('\n');

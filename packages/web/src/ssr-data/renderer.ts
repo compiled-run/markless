@@ -201,7 +201,8 @@ export type SsrDataStructure = {
 		readonly index: number;
 	}>;
 	readonly anchors: ReadonlyArray<{
-		readonly kind: 'branch' | 'async';
+		// An arm-branch's comment indexes count only the page's comments around it.
+		readonly kind: 'branch' | 'async' | 'arm-branch';
 		readonly id: string;
 		readonly startIndex: number;
 		readonly endIndex: number;
@@ -1039,7 +1040,6 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 		}
 		// Arm-branch comments live in their owning boundary's local census.
 		// Page-level anchor indexes deliberately do not count them.
-		if (token.anchorKind === 'arm-branch') continue;
 		if (token.edge === 'start')
 			starts.set(token.anchorId, {
 				comment: commentIndex,
@@ -1060,7 +1060,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 				html: start.html,
 			});
 		}
-		commentIndex++;
+		if (token.anchorKind !== 'arm-branch') commentIndex++;
 	}
 	return { locators, anchors, elementCount };
 }

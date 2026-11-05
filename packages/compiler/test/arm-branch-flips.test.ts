@@ -130,7 +130,7 @@ test('the arm-scoped flip module rebuilds the range from parts + repeat rows, no
 	expect(result.publicRenderModule.ssrModuleSource).not.toContain('marklessSsrHostLocators');
 });
 
-test('an @if containing a component escalates to the whole @try re-render AND diagnoses in author words', async () => {
+test('an @if containing a component flips its own range from a render AND says so in author words', async () => {
 	const childSource = `export function Panel({ label }) @{ <em class="panel">{label}</em> }`;
 	const child = await compileTsrxModule({
 		filename: 'src/Panel.tsrx',
@@ -172,31 +172,33 @@ export function App() @{
 
 	// D2: escalation is never silent — and D4: the message speaks the author's
 	// words, never arm/tier/anchor/boundary vocabulary.
-	const diagnostic = result.publicRenderPlan.diagnostics.find(
-		(candidate) => candidate.code === 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
+	expect(
+		result.publicRenderPlan.diagnostics.some(
+			(candidate) => candidate.code === 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
+		),
+	).toBe(false);
+	const diagnostic = result.symbolModules.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
 	);
-	expect(diagnostic).toBeDefined();
 	expect(diagnostic?.severity).toBe('warning');
-	expect(diagnostic?.message).toBe(
-		'this @if contains <Panel>, so toggling it re-renders the whole @try block — move the component outside the @if to keep the toggle cheap.',
-	);
-	for (const banned of ['arm', 'tier', 'anchor', 'boundary']) {
-		expect(diagnostic?.message.toLowerCase()).not.toContain(banned);
-		expect(diagnostic?.suggestions[0]?.message.toLowerCase() ?? '').not.toContain(banned);
-	}
+	expect(diagnostic?.message).toContain('by running <Panel>');
+	for (const banned of ['arm', 'tier', 'anchor', 'boundary'])
+		expect(diagnostic?.message.toLowerCase()).not.toMatch(new RegExp(`\\b${banned}\\b`));
 
-	// The toggle still WORKS: the boundary's own update module re-renders the
-	// arm, so the record ships test reads that route through that path.
+	// The toggle replaces only the @if's own range: the record ships the flip
+	// symbol and its anchor pair inside the @try content.
 	const record = result.protocolView.asyncBoundaries[0]?.armRecords?.[0]?.branches?.[0];
 	expect(record).toEqual(
 		expect.objectContaining({
 			id: 'branch-site:0',
 			testReads: [expect.objectContaining({ graphNodeId: 'state:detailsOpen' })],
+			startAnchor: { strategy: 'arm-branch-comment', index: 0 },
+			endAnchor: { strategy: 'arm-branch-comment', index: 1 },
 		}),
 	);
-	expect(record?.symbolId).toBeUndefined();
-	expect(record?.startAnchor).toBeUndefined();
-	expect(result.protocolView.asyncBoundaries[0]?.updateSymbolId).toBeDefined();
+	expect(result.symbolModules.armEscalationCandidates).toEqual([
+		{ branchSiteId: 'branch-site:0', symbolId: record?.symbolId },
+	]);
 });
 
 // U-K: at page level there is no @try to escalate to, so a component inside an

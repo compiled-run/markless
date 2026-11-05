@@ -17,7 +17,7 @@ type LocatorRecord = {
 // built-page structure carries markup alone, and an arm cannot be addressed
 // from that.
 type BranchRangeAnchor = {
-	readonly kind: 'branch' | 'async';
+	readonly kind: 'branch' | 'async' | 'arm-branch';
 	readonly id: string;
 	readonly html: string;
 	readonly elementStart?: number;

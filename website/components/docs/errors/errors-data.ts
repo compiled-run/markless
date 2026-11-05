@@ -6119,6 +6119,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				file: 'packages/web/src/prerender/branch-arm.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/prerender/branch-arm.ts',
 			},
+			{
+				id: 'f1',
+				file: 'packages/web/src/prerender/evaluator.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/prerender/evaluator.ts',
+			},
 		],
 		moreSources: 0,
 	},
@@ -6570,11 +6575,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
-			},
-			{
-				id: 'f1',
-				file: 'packages/compiler/src/passes/symbol-modules.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/symbol-modules.ts',
 			},
 		],
 		moreSources: 0,
@@ -11472,110 +11472,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/web/src/fns/update-text.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/update-text.ts',
-			},
-		],
-		moreSources: 0,
-	},
-	{
-		code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-		packageName: '@markless/compiler',
-		stage: 'compile',
-		severity: 'warning',
-		description: 'Toggling an @if that holds a component re-renders the whole @try block.',
-		printed: [
-			'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: Toggling this <branchLabel> re-renders the whole @try block',
-			'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
-			'Move the component outside the <branchLabel>, or keep the <branchLabel> content to plain elements, text, and state reads.',
-			'https://markless.dev/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-		],
-		structured: true,
-		guide: {
-			summary: 'Toggling an @if that holds a component re-renders the whole @try block.',
-			what: [
-				{
-					id: 's0',
-					text: 'This ',
-				},
-				{
-					id: 's1',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's2',
-					text: ' sits inside ',
-				},
-				{
-					id: 's3',
-					text: '@try',
-					code: true,
-				},
-				{
-					id: 's4',
-					text: ' and holds a component. When it toggles, Markless renders the whole ',
-				},
-				{
-					id: 's5',
-					text: '@try',
-					code: true,
-				},
-				{
-					id: 's6',
-					text: ' block again, not only the ',
-				},
-				{
-					id: 's7',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's8',
-					text: '.',
-				},
-			],
-			how: [
-				{
-					id: 's0',
-					text: 'Move the component out of the ',
-				},
-				{
-					id: 's1',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's2',
-					text: '. Or keep the ',
-				},
-				{
-					id: 's3',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's4',
-					text: ' content to plain elements, text, and state reads.',
-				},
-			],
-			example: [],
-		},
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
-		sources: [
-			{
-				id: 'f0',
-				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
 			},
 		],
 		moreSources: 0,

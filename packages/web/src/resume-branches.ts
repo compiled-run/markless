@@ -208,6 +208,9 @@ function createBranchRegistration(
 					graphNodeId: read.graphNodeId,
 					path: read.path,
 					async run() {
+						// An arm another commit replaced took this flip's range with it; that commit wired its own.
+						if (branch.armBoundaryId && detached(input.root, branch.startAnchor))
+							return release();
 						// Hold the prior arm while the deciding async computed re-runs (the branch's only test read).
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
 						const arm = branch.testReads.length
@@ -317,6 +320,14 @@ function announceArm(root: ResumeDomElement, branch: ResumeBranchRecord, arm: nu
 		Object.assign(shown, { arm, start: branch.startAnchor, end: branch.endAnchor }),
 	);
 	for (const paint of shown.listeners) paint();
+}
+
+// A removed ancestor ends the parent chain short of the root; a host without parent links counts as attached.
+function detached(root: unknown, node: unknown): boolean {
+	type Linked = { readonly parentNode?: Linked | null };
+	for (let at = node as Linked | null | undefined; at; at = at.parentNode)
+		if (at === root || at.parentNode === undefined) return false;
+	return !!node;
 }
 
 function onceRelease(release: () => void): () => void {
