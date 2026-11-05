@@ -12,6 +12,13 @@ export default function GalleryAnatomy() @{
 	let last = state('');
 	let hover = state('');
 	let touched = state(false);
+	const caption = computed(() =>
+		hover === 'share'
+			? (ranShare ? 'share.js: downloaded at load, ran on this click' : 'share.js: downloaded at load, not run yet')
+			: hover.startsWith('p')
+				? (ranOpen ? 'open-photo.js: downloaded at load, ran on click' : 'open-photo.js: downloaded at load, not run yet')
+				: 'Hover a photo or Share, then press it.',
+	);
 	const said = computed(() => describeGallery({ open: ranOpen, share: ranShare }, shown, last));
 	const open = (i: number) => {
 		shown = i;
@@ -98,7 +105,6 @@ export default function GalleryAnatomy() @{
 							<text class={words.cls} transform={words.matrix}>{words.text}</text>
 						}
 					</g>
-					<text class="obj-label" x={art.thumbs[0]!.label[0]} y={art.thumbs[0]!.label[1]}>{ranOpen ? 'its code ran' : 'code here, not run'}</text>
 				</g>
 				<g class="large" data-shown={shown === 0 ? 'yes' : 'no'}>
 					@for (const layer of art.large[0]!.art.layers; key layer.key) {
@@ -127,7 +133,6 @@ export default function GalleryAnatomy() @{
 							<text class={words.cls} transform={words.matrix}>{words.text}</text>
 						}
 					</g>
-					<text class="obj-label" x={art.thumbs[1]!.label[0]} y={art.thumbs[1]!.label[1]}>{ranOpen ? 'its code ran' : 'code here, not run'}</text>
 				</g>
 				<g class="large" data-shown={shown === 1 ? 'yes' : 'no'}>
 					@for (const layer of art.large[1]!.art.layers; key layer.key) {
@@ -156,7 +161,6 @@ export default function GalleryAnatomy() @{
 							<text class={words.cls} transform={words.matrix}>{words.text}</text>
 						}
 					</g>
-					<text class="obj-label" x={art.thumbs[2]!.label[0]} y={art.thumbs[2]!.label[1]}>{ranOpen ? 'its code ran' : 'code here, not run'}</text>
 				</g>
 				<g class="large" data-shown={shown === 2 ? 'yes' : 'no'}>
 					@for (const layer of art.large[2]!.art.layers; key layer.key) {
@@ -184,7 +188,6 @@ export default function GalleryAnatomy() @{
 							<text class={words.cls} transform={words.matrix}>{words.text}</text>
 						}
 					</g>
-					<text class="obj-label" x={art.share.label[0]} y={art.share.label[1]}>{ranShare ? 'ran' : 'not run'}</text>
 				</g>
 				<g class="row" data-ran={'yes'} data-fresh={fresh === 'page' ? 'yes' : 'no'}>
 					<g class="row-spot">
@@ -211,6 +214,7 @@ export default function GalleryAnatomy() @{
 				<text class="note" x={art.note.x} y={art.note.y}>DOWNLOADED EARLY, RUN ON CLICK</text>
 			</svg>
 		</button>
+		<p class="hover-caption" aria-hidden="true">{caption}</p>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a photo gallery in a browser window, with three photos and a Share button, beside a network panel. The
 			panel lists photos.html, open-photo.js and share.js: all three arrived when the page loaded, and only the page has run. Press a
@@ -407,6 +411,15 @@ export default function GalleryAnatomy() @{
 				font-size: 4.4px;
 				font-variation-settings: 'MONO' 1;
 				fill: var(--sheet-ink);
+			}
+
+			.hover-caption {
+				margin: 0.3rem 0 0;
+				min-height: 1.4em;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 0.95rem;
+				text-align: center;
+				color: var(--ink);
 			}
 
 			.hit {

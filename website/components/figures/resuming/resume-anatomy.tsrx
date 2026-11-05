@@ -26,6 +26,12 @@ export default function ResumeAnatomy() @{
 	const bkPlace = computed(() => placeOf(art.squares, 'bk', bkSq, held === 'bk' ? dragX : 0, held === 'bk' ? dragY : 0));
 	const wpPlace = computed(() => placeOf(art.squares, 'wp', wpSq, held === 'wp' ? dragX : 0, held === 'wp' ? dragY : 0));
 	const wnPlace = computed(() => placeOf(art.squares, 'wn', wnSq, held === 'wn' ? dragX : 0, held === 'wn' ? dragY : 0));
+	const caption = computed(() => {
+		const id = held || hover;
+		if (!id) return 'Hover a piece, drag it, or press the board for the next move.';
+		const name = id === 'bk' ? 'black king' : id === 'wp' ? 'white pawn' : 'white knight';
+		return name + ' on ' + (id === 'bk' ? bkSq : id === 'wp' ? wpSq : wnSq);
+	});
 	const lines = computed(() => sheetLines(notes, 4));
 	const fresh = computed(() => (notes.length > 0 ? 'yes' : 'no'));
 
@@ -59,7 +65,7 @@ export default function ResumeAnatomy() @{
 		fromY = event.clientY;
 		dragX = 0;
 		dragY = 0;
-		const box = (event.currentTarget as Element).getBoundingClientRect();
+		const box = (event.target as Element | null)?.closest?.('svg')?.getBoundingClientRect();
 		ratio = box && box.width > 0 ? art.width / box.width : 1;
 	};
 
@@ -89,11 +95,7 @@ export default function ResumeAnatomy() @{
 			aria-label="Chess board. Press for the next move; arrow keys move the chosen piece; 1, 2 and 3 choose a piece."
 			onClick={() => {
 				if (Date.now() - dropped < 400) return;
-				if (hover) {
-					touched = true;
-					picked = hover;
-					return;
-				}
+
 				touched = true;
 				const to = nextMove({ bk: bkSq, wp: wpSq, wn: wnSq });
 				if (to) play('wn', to);
@@ -115,10 +117,14 @@ export default function ResumeAnatomy() @{
 				viewBox={'0 0 ' + art.width + ' ' + art.height}
 				aria-hidden="true"
 				onPointerdown={(event) => {
-					if (hover) grab(hover, event);
+					const id = (event.target as Element | null)?.closest?.('[data-piece]')?.getAttribute('data-piece');
+					if (id) grab(id, event);
 				}}
 				onPointermove={(event) => {
-					if (!held && event.buttons === 1 && hover) grab(hover, event);
+					if (!held && event.buttons === 1) {
+						const id = (event.target as Element | null)?.closest?.('[data-piece]')?.getAttribute('data-piece');
+						if (id) grab(id, event);
+					}
 					if (!held) return;
 					dragX = (event.clientX - fromX) * ratio;
 					dragY = (event.clientY - fromY) * ratio;
@@ -168,6 +174,7 @@ export default function ResumeAnatomy() @{
 
 				<g
 					class="piece"
+					data-piece="bk"
 					data-hover={hover === 'bk' ? 'yes' : 'no'}
 					data-held={held === 'bk' ? 'yes' : 'no'}
 					data-picked={picked === 'bk' && touched ? 'yes' : 'no'}
@@ -187,10 +194,10 @@ export default function ResumeAnatomy() @{
 						<path class="tone" d={BK.topTone} />
 						<path class="ink" d={BK.topInk} />
 					</g>
-					<text class="square-label" x={art.squares[START.bk]![0] + 16} y={art.squares[START.bk]![1] + 4}>{bkSq}</text>
 				</g>
 				<g
 					class="piece"
+					data-piece="wp"
 					data-hover={hover === 'wp' ? 'yes' : 'no'}
 					data-held={held === 'wp' ? 'yes' : 'no'}
 					data-picked={picked === 'wp' && touched ? 'yes' : 'no'}
@@ -210,10 +217,10 @@ export default function ResumeAnatomy() @{
 						<path class="tone" d={WP.topTone} />
 						<path class="ink" d={WP.topInk} />
 					</g>
-					<text class="square-label" x={art.squares[START.wp]![0] + 16} y={art.squares[START.wp]![1] + 4}>{wpSq}</text>
 				</g>
 				<g
 					class="piece"
+					data-piece="wn"
 					data-hover={hover === 'wn' ? 'yes' : 'no'}
 					data-held={held === 'wn' ? 'yes' : 'no'}
 					data-picked={picked === 'wn' && touched ? 'yes' : 'no'}
@@ -233,13 +240,13 @@ export default function ResumeAnatomy() @{
 						<path class="tone" d={WN.topTone} />
 						<path class="ink" d={WN.topInk} />
 					</g>
-					<text class="square-label" x={art.squares[START.wn]![0] + 16} y={art.squares[START.wn]![1] + 4}>{wnSq}</text>
 				</g>
 
 				<path class="desk-ink" d={art.note.arrow} />
 				<text class="hand" x={art.note.x} y={art.note.y}>LEFT MID-GAME</text>
 			</svg>
 		</button>
+		<p class="hover-caption" aria-hidden="true">{caption}</p>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a chess board on a desk, left mid-game with three pieces: a black king on g8, a white pawn on e4 and a
 			white knight on f3, with a blank score sheet beside it. Press the board, or Enter or Space, for the next move: only the
@@ -440,6 +447,15 @@ export default function ResumeAnatomy() @{
 			.piece[data-held='yes'] .cast {
 				transform: translate(7px, 3px);
 				opacity: 0.7;
+			}
+
+			.hover-caption {
+				margin: 0.3rem 0 0;
+				min-height: 1.4em;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 0.95rem;
+				text-align: center;
+				color: var(--ink);
 			}
 
 			.square-label {
