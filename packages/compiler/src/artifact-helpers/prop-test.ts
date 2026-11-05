@@ -24,6 +24,8 @@ export function evaluatePropTest(
 			const left = evaluatePropTest(test.left, prop);
 			const right = left.known ? evaluatePropTest(test.right, prop) : UNKNOWN;
 			if (!left.known || !right.known) return UNKNOWN;
+			// The build rebuilds each object a caller passes, so identity between two of them is unknown.
+			if (isReference(left.value) || isReference(right.value)) return UNKNOWN;
 			const equal =
 				test.operator === '===' || test.operator === '!=='
 					? left.value === right.value
@@ -42,6 +44,10 @@ export function evaluatePropTest(
 			return short ? left : evaluatePropTest(test.right, prop);
 		}
 	}
+}
+
+function isReference(value: unknown): boolean {
+	return (typeof value === 'object' && value !== null) || typeof value === 'function';
 }
 
 /** The arm one caller's props render: an index, null for none, undefined when the props do not decide it. */

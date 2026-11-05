@@ -100,6 +100,22 @@ describe('a branch whose test reads only props and literals records it as a prop
 		);
 		expect(built.branchSites[0]!.propTest).toBeUndefined();
 	});
+
+	test('an alias of a prop with a default has none either', () => {
+		const built = graph(
+			'const shown = label;\n\t<div>@if (shown) { <Badge text="x" /> }</div>',
+			"{ label = 'fallback' }",
+		);
+		expect(built.branchSites[0]!.propTest).toBeUndefined();
+	});
+
+	test('a local named undefined is not the undefined value', () => {
+		const built = graph(
+			'<div>@if (undefined) { <Badge text="x" /> }</div>',
+			'{ flag: undefined }',
+		);
+		expect(built.branchSites[0]!.propTest).toBeUndefined();
+	});
 });
 
 describe('the props one caller passes decide which arm it renders', () => {
@@ -113,6 +129,16 @@ describe('the props one caller passes decide which arm it renders', () => {
 		expect(propDecidedArm(site('label'), known({}))).toBe(1);
 		expect(propDecidedArm(site('label'), known({ label: 'shown' }))).toBe(0);
 		expect(propDecidedArm(site("tone !== 'quiet'"), known({ tone: 'quiet' }))).toBe(1);
+	});
+
+	test('two objects a caller passes are never known to be the same object', () => {
+		const same = { size: 1 };
+		expect(
+			propDecidedArm(site('label === tone'), known({ label: same, tone: same })),
+		).toBeUndefined();
+		expect(
+			propDecidedArm(site('label !== tone'), known({ label: same, tone: same })),
+		).toBeUndefined();
 	});
 
 	test('a prop the caller passes without a build-time value decides nothing', () => {

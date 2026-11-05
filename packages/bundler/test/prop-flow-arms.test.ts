@@ -113,6 +113,40 @@ test.each([
 	expect(unreachable(flows, ['/app/pages/a.tsrx'])).toEqual({});
 });
 
+test('projected children decide a children test, not a children attribute beside them', () => {
+	const flows = new PropFlowRegistry();
+	flows.record(
+		caption,
+		{
+			...captionFlow,
+			branches: [
+				{ ...captionFlow.branches![0]!, propTest: { kind: 'prop', path: ['children'] } },
+			],
+		},
+		new Map([
+			['component-edge:0', gloss],
+			['component-edge:1', icon],
+		]),
+	);
+	const caller = (childCount: number) =>
+		page({ children: { kind: 'fixed', value: { value: undefined } } }).edges.map((edge) => ({
+			...edge,
+			childCount,
+		}));
+	flows.record(
+		'/app/pages/a.tsrx',
+		{ ...textOnly, edges: caller(1) },
+		new Map([['component-edge:0', caption]]),
+	);
+	expect(unreachable(flows, ['/app/pages/a.tsrx'])).toEqual({});
+	flows.record(
+		'/app/pages/a.tsrx',
+		{ ...textOnly, edges: caller(0) },
+		new Map([['component-edge:0', caption]]),
+	);
+	expect(unreachable(flows, ['/app/pages/a.tsrx'])).toEqual({ [caption]: [gloss] });
+});
+
 test('a caller spreading props keeps Gloss', () => {
 	const flows = registry({
 		'/app/pages/a.tsrx': {

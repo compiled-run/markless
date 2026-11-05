@@ -28,7 +28,10 @@ export function propTestOf(
 				? { kind: 'value', value: test.value }
 				: undefined;
 		case 'Identifier':
-			if (getIdentifierName(test) === 'undefined') return { kind: 'value', value: undefined };
+			if (getIdentifierName(test) === 'undefined')
+				return bindsName(state, 'undefined')
+					? undefined
+					: { kind: 'value', value: undefined };
 			return propRead(test, state);
 		case 'MemberExpression':
 			return propRead(test, state);
@@ -75,5 +78,34 @@ function propRead(node: AnyNode, state: WalkState): SemanticPropTest | undefined
 		resolved.path.length === 0
 	)
 		return undefined;
+	// A default anywhere on the prop's path stands in when the caller omits it, whichever alias reads it.
+	const overlaps = (path: ReadonlyArray<string>) =>
+		path.every((key, index) => index >= resolved.path.length || resolved.path[index] === key);
+	if (
+		state.graph.componentPropBindings.some(
+			(binding) =>
+				binding.componentName === componentName &&
+				binding.defaultSource !== undefined &&
+				overlaps(binding.propPath),
+		)
+	)
+		return undefined;
 	return { kind: 'prop', path: resolved.path };
+}
+
+function bindsName(state: WalkState, name: string): boolean {
+	const componentName = state.currentComponentName;
+	const inScope = (owner: string | undefined) => owner === undefined || owner === componentName;
+	return (
+		state.graph.graphBindings.some(
+			(binding) => binding.name === name && inScope(binding.componentName),
+		) ||
+		state.graph.aliases.some((alias) => alias.name === name && inScope(alias.componentName)) ||
+		state.graph.localDeclarations.some(
+			(local) => local.name === name && inScope(local.componentName),
+		) ||
+		state.graph.componentPropBindings.some(
+			(binding) => binding.localName === name && binding.componentName === componentName,
+		)
+	);
 }

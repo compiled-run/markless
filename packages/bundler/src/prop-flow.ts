@@ -335,12 +335,14 @@ export class PropFlowRegistry {
 function passedValue(edge: ModulePropFlow['edges'][number], path: ReadonlyArray<string>): KnownPropValue {
 	const [name, ...rest] = path;
 	if (name === undefined || edge.spread) return { known: false };
+	// Projected children replace a `children` attribute when the child renders.
+	if (name === 'children' && edge.childCount !== 0) return { known: false };
 	const passed = edge.props[name];
 	let value: unknown;
 	if (passed) {
 		if (passed.kind !== 'fixed' || !passed.value) return { known: false };
 		value = passed.value.value;
-	} else if (name === 'children' && edge.childCount !== 0) return { known: false };
+	}
 	for (const key of rest) {
 		if (value === null || value === undefined) return { known: true, value: undefined };
 		if (typeof value !== 'object') return { known: false };
