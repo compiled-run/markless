@@ -523,7 +523,34 @@ export function planBoundSymbolResolver(
 		const instancePath = componentEdgeInstanceSegment(edge, edges);
 		return instancePath ? [{ componentEdgeId: edge.id, instancePath }] : [];
 	});
-	return { passId: 'bound-symbol-resolver', rows, componentEdgeInstancePaths };
+	return {
+		passId: 'bound-symbol-resolver',
+		rows: withCallbackRowsNamed(rows),
+		componentEdgeInstancePaths,
+	};
+}
+
+// The route table resolves an instance path one edge at a time and keeps one row per inner edge, so a callback whose captures differ per instance is named by its own row.
+function withCallbackRowsNamed(rows: BoundSymbolResolverRow[]): BoundSymbolResolverRow[] {
+	const callbackRows = new Map<string, string>();
+	for (const row of rows)
+		if (!row.loaderSymbolId && !row.rowPieces && row.instancePath)
+			callbackRows.set(`${row.instancePath}${row.baseSymbolId}`, row.id);
+	return rows.map((row) =>
+		row.rowPieces
+			? row
+			: {
+					...row,
+					captureSlots: row.captureSlots.map((slot) => {
+						const route = slot.route;
+						if (route.kind !== 'callback-route' || !route.composerPath) return slot;
+						const callbackRowId = callbackRows.get(route.composerPath + route.callbackSymbolId);
+						if (!callbackRowId) return slot;
+						const { composerPath: _composerPath, ...named } = route;
+						return { ...slot, route: { ...named, callbackSymbolId: callbackRowId } };
+					}),
+				},
+	);
 }
 
 function qualifiedRoute(
