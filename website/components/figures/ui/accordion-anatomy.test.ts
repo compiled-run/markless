@@ -9,8 +9,9 @@ describe('accordion anatomy', () => {
 		for (const layer of drawn.layers) expect(layer.texts.filter((t) => t.cls === 'name').map((t) => t.text)).toEqual(['accordion.' + layer.part]);
 	});
 
-	it('shows no words at rest beyond the demo question', () => {
-		expect(drawn.layers.flatMap((l) => l.texts).filter((t) => t.cls !== 'name').map((t) => t.text)).toEqual(['Do you ship overseas?']);
+	it('tags each layer with one short word', () => {
+		const tags = drawn.layers.flatMap((l) => l.texts).filter((t) => t.cls.startsWith('tag')).map((t) => t.text);
+		expect(tags).toEqual(['root', 'item', 'heading', 'panel', 'trigger']);
 	});
 
 	it('draws the same every time', () => {

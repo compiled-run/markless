@@ -1,9 +1,10 @@
-// The accordion pulled apart into its parts like an exploded drawing: press, drag or arrow to snap it together, and the panel springs back if you pull it from its item.
+// A working accordion that lifts apart into its parts on hover or on Take apart, each layer tinted and tagged; pull the panel from its item and it springs back.
 import { computed, state } from '@markless/core';
+import InkButton from '../ink/ink-button.tsrx';
 import { art } from './accordion-anatomy.art.ts';
 
 export default function AccordionAnatomy() @{
-	let together = state(false);
+	let together = state(true);
 	let open = state(true);
 	let dragX = state(0);
 	let dragY = state(0);
@@ -23,7 +24,7 @@ export default function AccordionAnatomy() @{
 			class="stage"
 			tabindex={0}
 			role="group"
-			aria-label="The accordion's parts, pulled apart. Press, drag, or use the arrow keys to put them together."
+			aria-label="An accordion. Up arrow takes it apart into its parts, Down arrow puts it together, Enter opens or closes the panel."
 			onPointerdown={(event: PointerEvent) => {
 				const part = (event.target as Element).closest('[data-part]')?.getAttribute('data-part') ?? '';
 				grabbed = part;
@@ -41,9 +42,6 @@ export default function AccordionAnatomy() @{
 				dragY = dy;
 			}}
 			onPointerup={(event: PointerEvent) => {
-				const dx = event.clientX - startX;
-				const dy = event.clientY - startY;
-				const far = dx * dx + dy * dy > 400;
 				if (dragging) {
 					dragging = false;
 					dragX = 0;
@@ -51,10 +49,6 @@ export default function AccordionAnatomy() @{
 					moved = true;
 					spring = spring === 'a' ? 'b' : 'a';
 					said = 'The panel sprang back. A panel always belongs to its item.';
-				} else if (far) {
-					moved = true;
-					together = dy > 0 ? true : dy < 0 ? false : !together;
-					said = together ? 'The parts snapped together into a working accordion.' : 'The parts came apart.';
 				}
 				grabbed = '';
 			}}
@@ -64,36 +58,28 @@ export default function AccordionAnatomy() @{
 					return;
 				}
 				const part = (event.target as Element).closest('[data-part]')?.getAttribute('data-part') ?? '';
-				if (together && (part === 'itemtrigger' || part === 'itemlabel')) {
+				if (part === 'itemtrigger' || part === 'itemlabel') {
 					open = !open;
 					said = open ? 'The heading opened its panel.' : 'The heading closed its panel. It stays in the page, hidden.';
-					return;
 				}
-				together = !together;
-				said = together ? 'The parts snapped together into a working accordion.' : 'The parts came apart.';
 			}}
 			onKeydown={(event: KeyboardEvent) => {
 				if (event.key === 'ArrowDown') {
 					event.preventDefault();
 					together = true;
 					said = 'The parts snapped together into a working accordion.';
-				} else if (event.key === 'ArrowUp' || event.key === 'Escape') {
+				} else if (event.key === 'ArrowUp') {
 					event.preventDefault();
 					together = false;
 					said = 'The parts came apart.';
 				} else if (event.key === 'Enter' || event.key === ' ') {
 					event.preventDefault();
-					if (together) {
-						open = !open;
-						said = open ? 'The heading opened its panel.' : 'The heading closed its panel. It stays in the page, hidden.';
-					} else {
-						together = true;
-						said = 'The parts snapped together into a working accordion.';
-					}
+					open = !open;
+					said = open ? 'The heading opened its panel.' : 'The heading closed its panel. It stays in the page, hidden.';
 				}
 			}}
 		>
-			<svg class="scene" viewBox="0 0 680 500" aria-hidden="true">
+			<svg class="scene" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<g class="plane">
 					@for (const guide of art.guides; key guide.part) {
 						<path class="guide" d={guide.d} />
@@ -115,6 +101,17 @@ export default function AccordionAnatomy() @{
 					}
 				</g>
 			</svg>
+		</div>
+		<div class="controls">
+			<InkButton
+				pressed={!together}
+				onClick={() => {
+					together = !together;
+					said = together ? 'The parts snapped together into a working accordion.' : 'The accordion came apart into its parts.';
+				}}
+			>
+				Take apart
+			</InkButton>
 		</div>
 		<figcaption class="sr">
 			The parts nest like this: accordion.root holds each accordion.item; an item holds an accordion.itemlabel, which holds the accordion.itemtrigger, and an accordion.itemcontent panel.
@@ -151,21 +148,92 @@ export default function AccordionAnatomy() @{
 			}
 
 			.plane {
-				transform: translate(70px, 236px) skewX(-14deg) scale(0.95, 0.78);
-				transition: transform 520ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
-			}
-
-			.accordion-anatomy[data-mode='together'] .plane {
-				transform: translate(120px, 80px);
+				transform: translate(60px, 90px);
+				transition: transform 560ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
 			}
 
 			.layer {
-				transform: translate(var(--dx), var(--dy));
-				transition: transform 520ms cubic-bezier(0.2, 0.9, 0.3, 1.15);
+				transition: transform 560ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
 			}
 
-			.accordion-anatomy[data-mode='together'] .layer {
-				transform: none;
+			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .plane {
+				transform: translate(40px, 186px) skewX(-6deg) scale(1, 0.9);
+			}
+
+			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer {
+				transform: translate(var(--dx), var(--dy));
+			}
+
+			.tag,
+			.leader,
+			.name {
+				opacity: 0;
+				transition: opacity 250ms ease 150ms;
+			}
+
+			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) :is(.tag, .leader) {
+				opacity: 1;
+			}
+
+			.tag {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 22px;
+				font-weight: 700;
+			}
+
+			.leader {
+				stroke-dasharray: 2 4;
+			}
+
+			.tint {
+				opacity: 0;
+				mix-blend-mode: multiply;
+				transition: opacity 300ms ease;
+
+				html.dark & {
+					mix-blend-mode: normal;
+				}
+			}
+
+			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .tint {
+				opacity: 0.38;
+			}
+
+			.tint-root,
+			.tag-root {
+				--tone: var(--purple);
+			}
+
+			.tint-item,
+			.tag-item {
+				--tone: oklch(72% 0.12 230);
+			}
+
+			.tint-itemlabel,
+			.tag-itemlabel {
+				--tone: var(--yellow);
+			}
+
+			.tint-itemtrigger,
+			.tag-itemtrigger {
+				--tone: var(--pink);
+			}
+
+			.tint-itemcontent,
+			.tag-itemcontent {
+				--tone: oklch(76% 0.13 150);
+			}
+
+			.tint {
+				fill: var(--tone);
+			}
+
+			.tag {
+				fill: color-mix(in oklch, var(--tone) 55%, var(--ink));
+			}
+
+			.controls {
+				margin-block-start: 0.4rem;
 			}
 
 			.layer[data-part='itemcontent'] .lift {
@@ -190,12 +258,12 @@ export default function AccordionAnatomy() @{
 				stroke: var(--ink);
 				stroke-width: 1.4;
 				stroke-dasharray: 4 6;
-				opacity: 0.7;
+				opacity: 0;
 				transition: opacity 300ms ease;
 			}
 
-			.accordion-anatomy[data-mode='together'] .guide {
-				opacity: 0;
+			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .guide {
+				opacity: 0.7;
 			}
 
 			.paper,
@@ -256,7 +324,11 @@ export default function AccordionAnatomy() @{
 			.ui {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: 17px;
-				fill: #2d2a24;
+				fill: var(--ink);
+			}
+
+			.light {
+				opacity: 0.75;
 			}
 
 			.name {
@@ -268,15 +340,15 @@ export default function AccordionAnatomy() @{
 				transition: opacity 150ms ease;
 			}
 
-			.layer:hover .name {
+			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer:hover .name {
 				opacity: 1;
 			}
 
-			.accordion-anatomy[data-mode='together'][data-panel='closed'] .layer[data-part='itemcontent'] {
+			.accordion-anatomy[data-panel='closed'] .layer[data-part='itemcontent'] {
 				opacity: 0.25;
 			}
 
-			.accordion-anatomy[data-mode='together'][data-panel='closed'] .wash {
+			.accordion-anatomy[data-panel='closed'] .wash {
 				opacity: 0;
 			}
 
