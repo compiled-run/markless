@@ -1064,7 +1064,9 @@ function composedBoundaryArmRecords(
 	const prefix = local ? boundary.id.slice(0, local.index - drawn.length) : '';
 	if (!prefix) return set;
 	// Host ids take the whole prefix; symbol ids the symbol prefix, which past one level of nesting differs; graph ids its instance-path part.
-	const composedSymbols = boundary.composedSymbolPrefix;
+	// A served boundary's update symbol was spelled through the composing edges' symbol prefixes.
+	const composedSymbols =
+		boundary.composedSymbolPrefix ?? (marklessInstancePath(boundary.updateSymbolId) || undefined);
 	const symbols =
 		symbolPrefix ??
 		(composedSymbols?.endsWith(drawn)

@@ -258,7 +258,7 @@ export type ElementHandleQualifier = (
 
 type ComposedBoundary = Pick<
 	ResumeAsyncBoundaryRecord,
-	'id' | 'composedInstancePath' | 'composedGraphProps' | 'composedSymbolPrefix'
+	'id' | 'composedInstancePath' | 'composedGraphProps' | 'composedSymbolPrefix' | 'updateSymbolId'
 >;
 export type ComposedArmRecordQualifier = ((
 	boundary: ComposedBoundary,
