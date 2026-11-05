@@ -22,9 +22,7 @@ export default function ChecksFigure() @{
 	const hint = computed(() => (hovered >= 0 ? art.rows[hovered]!.job + ': ' + RUNS[hovered]!.replaceAll('`', '') : 'Hover a check to see what it runs.'));
 	const phase = computed(() => (merged ? 3 : status.includes('0') ? 0 : status.includes('2') ? 2 : 1));
 	const dials = computed(() => {
-		let out = '--ph:' + phase + ';--pt:' + point + ';--merged:' + (merged ? 1 : 0);
-		for (let i = 0; i < status.length; i++) out += ';--s' + i + ':' + status[i];
-		return out;
+		return '--ph:' + phase + ';--merged:' + (merged ? 1 : 0);
 	});
 
 	const settle = (from: string, t: number) => {
@@ -169,7 +167,7 @@ export default function ChecksFigure() @{
 			<path class="head-hit" d={art.hit} />
 			<g>
 				@for (const row of art.rows; key row.key) {
-					<g class="row" data-row={row.key} style={'--s:var(--s' + row.key + ');--i:' + row.key}>
+					<g class={'row s' + status[row.key] + (point === row.key ? ' blocking' : '')} data-row={row.key}>
 						<path class="row-hit" d={row.hit} />
 						<g class="hover">
 							@for (const item of row.hover.paths; key item.key) {
@@ -441,16 +439,16 @@ export default function ChecksFigure() @{
 				opacity: max(0, var(--ph) - 2);
 			}
 
-			.pending {
-				opacity: max(0, 1 - var(--s));
+			.state,
+			.pointed {
+				opacity: 0;
 			}
 
-			.passed {
-				opacity: max(0, 1 - max(var(--s) - 1, 1 - var(--s)));
-			}
-
-			.failed {
-				opacity: max(0, var(--s) - 1);
+			.s0 .pending,
+			.s1 .passed,
+			.s2 .failed,
+			.blocking .pointed {
+				opacity: 1;
 			}
 
 			.hover {
@@ -503,10 +501,6 @@ export default function ChecksFigure() @{
 					mix-blend-mode: normal;
 					opacity: 0.4;
 				}
-			}
-
-			.pointed {
-				opacity: max(0, 1 - max(var(--pt) - var(--i), var(--i) - var(--pt)));
 			}
 
 			.bad-pen {

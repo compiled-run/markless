@@ -11,15 +11,7 @@ export default function PackagesFigure() @{
 	let hovered = state(-1);
 	const hint = computed(() => (hovered >= 0 ? '@markless/' + art.rows[hovered]!.name + ': ' + art.rows[hovered]!.does : 'Hover a package to see what it does.'));
 	let said = state('');
-	const dials = computed(() => {
-		let out = '--n:' + installed + ';--d:' + deleted;
-		const gone = deleted >= 0 ? art.rows[deleted]!.name : '';
-		for (const row of art.rows) {
-			const m = row.missing.findIndex((miss) => miss.dep === gone);
-			out += ';--m' + row.key + ':' + m + ';--r' + row.key + ':' + (m >= 0 ? 1 : 0);
-		}
-		return out;
-	});
+	const gone = computed(() => (deleted >= 0 ? art.rows[deleted]!.name : ''));
 
 	const install = () => {
 		deleted = -1;
@@ -75,7 +67,6 @@ export default function PackagesFigure() @{
 	>
 		<svg
 			class="scene"
-			style={dials}
 			viewBox={art.view}
 			aria-hidden="true"
 			onClick={(event) => {
@@ -108,7 +99,7 @@ export default function PackagesFigure() @{
 			<path class="hit run" d={art.run} />
 			<g>
 				@for (const row of art.rows; key row.key) {
-					<g class="row" data-row={row.key} style={'--i:' + row.key + ';--m:var(--m' + row.key + ');--r:var(--r' + row.key + ')'}>
+					<g class={'row' + (installed > row.key ? ' in' : '') + (deleted === row.key ? ' del' : '') + (row.missing.some((miss) => miss.dep === gone) ? ' red' : '')} data-row={row.key}>
 						<path class="hit" d={row.hit} />
 						<g class="hover fade overlay">
 							<g>
@@ -148,7 +139,7 @@ export default function PackagesFigure() @{
 						</g>
 						<g>
 							@for (const miss of row.missing; key miss.key) {
-								<g class="miss fade overlay" style={'--k:' + miss.key}>
+								<g class={'miss fade overlay' + (miss.dep === gone ? ' on' : '')}>
 									<g>
 										@for (const item of miss.part.paths; key item.key) {
 											<path class={item.cls} d={item.d} />
@@ -403,28 +394,32 @@ export default function PackagesFigure() @{
 				white-space: nowrap;
 			}
 
-			.shown {
-				opacity: clamp(0, var(--n) - var(--i), 1);
+			.shown,
+			.gone,
+			.miss {
+				opacity: 0;
+			}
+
+			.in .shown,
+			.in.del .gone,
+			.in .miss.on {
+				opacity: 1;
 			}
 
 			.name {
-				fill: color-mix(in oklch, var(--bad) calc(var(--r) * 100%), var(--sheet-ink));
+				fill: var(--sheet-ink);
 			}
 
-			.gone {
-				opacity: calc(clamp(0, var(--n) - var(--i), 1) * max(0, 1 - max(var(--d) - var(--i), var(--i) - var(--d))));
-			}
-
-			.miss {
-				opacity: calc(clamp(0, var(--n) - var(--i), 1) * max(0, 1 - max(var(--m) - var(--k), var(--k) - var(--m))));
+			.red .name {
+				fill: var(--bad);
 			}
 
 			.hover {
 				opacity: 0;
 			}
 
-			.row:hover .hover {
-				opacity: clamp(0, var(--n) - var(--i), 1);
+			.in:hover .hover {
+				opacity: 1;
 			}
 
 			.row:hover .miss,

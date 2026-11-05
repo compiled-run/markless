@@ -8,7 +8,7 @@ export const PACKAGES = [
 	{ name: 'bundler', does: 'runs the compiler in Vite', needs: ['compiler', 'serializer', 'web'] },
 	{ name: 'router', does: 'file routes, Link, navigate()', needs: ['bundler', 'compiler', 'web'] },
 	{ name: 'web', does: 'the render code', needs: ['runtime', 'serializer'] },
-	{ name: 'compiler', does: 'reads .tsrx files', needs: ['serializer'] },
+	{ name: 'compiler', does: 'reads .tsrx files', needs: ['serializer', 'web'] },
 	{ name: 'serializer', does: 'state and page data format', needs: [] },
 	{ name: 'runtime', does: 'keeps state', needs: ['serializer'] },
 ];

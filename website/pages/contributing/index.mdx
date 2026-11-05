@@ -32,11 +32,11 @@ A *pipeline* is a chain where each package hands its output to the next. Press `
 
 ## Three packages work before your app runs
 
-- **`@markless/compiler`** reads `.tsrx` and plans it: semantic graph, state lowering, payload planning, emit. Imports `serializer`.
+- **`@markless/compiler`** reads `.tsrx` and plans it: semantic graph, state lowering, payload planning, emit. Imports `serializer` and `web`.
 - **`@markless/bundler`** runs the compiler inside Vite or Rolldown. Build-time prerendering lives here too, as a preview. Imports `compiler`, `serializer` and `web`.
 - **`@markless/typescript-plugin`** gives editors `.tsrx` support, and holds the repo's `src/tsc.ts` checker. Imports `compiler`.
 
-The compiler doesn't import `web`, but the code it writes does: compiled components import helpers from `@markless/web/fns/*`.
+The compiler imports one rule from `web`, how an attribute's value is written, and the code it writes imports helpers from `@markless/web/fns/*`.
 
 ## Four packages run the result
 

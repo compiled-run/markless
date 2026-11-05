@@ -8,7 +8,7 @@ export const PACKAGES = [
 	{ name: 'analyzer', imports: [] as string[], pipeline: false },
 	{ name: 'bundler', imports: ['compiler', 'serializer', 'web'], pipeline: true },
 	{ name: 'cli', imports: [], pipeline: false },
-	{ name: 'compiler', imports: ['serializer'], pipeline: true },
+	{ name: 'compiler', imports: ['serializer', 'web'], pipeline: true },
 	{ name: 'core', imports: ['web', 'bundler', 'router'], pipeline: true },
 	{ name: 'headless', imports: [], pipeline: false },
 	{ name: 'router', imports: ['bundler', 'compiler', 'web'], pipeline: false },

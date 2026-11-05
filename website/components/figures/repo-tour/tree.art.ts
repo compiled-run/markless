@@ -604,7 +604,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": 3,
 			"name": "compiler",
-			"imports": "compiler imports serializer",
+			"imports": "compiler imports serializer, web",
 			"hover": {
 				"paths": [
 					{
