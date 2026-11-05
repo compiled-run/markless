@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -34,
+			"reason": "the docs pages download the in-browser compile worker, which now carries destructured @for loop names (repeat-item-binding.ts, alias reads in the readers, handlers and child props, and the new diagnostic)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1044,
+			"reason": "the docs pages download the in-browser compile worker, which now carries destructured @for loop names (repeat-item-binding.ts, alias reads in the readers, handlers and child props, and the new diagnostic)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "the docs pages download the in-browser compile worker, which now carries destructured @for loop names (repeat-item-binding.ts, alias reads in the readers, handlers and child props, and the new diagnostic)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1044,
+			"reason": "the docs pages download the in-browser compile worker, which now carries destructured @for loop names (repeat-item-binding.ts, alias reads in the readers, handlers and child props, and the new diagnostic)",
+			"date": "2026-11-05"
+		}
+	]
+}
