@@ -56,6 +56,7 @@ import {
 	resolvedSymbolAt,
 } from './collect-expressions.ts';
 import { collectRowLocalReads } from './row-local-reads.ts';
+import { takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -164,6 +165,8 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	}
 
 	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
+	const moduleScopeClass = state.currentStyleScopeClass;
+	if (tagName && !takesStyleScopeClass(tagName)) state.currentStyleScopeClass = null;
 	for (const attribute of getElementAttributes(node)) {
 		collectAttribute(
 			attribute,
@@ -174,6 +177,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 			isHostElement,
 		);
 	}
+	state.currentStyleScopeClass = moduleScopeClass;
 
 	if (isHostElement) {
 		joinHostText(node, state);

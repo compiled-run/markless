@@ -249,6 +249,21 @@ function spliceScopeClass(source: string, offsets: readonly number[], scopeClass
 	return output + source.slice(from);
 }
 
+// Document metadata is never rendered, so no scoped selector can style it.
+const UNSTYLED_DOCUMENT_TAGS = new Set([
+	'head',
+	'title',
+	'meta',
+	'link',
+	'base',
+	'script',
+	'style',
+]);
+
+export function takesStyleScopeClass(tagName: string): boolean {
+	return !UNSTYLED_DOCUMENT_TAGS.has(tagName.toLowerCase());
+}
+
 // FNV-1a over the module id: stable per component module, runtime-agnostic.
 function styleScopeId(moduleId: string): string {
 	let hash = 0x811c9dc5;

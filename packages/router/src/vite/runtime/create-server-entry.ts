@@ -874,6 +874,9 @@ function addModulePreloads(
 	}
 }
 
+// A document.tsrx that writes <html> itself (rather than <Html>) renders the root element.
+const AUTHORED_HTML_ROOT = /^\s*<html[\s>]/i;
+
 // The document with the children placeholder INTACT: blocking responses fill
 // it in one piece; streaming responses split at it so everything after the
 // page (and the closing tags) flushes only when the last boundary settled.
@@ -891,11 +894,20 @@ async function renderDocumentShell(
 	);
 	const attributes = htmlAttributes(documentModule, pageProps, written);
 	if (documentHtml !== undefined) {
-		const { html, preloads } = takeHeadModulePreloads(insertHeadHtml(documentHtml, headHtml));
+		const authoredRoot = AUTHORED_HTML_ROOT.test(documentHtml);
+		const { html, preloads } = takeHeadModulePreloads(
+			insertHeadHtml(authoredRoot ? documentHtml.trim() : documentHtml, headHtml),
+		);
+		const content = insertHeadModulePreloads(
+			insertImportMap(html, importMap),
+			importMap,
+			preloads,
+		);
+		if (authoredRoot) return `<!doctype html>${content}`;
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertHeadModulePreloads(insertImportMap(html, importMap), importMap, preloads),
+			content,
 			'</html>',
 		].join('');
 	}
