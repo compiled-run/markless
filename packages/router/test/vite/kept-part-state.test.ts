@@ -196,6 +196,30 @@ test('state the part set from a prop the two pages pass differently takes the ne
 	await page.close();
 });
 
+test('a part the next page places at another instance path keeps its state there and on the way back', async () => {
+	const guide = openingTag(await fetchText('/guide'), 'data-side-nav');
+	const reference = openingTag(await fetchText('/reference'), 'data-side-nav');
+	expect(attribute(guide, PROTOCOL_KEEP_INSTANCE_ATTRIBUTE)).not.toBe(
+		attribute(reference, PROTOCOL_KEEP_INSTANCE_ATTRIBUTE),
+	);
+	const { page, errors } = await open('/guide');
+	await toggle(page, '1');
+	await remember(page);
+	await page.click('[data-nav="reference"]');
+	await shows(page, 'Reference page');
+	expect(await sideNav(page)).toMatchObject({ same: true, shown: 'open', count: '1' });
+	expect(await page.getAttribute('[data-side-nav]', PROTOCOL_KEEP_INSTANCE_ATTRIBUTE)).toBe(
+		attribute(reference, PROTOCOL_KEEP_INSTANCE_ATTRIBUTE),
+	);
+	await toggle(page, '2');
+	await page.click('[data-nav="guide"]');
+	await shows(page, 'Guide page');
+	expect(await sideNav(page)).toMatchObject({ same: true, shown: 'closed', count: '2' });
+	await toggle(page, '3');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('Back and Forward keep the part and its state', async () => {
 	const { page, errors } = await open('/guide');
 	await toggle(page, '1');

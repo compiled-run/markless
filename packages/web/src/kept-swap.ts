@@ -1,7 +1,7 @@
 // Hands a kept part's live state to the next page of an in-place navigation, still off screen (see PROTOCOL_KEEP_INSTANCE_ATTRIBUTE).
 import { decodePayloadScriptsWithVersion } from '../../serializer/src/protocol-client.ts';
 import { marklessInstancePath } from './fns/instance-scope.ts';
-import { moduleHref, sameValue } from './fns/shared-instances.ts';
+import { cloneValue, moduleHref, sameValue } from './fns/shared-instances.ts';
 import { readPayloadScriptsFromDocument } from './payload-document-common.ts';
 import { decodeServedComputedValues, decodeStateCells } from './payload-graph-construct.ts';
 import { paintValues } from './shared-swap.ts';
@@ -11,9 +11,16 @@ type ResumeEntry = { readonly routeModule?: (root: object) => Promise<unknown> |
 type LiveValues = { __marklessEventOnlyGraph?: Map<string, unknown> };
 type Decoded = ReturnType<typeof decodePayloadScriptsWithVersion>;
 
+export type KeptCarry = {
+	// A handler changed a cell this read while it painted: the painted page is behind, so the swap carries again.
+	readonly moved: () => boolean;
+	// Gives the container the carried values once the leaving page is gone.
+	readonly install: (container: Element) => void;
+};
+
 /**
  * Before the swap: which kept parts carry state, what the next page's instance of each starts from, and the
- * next page painted with it. The returned install gives the container those values once the leaving page is gone.
+ * next page painted with it.
  */
 export async function carryKeptParts(input: {
 	readonly outgoing: Element;
@@ -22,7 +29,7 @@ export async function carryKeptParts(input: {
 	readonly resumeAttribute: string;
 	// The instance path of each kept part with state on the leaving page, and of the part the swap keeps it as.
 	readonly pairs: ReadonlyArray<{ readonly from: string; readonly to: string }>;
-}): Promise<((container: Element) => void) | undefined> {
+}): Promise<KeptCarry | undefined> {
 	const containerOf = (region: Element) =>
 		region.hasAttribute(input.containerAttribute)
 			? region
@@ -48,6 +55,9 @@ export async function carryKeptParts(input: {
 		),
 	);
 	const values = new Map<string, unknown>();
+	const read = new Map<string, unknown>();
+	const now = (id: string, served: unknown) =>
+		live.has(id) ? live.get(id) : (live.get(id) ?? served);
 	for (const cell of cells) {
 		const pair = pairs.find(({ to }) => cell.graphNodeId.startsWith(to));
 		if (!pair || outsideInstances.has(cell.graphNodeId) || !ownState(cell.graphNodeId))
@@ -55,8 +65,9 @@ export async function carryKeptParts(input: {
 		const from = pair.from + cell.graphNodeId.slice(pair.to.length);
 		if (!served.has(from)) continue;
 		const before = served.get(from);
-		const now = live.has(from) ? live.get(from) : (live.get(from) ?? before);
-		const value = carried(now, before, cell.value);
+		const current = now(from, before);
+		read.set(from, cloneValue(current));
+		const value = carried(current, before, cell.value);
 		if (!sameValue(value, cell.value)) values.set(cell.graphNodeId, value);
 	}
 	if (values.size === 0) return undefined;
@@ -87,8 +98,11 @@ export async function carryKeptParts(input: {
 		const value = painted.read(id);
 		if (value !== undefined && !sameValue(value, servedNext.get(id))) adopted.set(id, value);
 	}
-	return (container) => {
-		(container as LiveValues).__marklessEventOnlyGraph = adopted;
+	return {
+		moved: () => [...read].some(([id, value]) => !sameValue(now(id, served.get(id)), value)),
+		install: (container) => {
+			(container as LiveValues).__marklessEventOnlyGraph = adopted;
+		},
 	};
 }
 
@@ -119,9 +133,9 @@ const isPlain = (value: unknown): value is Record<string, unknown> =>
 function carried(live: unknown, before: unknown, next: unknown): unknown {
 	if (sameValue(before, next)) return live;
 	if (!isPlain(live) || !isPlain(before) || !isPlain(next)) return next;
-	const merged: Record<string, unknown> = { ...live };
+	const merged: Record<string, unknown> = {};
 	for (const key of Object.keys(next))
-		merged[key] = sameValue(before[key], next[key]) ? live[key] : next[key];
+		merged[key] = sameValue(before[key], next[key]) && key in live ? live[key] : next[key];
 	return merged;
 }
 

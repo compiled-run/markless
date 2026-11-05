@@ -682,6 +682,10 @@ function morphRange(
 			if (after && after !== stop && sameKind(after, next)) {
 				cursor.remove();
 				cursor = after;
+				if (kept(d, cursor, next, fresh)) {
+					cursor = cursor.nextSibling;
+					continue;
+				}
 			}
 		}
 		if (cursor && cursor !== stop && sameKind(cursor, next)) {
@@ -760,7 +764,10 @@ function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): bo
 	const slots = keptSlots(from, to);
 	if (!slots) return false;
 	const [leaving, arriving, [before, after]] = slots;
-	const [, , vary, , text] = keepAttributes;
+	const [, , vary, instance, text] = keepAttributes;
+	// The next page may place the part at another instance path; its next swap reads the cells under this one.
+	const path = (to as Element).getAttribute(instance);
+	if (path !== null) (from as Element).setAttribute(instance, path);
 	before.forEach((element, index) => {
 		const next = after[index]!;
 		for (const name of next.getAttribute(vary)!.split(' ')) {
@@ -815,6 +822,13 @@ function morphDrops([parent, start, stop, incoming, page]: MorphRange, node: Nod
 			if (after && after !== stop && sameKind(after, next)) {
 				if (cursor === own) return true;
 				cursor = after;
+				const slots = keptSlots(cursor, next);
+				if (slots) {
+					if (cursor === own)
+						return slots[0].some((slot) => slot !== node && slot.contains(node));
+					cursor = cursor.nextSibling;
+					continue;
+				}
 			}
 		}
 		if (sameKind(cursor, next)) {
@@ -1173,20 +1187,24 @@ export async function navigate(
 		}
 		if (stale()) return abandon();
 	}
-	let adoptKept: ((container: Element) => void) | undefined;
+	let adoptKept: import('@markless/web/kept-swap').KeptCarry | undefined;
 	const swapping = await keptSwapping?.catch(() => undefined);
 	if (stale()) return abandon();
 	keptSwap = swapping;
 	const pairs = keptSwap ? keptPairs(outgoing, incoming, keepAttribute, instanceAttribute) : [];
 	if (keptSwap && pairs.length > 0) {
 		try {
-			adoptKept = await keptSwap.carryKeptParts({
-				outgoing,
-				incoming,
-				containerAttribute,
-				resumeAttribute,
-				pairs,
-			});
+			for (let tries = 0; tries < 3 && (!adoptKept || adoptKept.moved()); tries++) {
+				adoptKept = await keptSwap.carryKeptParts({
+					outgoing,
+					incoming,
+					containerAttribute,
+					resumeAttribute,
+					pairs,
+				});
+				if (stale()) return abandon();
+				if (!adoptKept) break;
+			}
 		} catch (error) {
 			reportAsync(error);
 		}
@@ -1298,7 +1316,7 @@ export async function navigate(
 		const container = isContainer(outgoing)
 			? outgoing
 			: outgoing.querySelector(`[${containerAttribute}]`);
-		if (adoptKept && container) adoptKept(container);
+		if (adoptKept && container) adoptKept.install(container);
 		if (leavingEnd) end = leavingEnd;
 		else if (wholeBody) region.append((end = d.createComment('')));
 		else outgoing.after((end = d.createComment('')));
