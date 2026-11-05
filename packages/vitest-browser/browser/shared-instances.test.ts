@@ -5,6 +5,8 @@ import type { ProtocolSharedInstances } from '../../serializer/src/protocol-shar
 import { ChoicePanel } from './shared-instances/choice.tsrx';
 import { ChoiceReader } from './shared-instances/choice-reader.tsrx';
 import { OwnChoicePanel } from './shared-instances/own-choice.tsrx';
+import { ChoiceCounter } from './shared-instances/choice-counter.tsrx';
+import { PairPanel } from './shared-instances/pair.tsrx';
 
 // Containers on one document that resolve one shared() definition read and write one instance (spec 03).
 
@@ -41,6 +43,46 @@ test('SSR resume: a container that only reads the key shows the other containerâ
 
 	press(writer, '[data-manual]');
 	await expect.poll(() => shown(reader)).toBe('manual');
+});
+
+test('a running container binds no instance until a shared value moves, then publishes it', async () => {
+	const counter = (await renderSSR(ChoiceCounter)).container;
+	const reader = (await renderSSR(ChoiceReader)).container;
+	press(counter, '[data-count-up]');
+	await expect.poll(() => counter.querySelector('[data-count]')?.textContent).toBe('1');
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	expect(Object.values(instances()?.instances ?? {}).some((instance) => instance.shape)).toBe(
+		false,
+	);
+
+	press(counter, '[data-manual]');
+	await expect.poll(() => shown(reader)).toBe('manual');
+	expect(Object.values(instances()!.instances).some((instance) => instance.shape)).toBe(true);
+});
+
+test('two containers that write different fields before either binds keep both writes', async () => {
+	const first = (await renderSSR(PairPanel)).container;
+	const second = (await renderSSR(PairPanel)).container;
+	press(first, '[data-left]');
+	press(second, '[data-right]');
+	await expect.poll(() => [shown(first), shown(second)]).toEqual(['l1/r1', 'l1/r1']);
+});
+
+test('a value written from null to an object still lets another container join', async () => {
+	const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+	try {
+		const first = (await renderSSR(PairPanel)).container;
+		const second = (await renderSSR(PairPanel)).container;
+		press(first, '[data-choose]');
+		await expect.poll(() => second.querySelector('[data-pick]')?.textContent).toBe('ada');
+		expect(
+			errors.mock.calls.filter((call) =>
+				String(call[0]).includes('MARKLESS_SHARED_SHAPE_MISMATCH'),
+			),
+		).toHaveLength(0);
+	} finally {
+		errors.mockRestore();
+	}
 });
 
 test('CSR: two mounts that share a key show each otherâ€™s writes', async () => {

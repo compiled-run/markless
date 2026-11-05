@@ -2,7 +2,6 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalResult } from '@markless/runtime';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
-import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import type { ArmCommitUpdate, ArmRegistrationDeps } from './resume-commit-arm.ts';
 import type {
 	ResumeArmRange,
@@ -17,7 +16,7 @@ import type {
 
 // Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
 type SharedInstancesHost = {
-	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-instances.ts')>;
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-start.ts')>;
 };
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 type RuntimeShared = ReturnType<
@@ -456,10 +455,10 @@ export function createResumeRuntime(
 		// The seeded-value reconcile flushed before the journal listener existed; the graph kept its entries.
 		if (storagePlane) await input.graph.flush();
 		if (
-			hasLiveSharedDefinitions(input.state) &&
-			(await (globalThis as SharedInstancesHost).__marklessSharedInstances?.())?.reconcileSharedCells(
-				input.graph,
-			)
+			(input.root as { readonly __mSharedReconcile?: true }).__mSharedReconcile &&
+			(await (
+				await (globalThis as SharedInstancesHost).__marklessSharedInstances?.()
+			)?.reconcileSharedCells(input.graph))
 		)
 			await input.graph.flush();
 		captureListenersStarted = true;

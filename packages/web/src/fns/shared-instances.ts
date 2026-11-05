@@ -9,6 +9,7 @@ import {
 } from '../../../serializer/src/protocol-shared-instances.ts';
 import type { RuntimePayloadType } from '../../../serializer/src/protocol-client.ts';
 import { RESUME_MODULE_ATTRIBUTE } from './container-region.ts';
+import { decodeServedComputedValues, decodeStateCells } from '../payload-graph-construct.ts';
 
 
 type Definition = NonNullable<ProtocolStatePayload['sharedDefinitions']>[number];
@@ -69,6 +70,59 @@ export function bindSharedCells(
 			connectGraph(host, graph, bound, agreed);
 		},
 	};
+}
+
+/**
+ * Binds a runtime that started before any instance held values: the cells it `written` since are
+ * published, the rest take what another container wrote. Shapes compare the served values.
+ */
+export async function bindRunningGraph(
+	root: object,
+	state: ProtocolStatePayload,
+	graph: RuntimeGraph,
+	written: ReadonlySet<string>,
+): Promise<void> {
+	const served = [
+		...(await decodeStateCells(state)),
+		...(await decodeServedComputedValues(state)),
+	];
+	const base = new Map(served.map((cell) => [cell.graphNodeId, cell.value]));
+	const { bound } = bindDefinitions(placesOf(root), state, served, root, true);
+	const seeded = new Set((state.sharedSeeds ?? []).map((seed) => seed.graphNodeId));
+	const agreed = new Map<string, unknown>();
+	const published: Array<[Bound, string]> = [];
+	for (const binding of bound)
+		for (const id of binding.cellIds) {
+			const now = graph.read(id, []);
+			agreed.set(id, now);
+			if (written.has(id)) {
+				// Another container may have written other fields while this one's binding loaded.
+				const merged = mergeWrite(base.get(id), binding.instance.cells[id], now);
+				if (!sameValue(merged, now))
+					graph.write({ graphNodeId: id, value: cloneValue(merged) });
+				agreed.set(id, merged);
+				binding.instance.cells[id] = cloneValue(merged);
+				published.push([binding, id]);
+			} else if (!seeded.has(id) && !sameValue(binding.instance.cells[id], now)) {
+				agreed.set(id, binding.instance.cells[id]);
+				graph.write({ graphNodeId: id, value: cloneValue(binding.instance.cells[id]) });
+			}
+		}
+	connectGraph(root as Host, graph, bound, agreed);
+	for (const [binding, id] of published)
+		publish(root as Host, binding.instance, binding.definition, id);
+}
+
+// This container's changes since `base` laid over `theirs`, field by field where both are plain objects.
+function mergeWrite(base: unknown, theirs: unknown, ours: unknown): unknown {
+	if (sameValue(theirs, base)) return ours;
+	if (!isPlain(base) || !isPlain(theirs) || !isPlain(ours) || Array.isArray(ours)) return ours;
+	const merged: Record<string, unknown> = { ...(theirs as Record<string, unknown>) };
+	const before = base as Record<string, unknown>;
+	for (const [key, value] of Object.entries(ours as Record<string, unknown>))
+		if (!sameValue(value, before[key]))
+			merged[key] = mergeWrite(before[key], merged[key], value);
+	return merged;
 }
 
 // Called once the runtime's bindings exist: the reads land the live values through them.

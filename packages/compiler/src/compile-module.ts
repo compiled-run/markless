@@ -169,6 +169,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 				importedModuleInterfaces: input.importedModuleInterfaces,
 				components: artifacts.semanticGraph.components,
 				sharedCallbackBindings: artifacts.semanticGraph.sharedCallbackBindings,
+				keyedRepeats: artifacts.semanticGraph.keyedRepeats,
 			},
 			artifacts.runtimeDemandMaps,
 		),
@@ -523,6 +524,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						components: (inputs.semanticGraph as SemanticGraphArtifact).components,
 						sharedCallbackBindings: (inputs.semanticGraph as SemanticGraphArtifact)
 							.sharedCallbackBindings,
+						keyedRepeats: (inputs.semanticGraph as SemanticGraphArtifact).keyedRepeats,
 					};
 					const runtimeDemandMaps = {
 						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),
