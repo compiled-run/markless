@@ -1,12 +1,11 @@
-// The DOM/JSX attribute convention every render and update path shares: null,
-// undefined and false mean the attribute is absent; true is the bare boolean
-// form, except for aria-/data- names whose consumers parse the word "true".
-// The compiler applies the same rule to values it already knows while
-// compiling (see collect-markup.ts staticAttributeText).
+// null, undefined and false mean absent and true is bare, except aria-/data- names (true reads "true") and the enumerated ones, which spell both words.
+export const ENUMERATED_BOOLEAN_ATTRIBUTE = /^(draggable|contenteditable|spellcheck)$/;
+
 export function marklessAttributeValue(name: string, value: unknown): string | null {
-	if (value == null || value === false) return null;
-	if (value !== true) return String(value);
-	return /^(aria|data)-/.test(name) ? 'true' : '';
+	if (value == null || (value === false && !ENUMERATED_BOOLEAN_ATTRIBUTE.test(name))) return null;
+	return value !== true || ENUMERATED_BOOLEAN_ATTRIBUTE.test(name) || /^(aria|data)-/.test(name)
+		? String(value)
+		: '';
 }
 
 type AttributeTarget = {

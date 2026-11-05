@@ -16,6 +16,13 @@ const stage = document.querySelector<HTMLElement>('[data-code-frame]') ?? docume
 let latest = 0;
 let urls: string[] = [];
 let mountedRun = -1;
+type Mounted = Awaited<ReturnType<typeof render>>;
+let mounted: Mounted | undefined;
+
+// A run left running keeps settling its async values and loads their code through a run already deleted.
+function dispose(container: Mounted | undefined): void {
+	(container?.runtime as { readonly dispose?: () => void } | undefined)?.dispose?.();
+}
 
 function reply(message: FrameReply): void {
 	parent.postMessage(message, location.origin);
@@ -61,6 +68,7 @@ async function run(
 		},
 	});
 	const mount = document.createElement('div');
+	let container: Mounted;
 	try {
 		const entryUrl = await linker.url(entryId);
 		const entry = (await import(/* @vite-ignore */ entryUrl)) as {
@@ -72,7 +80,7 @@ async function run(
 				`${entryId} has no default export, so there is no component to show.`,
 			);
 		// render() types its target for the resume DOM too, so a real element needs the cast.
-		await render(entry.default as Parameters<typeof render>[0], {
+		container = await render(entry.default as Parameters<typeof render>[0], {
 			target: mount as unknown as RenderTarget,
 		});
 	} catch (error) {
@@ -80,11 +88,13 @@ async function run(
 			reply({ type: 'code:result', id, ok: false, diagnostics: [runtimeError(error)] });
 		return;
 	}
-	if (id !== latest) return;
+	if (id !== latest) return dispose(container);
 	const page = document.createElement('style');
 	page.textContent = pageStyles.join('\n');
 	const style = document.createElement('style');
 	style.textContent = blockStyles(modules);
+	dispose(mounted);
+	mounted = container;
 	stage.replaceChildren(page, style, mount);
 	for (const old of runs.keys()) if (old < id) runs.delete(old);
 	for (const url of previousUrls) URL.revokeObjectURL(url);

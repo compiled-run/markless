@@ -40,6 +40,11 @@ export const BUDGETS = {
 	routeTableLoadChars: 512,
 	// Below this the many-link page no longer ships a bigger route table, and G15 would compare two equal pages.
 	routeTableMinHtmlGrowth: 4 * 1024,
+	// Pages passing Caption only text loaded the same bytes with the short and long Gloss; on main the long one leaked 3.7 KB into them.
+	staticPropArmLoadBytes: 512,
+	staticPropArmLoadChars: 512,
+	// Below this the long Gloss no longer loads more where it shows, and G18 would compare two equal builds.
+	staticPropArmMinShownGrowth: 2 * 1024,
 	// The two Workers differ only in a prerendered page's stylesheet; they measured 1 B apart.
 	serverStylesheetGrowthBytes: 1024,
 	// Below this the large build no longer ships a bigger prerendered stylesheet, and G17 would compare two equal builds.

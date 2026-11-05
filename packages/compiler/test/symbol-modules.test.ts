@@ -44,12 +44,12 @@ test('symbol modules carry authoredSource unless the build asks for it to be omi
 		omitAuthoredSource: true,
 	});
 
-	expect(kept.symbolModules.modules.some((module) => module.source.includes('authoredSource'))).toBe(
-		true,
-	);
-	expect(cut.symbolModules.modules.some((module) => module.source.includes('authoredSource'))).toBe(
-		false,
-	);
+	expect(
+		kept.symbolModules.modules.some((module) => module.source.includes('authoredSource')),
+	).toBe(true);
+	expect(
+		cut.symbolModules.modules.some((module) => module.source.includes('authoredSource')),
+	).toBe(false);
 	// Only the dead string leaves: same symbols, same exports, same executable bodies.
 	expect(cut.symbolModules.modules.map((module) => module.symbolId)).toEqual(
 		kept.symbolModules.modules.map((module) => module.symbolId),
@@ -59,9 +59,11 @@ test('symbol modules carry authoredSource unless the build asks for it to be omi
 	);
 	for (const [index, module] of cut.symbolModules.modules.entries()) {
 		const keptSource = kept.symbolModules.modules[index]!.source;
-		expect(keptSource.split('\n').filter((line) => !line.startsWith('export const authoredSource ='))).toEqual(
-			module.source.split('\n'),
-		);
+		expect(
+			keptSource
+				.split('\n')
+				.filter((line) => !line.startsWith('export const authoredSource =')),
+		).toEqual(module.source.split('\n'));
 	}
 });
 
@@ -351,11 +353,13 @@ function emitSelectAssignmentSymbol(valueSource: string, renderData?: any) {
 function repeatLocalRenderData() {
 	return {
 		repeats: [{ repeatId: 'repeat:0', rowChunkId: 'repeat:repeat:0:row', itemName: 'entry' }],
-		chunks: [{
-			id: 'repeat:repeat:0:row',
-			hosts: [{ hostNodeId: 'h2' }],
-			slots: [],
-		}],
+		chunks: [
+			{
+				id: 'repeat:repeat:0:row',
+				hosts: [{ hostNodeId: 'h2' }],
+				slots: [],
+			},
+		],
 		interactions: [{ hostNodeId: 'h2', symbolIds: ['symbol:select'] }],
 	};
 }
@@ -705,8 +709,7 @@ test('emitSymbolModules keeps dependency-like string values literal in sync comp
 					kind: 'sync-computed-derive',
 					graphNodeId: 'computed:status',
 					name: 'status',
-					source:
-						"() => alpha === 'alpha' || alpha === 'alpha-applied' || alpha === 'alphaapplied'",
+					source: "() => alpha === 'alpha' || alpha === 'alpha-applied' || alpha === 'alphaapplied'",
 					dependencies: [
 						{
 							source: 'alpha',
@@ -727,7 +730,7 @@ test('emitSymbolModules keeps dependency-like string values literal in sync comp
 	});
 
 	expect(artifact.modules[0].source).toContain(
-		"return context.graph.read(\"state:alpha\") === 'alpha' || context.graph.read(\"state:alpha\") === 'alpha-applied' || context.graph.read(\"state:alpha\") === 'alphaapplied';",
+		'return context.graph.read("state:alpha") === \'alpha\' || context.graph.read("state:alpha") === \'alpha-applied\' || context.graph.read("state:alpha") === \'alphaapplied\';',
 	);
 });
 
@@ -1902,8 +1905,8 @@ export function App() @{
 `,
 		symbols: [],
 	});
-	const child = result.symbolModules.modules.find((module) =>
-		module.kind === 'event-handler' && module.source.includes('capture.invoke'),
+	const child = result.symbolModules.modules.find(
+		(module) => module.kind === 'event-handler' && module.source.includes('capture.invoke'),
 	);
 	const callback = result.symbolModules.modules.find((module) => module.kind === 'callback-prop');
 	expect(child?.source).toContain('context.capture.read(');
@@ -1915,13 +1918,22 @@ export function App() @{
 
 	const multiArgumentCallback = emitSymbolModules({
 		symbolResolver: {
-			passId: 'symbol-resolver', dynamicImportOwner: 'generated-symbol-resolver',
-			symbols: [{
-				id: 'symbol:callback', kind: 'callback-prop', componentEdgeId: 'edge:0',
-				propName: 'onTrace', source: '(payload, reason) => console.log(payload, reason)',
-				parameters: ['payload', 'reason'], reads: [], writes: [],
-			}],
-			syncPolicies: [], diagnostics: [],
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			symbols: [
+				{
+					id: 'symbol:callback',
+					kind: 'callback-prop',
+					componentEdgeId: 'edge:0',
+					propName: 'onTrace',
+					source: '(payload, reason) => console.log(payload, reason)',
+					parameters: ['payload', 'reason'],
+					reads: [],
+					writes: [],
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
 		},
 		captureAnalysis: { passId: 'capture-analysis', extractedSymbols: [], diagnostics: [] },
 	}).modules[0]?.source;
@@ -1929,7 +1941,7 @@ export function App() @{
 	expect(multiArgumentCallback).toContain('const reason = context.args?.[1];');
 });
 
-test('a direct callback prop event reference invokes its graph-routable prop', async () => {
+test('a direct callback prop event reference invokes its graph-routable prop with the event, or nothing when absent', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Controls.tsrx',
 		source: `
@@ -1942,8 +1954,9 @@ export function Controls({ onActivate }) @{
 	const directHandler = result.symbolModules.modules.find(
 		(module) => module.kind === 'event-handler',
 	);
+	expect(directHandler?.source).toContain('const event = context.event;');
 	expect(directHandler?.source).toContain(
-		'return context.graph.read("prop:props", ["onActivate"])(context.event);',
+		'return context.graph.read("prop:props", ["onActivate"])?.(event);',
 	);
 });
 
@@ -1974,7 +1987,8 @@ export function App() @{
 	const pattern = handlers.find((module) => module.source.includes('"pattern"'));
 	const loop = handlers.find((module) => module.source.includes('"loop"'));
 	const prop = handlers.find(
-		(module) => module.source.includes('capture.invoke') && module.source.includes('capture.read'),
+		(module) =>
+			module.source.includes('capture.invoke') && module.source.includes('capture.read'),
 	);
 
 	expect(local?.source).toContain('const label = "local";');
@@ -2010,9 +2024,7 @@ export function App() @{
 `,
 		symbols: [],
 	});
-	const child = result.symbolModules.modules.find(
-		(module) => module.kind === 'event-handler',
-	);
+	const child = result.symbolModules.modules.find((module) => module.kind === 'event-handler');
 	const childRow = result.boundSymbolResolver.rows.find(
 		(row) => row.baseSymbolId === child?.symbolId,
 	);
@@ -2048,9 +2060,9 @@ export function App() @{
 	expect(result.captureAnalysis.diagnostics).toEqual([
 		expect.objectContaining({ code: 'MARKLESS_CAPTURE_OPAQUE_PROP' }),
 	]);
-	expect(
-		result.symbolModules.modules.some((module) => module.kind === 'event-handler'),
-	).toBe(false);
+	expect(result.symbolModules.modules.some((module) => module.kind === 'event-handler')).toBe(
+		false,
+	);
 });
 
 test('B908 preserves setTimeout deferral while splicing nested writes', () => {
@@ -3001,7 +3013,6 @@ export function Widget() @{
 	).toContain('marklessBoundaryArms');
 });
 
-
 test('branch-update modules defer to the runtime-computed arm when provided', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PropBranch.tsrx',
@@ -3079,7 +3090,8 @@ export function App() @{
 			if (graphNodeId === 'state:expanded') return expanded;
 			return path && path.length > 0
 				? path.reduce<unknown>(
-						(value, key) => (value == null ? value : (value as Record<string, unknown>)[key]),
+						(value, key) =>
+							value == null ? value : (value as Record<string, unknown>)[key],
 						snapshot,
 					)
 				: snapshot;

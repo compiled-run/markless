@@ -38,6 +38,7 @@ const guards = {
 	G15: 'a page runs no more code at load for linking more routes',
 	G16: 'no page runs or downloads more JS at load than its anchor',
 	G17: 'the server bundle carries no stylesheet text of prerendered pages, and each sheet once',
+	G18: 'a page loads no code for an arm its literal props rule out',
 } as const;
 
 for (const [guard, title] of Object.entries(guards)) {

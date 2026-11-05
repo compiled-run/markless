@@ -1277,6 +1277,7 @@ function runInlineResumer(
 				event,
 				element: event.target,
 				eventRecord: null,
+				propagationStopped: event.cancelBubble,
 				...(policyApplied ? { syncPolicyAlreadyApplied: true } : {}),
 			});
 		}

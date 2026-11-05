@@ -175,6 +175,7 @@ export function collectComponentEdge(
 		},
 		branchScopeIds: [...state.currentBranchScopeIds],
 		branchSiteIds: [...state.currentBranchSiteIds],
+		...(state.currentBranchArms.length > 0 ? { branchArms: [...state.currentBranchArms] } : {}),
 		keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 	});
 
@@ -197,18 +198,7 @@ function componentPropBindings(
 ): ReadonlyArray<SemanticComponentPropBinding> {
 	// Component-body scope: an unscoped map resolves `checklist` to the shared
 	// factory's own local of the same name, which is a different node.
-	const scope: GraphReadScope = {
-		bindings: graphBindingMap(
-			state.graph,
-			state.currentSharedDefinitionId ?? null,
-			state.currentComponentName,
-		),
-		aliases: semanticAliasMap(
-			state.graph,
-			state.currentSharedDefinitionId ?? null,
-			state.currentComponentName,
-		),
-	};
+	const scope = componentBodyScope(state);
 	const { bindings, aliases } = scope;
 	const props: SemanticComponentPropBinding[] = [];
 
@@ -311,7 +301,7 @@ function componentPropBindings(
 		// A received handler handed on as is (`onClick={onPress}`) runs as this instance's `(event) => onPress?.(event)` would.
 		const relayed =
 			expression && isEventAttribute(name)
-				? relayedHandlerSource(expression, source, scope, state)
+				? relayedHandlerSource(expression, scope, state)
 				: undefined;
 		if (relayed && childSpreadsProp(name, link, state, childComponentName)) {
 			props.push({
@@ -676,13 +666,37 @@ function spreadForwardsProp(
 	);
 }
 
+/** A received prop handed to an event attribute as is (`onClick={onPress}`), rewritten as the instance's `(event) => onPress?.(event)`. */
+export function receivedHandlerRelay(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly source: string; readonly parameter: string } | undefined {
+	return relayedHandlerSource(expression, componentBodyScope(state), state);
+}
+
+function componentBodyScope(state: WalkState): GraphReadScope {
+	return {
+		bindings: graphBindingMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+		aliases: semanticAliasMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+	};
+}
+
 function relayedHandlerSource(
 	expression: AnyNode,
-	source: string,
 	scope: GraphReadScope,
 	state: WalkState,
 ): { readonly source: string; readonly parameter: string } | undefined {
-	if (expression.type !== 'Identifier' || repeatRowBindsName(source, state)) return undefined;
+	if (expression.type !== 'Identifier') return undefined;
+	const source = getIdentifierName(expression);
+	if (!source || repeatRowBindsName(source, state)) return undefined;
 	const graph = resolveGraphPath(source, scope.bindings, scope.aliases);
 	if (graph?.binding.kind !== 'prop' || graph.path.length !== 1) return undefined;
 	const parameter = source === 'event' ? 'domEvent' : 'event';

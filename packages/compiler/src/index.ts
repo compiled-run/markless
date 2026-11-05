@@ -4,6 +4,7 @@ export type * from './type-service.ts';
 
 export { collectTsrxModuleDiagnostics } from './collect-diagnostics.ts';
 export { propsDeciding, rowsDecidedBy } from './artifact-helpers/prop-deciders.ts';
+export { propDecidedArm, type KnownPropValue } from './artifact-helpers/prop-test.ts';
 export { DEBUGGING_PLAYBOOK_HINT } from './debugging-playbook.ts';
 export { compileTsrxModule } from './compile-module.ts';
 export { ELEMENT_ONLY_ATTRIBUTE_MISPLACED_CODE } from './passes/semantic-graph/element-only-attributes.ts';

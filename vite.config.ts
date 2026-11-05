@@ -111,13 +111,6 @@ const buildOrder: PackUserConfig[] = [
 		},
 	}),
 	marklessPack({
-		packageName: 'compiler',
-		entry: {
-			index: './src/index.ts',
-			'type-service': './src/type-service.ts',
-		},
-	}),
-	marklessPack({
 		packageName: 'runtime',
 		entry: {
 			index: './src/index.ts',
@@ -131,6 +124,7 @@ const buildOrder: PackUserConfig[] = [
 		packageName: 'web',
 		entry: {
 			index: './src/index.ts',
+			'dom-attribute': './src/dom-attribute.ts',
 			'dom-journal': './src/dom-journal.ts',
 			'dom-update': './src/dom-update.ts',
 			'event-only-resume': './src/event-only-resume.ts',
@@ -147,6 +141,13 @@ const buildOrder: PackUserConfig[] = [
 			...webFnsEntries,
 			'resume-storage-free': './src/payload-full-storage-free.ts',
 			'shared-swap': './src/shared-swap.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'compiler',
+		entry: {
+			index: './src/index.ts',
+			'type-service': './src/type-service.ts',
 		},
 	}),
 	marklessPack({
@@ -173,6 +174,7 @@ const buildOrder: PackUserConfig[] = [
 			'vite/runtime/mdx-route': './src/vite/runtime/mdx-route.ts',
 			'vite/runtime/create-server-entry': './src/vite/runtime/create-server-entry.ts',
 			'vite/route-href': './src/vite/entries/route-href.ts',
+			'vite/route-types': './src/vite/route-typegen.ts',
 			'typescript-plugin': './src/typescript-plugin/index.ts',
 		},
 	}),

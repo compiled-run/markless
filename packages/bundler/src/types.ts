@@ -294,6 +294,13 @@ export type MarklessRolldownPluginApi = {
 	}>;
 	/** Whether every compiled module of this build mounts through the direct-DOM renderer. */
 	directCsrOnly: () => boolean;
+	/** Per component file of a route: the child files it imports only for arms no caller on the route renders. */
+	unreachableChildren: import('./build/interaction-closures.ts').UnreachableChildren;
+	/** A host plugin names the components a non-TSRX page renders (an MDX page), each with props fixed at build time. */
+	recordLiteralComponentInstances: (
+		source: string,
+		instances: ReadonlyArray<import('./prop-flow.ts').LiteralComponentInstance>,
+	) => void;
 	/** What the client build leaves for the environments built after it, so they can build in another process. */
 	clientBuildHandoff: () => ClientBuildHandoff;
 	/** Starts the later environments from a client build that ran in another process. */

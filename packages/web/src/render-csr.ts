@@ -231,7 +231,9 @@ export async function renderCsrRuntime(input: {
 	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
 	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
 	if (hasLiveSharedDefinitions(state))
-		(await (globalThis as SharedInstancesHost).__marklessSharedInstances?.())?.registerDormantContainer(
+		(
+			await (globalThis as SharedInstancesHost).__marklessSharedInstances?.()
+		)?.registerDormantContainer(
 			output.root,
 			state,
 			() => void (disposed || deferredRuntime.start()),
@@ -440,7 +442,11 @@ function installDelegatedTriggers(
 					? actionKind === PROTOCOL_EVENT_ACTION_KIND.event && record.syncPolicy
 					: !syncPolicyApplied && rowPolicy(element as RowNode, event.type, path);
 				if (policy) {
-					runSyncPolicyActions(policy, syncPolicyGraph, event as unknown as SyncPolicyDomEvent);
+					runSyncPolicyActions(
+						policy,
+						syncPolicyGraph,
+						event as unknown as SyncPolicyDomEvent,
+					);
 					syncPolicyApplied = true;
 				}
 			}
@@ -464,10 +470,12 @@ function installDelegatedTriggers(
 					throw unroutedDelegatedTriggerError(actionKind);
 				return;
 			}
-			await action(
-				event,
-				{ ignoreUnmatched: !named, syncPolicyAlreadyApplied: syncPolicyApplied },
-			);
+			// The walk runs after the browser has reset cancelBubble, so the stop is read now.
+			await action(event, {
+				ignoreUnmatched: !named,
+				syncPolicyAlreadyApplied: syncPolicyApplied,
+				propagationStopped: event.cancelBubble === true,
+			});
 		};
 		// addEventListener drops the returned promise, so a rejection would escape
 		// the flush unhandled: contain it here and report it instead.
@@ -524,7 +532,8 @@ function installDelegatedTriggers(
 	};
 	const installEventNames = (eventName: string) => {
 		installEventListener(eventName);
-		if (isFocusPreloadEventName(eventName)) installPreloadTrigger('focusin', focusPreloadEventNames);
+		if (isFocusPreloadEventName(eventName))
+			installPreloadTrigger('focusin', focusPreloadEventNames);
 		// pointerenter does not bubble, so a delegated listener would only ever see
 		// the container's own crossing.
 		if (PRESS_EVENT_NAMES.includes(eventName))
