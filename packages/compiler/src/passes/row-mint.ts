@@ -10,7 +10,11 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
-import { childConstructReach, type ConstructReachInput } from './construct-reach.ts';
+import {
+	childConstructReach,
+	childRootBoundary,
+	type ConstructReachInput,
+} from './construct-reach.ts';
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
 
@@ -101,7 +105,7 @@ export function resolveRowComponentMint(
 		!projectionIsMintable(input, slot.projectionChunkId, new Set(), [input.itemName])
 	)
 		return null;
-	if (!childIsMintable(input, edge, slot.childTemplateId, new Set())) return null;
+	if (!childIsMintable(input, edge, slot.childTemplateId, new Set(), !wraps)) return null;
 	const itemProps = edge.props.filter((prop) => prop.source === input.itemName);
 	return {
 		componentEdgeId: slot.componentEdgeId,
@@ -547,6 +551,7 @@ function childIsMintable(
 	edge: SemanticComponentEdge,
 	childTemplateId: string,
 	seen: Set<string>,
+	isWholeRow = false,
 ): boolean {
 	if (edge.importSource !== undefined) {
 		const entry = input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
@@ -555,7 +560,13 @@ function childIsMintable(
 		if (!entry) return false;
 	}
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
-	return reach !== 'boundaries' && reach !== 'unknown';
+	if (reach === 'unknown') return false;
+	// A row moves as its one element, so a @try beside that element would be left behind.
+	return !(
+		isWholeRow &&
+		reach === 'boundaries' &&
+		childRootBoundary(input, edge, childTemplateId, new Set())
+	);
 }
 
 // A nested list's rows stand in front of what follows its anchor, so a patch counts those steps from the parent's end; lists on both sides leave no count.

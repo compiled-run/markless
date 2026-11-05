@@ -377,6 +377,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly addressSteps?: ModuleGraphInterfaceElementCount;
 			// Absent on an interface built before this field existed, which reads as 'unknown'.
 			readonly constructReach?: ModuleGraphInterfaceConstructReach;
+			/** A @try stands at the component's top level, outside every element it renders. */
+			readonly rootBoundary?: true;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			/** Props this component files into a widget callback slot. */

@@ -40,6 +40,7 @@ import {
 	type KeyedRepeatRowMintRefusal,
 	type KeyedRepeatRowValueUnpaintedCause,
 } from './diagnostics.ts';
+import { childRootBoundary } from '../construct-reach.ts';
 
 /**
  * A keyed @for whose rows cannot be built in the browser says so.
@@ -503,7 +504,23 @@ function rowMintRefusal(input: {
 			rowElementCount: chunk.hosts.length,
 			itemName: input.itemName,
 		});
-		return mint ? null : { kind: 'component', componentName: componentSlot.childComponentName };
+		if (mint) return null;
+		const edge = input.componentEdges.find(
+			(candidate) => candidate.id === componentSlot.componentEdgeId,
+		);
+		const reachInput = {
+			chunks: input.chunks,
+			componentEdges: input.componentEdges,
+			componentNames: input.componentNames,
+			...(input.importedModuleInterfaces
+				? { importedModuleInterfaces: input.importedModuleInterfaces }
+				: {}),
+		};
+		return chunk.hosts.length === 0 &&
+			edge &&
+			childRootBoundary(reachInput, edge, componentSlot.childTemplateId, new Set())
+			? { kind: 'component-root-boundary', componentName: componentSlot.childComponentName }
+			: { kind: 'component', componentName: componentSlot.childComponentName };
 	}
 	for (const slot of chunk.slots) {
 		if (slot.kind === 'text' || slot.kind === 'attribute') {
