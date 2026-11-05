@@ -112,6 +112,18 @@ export default function Visitor() @{
 
 A click changes the text that shows `user.visits`. The text that shows `user.name` stays as it is.
 
+## Give state a type
+
+TypeScript takes the type from the starting value. When the starting value is narrower than what the
+state will hold, pass the type: `state<T>(initial: T): T`.
+
+```tsrx
+type Sort = 'newest' | 'oldest';
+
+let sort = state<Sort>('newest');
+let todos = state<Todo[]>([]);
+```
+
 ## Where state can live
 
 Make `state()` directly in the component body, next to your other variables. Anywhere else, the

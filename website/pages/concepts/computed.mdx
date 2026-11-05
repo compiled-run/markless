@@ -66,6 +66,9 @@ Now look in the file for the line that updates the total. There is no such line.
 changes one count and stops. When a count changes, Markless runs the recipe again and updates the
 text that shows `total`.
 
+A recipe can be `async`. Then `computed()` gives back the value the promise resolves to, and its
+type is that value's type, not a promise. [Waiting](/concepts/async) shows how the page waits for it.
+
 ## What a recipe can read
 
 A recipe can read state, props, imports, and `const` values built from those. It cannot read other

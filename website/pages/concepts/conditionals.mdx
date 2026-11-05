@@ -113,6 +113,35 @@ export default function Light() @{
 }
 ```
 
+Each arm holds one node: an element, a fragment `<>…</>`, or another `@` block. Two elements side
+by side stop the build with [`MARKLESS_BLOCK_SIBLING_NODES`](/errors/MARKLESS_BLOCK_SIBLING_NODES).
+Wrap them in `<>` and `</>`.
+
+## An attribute that comes and goes
+
+For one attribute, you do not need an `@if`. Give it a value that can be missing:
+
+| Value | What the element gets |
+| --- | --- |
+| `undefined`, `null` | no attribute |
+| `false` | no attribute, except the `aria-*` states listed below, which get `"false"` |
+| `true` | the bare attribute, as in `disabled=""`; `aria-*` and `data-*` get `"true"` |
+| a string or number | that text |
+
+```tsrx
+<button disabled={saving} aria-pressed={on}>Save</button>
+```
+
+`aria-pressed={false}` writes `aria-pressed="false"`, because for these states "false" and missing
+mean different things to a screen reader: `aria-atomic`, `aria-busy`, `aria-checked`, `aria-current`,
+`aria-disabled`, `aria-expanded`, `aria-grabbed`, `aria-haspopup`, `aria-invalid`, `aria-modal`,
+`aria-multiline`, `aria-multiselectable`, `aria-pressed`, `aria-readonly`, `aria-required` and
+`aria-selected`. Every other attribute, `aria-hidden` included, is removed by `false`. To drop one of
+those states, pass `undefined`: `aria-busy={saving ? true : undefined}`.
+
+You rarely write `aria-busy` by hand. While an async value loads again, Markless marks the elements
+that show it. See [waiting](/concepts/async#while-a-new-answer-loads).
+
 ## Give the test a name
 
 The demo tests `long`, not `note.length > 20`. The recipe in `computed()` gives the test a name, and

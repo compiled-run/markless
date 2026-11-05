@@ -110,6 +110,12 @@ the analytics script, so neither one is part of the page load.
 It runs once per element. An element inside an `@if` or `@for` runs it after the element appears
 and the page is idle again. An element that is gone by then never runs it.
 
+## A handler that awaits
+
+A handler can be `async`. If an `await` in it fails, the error does not reach a `@catch` block: the
+handler stops there and the browser reports an uncaught error. Wrap the `await` in `try` and
+`catch`, and keep a message in state. See [waiting](/concepts/async#what-if-an-await-inside-a-click-handler-fails).
+
 ## Naming the prop
 
 Write `on` and then the event name. `click` becomes `onClick`, `input` becomes `onInput`, and

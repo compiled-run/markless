@@ -98,13 +98,17 @@ away, waits before it answers anything else, and fails for a mug it does not kno
 ## The three blocks
 
 `@try` holds what you show once the value is ready. Inside it, read the value directly, as in
-`fact.text`. There is no `.data` to reach through and no status to check.
+`fact.text`. There is no `.data` to reach through and no status to check. The type says the same:
+`computed(async () => ({ text: '' }))` is typed `{ text: string }`, the resolved value, not a promise.
 
 `@catch` holds what you show when the recipe throws or its promise rejects. On the first load it is
 the only thing shown. After that, the last answer stays and `@catch` shows right after it.
 
 `@pending` holds what you show while there is no answer yet. That is the first load: once an answer
 is on the page, picking again keeps it there while the next answer loads.
+
+A `@try` needs a `@pending` or a `@catch` after it, or both. Each block holds one node. For more,
+wrap them in a fragment: `@try { <><h2>{fact.text}</h2><p>More</p></> } @pending { <p>Loading</p> }`.
 
 <MugSpot mood="brew" at="perch" />
 
@@ -318,5 +322,78 @@ One read stops the build with `MARKLESS_ASYNC_POST_AWAIT_READ`: a lookup whose k
 itself, like `shelf[(await loadPick()).id]`. Markless cannot know which entry that is until the
 answer arrives. Return the answer from the recipe, and do the lookup in a second, plain
 `computed()`.
+
+## Build errors inside `@try`
+
+These shapes stop the build:
+
+| Shape | Code |
+| --- | --- |
+| Two nodes side by side in a `@try`, `@pending` or `@catch` block | [`MARKLESS_BLOCK_SIBLING_NODES`](/errors/MARKLESS_BLOCK_SIBLING_NODES) |
+| A `@try` with neither `@pending` nor `@catch` after it | `MARKLESS_PARSE_ERROR` (TSRX1010) |
+| A read of the async value outside every `@try` | [`MARKLESS_ASYNC_BOUNDARY_REQUIRED`](/errors/MARKLESS_ASYNC_BOUNDARY_REQUIRED) |
+| `@pending` written after `@catch` | [`MARKLESS_ASYNC_ARM_ORDER`](/errors/MARKLESS_ASYNC_ARM_ORDER) |
+| `@catch` after an element instead of a `@try` | [`MARKLESS_ASYNC_CATCH_WITHOUT_TRY`](/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY) |
+| A `@for` row that is not one element | [`MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT`](/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT) |
+| A lookup keyed by the answer, like `shelf[(await loadPick()).id]` | [`MARKLESS_ASYNC_POST_AWAIT_READ`](/errors/MARKLESS_ASYNC_POST_AWAIT_READ) |
+
+[`MARKLESS_ASYNC_INPUT_BESIDE_VALUE`](/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE) is a warning, not
+an error. [Error codes](/errors) lists every other code.
+
+## Common questions
+
+### Is `@catch` required?
+
+No. A `@try` needs a `@pending` or a `@catch`, and either one is enough. Without `@catch`, a first
+load that fails leaves that spot empty, and the rest of the page still shows.
+
+### Can `@catch` take only the error?
+
+Yes. `@catch` names nothing, `@catch (error)` names the error, and `@catch (error, reset)` also names
+the [try-again function](#try-again).
+
+### Can a click handler read the async value?
+
+Yes. Put the button inside the `@try` and read the value as the page does:
+`onClick={() => save(report.days)}`. While a new answer loads, the handler still reads the answer on
+the page.
+
+### What if an `await` inside a click handler fails?
+
+`@catch` does not show. It only shows when a `computed()` recipe fails. The handler stops at that
+`await`, state it changed before the `await` keeps its new value, and the browser reports an uncaught
+error. To show the failure, catch it in the handler and keep a message in state:
+
+```tsrx
+<button onClick={async () => {
+	try {
+		await saveReport(report.days);
+		note = 'Saved';
+	} catch {
+		note = 'Could not save';
+	}
+}}>Save</button>
+```
+
+### What if answers arrive out of order?
+
+The newest input wins. Each change starts the recipe again, and only the run that started last can
+put its answer on the page. An older run that finishes later is dropped, whether it succeeds or
+fails. Your request itself is not cancelled. It runs to the end, and its answer is ignored.
+
+### Is there a mount hook or an effect?
+
+No. There is no `onMount`, no `useEffect` and no effect function. The component body runs once, to
+set up the page. To load data when the page opens, use `computed(async …)`. For code that needs the
+element itself, use [`attach`](/build/elements). For code that should wait until the page is idle,
+use [`onIdle`](/concepts/events). Work that follows a change goes in the handler that makes the change.
+
+### Is there an API reference or an example app?
+
+There is no separate API reference page. [Every Markless package](/reference) lists what each
+package exports, and the types ship with `@markless/core`: `state<T>(initial: T): T`, and
+`computed()`, which gives back the resolved value for an async recipe. Each build error has a page
+in [Error codes](/errors). There is no example app written for learning yet.
+[Apps moved so far](/start/migrate) lists real apps ported to Markless.
 
 Next: [two components that both call something .card](/concepts/styling).

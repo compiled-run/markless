@@ -56,6 +56,24 @@ test('storage() rejects three arguments', () => {
 	expect(diagnostics.join('\n')).toMatch(/argument/i);
 });
 
+test('state<T>() takes a type argument and gives back T', () => {
+	expect(
+		diagnosticsForCallSite(
+			"type Sort = 'newest' | 'oldest';\nconst sort: Sort = state<Sort>('newest');\nconst todos: string[] = state<string[]>([]);\nvoid sort; void todos;",
+			"import { state } from './framework-api';",
+		),
+	).toEqual([]);
+});
+
+test('computed(async ...) types as the resolved value, with no wrapper', () => {
+	expect(
+		diagnosticsForCallSite(
+			'const report = computed(async () => ({ days: 7, items: ["a"] }));\nconst days: number = report.days;\nconst first: string = report.items[0]!;\nvoid days; void first;',
+			"import { computed } from './framework-api';",
+		),
+	).toEqual([]);
+});
+
 // Requires `vp pack` output. Skipped when dist is absent (plain `vp test` runs
 // without packing), mirroring scripts/release/publish-shape.test.ts. This is the
 // assertion that ties the SHIPPED declaration to the SHIPPED doc: both files
