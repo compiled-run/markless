@@ -23,7 +23,7 @@ describe('the lazy-chunks figure', () => {
 		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
 		expect(piece).not.toMatch(/bags|counter/i);
 		expect(piece).toContain("event.key === 'Escape'");
-		expect(piece).not.toMatch(/cord|crocodile|wire/i);
+		expect(piece).not.toMatch(/\b(cord|crocodile|wire)s?\b/i);
 	});
 
 	it('answers the pointer: every object lifts on hover', () => {

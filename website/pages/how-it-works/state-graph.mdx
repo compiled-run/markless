@@ -1,61 +1,74 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import PlaylistAnatomy from '../../components/figures/state-graph/playlist-anatomy.tsrx';
+import GraphAnatomy from '../../components/figures/state-graph/graph-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# One write wakes only its readers
+# The state graph
 
-<PageMeta time="2 min" assumes="state, computed, events" />
+<PageMeta time="3 min" assumes="state, computed, events" />
 
-<Subtitle text="The compiler writes down who reads what before the page exists, so a write reaches only the spots that read it." />
-
-<PlaylistAnatomy />
-
-Pick a song. The value `playing` is ruled to the two spots that read it, so only those two change. The title reads nothing, so nothing ever redraws it.
+<Subtitle text="The state graph is a list, written at compile time, of which values each spot on the page reads." terms="values" />
 
 ```tsrx title="playlist.tsrx"
-import { state } from '@markless/core';
+import { computed, state } from '@markless/core';
 
 export default function Playlist() @{
 	let playing = state('Harbour Lights');
+	const heading = computed(
+		() => 'Now playing: ' + playing,
+	);
 
-	<section>
-		<h2>Road trip</h2>
-		<p>Now playing: {playing}</p>
-		<button
-			class={playing === 'Slow Train' ? 'on' : ''}
-			onClick={() => (playing = 'Slow Train')}
-		>
-			Slow Train
-		</button>
-	</section>
+	<p>{heading}</p>
 }
 ```
 
-## The rules are the state graph
+**`playing`** is a value the page watches. **`heading`** is worked out from it. **`{heading}`** is the one spot that shows it, so a change to `playing` reaches that line and nothing else.
 
-- A **node** holds one value: `state()` makes `state:playing`, and `computed()` makes a node of its own.
-- A **subscription** is one ruled line: a node, a path into its value, and a small function to run when it changes.
-- The **journal** is the list of page changes those functions return: here a `setText` for the paragraph and a class update for the button. The compiler reads the class through a small computed node it adds on its own.
+## The graph is written before the page runs
 
-## One write, two readers
+The compiler turns each `state()` and `computed()` into a *node*, and each spot that reads one into a *subscription*:
 
-For `playing = 'Slow Train'`, the graph in `@markless/runtime`:
+- `state:playing` is a node
+- `computed:heading` reads `state:playing`
+- the `<p>` text reads `computed:heading`
 
-1. stops if the value didn't change,
-2. marks `state:playing` changed, and any computed that reads it stale,
-3. schedules one flush right after the current code,
-4. runs only the subscriptions ruled to it, and applies the journal entries they return.
+Press **Slow Train**, then **Shuffle**, and watch the graph:
 
-Two writes in the same turn share one flush. A write to `song.title` doesn't reach a reader of `song.artist`; replacing `song` reaches both.
+<GraphAnatomy />
 
-Not on this path:
+- Slow Train lights one path, `playing` to `heading` to the paragraph.
+- Pressing it again does nothing: the value is the same, so the graph stops.
+- `shuffle` has no readers, so changing it changes nothing on the page.
 
-- A component on the [direct module](/how-it-works/compiler) keeps a plain `Map` instead, and rewrites only the text that changed.
+## A write runs only its own path
+
+When `playing` changes, `@markless/runtime`:
+
+1. marks `state:playing` changed and `computed:heading` stale,
+2. waits for the current code to finish, then runs one *flush*,
+3. runs only the subscriptions on that path and applies the page changes they return.
+
+<Code steps={[{ label: 'Change `Harbour Lights` to `Slow Train`.', shows: 'Now playing: Slow Train' }, { label: "Under the paragraph, add `<button onClick={() => (playing = 'Northbound')}>Next</button>`. Press it.", shows: 'Now playing: Northbound' }]}>
+```tsrx title="playlist.tsrx"
+import { computed, state } from '@markless/core';
+
+export default function Playlist() @{
+	let playing = state('Harbour Lights');
+	const heading = computed(
+		() => 'Now playing: ' + playing,
+	);
+
+	<p>{heading}</p>
+}
+```
+</Code>
+
+- Two writes in the same turn share one flush.
+- A write to `song.title` doesn't reach a reader of `song.artist`; replacing `song` reaches both.
 - `@markless/core` has no effect function. The compiler plans every subscription.
 
-[Lazy chunks](/how-it-works/lazy-chunks) shows where those small functions live.
+[Lazy chunks](/how-it-works/lazy-chunks) shows where the code behind each subscription lives.
