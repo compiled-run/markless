@@ -73,7 +73,8 @@ const PLAYWRIGHT_JOB = 'prepare-playwright';
 
 // The analyzer receipt set is checked inside the gate, after its result step.
 const RECEIPTS_JOB = GATE_JOB;
-const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-chromium-webkit-';
+const IMAGE_KEY = '${{ needs.lanes.outputs.image_os }}';
+const BROWSER_CACHE_KEY = 'playwright-${{ runner.os }}-' + IMAGE_KEY + '-chromium-webkit-';
 
 // Jobs the gate depends on that are wiring rather than a content-hashed lane.
 const GATE_INFRASTRUCTURE = new Set([LANES_JOB]);
@@ -399,7 +400,18 @@ if (isCiSuite && !jobNames.includes(PLAYWRIGHT_JOB)) {
 			const cachePath = withOf(step).path;
 			if (typeof cachePath === 'string' && cachePath.includes('ms-playwright') && cachePath !== browsersPath)
 				fail(`Step \`${step.name ?? step.id ?? 'unnamed'}\` in \`${name}\` caches \`${cachePath}\`, not the job's \`PLAYWRIGHT_BROWSERS_PATH\` \`${browsersPath}\`.`);
+			const keys = [withOf(step).key, ...String(withOf(step)['restore-keys'] ?? '').split('\n')].map((key) => String(key ?? '').trim()).filter(Boolean);
+			if (typeof cachePath === 'string' && /ms-playwright|playwright-apt/.test(cachePath) && keys.some((key) => !key.includes(IMAGE_KEY)))
+				fail(`Step \`${step.name ?? step.id ?? 'unnamed'}\` in \`${name}\` keys \`${cachePath}\` without the runner image; WebKit and its system packages differ per Ubuntu release.`);
 		}
+	}
+	// The lanes job names the image for every job's cache key, so that image has to be the one each job runs on.
+	const lanesRunner = jobs[LANES_JOB]?.['runs-on'];
+	if (lanesRunner === 'ubuntu-latest')
+		fail(`Job \`${LANES_JOB}\` runs on \`ubuntu-latest\`, which moves between Ubuntu releases mid-rollout; pin the release.`);
+	for (const name of jobNames) {
+		if (jobText(name).includes(IMAGE_KEY) && jobs[name]?.['runs-on'] !== lanesRunner)
+			fail(`Job \`${name}\` keys a cache on \`${LANES_JOB}\`'s runner image but runs on \`${jobs[name]?.['runs-on']}\`, not \`${lanesRunner}\`.`);
 	}
 	const launchers = nodeTestsLaunchingBrowsers();
 	if (launchers.length > 0 && jobNames.includes('unit')) {
