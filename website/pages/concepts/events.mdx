@@ -19,13 +19,13 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 That is `addEventListener('input', …)` written on the element. `event.key` and `event.preventDefault()` are the real ones.
 
-## Follow the key press
+## Strike a key
 
-The box is `name`, and the `onInput` wire is the handler. Press the drawing to type a letter.
+The keys are the browser, and the roller lettered `onInput` is your handler. Press the drawing to strike a key.
 
 <TypingAnatomy />
 
-The handler runs only when its event fires, and only the preview follows `name`.
+Each strike is one event that carries its key. The handler runs only then, and only the field and the preview change.
 
 ## Write your own
 

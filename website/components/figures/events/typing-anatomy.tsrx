@@ -1,15 +1,15 @@
-// The shop page on the desk with a name field and the `name` box: each key press sends the browser's input event down the handler's wire, and only the preview follows.
+// The shop page with its name field under a typewriter's platen: a key strike is the browser's event, and the platen, the onInput handler, types it onto the page.
 import { computed, state } from '@markless/core';
-import { describeTyping, flip, PREVIEW_NEW, PREVIEW_OLD, press, PRICE, PRODUCT, SHOP, START, typed, TYPING_TOUR } from './typing-model.ts';
+import { describeTyping, flip, NAME, press, PRICE, PRODUCT, SHOP, START, typed, TYPING_TOUR } from './typing-model.ts';
 import { art } from './typing.art.ts';
 
 export default function TypingAnatomy() @{
 	let letters = state(START);
-	let prev = state(START);
 	let beat = state('rest');
 	let touched = state(false);
 	const name = computed(() => typed(letters));
-	const before = computed(() => typed(prev));
+	const struck = computed(() => NAME[letters - 1]!.toUpperCase());
+	const slip = computed(() => 'input · "' + NAME[letters - 1] + '"');
 	const said = computed(() => describeTyping(letters, beat !== 'rest'));
 
 	<figure
@@ -28,15 +28,13 @@ export default function TypingAnatomy() @{
 				const next = TYPING_TOUR[step % TYPING_TOUR.length];
 				step++;
 				if (next === 'key') {
-					prev = letters;
 					letters = press(letters);
 					beat = flip(beat);
 				} else if (next === 'reset') {
-					prev = START;
 					letters = START;
 					beat = 'rest';
 				}
-			}, 3400);
+			}, 3000);
 			return () => {
 				clearInterval(timer);
 				watcher.disconnect();
@@ -46,17 +44,15 @@ export default function TypingAnatomy() @{
 		<button
 			type="button"
 			class="stage"
-			aria-label="Type the next letter"
+			aria-label="Strike the next key"
 			onClick={() => {
 				touched = true;
-				prev = letters;
 				letters = press(letters);
 				beat = flip(beat);
 			}}
 			onKeyDown={(event) => {
 				if (event.key === 'Escape') {
 					touched = true;
-					prev = START;
 					letters = START;
 					beat = 'rest';
 				}
@@ -64,14 +60,14 @@ export default function TypingAnatomy() @{
 		>
 			<svg class="scene" data-beat={beat} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="pencil" d={art.sheet.pencil} />
-				<path class="pencil" d={art.name.pencil} />
+				<path class="pencil" d={art.deck.pencil} />
 				<path class="shadow-wash" d={art.sheet.curl.shadow} />
 				<path class="hatch deep" d={art.sheet.curl.hatch} />
 				<path class="shadow-wash light" d={art.sheet.contactWash} />
 				<path class="hatch deep" d={art.sheet.contact} />
 				<path class="hatch deep light" d={art.sheet.desk} />
-				<path class="shadow-wash" d={art.name.cast.wash} />
-				<path class="hatch deep light" d={art.name.cast.hatch} />
+				<path class="shadow-wash" d={art.deck.shadow.wash} />
+				<path class="hatch deep light" d={art.deck.shadow.hatch} />
 
 				<g class="sheet">
 					<path class="sheet-paper" d={art.sheet.paper} />
@@ -98,79 +94,62 @@ export default function TypingAnatomy() @{
 				</g>
 
 				<path class="sheet-paper" d={art.page.field.paper} />
-				<path class="sheet-hatch light" d={art.page.field.inset} />
 				<path class="sheet-ink" d={art.page.field.ink} />
 				<g transform={art.page.field.matrix}>
-					<text class="field-text">{name}</text>
+					<text class="field-text live step-1">{name}</text>
 				</g>
-				<g class="preview-spot">
-					<path class="wash yellow" d={art.page.spot.wash} />
-					<path class="wash yellow pool" d={art.page.spot.pool} />
-					<path class="wash-edge" d={art.page.spot.edge} />
-				</g>
+				<path class="shadow-wash" d={art.page.field.roller.cast} />
+				<path class="roller" d={art.page.field.roller.paper} />
+				<path class="hatch" d={art.page.field.roller.shade} />
+				<path class="jar-ink" d={art.page.field.roller.ink} />
+				<path class="roller" d={art.page.field.roller.knobs[0].paper} />
+				<path class="hatch" d={art.page.field.roller.knobs[0].shade} />
+				<path class="jar-ink" d={art.page.field.roller.knobs[0].ink} />
+				<path class="roller" d={art.page.field.roller.knobs[1].paper} />
+				<path class="hatch" d={art.page.field.roller.knobs[1].shade} />
+				<path class="jar-ink" d={art.page.field.roller.knobs[1].ink} />
+				<text class="roller-label" transform={art.page.field.roller.labelMatrix}>onInput</text>
+
+				<path class="wash yellow" d={art.page.spot.wash} />
+				<path class="wash yellow pool" d={art.page.spot.pool} />
 				<g transform={art.page.previewMatrix}>
 					<text class="page-text label">Preview:</text>
-					<g class="old preview-old">
-						<text class="page-text small" x={PREVIEW_OLD}>{before}</text>
-						<path class="strike" d={art.strike.d} style={'--l:' + art.strike.length} />
-					</g>
-					<text class="digit preview-now" x={PREVIEW_NEW}>{name}</text>
+					<text class="digit live step-2" x="100">{name}</text>
 				</g>
 
-				<path class="shadow-ink" d={art.wires.handler.shadow} />
-				<path class="hatch deep" d={art.wires.handler.shadowHatch} />
-				<path class="shadow-ink" d={art.wires.out.shadow} />
-				<path class="hatch deep" d={art.wires.out.shadowHatch} />
-				<path class="shadow-wash" d={art.wires.clip.cast} />
+				<path class="deck" d={art.deck.edge} />
+				<path class="hatch" d={art.deck.edgeHatch} />
+				<path class="deck" d={art.deck.paper} />
+				<path class="hatch light" d={art.deck.tone} />
+				<path class="jar-ink" d={art.deck.ink} />
+				@for (const key of art.keys; key key.letter) {
+					<g class={key.letter === struck ? 'key struck' : 'key'} style={key.sink}>
+						<path class="key-stem" d={key.stem} />
+						<path class="hatch light" d={key.shade} />
+						<path class="key-face" d={key.paper} />
+						<path class="wash pink key-wash" d={key.wash} />
+						<path class="jar-ink" d={key.ink} />
+						<text class="key-letter" transform={key.matrix}>{key.letter}</text>
+					</g>
+				}
 
-				<path class="box-paper" d={art.name.paper} />
-				<path class="wash kraft-wash" d={art.name.kraft} />
-				<path class="hatch" d={art.name.shade} />
-				<path class="tag-paper" d={art.name.label} />
-				<path class="tag-ink" d={art.name.labelInk} />
-				<path class="jar-ink" d={art.name.ink} />
-				<text class="count stamp-count" transform={art.name.valueMatrix}>{name}</text>
-				<path class="jar-ink" d={art.name.tag.string} />
-				<path class="tag-paper" d={art.name.tag.paper} />
-				<path class="tag-hatch" d={art.name.tag.shade} />
-				<path class="tag-ink" d={art.name.tag.ink} />
-				<text class="tag-text" transform={art.name.tag.matrix}>name</text>
-
-				<path class="cord" d={art.wires.handler.paper} />
-				<path class="jar-ink" d={art.wires.handler.tone} />
-				<path class="jar-ink" d={art.wires.handler.ink} />
-				<path class="boot" d={art.wires.socket.paper} />
-				<path class="jar-ink" d={art.wires.socket.ink} />
-				<path class="jar-ink" d={art.wires.slip.string} />
-				<path class="tag-paper" d={art.wires.slip.paper} />
-				<path class="wash pink slip-wash" d={art.wires.slip.paper} />
-				<path class="tag-hatch" d={art.wires.slip.shade} />
-				<path class="tag-ink" d={art.wires.slip.ink} />
-				<text class="tag-text" transform={art.wires.slip.matrix}>onInput</text>
-				<path class="cord" d={art.wires.out.paper} />
-				<path class="jar-ink" d={art.wires.out.tone} />
-				<path class="jar-ink" d={art.wires.out.ink} />
-				<path class="boot" d={art.wires.clip.boot} />
-				<path class="hatch" d={art.wires.clip.bootTone} />
-				<path class="brass" d={art.wires.clip.paper} />
-				<path class="wash brass-wash" d={art.wires.clip.wash} />
-				<path class="hatch" d={art.wires.clip.side} />
-				<path class="jar-ink" d={art.wires.clip.ink} />
-
-				<path class="pulse to-name" d={art.wires.handler.centre} style={'--len:' + art.wires.handler.length} />
-				<path class="pulse to-preview" d={art.wires.out.centre} style={'--len:' + art.wires.out.length} />
+				<g class="slip">
+					<path class="sheet-paper" d={art.slip.paper} />
+					<path class="wash yellow" d={art.slip.wash} />
+					<path class="sheet-ink" d={art.slip.ink} />
+					<text class="slip-text" transform={art.slip.matrix}>{slip}</text>
+				</g>
 
 				<path class="jar-ink" d={art.note.arrow} />
-				<text class="hand" x={art.note.x} y={art.note.y}>WIRED BEFORE THE PAGE RAN</text>
+				<text class="hand" x={art.note.x} y={art.note.y}>EACH KEY IS AN EVENT</text>
 			</svg>
 		</button>
 		<figcaption class="sr">
 			A pen-and-ink drawing of a desk. A sheet of paper on it is drawn as a shop page at beanshop.dev: the shop name {SHOP}, a bag of
-			coffee sold as {PRODUCT} for {PRICE}, a field labelled "Name on the bag" holding "{name}", and the line "Preview: {name}" in a
-			yellow wash. Beside the sheet stands a box tagged name. A wire tagged onInput runs from the field into the box, and another wire
-			runs from the box to the preview. Nothing else on the page is wired. Press the drawing, or Enter or Space, to type the next letter:
-			the key lands in the field, the browser's input event runs down the onInput wire into the box, and the new name runs on to the
-			preview. Escape resets.
+			coffee sold as {PRODUCT} for {PRICE}, a field labelled "Name on the bag" holding "{name}", and the line "Preview: {name}". A
+			typewriter's roller, lettered onInput, lies across the top of the field, and the typewriter's keys stand on the desk beside the
+			sheet. Press the drawing, or Enter or Space, to strike the next key: the key sinks, a slip of paper pops up saying which key it was,
+			the roller types that letter into the field, and the preview follows. Nothing else on the page changes. Escape resets.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -489,104 +468,107 @@ export default function TypingAnatomy() @{
 				transform-origin: center;
 			}
 
-			.small {
-				font-size: 12px;
-				font-weight: 600;
+			.button-label {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: 8px;
+				font-weight: 800;
+				fill: var(--sheet-ink);
 			}
 
-			.button-label,
-			.stamp-count,
-			.rule-text {
+			.field-text {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: 14px;
+				font-weight: 700;
+				fill: var(--sheet-ink);
+			}
+
+			.roller {
+				fill: color-mix(in oklch, var(--ink) 18%, var(--paper));
+			}
+
+			.roller-label,
+			.key-letter,
+			.slip-text {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-weight: 800;
 			}
 
-			.button-label {
+			.roller-label {
+				font-size: 9px;
+				fill: var(--ink);
+				letter-spacing: 0.06em;
+			}
+
+			.deck {
+				fill: color-mix(in oklch, var(--ink) 30%, var(--paper));
+			}
+
+			.key-stem {
+				fill: color-mix(in oklch, var(--ink) 45%, var(--paper));
+			}
+
+			.key-face {
+				fill: var(--paper);
+			}
+
+			.key-letter {
 				font-size: 8px;
+				fill: var(--ink);
+			}
+
+			.key-wash {
+				opacity: 0;
+			}
+
+			.struck .key-wash {
+				opacity: 0.7;
+			}
+
+			.slip-text {
+				font-size: 10px;
 				fill: var(--sheet-ink);
 			}
 
-			.stamp-count {
-				font-size: 11px;
-				text-anchor: middle;
-				fill: var(--ink);
+			.slip {
+				opacity: 0;
 			}
 
-			.rule-text {
-				font-size: 7.5px;
-				text-anchor: middle;
-				fill: var(--ink);
+			.live {
+				stroke: var(--sheet-ink);
+				stroke-width: 0.25;
+				stroke-dasharray: 60;
 			}
 
 			.scene[data-beat='odd'] {
 				--sink: sink-a;
-				--travel: travel-a;
-				--strike: strike-a;
-				--come-cart: come-cart-a;
-				--wash-cart: wash-cart-a;
-				--count: count-a;
-				--old: old-a;
-				--flash: flash-a;
+				--ink-in: ink-in-a;
+				--pop: pop-a;
 			}
 
 			.scene[data-beat='even'] {
 				--sink: sink-b;
-				--travel: travel-b;
-				--strike: strike-b;
-				--come-cart: come-cart-b;
-				--wash-cart: wash-cart-b;
-				--count: count-b;
-				--old: old-b;
-				--flash: flash-b;
+				--ink-in: ink-in-b;
+				--pop: pop-b;
 			}
 
-			.press {
+			.scene:not([data-beat='rest']) .struck {
 				animation: var(--sink) 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}
 
-			.to-name {
-				animation: var(--travel) 700ms 250ms ease-in-out both;
+			.scene:not([data-beat='rest']) .slip {
+				animation: var(--pop) 2400ms 200ms both;
 			}
 
-			.to-preview {
-				animation: var(--travel) 650ms 1150ms ease-in-out both;
+			.scene:not([data-beat='rest']) .live {
+				animation: var(--ink-in) 650ms both;
 			}
 
-			.slip-wash {
-				opacity: 0;
-				animation: var(--flash) 900ms ease-out both;
+			.scene:not([data-beat='rest']) .step-1 {
+				animation-delay: 900ms;
 			}
 
-			.scene[data-beat='rest'] .slip-wash {
-				animation: none;
-			}
-
-			.count {
-				animation: var(--count) 3300ms linear both;
-			}
-
-			.old {
-				opacity: 0;
-			}
-
-			.scene:not([data-beat='rest']) .old {
-				animation: var(--old) 3300ms linear both;
-			}
-
-			.preview-old .strike {
-				animation: var(--strike) 260ms 1800ms ease-out both;
-			}
-
-			
-			.preview-now {
-				stroke: var(--sheet-ink);
-				stroke-width: 0.3;
-				stroke-dasharray: 60;
-				animation: var(--come-cart) 3300ms linear both;
-			}
-
-			.preview-spot {
-				animation: var(--wash-cart) 3300ms linear both;
+			.scene:not([data-beat='rest']) .step-2 {
+				animation-delay: 1600ms;
 			}
 
 			@keyframes sink-a {
@@ -601,75 +583,15 @@ export default function TypingAnatomy() @{
 				}
 			}
 
-			@keyframes travel-a {
+			@keyframes ink-in-a {
 				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes travel-b {
-				0% {
-					opacity: 1;
-					stroke-dashoffset: 2;
-				}
-
-				92% {
-					opacity: 1;
-				}
-
-				100% {
-					opacity: 0;
-					stroke-dashoffset: calc(var(--len) * -1px);
-				}
-			}
-
-			@keyframes strike-a {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes strike-b {
-				from {
-					stroke-dashoffset: var(--l);
-				}
-
-				to {
-					stroke-dashoffset: 0;
-				}
-			}
-
-			@keyframes come-cart-a {
-				0% {
-					opacity: 1;
-				}
-
-				5%,
-				57% {
 					opacity: 0;
 					stroke-dashoffset: 60;
 					fill-opacity: 0;
 				}
 
-				58% {
+				30% {
 					opacity: 1;
-				}
-
-				66% {
 					fill-opacity: 0;
 				}
 
@@ -679,23 +601,15 @@ export default function TypingAnatomy() @{
 				}
 			}
 
-			@keyframes come-cart-b {
+			@keyframes ink-in-b {
 				0% {
-					opacity: 1;
-				}
-
-				5%,
-				57% {
 					opacity: 0;
 					stroke-dashoffset: 60;
 					fill-opacity: 0;
 				}
 
-				58% {
+				30% {
 					opacity: 1;
-				}
-
-				66% {
 					fill-opacity: 0;
 				}
 
@@ -705,85 +619,16 @@ export default function TypingAnatomy() @{
 				}
 			}
 
-			@keyframes wash-cart-a {
+			@keyframes pop-a {
 				0% {
-					opacity: 1;
-				}
-
-				5%,
-				60% {
 					opacity: 0;
+					transform: translateY(10px);
 				}
-			}
 
-			@keyframes wash-cart-b {
-				0% {
+				15%,
+				75% {
 					opacity: 1;
-				}
-
-				5%,
-				60% {
-					opacity: 0;
-				}
-			}
-
-			@keyframes count-a {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				28% {
-					opacity: 0;
-				}
-
-				36% {
-					opacity: 1;
-				}
-			}
-
-			@keyframes count-b {
-				0% {
-					opacity: 1;
-				}
-
-				4%,
-				28% {
-					opacity: 0;
-				}
-
-				36% {
-					opacity: 1;
-				}
-			}
-
-			@keyframes old-a {
-				0%,
-				4% {
-					opacity: 0;
-				}
-
-				8%,
-				100% {
-					opacity: 0.55;
-				}
-			}
-
-			@keyframes old-b {
-				0%,
-				4% {
-					opacity: 0;
-				}
-
-				8%,
-				100% {
-					opacity: 0.55;
-				}
-			}
-
-			@keyframes flash-a {
-				0% {
-					opacity: 0.9;
+					transform: none;
 				}
 
 				100% {
@@ -791,9 +636,16 @@ export default function TypingAnatomy() @{
 				}
 			}
 
-			@keyframes flash-b {
+			@keyframes pop-b {
 				0% {
-					opacity: 0.9;
+					opacity: 0;
+					transform: translateY(10px);
+				}
+
+				15%,
+				75% {
+					opacity: 1;
+					transform: none;
 				}
 
 				100% {
@@ -822,24 +674,6 @@ export default function TypingAnatomy() @{
 				clip-path: inset(50%);
 				white-space: nowrap;
 			}
-			.field-text {
-				font-family: 'Shantell Sans', system-ui, sans-serif;
-				font-size: 12px;
-				font-weight: 700;
-				fill: var(--sheet-ink);
-			}
-
-			.caret {
-				fill: var(--sheet-ink);
-				animation: blink 1s steps(1) infinite;
-			}
-
-			@keyframes blink {
-				50% {
-					opacity: 0;
-				}
-			}
-
 		</style>
 	</figure>
 }

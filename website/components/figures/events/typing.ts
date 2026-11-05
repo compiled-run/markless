@@ -1,101 +1,103 @@
-// The shop page with a name field and the `name` box on the desk: a key press sends the browser's input event down the handler's wire into the box, and the preview follows.
-import { bezier, createScene, type Crate, ellipse, type P, type Point3, roundRect, sheetAt } from '../ink/scene.ts';
-import { add3 } from '../kit/lathe.ts';
-import { hatch, outline, pathOf, r1, seeded, wash } from '../ink/ink.ts';
-import { PREVIEW_NEW, PREVIEW_OLD } from './typing-model.ts';
+// The shop page with its name field under a typewriter's platen, and the typewriter's keys on the desk: a key strike is the event, and the platen types it onto the page.
+import { createScene, ellipse, type P, roundRect } from '../ink/scene.ts';
+import { deskPlane, pencil } from '../ink/plane.ts';
+import { hatch, hull, line, outline, pathOf, pool, r1, wash } from '../ink/ink.ts';
+import { PREVIEW_NEW } from './typing-model.ts';
 
 export const WIDTH = 680;
-export const HEIGHT = 420;
+export const HEIGHT = 440;
 
-export const LABEL_ROW = { u: 1.4, v: 9.2 };
-export const PREVIEW_ROW = { u: 1.4, v: 13.2 };
-const FIELD = { u0: 1.4, v0: 9.7, u1: 9.8, v1: 11.1 };
-const NAME_BOX: Crate = { u: 24.6, v: -0.6, w: 4.6, d: 3.6, h: 3 };
-
-export const PREVIEW_CLIP = { rear: [17.4, 13.8] as P, tip: [14.4, 12.95] as P };
+export const LABEL_ROW = { u: 1.4, v: 8.85 };
+export const PREVIEW_ROW = { u: 1.4, v: 14.1 };
+const FIELD = { u0: 1.4, v0: 10.6, u1: 12.4, v1: 12.3 };
+const KEYS = { c: [27.2, 1.2] as P, w: 10.6, h: 5.2, turn: 0.04 };
+export const ROWS = ['QWERTYU', 'ASDFGHJ', 'ZXCVBNM'] as const;
 
 const scene = createScene({
 	width: WIDTH,
 	height: HEIGHT,
 	extra: [
-		[NAME_BOX.u + NAME_BOX.w - 1.6 + 0.6, NAME_BOX.v - 8.8, 0],
-		[NAME_BOX.u + NAME_BOX.w - 1.6, NAME_BOX.v - 8.8, NAME_BOX.h + 2.4],
-		[NAME_BOX.u + NAME_BOX.w - 1.6 + 1, NAME_BOX.v + NAME_BOX.d - 8.8 + 3, 0],
+		[KEYS.c[0] + KEYS.w / 2 + 1, KEYS.c[1] - KEYS.h / 2 - 2.4, 0],
+		[KEYS.c[0] + KEYS.w / 2 + 1, KEYS.c[1] + KEYS.h / 2 + 1, 0],
 	],
-	target: [11.6, -1.6, 0.6],
+	target: [13.6, -2, 0.4],
 });
-const { proj, onSheet, sheetMatrix, cord, alongSheet, crocodile } = scene;
+const { proj, onSheet, sheetMatrix } = scene;
+const deck = deskPlane(proj, KEYS.c, KEYS.w, KEYS.h, KEYS.turn, 0.6);
 
-/** The text field on the page: an inked box with a caret, its text placed by a matrix. */
+/** The name field on the page, with the typewriter's platen lying across its top edge. */
 function fieldArt() {
 	const { u0, v0, u1, v1 } = FIELD;
 	const box = onSheet(roundRect(u0, v0, u1, v1, 0.2));
-	const inset = onSheet([[u0 + 0.12, v0 + 0.12], [u1 - 0.12, v0 + 0.12], [u1 - 0.12, v0 + 0.34], [u0 + 0.12, v0 + 0.34]]);
+	const roller = onSheet(roundRect(u0 - 0.8, v0 - 0.95, u1 + 0.8, v0 - 0.05, 0.45), 0.5);
+	const rollerShade = onSheet([[u0 - 0.6, v0 - 0.45], [u1 + 0.6, v0 - 0.45], [u1 + 0.6, v0 - 0.1], [u0 - 0.6, v0 - 0.1]], 0.5);
+	const knob = (u: number, seed: number) => {
+		const k = onSheet(ellipse(u, v0 - 0.5, 0.55, 0.62, 18), 0.6);
+		return { paper: pathOf(k, true), ink: outline(k, { w: 1.1, heavy: 0.9, seed }), shade: hatch(k, 0.9, 1.1, seed + 1, { cluster: 2 }) };
+	};
 	return {
 		paper: pathOf(box, true),
 		ink: outline(box, { w: 1.1, heavy: 0.9, seed: 4010 }),
-		inset: hatch(inset, 0.05, 1.6, 4011, { cluster: 6, skip: 0.2 }),
-		wash: wash(box, 4012, 0.6, 1.6),
-		matrix: sheetMatrix(u0 + 0.4, v0 + 1.0),
+		matrix: sheetMatrix(u0 + 0.5, v1 - 0.45),
+		roller: {
+			cast: wash(onSheet(roundRect(u0 - 0.6, v0 - 0.2, u1 + 1, v0 + 0.4, 0.3)), 4020, 0.8, 2),
+			paper: pathOf(roller, true),
+			shade: hatch(rollerShade, 0.08, 1.2, 4021, { cluster: 5, skip: 0.15 }),
+			ink: outline(roller, { w: 1.4, heavy: 1.2, seed: 4022 }) + line(onSheet([[u0 - 0.4, v0 - 0.55], [u1 + 0.4, v0 - 0.55]], 0.5), { w: 0.5, seed: 4023, over: 0 }),
+			knobs: [knob(u0 - 1.2, 4030), knob(u1 + 1.2, 4040)],
+			labelMatrix: sheetMatrix((u0 + u1) / 2 - 1.4, v0 - 0.22),
+		},
 	};
 }
 
-/** The `name` box: a kraft box with what it holds written on its front label. */
-function nameArt() {
-	const box = scene.crate(NAME_BOX, 4100);
-	const { w, d, h } = NAME_BOX;
-	const face = (pts: [number, number][]) => box.poly(pts.map(([x, z]) => [x, d, z] as [number, number, number]));
-	const label = face([[0.4, h * 0.8], [w - 0.4, h * 0.8], [w - 0.4, h * 0.22], [0.4, h * 0.22]]);
+/** One round typewriter key standing on the deck: its rim, its face, a side shadow and the matrix for its letter. */
+function keyArt(row: number, col: number, seed: number) {
+	const u = 0.9 + col * 1.42 + row * 0.45;
+	const v = 0.9 + row * 1.55;
+	const face = deck.on(ellipse(u, v, 0.58, 0.52, 22), 0.5);
+	const side = deck.on(ellipse(u + 0.05, v + 0.08, 0.58, 0.52, 22));
+	const stem = hull([...face, ...side]);
+	const top = deck.at(u, v, 0.5);
+	const bottom = deck.at(u + 0.05, v + 0.08, 0);
 	return {
-		cast: box.cast,
-		paper: box.paper,
-		kraft: wash(face([[0, 0], [w, 0], [w, h], [0, h]]), 4120, 0.8, 2) + wash(box.poly([[0, 0, h], [w, 0, h], [w, d, h], [0, d, h]]), 4121, 0.6, 2),
-		shade: box.shade,
-		ink: box.ink,
-		label: pathOf(label, true),
-		labelInk: outline(label, { w: 0.8, seed: 4125 }),
-		valueMatrix: box.frontMatrix(w / 2, h * 0.38),
-		pencil: box.pencil,
-		tag: scene.tag(box.world(w - 0.02, d - 0.02, h * 0.82), [0.55, 1, 0], 4140),
+		stem: pathOf(stem, true),
+		paper: pathOf(face, true),
+		ink: outline(face, { w: 1, heavy: 0.8, seed }) + outline(side, { w: 0.6, seed: seed + 1 }),
+		shade: hatch(stem, 1, 1.2, seed + 2, { cluster: 2, skip: 0.3 }),
+		wash: wash(face, seed + 3, 0.6, 1.4),
+		matrix: deck.matrix(u - 0.18, v + 0.2, 0.1, 0.5),
+		sink: `--sink-x:${r1(proj(bottom)[0] - proj(top)[0]) * 0.4}px;--sink-y:${r1((proj(bottom)[1] - proj(top)[1]) * 0.6)}px`,
 	};
 }
 
-/** A loose pen line through the old preview, in the text's own units. */
-function scratch(x0: number, x1: number, seed: number) {
-	const rnd = seeded(seed);
-	const pts: P[] = [
-		[x0 - 2, -3 + rnd()],
-		[(x0 + x1) / 2, -4.6 + rnd()],
-		[x1 + 2, -6.2 + rnd()],
-	];
-	const length = Math.hypot(pts[1]![0] - pts[0]![0], pts[1]![1] - pts[0]![1]) + Math.hypot(pts[2]![0] - pts[1]![0], pts[2]![1] - pts[1]![1]) + 1;
-	return { d: `M${r1(pts[0]![0])} ${r1(pts[0]![1])}Q${r1(pts[1]![0])} ${r1(pts[1]![1])} ${r1(pts[2]![0])} ${r1(pts[2]![1])}`, length: r1(length) };
+/** The deck under the keys: a dark metal plate with a hatched front edge. */
+function deckArt() {
+	const { w, h } = KEYS;
+	const plate = deck.on([[0, 0], [w, 0], [w, h], [0, h]], 0);
+	const front = deskPlane(proj, KEYS.c, KEYS.w, KEYS.h, KEYS.turn, 0).on([[0, h], [w, h]]);
+	const edge = [...deck.on([[w, h], [0, h]], 0), ...front.reverse()];
+	const shadow = hull([...plate.map(([x, y]) => [x + 7, y + 8] as P), ...plate]);
+	return {
+		shadow: { wash: wash(shadow, 4110, 1.2, 3), hatch: hatch(shadow, -0.5, 2.6, 4111, { cluster: 5, skip: 0.25 }) },
+		paper: pathOf(plate, true),
+		tone: hatch(plate, 0.15, 2.2, 4112, { cluster: 5, skip: 0.35, trim: 0.5 }),
+		edge: pathOf(edge, true),
+		edgeHatch: hatch(edge, 1.2, 1.1, 4113, { cluster: 3 }),
+		ink: outline(plate, { w: 1.5, heavy: 1.3, seed: 4114 }) + outline(edge, { w: 1, seed: 4115 }),
+		pencil: pencil(deck.on([[-0.8, 0], [w + 1, 0]], 0), 4116),
+	};
 }
 
-function wires() {
-	const r = 0.24;
-	const t = 0.16;
-	const handlerPath: P[] = [
-		[FIELD.u1 + 0.05, (FIELD.v0 + FIELD.v1) / 2],
-		[12.6, 9.6],
-		[17.8, 7.2],
-		[21.8, 4.2],
-		[23.6, 2.2],
-		[NAME_BOX.u + 0.1, NAME_BOX.v + 1.6],
-	];
-	const handler = cord(alongSheet(handlerPath, t - 0.02), t, 4300);
-	const socket = onSheet(ellipse(NAME_BOX.u + 0.1, NAME_BOX.v + 1.6, 0.3, 0.26, 14), 0.4);
-	const start: Point3 = sheetAt(NAME_BOX.u + 1, NAME_BOX.v + NAME_BOX.d + 0.05, 0.6);
-	const rear = PREVIEW_CLIP.rear;
-	const desk = alongSheet([[NAME_BOX.u + 0.8, NAME_BOX.v + NAME_BOX.d + 1.2], [23.8, 7.4], [21.6, 11.2], [rear[0] + 0.7, rear[1] + 0.1], rear], r - 0.02);
-	const out = cord([...bezier(start, add3(start, [0, 0.6, 0]), add3(desk[0]!, [0, -0.3, 0.2]), desk[0]!, 8), ...desk.slice(1)], r, 4400);
-	const slipAt = sheetAt(14.6, 8.6, 0.3);
+/** The slip a struck key throws up: the event, typed on a scrap of paper above the keys. */
+function slipArt() {
+	const at = deskPlane(proj, [KEYS.c[0] - 1.6, KEYS.c[1] - KEYS.h / 2 - 1.6], 5.6, 1.6, KEYS.turn, 1.2);
+	const poly = at.on(roundRect(0, 0, 5.6, 1.6, 0.15));
 	return {
-		handler,
-		out,
-		socket: { paper: pathOf(socket, true), ink: outline(socket, { w: 0.8, seed: 4410 }) },
-		clip: crocodile(PREVIEW_CLIP.rear, PREVIEW_CLIP.tip, 4500),
-		slip: scene.tag(slipAt, [0.4, 1, 0], 4600),
+		paper: pathOf(poly, true),
+		ink: outline(poly, { w: 0.9, seed: 4210 }),
+		wash: wash(poly, 4211, 0.5, 1.2),
+		pool: wash(pool(poly, poly[0]!, 0.5), 4212, 0.4, 1),
+		matrix: at.matrix(0.35, 1.05, 0.1),
 	};
 }
 
@@ -112,9 +114,9 @@ export function drawing() {
 			spot: scene.spot(PREVIEW_ROW.u + PREVIEW_NEW / 10 + 1.4, PREVIEW_ROW.v - 0.62, 2.2, 0.9, 4900),
 			field: fieldArt(),
 		},
-		strike: scratch(PREVIEW_OLD, PREVIEW_OLD + 20, 4950),
-		name: nameArt(),
-		wires: wires(),
-		note: scene.note(proj(sheetAt(20.6, 5.2, 0.3)), 4970),
+		deck: deckArt(),
+		keys: ROWS.flatMap((row, r) => [...row].map((letter, c) => ({ letter, ...keyArt(r, c, 4300 + r * 40 + c * 5) }))),
+		slip: slipArt(),
+		note: scene.note(deck.on([[0.5, 0.3]], 0.5)[0]!, 4970),
 	};
 }
