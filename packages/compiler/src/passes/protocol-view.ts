@@ -762,14 +762,17 @@ function mintableRowTemplate(
 				)
 			: null);
 	const branchSlots: Array<RowTemplateBranchSlot> = [];
+	let holdsServedOnlyRows = false;
 	for (const slot of chunk.slots) {
 		if (slot === wrappedComponentSlot) continue;
 		if (slot.kind === 'repeat' && nestedRepeatMints(input, render, slot.repeatId)) continue;
 		if (
 			slot.kind === 'repeat' &&
 			servedOnlyNestedRepeat(input, chunk, semanticRepeat, slot.repeatId)
-		)
+		) {
+			holdsServedOnlyRows = true;
 			continue;
+		}
 		if (slot.kind === 'branch' && !mint) {
 			const branch = rowBranchSlot(input, chunk, slot, slotValue);
 			if (!branch) return {};
@@ -781,9 +784,18 @@ function mintableRowTemplate(
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
 		const value = slotValue(slot);
 		if (!value) return {};
-		if (slot.kind === 'text') textSlots.push({ path: slot.coordinate.path, ...value });
-		else attributeSlots.push({ path: slot.coordinate.path, name: slot.name, ...value });
+		const fromEnd = stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text');
+		if (!fromEnd) return {};
+		const at = { path: slot.coordinate.path, ...(fromEnd.length > 0 ? { fromEnd } : {}) };
+		if (slot.kind === 'text') textSlots.push({ ...at, ...value });
+		else attributeSlots.push({ ...at, name: slot.name, ...value });
 	}
+	// Only a patch keeps rows the server alone rendered, and only attribute writes and item text never fall back to a rebuild.
+	if (
+		holdsServedOnlyRows &&
+		(branchSlots.length > 0 || textSlots.some((slot) => !('itemPath' in slot)))
+	)
+		return {};
 	const html = chunk.statics.join('');
 	if (!html) return {};
 	const readsExpressions = [
@@ -922,6 +934,29 @@ function nestedRepeatMints(
 	if (rowComponentMint(input, render)) return true;
 	const template = mintableRowTemplate(input, render, null).rowTemplate;
 	return template !== undefined;
+}
+
+// A nested list's rows stand in front of what follows its anchor, so a patch counts those steps from the parent's end; lists on both sides leave no count.
+function stepsAfterNestedRows(
+	chunk: SemanticMarkupChunk,
+	path: ReadonlyArray<number>,
+	text: boolean,
+): number[] | null {
+	const anchors = chunk.slots.flatMap((slot) =>
+		slot.kind === 'repeat' ? [slot.coordinate.path] : [],
+	);
+	const fromEnd: number[] = [];
+	for (let depth = 1; depth < path.length - (text ? 1 : 0); depth++) {
+		const siblings = anchors.filter(
+			(anchor) =>
+				anchor.length === depth + 1 &&
+				anchor.slice(0, depth).every((step, at) => step === path[at]),
+		);
+		const before = siblings.some((anchor) => anchor[depth]! < path[depth]!);
+		if (before && siblings.some((anchor) => anchor[depth]! > path[depth]!)) return null;
+		if (before) fromEnd.push(depth);
+	}
+	return fromEnd;
 }
 
 // A list the browser never adds rows to only patches them, so rows inside them that only the server renders stay as served.
