@@ -223,6 +223,15 @@ export default function Code({
 				}
 			}
 
+			@media (min-width: 96.01rem) {
+				.code-block {
+					--code-wide: min(1100px, 100vw - 2 * (17rem + var(--space-s-l)));
+					--code-font-size: clamp(0.9rem, 1.8cqi, 1.2rem);
+					width: max(calc(100% + var(--code-bleed)), var(--code-wide));
+					margin-inline-start: calc(50% - max(calc(100% + var(--code-bleed)), var(--code-wide)) / 2);
+				}
+			}
+
 			.code-block[data-lines='off'] {
 				--code-gutter: 1rem;
 				--code-numbers: none;
