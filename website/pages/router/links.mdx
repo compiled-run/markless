@@ -3,6 +3,7 @@ import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import LinkAnatomy from '../../components/figures/links/link-anatomy.tsrx';
+import RouteKey from '../../components/figures/route-key/route-key.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -30,21 +31,21 @@ export default function Home() @{
 
 ## The build checks every pattern
 
+A link is a key cut for a route. Try both keys in the door.
+
+<RouteKey />
+
 - A pattern that matches no file in `pages/` stops the build.
 - A pattern without its `params` stops the build and names them.
 - A plain address like `/about` isn't checked by the build; your editor flags its typos.
 
-```txt
-Typed route error: /blog/[id] does not match any route in pages/.
-```
-
 ## A click swaps in only the page
 
-Press the drawing to click the other link. Watch what changes, and when.
+Swap the sheet, then try to pull the clip off.
 
 <LinkAnatomy />
 
-The router fetches the next page's middle and swaps it in. The address changes at that moment, not at the click. Back and Forward restore each page and its scroll, and Back before the page arrives cancels it.
+The router fetches the next page's middle and swaps it in, and the address changes as it lands. Back and Forward restore each page and its scroll.
 
 ## The next page is fetched early
 

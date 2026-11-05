@@ -3,13 +3,14 @@ import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import BakeSaleDemo from '../../components/figures/shared/bake-sale-demo.tsrx';
+import WhiteboardAnatomy from '../../components/figures/whiteboard/whiteboard-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
 # Share one piece of state with `shared()`
 
-<PageMeta time="4 min" assumes="state, components" />
+<PageMeta time="3 min" assumes="state, components" />
 
 <Subtitle text="shared() gives state a name. Every component that calls the name gets the same value, with no props in between." />
 
@@ -49,65 +50,46 @@ export default function Shop() @{
 ```
 </Code>
 
-No prop connects `Shop` and `CartBadge`. Both call `cart()`, and both get the same `bags`.
+No prop connects `Shop` and `CartBadge`. Both call `cart()`, so both get the same `bags`.
 
-The function you pass to `shared()` makes the state. It returns that state plus any methods you want, like `add()`.
+## One board, every desk reads it
+
+Press the pink `Shop` desk to write on the board. Hover either desk to see what it reads.
+
+<WhiteboardAnatomy />
+
+`CartBadge` has no board of its own. It reads the same `cart`, so it sees every write.
 
 ## Pick who shares one copy
 
-The second argument says who shares a copy. Press each stall's **Sell one**, and watch which numbers move.
+The second argument to `shared()` picks who shares a copy. Press each stall's **Sell one**.
 
 <BakeSaleDemo />
 
-- The day total moves on every press. `day` says `'page'`, so the whole page shares one copy.
-- Each stall's count moves only for its own stall. `stall` says `'widget'`, so each `Stall` gets its own copy.
-
-The two definitions differ only in their scope:
-
-```tsrx title="bake-sale.tsrx"
-const day = shared(
-	() => {
-		const box = state({ sold: 0 });
-		return { ...box };
-	},
-	{ scope: 'page' },
-);
-
-const stall = shared(
-	() => {
-		const box = state({ sold: 0 });
-		return { ...box };
-	},
-	{ scope: 'widget' },
-);
-```
+The day total is `'page'`, so every stall moves it. Each stall's count is `'widget'`, so it's its own.
 
 | Scope | Who shares one copy |
 | --- | --- |
 | `'page'`, the default | every component on the page |
 | `'request'` | the same as `'page'` in the browser |
-| `'container'` | one Markless app on the page, not the others |
+| `'container'` | one Markless app on the page |
 | `'widget'` | the pieces of one rendered widget, like one menu |
 
-A widget is the first component that calls the definition, plus everything inside it. The [UI components](/ui) use `'widget'`, so two menus on one page open and close on their own.
+A widget is the first component that calls the definition, plus everything inside it. The [UI components](/ui) use `'widget'`, so two menus open and close on their own.
 
 ## It lasts while the reader browses
 
-- **On the server**, every request starts from the starting values. One visitor never sees another's writes.
-- **In the browser**, one copy lives as long as the document. A link to another of your pages keeps it, and so do Back and Forward. The next page shows the live value from its first frame.
+- **On the server**, every request starts from the starting values.
+- **In the browser**, one copy lives as long as the document, through links, Back and Forward.
 - **A reload** starts again from the starting values.
 
 ## Two apps on one page share by name
 
-Some pages hold more than one Markless app, built and shipped separately. Each such app is called a *micro-frontend*. When two of them call the same definition, they read and write one copy.
+When two separately built apps on one page call the same definition, they read and write one copy. The name is the definition's file plus its export, like `lib/cart.tsrx#cart`, so both must import it from the same place. If the value's shape differs, that app keeps its own copy and logs `MARKLESS_SHARED_SHAPE_MISMATCH`.
 
-The name is the file the definition lives in plus its export name, such as `lib/cart.tsrx#cart`. For a definition from a package, the file is its path under `node_modules/`. So both apps must import the definition from the same place.
+Keep in mind:
 
-The value must also have the same shape in both: the same field names and types. An app whose shape differs keeps its own copy and logs `MARKLESS_SHARED_SHAPE_MISMATCH` once.
-
-Not yet:
-
-- Two components in one file calling a definition with no scope get the warning `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`. Write `{ scope: 'widget' }` for a copy per widget, or `{ scope: 'page' }` to say you meant to share.
-- Keep the definition and the components that call its methods in one file. From another file, `c.add()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`; change the field instead, `c.bags++`.
+- Two components in one file calling a definition with no scope get the warning `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`. Write the scope you mean.
+- Call a definition's methods from the file that defines it. From another file, `c.add()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`; change the field instead, `c.bags++`.
 
 Use `state()` when one component owns a value, and `shared()` when several need it. Next, [turn files into pages](/router/pages).

@@ -2227,9 +2227,6 @@ try {
 		await liveBlock(0).locator('label').click();
 		await settleFocus();
 		check(await activeIsField(), 'clicking the label focuses the field, because for={field} names it');
-		const rowsBlock = liveBlock(1);
-		await rowsBlock.getByRole('button', { name: 'Count rows' }).click();
-		await settleText(rowsBlock.locator('p').first(), (text) => text === 'Rows on the page: 3', 'an array handle reads every row');
 		await page.screenshot({ path: `${shotsDir}/T006-elements-after.png`, fullPage: true });
 
 		// A storage() pick survives a reload, and is on <html> before the page shows.

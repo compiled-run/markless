@@ -1,57 +1,49 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ABOUT_URL, describeLink, flip, HOME_URL, LINK_TOUR, other } from './model.ts';
-import { drawing } from './links.ts';
+import { ABOUT, addressOf, clamp, CLIP_SAID, describeSwap, flip, HOME, other } from './model.ts';
+import { drawing } from './clipboard.ts';
 
-const linkArt = drawing();
+const boardArt = drawing();
 
 const page = readFileSync(new URL('../../../pages/router/links.mdx', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./link-anatomy.tsrx', import.meta.url), 'utf8');
 
-describe('the magazine and its centre spread', () => {
-	it('swaps the spread and then the spine label, and keeps the cover', () => {
+describe('the clipboard', () => {
+	it('swaps the sheet and re-inks the address, and the clip snaps back', () => {
 		expect(other('home')).toBe('about');
-		expect(other('about')).toBe('home');
-		expect(describeLink('about', true)).toContain('only then did the spine change to beanshop.dev/about');
-		expect(describeLink('home', false)).toBe('');
-		expect(HOME_URL).toBe('beanshop.dev');
-		expect(ABOUT_URL).toBe('beanshop.dev/about');
-		expect(LINK_TOUR[0]).toBe('go');
+		expect(addressOf('about')).toBe(ABOUT);
+		expect(addressOf('home')).toBe(HOME);
+		expect(describeSwap('about', true)).toBe('New sheet. The board and clip stayed, and the address label now reads /about.');
+		expect(describeSwap('home', false)).toBe('');
+		expect(CLIP_SAID).toContain('snapped back');
+		expect(clamp(40, 0, 16)).toBe(16);
 		expect(flip('odd')).toBe('even');
 	});
 
-	it('draws two spreads and one cover, and the cover reads no state', () => {
-		expect(piece.match(/class="spread home"/g)).toHaveLength(1);
-		expect(piece.match(/class="spread about"/g)).toHaveLength(1);
-		const start = piece.indexOf('class="cover once"');
-		const once = piece.slice(start, piece.indexOf('</g>', start));
-		expect(once).toContain('{SHOP}');
-		expect(once).not.toMatch(/\bat\b|beat|URL/);
+	it('has three objects and only code values for words', () => {
+		expect(piece.match(/class="sheet (home|about)"/g)).toHaveLength(2);
+		expect(piece).toContain('class="board"');
+		expect(piece).toContain('class="clip"');
+		const words = [...piece.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]!.trim());
+		expect(words).toEqual(['Shop', 'About', '{HOME}', '{ABOUT}']);
+		expect(piece).not.toMatch(/cord|wire|parcel|pulse|crocodile|@for|@if/i);
 	});
 
-	it('changes the spine label only after the new spread is in', () => {
-		expect(piece).toMatch(/\.spine-text \{\s*transition-delay: 1900ms;/);
-		expect(piece).toContain('animation: var(--in) 800ms 1100ms');
-	});
-
-	it('uses no wires, cords or parcels', () => {
-		expect(piece).not.toMatch(/cord|wire|parcel|pulse|crocodile/i);
-		expect(Object.keys(linkArt)).not.toContain('wires');
-	});
-
-	it('has one margin note, no motion under reduced motion, and a tour that stops on touch', () => {
-		expect(piece.match(/class="hand/g)).toHaveLength(1);
+	it('plays: hover, drag, keys, and the clip that will not come off', () => {
+		expect(piece).toContain('.sheet-grip:hover .lift');
+		expect(piece).toContain('setPointerCapture');
+		expect(piece).toContain("event.key === 'ArrowLeft'");
+		expect(piece).toContain('snapBack()');
+		expect(piece.match(/tabindex="0"/g)).toHaveLength(2);
+		expect(piece).toContain('aria-live="polite"');
 		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
 		expect(piece).toContain('if (!seen || touched) return;');
-		expect(piece).toContain("event.key === 'Escape'");
-		expect(piece).toContain('aria-live="polite"');
-		expect(piece).not.toMatch(/@for|@if/);
 	});
 
-	it('inks every part fully and draws the same scene every time', () => {
-		expect(linkArt.spread.ink.length).toBeGreaterThan(300);
-		expect(linkArt.spine.tone.length).toBeGreaterThan(100);
-		expect(JSON.stringify(drawing())).toBe(JSON.stringify(linkArt));
+	it('inks every part fully and draws the same figure every time', () => {
+		expect(boardArt.board.ink.length).toBeGreaterThan(300);
+		expect(boardArt.clip.ink.length).toBeGreaterThan(300);
+		expect(JSON.stringify(drawing())).toBe(JSON.stringify(boardArt));
 	});
 
 	it('is on the Links page under its own heading', () => {
@@ -62,11 +54,11 @@ describe('the magazine and its centre spread', () => {
 
 describe('frozen art', () => {
 	it('freezes the drawing into a plain-data module the compiler can read (run with -u after editing)', async () => {
-		const module = `// Written by links.test.ts from links.ts. Refresh with the figure test's -u flag.
-import type { drawing } from './links.ts';
+		const module = `// Written by links.test.ts from clipboard.ts. Refresh with the figure test's -u flag.
+import type { drawing } from './clipboard.ts';
 
-export const art: ReturnType<typeof drawing> = ${JSON.stringify(linkArt, null, '\t')};
+export const art: ReturnType<typeof drawing> = ${JSON.stringify(boardArt, null, '\t')};
 `;
-		await expect(module).toMatchFileSnapshot('./links.art.ts');
+		await expect(module).toMatchFileSnapshot('./clipboard.art.ts');
 	});
 });

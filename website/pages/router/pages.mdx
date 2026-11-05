@@ -2,13 +2,14 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import CatalogueAnatomy from '../../components/figures/catalogue/catalogue-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
 # Make a file, get a URL
 
-<PageMeta time="3 min" assumes="components" />
+<PageMeta time="2 min" assumes="components" />
 
 <Subtitle text="Each file in pages/ is one page of your app, and its path on disk is its address." />
 
@@ -18,27 +19,26 @@ export default function About() @{
 }
 ```
 
-Save that file, and `/about` shows **About the shop**. The *router* is the part of your app that turns an address into a page. `@markless/router` does it, and every `npm create markless` starter includes it.
+Save that file, and `/about` shows **About the shop**. Every `npm create markless` starter includes `@markless/router`, which does this.
 
 ## The file name is the address
+
+Press the drawing to drop the address on the card.
+
+<CatalogueAnatomy />
+
+A bracket in a file name is a blank the address fills in. `blog/[slug].tsrx` answers `/blog/hello` with `slug` set to `hello`.
 
 | File in `pages/` | Address |
 | --- | --- |
 | `index.tsrx` | `/` |
-| `about.tsrx` | `/about`, and `/about/` too |
-| `docs/index.mdx` | `/docs` |
-| `blog/[slug].tsrx` | `/blog/` plus one part, like `/blog/hello` |
+| `blog/[slug].tsrx` | `/blog/` plus one part |
 | `docs/[...slug].mdx` | `/docs/` plus one part or more |
-| `404.tsrx` | any address with no matching file, with status 404 |
-| `500.tsrx` | a page that throws in a production build, with status 500 |
+| `404.tsrx` | anything else, with status 404 |
 
-- Page files end in `.tsrx` or `.mdx`. Any other file in `pages/`, like a helper `.ts`, is skipped.
-- A plain name beats `[param]`, and `[param]` beats `[...rest]`. So `blog/new.tsrx` answers `/blog/new`, and `blog/[slug].tsrx` answers the rest.
-- In the dev server, a page that throws shows the Markless error page instead of `500.tsrx`.
+A plain name beats `[param]`, and `[param]` beats `[...rest]`.
 
 ## Read the params
-
-A *param* is the part of the address a bracket stands for. The page gets it as a prop:
 
 ```tsrx title="pages/blog/[slug].tsrx"
 import type { PageProps } from '@markless/router';
@@ -48,13 +48,9 @@ export default function Post({ params }: PageProps<{ slug: string }>) @{
 }
 ```
 
-`/blog/hello` shows **Post hello**. A catch-all param is one string, so for `/docs/guide/intro`, `slug` is `guide/intro`.
-
-Every page gets four props: `params`, `url`, `status` and `http`.
+Every page gets four props: `params`, `url`, `status` and `http`. A catch-all param is one string, like `guide/intro`.
 
 ## Answer with a status
-
-An invoice that doesn't exist should still show a message, but answer 404. Then browsers, search engines and caches know the page is missing. The `http` prop is how a page talks to the response:
 
 ```tsrx title="pages/invoices/[id].tsrx"
 import type { PageProps } from '@markless/router';
@@ -62,43 +58,18 @@ import { findInvoice } from '../../src/invoices.ts';
 
 export default function Invoice({ params, http }: PageProps<{ id: string }>) @{
 	const invoice = findInvoice(params.id);
-	if (!invoice) {
-		http.response.status = 404;
-		http.response.headers.set('cache-control', 'no-store');
-	}
-	const title = invoice ? `Invoice ${invoice.number}` : `No invoice ${params.id}`;
+	if (!invoice) http.response.status = 404;
 
-	<h1>{title}</h1>
+	<h1>{invoice ? invoice.title : 'No such invoice'}</h1>
 }
 ```
 
-`GET /invoices/42` now answers 404, with **No invoice 42** as its body. The status and headers leave with the first bytes of the page, so set them before anything the page waits on. Changing them later throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
+Set the status before anything the page waits on. Changing it later throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
 
-## Wrap every page in one document
+Keep in mind:
 
-There is no layout file. `document.tsrx` in the app root wraps every page, using `Html` from `@markless/router`. Each page arrives as `children`:
-
-```tsrx title="document.tsrx"
-import type { Children } from '@markless/core';
-import { Html } from '@markless/router';
-
-export default function Document({ children }: { readonly children?: Children }) @{
-	<Html>
-		<head>
-			<meta charset="utf-8" />
-			<meta name="viewport" content="width=device-width, initial-scale=1" />
-		</head>
-		<body>{children}</body>
-	</Html>
-}
-```
-
-For a header and footer that some pages share, write a [component](/build/components) that takes `children`, and wrap each page's content in it.
-
-Not yet:
-
-- Two files for one address stop the build, like `docs.tsrx` next to `docs.mdx`. So do a partial bracket like `post-[id].tsrx`, a catch-all that isn't the last part, and a `404.tsrx` or `500.tsrx` inside a folder.
-- `http` exists only on the server. Reading it in a handler, `attach` or `computed()` stops the build with `MARKLESS_SERVER_ONLY_PROP_BROWSER_READ`, so copy the one value the browser needs into `state()`.
-- `document.tsrx` can't hold event handlers. An `onClick` there stops the build with `MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED`.
+- `document.tsrx` in the app root wraps every page, using `Html` from `@markless/router`. It can't hold event handlers.
+- Two files for one address stop the build, like `docs.tsrx` next to `docs.mdx`.
+- `http` exists only on the server. Reading it in a handler stops the build with `MARKLESS_SERVER_ONLY_PROP_BROWSER_READ`.
 
 Next, [link between your pages](/router/links) so the build can check every link.

@@ -3,6 +3,7 @@ import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import TickerAnatomy from '../../components/figures/ticker/ticker-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -11,7 +12,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 
 <PageMeta time="2 min" assumes="async, routes" />
 
-<Subtitle text="A page loads its data with an async computed() inside @try. The fast part of the page shows first, and the data follows in the same response." />
+<Subtitle text="A page loads its data with an async computed() inside @try. The fast part shows first, and the data follows in the same response." />
 
 ```tsrx title="pages/shops/[shop].tsrx"
 import { computed } from '@markless/core';
@@ -22,11 +23,11 @@ export default function Orders({ params }: PageProps<{ shop: string }>) @{
 	const orders = computed(async () => recentOrders(params.shop));
 
 	<main>
-		<h1>Recent orders</h1>
+		<h1>Orders</h1>
 		@try {
-			<p>{orders.length} orders today</p>
+			<p>{orders.length} orders</p>
 		} @pending {
-			<p>Loading orders…</p>
+			<p>Loading…</p>
 		} @catch {
 			<p>Couldn't load the orders.</p>
 		}
@@ -34,33 +35,21 @@ export default function Orders({ params }: PageProps<{ shop: string }>) @{
 }
 ```
 
-There is no special loader function. A page loads data the way any component does, as an [async value](/concepts/async).
+There is no loader function. A page loads data the way any component does, as an [async value](/concepts/async).
 
 ## One response, in two parts
 
-If `recentOrders` is slow, the server answers in two parts of one response:
+Press the machine to print the page. Then tug the tape while it waits.
 
-1. The heading and the `@pending` text go out first, so the reader sees **Loading orders…** straight away.
-2. When the data is ready, the same response adds the `@try` content. The page puts it in place, and the response ends.
+<TickerAnatomy />
 
-The browser never makes a second trip for the data. If it is ready quickly, it goes out in the first part, and **Loading orders…** is never sent. You turn nothing on.
-
-## Read props before or after `await`
-
-The call can use the page's props on either side of an `await`, and Markless tracks both reads:
-
-```tsrx
-const orders = computed(async () => {
-	const list = await recentOrders(params.shop);
-	const status = new URLSearchParams(url.search).get('status');
-	return status ? list.filter((order) => order.status === status) : list;
-});
-```
+The heading and the `@pending` text go out first. When the orders are ready, the same response carries on with the `@try` content. The browser never asks twice, and fast data never sends `Loading…` at all.
 
 Keep in mind:
 
-- On the server, `fetch` needs a full address with a host. Build it from the `url` prop: `new URL('/api/orders', url.href)`.
-- The router can't wait for all the data before it sends the page. A slow `@try` always sends its `@pending` content first.
+- The call can read the page's props before or after an `await`, and Markless tracks both.
+- On the server, `fetch` needs a full address. Build it from the `url` prop: `new URL('/api/orders', url.href)`.
+- The router can't wait for all the data first. A slow `@try` always sends its `@pending` content first.
 
 <Collapsible
 	sprite="star-badge"

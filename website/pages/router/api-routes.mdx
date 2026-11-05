@@ -2,6 +2,7 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import VendingAnatomy from '../../components/figures/vending/vending-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -26,23 +27,15 @@ export default function user({ params }: EndpointHttpContext<{ id: string }>) {
 
 ## The path is the address, the name is the method
 
-`api/` sits at the root of your app, next to `pages/`, and follows the same address rules. The file name can also end with the one HTTP method it answers.
+`api/` sits at the app root, next to `pages/`. Press GET, then POST.
 
-| File in `api/` | What it answers |
-| --- | --- |
-| `health.ts` | every method on `/api/health` |
-| `index.ts` | `/api` |
-| `users/[id].get.ts` | only `GET` on `/api/users/` plus one part |
-| `files/[...path].ts` | `/api/files/` plus one part or more |
+<VendingAnatomy />
 
-A `POST` to `/api/users/42` finds no endpoint, because the file name says `get`. The method names a file can end with are `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `connect` and `trace`.
+`users/[id].get.ts` answers only `GET`, so a `POST` to `/api/users/42` gets nothing. A file name can end with `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `connect` or `trace`; with none, it answers every method.
 
 ## One function gets the whole request
 
-The function gets one object with `request`, `url`, `params`, `locals` and `response`. Return a `Response`, or set headers on `response.headers`.
-
-- Each file has one `export default` function.
-- Don't export a function called `GET` or `POST`. The method comes from the file name, and only the default export answers.
+It gets `request`, `url`, `params`, `locals` and `response`. Return a `Response`, or set headers on `response.headers`. Each file has one `export default` function; don't export one called `GET` or `POST`.
 
 ## Run code on every request with middleware
 
@@ -54,7 +47,7 @@ export default function request(http: import('@markless/router').MiddlewareHttpC
 }
 ```
 
-That header shows up on your pages and on your `/api/` answers. A middleware file follows the endpoint rule: one `export default` function.
+That header shows up on your pages and your `/api/` answers.
 
 Keep in mind:
 

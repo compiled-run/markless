@@ -1,19 +1,17 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import StencilAnatomy from '../../components/figures/stencil/stencil-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
 # Props pass values down, and callbacks talk back
 
-<PageMeta time="3 min" assumes="state, events" />
+<PageMeta time="2 min" assumes="state, events" />
 
 <Subtitle text="A component is a function, and its props are its parameter. A prop is a live read of the parent's value, not a copy." />
-
-Press **Add a bag** a few times.
 
 <Code steps={[{ label: 'Press Add a bag three times. The bag count goes up, and the ticket number stays.', shows: '3' }, { label: 'Under the badge, add `<CartBadge bags={bags * 2} />`. Press again, and both badges follow `bags`.', source: 'bags={bags * 2}' }]}>
 ```tsrx title="cart.tsrx"
@@ -44,11 +42,17 @@ export default function Cart() @{
 
 `CartBadge` takes `{ bags }`, and the parent writes `bags={bags}`. That is the whole connection.
 
-`CartBadge` picks its ticket number once, when it runs to set up the page. A click changes `bags`, and only the text inside `<strong>` changes. The child never runs again.
+## A child is cut once
+
+Press the paint pot for a new colour. Watch what changes on the `CartBadge` stencil.
+
+<StencilAnatomy />
+
+A child runs once, like a stencil cut once. A new value from the parent shows through where the child reads it.
 
 ## Talk back with a callback
 
-A child can't change the parent's state itself. The parent hands it a function, and the child calls that function.
+A child can't change the parent's state. The parent hands it a function, and the child calls it.
 
 <Code steps={[{ label: 'Press Grace.', shows: 'Host: Grace' }, { label: 'Add a third guest, `<Guest name="Linus" onPick={choose} />`, and press it.', shows: 'Host: Linus' }]}>
 ```tsrx title="host-pick.tsrx"
@@ -78,52 +82,22 @@ export default function HostPick() @{
 ```
 </Code>
 
-Each `Guest` gets its own `name` and the same `onPick`, the parent's `choose`. The click runs `onPick(name)` in the child, and `choose` sets `host`.
-
 ## Put children where you want them
 
-Elements between a component's tags arrive as its `children` prop. Write `{children}` where they go. The type is `Children` from `@markless/core`.
+Elements between a component's tags arrive as `children`, typed `Children` from `@markless/core`.
 
-```tsrx title="welcome.tsrx"
+```tsrx title="card.tsrx"
 import type { Children } from '@markless/core';
 
-function Card({ title, children }: { title: string; children?: Children }) @{
-	<section class="card">
-		<h2>{title}</h2>
-		{children}
-	</section>
-}
-
-export default function Welcome() @{
-	<Card title="Welcome">
-		<p>This paragraph lands where Card writes children.</p>
-	</Card>
-}
-```
-
-## Work out a default with `computed()`
-
-A default in the parameter, like `{ text = 'none' }`, stops the build when your elements show that prop. The error is `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`. Work out the fallback in a computed value instead:
-
-```tsrx title="label.tsrx"
-import { computed } from '@markless/core';
-
-export default function Label({ text }: { text?: string }) @{
-	const shown = computed(() => text ?? 'none');
-
-	<p>{shown}</p>
+export default function Card({ children }: { children?: Children }) @{
+	<section class="card">{children}</section>
 }
 ```
 
 Not yet:
 
-- A callback prop takes zero parameters or one. Two stop the build with `MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED`, so pass one object, like `onPick({ first, last })`.
-- You can place `children`, wrap it, or pass it on, but not map, count or index it. That stops the build with `MARKLESS_CHILDREN_OPAQUE`.
+- A callback prop takes zero parameters or one (`MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED`). Pass one object instead.
+- You can place, wrap or pass on `children`, but not map, count or index it (`MARKLESS_CHILDREN_OPAQUE`).
+- A default like `{ text = 'none' }` that the elements show stops the build (`MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`). Write `computed(() => text ?? 'none')` instead.
 
-<Collapsible
-	sprite="star-badge"
-	summary="Coming from another framework?"
-	text="In some frameworks, a new prop value calls the child function again. Here the child function runs once, to set up its part of the page. After that, Markless writes each new value into the one place that shows it."
-/>
-
-When a handler needs the real `<input>` itself, [reach a real element](/build/elements).
+When a handler needs the real `<input>`, [reach a real element](/build/elements).

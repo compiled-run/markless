@@ -3,13 +3,14 @@ import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
+import DoughAnatomy from '../../components/figures/dough/dough-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
 # Write once, then pick where it runs
 
-<PageMeta time="4 min" assumes="routes" />
+<PageMeta time="2 min" assumes="routes" />
 
 <Subtitle text="One build turns your pages, endpoints and middleware into a Node server. A preset turns the same files into output for another host." />
 
@@ -18,24 +19,15 @@ npm run build
 PORT=3000 node .output/server/index.mjs
 ```
 
-That is the default: a Node server that reads its port from `PORT`. To try the build on your own machine first, run `npm run preview`.
-
-The router builds on [Nitro](https://nitro.build), a server toolkit that writes output for many hosts. A *preset* names the host. Your files stay the same, and only the output changes.
-
-## What the build writes
-
-| Path | What it holds |
-| --- | --- |
-| `.output/server/index.mjs` | the server you start |
-| `.output/public/build/` | the browser code, sent with long-lived cache headers |
-| `.output/markless/router/types/` | the route types your editor uses to check links |
-| `.output/nitro.json` | Nitro's notes about this build |
-
-The starter's `.gitignore` already leaves `.output/` out of git.
+That is the default: a Node server that reads its port from `PORT`. Run `npm run preview` to try the build first.
 
 ## Pick another host with a preset
 
-Nitro reads the preset from the `NITRO_PRESET` variable when you build:
+The router builds on [Nitro](https://nitro.build), a server toolkit that writes output for many hosts. A *preset* names the host. Press the tin to switch it, or drag the dough in.
+
+<DoughAnatomy />
+
+The dough never changes: your files stay the same, and only the output takes the host's shape.
 
 | Host | `NITRO_PRESET` | Output |
 | --- | --- | --- |
@@ -47,41 +39,37 @@ Nitro reads the preset from the `NITRO_PRESET` variable when you build:
 NITRO_PRESET=vercel npm run build
 ```
 
-For Cloudflare, build with `NITRO_PRESET=cloudflare-module`, then deploy with `npx wrangler deploy --config .output/server/wrangler.json`.
+These three are tested with Markless. Treat Nitro's other presets as untested, and try a preview deploy first.
 
-These three are tested with Markless. Nitro has presets for many other hosts. Treat those as untested for now, and try a preview deploy first.
+## What the build writes
+
+| Path | What it holds |
+| --- | --- |
+| `.output/server/index.mjs` | the server you start |
+| `.output/public/build/` | the browser code, sent with long-lived cache headers |
+| `.output/markless/router/types/` | the route types your editor uses to check links |
+
+The starter's `.gitignore` already leaves `.output/` out of git.
 
 ## Serve prerendered pages free on Cloudflare
 
-Cloudflare answers a request for a file in `.output/public/` without running your Worker, and those requests are free. So a page you prerender costs nothing to serve:
+Deploy with `npx wrangler deploy --config .output/server/wrangler.json`. Cloudflare serves files in `.output/public/` without running your Worker, so prerendered pages cost nothing:
 
-- Give the page `prerender: true` in its route rule, and give its `/_markless/fragment/...` path the same rule. Then a click on a link to it is served from a file too.
-- `/guide` is written as `guide.html` and `/guide/` as `guide/index.html`, the names Cloudflare serves at those URLs with no redirect.
+- Give the page `prerender: true` in its route rule, and give its `/_markless/fragment/...` path the same rule, so a click on a link to it is served from a file too.
 - Pages that aren't prerendered render in the Worker and stream, so `@pending` content still shows first.
-- Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`. Nitro merges it into the one it writes.
-
-## Caches keep the page and its fragment apart
-
-When a link swaps in the next page, the router asks for just the page area, under its own path: `/_markless/fragment/docs` for `/docs`. A request for `/docs` itself gets the whole page. The two never share an address, so a CDN or a Vercel ISR cache keeps them apart, even one that ignores the query string. Your middleware and route rules see `/docs` for both.
+- Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`.
 
 ## Keep shared data out of memory
 
-A host runs your server as many copies, called *instances*, and starts or stops them as traffic changes. Each instance has its own memory, and no host shares it. A value in a variable is gone on the next instance, and the next visitor may land there.
-
-- Put counters, sessions and carts in a database or a key-value store.
-- A variable at the top of a module can exist more than once in one instance, because Nitro may load a module into more than one bundle. For one copy per instance, such as a database pool, put it on `globalThis`:
+A host runs many copies of your server, called *instances*, and each has its own memory. Put counters, sessions and carts in a database or a key-value store. For one copy per instance, such as a database pool, put it on `globalThis`:
 
 ```ts
 const pool = (globalThis.dbPool ??= createPool(process.env.DATABASE_URL));
 ```
 
-## Builds reuse what they compiled
-
-A build keeps each `.tsrx` file's compiled result in `node_modules/.vite/markless-compile/`. The next build reuses a result while the file, everything it was compiled against, and the compiler are unchanged. The cache holds at most 1 GB, and deleting it is always safe. To compile everything every time, pass `markless({ compileCache: false })`.
-
 <Collapsible summary="Nitro settings in vite.config.ts">
 
-Put Nitro settings under a top-level `nitro` key, and the router merges them into the Nitro setup it makes. This app serves from a sub-path:
+Put Nitro settings under a top-level `nitro` key, and the router merges them in. This app serves from a sub-path:
 
 ```ts title="vite.config.ts"
 import { markless } from '@markless/core/vite';
@@ -95,7 +83,7 @@ export default defineConfig({
 });
 ```
 
-Don't add `nitro()` to `plugins` yourself. The build stops with `Remove nitro() from vite.config.ts and keep plugins: [markless(), router()].`
+Don't add `nitro()` to `plugins` yourself; the build stops and asks you to remove it.
 
 </Collapsible>
 
