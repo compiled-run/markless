@@ -901,7 +901,9 @@ function captureSlot(
 				routePath,
 				input,
 				absentPropIsUndefined,
-				symbol.kind === 'sync-computed-derive' ? read : undefined,
+				symbol.kind === 'sync-computed-derive' || symbol.kind === 'async-computed-runner'
+					? read
+					: undefined,
 			)
 		: [
 				{

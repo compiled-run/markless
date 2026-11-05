@@ -101,15 +101,17 @@ async function asyncComputedFromRecord(
 			return values.length > 1 || Object(only) === only ? values : only;
 		},
 		run: async ({ key, signal, read }) => {
-			const graph = graphRef(),
-				node = computed.graphNodeId;
-			// Inputs held at what the screen shows reach the runner, which reads through the graph.
-			const held = read === graph.read ? graph : { ...graph, read };
-			return (await input.loadSymbol(runnerSymbolId))({
-				// A bound runner names edges, never a row; the node it settles names the row.
-				graph: node.includes('r:')
-					? ({ ...held, marklessPageGraph: held, marklessRowHostPath: node } as RuntimeGraph)
-					: held,
+			const graph = graphRef();
+			let runner = await input.loadSymbol(runnerSymbolId);
+			// A bound runner names edges, never a row; the node it settles names the row, as a bound derive's does.
+			if (computed.graphNodeId.includes('r:'))
+				runner = (await import('./row-placed-derive.ts')).marklessRowPlacedDerive(runner, {
+					graphNodeId: computed.graphNodeId,
+					deriveSymbolId: runnerSymbolId,
+				});
+			return runner({
+				// Inputs held at what the screen shows reach the runner, which reads through the graph.
+				graph: read === graph.read ? graph : { ...graph, read },
 				read,
 				key,
 				signal,

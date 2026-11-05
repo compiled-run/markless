@@ -190,7 +190,7 @@ export function App() @{ <main><Child /></main> }
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.diagnostics).toContainEqual(
+	expect(result.symbolModules.diagnostics).toContainEqual(
 		expect.objectContaining({
 			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
 			severity: 'error',

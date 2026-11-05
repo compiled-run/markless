@@ -6334,6 +6334,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
 			},
+			{
+				id: 'f1',
+				file: 'packages/compiler/src/passes/symbol-modules.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/symbol-modules.ts',
+			},
 		],
 		moreSources: 0,
 	},
