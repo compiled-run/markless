@@ -1214,9 +1214,8 @@ function rowItemPath(
 	const enclosing = input.semanticGraph.keyedRepeats.filter((repeat) =>
 		edge.keyedRepeatScopeIds.includes(repeat.id),
 	);
-	if (enclosing.some((repeat) => repeat.itemName === itemName))
-		return itemName ? { itemName, path } : undefined;
 	for (const repeat of enclosing.toReversed()) {
+		if (repeat.itemName === itemName) return itemName ? { itemName, path } : undefined;
 		const aliased = aliasedItemPath(repeat.itemAliases, source.trim());
 		if (aliased) return { itemName: repeat.itemName, path: aliased };
 	}

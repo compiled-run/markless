@@ -70,3 +70,15 @@ export function Rows() @{
 			'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
 		]);
 	});
+
+test('a key that computes from a destructured name is not read as a path', async () => {
+	const result = await compile(`import { state } from '@markless/core';
+export function Rows() @{
+	let rows = state([] as any[]);
+	<ul>@for (const { person } of rows; key person.id + 1) { <li>{person.id}</li> }</ul>
+}
+`);
+	expect(result.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+		'MARKLESS_REPEAT_KEY_UNSTABLE',
+	]);
+});

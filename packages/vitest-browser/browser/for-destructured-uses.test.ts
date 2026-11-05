@@ -14,6 +14,15 @@ const picked = (root: ParentNode) => root.querySelector('[data-picked]')!.textCo
 async function uses(root: ParentNode) {
 	expect(rows(root, 'data-person')).toEqual(['Adapick', 'Bopick']);
 	expect(rows(root, 'data-tags')).toEqual(['taggedmath', 'plain']);
+	// One spelling, three places: the first item field of a pair, an object's field, and an inner loop's item.
+	expect(rows(root, 'data-pair')).toEqual(['x:pair-x']);
+	expect(rows(root, 'data-group-name')).toEqual(['g1/']);
+	expect(rows(root, 'data-kid')).toEqual(['k1', 'k2']);
+	expect(rows(root, 'data-owner')).toEqual(['inner']);
+	press(root, 'echo');
+	await expect.poll(() => rows(root, 'data-echo')).toEqual(['inner']);
+	press(root, 'kid="k2"');
+	await expect.poll(() => picked(root)).toBe('k2');
 	press(root, 'pick="bo"');
 	await expect.poll(() => picked(root)).toBe('Bo');
 	press(root, 'add');

@@ -2183,13 +2183,21 @@ function rowLocalNamesBySymbol(
 			localNamesBySymbol.set(symbolId, localNames);
 		}
 		localNames.add(itemName);
+		localNames.itemPaths?.delete(itemName);
 		for (const alias of aliases) {
 			localNames.add(alias.name);
 			(localNames.itemPaths ??= new Map()).set(alias.name, [itemName, ...alias.path]);
 		}
 	};
+	// Outer rows first, so an inner row's names win over an outer row's of the same spelling.
+	const depth = (repeatId: string): number => {
+		const repeat = semanticGraph?.keyedRepeats.find((candidate) => candidate.id === repeatId);
+		return repeat?.enclosingRepeatId ? 1 + depth(repeat.enclosingRepeatId) : 0;
+	};
 	if (renderData) {
-		for (const repeat of renderData.repeats) {
+		for (const repeat of [...renderData.repeats].sort(
+			(left, right) => depth(left.repeatId) - depth(right.repeatId),
+		)) {
 			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);
 			const semanticRepeat = semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === repeat.repeatId,

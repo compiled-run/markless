@@ -39,8 +39,11 @@ export function aliasedItemPath(
 ): ReadonlyArray<string> | null {
 	for (const alias of aliases ?? []) {
 		if (source === alias.name) return alias.path;
-		if (source.startsWith(`${alias.name}.`))
-			return [...alias.path, ...source.slice(alias.name.length + 1).split('.')];
+		if (!source.startsWith(`${alias.name}.`)) continue;
+		const rest = source.slice(alias.name.length + 1).split('.');
+		return rest.every((segment) => /^[A-Za-z_$][\w$]*$/.test(segment))
+			? [...alias.path, ...rest]
+			: null;
 	}
 	return null;
 }
