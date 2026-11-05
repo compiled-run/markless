@@ -525,7 +525,7 @@ export default function ReloadAnatomy() @{
 				--spin: spin-b;
 			}
 
-			.scene:not([data-beat='rest']) .page-layer {
+			.scene:not([data-beat='rest']) :is(.page-ink, .sidebar) {
 				animation: var(--flicker) 520ms ease-out;
 			}
 
