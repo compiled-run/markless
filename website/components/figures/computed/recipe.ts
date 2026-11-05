@@ -10,7 +10,7 @@ export const HEIGHT = 600;
 export const CART_ROW = { u: 1.4, v: 11.3 };
 export const TOTAL_ROW = { u: 1.4, v: 13.3 };
 const BUTTON = { u0: 5, v0: 8.45, u1: 10.9, v1: 9.75 };
-const CARD = { c: [15.2, 11.6] as P, w: 16.6, h: 9.4, turn: -0.05 };
+const CARD = { c: [15.2, 11.6] as P, w: 16.6, h: 9.4, turn: 0 };
 /** The card's lines, in card units from its top left: the title, then the recipe's three steps. */
 export const CARD_LINES = [1.9, 4.1, 6.0, 7.9] as const;
 
