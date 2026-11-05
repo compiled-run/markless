@@ -79,8 +79,13 @@ function loadDerive(
 
 type RefreshInput = Parameters<typeof refreshSyncComputed>[0];
 
+// A derive that cannot run without mixing old and new data keeps its last result.
+const HELD = Symbol('held');
+
 function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeModule | undefined) {
-	const graph = seedSourceGraph(input.graph, input.computed);
+	const shown = input.graph.shownRead?.(input.computed.dependencies ?? []);
+	if (shown === false) return HELD;
+	const graph = seedSourceGraph(shown ? { ...input.graph, read: shown } : input.graph, input.computed);
 	return symbol({
 		graph,
 		read: graph.read,
@@ -108,7 +113,7 @@ export function deriveSyncComputedNow(
 	)
 		return false;
 	const write = (value: unknown) =>
-		input.graph.write({ graphNodeId: input.computed.graphNodeId, value });
+		value === HELD || input.graph.write({ graphNodeId: input.computed.graphNodeId, value });
 	const value = derive(input, symbol, roster || undefined);
 	if (typeof (value as PromiseLike<unknown> | null)?.then === 'function')
 		return Promise.resolve(value).then(write);
@@ -149,15 +154,12 @@ export async function refreshSyncComputed(
 	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
 	if (input.records && awaitsAsyncAncestor(input.computed, input.records, input.graph)) return;
 	const roster = await loadRosterResume();
-	const result = derive(
+	const result = await derive(
 		input,
 		input.derive ?? (await loadDerive(input.loadSymbol, input.computed)),
 		roster,
 	);
-	input.graph.write({
-		graphNodeId: input.computed.graphNodeId,
-		value: await result,
-	});
+	if (result !== HELD) input.graph.write({ graphNodeId: input.computed.graphNodeId, value: result });
 }
 
 type DependencyRecord = {
@@ -328,12 +330,12 @@ export async function refreshWhenShown(
 				() => settled(false),
 			);
 		} else {
-			// Read before its symbol arrived: a flip reads again once it has, and a shown reader refreshes.
+			// Read before its symbol arrived: the reader took the held value, so it derives once the symbol lands.
 			graph.pullBeforeRead!(id, () => pull(node));
 			const cleared = () => void (node.pending = undefined);
 			// Held in pending, so a flip settling the write observers waits for this derive too.
 			node.pending = Promise.resolve(prepare(node))
-				.then(() => (node.stale && shown(id) ? refresh(node) : undefined))
+				.then(() => (node.stale ? refresh(node) : undefined))
 				.then(cleared, cleared);
 		}
 	};

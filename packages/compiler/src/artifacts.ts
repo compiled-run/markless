@@ -1841,6 +1841,11 @@ export type PlannedSymbol =
 				readonly endOffset: number;
 			}>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+			// Reads that answer as the screen shows them while an async value they pair with refreshes.
+			readonly shownReads?: ReadonlyArray<{
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			}>;
 			// `@catch (error, reset)` names the handler calls, with the async values each re-runs.
 			readonly catchResets?: ReadonlyArray<{
 				readonly name: string;

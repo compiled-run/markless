@@ -107,6 +107,13 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			semanticsReader,
 		);
 
+		const writes = eventWrites(source, input.stateLowering?.writes, [
+			sourceSpan,
+			...inlined.spans,
+			...(event.handlerDefinitionSpans ?? []),
+		]);
+		const shownReads = handlerShownReads(reads, writes, input.semanticGraph);
+
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'event-handler',
@@ -119,11 +126,8 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			...(crossModuleInline ? { crossModuleInline } : {}),
 			order,
 			reads,
-			writes: eventWrites(source, input.stateLowering?.writes, [
-				sourceSpan,
-				...inlined.spans,
-				...(event.handlerDefinitionSpans ?? []),
-			]),
+			writes,
+			...(shownReads ? { shownReads } : {}),
 			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
 			elementHandleReads: handleReadsOf(reads),
 			...(event.handlerCatchResets?.length
@@ -1010,6 +1014,30 @@ function behaviorGraphAccess(
 			writes,
 		},
 	};
+}
+
+// Reads a handler pairs with an async-backed value; an input it writes stays live so a second click builds on the first.
+function handlerShownReads(
+	reads: ReadonlyArray<LoweredStateRead>,
+	writes: ReadonlyArray<LoweredStateWrite>,
+	semanticGraph: SymbolResolverInput['semanticGraph'],
+): ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> | undefined {
+	const written = new Set(writes.map((write) => write.graphNodeId));
+	const shown = new Map<string, { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>();
+	for (const read of reads)
+		if (!written.has(read.graphNodeId))
+			shown.set(`${read.graphNodeId} ${read.path.join('.')}`, {
+				graphNodeId: read.graphNodeId,
+				path: read.path,
+			});
+	const asyncBacked = new Set(
+		semanticGraph.graphBindings
+			.filter((binding) => binding.kind === 'computed' && binding.asyncCapable === true)
+			.map((binding) => binding.id),
+	);
+	const reached = [...shown.values()];
+	if (reached.length < 2 || !reached.some((read) => asyncBacked.has(read.graphNodeId))) return undefined;
+	return reached;
 }
 
 function eventWrites(

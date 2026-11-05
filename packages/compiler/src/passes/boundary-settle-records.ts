@@ -40,6 +40,8 @@ export type BoundarySettleRecordsInput = {
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	/** Repeat parts per emitted arm; the plan must agree with what the module renders. */
 	readonly repeatPartCounts: ReadonlyArray<number>;
+	/** Settled reads that also read live inputs, so their bindings change between settles. */
+	readonly liveSettledReads?: ReadonlySet<string>;
 };
 
 // Null when an element position cannot be stated exactly; the settle then commits html only.
@@ -99,7 +101,11 @@ export function boundarySettleRecords(
 		rowElements.push(layout.rowElements);
 	}
 	// Pay-per-use: an arm whose only bindings show the settled value needs no records.
-	const settledReads = new Set(boundary.asyncReads.map((read) => read.graphNodeId));
+	const settledReads = new Set(
+		boundary.asyncReads
+			.map((read) => read.graphNodeId)
+			.filter((graphNodeId) => !input.liveSettledReads?.has(graphNodeId)),
+	);
 	const registers = arms.some(
 		(arm) =>
 			arm.events.length > 0 ||

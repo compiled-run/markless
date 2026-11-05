@@ -44,12 +44,15 @@ export function readComputedNode(
 	readGraph: RuntimeGraphRead,
 	path: ReadonlyArray<string>,
 	reconcile?: ReconcileComputed,
+	shownRead?: (computed: RuntimeComputedNode) => RuntimeGraphRead | false | undefined,
 ): unknown {
 	// Dependency-only nodes carry no compute; callers already gate on it.
 	const { compute } = computed;
 	if (computed.dirty && compute) {
 		const previous = computed.value;
-		computed.value = compute(readGraph);
+		const read = shownRead?.(computed);
+		// `false`: it would mix old and new data, so it keeps its last value until the refresh lands.
+		if (read !== false) computed.value = compute(read ?? readGraph);
 		computed.dirty = false;
 		// A plane, when installed, narrows the invalidation to the paths that
 		// moved; without one the whole node was already dirtied.

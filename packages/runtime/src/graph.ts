@@ -17,6 +17,8 @@ import {
 	invalidateAsyncComputed as invalidateRuntimeAsyncComputed,
 	retryAsyncComputed as retryRuntimeAsyncComputed,
 	readAsyncComputedNode,
+	seedValueInputs,
+	shownReadFor,
 	type RuntimeAsyncComputedNode,
 } from './graph-async.ts';
 import {
@@ -299,6 +301,10 @@ export type RuntimeGraph = {
 	 * answers, so a value derived on demand can write itself first.
 	 */
 	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
+	/** While an async value refreshes, its key's inputs read as its shown value was fetched; `false`: the reader would mix. */
+	readonly shownRead?: (
+		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
+	) => RuntimeGraphRead | false | undefined;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (asyncComputed: RuntimeGraphAsyncComputed) => boolean;
 	/**
@@ -355,7 +361,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
 		if (computed?.compute) {
-			return readComputedNode(computed, readGraph, path, plane?.reconcileComputed);
+			return readComputedNode(computed, readGraph, path, plane?.reconcileComputed, (node) =>
+				shownRead(node.dependencies),
+			);
 		}
 
 		const asyncComputed = asyncComputedNodes.get(graphNodeId);
@@ -498,6 +506,20 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		scheduleFlush,
 		reconcile: plane,
 	});
+	const shownRead = (dependencies: ReadonlyArray<RuntimeGraphComputedDependency>) =>
+		asyncComputedNodes.size === 0
+			? undefined
+			: shownReadFor(dependencies, { computedNodes, asyncComputedNodes, readGraph });
+	// What the page was served with: no initializer runs and no async value starts.
+	const peek: RuntimeGraphRead = (graphNodeId, path = []) => {
+		const asyncNode = asyncComputedNodes.get(graphNodeId);
+		return asyncNode
+			? readAsyncComputedNode(asyncNode, path, () => {})
+			: readPath(cells.get(graphNodeId), path);
+	};
+	for (const node of asyncComputedNodes.values())
+		seedValueInputs(node, { computedNodes, asyncComputedNodes }, peek);
+
 	const demandAsyncComputed = (node: RuntimeAsyncComputedNode): void =>
 		demandRuntimeAsyncComputed({ node, ...asyncComputedInput() });
 
@@ -682,12 +704,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return outcome.result;
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
+		shownRead,
 		retry: (graphNodeId) => retry(graphNodeId, new Set()),
 		defineAsyncComputed(asyncComputed) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncComputedNodes.has(id) || cells.has(id)) return false;
-			asyncComputedNodes.set(id, createRuntimeAsyncComputedNodes([asyncComputed]).get(id)!);
+			const node = createRuntimeAsyncComputedNodes([asyncComputed]).get(id)!;
+			asyncComputedNodes.set(id, node);
 			dependents = indexRuntimeDependents(computedNodes, asyncComputedNodes);
+			seedValueInputs(node, { computedNodes, asyncComputedNodes }, peek);
 			return true;
 		},
 		subscribe(subscription) {

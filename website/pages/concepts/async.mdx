@@ -127,6 +127,44 @@ it, for example `[aria-busy='true'] { opacity: 0.5; }`. The attribute goes away 
 or the `@catch` block, is on the page. If the block shares its element with other content, each
 element inside the block gets the attribute instead.
 
+Values shown together stay matched while the new answer loads. Say a figure divides a total by
+the number of days you picked. Pick a longer range, and until the new total arrives the figure keeps
+using the old range, so it never shows the old total divided by the new days. A setting the request
+does not use, such as a currency the page converts itself, applies at once. An event handler reads
+the same pair the page shows, so a Share button shares the figure next to the range it was
+fetched for.
+
+To compare the old answer with what the user just typed, keep two states: one the request reads,
+one it does not. The one it does not read always shows the latest value.
+
+```tsrx
+import { computed, state } from '@markless/core';
+import { loadMugFact } from './mug-facts.ts';
+
+export default function MugSearch() @{
+	let typed = state('tall');
+	let asked = state('tall');
+	const fact = computed(async () => {
+		const mug = asked;
+		return { mug, text: await loadMugFact(mug) };
+	});
+
+	<section>
+		<input value={typed} onInput={(event) => {
+			typed = event.currentTarget.value;
+			asked = event.currentTarget.value;
+		}} />
+		@try {
+			<p class={fact.mug !== typed ? 'old' : ''}>{fact.text}</p>
+		} @pending {
+			<p>Looking it up</p>
+		}
+	</section>
+}
+```
+
+`fact.mug !== typed` is true while a newer answer loads, because the request never reads `typed`.
+
 `@pending` only comes back if the newest request has been waiting for more than 5 seconds. Each new
 pick starts that wait over, so fast typing never brings it back.
 

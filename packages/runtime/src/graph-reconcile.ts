@@ -528,12 +528,11 @@ function asyncCommitPaths(
 		paths.push(['error']);
 	}
 
-	// A pending re-run carries the prior settled value forward, so value cells
-	// never re-check on a pending flip.
-	if (next.status === 'pending') return paths;
-
 	const previousValue = snapshotField(previous, 'value');
 	const nextValue = snapshotField(next, 'value');
+	// A pending flip carries the prior value forward; only a run on held inputs brings a new one.
+	if (next.status === 'pending' && Object.is(previousValue, nextValue)) return paths;
+
 	if (
 		!Object.is(previousValue, nextValue) &&
 		isDiffableContainer(previousValue) &&

@@ -136,6 +136,7 @@ export function armEscalationCandidateSiteIds(input: SymbolModulesInput): Readon
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
+	const liveSettledReads = valuesChangingBetweenSettles(input.semanticGraph);
 	const localNamesBySymbol = rowLocalNamesBySymbol(
 		input.renderData,
 		input.semanticGraph,
@@ -246,6 +247,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 							repeatPartCounts: arms.arms.map(
 								(arm) => arm.filter((part) => 'repeat' in part).length,
 							),
+							liveSettledReads,
 						})
 					: null;
 				return [
@@ -6033,8 +6035,9 @@ export function buildEventHandlerEmission(
 	// the print site hands the printer as its `source` (invariant 3).
 	const source = projection?.source ?? symbol.source;
 
+	const shownReads = symbol.kind === 'event-handler' ? symbol.shownReads : undefined;
 	const scalarLeaf =
-		input.captureSlots.length === 0
+		input.captureSlots.length === 0 && !shownReads
 			? eventHandlerScalarLeafStatements(input, projection)
 			: null;
 	if (scalarLeaf) {
@@ -6132,6 +6135,15 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
+			...(shownReads
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: SHOWN_READS_FN,
+							source: '@markless/web/fns/shown-reads',
+						}),
+					]
+				: []),
 			...imports.map((moduleImport) =>
 				moduleImportNode({
 					kind: moduleImport.kind,
@@ -6143,6 +6155,7 @@ export function buildEventHandlerEmission(
 			...declarationStatements,
 			exportNamedDeclarationNode(
 				eventHandlerFunctionNode(exportName, isAsync, [
+					...(shownReads ? [shownReadsStatement(shownReads)] : []),
 					...(importedReference ? [] : eventHandlerParameterStatements(input)),
 					...bodyStatements,
 				]),
@@ -7518,6 +7531,46 @@ const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
 const CHANGED_FN = 'marklessChanged';
 const CATCH_RESET_FN = 'marklessCatchReset';
+
+// A value that reads an input beside async values changes in place between settles.
+function valuesChangingBetweenSettles(semanticGraph: SymbolModulesInput['semanticGraph']): ReadonlySet<string> {
+	const graphBindings = semanticGraph?.graphBindings ?? [];
+	const bindings = new Map(graphBindings.map((binding) => [binding.id, binding]));
+	const asyncBacked = (graphNodeId: string) => {
+		const binding = bindings.get(graphNodeId);
+		return binding?.kind === 'computed' && binding.asyncCapable === true;
+	};
+	return new Set(
+		graphBindings
+			.filter((binding) => {
+				if (binding.kind !== 'computed') return false;
+				const dependencies = binding.dependencies ?? [];
+				const readsInput = dependencies.some((dependency) => !asyncBacked(dependency.graphNodeId));
+				return binding.async === true
+					? readsInput && dependencies.some((dependency) => asyncBacked(dependency.graphNodeId))
+					: readsInput;
+			})
+			.map((binding) => binding.id),
+	);
+}
+const SHOWN_READS_FN = 'marklessShownReads';
+
+function shownReadsStatement(
+	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
+): EmissionNode {
+	return {
+		type: 'ExpressionStatement',
+		expression: {
+			type: 'AssignmentExpression',
+			operator: '=',
+			left: identifierNode('context'),
+			right: callNode(identifierNode(SHOWN_READS_FN), [
+				identifierNode('context'),
+				jsonValueNode(reads.map(({ graphNodeId, path }) => ({ graphNodeId, path }))),
+			]),
+		},
+	};
+}
 
 function catchResetCall(reset: { readonly graphNodeIds: ReadonlyArray<string> }): EmissionNode {
 	return callNode(identifierNode(CATCH_RESET_FN), [

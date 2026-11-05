@@ -153,6 +153,15 @@ across all three cases:
   requires seeded content to stay visible. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
+- Matched values during a re-settle (2026-11-04, async-error-states): the
+  held content keeps showing pairs that belong together. A binding in the
+  arm that reads the refreshing value beside an input of its key shows that
+  input as the shown value was fetched with it, and a binding that reads an
+  input outside the key updates in place at once (03-state-graph "Values
+  shown together never mix"). So a client-settled arm registers update
+  records for any binding whose value can change between settles: a sync
+  computed or template expression that reads a live input, and an async
+  value that reads one beside an async input.
 - Failed refresh (2026-11-04, async-error-states): a refresh that rejects
   keeps the last good value. The rejected snapshot carries the previous
   settled `value` and the `valueKey` it was fetched for; a first-load failure

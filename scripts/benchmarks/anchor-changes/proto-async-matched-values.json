@@ -1,0 +1,238 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 1243,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-async"
+			],
+			"delta": 5913,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-computed"
+			],
+			"delta": 77,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": 81,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 804,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 250,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 546,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": 68,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 214,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 134,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 1243,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-async"
+			],
+			"delta": 5913,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-computed"
+			],
+			"delta": 77,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": 81,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 804,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 250,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 546,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": 68,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 214,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 143,
+			"reason": "matched values: async values remember the inputs their shown value was fetched with, readers pin them during a refresh (graph-async, graph, resume-sync-computed), CSR first paint skips derives over unsettled async values (evaluator)",
+			"date": "2026-11-05"
+		}
+	]
+}

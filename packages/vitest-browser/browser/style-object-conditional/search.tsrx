@@ -2,20 +2,25 @@ import { computed, state } from '@markless/core';
 import { searchFruit } from './search-fruit.ts';
 
 export function Search() @{
+	// The search reads its own copy, so `query` is live inside @try and comparing them shows a newer search is running.
 	let query = state('');
+	let searched = state('');
 	let attempt = state(0);
 	let selected = state('apple');
 	const results = computed(async () => {
-		const q = query;
+		const q = searched;
 		const tries = attempt;
 		const items = await searchFruit(q, tries);
 		return { q, attempt: tries, items };
 	});
 
 	<>
-		<input value={query} onInput={(event) => (query = event.currentTarget.value)} />
+		<input value={query} onInput={(event) => {
+			query = event.currentTarget.value;
+			searched = event.currentTarget.value;
+		}} />
 		@try {
-			const stale = results.q !== query || results.attempt !== attempt;
+			const stale = results.q !== query;
 			<ul
 				aria-busy={stale}
 				style={{ opacity: stale ? 0.5 : 1, background: 'transparent', transition: 'opacity 150ms' }}

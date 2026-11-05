@@ -161,8 +161,10 @@ export async function asyncComputedFromRecord(
 			return values.length > 1 || Object(only) === only ? values : only;
 		},
 		run: async ({ key, signal, read }) => {
+			const graph = graphRef();
 			return (await input.loadSymbol(runnerSymbolId))({
-				graph: graphRef(),
+				// Inputs held at what the screen shows reach the runner, which reads through the graph.
+				graph: read === graph.read ? graph : { ...graph, read },
 				read,
 				key,
 				signal,
