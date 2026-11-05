@@ -1,46 +1,44 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { add, describeResume, flip, RESUME_TOUR, START } from './model.ts';
-import { drawing } from './wired.ts';
+import { describeResume, flip, MOVER, PIECES, RESUME_TOUR } from './model.ts';
+import { drawing, squareCentre } from './board.ts';
 
-const resumeArt = drawing();
+const boardArt = drawing();
 
 const page = readFileSync(new URL('../../../pages/how-it-works/resuming.mdx', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./resume-anatomy.tsrx', import.meta.url), 'utf8');
 
-describe('the page that arrives wired', () => {
-	it('counts a bag per press and says what moved', () => {
-		expect(add(START)).toBe(START + 1);
-		expect(add(99)).toBe(0);
-		expect(flip('odd')).toBe('even');
-		expect(RESUME_TOUR[0]).toBe('add');
-		expect(describeResume(3, true)).toContain('Nothing else on the page was rebuilt.');
-		expect(describeResume(2, false)).toBe('The page arrived already wired. The cart line shows 2.');
+describe('chess by post', () => {
+	it('sets up a legal-looking position with one piece on each square', () => {
+		const squares = PIECES.map((p) => p.square);
+		expect(new Set(squares).size).toBe(squares.length);
+		expect(PIECES.filter((p) => p.kind === 'king')).toHaveLength(2);
+		expect(squareCentre('a8')).toEqual([0.75, 0.75]);
+		expect(squareCentre('h1')).toEqual([11.25, 11.25]);
 	});
 
-	it('wires only the cart line; the shop name, product and price never move', () => {
-		expect(piece.match(/class="pulse to-page"/g)).toHaveLength(1);
-		expect(piece.match(/class="pulse to-envelope"/g)).toHaveLength(1);
-		const start = piece.indexOf('class="once"');
-		const once = piece.slice(start, piece.indexOf('</g>', start));
-		expect(once).toContain('{SHOP}');
-		expect(once).not.toMatch(/cart\}|newest|beat/);
+	it('moves exactly one piece and says the rest stayed put', () => {
+		expect(boardArt.pieces.filter((p) => p.id === MOVER)).toHaveLength(1);
+		expect(describeResume(true)).toContain('nobody replayed the game from move one');
+		expect(describeResume(false)).toBe('The board arrived set up mid-game, with the score sheet beside it.');
+		expect(flip('odd')).toBe('even');
+		expect(RESUME_TOUR[0]).toBe('move');
 	});
 
 	it('has one margin note, no motion under reduced motion, and a tour that stops on touch', () => {
-		expect(piece.match(/class="hand/g)).toHaveLength(1);
-		expect(piece).toContain('WIRED BEFORE THE PAGE RAN');
+		expect(piece.match(/class="hand"/g)).toHaveLength(1);
 		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
 		expect(piece).toContain('if (!seen || touched) return;');
 		expect(piece).toContain("event.key === 'Escape'");
 		expect(piece).toContain('aria-live="polite"');
+		expect(piece).not.toMatch(/cord|crocodile|wire/);
 	});
 
-	it('inks every part fully and draws the same scene every time', () => {
-		expect(resumeArt.envelope.ink.length).toBeGreaterThan(300);
-		expect(resumeArt.wires.main.length).toBeGreaterThan(50);
-		expect(resumeArt.wires.thin.length).toBeGreaterThan(50);
-		expect(JSON.stringify(drawing())).toBe(JSON.stringify(resumeArt));
+	it('inks every piece fully and draws the same scene every time', () => {
+		expect(boardArt.pieces).toHaveLength(PIECES.length);
+		for (const p of boardArt.pieces) expect(p.ink.length).toBeGreaterThan(200);
+		expect(boardArt.board.dark.length).toBeGreaterThan(1000);
+		expect(JSON.stringify(drawing())).toBe(JSON.stringify(boardArt));
 	});
 
 	it('opens the Resuming page, before its first section', () => {
@@ -52,11 +50,11 @@ describe('the page that arrives wired', () => {
 
 describe('frozen art', () => {
 	it('freezes the drawing into a plain-data module the compiler can read (run with -u after editing)', async () => {
-		const module = `// Written by resume.test.ts from wired.ts. Run the figure test with -u to refresh.
-import type { drawing } from './wired.ts';
+		const module = `// Written by resume.test.ts from board.ts. Run the figure test with -u to refresh.
+import type { drawing } from './board.ts';
 
-export const art: ReturnType<typeof drawing> = ${JSON.stringify(resumeArt, null, '\t')};
+export const art: ReturnType<typeof drawing> = ${JSON.stringify(boardArt, null, '\t')};
 `;
-		await expect(module).toMatchFileSnapshot('./wired.art.ts');
+		await expect(module).toMatchFileSnapshot('./board.art.ts');
 	});
 });
