@@ -76,7 +76,7 @@ export default function SourceAnatomy() @{
 		<div class="ink-card sheet">
 			<p class="sheet-head">View Source</p>
 			<div class="body">
-				<pre class="code"><code>@for (const line of art.lines; key line.key) {<span class="line" data-key={line.part}>@for (const token of line.tokens; key token.key) {<span class={'t ' + token.c} data-w={token.w}>{token.t}</span>}</span>}</code></pre>
+				<pre class="code"><code>@for (const line of art.lines; key line.key) {<span class="line" data-key={line.part} style={line.hang}>@for (const token of line.tokens; key token.key) {<span class={'t ' + token.c} data-w={token.w}>{token.t}</span>}</span>}</code></pre>
 				<div class="margin" aria-hidden="true">
 					<p class="note note-state" data-key="state">the values</p>
 					<p class="note note-view" data-key="view">who does what</p>
@@ -420,7 +420,18 @@ export default function SourceAnatomy() @{
 
 				.body {
 					grid-template-columns: minmax(0, 1fr);
-					overflow-x: auto;
+				}
+
+				.code {
+					white-space: pre-wrap;
+					overflow-wrap: anywhere;
+				}
+
+				.line {
+					height: auto;
+					min-height: var(--lh);
+					padding-left: calc(var(--in, 0ch) + 2ch);
+					text-indent: calc(-1 * (var(--in, 0ch) + 2ch));
 				}
 
 				.margin {

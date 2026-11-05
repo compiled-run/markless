@@ -6,6 +6,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s0",
 			"part": "",
+			"hang": "--in:0ch",
 			"tokens": [
 				{
 					"key": "s0-0",
@@ -30,6 +31,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s1",
 			"part": "heading",
+			"hang": "--in:2ch",
 			"tokens": [
 				{
 					"key": "s1-0",
@@ -84,6 +86,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s2",
 			"part": "booked",
+			"hang": "--in:2ch",
 			"tokens": [
 				{
 					"key": "s2-0",
@@ -138,6 +141,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s3",
 			"part": "day",
+			"hang": "--in:2ch",
 			"tokens": [
 				{
 					"key": "s3-0",
@@ -210,6 +214,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s4",
 			"part": "",
+			"hang": "--in:0ch",
 			"tokens": [
 				{
 					"key": "s4-0",
@@ -234,6 +239,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s5",
 			"part": "state",
+			"hang": "--in:0ch",
 			"tokens": [
 				{
 					"key": "s5-0",
@@ -276,6 +282,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s6",
 			"part": "state",
+			"hang": "--in:2ch",
 			"tokens": [
 				{
 					"key": "s6-0",
@@ -354,6 +361,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s7",
 			"part": "state",
+			"hang": "--in:0ch",
 			"tokens": [
 				{
 					"key": "s7-0",
@@ -378,6 +386,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s8",
 			"part": "view",
+			"hang": "--in:0ch",
 			"tokens": [
 				{
 					"key": "s8-0",
@@ -420,6 +429,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s9",
 			"part": "view",
+			"hang": "--in:2ch",
 			"tokens": [
 				{
 					"key": "s9-0",
@@ -504,6 +514,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s10",
 			"part": "view",
+			"hang": "--in:3ch",
 			"tokens": [
 				{
 					"key": "s10-0",
@@ -582,6 +593,7 @@ export const art: ReturnType<typeof drawing> = {
 		{
 			"key": "s11",
 			"part": "view",
+			"hang": "--in:0ch",
 			"tokens": [
 				{
 					"key": "s11-0",

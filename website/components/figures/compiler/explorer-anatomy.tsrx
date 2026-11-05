@@ -5,7 +5,7 @@ import type { Explored } from './pieces.ts';
 import { START } from './start.art.ts';
 import { art } from './explorer.art.ts';
 
-const NONE = { a: '', b: '', c: '', kind: 'none', on: 'no' };
+const NONE = { a: '', b: '', c: '', kind: 'none', on: 'no', hang: '' };
 const EMPTY = { shown: 'no', id: '', what: '', kind: 'none', style: '', on: 'off', d: '' };
 
 export default function ExplorerAnatomy() @{
@@ -32,8 +32,10 @@ export default function ExplorerAnatomy() @{
 			const text = lines[i] ?? '';
 			const index = shown[active]?.line === i ? active : shown.findIndex((p) => p.line === i);
 			const piece = shown[index];
-			if (!piece) return { ...NONE, a: text };
-			return { a: text.slice(0, piece.from), b: text.slice(piece.from, piece.to), c: text.slice(piece.to), kind: piece.kind, on: pairOn(index) };
+			const lead = /^[\t ]*/.exec(text)![0];
+			const hang = '--in:' + (lead.length + (lead.match(/\t/g)?.length ?? 0)) + 'ch';
+			if (!piece) return { ...NONE, a: text, hang };
+			return { a: text.slice(0, piece.from), b: text.slice(piece.from, piece.to), c: text.slice(piece.to), kind: piece.kind, on: pairOn(index), hang };
 		}),
 	);
 	const slips = computed(() =>
@@ -133,40 +135,40 @@ export default function ExplorerAnatomy() @{
 			</div>
 			<div class="ink-card sheet" data-editing={editing ? 'yes' : 'no'} tabindex="0" aria-label="chat.tsrx and its compiled pieces. Up and down arrows step through the pieces; Escape starts again.">
 				<ol class="lines" aria-hidden={editing ? 'true' : 'false'}>
-					<li data-key="l0" data-on={rows[0].on}>
+					<li data-key="l0" data-on={rows[0].on} style={rows[0].hang}>
 						{rows[0].a}<mark class="wash" data-kind={rows[0].kind}>{rows[0].b}</mark>{rows[0].c}
 					</li>
-					<li data-key="l1" data-on={rows[1].on}>
+					<li data-key="l1" data-on={rows[1].on} style={rows[1].hang}>
 						{rows[1].a}<mark class="wash" data-kind={rows[1].kind}>{rows[1].b}</mark>{rows[1].c}
 					</li>
-					<li data-key="l2" data-on={rows[2].on}>
+					<li data-key="l2" data-on={rows[2].on} style={rows[2].hang}>
 						{rows[2].a}<mark class="wash" data-kind={rows[2].kind}>{rows[2].b}</mark>{rows[2].c}
 					</li>
-					<li data-key="l3" data-on={rows[3].on}>
+					<li data-key="l3" data-on={rows[3].on} style={rows[3].hang}>
 						{rows[3].a}<mark class="wash" data-kind={rows[3].kind}>{rows[3].b}</mark>{rows[3].c}
 					</li>
-					<li data-key="l4" data-on={rows[4].on}>
+					<li data-key="l4" data-on={rows[4].on} style={rows[4].hang}>
 						{rows[4].a}<mark class="wash" data-kind={rows[4].kind}>{rows[4].b}</mark>{rows[4].c}
 					</li>
-					<li data-key="l5" data-on={rows[5].on}>
+					<li data-key="l5" data-on={rows[5].on} style={rows[5].hang}>
 						{rows[5].a}<mark class="wash" data-kind={rows[5].kind}>{rows[5].b}</mark>{rows[5].c}
 					</li>
-					<li data-key="l6" data-on={rows[6].on}>
+					<li data-key="l6" data-on={rows[6].on} style={rows[6].hang}>
 						{rows[6].a}<mark class="wash" data-kind={rows[6].kind}>{rows[6].b}</mark>{rows[6].c}
 					</li>
-					<li data-key="l7" data-on={rows[7].on}>
+					<li data-key="l7" data-on={rows[7].on} style={rows[7].hang}>
 						{rows[7].a}<mark class="wash" data-kind={rows[7].kind}>{rows[7].b}</mark>{rows[7].c}
 					</li>
-					<li data-key="l8" data-on={rows[8].on}>
+					<li data-key="l8" data-on={rows[8].on} style={rows[8].hang}>
 						{rows[8].a}<mark class="wash" data-kind={rows[8].kind}>{rows[8].b}</mark>{rows[8].c}
 					</li>
-					<li data-key="l9" data-on={rows[9].on}>
+					<li data-key="l9" data-on={rows[9].on} style={rows[9].hang}>
 						{rows[9].a}<mark class="wash" data-kind={rows[9].kind}>{rows[9].b}</mark>{rows[9].c}
 					</li>
-					<li data-key="l10" data-on={rows[10].on}>
+					<li data-key="l10" data-on={rows[10].on} style={rows[10].hang}>
 						{rows[10].a}<mark class="wash" data-kind={rows[10].kind}>{rows[10].b}</mark>{rows[10].c}
 					</li>
-					<li data-key="l11" data-on={rows[11].on}>
+					<li data-key="l11" data-on={rows[11].on} style={rows[11].hang}>
 						{rows[11].a}<mark class="wash" data-kind={rows[11].kind}>{rows[11].b}</mark>{rows[11].c}
 					</li>
 				</ol>
@@ -537,8 +539,28 @@ export default function ExplorerAnatomy() @{
 					display: none;
 				}
 
-				.sheet {
-					overflow-x: auto;
+				.lines li {
+					height: auto;
+					min-height: var(--lh);
+					white-space: pre-wrap;
+					overflow-wrap: anywhere;
+					padding-left: calc(var(--in, 0ch) + 2ch);
+					text-indent: calc(-1 * (var(--in, 0ch) + 2ch));
+				}
+
+				.sheet[data-editing='yes'] .lines {
+					display: none;
+				}
+
+				.code-edit {
+					position: static;
+					display: block;
+					width: 100%;
+					height: auto;
+					min-height: calc(var(--lh) * 14);
+					color: var(--ink);
+					white-space: pre-wrap;
+					overflow-wrap: anywhere;
 				}
 
 				.head-out {
