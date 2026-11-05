@@ -147,7 +147,7 @@ export function App() @{
 	expect(root?.statics.join('')).toContain('<li>Trailing</li>');
 });
 
-test('renderData keeps call-expression collections off the direct repeat path', async () => {
+test('renderData lifts a call-expression collection over state onto the direct repeat path', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/FilteredRows.tsrx',
 		source: `
@@ -168,9 +168,11 @@ export function App() @{
 			collectionSource: 'visibleRows(rows)',
 		}),
 	]);
-	expect(result.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toBeUndefined();
+	// The call reads state, so the collection is lifted onto the graph and its rows follow `rows`.
+	const lifted = result.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId;
+	expect(lifted).toMatch(/^computed:/);
 	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ directSupported: false }),
+		expect.objectContaining({ collectionGraphNodeId: lifted, directSupported: true }),
 	]);
 });
 

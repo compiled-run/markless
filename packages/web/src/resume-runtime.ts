@@ -343,7 +343,9 @@ export function createResumeRuntime(
 	function installArmEventType(eventType: string): void {
 		if (eventTypes.has(eventType)) return;
 		eventTypes.add(eventType);
-		if (captureListenersStarted && !input.root.__marklessDelegatedDispatch)
+		// Arm rows paint before they register, so the delegated container listens for them first.
+		if (input.root.__marklessDelegatedDispatch) input.delegatedTriggers?.registerRowEventName(eventType);
+		else if (captureListenersStarted)
 			input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 	}
 	async function registerServedBoundaryArms(): Promise<void> {

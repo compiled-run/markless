@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 306,
+	total: 305,
 	guided: 46,
 	groups: [
 		{
@@ -1340,11 +1340,6 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING',
-					kind: 'runtime error',
-					guided: false,
-				},
-				{
-					code: 'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
 					kind: 'runtime error',
 					guided: false,
 				},

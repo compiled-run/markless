@@ -46,6 +46,21 @@ export function firstReactiveRowRead(
 	return scan.found;
 }
 
+/** The first read in a `@for` collection expression that a later write can move. */
+export function firstReactiveCollectionRead(
+	collectionNode: AnyNode,
+	state: WalkState,
+): ReactiveRowRead | null {
+	const scan: Scan = {
+		state,
+		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
+		aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+		found: null,
+	};
+	scanRowNode(collectionNode, new Set(), scan);
+	return scan.found;
+}
+
 /** The names a row owns: the item and the index this `@for` declares. */
 export function repeatRowNames(itemName: string, indexName: string | null): ReadonlySet<string> {
 	return new Set(indexName ? [itemName, indexName] : [itemName]);

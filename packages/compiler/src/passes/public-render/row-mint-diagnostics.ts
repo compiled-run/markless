@@ -439,6 +439,7 @@ function rowMintRefusal(input: {
 				chunk.componentName,
 				slot,
 				input.rowNames,
+				(repeatId) => nestedRepeatMints(input, repeatId),
 			)
 		)
 			continue;

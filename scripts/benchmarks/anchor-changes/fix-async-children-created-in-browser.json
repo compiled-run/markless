@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": 162,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 42,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 72,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 67,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": 162,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 42,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 72,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 65,
+			"reason": "Rows built in the browser can hold a child with its own @try: async runners read their row, and the row-mint loader reloads once with the component-row host",
+			"date": "2026-11-05"
+		}
+	]
+}

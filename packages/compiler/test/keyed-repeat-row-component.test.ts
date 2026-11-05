@@ -218,7 +218,7 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-test('a wrapper around a component that opens a boundary ships neither half', async () => {
+test('a wrapper around a component that opens a boundary ships both halves', async () => {
 	const view = await viewOf(`import { computed, state } from '@markless/core';
 function Row({ label }) @{
 	const details = computed(async () => ({ label }));
@@ -229,8 +229,8 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row label={row.label} /></li> }</ul>
 }
 `);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.html).toContain('<li');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
 // Projected elements take their row's segment, so a projecting row rebuilds like any other.
@@ -336,7 +336,7 @@ export function App() @{
 
 // A branch inside the row component anchors on a comment pair the minted row
 // counts in its own fragment, the way it already counts its own elements, so the
-// identity still ships. A boundary is the half that stays withheld.
+// identity still ships. A boundary anchors the same way.
 const branchingRow = `import { state } from '@markless/core';
 function Row({ item }) @{
 	let open = state(false);
@@ -373,10 +373,7 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-// The split the mint turns on: a branch ARM holding a boundary is a boundary
-// answer, so walking the arms rather than stopping at the branch is what keeps
-// this refusal honest.
-test('a row component whose branch arm opens a boundary ships no identity', async () => {
+test('a row component whose branch arm opens a boundary ships its identity', async () => {
 	const view = await viewOf(`import { computed, state } from '@markless/core';
 function Row({ item }) @{
 	let open = state(false);
@@ -388,10 +385,10 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
 }
 `);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-test('a row component whose body opens a boundary ships no identity', async () => {
+test('a row component whose body opens a boundary ships its identity', async () => {
 	const view = await viewOf(`import { computed, state } from '@markless/core';
 function Row({ item }) @{
 	const details = computed(async () => ({ title: item.id }));
@@ -402,7 +399,7 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
 }
 `);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
 // Position keying leaves a row with no data identity to resume against, so the
@@ -494,7 +491,7 @@ test('an imported component whose body branches still ships its identity', async
 	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-test('an imported component whose body opens a boundary ships no identity', async () => {
+test('an imported component whose body opens a boundary ships its identity', async () => {
 	const boundaryImportedRow = `import { computed } from '@markless/core';
 export function Row({ item }) @{
 	const details = computed(async () => ({ title: item.id }));
@@ -508,7 +505,7 @@ export function Row({ item }) @{
 	expect(child.moduleGraphInterface.render.components[0]?.constructReach).toBe('boundaries');
 
 	const view = await viewOfImportedRow(boundaryImportedRow, importingApp);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
 // The browser renders the whole row, so a nested @for counts its own nodes there
@@ -595,8 +592,8 @@ test('a branch in a SIBLING component of the imported module still mints the row
 });
 
 // The answer is transitive: the row's own body is plain markup, and the boundary
-// it refuses on is two files down, reached through the child's own import.
-test("a boundary in the imported child's OWN imported child refuses the row", async () => {
+// is two files down, reached through the child's own import.
+test("a boundary in the imported child's OWN imported child still mints the row", async () => {
 	const leaf = await buildSemanticGraph({
 		filename: 'src/leaf.tsrx',
 		source: `import { computed } from '@markless/core';
@@ -626,7 +623,7 @@ export function Row({ item }) @{
 		importedModuleInterfaces: { './row.tsrx': middle.moduleGraphInterface },
 	});
 	const view = viewFrom(semanticGraph, { './row.tsrx': middle.moduleGraphInterface });
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
 // The branch twin of the case above: the same two-import chain carries

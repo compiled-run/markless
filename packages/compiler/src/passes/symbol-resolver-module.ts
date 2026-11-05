@@ -220,6 +220,10 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 	// interleave would otherwise read each other's rendered widgets.
 	const scoped = (graphNodeId: string, registry: string) =>
 		widgetAware ? `scoped(${graphNodeId}, ${registry})` : `scoped(${graphNodeId})`;
+	const scopedRead = (graphNodeId: string, registry: string) =>
+		widgetAware
+			? `scopedRead(${graphNodeId}, readPath, ${registry})`
+			: `scopedRead(${graphNodeId}, readPath)`;
 	return [
 		...(rowed
 			? [
@@ -237,13 +241,17 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 				]),
 		'	if (!path) return base;',
 		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
+		// A prop read no capture slot answers is this instance's own prop cell, never the page's.
+		'	const captured = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path ?? []])] : []));',
 		// A `shared:`/`storage:` id belongs to the page, and a widget-scoped one to
 		// its widget root, not to the edge this row was bound through. The runtime
 		// owns that reading; restating it here would put the write on a graph the
 		// part's own records never read.
 		widgetAware
-			? `	const scoped = (graphNodeId, registry) => pageSpace.has(graphNodeId) ? graphNodeId : ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath, registry)' : 'marklessComposedGraphNodeId(graphNodeId, path, registry)'};`
-			: `	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath)' : 'path + graphNodeId'};`,
+			? `	const own = (graphNodeId, registry) => ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath, registry)' : 'marklessComposedGraphNodeId(graphNodeId, path, registry)'};`
+			: `	const own = (graphNodeId) => ${rowed ? 'marklessRowBoundGraphNodeId(graphNodeId, path, rowedPath)' : 'path + graphNodeId'};`,
+		`	const scoped = (graphNodeId, registry) => pageSpace.has(graphNodeId) ? graphNodeId : own(graphNodeId, registry);`,
+		`	const scopedRead = (graphNodeId, readPath, registry) => pageSpace.has(graphNodeId) && captured.has(JSON.stringify([graphNodeId, readPath ?? []])) ? graphNodeId : own(graphNodeId, registry);`,
 		'	const scopeGraph = (graph) => {',
 		// A graph-less context still has an answer: the runtime hands back the
 		// `active` pointer, which is what an older payload's resolver read anyway.
@@ -255,7 +263,7 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 		// graph it qualifies against.
 		'		const outerQualify = graph.marklessQualifyGraphNodeId;',
 		`		const qualify = (graphNodeId) => { const scopedId = ${scoped('graphNodeId', 'registry')}; return typeof outerQualify === "function" ? outerQualify(scopedId) : scopedId; };`,
-		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, marklessQualifyGraphNodeId: qualify, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
+		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, marklessQualifyGraphNodeId: qualify, read: (graphNodeId, readPath) => graph.read(${scopedRead('graphNodeId', 'registry')}, readPath) };`,
 		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',
 		'			const method = graph[name];',
 		`			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: ${scoped('record.graphNodeId', 'registry')} });`,
@@ -265,7 +273,7 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 		'	return (context) => base({',
 		'		...context,',
 		'		graph: scopeGraph(context.graph),',
-		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scoped('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
+		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scopedRead('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
 		// A widget-scoped element() handle is spelled module-level in this symbol
 		// exactly as its graph nodes are, so it takes the SAME instance path - the
 		// bound edge's, which names the rendered widget even when the dispatching

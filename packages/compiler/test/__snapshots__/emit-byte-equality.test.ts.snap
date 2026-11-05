@@ -119,12 +119,13 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
             "elementHandles": []
           }
         ],
-        "updateSymbolId": "symbol:2"
+        "updateSymbolId": "symbol:2",
+        "refreshesInPlace": true
       }
     ]
   },
   "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:query\\",\\"name\\":\\"query\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":\\"Ada\\",\\"records\\":[]}}],\\"computed\\":[{\\"graphNodeId\\":\\"computed:details\\",\\"name\\":\\"details\\",\\"async\\":true,\\"dependencies\\":[{\\"graphNodeId\\":\\"state:query\\",\\"path\\":[]}]}],\\"sharedDefinitions\\":[]}</script>",
-  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"asyncRunners\\":{\\"computed:details\\":\\"symbol:1\\"},\\"locators\\":[],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"target\\":{\\"kind\\":\\"text\\"},\\"symbolId\\":\\"symbol:0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[{\\"id\\":\\"boundary:0\\",\\"runnerGraphNodeId\\":\\"computed:details\\",\\"initiallyServedArm\\":1,\\"startAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":0},\\"endAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":1},\\"asyncReads\\":[{\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"runnerSymbolId\\":\\"symbol:1\\"}],\\"armRecords\\":[{\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h3\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h2\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]}],\\"updateSymbolId\\":\\"symbol:2\\"}]}</script>"
+  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"asyncRunners\\":{\\"computed:details\\":\\"symbol:1\\"},\\"locators\\":[],\\"events\\":[],\\"domUpdates\\":[{\\"hostNodeId\\":\\"h1\\",\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"target\\":{\\"kind\\":\\"text\\"},\\"symbolId\\":\\"symbol:0\\"}],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[],\\"branches\\":[],\\"asyncBoundaries\\":[{\\"id\\":\\"boundary:0\\",\\"runnerGraphNodeId\\":\\"computed:details\\",\\"initiallyServedArm\\":1,\\"startAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":0},\\"endAnchor\\":{\\"strategy\\":\\"dom-order-comment\\",\\"index\\":1},\\"asyncReads\\":[{\\"source\\":\\"details.title\\",\\"graphNodeId\\":\\"computed:details\\",\\"path\\":[\\"title\\"],\\"runnerSymbolId\\":\\"symbol:1\\"}],\\"armRecords\\":[{\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h3\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]},{\\"locators\\":[{\\"hostNodeId\\":\\"h2\\",\\"index\\":0,\\"tagName\\":\\"p\\"}],\\"events\\":[],\\"behaviors\\":[],\\"elementHandles\\":[]}],\\"updateSymbolId\\":\\"symbol:2\\",\\"refreshesInPlace\\":true}]}</script>"
 }",
     "protocolState": "{
   "version": 1,
@@ -241,7 +242,8 @@ exports[`compileTsrxModule emitted artifacts stay byte-equal across public-rende
           "elementHandles": []
         }
       ],
-      "updateSymbolId": "symbol:2"
+      "updateSymbolId": "symbol:2",
+      "refreshesInPlace": true
     }
   ]
 }",
