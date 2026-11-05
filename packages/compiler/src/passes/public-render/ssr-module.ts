@@ -214,6 +214,21 @@ function branchArmHandleResolution(
 	return `,elementHandleIds:{${ids}},idrefSites:[${siteSources}]`;
 }
 
+// The runner registry a component's boundary cases read, declared inside each render function that has them.
+export function ssrAsyncRegistryLines(input: PublicRenderModuleInput): string[] {
+	const definitions = collectSsrAsyncRunnerDefinitions(input);
+	if (definitions.size === 0) return [];
+	return [
+		'const marklessSsrAsyncRuns = marklessSsrRenderContext?.streaming?.runs ?? new Map();',
+		`const marklessSsrAsyncRunnerDefinitions = new Map([${[...definitions]
+			.map(
+				([graphNodeId, definition]) =>
+					`[${JSON.stringify(graphNodeId)},{run:${definition.source},dependencies:${JSON.stringify(definition.dependencies)},async:${String(definition.async)}}]`,
+			)
+			.join(',')}]);`,
+	];
+}
+
 export function emitPublicSsrRenderModule(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
@@ -224,8 +239,6 @@ export function emitPublicSsrRenderModule(
 		input.semanticGraph.componentEdges,
 		'__marklessSsrComponent',
 	);
-	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
-	const hasAsyncDependencyRegistry = asyncRunnerDefinitions.size > 0;
 	// A streamed arm's branches must name the arm this render painted; only an @pending arm streams.
 	const streamsArms = input.semanticGraph.markup.chunks.some((chunk) =>
 		chunk.slots.some((slot) => slot.kind === 'async' && slot.armTemplateIds.pending !== undefined),
@@ -321,19 +334,7 @@ export function emitPublicSsrRenderModule(
 				'const marklessSsrChildren = [];',
 				'const marklessSsrBranches = [];',
 				'const marklessSsrAsyncSnapshots = [];',
-				...(hasAsyncDependencyRegistry
-					? [
-							'const marklessSsrAsyncRuns = marklessSsrRenderContext?.streaming?.runs ?? new Map();',
-							`const marklessSsrAsyncRunnerDefinitions = new Map([${[
-								...asyncRunnerDefinitions,
-							]
-								.map(
-									([graphNodeId, definition]) =>
-										`[${JSON.stringify(graphNodeId)},{run:${definition.source},dependencies:${JSON.stringify(definition.dependencies)},async:${String(definition.async)}}]`,
-								)
-								.join(',')}]);`,
-						]
-					: []),
+				...ssrAsyncRegistryLines(input),
 			...dataRenderLines,
 			],
 			rootDataLines.bodySharedComputed,

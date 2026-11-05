@@ -45,29 +45,27 @@ export function emptyPlan(
 	};
 }
 
-// Same-module helper components render through emission contexts that plan no
-// boundary anchors: an @try inside one drops its content from the html and
-// its in-arm records never register. Until that emission plans boundaries
-// (arm-commit runtime work), the drop must be loud (D2), in the author's
-// words (D4).
+// Re-rendering a module renders its root, so a same-file helper's @try must settle from its compiled arms.
 export function sameModuleChildBoundaryDiagnostics(
 	ast: AnyNode,
 	rootComponentName: string,
 	filename: string,
+	componentNames: ReadonlySet<string>,
 ) {
 	const diagnostics: ReturnType<typeof unsupportedRenderConstructDiagnostic>[] = [];
 	for (const statement of asNodes(ast.body)) {
 		const component = getComponentFunction(statement);
 		if (!component || component.name === rootComponentName) continue;
+		if (!componentNames.has(component.name)) continue;
 		const boundary = firstBoundaryNode(component.node);
 		if (!boundary) continue;
 		diagnostics.push(
 			unsupportedRenderConstructDiagnostic({
 				label: '@try/@pending/@catch',
-				message: `<${component.name}> contains an @try block, but <${component.name}> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML.`,
+				message: `<${component.name}> is a helper component in the same file as the page, and its @try content can only settle by rendering <${component.name}> again, for example an @catch that reads the error. A helper in the page's file cannot render again on its own.`,
 				node: boundary,
 				filename,
-				suggestion: `Move <${component.name}> into its own .tsrx file and import it, or move the @try block into the page component.`,
+				suggestion: `Move <${component.name}> into its own .tsrx file and import it, or keep its @try/@catch content to markup and values it reads.`,
 				severity: 'error',
 			}),
 		);

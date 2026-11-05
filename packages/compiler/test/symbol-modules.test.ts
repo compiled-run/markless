@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { emitSymbolModules } from '../src/passes/symbol-modules.ts';
 import { compileTsrxModule } from '../src/compile-module.ts';
+import { collectTsrxModuleDiagnostics } from '../src/collect-diagnostics.ts';
 
 test('state initializer symbols carry referenced same-module helpers', async () => {
 	const result = await compileTsrxModule({
@@ -2965,11 +2966,7 @@ export function App() @{
 	expect(update!.source).not.toContain('marklessCsrRenderChild');
 });
 
-// D4: when the arm-render tier cannot support a shape, the diagnostic speaks
-// the author's words — never "arm", "tier", "boundary", or "anchor".
-
-
-test('same-module helper components containing @try diagnose the dropped content in author vocabulary', async () => {
+test('a same-module helper holding @try settles through its own compiled arms', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Widgets.tsrx',
 		source: `
@@ -2992,15 +2989,12 @@ export function Widget() @{
 		symbols: [],
 	});
 
-	const diagnostic = result.publicRenderPlan.diagnostics.find(
-		(candidate) => candidate.code === 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-	);
-	expect(diagnostic?.message).toBe(
-		'<Widget> contains an @try block, but <Widget> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML. markless debugging playbook: run the doctor script (npm run doctor), or read agent/markless.md in the installed @markless/core package',
-	);
-	expect(diagnostic?.suggestions?.[0]?.message).toBe(
-		'Move <Widget> into its own .tsrx file and import it, or move the @try block into the page component.',
-	);
+	expect(
+		collectTsrxModuleDiagnostics(result).filter((diagnostic) => diagnostic.severity === 'error'),
+	).toEqual([]);
+	expect(
+		result.symbolModules.modules.find((module) => module.kind === 'async-boundary-update')?.source,
+	).toContain('marklessBoundaryArms');
 });
 
 

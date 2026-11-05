@@ -20,7 +20,6 @@ import {
 	componentRootDiagnostics,
 	componentUnsupportedBodyDiagnostics,
 	emptyPlan,
-	sameModuleChildBoundaryDiagnostics,
 } from './validation.ts';
 import { collectKeyedRepeatRowMintDiagnostics } from './row-mint-diagnostics.ts';
 import { payloadRecordHosts } from '../row-mint.ts';
@@ -141,11 +140,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		stylesheetImports: collectStylesheetImports(ast),
 		diagnostics: [
 			...styles.diagnostics,
-			...sameModuleChildBoundaryDiagnostics(
-				ast,
-				selectedRoot.componentName,
-				input.source.filename,
-			),
 			...collectUnsupportedConstructDiagnostics(selectedRoot.root, input.source.filename),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...boundaryRunnerDiagnostics,

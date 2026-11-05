@@ -35,6 +35,7 @@ import {
 	protocolElementHandleReadId,
 } from '@markless/serializer';
 import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
+import { sameModuleChildBoundaryDiagnostics } from './public-render/validation.ts';
 import type { SourceSpan } from '../diagnostics.ts';
 import { staticAttributeText } from './semantic-graph/collect-markup.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
@@ -294,6 +295,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			...branchArms.diagnostics,
 			...unaddressableElementDiagnostics(input),
 			...foreignScope.diagnostics,
+			...helperBoundaryRerenderDiagnostics(input, boundaryArmsById),
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
 			...sharedResolvingExportedFunctions(input.source).map(
 				sharedInstanceExportedFunctionDiagnostic,
@@ -1544,6 +1546,37 @@ function readPropNames(
 }
 
 const BRANCH_ARM_RENDERS_IN_BROWSER_CODE = 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER' as const;
+
+// A boundary whose arms have no compiled markup settles by rendering its module again, which only its root can.
+function helperBoundaryRerenderDiagnostics(
+	input: SymbolModulesInput,
+	boundaryArmsById: ReadonlyMap<string, PublicRenderPlanAsyncBoundaryArms>,
+) {
+	const root = input.renderData?.root?.componentName;
+	if (!input.renderData || !input.source || !root) return [];
+	const helpers = new Set(
+		input.renderData.boundaries.flatMap((boundary) => {
+			if (boundaryArmsById.has(boundary.boundaryId)) return [];
+			const owner = input.renderData!.chunks.find((chunk) =>
+				chunk.slots.some(
+					(slot) => slot.kind === 'async' && slot.boundaryId === boundary.boundaryId,
+				),
+			)?.componentName;
+			return owner && owner !== root ? [owner] : [];
+		}),
+	);
+	if (helpers.size === 0) return [];
+	const ast = parseJavaScriptModule(input.source.source, input.source.filename) as unknown as AnyNode;
+	return sameModuleChildBoundaryDiagnostics(ast, root, input.source.filename, helpers).map(
+		(diagnostic): SymbolModulesDiagnostic => ({
+			...diagnostic,
+			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+			phase: 'public-render',
+			passId: 'symbol-modules',
+			artifactKeys: ['renderData', 'symbolModules'],
+		}),
+	);
+}
 
 // Spec 12 D2: an arm the browser renders by running its components says so, with the restructure that avoids it.
 function branchArmRendersInBrowserDiagnostic(
@@ -4258,44 +4291,81 @@ function asyncRunnerReadBindingStatement(): EmissionNode {
 	);
 }
 
-/**
- * One `const <name> = ...;` per dependency the runner closes over, in dependency
- * order, first binding wins.
- *
- * The AST twin of `asyncRunnerDependencyDeclarations`. A dependency covered by a
- * capture slot reads through the capture table; every other one reads through
- * the bound `read` above.
- */
+// A slot answers the member read it was made for (`account.name`), so a name read only through slotted members is rebuilt from them.
 function asyncRunnerDependencyStatements(
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 ): EmissionNode[] {
-	const statements: EmissionNode[] = [];
-	const seenNames = new Set<string>();
-
+	const byName = new Map<
+		string,
+		Array<{
+			readonly binding: NonNullable<ReturnType<typeof asyncRunnerDependencyBinding>>;
+			readonly dependency: SemanticGraphDependency;
+			readonly slot: CaptureSlot | undefined;
+		}>
+	>();
 	for (const dependency of dependencies) {
 		const binding = asyncRunnerDependencyBinding(dependency);
-		if (!binding || seenNames.has(binding.name)) continue;
-
-		seenNames.add(binding.name);
-		const slot = captureSlots.find((candidate) =>
-			captureSlotMatchesRead(candidate, dependency),
-		);
-		statements.push(
-			constDeclarationNode(
-				binding.name,
-				slot
-					? callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)])
-					: graphReadCall({
-							callee: 'read',
-							graphNodeId: binding.graphNodeId,
-							path: binding.path,
-						}),
-			),
-		);
+		if (!binding) continue;
+		const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, dependency));
+		byName.set(binding.name, [...(byName.get(binding.name) ?? []), { binding, dependency, slot }]);
 	}
 
-	return statements;
+	return [...byName].map(([name, reads]) => {
+		const [first] = reads;
+		const whole = reads.find((read) => read.binding.memberPath.length === 0);
+		if (!reads.some((read) => read.slot && read.binding.memberPath.length > 0) || whole)
+			return constDeclarationNode(name, asyncRunnerRootRead(whole ?? first!));
+		return constDeclarationNode(
+			name,
+			memberReadsObjectNode(
+				reads.map((read) => ({
+					path: read.binding.memberPath,
+					value: read.slot
+						? captureSlotReadNode(read.slot)
+						: graphReadCall({
+								callee: 'read',
+								graphNodeId: read.dependency.graphNodeId,
+								path: read.dependency.path,
+							}),
+				})),
+			),
+		);
+	});
+}
+
+function asyncRunnerRootRead(read: {
+	readonly binding: NonNullable<ReturnType<typeof asyncRunnerDependencyBinding>>;
+	readonly slot: CaptureSlot | undefined;
+}): EmissionNode {
+	return read.slot && read.binding.memberPath.length === 0
+		? captureSlotReadNode(read.slot)
+		: graphReadCall({
+				callee: 'read',
+				graphNodeId: read.binding.graphNodeId,
+				path: read.binding.path,
+			});
+}
+
+// `{ name: <a>, owner: { id: <b> } }` from member reads; a shorter path already holds the longer ones under it.
+function memberReadsObjectNode(
+	reads: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly value: EmissionNode }>,
+): EmissionNode {
+	const keys = [...new Set(reads.flatMap((read) => read.path.slice(0, 1)))];
+	return objectNode(
+		keys.map((key) => {
+			const under = reads.filter((read) => read.path[0] === key);
+			const own = under.find((read) => read.path.length === 1);
+			return stringKeyPropertyNode(
+				key,
+				own
+					? own.value
+					: memberReadsObjectNode(
+							under.map((read) => ({ path: read.path.slice(1), value: read.value })),
+						),
+			);
+		}),
+	);
 }
 
 /** Matches `isIdentifierObjectKey`, which sits inside the scanner band. */
@@ -4310,6 +4380,7 @@ const ASYNC_RUNNER_IDENTIFIER = /^[$A-Z_a-z][$0-9A-Z_a-z]*$/;
  */
 function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 	readonly name: string;
+	readonly memberPath: ReadonlyArray<string>;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 } | null {
@@ -4321,6 +4392,7 @@ function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 
 	return {
 		name,
+		memberPath,
 		graphNodeId: dependency.graphNodeId,
 		path: dependency.path.slice(0, Math.max(0, dependency.path.length - memberPath.length)),
 	};

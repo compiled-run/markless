@@ -480,9 +480,10 @@ export function planBoundSymbolResolver(
 					symbol.kind !== 'event-handler' &&
 					symbol.kind !== 'callback-prop' &&
 					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant') &&
-					// A derive's constant slot is emitted as its value, which only works
-					// when every edge agrees; edges that disagree need a row each.
-					(symbol.kind !== 'sync-computed-derive' ||
+					// A derive's or runner's constant slot is emitted as its value, which only
+					// works when every edge agrees; edges that disagree need a row each.
+					((symbol.kind !== 'sync-computed-derive' &&
+						symbol.kind !== 'async-computed-runner') ||
 						edgeDependentSlots.every(captureSlotFoldsToConstant))
 				)
 					continue;

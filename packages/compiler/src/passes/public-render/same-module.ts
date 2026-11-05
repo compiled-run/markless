@@ -2,9 +2,11 @@ import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { componentMarkupRoot } from './component-markup-root.ts';
+import { collectSsrAsyncRunners } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
 	carriedSharedSeedSources,
+	ssrAsyncRegistryLines,
 	ssrSeedForwardBlockLines,
 	type SsrDataLines,
 } from './ssr-module.ts';
@@ -34,6 +36,16 @@ import {
 } from './shared.ts';
 import { componentSeedCellIndexes } from './derive-set.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
+
+// A boundary case runs its runner through the registry only when the boundary has one.
+function settlesAsyncBoundary(input: PublicRenderModuleInput, componentName: string): boolean {
+	const runners = collectSsrAsyncRunners(input);
+	return input.renderData.chunks.some(
+		(chunk) =>
+			chunk.componentName === componentName &&
+			chunk.slots.some((slot) => slot.kind === 'async' && runners.has(slot.boundaryId)),
+	);
+}
 
 export function ssrComponentFunctionName(componentName: string): string {
 	return `marklessRenderSsr${componentName}`;
@@ -140,6 +152,7 @@ export function emitSameModuleSsrComponents(
 					'const marklessSsrChildren = [];',
 					'const marklessSsrBranches = [];',
 					'const marklessSsrAsyncSnapshots = [];',
+					...(settlesAsyncBoundary(input, componentName) ? ssrAsyncRegistryLines(input) : []),
 					...dataLines.render,
 				],
 				dataLines.bodySharedComputed,

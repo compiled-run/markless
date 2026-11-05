@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": 205,
+			"reason": "An async runner in a keyed row is placed in its row the way a bound derive is, so a same-file row child's recipe reads its own row's props",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 16,
+			"reason": "An async runner in a keyed row is placed in its row the way a bound derive is, so a same-file row child's recipe reads its own row's props",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": 205,
+			"reason": "An async runner in a keyed row is placed in its row the way a bound derive is, so a same-file row child's recipe reads its own row's props",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 32,
+			"reason": "An async runner in a keyed row is placed in its row the way a bound derive is, so a same-file row child's recipe reads its own row's props",
+			"date": "2026-11-05"
+		}
+	]
+}
