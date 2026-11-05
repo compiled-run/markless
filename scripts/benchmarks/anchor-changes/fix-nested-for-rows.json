@@ -79,6 +79,170 @@
 			"delta": 69,
 			"reason": "a component in nested keyed rows takes a row segment for every enclosing row, spelled by one shared row-path helper",
 			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 3,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 54,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 3,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 54,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 3,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 54,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 19,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 723,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 19,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 723,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 344,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 281,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": -86,
+			"reason": "a component in nested keyed rows takes a row segment for every enclosing row and reads its row values by key",
+			"date": "2026-11-05"
 		}
 	]
 }
