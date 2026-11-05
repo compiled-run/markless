@@ -136,6 +136,12 @@ does not use, such as a currency the page converts itself, applies at once. An e
 the same pair the page shows, so a Share button shares the figure next to the range it was
 fetched for.
 
+Text that reads only the setting, not the answer, does not wait. `<p>Sorted by {sort}</p>` next to
+a list fetched with `sort` shows the new order above the old list until the new list arrives. The
+build warns about this with `MARKLESS_ASYNC_INPUT_BESIDE_VALUE`. Return the setting along with the
+data and show it from there, as `{posts.sort}`. A picker or button that sets `sort` is fine as it
+is: it shows the choice the user just made.
+
 To compare the old answer with what the user just typed, keep two states: one the request reads,
 one it does not. The one it does not read always shows the latest value.
 
@@ -170,9 +176,18 @@ export default function MugSearch() @{
 `@pending` only comes back if the newest request has been waiting for more than 5 seconds. Each new
 pick starts that wait over, so fast typing never brings it back.
 
-To tell screen reader users something changed, put the message in a status element outside the
-block, such as `<p role="status">`. Some screen readers, NVDA in Firefox for one, stay silent about
-live regions inside a busy element.
+Screen reader users hear about it too. When a block keeps its content and marks it busy, Markless
+says "Updating…" through a hidden status message, then "Updated", or "Update failed" when the
+`@catch` block shows instead. A first load says nothing, and a burst of quick changes, such as
+typing, is said once. The message lives outside the page content, because some screen readers,
+NVDA in Firefox for one, stay silent about messages inside a busy element.
+
+To say something else, put the block inside an element with `aria-live` or `role="status"` and
+write your own message there. Markless then leaves that block to you. `aria-live="off"` on that
+element turns the message off.
+
+In the editor, hover `@try` or an async value to see what happens there on a refresh: which input
+starts it, which elements are marked busy, and which input the shown text stays matched to.
 
 ## Try again
 
@@ -209,6 +224,45 @@ shows inside it, and the outer block keeps showing what it had.
 
 Write `@catch` right after a `@try` block. Written after an element, it is just text on the page, so
 the build stops with `MARKLESS_ASYNC_CATCH_WITHOUT_TRY`.
+
+## Load it again
+
+A recipe runs again when a state it reads changes. To load the same thing again, after a save or
+from a Reload button, give the recipe a counter to read and add one to it:
+
+```tsrx
+import { computed, state } from '@markless/core';
+import { loadMugs, saveMug } from './mugs.ts';
+
+export default function MugShelf() @{
+	let reload = state(0);
+	const mugs = computed(async () => {
+		reload;
+		return await loadMugs();
+	});
+
+	<section>
+		<button onClick={() => reload++}>Reload</button>
+		<button onClick={async () => {
+			await saveMug('tall');
+			reload++;
+		}}>Add a tall mug</button>
+		@try {
+			<ul>
+				@for (const mug of mugs; key mug.id) {
+					<li>{mug.name}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Counting mugs</p>
+		}
+	</section>
+}
+```
+
+The bare `reload;` line is the read: it is what makes a change to `reload` run the recipe again.
+Adding one is a refresh like any other: the list stays on the page, marked busy, until the new one
+arrives.
 
 ## One block per row
 
