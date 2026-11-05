@@ -213,7 +213,10 @@ function rowScope(state: WalkState): { readonly keyedRepeatId?: string } {
 
 export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
-	if (readsShadowingRowItem(expression, state)) return;
+	if (readsShadowingRowItem(expression, state)) {
+		collectRowLocalReads(expression, state);
+		return;
+	}
 	const joined = joinedTextExpressions.get(expression);
 	if (joined === null) return;
 	const composite =
@@ -1197,6 +1200,7 @@ function collectAttribute(
 		? null
 		: conditionalClassTarget(attributeName, expressionValue, state.currentStyleScopeClass);
 	if (conditionalClass && readsShadowingRowItem(conditionalClass.test, state)) {
+		if (expressionValue) collectRowLocalReads(expressionValue, state);
 		walk(expressionValue, state);
 		return;
 	}
@@ -1258,6 +1262,7 @@ function collectAttribute(
 
 	if (expressionValue && expressionValue.type !== 'Literal') {
 		if (readsShadowingRowItem(expressionValue, state)) {
+			collectRowLocalReads(expressionValue, state);
 			walk(expressionValue, state);
 			return;
 		}

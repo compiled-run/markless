@@ -62,11 +62,18 @@ function followLocal(
 			: null;
 	if (!value) return binding.name;
 	const componentName = state.currentComponentName ?? undefined;
-	reads.push(...collectGraphDependencies(value, state, componentName));
-	walkNode(value, (node) => {
-		for (const fallback of parameterDefaults(node))
-			reads.push(...collectGraphDependencies(fallback, state, componentName));
-	});
+	// A definition outside every row sees no row's names: a row item spelled like a state must not hide it.
+	const active = state.currentKeyedRepeatScopeIds;
+	if (!insideRowBody(value, state)) state.currentKeyedRepeatScopeIds = [];
+	try {
+		reads.push(...collectGraphDependencies(value, state, componentName));
+		walkNode(value, (node) => {
+			for (const fallback of parameterDefaults(node))
+				reads.push(...collectGraphDependencies(fallback, state, componentName));
+		});
+	} finally {
+		state.currentKeyedRepeatScopeIds = active;
+	}
 	for (const local of bodyLocalsNamed(value, state)) {
 		if (seen.has(local.symbolId)) continue;
 		seen.add(local.symbolId);
@@ -117,6 +124,24 @@ function readsGraph(name: string, state: WalkState): boolean {
 		resolveSharedInstanceGraphPath(name, state.graph, componentName) ??
 		findSharedInstance(name, state.graph, componentName),
 	);
+}
+
+const rowBodiesByState = new WeakMap<WalkState, ReadonlyArray<Region>>();
+
+function insideRowBody(node: AnyNode, state: WalkState): boolean {
+	let bodies = rowBodiesByState.get(state);
+	if (!bodies) {
+		const spans: Region[] = [];
+		walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
+			const body = candidate.type === 'JSXForExpression' ? (candidate.body as AnyNode | undefined) : null;
+			if (typeof body?.start === 'number' && typeof body.end === 'number')
+				spans.push({ start: body.start, end: body.end });
+		});
+		rowBodiesByState.set(state, spans);
+		bodies = spans;
+	}
+	const start = node.start;
+	return typeof start === 'number' && bodies.some((body) => start >= body.start && start < body.end);
 }
 
 const definitionsByState = new WeakMap<WalkState, ReadonlyMap<number, AnyNode>>();

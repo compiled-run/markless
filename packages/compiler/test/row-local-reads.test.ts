@@ -121,3 +121,14 @@ test('a local with no definition to follow refuses the row value and says so', a
 		codes: ['MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED'],
 	});
 });
+
+test('a helper reads the state it closes over even when the row item shares that state\'s name', async () => {
+	const source = rows('const on = (row: { key: number }) => picked === row.key;', "on(picked) ? 'on' : 'off'").replace(
+		'@for (const row of ROWS; key row.key)',
+		'@for (const picked of ROWS; key picked.key)',
+	).replace('{row.name}', '{picked.name}');
+	const result = await compileTsrxModule({ filename: 'src/Rows.tsrx', source, symbols: [] });
+	expect(result.semanticGraph.rowLocalReads?.map((entry) => [entry.name, entry.reads.map((read) => read.graphNodeId)])).toEqual([
+		['on', ['state:picked']],
+	]);
+});
