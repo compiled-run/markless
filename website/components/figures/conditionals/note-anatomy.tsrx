@@ -1,5 +1,6 @@
 // A sheet, a sticky note and a bin: close the note (drag it to the bin, its ×, or Delete) and it is gone with what you wrote; click the sheet and a fresh blank note is built.
 import { computed, state } from '@markless/core';
+import { ignoredKey, keep } from '../ink/keys.ts';
 import { capture } from '../ink/pointer.ts';
 import { addLetter, BIN_REACH, describeNote, MAX_TEXT, WRITE_FIRST } from './note-model.ts';
 import { art } from './note.art.ts';
@@ -18,9 +19,41 @@ export default function NoteAnatomy() @{
 	let hinted = state(false);
 	let hint = state(false);
 	let focused = state(false);
+	let inView = state(false);
 	const place = computed(() => 'transform: translate(' + dragX + 'px, ' + dragY + 'px)');
 
-	<figure class="anatomy sticky">
+	<figure
+		class="anatomy sticky"
+		onVisible={(event) => {
+			const host = event.target as Element;
+			const listen = (pressed: KeyboardEvent) => {
+				if (!open || pressed.repeat || ignoredKey(pressed, document.activeElement, host)) return;
+				keep(pressed);
+				if (pressed.key === 'Delete' || pressed.key === 'Escape') {
+					open = false;
+					binned = binned + 1;
+					said = describeNote('binned');
+				} else if (pressed.key === 'Backspace') text = text.slice(0, -1);
+				else if (pressed.key.length === 1 && text.length < MAX_TEXT) text = addLetter(text, pressed.key);
+			};
+			let on = false;
+			const watcher = new IntersectionObserver(
+				(entries) => {
+					const visible = Boolean(entries.at(-1)?.isIntersecting);
+					if (visible && !on) window.addEventListener('keydown', listen);
+					else if (!visible && on) window.removeEventListener('keydown', listen);
+					on = visible;
+					inView = visible;
+				},
+				{ threshold: 0.5 },
+			);
+			watcher.observe(host);
+			return () => {
+				watcher.disconnect();
+				window.removeEventListener('keydown', listen);
+			};
+		}}
+	>
 		<svg class="scene" viewBox={'0 0 ' + art.width + ' ' + art.height} role="group" aria-label="A sheet with a sticky note, and a waste bin">
 			<g
 				class="sheet"
@@ -121,7 +154,7 @@ export default function NoteAnatomy() @{
 					<path class="ink" d={art.note.ink} />
 					<text class="note-text" x={art.note.textX} y={art.note.textY}>
 						{text}
-						<tspan class={focused ? 'caret on' : 'caret'}>|</tspan>
+						<tspan class={focused || inView ? 'caret on' : 'caret'}>|</tspan>
 					</text>
 					<text class={text === '' ? 'prompt' : 'prompt gone'} x={art.note.textX + 14} y={art.note.textY}>write here</text>
 					<text class={hint && text === '' ? 'hint on' : 'hint'} x={art.note.textX} y={art.note.textY + 60}>write first?</text>

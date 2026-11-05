@@ -75,6 +75,7 @@ export default function Code({
 		shows: step.shows,
 		source: step.source,
 		rewrites: step.rewrites === undefined ? undefined : String(step.rewrites),
+		fails: step.fails,
 	}));
 	// Panel names become element ids, so each block names its panes after its own files.
 	const key = (
@@ -159,6 +160,7 @@ export default function Code({
 							data-step-shows={step.shows}
 							data-step-source={step.source}
 							data-step-rewrites={step.rewrites}
+							data-step-fails={step.fails}
 						>
 							<span class="tick" aria-hidden="true"></span>
 							<span class="said" data-step-state>To do: </span>

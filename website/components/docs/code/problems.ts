@@ -13,6 +13,11 @@ export function groupProblems(
 	return [...groups.values()].map((places) => ({ first: places[0]!, places }));
 }
 
+/** The Markless error code a problem message starts with, if any. */
+export function errorCodeOf(message: string): string | undefined {
+	return /^MARKLESS_[A-Z0-9_]+/.exec(message)?.[0];
+}
+
 export function problemItem(
 	group: ReturnType<typeof groupProblems>[number],
 	reveal: (problem: CodeDiagnostic) => void,
@@ -39,7 +44,14 @@ export function problemItem(
 	}
 	const message = document.createElement('span');
 	message.className = 'code-problem-message';
-	message.textContent = group.first.message;
+	const code = errorCodeOf(group.first.message);
+	if (code) {
+		const link = document.createElement('a');
+		link.className = 'code-problem-code';
+		link.href = `/errors/${code}`;
+		link.textContent = code;
+		message.append(link, group.first.message.slice(code.length));
+	} else message.textContent = group.first.message;
 	head.append(message);
 	item.append(head);
 	if (group.first.detail) {

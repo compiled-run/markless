@@ -8,3 +8,5 @@ export const capOf = (key: string) => (key === ' ' ? '␣' : key.length === 1 ? 
 export const cardText = (key: string) => `key: ${JSON.stringify(key)}`;
 
 export const describeKey = (key: string) => `The browser handed your handler an event: key is ${JSON.stringify(key)}.`;
+
+export { ignoredKey } from '../ink/keys.ts';

@@ -10,7 +10,7 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Styling
 
-<PageMeta time="3 min" assumes="state" />
+<PageMeta time="2 min" assumes="state" />
 
 <Subtitle text="A style block inside a component styles that file's elements and nothing else." terms="elements" />
 
@@ -31,7 +31,7 @@ The **`<style>` block** sits inside the component. Its **`.card`** rule reaches 
 
 ## The same class name never collides
 
-A *scoped* rule is one that only reaches its own file. Markless adds a class made from the file's path, starting `mk-`, to the file's selectors and elements.
+A *scoped* rule is one that reaches only its own file's elements. Markless adds a class made from the file's path, starting `mk-`, to the file's selectors and elements.
 
 - Two files can both style `.card`.
 - Each rule paints only its own file's card.
@@ -41,7 +41,7 @@ Change either file's colour, and hover a card to see its classes.
 
 <FilesAnatomy />
 
-<Code steps={[{ label: 'In `paper-card.tsrx`, change the background to `lightblue`. Only the paper card turns blue.', source: 'background: lightblue' }, { label: 'In `chalk-card.tsrx`, change `plum` to `gold`. Only the chalk card changes.', source: 'background: gold' }]}>
+<Code steps={[{ label: 'In `paper-card.tsrx`, change the background to `lightblue`. Only the paper card turns blue.', source: 'background: lightblue' }, { label: 'In `chalk-card.tsrx`, change `plum` to `gold`. Only the chalk card changes.', source: 'background: gold' }, { label: "Try breaking it: in `chalk-card.tsrx`, write `class={{ card: true, lit }}`. The build stops, because a class is a string.", fails: 'MARKLESS_ATTRIBUTE_OBJECT_VALUE' }]}>
 ```tsrx title="two-cards.tsrx"
 import PaperCard from './paper-card.tsrx';
 import ChalkCard from './chalk-card.tsrx';
@@ -100,24 +100,7 @@ export default function ChalkCard() @{
 
 ## The extra class belongs to the file
 
-- The extra class is worked out from the file's path.
-- Rules inside `@media` get the class too. `@keyframes` names stay as you wrote them.
-- In a built app the rules ship as plain CSS in the page. No script runs to apply them.
-- The class belongs to the file, not the component. Two components in one `.tsrx` file share it.
-  To give a component its own scope, move it to its own file.
-- For rules that cover the whole site, import an ordinary stylesheet.
-
-## A class is a string
-
-`class` takes a string. Any expression that makes one works, like `lit ? 'card lit' : 'card'`, and
-the page updates the class when `lit` changes.
-
-Not yet:
-
-- An object or an array, as in `class={{ lit: on }}`, stops the build with
-  `MARKLESS_ATTRIBUTE_OBJECT_VALUE`. Build the string with `? :` instead.
-- A `<style>` block outside a component's elements never reaches the page, so the build stops
-  with `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`.
+Two components in one `.tsrx` file share one class, so give a component its own file to give it its own styles. For rules that cover the whole site, import an ordinary stylesheet.
 
 <Collapsible sprite="thought-bubble" summary="How do existing tools handle this?">
 

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { capOf, cardText, describeKey } from './keycard-model.ts';
+import { capOf, cardText, describeKey, ignoredKey } from './keycard-model.ts';
 import { drawing } from './keycard.ts';
 
 const keyArt = drawing();
@@ -16,10 +16,23 @@ describe('a key, its event card and the hand', () => {
 		expect(describeKey('a')).toBe('The browser handed your handler an event: key is "a".');
 	});
 
+	it('leaves shortcuts, fields and dialogs alone', () => {
+		const key = (k: string, mod = {}) => ({ key: k, metaKey: false, ctrlKey: false, altKey: false, ...mod });
+		const nobody = { contains: () => false };
+		expect(ignoredKey(key('a'), null, nobody)).toBe(false);
+		expect(ignoredKey(key('k', { metaKey: true }), null, nobody)).toBe(true);
+		expect(ignoredKey(key('a'), { tagName: 'INPUT' }, nobody)).toBe(true);
+		expect(ignoredKey(key('a'), { tagName: 'DIV', isContentEditable: true }, nobody)).toBe(true);
+		expect(ignoredKey(key('a'), { tagName: 'BUTTON', closest: () => ({}) }, nobody)).toBe(true);
+		expect(ignoredKey(key('a'), { tagName: 'BODY', closest: () => null }, nobody)).toBe(false);
+	});
+
 	it('has three objects, and only a press sends a card', () => {
 		for (const part of ['class="key"', 'class="card"', 'class="hand"']) expect(piece).toContain(part);
 		expect(piece).toContain('key = event.key;');
 		expect(piece).not.toMatch(/class="cord"|art\.wires|class="hand"[^>]*on[A-Z]/);
+		expect(piece).toContain('{ threshold: 0.5 }');
+		expect(piece).toContain('>type any key</p>');
 		expect(piece).toContain('aria-live="polite"');
 		expect(piece).toContain('prefers-reduced-motion: reduce');
 	});

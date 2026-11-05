@@ -29,5 +29,5 @@ export const slotAt = (x: number, slots: readonly number[], width: number) => sl
 
 export function describeOrder(order: readonly GuestId[], ticked: readonly GuestId[]): string {
 	const list = order.map((id) => nameOf(id) + (ticked.includes(id) ? ' (ticked)' : '')).join(', ');
-	return `The cards now read ${list}. Each tick moved with its card; the slots stayed put.`;
+	return `The cards now read ${list}. Each tick moved with its card; the places stayed put.`;
 }

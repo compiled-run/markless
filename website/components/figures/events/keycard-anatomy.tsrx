@@ -1,6 +1,7 @@
 // One key, the event card it drops, and the open hand that is your handler: press the key (or type on your own keyboard) and the browser's event lands in the hand.
 import { computed, state } from '@markless/core';
-import { capOf, cardText, describeKey, flip } from './keycard-model.ts';
+import { keep } from '../ink/keys.ts';
+import { capOf, cardText, describeKey, flip, ignoredKey } from './keycard-model.ts';
 import { art } from './keycard.art.ts';
 
 export default function KeycardAnatomy() @{
@@ -10,7 +11,33 @@ export default function KeycardAnatomy() @{
 	const text = computed(() => cardText(key));
 	const said = computed(() => (beat === 'rest' ? '' : describeKey(key)));
 
-	<figure class="anatomy keycard">
+	<figure
+		class="anatomy keycard"
+		onVisible={(event) => {
+			const host = event.target as Element;
+			const listen = (pressed: KeyboardEvent) => {
+				if (pressed.repeat || ignoredKey(pressed, document.activeElement, host)) return;
+				if (pressed.key === ' ') keep(pressed);
+				key = pressed.key;
+				beat = flip(beat);
+			};
+			let on = false;
+			const watcher = new IntersectionObserver(
+				(entries) => {
+					const visible = Boolean(entries.at(-1)?.isIntersecting);
+					if (visible && !on) window.addEventListener('keydown', listen);
+					else if (!visible && on) window.removeEventListener('keydown', listen);
+					on = visible;
+				},
+				{ threshold: 0.5 },
+			);
+			watcher.observe(host);
+			return () => {
+				watcher.disconnect();
+				window.removeEventListener('keydown', listen);
+			};
+		}}
+	>
 		<svg class="scene" data-beat={beat} viewBox={'0 0 ' + art.width + ' ' + art.height} role="group" aria-label="A key, an event card and a hand">
 			<g class="hand">
 				<path class="hand-paper" d={art.hand.paper} />
@@ -49,6 +76,7 @@ export default function KeycardAnatomy() @{
 				<text class="key-letter" x={art.key.letterX} y={art.key.letterY}>{cap}</text>
 			</g>
 		</svg>
+		<p class="hint" aria-hidden="true">type any key</p>
 		<figcaption class="sr">
 			An ink drawing of one keyboard key, an empty open hand, and nothing between them. Press the key, or focus it and type any key on
 			your own keyboard: the key sinks, and a card labelled event slides out to land in the hand, reading which key it was. With no press,
@@ -249,6 +277,14 @@ export default function KeycardAnatomy() @{
 				.scene:not([data-beat='rest']) .card {
 					opacity: 1;
 				}
+			}
+
+			.hint {
+				margin: 0.2rem 0 0;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-style: italic;
+				text-align: center;
+				opacity: 0.45;
 			}
 
 			.sr {

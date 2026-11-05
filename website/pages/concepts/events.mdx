@@ -37,7 +37,7 @@ Press the key, or click it and type on your own keyboard.
 
 <KeycardAnatomy />
 
-<Code steps={[{ label: 'Type Ada. The preview follows every key.', shows: 'Preview: Ada' }, { label: 'Under the preview, add `<p>{name.length} letters</p>` and type again.', source: '{name.length}' }, { label: 'Change `onInput` to `onChange`. The preview now waits until you leave the field.', source: 'onChange=' }]}>
+<Code steps={[{ label: 'Type Ada. The preview follows every key.', shows: 'Preview: Ada' }, { label: 'Under the preview, add `<p>{name.length} letters</p>` and type again.', source: '{name.length}' }, { label: 'Change `onInput` to `onChange`. The preview now waits until you leave the field.', source: 'onChange=' }, { label: "Try breaking it: change `state('nothing yet')` to a plain `'nothing yet'`. The build stops, because a handler can only change state.", fails: 'MARKLESS_HANDLER_READS_RENDER_LOCAL' }]}>
 ```tsrx title="mug-label.tsrx"
 import { state } from '@markless/core';
 
@@ -73,14 +73,6 @@ export default function MugLabel() @{
 
 ## Name the prop after the event
 
-- `on` plus the event name: `onClick`, `onInput`, `onKeyDown`. The case after `on` doesn't matter.
-- Pass an array to run two handlers in order: `onClick={[save, countSave]}`.
-- `onIdle` runs once when the page is idle, and `onVisible` once when the element scrolls into view.
-
-Not yet:
-
-- A handler can't read a plain `let` from the component body: `MARKLESS_HANDLER_READS_RENDER_LOCAL`.
-- Changing a body `const`, as in `list.push(3)`, stops the build with `MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`.
-- `event.preventDefault()` inside an `if` needs a test on state, props, constants or an event field, like `event.key === 'Enter'`: `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`.
+Write `on` plus the event name, like `onClick` or `onKeyDown`. Two more run without a person: `onIdle` once the page is idle, and `onVisible` once the element scrolls into view.
 
 [Conditionals](/concepts/conditionals) shows parts of the page that come and go.

@@ -13,7 +13,7 @@ describe('three keyed name cards', () => {
 		expect(swap(FIRST, 0, 2)).toEqual(['ada', 'linus', 'grace']);
 		expect(toggle(['linus'], 'linus')).toEqual([]);
 		expect(slotAt(tentArt.slots[2]! + 10, tentArt.slots, CARD_W)).toBe(2);
-		expect(describeOrder(reverse(FIRST), ['grace'])).toBe('The cards now read Ada, Linus, Grace (ticked). Each tick moved with its card; the slots stayed put.');
+		expect(describeOrder(reverse(FIRST), ['grace'])).toBe('The cards now read Ada, Linus, Grace (ticked). Each tick moved with its card; the places stayed put.');
 	});
 
 	it('keeps each tick on its own card; the slot numbers never move', () => {

@@ -66,7 +66,7 @@ and the change goes straight to the spots that show it.
 
 </Collapsible>
 
-<Code steps={[{ label: 'Press Dark.', shows: 'Theme: dark' }, { label: 'Add `<p>{theme}</p>` under the heading, and press Light. Both lines follow.', source: '<p>{theme}</p>' }, { label: "Change `state('light')` to a plain `'light'`, and read the build error.", source: "let theme = 'light'" }]}>
+<Code steps={[{ label: 'Press Dark.', shows: 'Theme: dark' }, { label: 'Add `<p>{theme}</p>` under the heading, and press Light. Both lines follow.', source: '<p>{theme}</p>' }, { label: "Try breaking it: change `state('light')` to a plain `'light'`. The build stops, because a plain variable isn't watched.", fails: 'MARKLESS_HANDLER_READS_RENDER_LOCAL' }]}>
 ```tsrx title="settings.tsrx"
 import { state } from '@markless/core';
 
@@ -116,13 +116,6 @@ export default function Visitor() @{
 
 ## Make state in the component body
 
-Write `state()` directly in the component body, next to your other variables. Anywhere else, the
-build stops and names the line:
-
-- outside the component: `MARKLESS_STATE_MODULE_SCOPE`
-- inside an `@if`, an event handler or a `for` loop: `MARKLESS_STATE_CREATION_SITE_UNSTABLE`
-- changed inside the markup, as in `{count++}`: `MARKLESS_STATE_WRITE_IN_TEMPLATE`
-
-`state()` only works in `.tsrx` files. In a plain `.ts` file it throws as soon as it runs.
+Write `state()` next to your other variables in the component body, never inside an `@if`, a handler or a loop. It only works in `.tsrx` files.
 
 [Computed](/concepts/computed) works out a value from your state, so it can never go stale.

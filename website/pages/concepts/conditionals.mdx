@@ -11,7 +11,7 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="2 min" assumes="state, events" />
 
-<Subtitle text="@if puts elements on the page while its test is true, and takes them off again when it isn't." terms="elements" />
+<Subtitle text="@if shows its elements while a condition is true, and removes them when it isn't." terms="elements" />
 
 ```tsrx title="note-field.tsrx"
 import { state } from '@markless/core';
@@ -25,11 +25,11 @@ export default function NoteField() @{
 }
 ```
 
-**`@if (open)`** builds the `<textarea>` while `open` is true. When `open` turns false, the **branch** and everything in it leave the page.
+**`@if (open)`** builds the `<textarea>` while `open` is true. When `open` turns false, everything inside the **`@if`** leaves the page.
 
-## A hidden branch is gone, not covered
+## A closed `@if` is gone, not covered
 
-A *branch* is the part inside `@if { }`. It isn't hidden with CSS; it's removed, and built fresh next time.
+A *condition* is the true-or-false value in `@if ( )`. When it turns false, the part inside isn't hidden with CSS; it's removed, and built fresh next time.
 
 - Closing removes the elements and what you typed in them.
 - Opening builds new, empty ones.
@@ -39,7 +39,7 @@ Write on the note, then drag it to the bin. Click the sheet to open a note again
 
 <NoteAnatomy />
 
-<Code steps={[{ label: 'Press Show or hide the note, and type a note longer than 20 letters.', shows: 'That is a long note.' }, { label: 'Close the note and open it again. Your text is still there, because `note` lives above the `@if`.', source: "let note = state('')" }, { label: "Inside the `@if`, wrap the label in `@{ let note = state(''); … }`, and read the build error.", source: "@{ let note = state(" }]}>
+<Code steps={[{ label: 'Press Show or hide the note, and type a note longer than 20 letters.', shows: 'That is a long note.' }, { label: 'Close the note and open it again. Your text is still there, because `note` lives above the `@if`.', source: "let note = state('')" }, { label: "Try breaking it: inside the `@if`, wrap the label in `@{ let draft = state(''); … }`. The build stops, because state made inside an `@if` would leave with it.", fails: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE' }]}>
 ```tsrx title="note-panel.tsrx"
 import { computed, state } from '@markless/core';
 
@@ -75,12 +75,6 @@ export default function NotePanel() @{
 
 ## `@else` and `@switch` pick one of several
 
-- `@else` covers the other side. A plain `else` stops the build with `MARKLESS_BRANCH_ELSE_SPELLING`.
-- `@switch (status) { @case 'ready': { … } @default: { … } }` picks one case.
-
-Not yet:
-
-- An `@if` or `@switch` can't sit inside another `@if`, and `@else if` doesn't work: `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`. Put branches side by side, or use `@switch`.
-- `state()` inside an `@if` stops the build with `MARKLESS_STATE_CREATION_SITE_UNSTABLE`.
+`@else` shows what to put there when the condition is false, and `@switch` picks one `@case` from several. Put `@if` blocks side by side; one can't sit inside another yet.
 
 [Lists](/concepts/lists) shows rows that keep their own state when the list moves.

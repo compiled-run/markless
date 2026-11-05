@@ -23,7 +23,7 @@ export default function TentAnatomy() @{
 	const hop2 = computed(() => (slotOf(order, 'ada') > slotOf(prev, 'ada') ? 'hop up ' + beat : 'hop'));
 
 	<figure class="anatomy tents">
-		<div class="scene" data-dragging={dragging === '' ? 'no' : 'yes'} role="group" aria-label="Three name cards in three slots">
+		<div class="scene" data-dragging={dragging === '' ? 'no' : 'yes'} role="group" aria-label="Three name cards in three places">
 		<svg class="table" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 			<path class="ink" d={art.table.edge} />
 			<path class="ink faint" d={art.table.marks} />
@@ -38,7 +38,7 @@ export default function TentAnatomy() @{
 				tabindex="0"
 				role="checkbox"
 				aria-checked={ticked.includes('grace') ? 'true' : 'false'}
-				aria-label={nameOf('grace') + ', in slot ' + (slotOf(order, 'grace') + 1)}
+				aria-label={nameOf('grace') + ', in place ' + (slotOf(order, 'grace') + 1)}
 				onPointerDown={(event) => {
 					capture(event);
 					scale = art.width / (event.currentTarget.parentElement as HTMLElement).getBoundingClientRect().width;
@@ -103,7 +103,7 @@ export default function TentAnatomy() @{
 				tabindex="0"
 				role="checkbox"
 				aria-checked={ticked.includes('linus') ? 'true' : 'false'}
-				aria-label={nameOf('linus') + ', in slot ' + (slotOf(order, 'linus') + 1)}
+				aria-label={nameOf('linus') + ', in place ' + (slotOf(order, 'linus') + 1)}
 				onPointerDown={(event) => {
 					capture(event);
 					scale = art.width / (event.currentTarget.parentElement as HTMLElement).getBoundingClientRect().width;
@@ -168,7 +168,7 @@ export default function TentAnatomy() @{
 				tabindex="0"
 				role="checkbox"
 				aria-checked={ticked.includes('ada') ? 'true' : 'false'}
-				aria-label={nameOf('ada') + ', in slot ' + (slotOf(order, 'ada') + 1)}
+				aria-label={nameOf('ada') + ', in place ' + (slotOf(order, 'ada') + 1)}
 				onPointerDown={(event) => {
 					capture(event);
 					scale = art.width / (event.currentTarget.parentElement as HTMLElement).getBoundingClientRect().width;
@@ -241,9 +241,9 @@ export default function TentAnatomy() @{
 			</InkButton>
 		</div>
 		<figcaption class="sr">
-			Three folded name cards stand in three numbered slots: Grace, Linus and Ada, with Grace ticked. Press Reverse, or drag a card onto
-			another slot, or focus a card and use the arrow keys: the cards walk to their new slots and each tick goes with its own card, while
-			the slot numbers stay put. Click a card, or press Space on it, to tick it.
+			Three folded name cards stand in three numbered places: Grace, Linus and Ada, with Grace ticked. Press Reverse, or drag a card onto
+			another place, or focus a card and use the arrow keys: the cards walk to their new places and each tick goes with its own card, while
+			the place numbers stay put. Click a card, or press Space on it, to tick it.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>

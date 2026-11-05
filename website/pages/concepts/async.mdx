@@ -27,17 +27,17 @@ const forecast = computed(async () => loadForecast(city));
 
 ## Only the slow spot waits
 
-A *boundary* is the `@try` block around an async value. Everything outside it is on the page straight away.
+An *async* value is one that arrives later. It can only be shown inside `@try`, and everything outside `@try` is on the page straight away.
 
 - `@try` holds what you show once the value is ready.
 - `@pending` holds what you show before the first answer.
-- `@catch` holds what you show if the recipe fails. Write the three in that order.
+- `@catch` holds what you show if loading it fails. Write the three in that order.
 
 Pick a city, then try picking two quickly.
 
 <WeatherAnatomy />
 
-<Code steps={[{ label: 'Press Lisbon and wait. The Oslo forecast stays until the new one lands.', shows: 'Lisbon: sunny, 19°' }, { label: 'Press Atlantis. The `@catch` block takes over.', shows: 'No forecast for that city.' }, { label: 'Move the `@pending` block after `@catch`, and read the build error.', source: '@catch {<p>No forecast for that city.</p>} @pending' }]}>
+<Code steps={[{ label: 'Press Lisbon and wait. The Oslo forecast stays until the new one lands.', shows: 'Lisbon: sunny, 19°' }, { label: 'Press Atlantis. The `@catch` block takes over.', shows: 'No forecast for that city.' }, { label: 'Try breaking it: move `<p>{forecast.text}</p>` above `@try`. The build stops, because an async value can only be shown inside `@try`.', fails: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED' }]}>
 ```tsrx title="forecast-card.tsrx"
 import { computed, state } from '@markless/core';
 import { loadForecast } from './forecast.ts';
@@ -91,13 +91,6 @@ export function loadForecast(
 
 ## The old answer stays while a new one loads
 
-- The old answer stays up, and `@pending` returns only after 5 seconds of waiting.
-- The element around the block gets `aria-busy="true"`, so you can style it.
-
-Not yet:
-
-- A read of an async value outside `@try` stops the build with `MARKLESS_ASYNC_BOUNDARY_REQUIRED`.
-- An `@pending` after `@catch` stops the build with `MARKLESS_ASYNC_ARM_ORDER`.
-- A lookup keyed by the answer itself, like `shelf[(await loadPick()).id]`, stops the build with `MARKLESS_ASYNC_POST_AWAIT_READ`. Return the answer, and look it up in a second `computed()`.
+Picking again keeps the last answer on the page until the new one lands. The element around the block gets `aria-busy="true"` meanwhile, so you can style the wait.
 
 [Styling](/concepts/styling) shows how two components can both call something `.card`.

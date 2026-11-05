@@ -37,11 +37,11 @@ A *key* is a value that names one item for good, like an id. With it, a row keep
 - What a row holds, like a tick, rides along.
 - No row is built again.
 
-Press **Reverse**, or drag a card onto another slot.
+Press **Reverse**, or drag a card onto another place.
 
 <TentAnatomy />
 
-<Code steps={[{ label: "Add `{ id: 'beans', name: 'Beans', done: false }` to the starting list.", shows: 'Beans' }, { label: 'Tick every row and press Remove ticked. The `@empty` line takes over.', shows: 'Nothing left to buy.' }]}>
+<Code steps={[{ label: "Add `{ id: 'beans', name: 'Beans', done: false }` to the starting list.", shows: 'Beans' }, { label: 'Tick every row and press Remove ticked. The `@empty` line takes over.', shows: 'Nothing left to buy.' }, { label: 'Try breaking it: delete `; key item.id` from the `@for`. The build stops, because every row needs a key.', fails: 'MARKLESS_REPEAT_KEY_REQUIRED' }]}>
 ```tsrx title="shopping-list.tsrx"
 import { state } from '@markless/core';
 
@@ -96,22 +96,12 @@ export default function ShoppingList() @{
 
 ## Pick a key that names the item
 
-- Use what names the item in your data: an id, a slug, an order number.
-- It must be unique in the list, and the same item must keep the same key.
-- Not the position: a tick would then stay with the slot, not the item.
-- Not a value the reader edits: a renamed row would become a new row.
-
-Need the position for display? Add `index i` and keep the key on the data:
+Use what names the item in your data, like an id, never its position. To show the position, add `index i` and keep the key on the data:
 
 ```tsrx
 @for (const step of steps; index i; key step.id) {
 	<li>{i + 1}: {step.text}</li>
 }
 ```
-
-Not yet:
-
-- Every `@for` needs a key. Without one the build stops with `MARKLESS_REPEAT_KEY_REQUIRED`.
-- `key i` builds with a `MARKLESS_REPEAT_KEY_IS_INDEX` warning, and each row then follows its slot.
 
 [Async](/concepts/async) shows how a page waits for data.
