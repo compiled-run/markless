@@ -1037,6 +1037,8 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// Names a composite read with no route reads, resolved by scope analysis.
+	readonly readNames?: ReadonlyArray<string>;
 	// The expression as written, when `source` carries a body function spliced into its call.
 	readonly authoredSource?: string;
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
