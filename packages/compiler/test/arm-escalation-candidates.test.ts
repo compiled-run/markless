@@ -370,3 +370,54 @@ for (const [shape, source, filename, test_, runs, refusal] of [
 			symbols.find((symbol) => symbol.manifest.kind === 'branch-update')?.branchSiteId,
 		).toBe(candidates[0]?.branchSiteId);
 	});
+
+const NESTED_ARM_DERIVE = `
+import { computed, state } from '@markless/core';
+
+async function load(id) {
+	return { name: 'item-' + id };
+}
+
+function Form({ id }) @{
+	const item = computed(async () => load(id));
+	let busy = state(false);
+	const locked = computed(() => false || busy);
+	@try {
+		<button disabled={locked} onClick={() => busy = !busy}>{item.name}</button>
+	} @pending {
+		<span>Loading</span>
+	}
+}
+
+function Shell() @{
+	let open = state(false);
+	<section>
+		<button onClick={() => open = !open}>Open</button>
+		@if (open) { <Form id={1} /> }
+	</section>
+}
+
+export default function Page() @{
+	<main><h1>Items</h1><Shell /></main>
+}
+`;
+
+// An arm rendered two components below the page names its values through every edge prefix on the way down.
+test('a linked render loads a same-file symbol through nested component edge prefixes', async () => {
+	const compiled = await compilePage(NESTED_ARM_DERIVE, 'src/NestedArm.tsrx');
+	const symbols = linkedRenderDataBoundarySymbols({
+		...linkInput(compiled),
+		branchExportName: (index: number) => `branchUpdate${String(index)}`,
+	} as never);
+	const source = symbols.find((symbol) => symbol.manifest.kind === 'branch-update')?.module.source ?? '';
+	const loader = /function marklessLoadLinkedSymbol\(symbolId\) \{[\s\S]*?\n\}/.exec(source)?.[0];
+	expect(loader).toBeDefined();
+	const prefixes = [...loader!.matchAll(/startsWith\("(c\d+:)"\)/g)].map((match) => match[1]!);
+	expect(prefixes.length).toBeGreaterThan(1);
+	const loaded: string[] = [];
+	const load = new Function('marklessLoadLocalSymbol', `${loader}\nreturn marklessLoadLinkedSymbol;`)(
+		(symbolId: string) => loaded.push(symbolId),
+	) as (symbolId: string) => void;
+	for (const outer of prefixes) for (const inner of prefixes) load(`${outer}${inner}symbol:7`);
+	expect(new Set(loaded)).toEqual(new Set(['symbol:7']));
+});
