@@ -769,3 +769,64 @@ test('the interface entry grows only the fields this component needs', async () 
 		'rootChunkId',
 	]);
 });
+
+// A row moves as its one element, so a @try standing beside that element keeps the row from minting.
+test('an imported row component whose top level is a @try ships no identity', async () => {
+	const bareTry = `import { computed } from '@markless/core';
+export function Row({ item }) @{
+	const details = computed(async () => ({ title: item.id }));
+	@try { <li>{details.title}</li> } @catch { <li>failed</li> }
+}
+`;
+	const child = await buildSemanticGraph({ filename: 'src/row.tsrx', source: bareTry });
+	expect(child.moduleGraphInterface.render.components[0]?.rootBoundary).toBe(true);
+	const view = await viewOfImportedRow(bareTry, importingApp);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+});
+
+test('the same top-level @try inside a row element still mints the row', async () => {
+	const bareTry = `import { computed } from '@markless/core';
+export function Row({ item }) @{
+	const details = computed(async () => ({ title: item.id }));
+	@try { <b>{details.title}</b> } @catch { <b>failed</b> }
+}
+`;
+	const wrappingApp = `import { state } from '@markless/core';
+import { Row } from './row.tsrx';
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row item={row} /></li> }</ul>
+}
+`;
+	const view = await viewOfImportedRow(bareTry, wrappingApp);
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+});
+
+test('a component whose top level renders a child with a top-level @try carries the fact up', async () => {
+	const leaf = await buildSemanticGraph({
+		filename: 'src/leaf.tsrx',
+		source: `import { computed } from '@markless/core';
+export function Leaf({ label }) @{
+	const shown = computed(async () => label);
+	@try { <li>{shown}</li> } @catch { <li>none</li> }
+}
+`,
+	});
+	const middle = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: `import { Leaf } from './leaf.tsrx';
+export function Row({ item }) @{
+	<Leaf label={item.label} />
+}
+`,
+		importedModuleInterfaces: { './leaf.tsrx': leaf.moduleGraphInterface },
+	});
+	expect(middle.moduleGraphInterface.render.components[0]?.rootBoundary).toBe(true);
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: importingApp,
+		importedModuleInterfaces: { './row.tsrx': middle.moduleGraphInterface },
+	});
+	const view = viewFrom(semanticGraph, { './row.tsrx': middle.moduleGraphInterface });
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+});

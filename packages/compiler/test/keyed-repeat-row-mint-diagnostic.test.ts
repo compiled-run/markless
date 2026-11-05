@@ -24,6 +24,9 @@ test('every refusal clause names itself in the author’s own words', () => {
 	expect(messageFor({ kind: 'component', componentName: 'Row' })).toContain(
 		'what <Row> renders could not be seen from here',
 	);
+	expect(messageFor({ kind: 'component-root-boundary', componentName: 'Row' })).toContain(
+		'<Row> renders a @try at its top level, outside every element',
+	);
 	expect(messageFor({ kind: 'nested-construct', label: 'an @if or @switch' })).toContain(
 		'holds an @if or @switch',
 	);
@@ -35,13 +38,18 @@ test('every refusal clause names itself in the author’s own words', () => {
 		'This @for row over item renders shout(tags)',
 	);
 	expect(
-		messageFor({ kind: 'unfillable-read', read: 'the id of the box element handle', attributeName: 'aria-controls' }),
+		messageFor({
+			kind: 'unfillable-read',
+			read: 'the id of the box element handle',
+			attributeName: 'aria-controls',
+		}),
 	).toContain('sets aria-controls from the id of the box element handle');
 });
 
 test('every clause says the consequence: the list renders and reorders but never grows', () => {
 	for (const message of [
 		messageFor({ kind: 'component', componentName: 'Row' }),
+		messageFor({ kind: 'component-root-boundary', componentName: 'Row' }),
 		messageFor({ kind: 'nested-construct', label: 'a nested @for' }),
 		messageFor({ kind: 'attribute', attributeName: 'href' }),
 		messageFor({ kind: 'unfillable-read', read: 'shout(tags)' }),
