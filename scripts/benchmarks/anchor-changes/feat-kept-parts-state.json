@@ -4,180 +4,6 @@
 			"surface": "perf-guards",
 			"path": [
 				"loadWeight",
-				"darwin-arm64",
-				"bench /",
-				"executedChars"
-			],
-			"delta": 33,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 350,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /records",
-				"executedChars"
-			],
-			"delta": 33,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 350,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /settings",
-				"executedChars"
-			],
-			"delta": 33,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 350,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /",
-				"executedChars"
-			],
-			"delta": 21,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 1408,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /concepts/state",
-				"executedChars"
-			],
-			"delta": 22,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 765,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /ui/accordion",
-				"executedChars"
-			],
-			"delta": 33,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 419,
-			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"router/vite/entries/fragment-entry"
-			],
-			"delta": 2333,
-			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides and paints their live state; web/shared-swap's off-screen painter is shared with it",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/kept-swap"
-			],
-			"set": 5237,
-			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides and paints their live state; web/shared-swap's off-screen painter is shared with it",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/shared-swap"
-			],
-			"delta": 307,
-			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides and paints their live state; web/shared-swap's off-screen painter is shared with it",
-			"date": "2026-11-05"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
 				"linux-x64",
 				"bench /",
 				"executedChars"
@@ -316,6 +142,180 @@
 			],
 			"delta": 424,
 			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike (Linux: CI run 42023807016 attempt 2 against merge-queue run 42021588235)",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 354,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 354,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 354,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 21,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1410,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 22,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 767,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 421,
+			"reason": "kept parts with state: the router carries a kept part's live state to the next page (fragment entry +2.3 KB rendered, two more config strings in the inline bootstrap), and the docs sidebar's links hold their current-page mark as state so every page of a mode renders the sidebar alike",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 2331,
+			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides, paints and can restore their live state; web/shared-swap's off-screen painter is shared with it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/kept-swap"
+			],
+			"set": 6012,
+			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides, paints and can restore their live state; web/shared-swap's off-screen painter is shared with it",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/shared-swap"
+			],
+			"delta": 387,
+			"reason": "kept parts with state: the fragment entry pairs kept parts and loads web/kept-swap only when the leaving page holds one; web/kept-swap reads, decides, paints and can restore their live state; web/shared-swap's off-screen painter is shared with it",
 			"date": "2026-11-05"
 		}
 	]
