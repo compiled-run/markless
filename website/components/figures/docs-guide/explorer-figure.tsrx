@@ -62,7 +62,7 @@ export default function DocsExplorerFigure() @{
 					<span class="hint">move here</span>
 				</button>
 				@if (folder === 'pages/') {
-					<button type="button" class="file" draggable="true" onClick={() => rename()}>
+					<button type="button" class="file" draggable={true} onClick={() => rename()}>
 						<span class="name">{file}</span>
 						<span class="hint">rename, or drag</span>
 					</button>
@@ -72,7 +72,7 @@ export default function DocsExplorerFigure() @{
 					<span class="hint">move here</span>
 				</button>
 				@if (folder === 'pages/concepts/') {
-					<button type="button" class="file deep" draggable="true" onClick={() => rename()}>
+					<button type="button" class="file deep" draggable={true} onClick={() => rename()}>
 						<span class="name">{file}</span>
 						<span class="hint">rename, or drag</span>
 					</button>
@@ -82,7 +82,7 @@ export default function DocsExplorerFigure() @{
 					<span class="hint">move here</span>
 				</button>
 				@if (folder === 'components/') {
-					<button type="button" class="file" draggable="true" onClick={() => rename()}>
+					<button type="button" class="file" draggable={true} onClick={() => rename()}>
 						<span class="name">{file}</span>
 						<span class="hint">rename, or drag</span>
 					</button>

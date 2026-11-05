@@ -30,6 +30,6 @@ describe('improve the docs explorer figure', () => {
 	});
 
 	it('answers press, drag and keys, speaks each change, and drops animation under reduced motion', () => {
-		for (const hook of ['onDrop', 'draggable="true"', 'onClick={() => rename()}', "event.key !== 'Escape'", 'aria-live="polite"', 'prefers-reduced-motion: reduce']) expect(toy).toContain(hook);
+		for (const hook of ['onDrop', 'draggable={true}', 'onClick={() => rename()}', "event.key !== 'Escape'", 'aria-live="polite"', 'prefers-reduced-motion: reduce']) expect(toy).toContain(hook);
 	});
 });
