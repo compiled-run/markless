@@ -2609,8 +2609,8 @@ try {
 			['compiler', 'The file was cut into frames before anything ran'],
 			['payload', 'That is everything the server added'],
 			['resuming', 'nobody replayed the game from move one'],
-			['state-graph', 'Papers went to the two houses on its rounds'],
-			['lazy-chunks', 'Only that tub was opened and cooked'],
+			['state-graph', 'reached only the two spots ruled to it'],
+			['lazy-chunks', 'was ordered and opened'],
 			['native-targets', 'both the iOS and the macOS button now read Count 1'],
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });

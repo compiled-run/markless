@@ -132,7 +132,13 @@ export function createDesk({ width, height, bounds, target, elevation = 50, azim
 		return { layers: layers.splice(start), words: words.splice(wordStart) };
 	}
 
-	return { at, atAll, put, say, layers, words, group, surface, flat, upright, card, box, spot, note, deskTone, pencilLine: (pts: P[], seed: number) => pathOf(jitter(resample(pts, 6), seed, 0.7)) };
+	/** One thing the reader can point at: its own layers and words, where its hover label sits, and its centre for drops. */
+	function object(draw: () => void, label: P, anchor: P = label) {
+		const g = group(draw);
+		return { ...g, label: [r1(label[0]), r1(label[1])] as [number, number], anchor: [r1(anchor[0]), r1(anchor[1])] as [number, number] };
+	}
+
+	return { at, atAll, put, say, layers, words, group, object, surface, flat, upright, card, box, spot, note, deskTone, pencilLine: (pts: P[], seed: number) => pathOf(jitter(resample(pts, 6), seed, 0.7)) };
 }
 
 const centre3 = (pts: Point3[]): Point3 => mul3(pts.reduce((a, b) => add3(a, b), [0, 0, 0] as Point3), 1 / pts.length);

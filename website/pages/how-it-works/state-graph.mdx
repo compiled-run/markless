@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import RoundAnatomy from '../../components/figures/state-graph/round-anatomy.tsrx';
+import PlaylistAnatomy from '../../components/figures/state-graph/playlist-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -11,44 +11,47 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="2 min" assumes="state, computed, events" />
 
-<Subtitle text="The compiler writes down who reads what before the page exists, so a write reaches only the text that reads it." />
+<Subtitle text="The compiler writes down who reads what before the page exists, so a write reaches only the spots that read it." />
 
-<RoundAnatomy />
+<PlaylistAnatomy />
 
-Press the drawing to print a new edition of `bags`. It goes only to the houses on its round, and the house with no round gets nothing.
+Pick a song. The value `playing` is ruled to the two spots that read it, so only those two change. The title reads nothing, so nothing ever redraws it.
 
-```tsrx title="cart.tsrx"
-import { computed, state } from '@markless/core';
+```tsrx title="playlist.tsrx"
+import { state } from '@markless/core';
 
-export default function Cart() @{
-	let bags = state(2);
-	const total = computed(() => bags * 14);
+export default function Playlist() @{
+	let playing = state('Harbour Lights');
 
 	<section>
-		<p>House blend · 250 g</p>
-		<p>In your cart: {bags} bags</p>
-		<p>Total: ${total}</p>
-		<button onClick={() => bags++}>Add to cart</button>
+		<h2>Road trip</h2>
+		<p>Now playing: {playing}</p>
+		<button
+			class={playing === 'Slow Train' ? 'on' : ''}
+			onClick={() => (playing = 'Slow Train')}
+		>
+			Slow Train
+		</button>
 	</section>
 }
 ```
 
-## The round book is the state graph
+## The rules are the state graph
 
-- A **node** holds one value: `state()` makes `state:bags`, and `computed()` makes `computed:total`.
-- A **subscription** is one house on a round: a node, a path into its value, and a small function to run when it changes.
-- The **journal** is the list of page changes those functions return, such as `setText`.
+- A **node** holds one value: `state()` makes `state:playing`, and `computed()` makes a node of its own.
+- A **subscription** is one ruled line: a node, a path into its value, and a small function to run when it changes.
+- The **journal** is the list of page changes those functions return: here a `setText` for the paragraph and a class update for the button. The compiler reads the class through a small computed node it adds on its own.
 
-## One write, one round
+## One write, two readers
 
-For `bags++`, the graph in `@markless/runtime`:
+For `playing = 'Slow Train'`, the graph in `@markless/runtime`:
 
 1. stops if the value didn't change,
-2. marks `state:bags` changed and `computed:total` stale,
+2. marks `state:playing` changed, and any computed that reads it stale,
 3. schedules one flush right after the current code,
-4. runs only the subscriptions on that round, and applies the journal entries they return.
+4. runs only the subscriptions ruled to it, and applies the journal entries they return.
 
-Two writes in the same turn share one flush. A write to `order.grind` doesn't reach a reader of `order.bags`; replacing `order` reaches both.
+Two writes in the same turn share one flush. A write to `song.title` doesn't reach a reader of `song.artist`; replacing `song` reaches both.
 
 Not on this path:
 

@@ -1,8 +1,11 @@
-// The values the restaurant-pass figure shows and the sentence its live region speaks.
-export const TUBS = ['Add to cart', 'Gift note', 'Size guide'] as const;
-export const ORDERED = TUBS[0];
+// The values the prep-tub figure shows and the sentences its live region speaks.
+export const TUBS = { add: 'Add', gift: 'Gift' } as const;
 
-export const describePass = (ordered: boolean) =>
-	ordered
-		? `An order came in for ${ORDERED}. Only that tub was opened and cooked; it had arrived with the page. The ${TUBS[1]} and ${TUBS[2]} tubs arrived too, and stay sealed until someone orders them.`
-		: `Three prep tubs, ${TUBS.join(', ')}, arrived with the page and stand sealed on the pass. Nothing is cooking.`;
+export const describePass = (add: boolean, gift: boolean) => {
+	if (!add && !gift) return 'Two prep tubs, Add and Gift, arrived with the page and stand sealed.';
+	const open = [add ? 'Add' : '', gift ? 'Gift' : ''].filter(Boolean).join(' and ');
+	const sealed = !add ? 'Add' : !gift ? 'Gift' : '';
+	return `${open} ${add && gift ? 'were' : 'was'} ordered and opened. ${sealed ? `${sealed} arrived too, and stays sealed until it is ordered.` : 'Both arrived with the page; each opened only when ordered.'}`;
+};
+
+export const NO_TUB = 'That order has no tub, so the ticket came back.';

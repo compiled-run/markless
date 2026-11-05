@@ -1,20 +1,9 @@
-// The values the round-book figure shows, its tour and the sentence its live region speaks.
-export const PRICE = 14;
-export const START_BAGS = 2;
+// The playlist the State graph figure draws: one `playing` value, read by two spots, and a title that reads nothing.
+export const TITLE = 'Road trip';
+export const SONGS = ['Harbour Lights', 'Slow Train', 'Northbound'] as const;
+export const START = SONGS[0];
 
-export const totalFor = (bags: number) => bags * PRICE;
-
-/** The three spots on the cart page, as houses on the street; only the first two are on a round. */
-export const HOUSES = [
-	{ key: 'bags', round: true },
-	{ key: 'total', round: true },
-	{ key: 'product', round: false },
-] as const;
-
-export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
-export const ROUND_TOUR = ['print', 'rest', 'print', 'rest', 'reset'] as const;
-
-export const describeRound = (bags: number, printed: boolean) =>
-	printed
-		? `A new edition, bags = ${bags}, was printed. Papers went to the two houses on its rounds: In your cart now reads ${bags} bags and Total reads $${totalFor(bags)}. House blend is on no round and got nothing.`
-		: `The round book lists who reads state:bags. The street shows In your cart: ${bags} bags, Total: $${totalFor(bags)}, and House blend.`;
+export const describePlay = (playing: string, changed: boolean) =>
+	changed
+		? `Now playing ${playing}. The write to playing reached only the two spots ruled to it: the header and the marked row. The title, ${TITLE}, reads nothing and stayed as it was.`
+		: `A playlist called ${TITLE}. The value playing is ruled to two spots: the header and the marked row. Pick a song.`;

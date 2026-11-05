@@ -172,7 +172,10 @@ export default function ResumeAnatomy() @{
 					data-held={held === 'bk' ? 'yes' : 'no'}
 					data-picked={picked === 'bk' && touched ? 'yes' : 'no'}
 					style={bkPlace}
-					onPointerenter={() => (hover = 'bk')}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'bk';
+					}}
 					onPointerleave={() => (hover = '')}
 				>
 					<path class="shadow-wash cast" d={BK.cast} />
@@ -192,7 +195,10 @@ export default function ResumeAnatomy() @{
 					data-held={held === 'wp' ? 'yes' : 'no'}
 					data-picked={picked === 'wp' && touched ? 'yes' : 'no'}
 					style={wpPlace}
-					onPointerenter={() => (hover = 'wp')}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'wp';
+					}}
 					onPointerleave={() => (hover = '')}
 				>
 					<path class="shadow-wash cast" d={WP.cast} />
@@ -212,7 +218,10 @@ export default function ResumeAnatomy() @{
 					data-held={held === 'wn' ? 'yes' : 'no'}
 					data-picked={picked === 'wn' && touched ? 'yes' : 'no'}
 					style={wnPlace}
-					onPointerenter={() => (hover = 'wn')}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'wn';
+					}}
 					onPointerleave={() => (hover = '')}
 				>
 					<path class="shadow-wash cast" d={WN.cast} />
