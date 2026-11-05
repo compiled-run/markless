@@ -113,8 +113,16 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		? null
 		: (resolveGraphPath(
 				collectionSource,
-				graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
-				semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+				graphBindingMap(
+					state.graph,
+					state.currentSharedDefinitionId ?? null,
+					state.currentComponentName ?? undefined,
+				),
+				semanticAliasMap(
+					state.graph,
+					state.currentSharedDefinitionId ?? null,
+					state.currentComponentName ?? undefined,
+				),
 			) ??
 			resolveSharedInstanceGraphPath(
 				collectionSource,

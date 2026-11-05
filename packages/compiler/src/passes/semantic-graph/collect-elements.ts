@@ -1128,6 +1128,7 @@ function collectAttribute(
 				id: `event:${state.nextEventId++}`,
 				hostNodeId,
 				eventName: normalizeEventName(attributeName),
+				...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 				...(handler
 					? {
 							handlerSource: relayed?.source ?? inlined?.source ?? handler.source,

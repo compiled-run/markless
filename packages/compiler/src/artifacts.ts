@@ -824,6 +824,8 @@ export type SemanticEvent = {
 	readonly id: string;
 	readonly hostNodeId: string;
 	readonly eventName: string;
+	// The component whose markup wrote the handler, so its names resolve to that component's bindings.
+	readonly componentName?: string;
 	// One handler per event attribute; absent when the attribute carries no value.
 	readonly handlerSource?: string;
 	readonly handlerSpan?: SourceSpan;
