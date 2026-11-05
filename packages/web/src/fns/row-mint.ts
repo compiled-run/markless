@@ -44,7 +44,11 @@ export function renderEmptyArm(
 			'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
 			'has no document to render its @empty arm markup with.',
 		);
-	const nodes = markupNodes<ResumeDomNode>(template, repeat.emptyArm!.html, parent as MarkupParent);
+	const nodes = markupNodes<ResumeDomNode>(
+		template,
+		repeat.emptyArm!.html,
+		parent as MarkupParent,
+	);
 	if (nodes.length === 0)
 		throw repeatRuntimeError(
 			repeat,
@@ -149,7 +153,10 @@ export function mintRowNodes(
 			'MARKLESS_REPEAT_ROW_MINT_EMPTY',
 			'built no row from its markup, and half a row is worse than none.',
 		);
-	if (anchors.some((anchor) => !anchor?.replaceWith) || hosts.some((element) => !element?.setAttribute))
+	if (
+		anchors.some((anchor) => !anchor?.replaceWith) ||
+		hosts.some((element) => !element?.setAttribute)
+	)
 		throw empty();
 	const valueAt = (at: number, slot: ProtocolRowTemplateSlotValue) =>
 		values ? values[at] : slotValue(slot, item, graph);
@@ -198,7 +205,8 @@ export function patchRow(
 	rewire?: () => void,
 ): boolean {
 	// Its arms stand between the row's elements, so a row with an @if is patched by the code that counts them.
-	if (repeat.rowTemplate!.branchSlots) return rowBranches!.patch(row, repeat, before, after, rewire);
+	if (repeat.rowTemplate!.branchSlots)
+		return rowBranches!.patch(row, repeat, before, after, rewire);
 	const template = repeat.rowTemplate!,
 		texts = template.textSlots ?? [],
 		writes: Array<() => void> = [];
@@ -212,7 +220,7 @@ export function patchRow(
 			(row as { readonly parentNode?: MarkupParent }).parentNode,
 		);
 		targets = [...texts, ...(template.attributeSlots ?? [])].map((slot, at) =>
-			slotTarget(nodes, slot.path, at < texts.length),
+			slotTarget(nodes, slot.path, at < texts.length, slot.fromEnd),
 		);
 		slotTargets.set(template, targets);
 	}
@@ -220,7 +228,7 @@ export function patchRow(
 		if (Object.is(value, before[at])) continue;
 		const [path, source] = targets[at] ?? [];
 		let node: ResumeDomNode | undefined = path && row;
-		for (const index of path ?? []) node = childElements(node)[index];
+		for (const index of path ?? []) node = childElements(node).at(index);
 		const element = node as (AttributableNode & Record<string, unknown>) | undefined;
 		if (!element) return false;
 		if (at < texts.length) {
@@ -236,7 +244,7 @@ export function patchRow(
 	return true;
 }
 
-// Per slot: element indexes under the row root, and the template element holding the slot's static part.
+// Per slot: element indexes under the row root (negative counts from the parent's end), and the template element holding the slot's static part.
 const slotTargets = new WeakMap<
 	object,
 	ReadonlyArray<readonly [number[], AttributableNode] | undefined>
@@ -247,14 +255,16 @@ function slotTarget(
 	nodes: ReadonlyArray<ResumeDomNode>,
 	path: ReadonlyArray<number>,
 	text: boolean,
+	fromEnd: ReadonlyArray<number> = [],
 ): readonly [number[], AttributableNode] | undefined {
 	let node = nodes[path[0]!];
 	if (node !== nodes.find((root) => root.nodeType === 1)) return;
 	const indexes: number[] = [];
-	for (const index of path.slice(1, text ? -1 : undefined)) {
+	for (const [depth, index] of path.slice(1, text ? -1 : undefined).entries()) {
 		const child: ResumeDomNode | undefined = node?.childNodes?.[index];
 		if (child?.nodeType !== 1) return;
-		indexes.push(childElements(node).indexOf(child));
+		const kids = childElements(node);
+		indexes.push(kids.indexOf(child) - (fromEnd.includes(depth + 1) ? kids.length : 0));
 		node = child;
 	}
 	return node?.nodeType === 1 && (!text || node.childNodes?.length === 1)
@@ -377,11 +387,7 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}
 	return cursor;
 }
-function repeatRuntimeError(
-	repeat: ResumeKeyedRepeatRecord,
-	code: string,
-	detail: string,
-): Error {
+function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
 	const error = new Error(`${code}: ${repeat.id} ${detail}`) as Error & Record<string, unknown>;
 	error.name = 'KeyedRepeatRuntimeError';
 	error.code = code;
