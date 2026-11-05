@@ -182,13 +182,13 @@ export default function GraphAnatomy() @{
 						<path class="ink" d={row.dotInk} />
 					</g>
 				}
-				<g class="piece" data-key="piece:heading" data-on={onHeading ? 'yes' : 'no'} data-held={held === 'heading' ? 'yes' : 'no'} style={headingStyle}>
+				<g class="piece" onTouchmove={(event) => event.preventDefault()} data-key="piece:heading" data-on={onHeading ? 'yes' : 'no'} data-held={held === 'heading' ? 'yes' : 'no'} style={headingStyle}>
 					<path class="hit" d={art.pieces.heading.hit} />
 					@for (const words of art.pieces.heading.words; key words.key) {
 						<text class={words.cls} transform={words.matrix}>{words.text}</text>
 					}
 				</g>
-				<g class="piece" data-key="piece:cover" data-on={onCover ? 'yes' : 'no'} data-held={held === 'cover' ? 'yes' : 'no'} data-beat={beat} style={coverStyle}>
+				<g class="piece" onTouchmove={(event) => event.preventDefault()} data-key="piece:cover" data-on={onCover ? 'yes' : 'no'} data-held={held === 'cover' ? 'yes' : 'no'} data-beat={beat} style={coverStyle}>
 					@for (const layer of art.pieces.cover.layers; key layer.key) {
 						<path class={layer.cls} d={layer.d} />
 					}
@@ -209,7 +209,7 @@ export default function GraphAnatomy() @{
 					</g>
 					<path class="hit" d={art.pieces.cover.hit} />
 				</g>
-				<g class="piece" data-key="piece:label" data-on={onLabel ? 'yes' : 'no'} data-held={held === 'label' ? 'yes' : 'no'} style={labelStyle}>
+				<g class="piece" onTouchmove={(event) => event.preventDefault()} data-key="piece:label" data-on={onLabel ? 'yes' : 'no'} data-held={held === 'label' ? 'yes' : 'no'} style={labelStyle}>
 					@for (const layer of art.pieces.label.layers; key layer.key) {
 						<path class={layer.cls} d={layer.d} />
 					}
@@ -280,7 +280,7 @@ export default function GraphAnatomy() @{
 			}
 
 			.scene {
-				touch-action: none;
+				touch-action: pan-y;
 				display: block;
 				width: 100%;
 				height: auto;

@@ -182,6 +182,7 @@ export default function ResumeAnatomy() @{
 
 				<g
 					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
 					data-piece="bk"
 					data-hover={hover === 'bk' ? 'yes' : 'no'}
 					data-held={held === 'bk' ? 'yes' : 'no'}
@@ -206,6 +207,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wp"
 					data-hover={hover === 'wp' ? 'yes' : 'no'}
 					data-held={held === 'wp' ? 'yes' : 'no'}
@@ -230,6 +232,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wn"
 					data-hover={hover === 'wn' ? 'yes' : 'no'}
 					data-held={held === 'wn' ? 'yes' : 'no'}
@@ -289,7 +292,7 @@ export default function ResumeAnatomy() @{
 			}
 
 			.scene {
-				touch-action: none;
+				touch-action: pan-y;
 				display: block;
 				width: 100%;
 				height: auto;

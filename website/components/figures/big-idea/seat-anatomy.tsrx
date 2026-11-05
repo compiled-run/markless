@@ -206,7 +206,7 @@ export default function SeatAnatomy() @{
 					<text class="code term" x={art.terminalLines[3]!.x} y={art.terminalLines[3]!.y}>{'</section>'}</text>
 				</g>
 				<text class="pencil-text waiting" data-on={onTerminal ? 'yes' : 'no'} x={art.empty.terminal.x} y={art.empty.terminal.y}>waiting for the plan</text>
-				<g class="file" data-held={held ? 'yes' : 'no'} data-hover={hover === 'file' ? 'yes' : 'no'} style={fileStyle}>
+				<g class="file" onTouchmove={(event) => event.preventDefault()} data-held={held ? 'yes' : 'no'} data-hover={hover === 'file' ? 'yes' : 'no'} style={fileStyle}>
 					<g class="lift">
 						@for (const layer of art.file.layers; key layer.key) {
 							<path class={layer.cls} d={layer.d} />
@@ -253,7 +253,7 @@ export default function SeatAnatomy() @{
 			}
 
 			.scene {
-				touch-action: none;
+				touch-action: pan-y;
 				display: block;
 				width: 100%;
 				height: auto;
