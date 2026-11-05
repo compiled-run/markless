@@ -1,7 +1,7 @@
 import type { RuntimeAsyncComputedNode } from './graph-async.ts';
 import type { RuntimeComputedNode } from './graph-computed.ts';
 import { readPath } from './graph-core.ts';
-import { ASYNC_SNAPSHOT_META_KEYS, type DirtyPath } from './graph-scheduler.ts';
+import { isAsyncSnapshotMetaKey, type DirtyPath } from './graph-scheduler.ts';
 import type {
 	RuntimeGraphAsyncSnapshot,
 	RuntimeGraphRead,
@@ -547,7 +547,7 @@ function asyncCommitPaths(
 		if (changed.every((path) => path.length > 0)) {
 			for (const path of changed) {
 				paths.push(['value', ...path]);
-				if (!ASYNC_SNAPSHOT_META_KEYS.has(path[0])) paths.push([...path]);
+				if (!isAsyncSnapshotMetaKey(path[0])) paths.push([...path]);
 			}
 			return paths;
 		}

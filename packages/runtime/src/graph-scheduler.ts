@@ -13,4 +13,6 @@ export function appendJournalResult(
 	else if (result) journal.push(result as DomJournalEntry);
 }
 
-export const ASYNC_SNAPSHOT_META_KEYS = new Set('status version key error value'.split(' '));
+export function isAsyncSnapshotMetaKey(key: string | undefined): boolean {
+	return key !== undefined && /^(?:status|version|key|error|value)$/.test(key);
+}

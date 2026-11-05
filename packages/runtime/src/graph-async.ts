@@ -6,7 +6,7 @@ import type {
 	RuntimeGraphRead,
 } from './graph.ts';
 import { readPath } from './graph-core.ts';
-import { ASYNC_SNAPSHOT_META_KEYS } from './graph-scheduler.ts';
+import { isAsyncSnapshotMetaKey } from './graph-scheduler.ts';
 import type { HeldInputsPlane } from './graph-held.ts';
 
 /** One input a key read, with the value it had when the run started. */
@@ -60,7 +60,7 @@ function createNode(asyncComputed: RuntimeGraphAsyncComputed): RuntimeAsyncCompu
 
 function peek(node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>): unknown {
 	const head = path[0];
-	return head === undefined || ASYNC_SNAPSHOT_META_KEYS.has(head)
+	return head === undefined || isAsyncSnapshotMetaKey(head)
 		? readPath(node.snapshot, path)
 		: readPath((node.snapshot as { readonly value?: unknown }).value, path);
 }

@@ -544,12 +544,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		asyncComputed?: RuntimeGraphAsyncComputed,
 	) => {
 		asyncPlane ??= factory?.({
+			...internals,
 			asyncComputed: input.asyncComputed,
-			cells,
-			computedNodes,
-			readGraph,
-			markDirtyPath,
-			scheduleFlush,
 			reconcile: plane,
 			landWithoutObservers,
 		});

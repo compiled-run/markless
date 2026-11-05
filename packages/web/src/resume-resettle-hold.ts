@@ -31,7 +31,8 @@ export function createResettleHold(deps: {
 	readonly clock?: { readonly wait?: PendingTimingClock['wait'] };
 }): ResettleHold {
 	const stalls = new Map<string, Stall>();
-	const setBusy = deps.setBusy ?? setBoundaryBusy;
+	const setBusy =
+		deps.setBusy ?? ((boundary, busy) => (asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, busy));
 	const wait = deps.clock?.wait ?? waitMs;
 	return (boundary, snapshot) => {
 		const { status, version } =

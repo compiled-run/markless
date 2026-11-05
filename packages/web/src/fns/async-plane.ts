@@ -9,15 +9,15 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serial
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import type { ResumePayloadGraphInput } from '../payload-graph-construct.ts';
 import { asyncPlanes } from '../reconcile-plane-slot.ts';
-import { busyMarks } from './busy-marks.ts';
+import { apply, note, set, settleRange, shown } from './busy-marks.ts';
 
 export function installMarklessAsyncPlane(): void {
 	asyncPlanes.async = createAsyncComputedPlane;
 	asyncPlanes.fromPayload = asyncComputedFromPayload;
 	asyncPlanes.fromRecord = asyncComputedFromRecord;
 	asyncPlanes.awaits = awaitsAsyncValue;
-	asyncPlanes.busy = busyMarks;
 	asyncPlanes.awaitsAncestor = awaitsAsyncAncestor;
+	asyncPlanes.busy = { note, set, apply, settleRange, shown };
 }
 
 type DependencyRecord = {
@@ -66,16 +66,19 @@ function awaitsAsyncValue(
 		});
 }
 
+type Decode = (payload: SerializedGraphPayload) => Promise<unknown>;
+
 function asyncComputedFromPayload(
 	input: ResumePayloadGraphInput,
 	graphRef: () => RuntimeGraph,
+	decode: Decode,
 ): Promise<RuntimeGraphAsyncComputed[]> {
 	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
 	return Promise.all(
 		input.state.computed
 			.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
 			.map((computed) =>
-				asyncComputedFromRecord(computed, runnerSymbols[computed.graphNodeId]!, input, graphRef),
+				asyncComputedFromRecord(computed, runnerSymbols[computed.graphNodeId]!, input, graphRef, decode),
 			),
 	);
 }
@@ -85,13 +88,14 @@ async function asyncComputedFromRecord(
 	runnerSymbolId: string,
 	input: Pick<ResumePayloadGraphInput, 'root' | 'loadSymbol'>,
 	graphRef: () => RuntimeGraph,
+	decode?: Decode,
 ): Promise<RuntimeGraphAsyncComputed> {
 	const dependencies = computed.dependencies ?? [];
 	return {
 		graphNodeId: computed.graphNodeId,
 		dependencies,
 		initialSnapshot:
-			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot)),
+			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot, decode)),
 		key: (read: RuntimeGraphRead) => {
 			const values = dependencies.map((dependency) =>
 				read(dependency.graphNodeId, dependency.path),
@@ -132,11 +136,11 @@ function asyncRunnerSymbolsByGraphNode(view: ProtocolViewPayload): Record<string
 
 async function deserializeAsyncComputedSnapshot(
 	snapshot: NonNullable<ProtocolStatePayload['computed'][number]['snapshot']>,
+	decode?: Decode,
 ) {
 	if (snapshot.status === 'idle') return snapshot;
-	const { deserializeGraphValueForClient: decode } = await import(
-		'../../../serializer/src/value-decode-client-lazy.ts'
-	);
+	decode ??= (await import('../../../serializer/src/value-decode-client-lazy.ts'))
+		.deserializeGraphValueForClient as Decode;
 	const decoded: Record<string, unknown> = {
 		...snapshot,
 		key: await decode(snapshot.key as SerializedGraphPayload),
@@ -154,6 +158,6 @@ export type AsyncPlaneSlot = {
 	fromPayload?: typeof asyncComputedFromPayload;
 	fromRecord?: typeof asyncComputedFromRecord;
 	awaits?: typeof awaitsAsyncValue;
-	busy?: typeof busyMarks;
 	awaitsAncestor?: typeof awaitsAsyncAncestor;
+	busy?: Pick<typeof import('./busy-marks.ts'), 'note' | 'set' | 'apply' | 'settleRange' | 'shown'>;
 };

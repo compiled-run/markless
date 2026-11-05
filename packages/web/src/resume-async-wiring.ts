@@ -183,13 +183,13 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 						);
 						// Once the range shows settled content, a re-run keeps the prior snapshot on screen.
 						if (!settled && input.settleTracker?.hasSettledContent(boundary.id)) {
-							setBoundaryBusy(boundary, true);
+							(asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, true);
 							return;
 						}
 						if (settled) {
 							if (!claim()) return;
 							input.settleTracker?.markSettled(boundary.id);
-							setBoundaryBusy(boundary, false);
+							(asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, false);
 						}
 						return boundaryRangeJournal(boundary.id, {
 							type: 'async-boundary-snapshot',

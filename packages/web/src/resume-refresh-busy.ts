@@ -1,4 +1,3 @@
-import { asyncPlanes } from './reconcile-plane-slot.ts';
 import type { ResumeArmRange } from './resume-types.ts';
 
 export type BusyNode = {
@@ -31,7 +30,6 @@ export function setBoundaryBusy(
 	boundary: Pick<ResumeArmRange, 'startAnchor' | 'endAnchor'>,
 	busy: boolean,
 ): void {
-	if (asyncPlanes.busy) return asyncPlanes.busy.set(boundary, busy);
 	for (const host of boundaryBusyHosts(boundary)) {
 		if (busy) host.setAttribute?.('aria-busy', 'true');
 		else host.removeAttribute?.('aria-busy');

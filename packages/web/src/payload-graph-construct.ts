@@ -40,7 +40,7 @@ export async function createRuntimeGraphFromResumePayload(
 	const { createRuntimeGraph } = await runtimeModule();
 	let graph!: RuntimeGraph;
 	const asyncComputed = input.state.computed.some((computed) => computed.async)
-		? await asyncPlaneFactories().fromPayload(input, () => graph)
+		? await asyncPlaneFactories().fromPayload(input, () => graph, deserializeGraphValue)
 		: [];
 	const cells = [
 		...(await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph)),

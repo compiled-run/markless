@@ -25,26 +25,33 @@ function withMarks(start: boolean, run: (marks: Marks) => void): void {
 	queued.push(run);
 }
 
-const note = (
+export function note(
 	boundary: BusyBoundary,
 	graphNodeId: string,
 	snapshot: unknown,
 	showsSettledContent: boolean,
-): void =>
+): void {
 	withMarks(
 		showsSettledContent && (snapshot as { readonly status?: unknown } | null)?.status === 'pending',
 		(loaded) => loaded.note(boundary, graphNodeId, snapshot, showsSettledContent),
 	);
-const set = (boundary: BusyBoundary, busy: boolean): void =>
+}
+
+export function set(boundary: BusyBoundary, busy: boolean): void {
 	withMarks(busy, (loaded) => loaded.set(boundary, busy));
-const apply = (boundary: BusyBoundary): void => withMarks(false, (loaded) => loaded.apply(boundary));
+}
+
+export function apply(boundary: BusyBoundary): void {
+	withMarks(false, (loaded) => loaded.apply(boundary));
+}
 
 type ShownArm = { __marklessShownArm?: number };
-const shown = (boundary: ResumeAsyncBoundaryRecord, arm: number) =>
-	void ((boundary.endAnchor as ShownArm).__marklessShownArm = arm);
+export function shown(boundary: ResumeAsyncBoundaryRecord, arm: number): void {
+	(boundary.endAnchor as ShownArm).__marklessShownArm = arm;
+}
 
 // A failed refresh over shown @try content keeps it and draws the @catch in a range opened after it.
-function settleRange(boundary: ResumeAsyncBoundaryRecord, arm: number): ResumeArmRange | undefined {
+export function settleRange(boundary: ResumeAsyncBoundaryRecord, arm: number): ResumeArmRange | undefined {
 	const after =
 		arm === ASYNC_BOUNDARY_ARM.catch &&
 		((boundary.endAnchor as ShownArm).__marklessShownArm ?? boundary.initiallyServedArm) ===
@@ -62,4 +69,3 @@ function settleRange(boundary: ResumeAsyncBoundaryRecord, arm: number): ResumeAr
 	return { id: `${boundary.id}:after`, startAnchor: end.__marklessAfter!, endAnchor: boundary.endAnchor };
 }
 
-export const busyMarks = { note, set, apply, settleRange, shown };

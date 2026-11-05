@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { busyMarks } from '../src/fns/busy-marks.ts';
+import * as busyMarks from '../src/fns/busy-marks.ts';
 
 // The per-element marks load with the first refresh; calls made while they load run in order once they arrive.
 // The last read to settle clears with its settle commit, which the wiring signals with set(boundary, false).
