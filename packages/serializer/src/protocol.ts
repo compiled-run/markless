@@ -804,6 +804,13 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 			readonly runnerSymbolId?: string;
 		}>;
+		/**
+		 * For each sync computed whose value depends on one of this boundary's async
+		 * reads, the async graph nodes it depends on. A refresh marks busy the elements
+		 * whose bindings read a refreshing async node directly or through one of these.
+		 * Absent when no sync computed sits between a binding and an async read.
+		 */
+		readonly asyncSources?: Readonly<Record<string, ReadonlyArray<string>>>;
 		/** As on a branch: the part instance that authored this boundary and where its live props now live, for the arm its own module re-renders on settle. */
 		readonly composedInstancePath?: string;
 		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;

@@ -2,7 +2,7 @@ import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
-import { setBoundaryBusy } from './resume-refresh-busy.ts';
+import { applyBusy, noteBoundaryReadStatus, setBoundaryBusy } from './resume-refresh-busy.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
@@ -173,6 +173,12 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 						input.settleTracker?.forget(boundary.id);
 						return release(boundary.id);
 					}
+					noteBoundaryReadStatus(
+						boundary,
+						asyncRead.graphNodeId,
+						snapshot,
+						input.settleTracker?.hasSettledContent(boundary.id) === true,
+					);
 					const claim = claimSettle(painted, asyncRead.graphNodeId, snapshot);
 					snapshot = boundaryGateSnapshot(
 						input.graph,
@@ -205,7 +211,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
-						clearBusyUnlessRerun(input.graph, boundary);
+						applyBusy(boundary);
 						return result;
 					});
 				},
@@ -281,15 +287,6 @@ export async function startAsyncBoundaries(
 		settleTracker,
 		...wireAsyncBoundariesWithoutLoadingCapability({ ...input, settleTracker, onAsyncSnapshot }),
 	};
-}
-
-function clearBusyUnlessRerun(
-	graph: ResumeRuntimeInput['graph'],
-	boundary: ResumeAsyncBoundaryRecord,
-): void {
-	if (boundary.runnerGraphNodeId !== null && graph.read(boundary.runnerGraphNodeId, ['status']) === 'pending')
-		return;
-	setBoundaryBusy(boundary, false);
 }
 
 // A removed ancestor ends the parent chain short of the root; a host without parent links counts as attached.

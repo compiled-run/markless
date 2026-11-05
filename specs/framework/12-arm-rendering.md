@@ -139,15 +139,24 @@ across all three cases:
 - Re-settle (mutation refresh, recompute; revised 2026-10-25, owner, on the
   async-refresh proof): the boundary keeps its last settled content
   (snapshots are versioned with status, so the prior value is always
-  addressable) and its host carries `aria-busy="true"` from the moment the
-  refresh starts until the new `@try` or `@catch` content commits. `@pending`
+  addressable) and every element whose binding reads a refreshing async
+  value carries `aria-busy="true"` from the moment that value's refresh
+  starts. A binding is a text or attribute update, a prop a child component
+  shows, or a keyed list (its parent element is marked); it reads the value
+  directly or through sync computeds, which the compiler records per
+  boundary (per-element marks, 2026-11-04). Elements that read only sync state are never marked,
+  even inside the block. Two async values in one block mark their own
+  elements; a value that settles while another is still running clears its
+  own marks, and the last one clears with the commit that shows it. `@pending`
   replaces the held content only when the NEWEST run has been pending longer
   than the stall threshold (5000 ms); the stall clock restarts on every newer
-  run, so a typing burst never reaches it. The host is the boundary's parent
-  element when the boundary is that element's only content, otherwise each
-  top-level element of the shown arm; a text-only arm in a shared parent gets
-  no marking. The runtime decides the host because a component whose root is
-  the boundary cannot see its parent at build time. Server-rendered and
+  run, so a typing burst never reaches it. A refreshing value no arm record
+  binds (bare text at the block's top level, an arm that registered no
+  records, a `@catch` arm reading only the error) falls back to the block's
+  host: its parent element when the block is that element's only content,
+  otherwise each top-level element of the shown arm. That fallback is decided
+  at runtime because a component whose root is the boundary cannot see its
+  parent at build time. Server-rendered and
   resumed boundaries get the busy marking but no stall fallback: their
   `@pending` arm is not shipped to the browser, and 13-resume-cache step 3
   requires seeded content to stay visible. Live regions inside a busy

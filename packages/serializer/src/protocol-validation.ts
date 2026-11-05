@@ -267,6 +267,7 @@ export function assertProtocolViewPayload(
 		assertCommentAnchor(boundary.startAnchor, `${context}.startAnchor`);
 		assertCommentAnchor(boundary.endAnchor, `${context}.endAnchor`);
 		assertAsyncBoundaryReads(boundary.asyncReads, context);
+		assertOptionalStringArrayRecord(boundary.asyncSources, `${context}.asyncSources`);
 	}
 
 	assertOptionalKeyedRepeats(payload);
@@ -1578,6 +1579,19 @@ function assertAsyncBoundaryReads(value: unknown, context: string): void {
 		assertStringField(read, 'graphNodeId', readContext);
 		assertStringArrayField(read, 'path', readContext);
 		assertOptionalStringField(read, 'runnerSymbolId', readContext);
+	}
+}
+
+function assertOptionalStringArrayRecord(value: unknown, context: string): void {
+	if (value === undefined) return;
+	assertRecordShape(value, context);
+	for (const [key, entry] of Object.entries(value)) {
+		if (!Array.isArray(entry) || entry.some((item) => typeof item !== 'string')) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}.${key}: expected string array.`,
+			);
+		}
 	}
 }
 

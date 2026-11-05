@@ -133,6 +133,7 @@ export function createProtocolViewPayload(
 		asyncBoundaries: input.payloadArena.view.asyncBoundaries.map(
 			({ kind: _kind, anchorOrder: _order, armRecords, ...boundary }) => ({
 				...boundary,
+				...boundaryAsyncSources(input, protocolAsyncBoundaryReads(input, boundary)),
 				armRecords: armRecords.map((set, arm) =>
 					wiredArmRecordSet(input, set, boundary.id, arm),
 				),
@@ -197,6 +198,44 @@ function protocolAsyncBoundaryReads(
 		}
 	}
 	return reads;
+}
+
+// Per sync computed reaching one of the boundary's async reads, those reads: a refresh marks the elements bound to it busy.
+function boundaryAsyncSources(
+	input: ProtocolViewPayloadInput,
+	reads: ReadonlyArray<{ readonly graphNodeId: string }>,
+): { readonly asyncSources?: Record<string, string[]> } {
+	const computedByGraphNode = new Map(
+		input.payloadArena.state.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	const boundaryAsync = new Set(
+		reads
+			.map((read) => read.graphNodeId)
+			.filter((graphNodeId) => computedByGraphNode.get(graphNodeId)?.async === true),
+	);
+	const reached = new Map<string, Set<string>>();
+	const reach = (graphNodeId: string, visiting: Set<string>): Set<string> => {
+		const known = reached.get(graphNodeId);
+		if (known) return known;
+		const found = new Set<string>();
+		const computed = computedByGraphNode.get(graphNodeId);
+		if (boundaryAsync.has(graphNodeId)) found.add(graphNodeId);
+		if (computed?.async !== true && !visiting.has(graphNodeId)) {
+			visiting.add(graphNodeId);
+			for (const dependency of computed?.dependencies ?? [])
+				for (const source of reach(dependency.graphNodeId, visiting)) found.add(source);
+			visiting.delete(graphNodeId);
+		}
+		reached.set(graphNodeId, found);
+		return found;
+	};
+	const asyncSources: Record<string, string[]> = {};
+	for (const computed of input.payloadArena.state.computed) {
+		if (computed.async === true) continue;
+		const sources = reach(computed.graphNodeId, new Set());
+		if (sources.size > 0) asyncSources[computed.graphNodeId] = [...sources];
+	}
+	return Object.keys(asyncSources).length > 0 ? { asyncSources } : {};
 }
 
 function optionalAsyncRunnerRegistry(
