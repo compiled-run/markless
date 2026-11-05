@@ -15,11 +15,12 @@ export default function AccordionAnatomy() @{
 	let moved = state(false);
 	let spring = state('');
 	let said = state('');
+	let picked = state('');
 	const mode = computed(() => (together ? 'together' : 'apart'));
 	const shown = computed(() => (open ? 'open' : 'closed'));
 	const pull = computed(() => '--drag-x:' + dragX + 'px;--drag-y:' + dragY + 'px');
 
-	<figure class="accordion-anatomy" data-mode={mode} data-panel={shown} data-dragging={dragging ? '' : undefined} data-spring={spring} style={pull}>
+	<figure class="accordion-anatomy" data-mode={mode} data-panel={shown} data-dragging={dragging ? '' : undefined} data-spring={spring} data-picked={picked} style={pull}>
 		<div
 			class="stage"
 			tabindex={0}
@@ -58,6 +59,11 @@ export default function AccordionAnatomy() @{
 					return;
 				}
 				const part = (event.target as Element).closest('[data-part]')?.getAttribute('data-part') ?? '';
+				if (!together) {
+					picked = part;
+					if (part !== '') said = 'accordion.' + part;
+					return;
+				}
 				if (part === 'itemtrigger' || part === 'itemlabel') {
 					open = !open;
 					said = open ? 'The heading opened its panel.' : 'The heading closed its panel. It stays in the page, hidden.';
@@ -67,6 +73,7 @@ export default function AccordionAnatomy() @{
 				if (event.key === 'ArrowDown') {
 					event.preventDefault();
 					together = true;
+					picked = '';
 					said = 'The parts snapped together into a working accordion.';
 				} else if (event.key === 'ArrowUp') {
 					event.preventDefault();
@@ -106,6 +113,7 @@ export default function AccordionAnatomy() @{
 			<InkButton
 				pressed={!together}
 				onClick={() => {
+					picked = '';
 					together = !together;
 					said = together ? 'The parts snapped together into a working accordion.' : 'The accordion came apart into its parts.';
 				}}
@@ -354,6 +362,45 @@ export default function AccordionAnatomy() @{
 			}
 
 			.accordion-anatomy:is([data-mode='apart'], :has(.stage:hover)) .layer:hover .tag {
+				opacity: 0;
+			}
+			.accordion-anatomy[data-mode='apart'][data-picked='root'] .layer[data-part='root'] .name {
+				opacity: 1;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='root'] .layer[data-part='root'] .tag {
+				opacity: 0;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='item'] .layer[data-part='item'] .name {
+				opacity: 1;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='item'] .layer[data-part='item'] .tag {
+				opacity: 0;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='itemlabel'] .layer[data-part='itemlabel'] .name {
+				opacity: 1;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='itemlabel'] .layer[data-part='itemlabel'] .tag {
+				opacity: 0;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='itemcontent'] .layer[data-part='itemcontent'] .name {
+				opacity: 1;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='itemcontent'] .layer[data-part='itemcontent'] .tag {
+				opacity: 0;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='itemtrigger'] .layer[data-part='itemtrigger'] .name {
+				opacity: 1;
+			}
+
+			.accordion-anatomy[data-mode='apart'][data-picked='itemtrigger'] .layer[data-part='itemtrigger'] .tag {
 				opacity: 0;
 			}
 
