@@ -73,6 +73,7 @@ export default function GalleryAnatomy() @{
 			}}
 			onKeyDown={(event) => {
 				touched = true;
+				hover = '';
 				if (event.key === 'ArrowRight') picked = (picked + 1) % 3;
 				if (event.key === 'ArrowLeft') picked = (picked + 2) % 3;
 				if (event.key === 's' || event.key === 'S') doShare();

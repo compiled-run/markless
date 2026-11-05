@@ -159,6 +159,11 @@ export default function GraphAnatomy() @{
 					dragX = 0;
 					dragY = 0;
 				}}
+				onPointercancel={() => {
+					held = '';
+					dragX = 0;
+					dragY = 0;
+				}}
 				onPointerleave={(event) => {
 					held = '';
 					if (event.pointerType !== 'touch') hover = '';
@@ -500,6 +505,7 @@ export default function GraphAnatomy() @{
 			}
 
 			.piece {
+				touch-action: none;
 				cursor: grab;
 				transition: transform 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}

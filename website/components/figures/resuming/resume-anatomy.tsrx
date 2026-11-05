@@ -1,6 +1,6 @@
 // A chess board left mid-game with three pieces and a score sheet. Press the board and the next move plays; hover, drag or use the keys to play the pieces yourself.
 import { computed, state } from '@markless/core';
-import { describeMove, describeRefusal, legal, nearestSquare, noteOf, placeOf, nextMove, sheetLines, START, START_SAID, stepped } from './model.ts';
+import { describeMove, describeRefusal, knightStep, legal, nearestSquare, noteOf, placeOf, nextMove, sheetLines, START, START_SAID, stepped } from './model.ts';
 import { art } from './board.art.ts';
 
 const BK = art.pieces.find((piece) => piece.id === 'bk')!;
@@ -109,7 +109,7 @@ export default function ResumeAnatomy() @{
 				if (event.key === '3') picked = 'wn';
 				if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
 					event.preventDefault();
-					play(picked, stepped(squareOfPiece(picked), event.key));
+					play(picked, picked === 'wn' ? knightStep({ bk: bkSq, wp: wpSq, wn: wnSq }, 'wn', event.key) : stepped(squareOfPiece(picked), event.key));
 				}
 			}}
 		>
@@ -144,11 +144,16 @@ export default function ResumeAnatomy() @{
 					dragX = 0;
 					dragY = 0;
 				}}
+				onPointercancel={() => {
+					held = '';
+					dragX = 0;
+					dragY = 0;
+				}}
 				onPointerleave={(event) => {
+					held = '';
 					if (event.pointerType === 'touch') return;
 					hover = '';
 					pointed = '';
-					held = '';
 					dragX = 0;
 					dragY = 0;
 				}}
@@ -430,6 +435,7 @@ export default function ResumeAnatomy() @{
 			}
 
 			.piece {
+				touch-action: none;
 				cursor: grab;
 				transition: transform 420ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}

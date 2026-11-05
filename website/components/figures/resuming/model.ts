@@ -47,6 +47,22 @@ export function noteOf(id: string, to: string): string {
 	return letter + to;
 }
 
+/** A knight's jump in the arrow's direction: two squares that way and one to the side, the first legal of the two. */
+export function knightStep(position: Position, id: string, key: string): string {
+	const [f, r] = coords(position[id]!);
+	const jumps: Record<string, [number, number][]> = {
+		ArrowUp: [[1, 2], [-1, 2]],
+		ArrowDown: [[1, -2], [-1, -2]],
+		ArrowRight: [[2, 1], [2, -1]],
+		ArrowLeft: [[-2, 1], [-2, -1]],
+	};
+	for (const [a, b] of jumps[key] ?? []) {
+		const to = squareOf(f + a, r + b);
+		if (to && legal(position, id, to)) return to;
+	}
+	return squareOf(f + (jumps[key]?.[0]?.[0] ?? 0), r + (jumps[key]?.[0]?.[1] ?? 0));
+}
+
 /** One square along an arrow key, or '' off the board. */
 export function stepped(square: string, key: string): string {
 	const [f, r] = coords(square);

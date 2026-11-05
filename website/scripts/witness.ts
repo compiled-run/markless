@@ -2608,7 +2608,7 @@ try {
 			['the-big-idea', 'got the same plan'],
 			['compiler', 'three pieces'],
 			['payload', 'Booked March'],
-			['resuming', 'nobody replayed the game from move one'],
+			['resuming', 'the game did not start over'],
 			['state-graph', 'only the pieces with an edge changed'],
 			['lazy-chunks', 'open-photo.js ran now'],
 			['native-targets', 'No WKWebView anywhere'],
@@ -2618,6 +2618,7 @@ try {
 			const stage = figure.locator('.stage');
 			if (await stage.count()) {
 				await stage.focus();
+				await page.keyboard.press('Escape');
 				await page.keyboard.press('Enter');
 			}
 			await see(figure.locator('[aria-live]').first(), (text) => text.includes(said), `the ${path} figure answers a press`);
@@ -2626,12 +2627,10 @@ try {
 
 		await page.goto(`${origin}/how-it-works/the-big-idea`, { waitUntil: 'load' });
 		const ideaStage = page.locator('.code-block [data-code-stage]').first();
-		await ideaStage.locator('p').first().waitFor();
-		await ideaStage.getByRole('button', { name: 'Add to cart', exact: true }).click();
 		await see(
 			ideaStage.locator('p').first(),
-			(text) => text === 'In your cart: 1 bags',
-			'the big idea cart counts a bag on the first press',
+			(text) => text === 'Your seat: A2',
+			'the big idea seat map serves its starting seat',
 		);
 
 		await page.goto(`${origin}/how-it-works/compiler`, { waitUntil: 'load' });

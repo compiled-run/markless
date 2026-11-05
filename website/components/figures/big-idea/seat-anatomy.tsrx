@@ -1,6 +1,6 @@
 // One seatmap.tsrx and three hosts: drag the file onto the browser, the phone or the server, and each draws the same plan in its own way.
 import { computed, state } from '@markless/core';
-import { describeHost, describeSeat, type Host, HOST_NOTE, ONE_FILE, START_SAID, TAKEN } from './model.ts';
+import { describeHost, describeSeat, type Host, HOST_NOTE, ONE_FILE, SEATS, START_SAID, TAKEN } from './model.ts';
 import { nearestTarget } from '../how/toy.ts';
 import { art } from './seatmap.art.ts';
 
@@ -88,7 +88,7 @@ export default function SeatAnatomy() @{
 		<button
 			type="button"
 			class="stage"
-			aria-label="One seat-map file and three hosts. Drag the file onto a host or press to send it to the next one; then press a seat. Keys 1, 2 and 3 send it to the browser, phone and server; Escape starts again."
+			aria-label="One seat-map file and three hosts. Drag the file onto a host or press to send it to the next one; then press a seat. Keys 1, 2 and 3 send it to the browser, phone and server; left and right arrows pick a browser seat, up and down a phone seat; Escape starts again."
 			onClick={(event) => {
 				if (Date.now() - dropped < 400) return;
 				touched = true;
@@ -105,6 +105,16 @@ export default function SeatAnatomy() @{
 				if (event.key === '1') deliver('browser');
 				if (event.key === '2') deliver('phone');
 				if (event.key === '3') deliver('terminal');
+				if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') && (onBrowser || onPhone)) {
+					event.preventDefault();
+					const onB = (event.key === 'ArrowLeft' || event.key === 'ArrowRight') ? onBrowser : !onPhone;
+					const current = onB ? seatB : seatP;
+					const step = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+					let at = SEATS.indexOf(current as (typeof SEATS)[number]);
+					do at = (at + step + SEATS.length) % SEATS.length;
+					while (TAKEN.includes(SEATS[at] as 'A3'));
+					pick((onB ? 'b:' : 'p:') + SEATS[at]);
+				}
 				if (event.key === 'Escape') reset();
 			}}
 		>
@@ -146,10 +156,14 @@ export default function SeatAnatomy() @{
 					dragX = 0;
 					dragY = 0;
 				}}
-				onPointerleave={(event) => {
-					if (event.pointerType === 'touch') return;
-					hover = '';
+				onPointercancel={() => {
 					held = false;
+					dragX = 0;
+					dragY = 0;
+				}}
+				onPointerleave={(event) => {
+					held = false;
+					if (event.pointerType !== 'touch') hover = '';
 				}}
 			>
 				@for (const layer of art.layers; key layer.key) {
@@ -519,7 +533,13 @@ export default function SeatAnatomy() @{
 				pointer-events: none;
 			}
 
+			.host > text,
+			.waiting {
+				pointer-events: none;
+			}
+
 			.file {
+				touch-action: none;
 				cursor: grab;
 				transition: transform 380ms cubic-bezier(0.3, 0.7, 0.4, 1);
 			}

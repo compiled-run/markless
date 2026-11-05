@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { legal, nearestSquare, noteOf, PIECES, placeOf, nextMove, sheetLines, START, stepped } from './model.ts';
+import { knightStep, legal, nearestSquare, noteOf, PIECES, placeOf, nextMove, sheetLines, START, stepped } from './model.ts';
 import { drawing, squareCentre } from './board.ts';
 
 const boardArt = drawing();
@@ -31,6 +31,8 @@ describe('the chess toy', () => {
 		expect(legal(START, 'bk', 'g6')).toBe(false);
 		expect(legal(START, 'wn', 'e4')).toBe(false);
 		expect(stepped('h8', 'ArrowRight')).toBe('');
+		expect(knightStep(START, 'wn', 'ArrowUp')).toBe('g5');
+		expect(legal(START, 'wn', knightStep(START, 'wn', 'ArrowLeft'))).toBe(true);
 	});
 
 	it('finds the square under a dropped piece and writes newest moves first', () => {

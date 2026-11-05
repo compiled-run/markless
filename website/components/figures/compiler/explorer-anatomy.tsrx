@@ -14,6 +14,8 @@ export default function ExplorerAnatomy() @{
 	let said = state('The chat box compiles to three pieces: state:draft, symbol:0 for the input handler, and symbol:1 for the text update.');
 	let ticket = state(0);
 	const lines = computed(() => source.split('\n'));
+	const moreLines = computed(() => Math.max(0, lines.length - LINE_SLOTS));
+	const morePieces = computed(() => Math.max(0, result.pieces.length - PIECE_SLOTS));
 	const hoverLine = computed(() => (hover.startsWith('l') ? Number(hover.slice(1)) : hover.startsWith('p') ? (result.pieces[Number(hover.slice(1))]?.line ?? -1) : -1));
 	const caption = computed(() => {
 		if (hover.startsWith('p')) {
@@ -41,6 +43,8 @@ export default function ExplorerAnatomy() @{
 			: 'Compiled to ' + answer.pieces.length + ' pieces: ' + answer.pieces.map((p) => p.id).join(', ') + '.';
 	};
 	const reset = () => {
+		ticket++;
+		busy = false;
 		editing = false;
 		source = START_SOURCE;
 		result = START;
@@ -111,6 +115,8 @@ export default function ExplorerAnatomy() @{
 						<li data-key="l11" data-on={hoverLine === 11 ? 'yes' : 'no'}>{lines[11] ?? ''}</li>
 					</ol>
 				}
+				<p class="more" data-shown={moreLines && !editing ? 'yes' : 'no'}>… {moreLines} more line{moreLines === 1 ? '' : 's'}: press Edit to see them</p>
+
 			</div>
 			<div class="pane out-pane" data-busy={busy ? 'yes' : 'no'}>
 				<div class="bar">
@@ -139,6 +145,7 @@ export default function ExplorerAnatomy() @{
 						<span>{result.pieces[4]?.what ?? ''}</span>
 					</li>
 				</ul>
+				<p class="more" data-shown={morePieces ? 'yes' : 'no'}>… and {morePieces} more piece{morePieces === 1 ? '' : 's'}</p>
 				<p class="errors" data-shown={result.errors.length ? 'yes' : 'no'}>{result.errors.join(' ')}</p>
 			</div>
 		</div>
@@ -326,6 +333,13 @@ export default function ExplorerAnatomy() @{
 				color: color-mix(in srgb, var(--pink) 70%, #c0403c);
 			}
 
+			.more {
+				margin: 0 0.6rem;
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: clamp(0.6rem, 1.8cqw, 0.85rem);
+			}
+
+			.more[data-shown='no'],
 			.errors[data-shown='no'] {
 				display: none;
 			}
