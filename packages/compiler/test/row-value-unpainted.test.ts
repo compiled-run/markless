@@ -152,3 +152,15 @@ test('a state list whose row has a value between two nested lists says it can ne
 		expect.stringContaining('between two nested @for lists'),
 	]);
 });
+
+test('an item-only value between two nested lists leaves the rest of the row without a template, so a state read elsewhere in it is an error', async () => {
+	const { compiled, errors } = await compile(
+		between(`<b class={row.id}>x</b>`).replace(
+			'<div>',
+			"<div class={picked === row.id ? 'on' : 'off'}>",
+		),
+	);
+	expect(compiled.protocolView.keyedRepeats?.[0]?.rowTemplate).toBeUndefined();
+	expect(errors).toHaveLength(1);
+	expect(errors[0]![1]).toContain("picked === row.id ? 'on' : 'off'");
+});

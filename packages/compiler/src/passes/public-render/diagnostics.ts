@@ -194,7 +194,7 @@ export function keyedRepeatRowValueUnpaintedDiagnostic(input: {
 		phase: PUBLIC_RENDER_PHASE,
 		title: 'This value in a @for row never updates in the browser',
 		message: between
-			? `This @for row over ${input.itemName} ${value}, which reads page state, but the element it is on stands between two nested @for lists in one parent element. After the page loads, the browser finds that element by counting from one end of its parent, and the nested lists' rows on both sides leave no count, so the row would keep the value the server rendered.`
+			? `This @for row over ${input.itemName} ${value}, which reads page state, but the row has a value on an element that stands between two nested @for lists in one parent element. After the page loads, the browser finds that element by counting from one end of its parent, and the nested lists' rows on both sides leave no count, so the row ships no markup to patch and keeps every value the server rendered.`
 			: `This @for row over ${input.itemName} ${value}, which reads page state, but the row also holds a nested @for over \`${input.cause.listSource}\`, which only the server renders. The browser can neither rebuild the row without losing those inner rows nor patch it in place, so the row would keep the value the server rendered.`,
 		why: 'The browser updates a @for row from one row of markup the payload carries. A row this cannot address or rebuild ships no markup, so every value in it stays as the server rendered it.',
 		primarySpan: sourceSpan(input.node, input.filename),
@@ -203,7 +203,7 @@ export function keyedRepeatRowValueUnpaintedDiagnostic(input: {
 		suggestions: [
 			{
 				message: between
-					? 'Wrap one of the two nested @for lists in its own element, so the element holding this value has nested rows on one side only.'
+					? 'Wrap one of the two nested @for lists in its own element, so every element with a value in the row has nested rows on one side only.'
 					: `Build the inner list from ${input.itemName} or from a computed, for example put the list on each item before the @for, so the browser holds it; or move the value that reads page state out of the row.`,
 			},
 		],

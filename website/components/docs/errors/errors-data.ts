@@ -5579,9 +5579,9 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'This value in a @for row never updates in the browser: a Markless build error.',
 		printed: [
-			"MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED: This @for row over <itemName> <value>, which reads page state, but the element it is on stands between two nested @for lists in one parent element. After the page loads, the browser finds that element by counting from one end of its parent, and the nested lists' rows on both sides leave no count, so the row would keep the value the server rendered.",
+			"MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED: This @for row over <itemName> <value>, which reads page state, but the row has a value on an element that stands between two nested @for lists in one parent element. After the page loads, the browser finds that element by counting from one end of its parent, and the nested lists' rows on both sides leave no count, so the row ships no markup to patch and keeps every value the server rendered.",
 			'The browser updates a @for row from one row of markup the payload carries. A row this cannot address or rebuild ships no markup, so every value in it stays as the server rendered it.',
-			'Wrap one of the two nested @for lists in its own element, so the element holding this value has nested rows on one side only.',
+			'Wrap one of the two nested @for lists in its own element, so every element with a value in the row has nested rows on one side only.',
 			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
 		],
 		structured: true,

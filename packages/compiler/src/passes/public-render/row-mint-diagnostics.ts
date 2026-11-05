@@ -253,6 +253,12 @@ function unpaintedRowValues(
 					slot.kind === 'branch' ||
 					(slot.kind === 'text' && slot.residue.kind !== 'repeat-item'),
 			));
+	// One value no count reaches withholds the whole row's template.
+	const betweenLists = chunk.slots.some(
+		(slot) =>
+			(slot.kind === 'text' || slot.kind === 'attribute') &&
+			stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null,
+	);
 	const values = [];
 	for (const slot of chunk.slots) {
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') continue;
@@ -262,7 +268,7 @@ function unpaintedRowValues(
 		const reads = 'graphNodeId' in value ? [value] : (value.reads ?? []);
 		if (reads.every((read) => constantInBrowser(graph, component, read.graphNodeId))) continue;
 		const cause: KeyedRepeatRowValueUnpaintedCause | null =
-			stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null
+			betweenLists
 				? { kind: 'between-lists' }
 				: servedOnlyRefused
 					? { kind: 'served-only-list', listSource: servedOnly[0]!.collectionSource }
