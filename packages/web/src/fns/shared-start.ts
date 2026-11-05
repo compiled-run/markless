@@ -67,22 +67,19 @@ export async function bindSharedCells(root: object, state: ProtocolStatePayload,
 		cells,
 		connect(graph: RuntimeGraph) {
 			const life = host.__mL;
-			let binding: unknown;
-			const bind = (mine: boolean) =>
-				(binding ??= instances().then(
-					(module) =>
-						host.__mL === life && module.bindRunningGraph(root, state, graph, mine),
-				));
+			const written = new Set<string>();
+			let binding: Promise<void> | undefined;
+			const bind = () =>
+				(binding ??= instances().then(async (module) => {
+					if (host.__mL === life)
+						await module.bindRunningGraph(root, state, graph, written);
+				}));
 			for (const [definition, store] of records) {
 				for (const graphNodeId of definition.graphNodeIds) {
+					const wrote = () => (written.add(graphNodeId), void bind());
 					// A first gesture's handler already wrote through the event-only graph.
-					if (host.__marklessEventOnlyGraph?.has(graphNodeId)) bind(true);
-					graph.subscribe({
-						id: 'shared-bind',
-						graphNodeId,
-						path: [],
-						run: () => void bind(true),
-					});
+					if (host.__marklessEventOnlyGraph?.has(graphNodeId)) wrote();
+					graph.subscribe({ id: 'shared-bind', graphNodeId, path: [], run: wrote });
 				}
 				if (!store) continue;
 				// Running now, so another container's write reaches it through the listener, not a wake.
@@ -91,7 +88,7 @@ export async function bindSharedCells(root: object, state: ProtocolStatePayload,
 					shape: '',
 					cells: {},
 					listeners: [],
-				}).listeners.push({ root, apply: () => void bind(false) });
+				}).listeners.push({ root, apply: () => void bind() });
 			}
 		},
 	};
