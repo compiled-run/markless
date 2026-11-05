@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": 53,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 24,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": 53,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 25,
+			"reason": "the CSR container listener passes the stop its sync policy applied on to the walk (+53 B rendered, +24 B gzip); without it a nested stopPropagation() never held",
+			"date": "2026-11-05"
+		}
+	]
+}
