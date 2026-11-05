@@ -45,6 +45,30 @@ export default function Page() @{
 	]);
 });
 
+test('a constant @for row reading a page const stays off the graph when a same-file child has a prop of that name', async () => {
+	const { graph, errors } = await compile(`function Badge({ mark }: { mark: string }) @{
+	<b>{mark}</b>
+}
+
+const ROWS = ['a', 'b'];
+
+export default function Page() @{
+	const mark = 'm' + '#';
+
+	<main>
+		<ul>
+			@for (const row of ROWS; key row) {
+				<li data-mark={mark}>{row}</li>
+			}
+		</ul>
+		<Badge mark="x" />
+	</main>
+}
+`);
+	expect(errors).toEqual([]);
+	expect(graph.keyedRepeats.map((repeat) => repeat.collectionGraphNodeId ?? null)).toEqual([null]);
+});
+
 test("a handler's sync policy reads page state, not a same-file child prop of the same name", async () => {
 	const { graph, errors } = await compile(`import { state } from '@markless/core';
 

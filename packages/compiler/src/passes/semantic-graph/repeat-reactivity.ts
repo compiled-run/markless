@@ -37,8 +37,7 @@ export function firstReactiveRowRead(
 ): ReactiveRowRead | null {
 	const scan: Scan = {
 		state,
-		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
-		aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+		...rowScopeMaps(state),
 		found: null,
 	};
 	scanRowNode(forNode.body as AnyNode | undefined, rowNames, scan);
@@ -53,8 +52,7 @@ export function firstReactiveCollectionRead(
 ): ReactiveRowRead | null {
 	const scan: Scan = {
 		state,
-		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
-		aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+		...rowScopeMaps(state),
 		found: null,
 	};
 	scanRowNode(collectionNode, new Set(), scan);
@@ -64,6 +62,15 @@ export function firstReactiveCollectionRead(
 /** The names a row owns: the item and the index this `@for` declares. */
 export function repeatRowNames(itemName: string, indexName: string | null): ReadonlySet<string> {
 	return new Set(indexName ? [itemName, indexName] : [itemName]);
+}
+
+function rowScopeMaps(state: WalkState): Pick<Scan, 'bindings' | 'aliases'> {
+	const shared = state.currentSharedDefinitionId ?? null;
+	const component = state.currentComponentName ?? undefined;
+	return {
+		bindings: graphBindingMap(state.graph, shared, component),
+		aliases: semanticAliasMap(state.graph, shared, component),
+	};
 }
 
 type Scan = {
