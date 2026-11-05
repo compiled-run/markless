@@ -189,7 +189,9 @@ a stable build-hashed scope class (`mk-<hash>` from the module filename).
 Every selector's subject compound gains the scope class, at-rule blocks are
 descended, and `@keyframes` contents are left untransformed. Host elements
 the component renders gain the scope class in emitted HTML across static,
-dynamic, spread, and dynamic-tag attribute paths. A `class` prop written on a
+dynamic, spread, and dynamic-tag attribute paths, except document metadata
+that is never rendered (`head`, `title`, `meta`, `link`, `base`, `script`,
+`style`), which no scoped selector can style and so never carries the class. A `class` prop written on a
 component call-site gains the calling module's scope class too, static and
 dynamic alike, so a scoped selector matches the element the child spreads
 that class onto; a call-site that writes no `class` prop gets none
