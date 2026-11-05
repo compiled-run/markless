@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import { resolveBoundaryRunners } from '../src/passes/public-render/boundary-runner.ts';
 
 // A page and a same-file child that use one name each read their own binding:
 // the child is declared first, so an unscoped lookup by name finds the child's.
@@ -69,5 +70,38 @@ export default function Page() @{
 	expect(conditions).toEqual([
 		{ type: 'graph-truthy', graphNodeId: 'state:held', path: [] },
 		{ type: 'graph-truthy', graphNodeId: 'state:held', path: [], equals: true },
+	]);
+});
+
+test('two same-file components with an async value of one name each settle their @try on their own', async () => {
+	const { graph, errors } = await compile(`import { computed } from '@markless/core';
+import { load } from './api.ts';
+
+function Inbox() @{
+	const data = computed(async () => await load('inbox'));
+
+	<p>@try { <span>{data.name}</span> } @pending { <i>wait</i> }</p>
+}
+
+function Outbox() @{
+	const data = computed(async () => await load('outbox'));
+
+	<p>@try { <span>{data.name}</span> } @pending { <i>wait</i> }</p>
+}
+
+export default function Page() @{
+	<main><Inbox /><Outbox /></main>
+}
+`);
+	expect(errors).toEqual([]);
+	const runners = resolveBoundaryRunners(graph);
+	expect(
+		graph.asyncBoundaries.map((boundary) => [
+			boundary.componentName,
+			runners.get(boundary.id)?.runnerGraphNodeId,
+		]),
+	).toEqual([
+		['Inbox', 'computed:Inbox.data'],
+		['Outbox', 'computed:Outbox.data'],
 	]);
 });
