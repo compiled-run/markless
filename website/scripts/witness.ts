@@ -2615,13 +2615,13 @@ try {
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
 			const figure = page.locator('figure.race, figure.anatomy, figure.explorer, figure.payload').first();
-			const stage = figure.locator('.stage');
+			const stage = figure.locator('.stage').first();
 			if (await stage.count()) {
 				await stage.focus();
 				await page.keyboard.press('Escape');
 				await page.keyboard.press('Enter');
 			}
-			await see(figure.locator('[aria-live]').first(), (text) => text.includes(said), `the ${path} figure answers a press`);
+			await see(figure.locator(':scope > [aria-live]').first(), (text) => text.includes(said), `the ${path} figure answers a press`);
 		}
 		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
 

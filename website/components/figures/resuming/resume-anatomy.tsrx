@@ -4,6 +4,7 @@ import { after, describeMove, describeRefusal, describeTurn, isWhite, legal, mov
 import { art } from './board.art.ts';
 
 const ART = Object.fromEntries(art.pieces.map((piece) => [piece.id, piece]));
+const REACH = Math.hypot(art.squares.a2![0] - art.squares.a1![0], art.squares.a2![1] - art.squares.a1![1]) * 0.8;
 const IDS = PIECES.map((piece) => piece.id);
 
 export default function ResumeAnatomy() @{
@@ -31,7 +32,7 @@ export default function ResumeAnatomy() @{
 	const aimPath = computed(() => (aim && targets.includes(aim) ? art.dots[aim]! : ''));
 	const places = computed(() => Object.fromEntries(IDS.map((id) => [id, placeOf(art.squares, id, pos[id] ?? '', held === id ? dragX : 0, held === id ? dragY : 0)])));
 	const caption = computed(() => {
-		const id = held || hover || pointed || picked;
+		const id = held || hover || picked || pointed;
 		if (id && pos[id]) {
 			const n = movesOf(pos, id).length;
 			return nameOf(id) + ' on ' + pos[id] + ': ' + (n === 1 ? '1 legal move' : n + ' legal moves');
@@ -168,7 +169,7 @@ export default function ResumeAnatomy() @{
 						const [x, y] = art.squares[pos[id]!]!;
 						const square = nearestSquare(art.squares, x + dragX, y + dragY);
 						const [sx, sy] = art.squares[square]!;
-						if (Math.hypot(sx - x - dragX, sy - y - dragY) > 34) said = 'The ' + nameOf(id) + ' was dropped off the board, so it slid back.';
+						if (Math.hypot(sx - x - dragX, sy - y - dragY) > REACH) said = 'The ' + nameOf(id) + ' was dropped off the board, so it slid back.';
 						else play(id, square);
 						dropped = Date.now();
 					}
@@ -680,12 +681,14 @@ export default function ResumeAnatomy() @{
 			}
 
 			.piece[data-hover='yes'] .lift,
-			.piece[data-held='yes'] .lift {
+			.piece[data-held='yes'] .lift,
+			.piece[data-picked='yes'] .lift {
 				transform: translateY(-9px);
 			}
 
 			.piece[data-hover='yes'] .cast,
-			.piece[data-held='yes'] .cast {
+			.piece[data-held='yes'] .cast,
+			.piece[data-picked='yes'] .cast {
 				transform: translate(7px, 3px);
 				opacity: 0.7;
 			}
@@ -756,19 +759,8 @@ export default function ResumeAnatomy() @{
 				color: var(--ink);
 			}
 
-			.square-label {
-				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: 17px;
-				fill: var(--sheet-ink);
-				opacity: 0;
-				transition: opacity 160ms ease;
-				pointer-events: none;
-			}
-
-			.piece[data-hover='yes'] .square-label,
-			.piece[data-held='yes'] .square-label,
-			.piece[data-picked='yes'] .square-label {
-				opacity: 1;
+			.piece[data-picked='yes'] .ink {
+				fill: color-mix(in srgb, var(--pink) 70%, #c0403c);
 			}
 
 			.newest {
