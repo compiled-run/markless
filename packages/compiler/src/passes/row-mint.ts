@@ -56,16 +56,12 @@ export type RowComponentMint = {
  * chain the row render walks - so an imported child mints on the same terms as a
  * local one.
  *
- * Still refused when the component's body carries a boundary (`@try`): its
- * settle bookkeeping reads a census the page counted once, at boot, for the rows
- * it served, and a row born after resume has none of it - the mint would index
- * into another row's, which is why the runtime refuses such a row loudly.
- * Refusing here means the page never gets that far: it falls back to today's
- * no-growth behaviour instead. A branch is admitted: its anchors are a comment
- * pair the minted row counts in its own fragment, exactly as it counts its own
- * elements. That question must be ANSWERED, not assumed: a child whose tree this
- * module cannot reach is refused too, because the chunk it could not read might
- * have held a boundary.
+ * A branch or a boundary (`@try`) is admitted: its anchors are a comment pair
+ * the minted row counts in its own fragment, exactly as it counts its own
+ * elements, and a boundary registers against those anchors as one an arm commit
+ * rendered. That question must be ANSWERED, not assumed: a child whose tree this
+ * module cannot reach is refused, because nothing proves the row render can
+ * build it.
  *
  * The public render plan pass asks the same question to decide whether a row
  * that cannot grow deserves a diagnostic, so the answer lives here once.
@@ -511,13 +507,12 @@ function memberReads(source: string, name: string): ReadonlySet<string> | null {
 }
 
 /**
- * Whether one component the row reaches is PROVABLY free of an async boundary,
- * whose settle bookkeeping the page counted only for the rows it served. A nested
- * @for or a render-chosen tag is admitted: the row renders whole in the browser,
- * so its own fragment counts their nodes and its records wire the nested rows.
+ * Whether one component the row reaches has a tree this module can answer for. A
+ * nested @for, a render-chosen tag or a boundary is admitted: the row renders
+ * whole in the browser, so its own fragment counts their nodes and its records
+ * wire the nested rows and boundaries.
  *
- * Provably is the whole point: a tree this module cannot reach is a refusal,
- * never a pass. A child declared here is answered from this module's own chunks.
+ * A tree this module cannot reach is a refusal, never a pass. A child declared here is answered from this module's own chunks.
  * A child behind an import has no chunks here, so the answer comes from the
  * construct reach its module published PER COMPONENT - a fact about that
  * component's own tree, so a boundary in a sibling of it says nothing about this
@@ -535,6 +530,5 @@ function childIsMintable(
 		);
 		if (!entry) return false;
 	}
-	const reach = childConstructReach(input, edge, childTemplateId, seen);
-	return reach !== 'boundaries' && reach !== 'unknown';
+	return childConstructReach(input, edge, childTemplateId, seen) !== 'unknown';
 }

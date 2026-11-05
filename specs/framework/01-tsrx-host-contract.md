@@ -88,6 +88,19 @@ The loop key applies to generated child identity for that iteration. If a child
 component or element supplies its own key, that authored key becomes the child
 identity within the keyed loop item.
 
+A key the browser has not seen before, whether the item was just added or its
+key changed, gets a new child instance. The browser renders it once from its
+compiled template, as a first render of that instance (the same kind of render
+as an arm commit in `12-arm-rendering.md`), never as a re-run of an existing
+one. A child with its own `@try` starts at its `@pending` content and loads on
+its own, so keying a child by a subject (`@for (const topic of [subject]; key
+topic)`) is how a new subject starts from its first load. When a child's async
+`computed()` runs again later, it reads the props the row passed it from that
+instance's own prop values, which the payload carries for every prop an async
+`computed()` reads. A collection expression that reads state, such as
+`[subject]`, is tracked like any other value built from state, so its rows
+follow it.
+
 ### Conditional identity
 
 `@if` branches create branch-local graph scopes. When a branch is removed from

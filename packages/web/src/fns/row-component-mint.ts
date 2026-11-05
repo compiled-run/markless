@@ -830,11 +830,11 @@ function placeMintedRow(input: ComponentRowInput, render: RenderedComponentRow):
 	const { rendered, rowSegment } = render;
 	assertRowWidgetsResolved(input.repeat, rendered.state);
 	const childNodes = parseRowNodes(input.parent, input.repeat, rendered.html);
-	assertMintableRowRecords(input.repeat, rendered.view);
-	// The child's locators and branch anchors index its OWN fragment, so they
+	// The child's locators and comment anchors index its OWN fragment, so they
 	// resolve against the child's nodes whether or not a wrapper holds them.
 	const elementsByHostId = resolveRowHosts(input.repeat, childNodes, rendered.view);
 	const branches = resolveRowBranches(input.repeat, childNodes, rendered.view);
+	const boundaries = resolveRowBoundaries(input.repeat, childNodes, rendered.view);
 	const placed = rowComponent.slotPath
 		? placeInWrapper(input, childNodes, rowComponent.slotPath)
 		: { nodes: childNodes, rowRoot: childNodes.find((node) => node.nodeType === 1) };
@@ -851,6 +851,7 @@ function placeMintedRow(input: ComponentRowInput, render: RenderedComponentRow):
 		commit: () =>
 			commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat, {
 				branches,
+				boundaries,
 				rowKey: input.rowKey,
 				rowSegment,
 				...(row.replaced ? { replaced: row.replaced } : {}),
@@ -902,6 +903,7 @@ async function commitMintedRow(
 	repeat: ResumeKeyedRepeatRecord,
 	row: {
 		readonly branches: ReadonlyArray<ResumeArmBranchRecord>;
+		readonly boundaries: ReadonlyArray<ResumeAsyncBoundaryRecord>;
 		readonly rowKey: unknown;
 		readonly rowSegment: string;
 		readonly replaced?: ResumeDomElement;
@@ -926,13 +928,22 @@ async function commitMintedRow(
 			if (element === replaced || replaced.contains?.(element)) deps.disposeHost(hostNodeId);
 	await seedMintedGraphNodes(deps, rendered.state);
 	await mergeMintedWidgetRoots(deps, rendered.state, repeat, row.rowSegment);
-	const { registerArmRecordSet } = await import('../resume-commit-arm.ts');
+	const { registerArmRecordSet, registerNestedAsyncBoundaries } =
+		await import('../resume-commit-arm.ts');
 	await registerArmRecordSet(
 		deps,
 		registration.installArmEventType,
 		mintedRowBoundary(repeat, row.rowKey),
 		{ armRecords, elementsByHostId, computed: rendered.state.computed },
 	);
+	if (row.boundaries.length)
+		await registerNestedAsyncBoundaries(
+			deps,
+			registration.installArmEventType,
+			undefined,
+			row.boundaries as unknown as NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
+			rendered.state.computed,
+		);
 }
 
 type EnclosingWidgets = {
@@ -1217,24 +1228,7 @@ function resolveRowBranches(
 ): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = view.branches ?? [];
 	if (!records.length) return [];
-	const comments: ResumeDomComment[] = [];
-	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
-		for (const node of list) {
-			if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
-				comments.push(node as ResumeDomComment);
-			visit(node.childNodes ?? []);
-		}
-	})(nodes);
-	const anchorAt = (index: number, name: string, id: string): ResumeDomComment => {
-		const comment = comments[index];
-		if (!comment)
-			throw rowComponentError(
-				repeat,
-				'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING',
-				`built a row with no comment at row-relative index ${index} for the ${name} of branch ${id}.`,
-			);
-		return comment;
-	};
+	const anchorAt = rowAnchors(repeat, nodes, 'branch');
 	return records.map(
 		(record) =>
 			({
@@ -1245,17 +1239,47 @@ function resolveRowBranches(
 	);
 }
 
-// A boundary inside a minted row settles against bookkeeping the page took once,
-// at boot, for the rows it served, so registering it would register half a row.
-function assertMintableRowRecords(
+// A row's comments in the order its own render counted them, which is how its records index their anchors.
+function rowAnchors(
 	repeat: ResumeKeyedRepeatRecord,
+	nodes: ReadonlyArray<ResumeDomNode>,
+	kind: string,
+): (index: number, name: string, id: string) => ResumeDomComment {
+	const comments: ResumeDomComment[] = [];
+	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
+		for (const node of list) {
+			if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+				comments.push(node as ResumeDomComment);
+			visit(node.childNodes ?? []);
+		}
+	})(nodes);
+	return (index, name, id) => {
+		const comment = comments[index];
+		if (!comment)
+			throw rowComponentError(
+				repeat,
+				'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING',
+				`built a row with no comment at row-relative index ${index} for the ${name} of ${kind} ${id}.`,
+			);
+		return comment;
+	};
+}
+
+// The row's own @try blocks, anchored to the comments it rendered, so they settle against this row and no other.
+function resolveRowBoundaries(
+	repeat: ResumeKeyedRepeatRecord,
+	nodes: ReadonlyArray<ResumeDomNode>,
 	view: ProtocolViewPayload,
-): void {
-	if (!view.asyncBoundaries.length) return;
-	throw rowComponentError(
-		repeat,
-		'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
-		'builds a row containing @try, which a minted row cannot register yet.',
+): ReadonlyArray<ResumeAsyncBoundaryRecord> {
+	if (!view.asyncBoundaries.length) return [];
+	const anchorAt = rowAnchors(repeat, nodes, 'boundary');
+	return view.asyncBoundaries.map(
+		(record) =>
+			({
+				...record,
+				startAnchor: anchorAt(record.startAnchor.index, 'start anchor', record.id),
+				endAnchor: anchorAt(record.endAnchor.index, 'end anchor', record.id),
+			}) as unknown as ResumeAsyncBoundaryRecord,
 	);
 }
 

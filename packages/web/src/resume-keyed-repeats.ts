@@ -64,7 +64,7 @@ type RowMintHost = {
 	// Written beside the mint loader only on a page whose rows hold an @if.
 	readonly __marklessRowBranches?: () => Promise<Partial<RowMint>>;
 };
-type RowMintCell = { mint?: RowMint; load?: Promise<RowMint> };
+type RowMintCell = { mint?: RowMint; load?: Promise<RowMint>; hosted?: boolean };
 const rowMintCells = new WeakMap<object, RowMintCell>();
 const noGraphKey = {};
 function rowMintCell(graph?: RuntimeGraph): RowMintCell {
@@ -81,6 +81,9 @@ function loadRowMint(
 	const { __marklessRowMint: load, __marklessRowBranches: branches } = globalThis as RowMintHost;
 	if (!load) return undefined;
 	const cell = rowMintCell(graph);
+	// A @try's repeat may load it hostless.
+	if (host && !cell.hosted) cell.load = undefined;
+	cell.hosted ||= !!host;
 	return (cell.load ||= load(renderData, graph, host).then(
 		async (module) => (cell.mint = branches ? { ...module, ...(await branches()) } : module),
 	));
@@ -324,7 +327,6 @@ export function wireKeyedRepeats(
 			},
 		});
 		if (observeWrites) input.storeContainerSubscription(observeWrites);
-		// Rows stay current with the page state their slots read.
 		if (builds)
 			for (const [at, read] of rowSlotReads(repeat).entries())
 				input.storeContainerSubscription(
@@ -400,7 +402,6 @@ function applyKeyedRepeatRowOrder(
 		// Set before the row's arm events register: they read which arm it now shows.
 		if (values) slots.values.set(rowKey, values);
 		let rowRoot = rowRootsByKey.get(rowKey);
-		// A row whose slot values moved is patched where it stands, else rebuilt.
 		const focus =
 			rowRoot &&
 			mint &&

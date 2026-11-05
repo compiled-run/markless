@@ -6897,7 +6897,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A Markless runtime error from @markless/web.',
 		printed: [
-			'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING: built a row with no comment at row-relative index <index> for the <name> of branch <id>.',
+			'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING: built a row with no comment at row-relative index <index> for the <name> of <kind> <id>.',
 		],
 		structured: false,
 		sources: [
@@ -7012,25 +7012,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'A Markless runtime error from @markless/web.',
 		printed: [
 			'MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING: names a component row, but this container was resumed with no render-data surface to render it against.',
-		],
-		structured: false,
-		sources: [
-			{
-				id: 'f0',
-				file: 'packages/web/src/fns/row-component-mint.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-component-mint.ts',
-			},
-		],
-		moreSources: 0,
-	},
-	{
-		code: 'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
-		packageName: '@markless/web',
-		stage: 'runtime',
-		severity: 'error',
-		description: 'A Markless runtime error from @markless/web.',
-		printed: [
-			'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED: builds a row containing @try, which a minted row cannot register yet.',
 		],
 		structured: false,
 		sources: [

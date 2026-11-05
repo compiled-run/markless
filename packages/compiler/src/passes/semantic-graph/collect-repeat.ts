@@ -25,7 +25,11 @@ import {
 	repeatKeyUnstableDiagnostic,
 	repeatRowHandlersUnwiredDiagnostic,
 } from './diagnostics.ts';
-import { firstReactiveRowRead, repeatRowNames } from './repeat-reactivity.ts';
+import {
+	firstReactiveCollectionRead,
+	firstReactiveRowRead,
+	repeatRowNames,
+} from './repeat-reactivity.ts';
 import {
 	enclosingKeyedRepeat,
 	enclosingRowItemPath,
@@ -178,8 +182,11 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	// collection is lifted onto the graph so those rows reconcile like any other.
 	if (!collection && !enclosingItemPath) {
 		const reactiveRead = firstReactiveRowRead(node, state, repeatRowNames(itemName, indexName));
+		// A collection that itself reads movable state changes which rows exist, so it is lifted too.
+		const movesRows =
+			!reactiveRead && !enclosing && firstReactiveCollectionRead(collectionNode, state);
 		const lifted =
-			reactiveRead && !enclosing
+			(reactiveRead || movesRows) && !enclosing
 				? liftStaticCollection(node, collectionNode, itemName, state)
 				: null;
 		if (lifted?.kind === 'lifted') collection = { graphNodeId: lifted.graphNodeId, path: [] };

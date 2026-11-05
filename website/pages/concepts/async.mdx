@@ -132,6 +132,32 @@ To tell screen reader users something changed, put the message in a status eleme
 block, such as `<p role="status">`. Some screen readers, NVDA in Firefox for one, stay silent about
 live regions inside a busy element.
 
+## One block per row
+
+To give each row of a list its own wait, put the async value in a component and render that
+component in the row. Each row then has its own `@try`, so one slow or failing row does not hold up
+the others:
+
+```tsrx
+@for (const list of lists; key list.id) {
+	<section>
+		<TodoList tag={list.tag} />
+	</section>
+}
+```
+
+A row added after the page loads gets its own copy of the component. Its `@pending` block shows,
+then its own answer. When the recipe runs again, it reads that row's `tag`.
+
+To start over when a choice changes, key a one-row list by the choice. A new value is a new key, so
+the old row goes away and the new one starts from its `@pending` block:
+
+```tsrx
+@for (const topic of [subject]; key topic) {
+	<Feed topic={topic} />
+}
+```
+
 ## Read state before or after an await
 
 A recipe can read state anywhere, before or after an `await`. Markless reads every state the recipe

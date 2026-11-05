@@ -161,8 +161,13 @@ export async function asyncComputedFromRecord(
 			return values.length > 1 || Object(only) === only ? values : only;
 		},
 		run: async ({ key, signal, read }) => {
+			const graph = graphRef(),
+				node = computed.graphNodeId;
 			return (await input.loadSymbol(runnerSymbolId))({
-				graph: graphRef(),
+				// A bound runner names edges, never a row; the node it settles names the row.
+				graph: node.includes('r:')
+					? ({ ...graph, marklessPageGraph: graph, marklessRowHostPath: node } as RuntimeGraph)
+					: graph,
 				read,
 				key,
 				signal,

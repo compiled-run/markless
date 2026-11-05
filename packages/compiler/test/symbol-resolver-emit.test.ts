@@ -443,7 +443,7 @@ test('emitSymbolResolverModule leaves page-local instance scoping free of the wi
 	});
 
 	expect(output).not.toContain('@markless/web/fns/instance-scope');
-	expect(output).toContain('const scoped = (graphNodeId) =>');
+	expect(output).toContain('const own = (graphNodeId) =>');
 	expect(output).toContain('path + graphNodeId');
 });
 

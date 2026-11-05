@@ -457,19 +457,21 @@ function armCommitRendererMissingError(boundary: ResumeArmRange): Error {
 }
 
 // @try blocks a settled arm rendered inside itself: their own arm records, the async
-// computeds of components that render created, then live boundary wiring.
-async function registerNestedAsyncBoundaries(
+// computeds of components that render created, then live boundary wiring. A row built
+// in the browser passes no range: its records already hold their live anchors.
+export async function registerNestedAsyncBoundaries(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
-	range: ResumeArmRange,
+	range: ResumeArmRange | undefined,
 	records: NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
 	computed: ArmCommitUpdate['computed'],
 ): Promise<void> {
 	const wiring = await deps.asyncBoundaryWiring?.();
 	if (!wiring || !deps.graph || !deps.loadSymbol)
 		throw new Error('Markless nested async boundary registration is unavailable.');
-	const census = commentsBetween(range.startAnchor, range.endAnchor);
+	const census = range ? commentsBetween(range.startAnchor, range.endAnchor) : [];
 	const boundaries: ResumeAsyncBoundaryRecord[] = records.map((record) => {
+		if (!range) return record as unknown as ResumeAsyncBoundaryRecord;
 		const startAnchor = census[record.startAnchor.index];
 		const endAnchor = census[record.endAnchor.index];
 		if (!startAnchor || !endAnchor)

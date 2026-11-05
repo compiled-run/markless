@@ -79,10 +79,23 @@ function derivePropReads(
 		reachable.add(id);
 		queue.push(...(edges.get(id) ?? []));
 	}
+	const rootComponentName = input.renderData.root?.componentName;
+	// An async recipe runs again in the browser whenever a dependency moves, and reads every prop it read before.
+	const asyncRecipes = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'computed' &&
+			binding.async &&
+			(binding.componentName ?? rootComponentName) === componentName
+				? [binding.id]
+				: [],
+		),
+	);
 	return input.protocolState.computed.flatMap((computed) =>
-		computed.async ||
-		computed.deriveSymbolId === undefined ||
-		!reachable.has(computed.graphNodeId)
+		(
+			computed.async
+				? !asyncRecipes.has(computed.graphNodeId)
+				: computed.deriveSymbolId === undefined || !reachable.has(computed.graphNodeId)
+		)
 			? []
 			: (computed.dependencies ?? []).map((dependency) => ({
 					graphNodeId: dependency.graphNodeId,
