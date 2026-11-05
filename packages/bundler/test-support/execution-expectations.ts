@@ -197,9 +197,10 @@ function isAllowedDispatchCoreVirtual(id: string): boolean {
 const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
 	event: ['core/web/resume', 'web/resume'],
 	'dom-update': ['core/web/resume', 'web/resume'],
-	'keyed-repeat': ['core/web/resume', 'web/resume'],
+	// Keyed-repeat wiring and arm settles compare row slot reads with the state the rows were painted from.
+	'keyed-repeat': ['core/web/resume', 'web/resume', 'web/fns/row-slot-reads'],
 	branch: ['core/web/resume', 'web/resume'],
-	'async-boundary': ['core/web/resume', 'web/resume'],
+	'async-boundary': ['core/web/resume', 'web/resume', 'web/fns/row-slot-reads'],
 	behavior: ['core/web/resume', 'web/resume'],
 	'element-handle': ['core/web/resume', 'web/resume'],
 };
