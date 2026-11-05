@@ -252,6 +252,21 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'<button>{label}</button>',
 		],
 	},
+	MARKLESS_BLOCK_SIBLING_NODES: {
+		summary: 'A block holds two or more nodes side by side.',
+		what: 'A component body renders exactly one node, and so does each `@if`, `@else`, `@for`, `@empty`, `@switch` case, `@try`, `@pending` and `@catch` arm. A node is an element, a fragment, or another `@` block. Here a second node follows the first in the same block.',
+		how: 'Wrap the nodes in a fragment, `<>` … `</>`, which adds no element to the page. One wrapping element, like `<div>`, works too.',
+		example: [
+			'@try {',
+			'\t<>',
+			'\t\t<h2>{report.title}</h2>',
+			'\t\t<p>{report.total}</p>',
+			'\t</>',
+			'} @pending {',
+			'\t<p>Loading…</p>',
+			'}',
+		],
+	},
 	MARKLESS_PARSE_ERROR: {
 		summary: 'Markless could not read a .tsrx file.',
 		what: 'Markless could not read this file. The text after "reported:" names the problem.',

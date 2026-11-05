@@ -604,6 +604,7 @@ function parseErrorDiagnostic(
 			span: parserErrorSpan(error, source),
 			parserMessage: message,
 		});
+	if (message.startsWith('TSRX2011')) return blockSiblingNodesDiagnostic(error, source);
 	const rule = templateRuleBroken(message, error, source);
 	return {
 		code: 'MARKLESS_PARSE_ERROR',
@@ -628,28 +629,50 @@ function parseErrorDiagnostic(
 	};
 }
 
-// A code block and every control-flow arm render one node, after their statements (TSRX2011 and TSRX2012).
+function parserErrorLine(error: SyntaxError, source: CompileTsrxModuleInput): number | null {
+	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
+	return typeof position === 'number'
+		? source.source.slice(0, position).split('\n').length
+		: null;
+}
+
+// TSRX2011: a component body and every control-flow arm render exactly one node.
+function blockSiblingNodesDiagnostic(
+	error: SyntaxError,
+	source: CompileTsrxModuleInput,
+): SemanticGraphArtifact['diagnostics'][number] {
+	const span = parserErrorSpan(error, source);
+	const line = parserErrorLine(error, source);
+	const tag = span ? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(span.start))?.[0] : undefined;
+	const subject = `${tag ? `\`${tag}>\`` : 'This node'}${line === null ? '' : ` on line ${line}`}`;
+	return {
+		code: 'MARKLESS_BLOCK_SIBLING_NODES',
+		severity: 'error',
+		phase: 'parse',
+		title: 'A block renders one node',
+		message: `${subject} is a second node in the same block. A component body and each @if, @else, @for, @empty, @switch case, @try, @pending and @catch arm render exactly one node. (@tsrx/yuku reported: ${error.message})`,
+		why: 'Each block hands exactly one node to the place it renders into. A fragment `<>…</>` or one wrapping element is that node, and it can hold as many children as you need.',
+		primarySpan: span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><h2>Title</h2><ul>…</ul></>`. A fragment adds no element to the page. One wrapping element, like `<div>`, works too.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_BLOCK_SIBLING_NODES',
+	};
+}
+
+// TSRX2012: a code block runs its statements before the node it renders.
 function templateRuleBroken(
 	message: string,
 	error: SyntaxError,
 	source: CompileTsrxModuleInput,
 ): { title: string; message: string; fix: string } | null {
-	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
-	const line =
-		typeof position === 'number' ? source.source.slice(0, position).split('\n').length : null;
+	const line = parserErrorLine(error, source);
 	const at = line === null ? '' : ` on line ${line}`;
-	if (message.startsWith('TSRX2011')) {
-		const tag =
-			typeof position === 'number'
-				? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(position))?.[0]
-				: undefined;
-		const subject = tag ? `\`${tag}>\`${at}` : `The node${at}`;
-		return {
-			title: 'A code block renders a single node',
-			message: `${subject} follows another node in the same code block or arm, and each one renders exactly one node.`,
-			fix: 'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><header>top</header><main>body</main></>`. A fragment adds no element to the page.',
-		};
-	}
 	if (message.startsWith('TSRX2012')) {
 		return {
 			title: 'Code must come before the rendered output',
@@ -673,7 +696,7 @@ function parserErrorSpan(
 /**
  * Diagnostics that make the render modules unserveable, so emitting them would
  * only produce source no host can run. A parse error leaves nothing to emit
- * from; an unbound shared call (defect 69) leaves a call the server prelude
+ * from; an unbound shared call leaves a call the server prelude
  * would emit verbatim and throw on, while the client body drops it — the exact
  * client-works/server-throws split the refusal exists to end.
  *
@@ -695,7 +718,7 @@ const unserveableDiagnosticCodes: ReadonlySet<string> = new Set([
 function hasUnserveableDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {
 	return semanticGraph.diagnostics.some(
 		(diagnostic) =>
-			(diagnostic.phase === 'parse' && diagnostic.code === 'MARKLESS_PARSE_ERROR') ||
+			diagnostic.phase === 'parse' ||
 			(diagnostic.severity === 'error' && unserveableDiagnosticCodes.has(diagnostic.code)),
 	);
 }

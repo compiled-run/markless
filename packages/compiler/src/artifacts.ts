@@ -843,6 +843,7 @@ export type SemanticEvent = {
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_PARSE_ERROR'
+		| 'MARKLESS_BLOCK_SIBLING_NODES'
 		| 'MARKLESS_UI_IMPORT_SHAPE'
 		| 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED'
 		| 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED'

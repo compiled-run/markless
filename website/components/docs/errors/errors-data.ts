@@ -1467,6 +1467,308 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_BLOCK_SIBLING_NODES',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A block holds two or more nodes side by side.',
+		printed: [
+			'MARKLESS_BLOCK_SIBLING_NODES: <subject> is a second node in the same block. A component body and each @if, @else, @for, @empty, @switch case, @try, @pending and @catch arm render exactly one node. (@tsrx/yuku reported: <message>)',
+			'Each block hands exactly one node to the place it renders into. A fragment `<>…</>` or one wrapping element is that node, and it can hold as many children as you need.',
+			'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><h2>Title</h2><ul>…</ul></>`. A fragment adds no element to the page. One wrapping element, like `<div>`, works too.',
+			'https://markless.dev/errors/MARKLESS_BLOCK_SIBLING_NODES',
+		],
+		structured: true,
+		guide: {
+			summary: 'A block holds two or more nodes side by side.',
+			what: [
+				{
+					id: 's0',
+					text: 'A component body renders exactly one node, and so does each ',
+				},
+				{
+					id: 's1',
+					text: '@if',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', ',
+				},
+				{
+					id: 's3',
+					text: '@else',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: '@for',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', ',
+				},
+				{
+					id: 's7',
+					text: '@empty',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ', ',
+				},
+				{
+					id: 's9',
+					text: '@switch',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: ' case, ',
+				},
+				{
+					id: 's11',
+					text: '@try',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: ', ',
+				},
+				{
+					id: 's13',
+					text: '@pending',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ' and ',
+				},
+				{
+					id: 's15',
+					text: '@catch',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: ' arm. A node is an element, a fragment, or another ',
+				},
+				{
+					id: 's17',
+					text: '@',
+					code: true,
+				},
+				{
+					id: 's18',
+					text: ' block. Here a second node follows the first in the same block.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Wrap the nodes in a fragment, ',
+				},
+				{
+					id: 's1',
+					text: '<>',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' … ',
+				},
+				{
+					id: 's3',
+					text: '</>',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', which adds no element to the page. One wrapping element, like ',
+				},
+				{
+					id: 's5',
+					text: '<div>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', works too.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '@try',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'h2',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>{report.title}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'h2',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>{report.total}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t</>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '} ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@pending',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>Loading…</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/compile-module.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/compile-module.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_BRANCH_ARM_EMPTY',
 		packageName: '@markless/web',
 		stage: 'runtime',

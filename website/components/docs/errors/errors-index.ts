@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 307,
-	guided: 47,
+	total: 308,
+	guided: 48,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -92,6 +92,11 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
 					kind: 'compile error',
 					guided: false,
+				},
+				{
+					code: 'MARKLESS_BLOCK_SIBLING_NODES',
+					kind: 'compile error',
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',

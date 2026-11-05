@@ -41,9 +41,10 @@ was unavailable):
   setup statements first and then renders exactly one node: an element, a
   fragment, or a control-flow construct. Several nodes go in a fragment
   `<>…</>`, which adds no element to the page. A second node is TSRX2011 and a
-  statement after the node is TSRX2012. Markless reports both as
-  `MARKLESS_PARSE_ERROR`, titled "A code block renders a single node" and "Code
-  must come before the rendered output", with the fix as the suggestion.
+  statement after the node is TSRX2012. Markless reports the first as
+  `MARKLESS_BLOCK_SIBLING_NODES` and the second as `MARKLESS_PARSE_ERROR`
+  titled "Code must come before the rendered output", each with the fix as the
+  suggestion.
 - A plain `} else {` after an `@if` body is a parse error (TSRX1009), which
   Markless reports as `MARKLESS_BRANCH_ELSE_SPELLING`.
 - An `@try`'s arms go in the order `@try`, `@pending`, `@catch`. An `@pending`
