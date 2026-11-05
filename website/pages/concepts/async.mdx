@@ -290,6 +290,24 @@ the old row goes away and the new one starts from its `@pending` block:
 }
 ```
 
+Each row of a list must be one element, so `Feed` wraps its `@try` in one:
+
+```tsrx
+export default function Feed({ topic }: { topic: string }) @{
+	const posts = computed(async () => await loadPosts(topic));
+
+	<section>
+		@try {
+			<p>{posts.length} posts about {topic}</p>
+		} @pending {
+			<p>Loading...</p>
+		}
+	</section>
+}
+```
+
+Without the `<section>`, the build stops with `MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT`.
+
 ## Read state before or after an await
 
 A recipe can read state anywhere, before or after an `await`. Markless reads every state the recipe
