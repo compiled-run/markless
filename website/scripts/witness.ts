@@ -2614,7 +2614,7 @@ try {
 			['native-targets', 'No WKWebView anywhere'],
 		] as const) {
 			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
-			const figure = page.locator('figure.anatomy, figure.explorer').first();
+			const figure = page.locator('figure.anatomy, figure.explorer, figure.payload').first();
 			const stage = figure.locator('.stage');
 			if (await stage.count()) {
 				await stage.focus();

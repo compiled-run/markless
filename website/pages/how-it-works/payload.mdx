@@ -27,11 +27,11 @@ export default function Calendar() @{
 
 ## The page is real HTML
 
-Hover the page, press a day, then switch JavaScript off:
+The page and its View Source share colours. Hover one, then press a day:
 
 <SourceAnatomy />
 
-- Every element is plain HTML, so the page shows in full even with JavaScript off.
+- Every element is plain HTML, so the page shows in full before any code runs.
 - An element with a handler carries `m:on`, naming its handler's record.
 - The first click fetches one small chunk of click code. The data itself never runs.
 
@@ -42,16 +42,58 @@ Everything the server adds to your HTML is the *payload*. It's two script tags t
 - **`markless/state`** holds the values: `state:day` is `13`.
 - **`markless/view`** says which element does what: the paragraph shows `state:day`, and each button's click runs its own symbol.
 
-Here is the real response of `renderToString()` for the full calendar, with the two inline scripts and the file names cut:
+Here is the real response of `renderToString()` for the full calendar, laid out across lines, with the inline scripts, file names and some fields cut to `…`:
 
 ```html title="response"
-<link rel="modulepreload" href="/build/chunk-….js" fetchpriority="high">
+<link rel="modulepreload" href="/build/chunk-….js"
+  crossorigin="anonymous" fetchpriority="high">
 <script>…</script>
 <div data-async-container data-markless-paths="…">
-  <section><h2>March</h2><p>Booked: March 13</p><button m:on="click:0">13</button>…</section>
-  <script type="markless/state">{"version":1,"cells":[{"graphNodeId":"state:day","name":"day","valueKind":"scalar","value":{"version":1,"root":13,"records":[]}}],"computed":[],"sharedDefinitions":[]}</script>
-  <script type="markless/view">{"version":1,"locators":{…},"events":[{"hostNodeId":"h3","eventName":"click","symbolIds":["symbol:0"]},…],"domUpdates":[{"hostNodeId":"h2","graphNodeId":"state:day","path":[],"target":{"kind":"text","prefix":"Booked: March "},"symbolId":"symbol:3"}],…}</script>
-  <script data-async-resumer data-markless-resume-module="/build/chunk-….js">…</script>
+  <section>
+    <h2>March</h2>
+    <p>Booked: March 13</p>
+    <button m:on="click:0">13</button>
+    <button m:on="click:1">14</button>
+    <button m:on="click:2">15</button>
+  </section>
+  <script type="markless/state">
+    {
+      "version": 1,
+      "cells": [
+        {
+          "graphNodeId": "state:day",
+          "name": "day",
+          "value": { "version": 1, "root": 13, "records": [] },
+          …
+        }
+      ],
+      …
+    }
+  </script>
+  <script type="markless/view">
+    {
+      "version": 1,
+      "events": [
+        {
+          "hostNodeId": "h3",
+          "eventName": "click",
+          "symbolIds": ["symbol:0"]
+        },
+        …
+      ],
+      "domUpdates": [
+        {
+          "hostNodeId": "h2",
+          "graphNodeId": "state:day",
+          "symbolId": "symbol:3",
+          …
+        }
+      ],
+      …
+    }
+  </script>
+  <script data-async-resumer
+    data-markless-resume-module="/build/chunk-….js">…</script>
 </div>
 ```
 

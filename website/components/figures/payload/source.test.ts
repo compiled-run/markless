@@ -1,33 +1,40 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { SOURCE } from './model.ts';
 import { drawing } from './source.ts';
 
 const sceneArt = drawing();
 const page = readFileSync(new URL('../../../pages/how-it-works/payload.mdx', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./source-anatomy.tsrx', import.meta.url), 'utf8');
+const response = page.slice(page.indexOf('```html title="response"'));
+const text = (i: number) => SOURCE[i]!.tokens.map((token) => token.t).join('');
 
 describe('the payload figure', () => {
-	it('draws the same scene every time, with enough ink to read', () => {
-		expect(JSON.stringify(drawing())).toBe(JSON.stringify(sceneArt));
-		const objects = (sceneArt as { objects?: Record<string, { layers: { d: string }[] }> }).objects ?? {};
-		const all = [...sceneArt.layers, ...Object.values(objects).flatMap((o) => o.layers)];
-		expect(all.length).toBeGreaterThan(8);
-		expect(all.map((layer) => layer.d).join('').length).toBeGreaterThan(8000);
-		expect(Object.keys(objects).length).toBeLessThanOrEqual(3);
+	it('shows about ten lines of View Source, none wider than the column', () => {
+		expect(SOURCE.length).toBeLessThanOrEqual(12);
+		for (const [i] of SOURCE.entries()) expect(text(i).length).toBeLessThanOrEqual(58);
 	});
 
-	it('has one margin note, a live region, a tour that stops on touch, and no wires', () => {
-		expect(piece).toContain('JavaScript: off');
+	it('abridges the real response on the page, keeping its fields', () => {
+		for (const fragment of ['<p>Booked: March 13</p>', '<button m:on="click:0">13</button>', '"graphNodeId": "state:day"', '"root": 13', '"hostNodeId": "h3"', '"symbolIds": ["symbol:0"]', '"hostNodeId": "h2"']) {
+			expect(response).toContain(fragment);
+		}
+	});
+
+	it('washes the Booked line, its value and its view entry in one colour, and each day button with its event in another', () => {
+		const washOf = (w: string) => SOURCE.flatMap((line) => line.tokens.filter((token) => token.w === w).map(() => line.key));
+		expect([...new Set(washOf('booked'))]).toEqual(['s2', 's6', 's10']);
+		expect([...new Set(washOf('day'))]).toEqual(['s3', 's9']);
+		expect(SOURCE[1]!.tokens.some((token) => token.w)).toBe(false);
+	});
+
+	it('has no JavaScript switch, labels the two blocks in the margin, and answers pointer, keys and Escape', () => {
+		expect(piece).not.toMatch(/JavaScript: o(n|ff)/);
+		expect(piece).toContain('the values');
+		expect(piece).toContain('who does what');
 		expect(piece).toContain('aria-live="polite"');
-		expect(piece).toContain('if (!seen || touched) return;');
-		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
-		expect(piece).toContain("event.key === 'Escape'");
-		expect(piece).not.toMatch(/(cord|crocodile|wire)s?/i);
-	});
-
-	it('answers the pointer: hovering an element lights its source', () => {
 		expect(piece).toContain('onPointerover');
-		expect(piece).toContain("hover = key");
+		expect(piece).toContain("event.key === 'Escape'");
 	});
 
 	it('is on the payload page', () => {
@@ -36,7 +43,7 @@ describe('the payload figure', () => {
 });
 
 describe('frozen art', () => {
-	it('freezes the drawing into a plain-data module the compiler can read (run with -u after editing)', async () => {
+	it('freezes the source lines into a plain-data module the compiler can read (run with -u after editing)', async () => {
 		const module = `// Written by source.test.ts from source.ts. Run the figure test with -u to refresh.
 import type { drawing } from './source.ts';
 
