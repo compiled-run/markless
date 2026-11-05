@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import GraphDemo from '../../components/figures/state-graph/graph-demo.tsrx';
+import RoundAnatomy from '../../components/figures/state-graph/round-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -11,7 +11,11 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="3 min" assumes="state, computed, events" />
 
-<Subtitle text="The compiler writes down who reads what before the page exists, so a write changes only the text that reads it." />
+<Subtitle text="The compiler writes down who reads what before the page exists, so a write reaches only the text that reads it." />
+
+<RoundAnatomy />
+
+Press the drawing to print a new edition of `bags`. It goes only to the houses on its round, and the house with no round gets nothing.
 
 ```tsrx title="cart.tsrx"
 import { computed, state } from '@markless/core';
@@ -29,59 +33,26 @@ export default function Cart() @{
 }
 ```
 
-A press changes two lines. Nothing runs the component again to find out which two.
+## The round book is the state graph
 
-## Three parts make the state graph
+- A **node** holds one value: `state()` makes `state:bags`, and `computed()` makes `computed:total`.
+- A **subscription** is one house on a round: a node, a path into its value, and a small function to run when it changes.
+- The **journal** is the list of page changes those functions return, such as `setText`.
 
-The *state graph* is the list of who reads what, kept while the page runs:
+## One write, one round
 
-- A **node** holds one value. `state()` makes one with an ID like `state:bags`, and `computed()` makes one like `computed:total`.
-- A **subscription** is one reader: a node, a path into its value, and a small function to run when that path changes.
-- The **journal** is the list of page changes those functions return, such as "set this text".
+For `bags++`, the graph in `@markless/runtime`:
 
-## Press it and watch which lines change
+1. stops if the value didn't change,
+2. marks `state:bags` changed and `computed:total` stale,
+3. schedules one flush right after the current code,
+4. runs only the subscriptions on that round, and applies the journal entries they return.
 
-Press **Add to cart** a few times.
+Two writes in the same turn share one flush. A write to `order.grind` doesn't reach a reader of `order.bags`; replacing `order` reaches both.
 
-<GraphDemo />
+Not on this path:
 
-- Ring 1 reads `state:bags` directly.
-- Ring 2 reads `computed:total`, which reads `state:bags`.
-- The product line reads nothing, so no press ever touches it.
+- A component on the [direct module](/how-it-works/compiler) keeps a plain `Map` instead, and rewrites only the text that changed.
+- `@markless/core` has no effect function. The compiler plans every subscription.
 
-## One write, step by step
-
-The full graph lives in `@markless/runtime`. For `bags++` it does this:
-
-1. If the new value equals the old one, it stops.
-2. Otherwise it stores the value and marks the written path as changed.
-3. It marks `computed:total` as stale, because `total` depends on `bags`.
-4. It schedules one flush as a *microtask*: a job that runs right after the current code finishes.
-5. The flush runs each subscription whose path meets a changed path. Reading `total` recomputes it now.
-6. Each subscription returns a journal entry, and Markless applies the entries to the page.
-
-Two writes in the same turn share one flush. A handler that writes `3` and then `4` leaves one entry, showing `4`.
-
-## Paths, not whole objects
-
-A subscription listens to a path inside a value. Two paths meet when one starts with the other. With `let order = state({ bags: 2, grind: 'whole' })`, a write to `order.grind` doesn't wake the reader of `order.bags`. Replacing `order` wakes both, because the empty path starts every path.
-
-A computed node lists the paths it reads. A write to one of them marks it stale, and it recomputes on its next read, not before.
-
-## What the journal holds
-
-| Entry | What it does |
-| --- | --- |
-| `setText` | Sets the text of one text node |
-| `setAttr`, `setProp` | Sets one attribute, or one DOM property |
-| `insertRange`, `removeRange`, `moveRange` | Inserts, removes or moves a run of nodes, such as an `@if` branch |
-| `runCleanup` | Runs a cleanup registered for one element |
-
-Nothing compares an old page with a new one, and `@markless/core` has no effect function: the compiler plans every subscription.
-
-Where the graph is smaller or bends:
-
-- A component on the [direct module](/how-it-works/compiler) skips this machinery. Its graph is a `Map`, and after a handler it reads each text slot again.
-- An `@if` or `@switch` inside `@try` that holds a component re-renders the whole `@try` block when it toggles. The compiler warns with `MARKLESS_TRY_BLOCK_TOGGLE_RERENDER`; move the component outside the `@if`.
-
-[Lazy chunks](/how-it-works/lazy-chunks) shows where the functions behind each subscription live.
+[Lazy chunks](/how-it-works/lazy-chunks) shows where those small functions live.

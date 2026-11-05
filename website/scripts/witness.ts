@@ -2602,28 +2602,16 @@ try {
 			if (wanted(text)) check(true, label);
 		};
 
-		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
-		const cartSheet = page.locator('.margin-notes .ink-screen').first();
-		const graphLines = cartSheet.locator('p.product, p.line > span');
-		await graphLines.first().waitFor();
-		const graphText = async () =>
-			(await graphLines.allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()).join(' | ');
-		const served = 'House blend · 250 g | In your cart: 2 bags | Total: $28';
-		check((await graphText()) === served, 'the state graph cart serves 2 bags and a $28 total', await graphText());
-		await cartSheet.getByRole('button', { name: 'Add to cart', exact: true }).click();
-		const pressed = 'House blend · 250 g | In your cart: 3 bags | Total: $42';
-		for (let attempt = 0; attempt < 40 && (await graphText()) !== pressed; attempt += 1)
-			await new Promise((done) => setTimeout(done, 100));
-		check(
-			(await graphText()) === pressed,
-			'one write moves the bags line and the total that reads it, and leaves the product line',
-			await graphText(),
-		);
-		await see(
-			page.locator('.margin-notes .tally').first(),
-			(text) => text.includes('ran once') && text.includes('that is 2 setText'),
-			'the state graph notes count one click and two journal entries',
-		);
+		// Each How it works page opens on its ink figure; a press must change what its live line says.
+		for (const [path, said] of [
+			['state-graph', 'Papers went to the two houses on its rounds'],
+			['resuming', 'nobody replayed the game from move one'],
+		] as const) {
+			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
+			const figure = page.locator('figure.anatomy').first();
+			await figure.locator('.stage').click();
+			await see(figure.locator('[aria-live]').first(), (text) => text.includes(said), `the ${path} figure answers a press`);
+		}
 		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
 
 		await page.goto(`${origin}/how-it-works/the-big-idea`, { waitUntil: 'load' });

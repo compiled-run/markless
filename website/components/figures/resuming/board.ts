@@ -10,6 +10,8 @@ export const HEIGHT = 440;
 const S = 1.5;
 const TOP = 0.55;
 const RIM = 0.7;
+/** The far rim is deeper, so the back rank's tall pieces stand on wood, not over the edge. */
+const BACK = 2.6;
 const BOARD = 8 * S;
 
 const camera = createCamera({
@@ -17,8 +19,8 @@ const camera = createCamera({
 	height: HEIGHT - 26,
 	view: { azimuth: 94, elevation: 44, distance: 72, target: [10.2, 6.4, 0.6] },
 	bounds: [
-		[-RIM - 0.6, -RIM - 0.4, 0],
-		[BOARD + RIM + 0.4, -RIM - 0.4, 0],
+		[-RIM - 0.6, -BACK - 0.4, 0],
+		[BOARD + RIM + 0.4, -BACK - 0.4, 0],
 		[-RIM - 0.6, BOARD + RIM + 0.8, 0],
 		[21.6, -0.6, 0],
 		[21.6, BOARD + RIM + 0.8, 0],
@@ -44,10 +46,10 @@ export const squareCentre = (square: string): [number, number] => {
 /** The board: a slab with a rim, light and hatched squares, and the file letters and rank numbers inked on the rim. */
 function boardArt() {
 	const top = plane(at, [0, 0, TOP], [1, 0, 0], [0, 1, 0]);
-	const rimOuter = top.on([[-RIM, -RIM], [BOARD + RIM, -RIM], [BOARD + RIM, BOARD + RIM], [-RIM, BOARD + RIM]]);
+	const rimOuter = top.on([[-RIM, -BACK], [BOARD + RIM, -BACK], [BOARD + RIM, BOARD + RIM], [-RIM, BOARD + RIM]]);
 	const front = atAll([[-RIM, BOARD + RIM, TOP], [BOARD + RIM, BOARD + RIM, TOP], [BOARD + RIM, BOARD + RIM, 0], [-RIM, BOARD + RIM, 0]]);
-	const side = atAll([[BOARD + RIM, -RIM, TOP], [BOARD + RIM, BOARD + RIM, TOP], [BOARD + RIM, BOARD + RIM, 0], [BOARD + RIM, -RIM, 0]]);
-	const castPts = [[-RIM, -RIM], [BOARD + RIM, -RIM], [BOARD + RIM, BOARD + RIM], [-RIM, BOARD + RIM]].flatMap(([x, y]) => [proj([x!, y!, 0]), proj(shadowOnDesk([x!, y!, TOP]))]).map(([x, y]) => [x, y + lift] as P);
+	const side = atAll([[BOARD + RIM, -BACK, TOP], [BOARD + RIM, BOARD + RIM, TOP], [BOARD + RIM, BOARD + RIM, 0], [BOARD + RIM, -BACK, 0]]);
+	const castPts = [[-RIM, -BACK], [BOARD + RIM, -BACK], [BOARD + RIM, BOARD + RIM], [-RIM, BOARD + RIM]].flatMap(([x, y]) => [proj([x!, y!, 0]), proj(shadowOnDesk([x!, y!, TOP]))]).map(([x, y]) => [x, y + lift] as P);
 	const cast = hull(castPts);
 	const dark: string[] = [];
 	for (let f = 0; f < 8; f++)
@@ -228,7 +230,7 @@ function sheetArt() {
 
 /** The one margin note, top left, with a loose arrow to the board. */
 function noteArt() {
-	const aim = at([2.4, -RIM - 0.2, TOP + 0.3]);
+	const aim = at([2.4, -BACK - 0.1, TOP + 0.3]);
 	const from: P = [96, 32];
 	const pts: P[] = Array.from({ length: 16 }, (_, i) => {
 		const t = i / 15;
