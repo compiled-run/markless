@@ -67,6 +67,11 @@ TSRX already gives `@for` optional `index` and `key` clauses:
 }
 ```
 
+A loop renders one row for each value a `for...of` over the collection would
+visit: each element of an array, each member of a `Set`, each `[key, value]`
+entry of a `Map`. The first render shows those rows, on the server and in the
+browser alike.
+
 This framework uses the `key` clause as the stable identity root for repeated
 local graph scopes. A keyed loop item keeps its component instances, local
 `state()`, `computed()` nodes, async nodes, DOM updates, and event wiring
