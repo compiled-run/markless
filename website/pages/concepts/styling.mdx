@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import LaundryAnatomy from '../../components/figures/styling/laundry-anatomy.tsrx';
+import FilesAnatomy from '../../components/figures/styling/files-anatomy.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -8,42 +8,40 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 <SiteNavbar />
 <Sidebar />
 
-# Two components can both call it .card
+# Styling
 
 <PageMeta time="3 min" assumes="state" />
 
-<Subtitle text="Put a style block inside a component, and its rules reach that file's elements and nothing else." terms="elements" />
+<Subtitle text="A style block inside a component styles that file's elements and nothing else." terms="elements" />
 
-A plain stylesheet is a shared room. You call something `.card`, someone two folders away does
-too, and one of you loses.
-
-```tsrx title="paper-card.tsrx"
-export default function PaperCard() @{
+```tsrx title="profile-card.tsrx"
+export default function ProfileCard() @{
 	<article class="card">
 		<style>
 			.card {
-				background: lightyellow;
+				background: peachpuff;
 			}
 		</style>
-		<p>Paper card</p>
+		<p>Ada Lovelace</p>
 	</article>
 }
 ```
 
-The `<style>` block sits inside the component's elements. Its `.card` rule reaches this file's
-`<article>`, and no other file's.
+The **`<style>` block** sits inside the component. Its **`.card`** rule reaches this file's `<article>`, and no other file's.
 
-## Same label, different tape
+## The same class name never collides
 
-Both shirts are labelled `card`. Each file sews its own extra class into its elements, like a name tape. Press the drawing to dip them.
+A *scoped* rule is one that only reaches its own file. Markless adds a class made from the file's path, starting `mk-`, to the file's selectors and elements.
 
-<LaundryAnatomy />
+- Two files can both style `.card`.
+- Each rule paints only its own file's card.
+- A rule in an imported stylesheet, like `global.css`, reaches every card.
 
-Only the shirt with the `paper-card.tsrx` tape takes the dye. The other file's `.card` stays untouched.
+Change either file's colour, and hover a card to see its classes.
 
-## Style both cards
+<FilesAnatomy />
 
-<Code steps={[{ label: 'In `paper-card.tsrx`, change the background to `lightblue`. Only the paper card turns blue.', source: 'background: lightblue' }, { label: 'In `chalk-card.tsrx`, change `plum` to `gold`, then press Light it up. Only the chalk card turns gold.', source: 'background: gold' }]}>
+<Code steps={[{ label: 'In `paper-card.tsrx`, change the background to `lightblue`. Only the paper card turns blue.', source: 'background: lightblue' }, { label: 'In `chalk-card.tsrx`, change `plum` to `gold`. Only the chalk card changes.', source: 'background: gold' }]}>
 ```tsrx title="two-cards.tsrx"
 import PaperCard from './paper-card.tsrx';
 import ChalkCard from './chalk-card.tsrx';
@@ -100,9 +98,7 @@ export default function ChalkCard() @{
 ```
 </Code>
 
-Neither card file mentions the other, and the order of the imports doesn't matter.
-
-## The rules you can rely on
+## The extra class belongs to the file
 
 - The extra class is worked out from the file's path.
 - Rules inside `@media` get the class too. `@keyframes` names stay as you wrote them.

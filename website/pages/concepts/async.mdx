@@ -2,114 +2,94 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import DevelopAnatomy from '../../components/figures/async/develop-anatomy.tsrx';
+import WeatherAnatomy from '../../components/figures/async/weather-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Waiting is a block, not a flag
+# Async values
 
-<PageMeta time="3 min" assumes="state, computed, conditionals" />
+<PageMeta time="2 min" assumes="state, computed, conditionals" />
 
-<Subtitle text="Give computed() an async recipe, then write three blocks: the answer, the wait and the failure." />
+<Subtitle text="An async computed is a value that arrives later, and @try shows it once it's there." terms="values" />
 
-A loading spinner usually needs four variables: the data, a "still loading" flag, an error, and a
-rule in your head about which one wins. Only the data is what the page is about.
+```tsrx title="forecast.tsrx"
+const forecast = computed(async () => loadForecast(city));
 
-```tsrx
 @try {
-	<p>{fact.text}</p>
+	<p>{forecast.text}</p>
 } @pending {
-	<p>Looking it up...</p>
-} @catch {
-	<p>That mug is not on the shelf.</p>
+	<p>Checking the sky…</p>
 }
 ```
 
-- `@try` holds what you show once the value is ready. Read it directly, as in `fact.text`.
-- `@pending` holds what you show before the first answer arrives.
-- `@catch` holds what you show when the recipe throws or its promise rejects.
+**`computed(async …)`** makes a value that arrives later. **`@try`** shows it once it's ready, and **`@pending`** holds the spot until then.
 
-Write them in that order. An `@pending` after `@catch` stops the build with
-`MARKLESS_ASYNC_ARM_ORDER`.
+## Only the slow spot waits
 
-## Watch a spot develop
+A *boundary* is the `@try` block around an async value. Everything outside it is on the page straight away.
 
-The page is a print in the tray, and `arrives` is the date that is still on its way. Press reload.
+- `@try` holds what you show once the value is ready.
+- `@pending` holds what you show before the first answer.
+- `@catch` holds what you show if the recipe fails. Write the three in that order.
 
-<DevelopAnatomy />
+Pick a city, then try picking two quickly.
 
-The rest of the page stays sharp. Only the date shows the `@pending` words in pencil, then develops when the answer comes back.
+<WeatherAnatomy />
 
-## Pick a mug
-
-`loadMugFact`, in the `mug-facts.ts` tab, stands in for a `fetch`. It waits 1.5 seconds, and fails
-for a mug it doesn't know.
-
-<Code steps={[{ label: 'Press Tall mug, wait, then press Cracked mug. The `@catch` block takes over.', shows: 'That mug is not on the shelf.' }, { label: 'Change the return line to `return { text: (await loadMugFact(mug)) + mug };`. Reading `mug` after the `await` works too.', source: '(await loadMugFact(mug)) + mug' }]}>
-```tsrx title="mug-facts.tsrx"
+<Code steps={[{ label: 'Press Lisbon and wait. The Oslo forecast stays until the new one lands.', shows: 'Lisbon: sunny, 19°' }, { label: 'Press Atlantis. The `@catch` block takes over.', shows: 'No forecast for that city.' }, { label: 'Move the `@pending` block after `@catch`, and read the build error.', source: '@catch {<p>No forecast for that city.</p>} @pending' }]}>
+```tsrx title="forecast-card.tsrx"
 import { computed, state } from '@markless/core';
-import { loadMugFact } from './mug-facts.ts';
+import { loadForecast } from './forecast.ts';
 
-export default function MugFacts() @{
-	let mug = state('');
-	const fact = computed(async () => {
-		return { text: await loadMugFact(mug) };
+export default function ForecastCard() @{
+	let city = state('Oslo');
+	const forecast = computed(async () => {
+		return { text: await loadForecast(city) };
 	});
 
 	<section>
-		<button onClick={() => (mug = 'tall')}>
-			Tall mug
+		<button onClick={() => (city = 'Oslo')}>
+			Oslo
 		</button>
-		<button onClick={() => (mug = 'small')}>
-			Small mug
+		<button onClick={() => (city = 'Lisbon')}>
+			Lisbon
 		</button>
-		<button onClick={() => (mug = 'cracked')}>
-			Cracked mug
+		<button onClick={() => (city = 'Atlantis')}>
+			Atlantis
 		</button>
 		@try {
-			<p>{fact.text}</p>
+			<p>{forecast.text}</p>
 		} @pending {
-			<p>Looking it up...</p>
+			<p>Checking the sky…</p>
 		} @catch {
-			<p>That mug is not on the shelf.</p>
+			<p>No forecast for that city.</p>
 		}
 	</section>
 }
 ```
 
-```ts title="mug-facts.ts"
-const facts: Record<string, string> = {
-	tall: 'The tall mug holds a big coffee.',
-	small: 'The small mug holds one espresso.',
+```ts title="forecast.ts"
+const skies: Record<string, string> = {
+	Oslo: 'Oslo: rain, 4°',
+	Lisbon: 'Lisbon: sunny, 19°',
 };
 
-export function loadMugFact(
-	mug: string,
+export function loadForecast(
+	city: string,
 ): Promise<string> {
-	if (mug === '') {
-		return Promise.resolve('Pick a mug.');
-	}
 	return new Promise((resolve, reject) => {
 		setTimeout(() => {
-			const fact = facts[mug];
-			if (fact) {
-				resolve(fact);
-			} else {
-				reject(new Error(`No mug called ${mug}`));
-			}
-		}, 1500);
+			const sky = skies[city];
+			if (sky) resolve(sky);
+			else reject(new Error(city));
+		}, 1200);
 	});
 }
 ```
 </Code>
 
-Each pick runs the recipe again. After the cracked mug, pick another and the page recovers.
-
-<MugSpot mood="brew" />
-
-## While a new answer loads
+## The old answer stays while a new one loads
 
 - The old answer stays up, and `@pending` returns only after 5 seconds of waiting.
 - The element around the block gets `aria-busy="true"`, so you can style it.
@@ -117,6 +97,7 @@ Each pick runs the recipe again. After the cracked mug, pick another and the pag
 Not yet:
 
 - A read of an async value outside `@try` stops the build with `MARKLESS_ASYNC_BOUNDARY_REQUIRED`.
+- An `@pending` after `@catch` stops the build with `MARKLESS_ASYNC_ARM_ORDER`.
 - A lookup keyed by the answer itself, like `shelf[(await loadPick()).id]`, stops the build with `MARKLESS_ASYNC_POST_AWAIT_READ`. Return the answer, and look it up in a second `computed()`.
 
 [Styling](/concepts/styling) shows how two components can both call something `.card`.

@@ -7,29 +7,37 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 <SiteNavbar />
 <Sidebar />
 
-# Events hand you the browser's own event
+# Events
 
 <PageMeta time="2 min" assumes="state" />
 
-<Subtitle text="An event prop is on plus the event name, and your handler gets the browser's own event." />
+<Subtitle text="An event prop runs your handler when the browser fires one of its events, and hands it the real event object." terms="events" />
 
-```tsrx
-<input onInput={(event) => (name = event.currentTarget.value)} />
+```tsrx title="name-field.tsrx"
+import { state } from '@markless/core';
+
+export default function NameField() @{
+	let name = state('');
+
+	<input onInput={(event) => (name = event.currentTarget.value)} />
+}
 ```
 
-That is `addEventListener('input', …)` written on the element. `event.key` and `event.preventDefault()` are the real ones.
+**`onInput`** is `on` plus the browser's `input` event. The **`event`** your handler gets is the real one, so `event.currentTarget.value` is what was typed.
 
-## Press a key
+## A handler runs when its event fires
+
+An *event* is something a person does: a key press, a click, a tap. Your handler runs once for each one, and never before.
+
+- The browser makes the event, with every field it always has.
+- Your handler gets that same object: `event.key`, `event.target`, `event.preventDefault()`.
+- No event, no run.
 
 Press the key, or click it and type on your own keyboard.
 
 <KeycardAnatomy />
 
-The hand is your handler. It gets the browser's own event, with the key you really pressed, and nothing until then.
-
-## Write your own
-
-<Code steps={[{ label: 'Under the preview, add `<p>{name.length} letters</p>` and type a name.', source: '{name.length}' }, { label: 'Change `onInput` to `onChange` and type again. The preview now waits until you leave the field.', source: 'onChange=' }]}>
+<Code steps={[{ label: 'Type Ada. The preview follows every key.', shows: 'Preview: Ada' }, { label: 'Under the preview, add `<p>{name.length} letters</p>` and type again.', source: '{name.length}' }, { label: 'Change `onInput` to `onChange`. The preview now waits until you leave the field.', source: 'onChange=' }]}>
 ```tsrx title="mug-label.tsrx"
 import { state } from '@markless/core';
 
@@ -63,7 +71,7 @@ export default function MugLabel() @{
 ```
 </Code>
 
-## Naming the prop
+## Name the prop after the event
 
 - `on` plus the event name: `onClick`, `onInput`, `onKeyDown`. The case after `on` doesn't matter.
 - Pass an array to run two handlers in order: `onClick={[save, countSave]}`.

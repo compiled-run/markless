@@ -1,20 +1,17 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import SeatsAnatomy from '../../components/figures/lists/seats-anatomy.tsrx';
+import TentAnatomy from '../../components/figures/lists/tent-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# A key tells the page which row is which
+# Lists
 
 <PageMeta time="2 min" assumes="state, events, conditionals" />
 
-<Subtitle text="A key answers which row is this. Once a row has one, everything on that row moves with it." />
-
-You tick a row and sort the list. The tick is now on somebody else's row: the page filled three
-slots again from the top, with no idea they were the same rows in a new order.
+<Subtitle text="@for draws one row per item, and a key tells the page which row is which." />
 
 ```tsrx title="guests.tsrx"
 import { state } from '@markless/core';
@@ -30,17 +27,19 @@ export default function Guests() @{
 }
 ```
 
-`@for` draws one row per item. `key guest.id` names each row by its data, not its place.
+**`@for`** draws one `<li>` per guest. **`key guest.id`** names each row by its data, so the page can tell the rows apart.
 
-## Watch the cards change seats
+## A key makes each row follow its item
 
-Each row is a place card keyed by its guest. Press **Sort A to Z**.
+A *key* is a value that names one item for good, like an id. With it, a row keeps its place in your data, not its place on the page.
 
-<SeatsAnatomy />
+- Reorder the list, and each row moves with its item.
+- What a row holds, like a tick, rides along.
+- No row is built again.
 
-Every card walks to its new seat with its own tick. The seat numbers stay put, and no card is made again.
+Press **Reverse**, or drag a card onto another slot.
 
-## Change the list
+<TentAnatomy />
 
 <Code steps={[{ label: "Add `{ id: 'beans', name: 'Beans', done: false }` to the starting list.", shows: 'Beans' }, { label: 'Tick every row and press Remove ticked. The `@empty` line takes over.', shows: 'Nothing left to buy.' }]}>
 ```tsrx title="shopping-list.tsrx"
@@ -95,13 +94,11 @@ export default function ShoppingList() @{
 ```
 </Code>
 
-`@empty` shows when the list has no rows.
-
-## Choosing a key
+## Pick a key that names the item
 
 - Use what names the item in your data: an id, a slug, an order number.
 - It must be unique in the list, and the same item must keep the same key.
-- Not the position: that names the slot, and brings the ticked-row bug back.
+- Not the position: a tick would then stay with the slot, not the item.
 - Not a value the reader edits: a renamed row would become a new row.
 
 Need the position for display? Add `index i` and keep the key on the data:

@@ -1,6 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import StateAnatomy from '../../components/figures/state/state-anatomy.tsrx';
 import SettingsDemo from '../../components/figures/state/settings-demo.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -8,32 +9,31 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 <SiteNavbar />
 <Sidebar />
 
-# State is a variable the page watches
+# State
 
 <PageMeta time="3 min" assumes="reading-tsrx" />
 
-Say you work at Beanshop, a coffee brand. Customers press **Add to cart** on your shop page, and
-the page needs to keep track of how many bags they have added.
+<Subtitle text="State is one of your values that the page watches: change it, and every spot that shows it updates." terms="values" />
 
-You already know how to count in JavaScript:
+```tsrx title="cart-badge.tsrx"
+import { state } from '@markless/core';
 
-```ts
-let cart = 0;
-cart++;
+export default function CartBadge() @{
+	let cart = state(0);
+
+	<button onClick={() => cart++}>In your cart: {cart}</button>
+}
 ```
 
-Here is that variable as a jar beside your shop page. Press **Add to cart**.
+**`state(0)`** makes `cart` a value the page watches. It's still a plain **`let`**: you read it as `cart` and change it with `cart++`.
+
+## A plain variable isn't watched
+
+A *plain variable* is one without `state()`. Here is `let cart = 0` as a jar beside a shop page. Press **Add to cart**.
 
 <StateAnatomy wired={false} />
 
-The jar fills up, but the page still says 0. A plain variable has no wires to the page, so the
-page never finds out.
-
-**Wrap the starting value in `state()`, and the page keeps up.**
-
-```tsrx
-let cart = state(0);
-```
+The jar fills up, but the page still says 0. Nothing tells the page that `cart` changed.
 
 ## Follow the wire
 
@@ -66,7 +66,7 @@ and the change goes straight to the spots that show it.
 
 </Collapsible>
 
-<Code note="Add a paragraph that also shows {theme}, then press Dark. Then change state('light') to a plain 'light' and read the build error: a plain let is read once, while the page is set up, so a later change never reaches the screen.">
+<Code steps={[{ label: 'Press Dark.', shows: 'Theme: dark' }, { label: 'Add `<p>{theme}</p>` under the heading, and press Light. Both lines follow.', source: '<p>{theme}</p>' }, { label: "Change `state('light')` to a plain `'light'`, and read the build error.", source: "let theme = 'light'" }]}>
 ```tsrx title="settings.tsrx"
 import { state } from '@markless/core';
 
