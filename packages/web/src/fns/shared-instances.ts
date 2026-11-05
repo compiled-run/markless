@@ -114,14 +114,19 @@ export async function bindRunningGraph(
 }
 
 // This container's changes since `base` laid over `theirs`, field by field where both are plain objects.
-function mergeWrite(base: unknown, theirs: unknown, ours: unknown): unknown {
+function mergeWrite(base: unknown, theirs: unknown, ours: unknown, seen = new Set<object>()): unknown {
 	if (sameValue(theirs, base)) return ours;
 	if (!isPlain(base) || !isPlain(theirs) || !isPlain(ours) || Array.isArray(ours)) return ours;
+	if (seen.has(ours)) return ours;
+	seen.add(ours);
 	const merged: Record<string, unknown> = { ...(theirs as Record<string, unknown>) };
 	const before = base as Record<string, unknown>;
-	for (const [key, value] of Object.entries(ours as Record<string, unknown>))
-		if (!sameValue(value, before[key]))
-			merged[key] = mergeWrite(before[key], merged[key], value);
+	const after = ours as Record<string, unknown>;
+	for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+		if (!Object.hasOwn(after, key)) delete merged[key];
+		else if (!Object.hasOwn(before, key) || !sameValue(after[key], before[key]))
+			merged[key] = mergeWrite(before[key], merged[key], after[key], seen);
+	}
 	return merged;
 }
 

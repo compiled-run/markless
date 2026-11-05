@@ -79,7 +79,12 @@ export async function bindSharedCells(root: object, state: ProtocolStatePayload,
 					const wrote = () => (written.add(graphNodeId), void bind());
 					// A first gesture's handler already wrote through the event-only graph.
 					if (host.__marklessEventOnlyGraph?.has(graphNodeId)) wrote();
-					graph.subscribe({ id: 'shared-bind', graphNodeId, path: [], run: wrote });
+					graph.subscribe({
+						id: `shared-bind:${graphNodeId}`,
+						graphNodeId,
+						path: [],
+						run: wrote,
+					});
 				}
 				if (!store) continue;
 				// Running now, so another container's write reaches it through the listener, not a wake.
@@ -88,7 +93,10 @@ export async function bindSharedCells(root: object, state: ProtocolStatePayload,
 					shape: '',
 					cells: {},
 					listeners: [],
-				}).listeners.push({ root, apply: () => void bind() });
+				}).listeners.push({
+					root,
+					apply: () => (host.__mL === life ? void bind() : false),
+				});
 			}
 		},
 	};
