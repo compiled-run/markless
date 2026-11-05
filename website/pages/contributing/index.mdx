@@ -2,24 +2,35 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import TransitMapFigure from '../../components/figures/repo-tour/transit-map-figure.tsrx';
+import TreeFigure from '../../components/figures/repo-tour/tree-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# A tour of the Markless repo
+# The Markless repo
 
 <PageMeta time="2 min" assumes="nothing" />
 
-<Subtitle text="Most packages form one pipeline: one half reads your .tsrx files before your app runs, and the other half runs the result wherever you pick." />
+<Subtitle text="The Markless repo is one pnpm workspace whose packages form a pipeline: half of them read your .tsrx files before your app runs, and half run the result." />
 
-Press the map, and ride `Counter.tsrx` from stop to stop:
+```bash title="Terminal"
+$ ls packages
+analyzer  bundler  cli  compiler  core  headless  router
+runtime  serializer  typescript-plugin  vitest-browser  web
+```
 
-<TransitMapFigure />
+**`compiler`** and **`bundler`** turn a `.tsrx` file into code before your app runs. **`web`**, **`runtime`** and **`serializer`** run that code, and **`core`** is the one package an app imports.
 
-Each stop is a package in `packages/`. The purple line works before your app runs, and the green line runs the result.
+## A .tsrx file moves through the packages one way
 
-## Compile time
+A *pipeline* is a chain where each package hands its output to the next. Press `map.tsrx` to follow it through `packages/`, then click `web` to add an import of `core`:
+
+<TreeFigure />
+
+- The compiler and bundler work before your app runs, and `web` runs the result.
+- No package imports one that depends on it, so the import from `web` would close a cycle.
+
+## Three packages work before your app runs
 
 - **`@markless/compiler`** reads `.tsrx` and plans it: semantic graph, state lowering, payload planning, emit. Imports `serializer`.
 - **`@markless/bundler`** runs the compiler inside Vite or Rolldown. Build-time prerendering lives here too, as a preview. Imports `compiler`, `serializer` and `web`.
@@ -27,23 +38,23 @@ Each stop is a package in `packages/`. The purple line works before your app run
 
 The compiler doesn't import `web`, but the code it writes does: compiled components import helpers from `@markless/web/fns/*`.
 
-## Render anywhere
+## Four packages run the result
 
 - **`@markless/web`** renders and resumes for the web: `render` in a browser, `renderToString` and `renderToStream` for HTML. Imports `runtime` and `serializer`.
 - **`@markless/runtime`** is the state graph: reads, writes, computed values and the flush journal. Imports `serializer`.
 - **`@markless/serializer`** holds value serialization and the payload protocol types. Imports nothing.
 - **`@markless/core`** is the one import for apps: `state`, `computed`, `shared`, `element` and `storage`, plus `render`, `renderToString` and the Vite plugin. Imports `web`, `bundler` and `router`.
 
-A server render and a browser render are two phases of one runtime in `web`, so there's no `packages/server`. No package imports one that depends on it.
+A server render and a browser render are two phases of one runtime in `web`, so there's no `packages/server`.
 
-## Around the pipeline
+## Other packages sit around the pipeline
 
 - **`@markless/router`** (`packages/router`): file routes, navigation and streaming, built on Nitro.
 - **`create-markless`** (`packages/cli`): creates apps from the four starters.
 - **`@markless/vitest-browser`**, **`@markless/analyzer`**: browser tests, and checks of a running app.
 - **`@markless/ui`**, **`@markless/icons`**, **`@markless/ui-tools`** (`packages/headless/`): UI components, icon packs and their build tools.
 
-## Everything else
+## The rest of the repo holds specs, demos and this site
 
 - `specs/` holds the behavior contract, `.ruler/` the agent rules and skills, and `docs/` the CI process.
 - `demos/` holds demo apps, `poc/fixtures/proofs/` the proof fixtures, `scripts/` the CI, release and benchmark tools, and `website/` this site.

@@ -3,25 +3,36 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import StatuteBookFigure from '../../components/figures/specs-rules/statute-book-figure.tsrx';
-import StampFigure from '../../components/figures/specs-rules/stamp-figure.tsrx';
+import ExplorerFigure from '../../components/figures/specs-rules/explorer-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Specs, rules and skills
+# Specs and rules
 
 <PageMeta time="2 min" assumes="nothing" />
 
-<Subtitle text="Two folders decide what the code must do: specs/ says how Markless behaves, and .ruler/ says how people and AI agents work in the repo." />
+<Subtitle text="Specs and rules are two folders: specs/ says how Markless behaves, and .ruler/ says how people and AI agents work in the repo." />
 
-## `specs/` holds the behavior contract
+```text title="markless/"
+specs/framework-design.md
+specs/framework/03-state-graph.md
+specs/router/
+.ruler/AGENTS.md
+.ruler/skills/markless-implementation/
+```
 
-Press the book to open it at its marks:
+**`specs/framework-design.md`** is the index of the behavior contract, and each file in **`specs/framework/`** owns one area. **`.ruler/`** holds the rules and skills every agent and contributor follows.
 
-<StatuteBookFigure />
+## `specs/` is the behavior contract
 
-Read `specs/framework-design.md` first. `08-deferred-decisions.md` lists the topics that stay open on purpose, and `specs/router/` covers routing, typed routing and the router CLI.
+A *spec* says what Markless must do, in words a test can check.
+
+- `specs/framework-design.md` is the index. Read it first.
+- `specs/framework/00-overview.md` to `14-emission-codegen-migration.md` each own one area, such as `07-diagnostics.md`.
+- `specs/framework/08-deferred-decisions.md` lists the topics that stay open on purpose.
+- `specs/router/` covers routing, typed routing and the router CLI.
+- `specs/framework/archive/` is history, not the current contract.
 
 <Callout
 	sprite="cross"
@@ -29,7 +40,7 @@ Read `specs/framework-design.md` first. `08-deferred-decisions.md` lists the top
 	text="A spec can drift from the code. When they disagree, the code and its tests show what Markless does today."
 />
 
-## Edit a spec
+## A spec edit follows one skill
 
 Follow `.ruler/skills/markless-spec-maintenance/spec.md`:
 
@@ -41,13 +52,14 @@ Follow `.ruler/skills/markless-spec-maintenance/spec.md`:
 
 ## `.ruler/` is the one source for the rules
 
-`pnpm rules` runs `ruler apply`, which stamps `AGENTS.md`, `CLAUDE.md`, the skill copies and the MCP configuration out of `.ruler/`. Press the stamp:
+`pnpm rules` runs `ruler apply`, which writes `AGENTS.md`, `CLAUDE.md`, the skill copies and the MCP configuration from `.ruler/`. Add a rule to `.ruler/AGENTS.md`, press **pnpm rules**, then edit `AGENTS.md` by hand:
 
-<StampFigure />
+<ExplorerFigure />
 
-Never edit those outputs by hand: the `agent-files` CI job fails if they drift from `.ruler/`. After you edit `.ruler/`, run `pnpm rules` and commit what it writes.
+- Never edit the outputs by hand: the `agent-files` CI job fails if they drift from `.ruler/`.
+- After you edit `.ruler/`, run `pnpm rules` and commit what it writes.
 
-## Rules to know
+## A few rules apply everywhere
 
 - Run `pnpm run typecheck` and `pnpm ci:local --fast` before you call a change done.
 - Write the test first. Run the narrowest failing test, then make the smallest change.

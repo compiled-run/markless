@@ -2,38 +2,41 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import PegboardFigure from '../../components/figures/dev-setup/pegboard-figure.tsrx';
-import TypecheckFigure from '../../components/figures/dev-setup/typecheck-figure.tsrx';
+import TerminalFigure from '../../components/figures/dev-setup/terminal-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Set up the repo on your machine
+# Dev setup
 
-<PageMeta time="2 min" assumes="nothing" />
+<PageMeta time="3 min" assumes="nothing" />
 
-<Subtitle text="One pnpm install sets up every package and turns on the git hooks, so your first commit already runs CI's fast checks." />
+<Subtitle text="Dev setup is one pnpm install that builds every package and turns on the git hooks, so your first commit already runs CI's fast checks." />
 
-```bash
+```bash title="terminal"
 git clone https://github.com/compiled-run/markless.git
 cd markless
 corepack enable
 pnpm install
 ```
 
-## What you need
+**`corepack enable`** picks up the pnpm version the repo pins. **`pnpm install`** installs every package and runs the root `prepare` script, which turns on the hooks.
+
+## You need Node, pnpm and git
 
 - **Node 24.** The repo doesn't pin a Node version, but every CI job that installs Node installs 24.
-- **pnpm 10.33.2.** The root `package.json` pins it in `packageManager`, and `corepack enable` picks it up.
+- **pnpm 10.33.2.** The root `package.json` pins it in `packageManager`.
 - **git**, and the **`gh`** command line if you ever push to `main`. The `pre-push` hook uses it.
 
-## `pnpm install` hangs up every script and the hooks
+## `pnpm install` turns on the hooks
 
-Press the board to run `pnpm install` again:
+A *git hook* is a script git runs before a commit or a push. Press **git commit** first, then **pnpm install**, then **git commit** again:
 
-<PegboardFigure />
+<TerminalFigure />
 
-The root `prepare` script points git at `.githooks/`, so every commit runs lint and CI's fast jobs first.
+- Before the install, a commit runs no checks.
+- After it, every commit runs lint, then CI's fast jobs.
+- `prepare` runs `git config core.hooksPath .githooks`.
 
 Some tests start real browsers. Install the ones CI uses:
 
@@ -43,7 +46,7 @@ pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 
 Or run `pnpm ci:local --install`, which runs each job's setup steps, the browser installs among them, before its checks.
 
-## The scripts you'll use
+## Scripts run what CI runs
 
 | Script | What it runs |
 | --- | --- |
@@ -59,12 +62,18 @@ Or run `pnpm ci:local --install`, which runs each job's setup steps, the browser
 
 `pnpm test` is not CI. It runs a different, longer set of commands, so use `pnpm ci:local` to run what CI runs.
 
-## Type-check the whole repo
+## `pnpm run typecheck` reads `.tsrx` files
 
 Plain `tsc` can't read `.tsrx` files. `pnpm run typecheck` wraps it, so every `tsc` flag still works:
 
-<TypecheckFigure />
+```text
+broken.tsrx(4,1): error TS91001: Markless TSRX parse error: Unexpected token '}'
+app.tsrx(4,7): error TS2322: Type 'number' is not assignable to type 'string'.
+Found 1 Markless TSRX compile error.
+```
 
-A file that doesn't parse fails the run too. `pnpm typecheck:ts7` runs the same check on the TypeScript 7.1 beta, and CI runs both. There, a parse error reports `TSRX771000` instead of `TS91001`, and it skips the type errors until every file parses.
+- Each error names the file, the line and the column.
+- A file that doesn't parse fails the run too.
+- `pnpm typecheck:ts7` runs the same check on the TypeScript 7.1 beta, and CI runs both. There, a parse error reports `TSRX771000` instead of `TS91001`.
 
-[Your first pull request](/contributing/first-pr) puts these commands to work on a real change.
+[Your first PR](/contributing/first-pr) puts these commands to work on a real change.

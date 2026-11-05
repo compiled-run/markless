@@ -3,28 +3,49 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import DictionaryFigure from '../../components/figures/glossary/dictionary-figure.tsrx';
+import TermFigure from '../../components/figures/glossary/term-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# One meaning for every word
+# Glossary
 
 <PageMeta time="4 min" assumes="nothing" />
 
-<Subtitle text="Each word on this site has one meaning. Look it up here." />
+<Subtitle text="The glossary is the one meaning each word has everywhere on this site." />
 
-The page is a dictionary with four sections, and every word in it has one sense. Press the book to open it at a section:
+```tsrx title="guest-list.tsrx"
+import { state } from '@markless/core';
 
-<DictionaryFigure />
+export default function GuestList() @{
+	let guests = state(['Ada', 'Grace']);
 
-## Writing components
+	<ul>
+		@for (const name of guests; key name) {
+			<li>{name}</li>
+		}
+	</ul>
+}
+```
+
+Three words from the tables below are in this file: **`GuestList`** is a *component*, **`guests`** is *state*, and **`key name`** is the *key* that gives each row its identity.
+
+## A word means the same on every page
+
+A *term* is a word this site defines once and underlines wherever it appears. Hover `resumes` on either page:
+
+<TermFigure />
+
+- Both tooltips say the same thing, word for word.
+- Each meaning comes from the tables below.
+
+## Words for writing components
 
 | Term | Meaning |
 | --- | --- |
-| component | A function in a `.tsrx` file whose body holds elements, written `function Counter() @{ ... }`. |
+| component | A function in a `.tsrx` file whose body holds elements, written `function GuestList() @{ ... }`. |
 | TSRX | The file format for components: TypeScript plus elements and `@if`, `@for` and `@try` blocks. |
-| state | A value from `state()` that you read and write as a plain variable, like `count`. |
+| state | A value from `state()` that you read and write as a plain variable, like `guests`. |
 | computed | A value from `computed()` that Markless works out from state. |
 | shared | Data from `shared()` that many components reach without props. |
 | storage | A string value from `storage()` that Markless saves in `localStorage`. |
@@ -32,7 +53,7 @@ The page is a dictionary with four sections, and every word in it has one sense.
 | key | The identity of each row in an `@for`, as in `key item.id`. |
 | async boundary | An `@try` block with `@pending` and `@catch` around an async read. |
 
-## Where a component renders
+## Words for where a component renders
 
 Markless plans a component while it builds your app. The same plan then renders in each of these places.
 
@@ -47,12 +68,12 @@ Markless plans a component while it builds your app. The same plan then renders 
 | test render | `@markless/vitest-browser` renders a component in a browser test, either mounted directly or through a server render. |
 | native host | Proofs in the repo drive UIKit and AppKit controls with the same model. They are proofs, not a feature you can use. |
 
-## How it works
+## Words for how Markless works
 
 | Term | Meaning |
 | --- | --- |
 | compiler | The build step that reads `.tsrx` files. It plans the state, the updates and the code each event runs, before the app runs. |
-| direct module | What the compiler writes for a simple component, such as a counter. At mount, it builds the DOM and its own small state graph. It puts listeners on the elements and patches text directly. No full runtime comes along. |
+| direct module | What the compiler writes for a simple component. At mount, it builds the DOM and its own small state graph. It puts listeners on the elements and patches text directly. No full runtime comes along. |
 | fallback runtime | What `render()` uses when the compiler cannot write a direct module. A container listens for events and brings in the full runtime when it needs it. |
 | symbol | One piece of code that the compiler split out, like one click handler. |
 | chunk | A file that holds symbols. A click's code runs only when someone clicks. A production build can still fetch the chunk earlier. |
@@ -63,7 +84,7 @@ Markless plans a component while it builds your app. The same plan then renders 
 | resumer | The small inline script in server output. It waits for the first interaction, then brings in the code that interaction needs. A page with no interactions gets no resumer. |
 | resume | The browser carries on from server HTML and its payload. It does not run the component body again. |
 
-## Tooling
+## Words for the tooling
 
 | Term | Meaning |
 | --- | --- |

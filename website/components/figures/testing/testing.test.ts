@@ -1,23 +1,25 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { frozen } from '../ink/freeze.ts';
-import * as marionette from './marionette.ts';
+import { COMPONENT, FAILURE, HANDLER, TEST } from './todo.ts';
 
-const figures = { marionette };
+const page = readFileSync(new URL('../../../pages/tooling/testing.mdx', import.meta.url), 'utf8');
+const toy = readFileSync(new URL('./runner-figure.tsrx', import.meta.url), 'utf8');
+const pkg = JSON.parse(readFileSync(new URL('../../../../packages/vitest-browser/package.json', import.meta.url), 'utf8')) as { name: string; exports: Record<string, unknown> };
 
-describe('testing figures', () => {
-	for (const [name, figure] of Object.entries(figures)) {
-		it(name + ' draws the same scene twice', () => {
-			expect(JSON.stringify(figure.drawing())).toBe(JSON.stringify(figure.drawing()));
-		});
+describe('testing runner figure', () => {
+	it('draws the same component and test the page shows', () => {
+		expect(page).toContain(COMPONENT.slice(1).join('\n'));
+		expect(page).toContain(TEST.slice(1).join('\n'));
+		expect(COMPONENT[6]).toContain(HANDLER.ok);
+	});
 
-		it(name + ' is frozen', async () => {
-			await expect(frozen(name + '.ts', 'testing.test.ts', figure.drawing())).toMatchFileSnapshot('./' + name + '.art.ts');
-		});
-	}
+	it('imports render from the real package and prints the failure Vitest prints', () => {
+		expect(pkg.name).toBe('@markless/vitest-browser');
+		expect(TEST[1]).toContain(pkg.name);
+		expect(FAILURE).toBe("AssertionError: expected 'Buy milk: to do' to be 'Buy milk: done' // Object.is equality");
+	});
 
-	it('presses both pages to Count 1, one per way in', () => {
-		const texts = marionette.drawing().layers.flatMap((l) => l.texts.map((t) => t.text));
-		expect(texts.filter((t) => t === '1')).toHaveLength(2);
-		for (const way of marionette.WAYS) expect(texts).toContain(way.call);
+	it('answers press and keys, speaks each change, and drops animation under reduced motion', () => {
+		for (const hook of ['onClick={() => run()}', 'onClick={() => flip()}', "event.key === 'Escape'", 'aria-live="polite"', 'prefers-reduced-motion: reduce']) expect(toy).toContain(hook);
 	});
 });

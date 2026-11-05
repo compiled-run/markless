@@ -1,33 +1,39 @@
-import { compileToVolarMappingsWithoutRecovery } from '@markless/typescript-plugin/volar';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { frozen } from '../ink/freeze.ts';
-import * as tracing from './tracing.ts';
-import * as whereItRuns from './where-it-runs.ts';
+import { drawing, ERRORS, VARIANTS } from './editor.ts';
 
-const figures = { tracing, 'where-it-runs': whereItRuns };
+const art = drawing();
+const page = readFileSync(new URL('../../../pages/tooling/type-checking.mdx', import.meta.url), 'utf8');
+const D = (ts as unknown as { Diagnostics: Record<string, { code: number; message: string }> }).Diagnostics;
+const fill = (template: string, ...args: string[]) => args.reduce((text, arg, i) => text.replace('{' + i + '}', arg), template);
+const text = (runs: { t: string }[]) => runs.map((r) => r.t).join('');
 
-describe('type checking figures', () => {
-	for (const [name, figure] of Object.entries(figures)) {
-		it(name + ' draws the same scene twice', () => {
-			expect(JSON.stringify(figure.drawing())).toBe(JSON.stringify(figure.drawing()));
-		});
-
-		it(name + ' is frozen', async () => {
-			await expect(frozen(name + '.ts', 'type-checking.test.ts', figure.drawing())).toMatchFileSnapshot('./' + name + '.art.ts');
-		});
-	}
-
-	it('prints the TSX copy the type service really writes for app.tsrx', () => {
-		const source = "import { Nav } from './nav.tsrx';\n\nexport function App() @{\n\t<Nav label={42} />\n}\n";
-		const emitted = compileToVolarMappingsWithoutRecovery(source, '/app.tsrx').code.trim().split('\n');
-		expect(emitted).toEqual(tracing.COPY);
+describe('type checking figure', () => {
+	it('draws the same scene twice', () => {
+		expect(JSON.stringify(drawing())).toBe(JSON.stringify(art));
 	});
 
-	it('marks the copy in red and lands the mark on line 4, column 7 of the file', () => {
-		const art = tracing.drawing();
-		const texts = art.layers.flatMap((l) => l.texts.map((t) => t.text));
-		expect(texts).toContain('TS2322');
-		expect(texts).toContain('LINE 4, COLUMN 7');
-		expect(art.layers.flatMap((l) => l.paths).filter((p) => p.cls.includes('squiggle')).length).toBe(3);
+	it('is frozen (refresh with -u after a geometry change)', async () => {
+		const module = `// Written by type-checking.test.ts from editor.ts. Refresh with the figure tests and -u.
+import type { drawing } from './editor.ts';
+
+export const art: ReturnType<typeof drawing> = ${JSON.stringify(art, null, '\t')};
+`;
+		await expect(module).toMatchFileSnapshot('./editor.art.ts');
+	});
+
+	// The values came from running packages/typescript-plugin/src/tsc.ts on this card.tsrx and avatar.tsrx.
+	it('shows the messages TypeScript prints for these two mistakes', () => {
+		expect(ERRORS.size).toMatchObject({ code: D.Type_0_is_not_assignable_to_type_1!.code, message: fill(D.Type_0_is_not_assignable_to_type_1!.message, 'string', 'number') });
+		expect(ERRORS.titel).toMatchObject({ code: D.Cannot_find_name_0_Did_you_mean_1!.code, message: fill(D.Cannot_find_name_0_Did_you_mean_1!.message, 'titel', 'title') });
+		expect(text(VARIANTS.size.wrong)).toContain('<Avatar size="large" />');
+		expect(text(VARIANTS.titel.wrong)).toContain('{titel}');
+	});
+
+	it('quotes the same messages on the page, with no internals', () => {
+		expect(page).toContain(ERRORS.size.message);
+		expect(page).toContain(ERRORS.titel.message);
+		expect(page).not.toMatch(/TSX copy|type service|emit/i);
 	});
 });

@@ -113,7 +113,7 @@ function edgeOf(w: number, h: number): P[] {
 export type At = number | undefined;
 
 /** Pen marks are drawn on, text and washes fade in, `gone` marks fade out: each at its own delay after a press. */
-export type Motion = 'draw' | 'show' | 'gone' | 'sink' | 'pulse' | 'flash' | '';
+export type Motion = 'draw' | 'show' | 'gone' | 'sink' | 'pulse' | 'flash' | 'away' | '';
 
 /**
  * A desk scene: give it every sheet first, so the camera can fit them; then print rows and add marks.
@@ -145,7 +145,7 @@ export function desk(width: number, specs: readonly SheetSpec[], extra: Point3[]
 	const motion = (m: Motion, at: At, extraStyle = '', until?: number) => {
 		const parts = [extraStyle];
 		if (m && at !== undefined) parts.push('--at:' + Math.round(at) + 'ms');
-		if (m === 'flash' && at !== undefined) parts.push('--for:' + Math.round((until ?? at + 1000) - at) + 'ms');
+		if ((m === 'flash' || m === 'away') && at !== undefined) parts.push('--for:' + Math.round((until ?? at + 1000) - at) + 'ms');
 		return parts.filter(Boolean).join(';');
 	};
 	const path = (d: string, cls: string, style = '') => {
@@ -410,6 +410,8 @@ export function desk(width: number, specs: readonly SheetSpec[], extra: Point3[]
 		text: (key: string, u: number, v: number, text: string, cls: string, m: Motion = '', at?: At) => layer.texts.push({ text, cls: [cls, m].filter(Boolean).join(' '), style: motion(m, at), matrix: matrixAt(get(key), u, v) }),
 		/** A text placed with a matrix the figure built itself, such as on the top face of a block. */
 		textWith: (matrix: string, text: string, cls: string, m: Motion = '', at?: At) => layer.texts.push({ text, cls: [cls, m].filter(Boolean).join(' '), style: motion(m, at), matrix }),
+		/** Motion style for a mark shown only between `at` and `until` ('flash'), or hidden only then ('away'). */
+		span: (m: 'flash' | 'away', at: number, until: number) => motion(m, at, '', until),
 		motion,
 		on: (key: string, pts: P[], lift = 0) => on(get(key), pts, lift),
 		at: (key: string, u: number, v: number, lift = 0) => get(key).at(u, v, lift),

@@ -2,47 +2,80 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import GlassesFigure from '../../components/figures/editor-setup/glasses-figure.tsrx';
-import TsconfigFigure from '../../components/figures/editor-setup/tsconfig-figure.tsrx';
+import EditorFigure from '../../components/figures/editor-setup/editor-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Make your editor read `.tsrx` files
+# Editor setup
 
 <PageMeta time="2 min" assumes="reading-tsrx" />
 
-<Subtitle text="Two pieces make your editor understand a .tsrx file: an extension adds the colours, and a TypeScript plugin adds everything else." />
+<Subtitle text="Your editor reads a .tsrx file with two pieces: an extension that colours it and a TypeScript plugin that understands it." />
 
-Press the glasses, and watch what each lens shows:
+```json title="tsconfig.json"
+{
+	"compilerOptions": {
+		"plugins": [
+			{ "name": "@markless/typescript-plugin" },
+			{ "name": "@markless/router/typescript-plugin" }
+		]
+	}
+}
+```
 
-<GlassesFigure />
+The **TSRX extension** colours the file and knows `@if` and `@{ }`. The **Markless TypeScript plugin**, named here, adds hover types, suggestions and red lines.
 
-The **TSRX extension** knows `@if` and `@{ }`, but nothing about Markless. The **Markless TypeScript plugin** adds the suggestions, hints and red lines. An app from `npm create markless` sets up both.
+## The extension colours, the plugin understands
 
-## Check `tsconfig.json`
+You get the colours once the extension is installed, and the rest once the plugin runs. Install the extension, hover `name`, then click `{name}` on line 7 to misspell it:
 
-The plugin is named in your app's `tsconfig.json`. A new app already has these three lines:
+<EditorFigure />
 
-<TsconfigFigure />
+- Before the install, the file is plain text.
+- After it, hovering `name` shows `let name: string`.
+- A typo gets a red line, with TypeScript's own message.
 
-Not sure a line is right? Run `npm run doctor -- --no-build`. It checks the `tsrx.compiler` line and prints the line to add if it's missing.
+## A new app is already set up
 
-## Pick your editor
+An app from `npm create markless` writes these lines into `tsconfig.json`:
+
+```json title="tsconfig.json"
+{
+	"tsrx": {
+		"compiler": "@markless/typescript-plugin/volar"
+	},
+	"compilerOptions": {
+		"jsx": "preserve",
+		"plugins": [
+			{ "name": "@markless/typescript-plugin" },
+			{ "name": "@markless/router/typescript-plugin" }
+		]
+	}
+}
+```
+
+- `tsrx.compiler` tells the TSRX tools to read `.tsrx` files the Markless way.
+- `@markless/typescript-plugin` adds Markless suggestions, hints, errors and `.tsrx` imports.
+- `@markless/router/typescript-plugin` suggests your page addresses inside `href`.
+
+Not sure a line is right? Run `npm run doctor -- --no-build`. It prints the `tsrx.compiler` line to add if it's missing.
+
+## Each editor finds the pieces its own way
 
 - **VS Code, Cursor or Windsurf.** Install the TSRX extension. The app's `.vscode/extensions.json` recommends it, so the editor offers it when you open the folder.
-- **Zed.** Nothing to install. The app's `.zed/settings.json` opens `.tsrx` files as TSX and loads the plugin into Zed's TypeScript server.
+- **Zed.** Nothing to install. The app's `.zed/settings.json` opens `.tsrx` files as TSX and loads the plugin.
 - **Any other editor** that runs TypeScript's own language server, such as WebStorm, reads the same `tsconfig.json` lines.
 
 ```bash
 code --install-extension ripple-ts.ripple-ts-vscode-plugin
 ```
 
-That installs the TSRX extension from a terminal. If you once installed the old `markless.markless` extension, remove it with `code --uninstall-extension markless.markless`, or the two fight over `.tsrx` files.
+That installs the extension from a terminal. Remove the old `markless.markless` extension if you have it, or the two fight over `.tsrx` files.
 
 ## Hints name the element
 
-After a tag whose props come from one HTML element, a small hint names that element: `<tabs.trigger` shows `: button`. To turn the hints off, add `"partHints": false` to the plugin's entry:
+A *part hint* names the HTML element a tag's props come from: `<tabs.trigger` shows `: button`. Turn the hints off with `"partHints": false`:
 
 ```json title="tsconfig.json"
 { "name": "@markless/typescript-plugin", "partHints": false }
@@ -50,15 +83,13 @@ After a tag whose props come from one HTML element, a small hint names that elem
 
 ## TypeScript 7.1 is experimental
 
-The plugin runs on TypeScript 5.9. TypeScript 7 can't load plugins, so it reads `.tsrx` files through [`@tsrx/content-mapper`](https://github.com/tsrx-org/tsrx/tree/main/packages/vscode-plugin#native-backend-setup) instead. Hover, go to definition, suggestions for members and props, and type errors work there.
+The plugin runs on TypeScript 5.9. TypeScript 7 can't load plugins, so it reads `.tsrx` files through [`@tsrx/content-mapper`](https://github.com/tsrx-org/tsrx/tree/main/packages/vscode-plugin#native-backend-setup) instead. Hover, go to definition, member suggestions and type errors work there, but these don't yet:
 
-Not yet, on TypeScript 7.1:
-
-- `@` block suggestions and element hints.
+- `@` block suggestions and part hints.
 - An auto-import that adds a new `import` line ([microsoft/TypeScript#64119](https://github.com/microsoft/TypeScript/issues/64119)).
-- Rename, where the TSX copy spells a name differently ([microsoft/TypeScript#63879](https://github.com/microsoft/TypeScript/issues/63879)).
+- Rename, in some files ([microsoft/TypeScript#63879](https://github.com/microsoft/TypeScript/issues/63879)).
 - Suggestions straight after a fresh `.`, Find File References and Go to Source Definition.
 
 Stay on TypeScript 5.9 for daily work. [tsrx-org/tsrx#136](https://github.com/tsrx-org/tsrx/issues/136) tracks every known gap.
 
-[Type checking](/tooling/type-checking) shows how TypeScript checks a `.tsrx` file at all.
+[Type checking](/tooling/type-checking) shows the errors the plugin catches.

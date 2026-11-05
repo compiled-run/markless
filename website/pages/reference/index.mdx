@@ -3,26 +3,40 @@ import ReleaseVersion from '../../components/docs/release-version.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import DollsFigure from '../../components/figures/reference/dolls-figure.tsrx';
+import PackagesFigure from '../../components/figures/reference/packages-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Every Markless package
+# Markless packages
 
 <PageMeta time="2 min" assumes="nothing" />
 
-<Subtitle text="An app installs a few Markless packages, and those use a few more. Every published package shares one version number." />
+<Subtitle text="Markless is a set of npm packages that share one version number: you install a few, and they bring the rest." />
+
+```json title="package.json"
+"dependencies": {
+	"@markless/core": "{{marklessVersion}}",
+	"@markless/router": "{{marklessVersion}}"
+},
+"devDependencies": {
+	"@markless/analyzer": "{{marklessVersion}}",
+	"@markless/typescript-plugin": "{{marklessVersion}}"
+}
+```
+
+A new app from `npm create markless` lists four Markless packages: **`core`** and **`router`** to run the app, and **`analyzer`** and **`typescript-plugin`** to check it. The CLI fills in `{{marklessVersion}}` as a `^` range of its own version:
 
 <ReleaseVersion />
 
-## Packages you install
+## You install four packages, and they bring the rest
 
-A new app from `npm create markless` installs four Markless packages. Press the dolls to open them:
+A *dependency* is a package another package needs, which npm installs along with it. Press the terminal to install `@markless/core`, then click a package to delete it:
 
-<DollsFigure />
+<PackagesFigure />
 
-You install the packages in this table yourself. The ones in the next table come along inside them.
+- Each package lands after the package that needs it.
+- Delete one, and every package that needs it turns red.
 
 | Package | What it gives you |
 | --- | --- |
@@ -33,7 +47,9 @@ You install the packages in this table yourself. The ones in the next table come
 | `@markless/analyzer` | Checks a running app in the browser: console errors, network requests, event wiring and JavaScript budgets you set. The Playwright driver is at `@markless/analyzer/playwright`. |
 | `create-markless` | Creates a new app. See [CLI](/reference/cli). |
 
-## Packages the others use
+## The packages you never import
+
+These come along as dependencies. You don't import them yourself.
 
 | Package | What it does |
 | --- | --- |
@@ -43,7 +59,7 @@ You install the packages in this table yourself. The ones in the next table come
 | `@markless/serializer` | The format for the state and page data that travel with rendered HTML. |
 | `@markless/web` | The render code behind `render()` in the browser and `renderToString()` for HTML. |
 
-## Not on npm yet
+## Three packages aren't on npm yet
 
 - **`@markless/ui`**: headless, accessible UI components. See [UI components](/ui). It waits on the two packages below. npm still holds an old `0.4.0` from before these pages.
 - **`@markless/icons`**: icon packs as `<pack.icon />` tags, inlined at build time.

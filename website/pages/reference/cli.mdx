@@ -3,24 +3,34 @@ import MarkedList from '../../components/docs/marked-list.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import QuestionnaireFigure from '../../components/figures/cli/questionnaire-figure.tsrx';
+import SessionFigure from '../../components/figures/cli/session-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Create an app from the command line
+# The create-markless CLI
 
-<PageMeta time="3 min" assumes="nothing" />
+<PageMeta time="4 min" assumes="nothing" />
 
-<Subtitle text="create-markless makes a new app in one command. It asks a few questions, or takes flags instead." />
+<Subtitle text="create-markless is the command that writes a new Markless app into a folder, asking a few questions unless flags answer them first." />
 
-This command makes the `app` starter in `my-app/`, installs its packages, and skips `git init`. Press the card to watch the flags answer the CLI's questions before it asks them:
+```bash title="Terminal"
+npm create markless@latest my-app -- --yes --starter app --no-git
+```
 
-<QuestionnaireFigure />
+**`my-app`** is the folder it creates. **`--yes`** takes the defaults, **`--starter app`** picks the `app` starter, and **`--no-git`** skips `git init`. With npm, the flags go after **`--`**, or npm reads `--yes` as its own option; pnpm, Yarn and Bun pass flags through without it.
 
-With npm, the flags go after `--`, or npm reads `--yes` as its own option. pnpm, Yarn and Bun pass flags through without it.
+## Flags answer the questions before they're asked
 
-## Flags
+A *flag* is a word starting with `--` that you add to a command. Press the terminal to run the command bare, then press a flag; tear off the `--` and try again:
+
+<SessionFigure />
+
+- Bare, the CLI asks "What are you building today?" and waits.
+- With the flags after `--`, it asks nothing and ends with "Markless app ready."
+- Without `--`, npm keeps the flags, and the CLI asks again.
+
+## Every flag the CLI takes
 
 This is what `npx create-markless --help` prints:
 
@@ -54,7 +64,7 @@ With `--yes` you must name the folder, and it takes these defaults:
 - a folder that must be empty, unless you pass `--force`
 - an app kept separate from any workspace around it, unless you pass `--workspace`
 
-## Starters
+## Four starters, all with pages
 
 All four starters are apps with pages, built on `@markless/router` and Nitro. Markless itself needs no server: `render()` from `@markless/core` mounts an app in the browser alone.
 
@@ -67,7 +77,7 @@ All four starters are apps with pages, built on `@markless/router` and Nitro. Ma
 
 Every starter also writes `package.json`, `tsconfig.json`, `vite.config.ts`, `README.md`, `.gitignore`, `public/` and `scripts/markless-doctor.mjs`. `--editor vscode` adds `.vscode/`, and `--editor zed` adds `.zed/`.
 
-## Coding agent skills
+## Your coding agent can get a Markless skill
 
 The CLI can put a Markless skill file in your coding agent's folder, like `~/.claude/skills/markless/SKILL.md`. It works for:
 
@@ -75,7 +85,7 @@ The CLI can put a Markless skill file in your coding agent's folder, like `~/.cl
 
 Add or remove it later with `create-markless agents <add|remove> [--agents <list|none>]`. Cursor's rules apply to every project, so the CLI doesn't write one.
 
-## Scripts in a new app
+## A new app comes with seven scripts
 
 | Script | Runs | What it does |
 | --- | --- | --- |

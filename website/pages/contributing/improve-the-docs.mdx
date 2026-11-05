@@ -1,7 +1,6 @@
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import TypoNotes from '../../components/figures/docs-guide/typo-notes.tsrx';
-import GalleyFigure from '../../components/figures/docs-guide/galley-figure.tsrx';
-import ComposingStickFigure from '../../components/figures/docs-guide/composing-stick-figure.tsrx';
+import SubtitlesNotes from '../../components/figures/docs-guide/subtitles-notes.tsrx';
+import DocsExplorerFigure from '../../components/figures/docs-guide/explorer-figure.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
@@ -14,34 +13,37 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="3 min" assumes="nothing" />
 
-<Subtitle text="This site is a Markless app in website/, so a framework change and the page that explains it can land in one pull request." />
+<Subtitle text="This site is a Markless app in website/, so a framework change and the page that explains it land in one pull request." />
 
-```bash
+```bash title="terminal"
 pnpm docs:dev       # dev server
 pnpm docs:build     # production build into website/.output/
 pnpm docs:preview   # serve the production build
 ```
 
-Run these from the repo root, after `pnpm install`.
+**`docs:dev`** serves the site while you edit, and **`docs:build`** builds it the way readers get it. Run them from the repo root.
 
 ## A page's path is its address
 
-<GalleyFigure />
+A *page file* is an `.mdx` file in `website/pages/`. Move `state.mdx` to another folder, or click it to rename it:
 
-A new page also needs its `nav.ts` entry, with a `title`, an `href`, an `icon` and a one-sentence `description`. The rest lives here:
+<DocsExplorerFigure />
 
-- `components/figures/<page>/`: the drawings and live demos.
-- `components/docs/`: `Code`, `Callout`, `Collapsible`, `Subtitle` and `PageMeta`.
-- `styles/global.css`: the tokens and the type scale.
-- `AGENTS.md` and `README.md` in `website/`: the styling rules. Read them first.
+- `pages/concepts/state.mdx` is served at `/concepts/state`.
+- A new page also needs its `nav.ts` entry, with a `title`, an `href`, an `icon` and a one-sentence `description`.
 
 ## Every page has the same shape
 
-<ComposingStickFigure />
+After its imports, each page opens with these, in order:
 
-`time` comes from the formula in `website/README.md`, and `assumes` lists keys from the `concepts` map in `nav.ts`. Write for a reader who has never used a UI framework: short sentences, "you", and everyday examples.
+1. A `#` title in plain words that names the thing.
+2. `<PageMeta time assumes />`, with `time` from the formula in `website/README.md`.
+3. `<Subtitle text />`: one sentence that says what the thing is.
+4. A small, real example, with its parts named in **bold** under it.
 
-## Pick one visual per idea
+Then come `##` headings that state each idea, and limits go last.
+
+## Each idea gets one visual
 
 | The idea | Use |
 | --- | --- |
@@ -52,37 +54,37 @@ A new page also needs its `nav.ts` entry, with a `title`, an `href`, an `icon` a
 | Facts to look up | A markdown table |
 | A trap the reader will hit | One `<Callout>`, at most one per page |
 
-## Code the reader can edit
+## A Code block runs what the reader types
 
-Wrap titled fences in `<Code>`. The page needs no import, because the build adds it.
+Wrap titled fences in `<Code>`; the build adds the import.
 
 ````txt
-<Code steps={[{ label: 'Rename the button to `Done`.', shows: 'Done' }, { label: 'Start at `3` instead of `0`.', source: 'state(3)' }]}>
-```tsrx title="tally.tsrx"
+<Code steps={[{ label: 'Rename the button to `Captions`.', shows: 'Captions: off' }, { label: 'Start with them on.', source: 'state(true)' }]}>
+```tsrx title="subtitles.tsrx"
 import { state } from '@markless/core';
 
-export default function Tally() @{
-	let fixed = state(0);
+export default function Subtitles() @{
+	let subtitles = state(false);
 
-	<button onClick={() => fixed++}>Typos fixed: {fixed}</button>
+	<button onClick={() => (subtitles = !subtitles)}>Subtitles: {subtitles ? 'on' : 'off'}</button>
 }
 ```
 </Code>
 ````
 
-Each step ticks itself on `shows` (an element shows this text), `source` (the code contains it) or `rewrites` (one update rewrites that many places). The starter must build, or the site build stops.
+A step ticks on `shows` (an element shows this text), `source` (the code contains it) or `rewrites` (one update rewrites that many places).
 
-## A textbook column
+## A textbook column shows what changes
 
-Press **Fixed one** a few times:
+Press **CC** a few times:
 
-<TypoNotes />
+<SubtitlesNotes />
 
-Ring 1 changes on every press, and nothing else on the sheet moves. Build one from `MarginNotes` in `components/figures/ink/margin-notes.tsrx`. Never put `Ring`, or any imported component, inside an `@if` arm or an `@for` row: draw the ring inline from `art.ring.ink`.
+Only ring 1 changes. Build one from `MarginNotes` in `components/figures/ink/margin-notes.tsrx`. Never put `Ring`, or any imported component, inside an `@if` arm or an `@for` row: draw the ring inline from `art.ring.ink`.
 
-## Check the facts, then the page
+## Facts come from the source
 
-Check every API name, flag and command against the Markless source. If you can't check a fact, leave it out. Then run:
+Check every API name, flag and command against the Markless source, and leave out what you can't check. Then run:
 
 ```bash
 pnpm --dir website run typecheck   # the .tsrx-aware checker over pages and components
@@ -96,4 +98,4 @@ pnpm ci:local --fast               # CI's fast jobs
 	text="Scoping keeps your selectors inside the component. It doesn't keep global selectors out. global.css can still style your class name, and a prose rule like .prose h3 can reach your element. Reset what they set in your own style block."
 />
 
-Open each page you changed in the light and dark theme, wide and phone-sized, before you ask for review. [Every Markless package](/reference) lists what each package does.
+Check each changed page in light, dark and phone width. [Every Markless package](/reference) lists what each package does.

@@ -4,36 +4,33 @@ import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import CheckInFigure from '../../components/figures/ci/check-in-figure.tsrx';
-import SortStepsFigure from '../../components/figures/ci/sort-steps-figure.tsrx';
-import SecurityGateFigure from '../../components/figures/ci/security-gate-figure.tsrx';
+import ChecksFigure from '../../components/figures/ci/checks-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# CI and the checks you run at home
+# CI and ci:local
 
-<PageMeta time="2 min" assumes="nothing" />
+<PageMeta time="3 min" assumes="nothing" />
 
-<Subtitle text="pnpm ci:local reads .github/workflows/ci.yml each time it runs, so your machine runs the same commands CI does." />
+<Subtitle text="CI is the set of checks GitHub runs on every pull request, and pnpm ci:local runs the same commands on your machine." />
 
-```bash
-pnpm ci:local --fast
+```text title="Terminal"
+$ pnpm ci:local --fast
+ci.yml local run (fast)
+  passed  agent-files  0s
+  passed  typecheck  17s
+  passed  typecheck-ts7  6s
+  passed  unit  160s
+  not run browser  [full]
+  …
 ```
 
-## Check in at home
-
-Press the boarding pass to check in again:
-
-<CheckInFigure />
-
-The four fast jobs run on your machine, and the pre-commit hook runs them too. Everything heavier runs on GitHub, where the pull request's green run is the proof.
+**`--fast`** runs the four fast jobs, the ones the pre-commit hook runs too. **`not run`** marks the heavier jobs, which run on GitHub, where the pull request's green run is the proof.
 
 ## Each step lands in one of three groups
 
-`scripts/ci/local.mjs` sorts every job's steps. Here is the `typecheck` job:
-
-<SortStepsFigure />
+A *job* is one named block in `.github/workflows/ci.yml`, and a *step* is one command in it. `scripts/ci/local.mjs` reads every job's steps and puts each one in a group:
 
 - **check**: a `run:` step that tests something. It runs.
 - **setup**: `pnpm install`, `corepack enable` and the Playwright installs. They run only with `--install`.
@@ -41,13 +38,15 @@ The four fast jobs run on your machine, and the pre-commit hook runs them too. E
 
 A new job with check steps but no entry in the script's mode table makes it stop with an error naming the job.
 
-## Security on GitHub, then the gate
+## Required checks gate the merge
 
-<SecurityGateFigure />
+The *merge queue* tests the exact commit it lands on `main`. Press the header to run the checks, click one to make it fail, then press **Merge when ready**:
 
-The merge queue is the gate: `main` takes a change only from it.
+<ChecksFigure />
 
-The required checks are `test`, `typecheck` and `agent-files`. `test` is the gate: it fails unless every lane passed or hit its cache.
+- The required checks are `test`, `typecheck` and `agent-files`.
+- `main` takes a change only from the merge queue.
+- `test` is the gate: it fails unless every lane passed or hit its cache.
 
 | Mode | Jobs |
 | --- | --- |
@@ -55,7 +54,7 @@ The required checks are `test`, `typecheck` and `agent-files`. `test` is the gat
 | full | `browser`, `completion-matrix`, the `boxes-*` jobs, `website-boxes`, `demo-boxes`, `perf-guards`, `build-scale`, `build-warnings`, `package-manager-matrix`, `test` |
 | CI only | `benchmark`, `benchmark-guard` |
 
-## Pick what to run
+## You pick which jobs run
 
 ```bash
 pnpm ci:local --list                            # every job and step, and its mode
@@ -67,7 +66,7 @@ pnpm ci:local --dry-run                         # print the commands, run nothin
 - `--clean` uses the committed tree, so an untracked file can't make a check pass.
 - `--full` runs every job this machine can run. Use it to debug, not as proof.
 
-## Never weaken a check
+## A failing check gets fixed, never weakened
 
 When a check fails, sort the failure first: environment drift, your regression, an older failure, or a flaky test. Then fix the cause.
 

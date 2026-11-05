@@ -1,19 +1,23 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { frozen } from '../ink/freeze.ts';
-import * as board from './board.ts';
+import { BRANCH, FINDINGS } from './review.ts';
 
-describe('first pull request figure', () => {
-	it('draws the same scene twice', () => {
-		expect(JSON.stringify(board.drawing())).toBe(JSON.stringify(board.drawing()));
+const page = readFileSync(new URL('../../../pages/contributing/first-pr.mdx', import.meta.url), 'utf8');
+const toy = readFileSync(new URL('./review-figure.tsrx', import.meta.url), 'utf8');
+
+describe('first pull request review figure', () => {
+	it('uses the branch and the reviewers the page names', () => {
+		expect(page).toContain('git switch -c ' + BRANCH);
+		expect(page).toContain('CodeRabbit');
+		expect(FINDINGS.map((f) => f.who)).toContain('CodeRabbit');
 	});
 
-	it('is frozen', async () => {
-		await expect(frozen('board.ts', 'first-pr.test.ts', board.drawing())).toMatchFileSnapshot('./board.art.ts');
+	it('refuses to merge while a finding is open, and points at it', () => {
+		expect(toy).toContain('if (open >= 0) {');
+		expect(toy).toContain('blocked = open;');
 	});
 
-	it('numbers the six steps and names the three required checks', () => {
-		const texts = board.drawing().layers.flatMap((l) => l.texts.map((t) => t.text));
-		expect(texts.filter((t) => /^[1-6]$/.test(t))).toEqual(['1', '2', '3', '4', '5', '6']);
-		for (const check of board.REQUIRED) expect(texts).toContain(check);
+	it('answers press and keys, speaks each change, and drops animation under reduced motion', () => {
+		for (const hook of ["answer(0, 'fix')", "answer(1, 'reply')", 'onClick={() => merge()}', "event.key !== 'Escape'", 'aria-live="polite"', 'prefers-reduced-motion: reduce']) expect(toy).toContain(hook);
 	});
 });

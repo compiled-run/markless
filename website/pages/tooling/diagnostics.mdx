@@ -3,21 +3,41 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import MugSpot from '../../components/mascot/mug-spot.tsrx';
-import CitationFigure from '../../components/figures/diagnostics/citation-figure.tsrx';
-import PermitFigure from '../../components/figures/diagnostics/permit-figure.tsrx';
+import OverlayFigure from '../../components/figures/diagnostics/overlay-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Read a Markless error in four lines
+# Diagnostics
 
-<PageMeta time="2 min" assumes="lists" />
+<PageMeta time="3 min" assumes="lists" />
 
-<Subtitle text="When Markless can't make a piece of code work, it stops the build and tells you what broke, why, how to fix it, and where to read more." />
+<Subtitle text="A diagnostic is the message Markless gives when it can't make your code work: what broke, why, how to fix it, and where to read more." />
 
-This list builds. Take its key away, and read what Markless says.
+```text title="npm run build"
+MARKLESS_COMPILE_BLOCKED: pages/list.tsrx has 1 compiler error(s).
 
-<Code note="On the @for line, delete ; key item and read the error under the result. Reset puts the key back.">
+MARKLESS_REPEAT_KEY_REQUIRED: @for (const item of items) repeats reactive state without a key. When items changes, the rows of this list have no identity to update, reorder, or resume by. (pages/list.tsrx:8:4)
+```
+
+**`MARKLESS_REPEAT_KEY_REQUIRED`** is the code, and every code has [its own page](/errors/MARKLESS_REPEAT_KEY_REQUIRED). The sentence after it says what broke, and **`pages/list.tsrx:8:4`** is the file, line and column.
+
+## An error has four parts
+
+An *error* stops the page. In the dev server, the browser shows it on top of the page. Remove the key, then add it back:
+
+<OverlayFigure />
+
+- The code, what broke, and where.
+- **Why** Markless can't build it.
+- **Suggested fix**: the first fix to try.
+- A link to the page for that code.
+
+## A key fixes this list
+
+This list builds. Try it:
+
+<Code steps={[{ label: 'Press Add an item.', shows: 'Tea 2' }, { label: 'Key the rows by position: change `key item` to `index i; key i`.', source: 'index i; key i' }]}>
 ```tsrx title="list.tsrx"
 import { state } from '@markless/core';
 
@@ -42,21 +62,18 @@ export default function List() @{
 ```
 </Code>
 
-## Read the error line by line
-
-An **error** stops the build. A **warning** shows as a wavy line in your editor, and the build goes on. Press the ticket to read what `npm run build` prints for the list with no key:
-
-<CitationFigure />
-
-Each error gets four lines, in this order, and the location in line 1 takes you to the code. The fix fits on one line, and line 3 suggested it.
+Delete the key from the `@for` line, and the error shows under the result.
 
 <MugSpot mood="scared" react="duck" />
 
-## Silence a warning, with a reason
+## A reason silences a warning
 
-If you accept a warning on purpose, write `// markless-allow CODE: reason` on the line above it, or on the same line:
+A *warning* is a wavy line in your editor, and the page still builds. To accept one on purpose, write `// markless-allow CODE: reason` above it:
 
-<PermitFigure />
+```tsrx
+// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: a fixed list, its order never changes
+@for (const item of items; index i; key i) {
+```
 
 Break one of the comment's rules, and Markless raises a warning of its own:
 

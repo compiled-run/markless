@@ -378,6 +378,7 @@ export default function DeskFigure({
 				--sink: sink-a;
 				--run: run-a;
 				--flash: flash-a;
+				--away: away-a;
 			}
 
 			.scene[data-beat='even'] {
@@ -387,6 +388,7 @@ export default function DeskFigure({
 				--sink: sink-b;
 				--run: run-b;
 				--flash: flash-b;
+				--away: away-b;
 			}
 
 			.gone {
@@ -416,6 +418,10 @@ export default function DeskFigure({
 				html.dark & {
 					opacity: 0;
 				}
+			}
+
+			.away {
+				animation: var(--away) var(--for) var(--at) linear both;
 			}
 
 			.pulse {
@@ -536,6 +542,28 @@ export default function DeskFigure({
 				92% {
 					opacity: 1;
 				}
+			}
+
+			@keyframes away-a {
+				8%,
+				92% {
+					opacity: 0;
+				}
+			}
+
+			@keyframes away-b {
+				8%,
+				92% {
+					opacity: 0;
+				}
+			}
+
+			.stamp-big {
+				font-family: 'Joy Elia', system-ui, sans-serif;
+				font-size: 15px;
+				letter-spacing: 0.14em;
+				fill: var(--sheet-ink);
+				opacity: 0.85;
 			}
 
 			@media (prefers-reduced-motion: reduce) {

@@ -1,31 +1,39 @@
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { frozen } from '../ink/freeze.ts';
-import * as glasses from './glasses.ts';
-import * as tsconfig from './tsconfig.ts';
+import { drawing, EXTENSION, HEADING, LINES, TYPO } from './editor.ts';
 
-const figures = { glasses, tsconfig };
+const art = drawing();
+const D = (ts as unknown as { Diagnostics: Record<string, { code: number; message: string }> }).Diagnostics;
+const recommended = JSON.parse(readFileSync(new URL('../../../../packages/cli/templates/common/.vscode/extensions.json', import.meta.url), 'utf8')) as { recommendations: string[] };
+const text = (runs: { t: string }[]) => runs.map((r) => r.t).join('');
+const texts = (part: { layers: { texts: { text: string }[] }[] }) => part.layers.flatMap((l) => l.texts.map((t) => t.text));
 
-describe('editor setup figures', () => {
-	for (const [name, figure] of Object.entries(figures)) {
-		it(name + ' draws the same scene twice', () => {
-			expect(JSON.stringify(figure.drawing())).toBe(JSON.stringify(figure.drawing()));
-		});
-
-		it(name + ' is frozen', async () => {
-			await expect(frozen(name + '.ts', 'editor-setup.test.ts', figure.drawing())).toMatchFileSnapshot('./' + name + '.art.ts');
-		});
-	}
-
-	it('colours only what the extension lens covers, and shows the plugin marks under the other', () => {
-		const texts = glasses.drawing().layers.flatMap((l) => l.texts);
-		expect(texts.some((t) => t.cls.includes('tint-'))).toBe(true);
-		for (const s of glasses.SUGGESTED) expect(texts.map((t) => t.text)).toContain(s);
-		const paths = glasses.drawing().layers.flatMap((l) => l.paths);
-		expect(paths.filter((p) => p.cls.includes('squiggle'))).toHaveLength(1);
+describe('editor setup figure', () => {
+	it('draws the same scene twice', () => {
+		expect(JSON.stringify(drawing())).toBe(JSON.stringify(art));
 	});
 
-	it('rings every Markless line of tsconfig.json once', () => {
-		const texts = tsconfig.drawing().layers.flatMap((l) => l.texts.map((t) => t.text));
-		for (const mark of tsconfig.MARKS) expect(texts).toContain(mark.says);
+	it('is frozen (refresh with -u after a geometry change)', async () => {
+		const module = `// Written by editor-setup.test.ts from editor.ts. Refresh with the figure tests and -u.
+import type { drawing } from './editor.ts';
+
+export const art: ReturnType<typeof drawing> = ${JSON.stringify(art, null, '\t')};
+`;
+		await expect(module).toMatchFileSnapshot('./editor.art.ts');
+	});
+
+	it('lists the extension a new app recommends', () => {
+		expect(recommended.recommendations).toContain(EXTENSION.id);
+		expect(EXTENSION.id.startsWith(EXTENSION.publisher + '.')).toBe(true);
+		expect(texts(art.base)).toEqual(expect.arrayContaining([EXTENSION.name, EXTENSION.publisher, 'profile.tsrx']));
+	});
+
+	// TYPO came from running packages/typescript-plugin/src/tsc.ts on this profile.tsrx with {nmae}.
+	it('shows the message TypeScript prints for the typo', () => {
+		expect(TYPO).toEqual({ code: D.Cannot_find_name_0!.code, message: D.Cannot_find_name_0!.message.replace('{0}', 'nmae') });
+		expect(text(HEADING.typo)).toContain('{nmae}');
+		expect(LINES.map(text).join('\n')).toContain("let name = state('Ada');");
+		expect(LINES.map(text).join('\n')).not.toMatch(/count|cart|weather/i);
 	});
 });
