@@ -59,6 +59,8 @@ export default function Collapsible({
 				font-weight: 700;
 				list-style: none;
 				cursor: pointer;
+				user-select: none;
+				-webkit-user-select: none;
 				-webkit-tap-highlight-color: transparent;
 			}
 
@@ -114,10 +116,11 @@ export default function Collapsible({
 				transform: rotate(90deg);
 			}
 
-			/* The rows grow from 0fr, which every engine interpolates. Hidden by visibility, not the UA's content-visibility, which WebKit drops at once on close. */
+			/* The rows grow from 0fr, which every engine interpolates; align-content: start keeps the summary row from stretching into the free space between 0fr and 1fr. Hidden by visibility, not the UA's content-visibility, which WebKit drops at once on close. */
 			.collapsible-note {
 				display: grid;
 				grid-template-rows: auto 0fr;
+				align-content: start;
 				transition: grid-template-rows var(--spring-slide-ms) var(--spring-slide);
 			}
 
