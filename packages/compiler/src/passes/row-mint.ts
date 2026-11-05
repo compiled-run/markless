@@ -555,7 +555,7 @@ function childIsMintable(
 		if (!entry) return false;
 	}
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
-	return reach !== 'boundaries' && reach !== 'unknown';
+	return reach !== 'unknown';
 }
 
 // A nested list's rows stand in front of what follows its anchor, so a patch counts those steps from the parent's end; lists on both sides leave no count.

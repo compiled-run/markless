@@ -53,6 +53,11 @@ closed, movable, replaceable, streamable units; the anchor pair is the only
 coupling to the page. Enables per-boundary lazy record loading; retires
 events-in-arm misalignment and in-arm compose offset arithmetic.
 
+A keyed `@for` row the browser builds after load (a row added by a write)
+registers each `@try` block its component renders the same way a settled arm
+registers the blocks nested in it: the block's anchors index the row's own
+comments, and the block settles and re-settles on its own like a served one.
+
 ## D4. Author vocabulary in diagnostics
 
 "Arm", "boundary", "tier", "anchor" are contributor vocabulary. Diagnostics

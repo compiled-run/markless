@@ -170,7 +170,10 @@ export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
 	boundary: ResumeArmRange,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells'>,
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells'> & {
+		// A minted row has no anchors around it, so it hands over the comments its @try records count in.
+		readonly comments?: ReadonlyArray<ResumeDomComment>;
+	},
 	eventTypesInstalled?: boolean,
 ) {
 	const exhaustive = {
@@ -241,7 +244,7 @@ export async function registerArmRecordSet(
 		await registerNestedAsyncBoundaries(
 			deps,
 			installEventType,
-			boundary,
+			update.comments ?? commentsBetween(boundary.startAnchor, boundary.endAnchor),
 			update.armRecords.asyncBoundaries,
 			update.computed,
 		);
@@ -461,14 +464,13 @@ function armCommitRendererMissingError(boundary: ResumeArmRange): Error {
 async function registerNestedAsyncBoundaries(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
-	range: ResumeArmRange,
+	census: ReadonlyArray<ResumeDomComment>,
 	records: NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
 	computed: ArmCommitUpdate['computed'],
 ): Promise<void> {
 	const wiring = await deps.asyncBoundaryWiring?.();
 	if (!wiring || !deps.graph || !deps.loadSymbol)
 		throw new Error('Markless nested async boundary registration is unavailable.');
-	const census = commentsBetween(range.startAnchor, range.endAnchor);
 	const boundaries: ResumeAsyncBoundaryRecord[] = records.map((record) => {
 		const startAnchor = census[record.startAnchor.index];
 		const endAnchor = census[record.endAnchor.index];
