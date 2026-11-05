@@ -4,9 +4,10 @@ import { drawing } from './accordion-anatomy.ts';
 const drawn = drawing();
 
 describe('accordion anatomy', () => {
-	it('labels each part once in the wide drawing', () => {
-		const words = drawn.wide.texts.map((t) => t.text);
-		for (const part of ['root', 'item', 'itemlabel', 'itemtrigger', 'itemcontent']) expect(words.filter((w) => w === 'accordion.' + part)).toHaveLength(1);
+	it('keeps to two objects and about five words', () => {
+		const words = drawn.texts.flatMap((t) => t.text.split(/\s+/));
+		expect(words.length).toBeLessThanOrEqual(5);
+		expect(drawn.shapes.filter((s) => s.cls.startsWith('box'))).toHaveLength(2);
 	});
 
 	it('draws the same every time', () => {
