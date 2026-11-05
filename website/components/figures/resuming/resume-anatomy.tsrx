@@ -1,22 +1,20 @@
-// A chess board left mid-game with three pieces and a score sheet. Press the board and the next move plays; hover, drag or use the keys to play the pieces yourself.
+// A chess game left mid-game, beside its score sheet. Drag any piece of the side to move to a dotted square, or press Next move: the side to move replies from where the game stands, and nothing replays from move one.
 import { computed, state } from '@markless/core';
-import { describeMove, describeRefusal, knightStep, legal, nearestSquare, noteOf, placeOf, nextMove, sheetLines, START, START_SAID, stepped } from './model.ts';
+import { after, describeMove, describeRefusal, describeTurn, isWhite, legal, movesOf, nameOf, nearestSquare, noteOf, PIECES, placeOf, type Position, reply, sheetLines, START, START_SAID, whiteToMove } from './model.ts';
 import { art } from './board.art.ts';
 
-const BK = art.pieces.find((piece) => piece.id === 'bk')!;
-const WP = art.pieces.find((piece) => piece.id === 'wp')!;
-const WN = art.pieces.find((piece) => piece.id === 'wn')!;
+const ART = Object.fromEntries(art.pieces.map((piece) => [piece.id, piece]));
+const IDS = PIECES.map((piece) => piece.id);
 
 export default function ResumeAnatomy() @{
-	let bkSq = state(START.bk!);
-	let wpSq = state(START.wp!);
-	let wnSq = state(START.wn!);
+	let pos = state<Position>(START);
 	let notes = state<string[]>([]);
 	let said = state(START_SAID);
 	let hover = state('');
 	let pointed = state('');
 	let held = state('');
-	let picked = state('wn');
+	let picked = state('');
+	let aim = state('');
 	let dragX = state(0);
 	let dragY = state(0);
 	let fromX = state(0);
@@ -24,44 +22,68 @@ export default function ResumeAnatomy() @{
 	let ratio = state(1);
 	let dropped = state(0);
 	let touched = state(false);
-	const bkPlace = computed(() => placeOf(art.squares, 'bk', bkSq, held === 'bk' ? dragX : 0, held === 'bk' ? dragY : 0));
-	const wpPlace = computed(() => placeOf(art.squares, 'wp', wpSq, held === 'wp' ? dragX : 0, held === 'wp' ? dragY : 0));
-	const wnPlace = computed(() => placeOf(art.squares, 'wn', wnSq, held === 'wn' ? dragX : 0, held === 'wn' ? dragY : 0));
+	const white = computed(() => whiteToMove(notes.length));
+	const targets = computed(() => {
+		const id = held || picked;
+		return id && pos[id] ? movesOf(pos, id) : [];
+	});
+	const dotsPath = computed(() => targets.map((square) => art.dots[square]).join(''));
+	const aimPath = computed(() => (aim && targets.includes(aim) ? art.dots[aim]! : ''));
+	const places = computed(() => Object.fromEntries(IDS.map((id) => [id, placeOf(art.squares, id, pos[id] ?? '', held === id ? dragX : 0, held === id ? dragY : 0)])));
 	const caption = computed(() => {
-		const id = held || hover || pointed;
-		if (!id) return 'Hover a piece, drag it, or press the board for the next move.';
-		const name = id === 'bk' ? 'black king' : id === 'wp' ? 'white pawn' : 'white knight';
-		return name + ' on ' + (id === 'bk' ? bkSq : id === 'wp' ? wpSq : wnSq);
+		const id = held || hover || pointed || picked;
+		if (id && pos[id]) {
+			const n = movesOf(pos, id).length;
+			return nameOf(id) + ' on ' + pos[id] + ': ' + (n === 1 ? '1 legal move' : n + ' legal moves');
+		}
+		return (white ? 'White' : 'Black') + ' to move. Drag a piece to a dotted square, or press Next move.';
 	});
 	const lines = computed(() => sheetLines(notes, 4));
 	const fresh = computed(() => (notes.length > 0 ? 'yes' : 'no'));
+	const turnLabel = computed(() => (white ? 'white to move' : 'black to move'));
 
-	const squareOfPiece = (id: string) => (id === 'bk' ? bkSq : id === 'wp' ? wpSq : wnSq);
 	const play = (id: string, to: string) => {
-		const position = { bk: bkSq, wp: wpSq, wn: wnSq };
-		const from = squareOfPiece(id);
-		if (!legal(position, id, to)) {
+		if (!pos[id]) return;
+		if (isWhite(id) !== white) {
+			said = describeTurn(white);
+			return;
+		}
+		if (!legal(pos, id, to)) {
 			said = describeRefusal(id, to || 'off the board');
 			return;
 		}
-		if (id === 'bk') bkSq = to;
-		if (id === 'wp') wpSq = to;
-		if (id === 'wn') wnSq = to;
-		notes = [...notes, noteOf(id, to)];
-		said = describeMove(id, from, to, 2);
+		said = describeMove(pos, id, to);
+		notes = [...notes, noteOf(pos, id, to)];
+		pos = after(pos, id, to);
+		picked = '';
+		aim = '';
+	};
+	const next = () => {
+		touched = true;
+		const move = reply(pos, white);
+		if (move) play(move.id, move.to);
+		else said = 'The side to move has no legal move left. Press Escape to set the board back.';
 	};
 	const reset = () => {
-		bkSq = START.bk!;
-		wpSq = START.wp!;
-		wnSq = START.wn!;
+		pos = START;
 		notes = [];
 		held = '';
+		picked = '';
+		aim = '';
 		said = START_SAID;
+	};
+	const pick = (id: string) => {
+		if (isWhite(id) !== white) {
+			said = describeTurn(white);
+			picked = '';
+			return;
+		}
+		picked = picked === id ? '' : id;
+		aim = '';
 	};
 	const grab = (id: string, event: PointerEvent) => {
 		touched = true;
 		held = id;
-		picked = id;
 		fromX = event.clientX;
 		fromY = event.clientY;
 		dragX = 0;
@@ -69,47 +91,52 @@ export default function ResumeAnatomy() @{
 		const box = (event.target as Element | null)?.closest?.('svg')?.getBoundingClientRect();
 		ratio = box && box.width > 0 ? art.width / box.width : 1;
 	};
+	const cycle = <T,>(list: readonly T[], current: T, step: number) => list[(list.indexOf(current) + step + list.length) % list.length];
 
-	<figure
-		class="anatomy"
-		onVisible={(event) => {
-			const host = event.target as Element;
-			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-			let seen = true;
-			const watcher = new IntersectionObserver((entries) => {
-				seen = Boolean(entries.at(-1)?.isIntersecting);
-			});
-			watcher.observe(host);
-			const timer = setInterval(() => {
-				if (!seen || touched) return;
-				hover = hover === 'wn' ? '' : 'wn';
-			}, 1800);
-			return () => {
-				clearInterval(timer);
-				watcher.disconnect();
-			};
-		}}
-	>
+	<figure class="anatomy">
 		<button
 			type="button"
 			class="stage"
-			aria-label="Chess board. Press for the next move; arrow keys move the chosen piece; 1, 2 and 3 choose a piece."
-			onClick={() => {
+			aria-label="Chess board, left mid-game. Enter plays the next move for the side to move. Left and right arrows choose a piece, up and down choose a square for it, Enter plays it; Escape sets the board back."
+			onClick={(event) => {
 				if (Date.now() - dropped < 400) return;
-
 				touched = true;
-				const to = nextMove({ bk: bkSq, wp: wpSq, wn: wnSq });
-				if (to) play('wn', to);
+				const id = (event.target as Element | null)?.closest?.('[data-piece]')?.getAttribute('data-piece') ?? '';
+				if (id && pos[id] && isWhite(id) === white) {
+					pick(id);
+					return;
+				}
+				if (picked) {
+					const box = (event.currentTarget as Element).querySelector('svg')!.getBoundingClientRect();
+					const scale = box.width > 0 ? art.width / box.width : 1;
+					const square = nearestSquare(art.squares, (event.clientX - box.left) * scale, (event.clientY - box.top) * scale);
+					if (id && targets.includes(pos[id]!)) play(picked, pos[id]!);
+					else if (targets.includes(square)) play(picked, square);
+					else picked = '';
+					return;
+				}
+				if (id && pos[id]) {
+					pick(id);
+					return;
+				}
+				if (event.detail === 0) return;
+				next();
 			}}
 			onKeyDown={(event) => {
+				if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') event.preventDefault();
 				touched = true;
 				if (event.key === 'Escape') reset();
-				if (event.key === '1') picked = 'bk';
-				if (event.key === '2') picked = 'wp';
-				if (event.key === '3') picked = 'wn';
-				if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-					event.preventDefault();
-					play(picked, picked === 'wn' ? knightStep({ bk: bkSq, wp: wpSq, wn: wnSq }, 'wn', event.key) : stepped(squareOfPiece(picked), event.key));
+				if (event.key === 'Enter' || event.key === ' ') {
+					if (picked && aim) play(picked, aim);
+					else next();
+				}
+				if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+					const mine = IDS.filter((id) => pos[id] && isWhite(id) === white && movesOf(pos, id).length > 0);
+					picked = cycle(mine, picked, event.key === 'ArrowRight' ? 1 : -1) ?? '';
+					aim = '';
+				}
+				if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && picked) {
+					aim = cycle(targets, aim, event.key === 'ArrowDown' ? 1 : -1) ?? '';
 				}
 			}}
 		>
@@ -133,11 +160,9 @@ export default function ResumeAnatomy() @{
 				onPointerup={() => {
 					if (!held) return;
 					const id = held;
-					const moved = Math.hypot(dragX, dragY) > 6;
-					if (moved) {
-						const [x, y] = art.squares[squareOfPiece(id)]!;
-						const to = nearestSquare(art.squares, x + dragX, y + dragY);
-						play(id, to);
+					if (Math.hypot(dragX, dragY) > 6) {
+						const [x, y] = art.squares[pos[id]!]!;
+						play(id, nearestSquare(art.squares, x + dragX, y + dragY));
 						dropped = Date.now();
 					}
 					held = '';
@@ -151,11 +176,11 @@ export default function ResumeAnatomy() @{
 				}}
 				onPointerleave={(event) => {
 					held = '';
+					dragX = 0;
+					dragY = 0;
 					if (event.pointerType === 'touch') return;
 					hover = '';
 					pointed = '';
-					dragX = 0;
-					dragY = 0;
 				}}
 			>
 				<path class="desk-hatch" d={art.desk} />
@@ -167,6 +192,8 @@ export default function ResumeAnatomy() @{
 				<path class="hatch light" d={art.board.front} />
 				<path class="hatch" d={art.board.side} />
 				<path class="ink" d={art.board.ink} />
+				<path class="dots" d={dotsPath} />
+				<path class="aim" d={aimPath} />
 
 				<path class="shadow-wash" d={art.sheet.cast} />
 				<path class="paper" d={art.sheet.paper} />
@@ -179,15 +206,44 @@ export default function ResumeAnatomy() @{
 				<text class="hand-text score" transform={art.sheet.lines[1]}>{lines[1]}</text>
 				<text class="hand-text score" transform={art.sheet.lines[2]}>{lines[2]}</text>
 				<text class="hand-text score" transform={art.sheet.lines[3]}>{lines[3]}</text>
+				<text class="pencil-text crossed" transform={art.sheet.crossed.matrix}>set up again from 1. e4?</text>
+				<path class="strike" d={art.sheet.crossed.strike} />
 
 				<g
 					class="piece"
 					onTouchmove={(event) => event.preventDefault()}
+					data-piece="br"
+					data-gone={pos.br ? 'no' : 'yes'}
+					data-hover={hover === 'br' ? 'yes' : 'no'}
+					data-held={held === 'br' ? 'yes' : 'no'}
+					data-picked={picked === 'br' ? 'yes' : 'no'}
+					style={places.br}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'br';
+						pointed = 'br';
+					}}
+					onPointerleave={() => (hover = '')}
+				>
+					<path class="shadow-wash cast" d={ART.br!.cast} />
+					<g class="lift">
+						<path class="paper" d={ART.br!.paper} />
+						<path class="tone" d={ART.br!.tone} />
+						<path class="ink" d={ART.br!.ink} />
+						<path class="paper" d={ART.br!.topPaper} />
+						<path class="tone" d={ART.br!.topTone} />
+						<path class="ink" d={ART.br!.topInk} />
+					</g>
+				</g>
+				<g
+					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
 					data-piece="bk"
+					data-gone={pos.bk ? 'no' : 'yes'}
 					data-hover={hover === 'bk' ? 'yes' : 'no'}
 					data-held={held === 'bk' ? 'yes' : 'no'}
-					data-picked={picked === 'bk' && touched ? 'yes' : 'no'}
-					style={bkPlace}
+					data-picked={picked === 'bk' ? 'yes' : 'no'}
+					style={places.bk}
 					onPointerenter={() => {
 						touched = true;
 						hover = 'bk';
@@ -195,24 +251,129 @@ export default function ResumeAnatomy() @{
 					}}
 					onPointerleave={() => (hover = '')}
 				>
-					<path class="shadow-wash cast" d={BK.cast} />
+					<path class="shadow-wash cast" d={ART.bk!.cast} />
 					<g class="lift">
-						<path class="paper" d={BK.paper} />
-						<path class="tone" d={BK.tone} />
-						<path class="ink" d={BK.ink} />
-						<path class="paper" d={BK.topPaper} />
-						<path class="tone" d={BK.topTone} />
-						<path class="ink" d={BK.topInk} />
+						<path class="paper" d={ART.bk!.paper} />
+						<path class="tone" d={ART.bk!.tone} />
+						<path class="ink" d={ART.bk!.ink} />
+						<path class="paper" d={ART.bk!.topPaper} />
+						<path class="tone" d={ART.bk!.topTone} />
+						<path class="ink" d={ART.bk!.topInk} />
+					</g>
+				</g>
+				<g
+					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
+					data-piece="bn"
+					data-gone={pos.bn ? 'no' : 'yes'}
+					data-hover={hover === 'bn' ? 'yes' : 'no'}
+					data-held={held === 'bn' ? 'yes' : 'no'}
+					data-picked={picked === 'bn' ? 'yes' : 'no'}
+					style={places.bn}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'bn';
+						pointed = 'bn';
+					}}
+					onPointerleave={() => (hover = '')}
+				>
+					<path class="shadow-wash cast" d={ART.bn!.cast} />
+					<g class="lift">
+						<path class="paper" d={ART.bn!.paper} />
+						<path class="tone" d={ART.bn!.tone} />
+						<path class="ink" d={ART.bn!.ink} />
+						<path class="paper" d={ART.bn!.topPaper} />
+						<path class="tone" d={ART.bn!.topTone} />
+						<path class="ink" d={ART.bn!.topInk} />
+					</g>
+				</g>
+				<g
+					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
+					data-piece="bb"
+					data-gone={pos.bb ? 'no' : 'yes'}
+					data-hover={hover === 'bb' ? 'yes' : 'no'}
+					data-held={held === 'bb' ? 'yes' : 'no'}
+					data-picked={picked === 'bb' ? 'yes' : 'no'}
+					style={places.bb}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'bb';
+						pointed = 'bb';
+					}}
+					onPointerleave={() => (hover = '')}
+				>
+					<path class="shadow-wash cast" d={ART.bb!.cast} />
+					<g class="lift">
+						<path class="paper" d={ART.bb!.paper} />
+						<path class="tone" d={ART.bb!.tone} />
+						<path class="ink" d={ART.bb!.ink} />
+						<path class="paper" d={ART.bb!.topPaper} />
+						<path class="tone" d={ART.bb!.topTone} />
+						<path class="ink" d={ART.bb!.topInk} />
+					</g>
+				</g>
+				<g
+					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
+					data-piece="bp"
+					data-gone={pos.bp ? 'no' : 'yes'}
+					data-hover={hover === 'bp' ? 'yes' : 'no'}
+					data-held={held === 'bp' ? 'yes' : 'no'}
+					data-picked={picked === 'bp' ? 'yes' : 'no'}
+					style={places.bp}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'bp';
+						pointed = 'bp';
+					}}
+					onPointerleave={() => (hover = '')}
+				>
+					<path class="shadow-wash cast" d={ART.bp!.cast} />
+					<g class="lift">
+						<path class="paper" d={ART.bp!.paper} />
+						<path class="tone" d={ART.bp!.tone} />
+						<path class="ink" d={ART.bp!.ink} />
+						<path class="paper" d={ART.bp!.topPaper} />
+						<path class="tone" d={ART.bp!.topTone} />
+						<path class="ink" d={ART.bp!.topInk} />
+					</g>
+				</g>
+				<g
+					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
+					data-piece="wb"
+					data-gone={pos.wb ? 'no' : 'yes'}
+					data-hover={hover === 'wb' ? 'yes' : 'no'}
+					data-held={held === 'wb' ? 'yes' : 'no'}
+					data-picked={picked === 'wb' ? 'yes' : 'no'}
+					style={places.wb}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'wb';
+						pointed = 'wb';
+					}}
+					onPointerleave={() => (hover = '')}
+				>
+					<path class="shadow-wash cast" d={ART.wb!.cast} />
+					<g class="lift">
+						<path class="paper" d={ART.wb!.paper} />
+						<path class="tone" d={ART.wb!.tone} />
+						<path class="ink" d={ART.wb!.ink} />
+						<path class="paper" d={ART.wb!.topPaper} />
+						<path class="tone" d={ART.wb!.topTone} />
+						<path class="ink" d={ART.wb!.topInk} />
 					</g>
 				</g>
 				<g
 					class="piece"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wp"
+					data-gone={pos.wp ? 'no' : 'yes'}
 					data-hover={hover === 'wp' ? 'yes' : 'no'}
 					data-held={held === 'wp' ? 'yes' : 'no'}
-					data-picked={picked === 'wp' && touched ? 'yes' : 'no'}
-					style={wpPlace}
+					data-picked={picked === 'wp' ? 'yes' : 'no'}
+					style={places.wp}
 					onPointerenter={() => {
 						touched = true;
 						hover = 'wp';
@@ -220,24 +381,25 @@ export default function ResumeAnatomy() @{
 					}}
 					onPointerleave={() => (hover = '')}
 				>
-					<path class="shadow-wash cast" d={WP.cast} />
+					<path class="shadow-wash cast" d={ART.wp!.cast} />
 					<g class="lift">
-						<path class="paper" d={WP.paper} />
-						<path class="tone" d={WP.tone} />
-						<path class="ink" d={WP.ink} />
-						<path class="paper" d={WP.topPaper} />
-						<path class="tone" d={WP.topTone} />
-						<path class="ink" d={WP.topInk} />
+						<path class="paper" d={ART.wp!.paper} />
+						<path class="tone" d={ART.wp!.tone} />
+						<path class="ink" d={ART.wp!.ink} />
+						<path class="paper" d={ART.wp!.topPaper} />
+						<path class="tone" d={ART.wp!.topTone} />
+						<path class="ink" d={ART.wp!.topInk} />
 					</g>
 				</g>
 				<g
 					class="piece"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wn"
+					data-gone={pos.wn ? 'no' : 'yes'}
 					data-hover={hover === 'wn' ? 'yes' : 'no'}
 					data-held={held === 'wn' ? 'yes' : 'no'}
-					data-picked={picked === 'wn' && touched ? 'yes' : 'no'}
-					style={wnPlace}
+					data-picked={picked === 'wn' ? 'yes' : 'no'}
+					style={places.wn}
 					onPointerenter={() => {
 						touched = true;
 						hover = 'wn';
@@ -245,14 +407,66 @@ export default function ResumeAnatomy() @{
 					}}
 					onPointerleave={() => (hover = '')}
 				>
-					<path class="shadow-wash cast" d={WN.cast} />
+					<path class="shadow-wash cast" d={ART.wn!.cast} />
 					<g class="lift">
-						<path class="paper" d={WN.paper} />
-						<path class="tone" d={WN.tone} />
-						<path class="ink" d={WN.ink} />
-						<path class="paper" d={WN.topPaper} />
-						<path class="tone" d={WN.topTone} />
-						<path class="ink" d={WN.topInk} />
+						<path class="paper" d={ART.wn!.paper} />
+						<path class="tone" d={ART.wn!.tone} />
+						<path class="ink" d={ART.wn!.ink} />
+						<path class="paper" d={ART.wn!.topPaper} />
+						<path class="tone" d={ART.wn!.topTone} />
+						<path class="ink" d={ART.wn!.topInk} />
+					</g>
+				</g>
+				<g
+					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
+					data-piece="wr"
+					data-gone={pos.wr ? 'no' : 'yes'}
+					data-hover={hover === 'wr' ? 'yes' : 'no'}
+					data-held={held === 'wr' ? 'yes' : 'no'}
+					data-picked={picked === 'wr' ? 'yes' : 'no'}
+					style={places.wr}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'wr';
+						pointed = 'wr';
+					}}
+					onPointerleave={() => (hover = '')}
+				>
+					<path class="shadow-wash cast" d={ART.wr!.cast} />
+					<g class="lift">
+						<path class="paper" d={ART.wr!.paper} />
+						<path class="tone" d={ART.wr!.tone} />
+						<path class="ink" d={ART.wr!.ink} />
+						<path class="paper" d={ART.wr!.topPaper} />
+						<path class="tone" d={ART.wr!.topTone} />
+						<path class="ink" d={ART.wr!.topInk} />
+					</g>
+				</g>
+				<g
+					class="piece"
+					onTouchmove={(event) => event.preventDefault()}
+					data-piece="wk"
+					data-gone={pos.wk ? 'no' : 'yes'}
+					data-hover={hover === 'wk' ? 'yes' : 'no'}
+					data-held={held === 'wk' ? 'yes' : 'no'}
+					data-picked={picked === 'wk' ? 'yes' : 'no'}
+					style={places.wk}
+					onPointerenter={() => {
+						touched = true;
+						hover = 'wk';
+						pointed = 'wk';
+					}}
+					onPointerleave={() => (hover = '')}
+				>
+					<path class="shadow-wash cast" d={ART.wk!.cast} />
+					<g class="lift">
+						<path class="paper" d={ART.wk!.paper} />
+						<path class="tone" d={ART.wk!.tone} />
+						<path class="ink" d={ART.wk!.ink} />
+						<path class="paper" d={ART.wk!.topPaper} />
+						<path class="tone" d={ART.wk!.topTone} />
+						<path class="ink" d={ART.wk!.topInk} />
 					</g>
 				</g>
 
@@ -260,13 +474,17 @@ export default function ResumeAnatomy() @{
 				<text class="hand" x={art.note.x} y={art.note.y}>LEFT MID-GAME</text>
 			</svg>
 		</button>
+		<div class="controls">
+			<span class="turn">{turnLabel}</span>
+			<button type="button" class="next" onClick={next}>Next move</button>
+		</div>
 		<p class="hover-caption" aria-hidden="true">{caption}</p>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a chess board on a desk, left mid-game with three pieces: a black king on g8, a white pawn on e4 and a
-			white knight on f3, with a blank score sheet beside it. Press the board, or Enter or Space, for the next move: only the
-			knight moves, to g5, and the move is written on the score sheet. Nothing else moves, and the board is never set up again. You can
-			also drag a piece, or choose one with 1, 2 or 3 and move it with the arrow keys; a legal move is played and written down, and an
-			illegal one slides back. Escape sets the board back.
+			A pen-and-ink drawing of a chess board on a desk, left mid-game with ten pieces, beside a score sheet that starts at move 9. In
+			pencil at the foot of the sheet, "set up again from 1. e4?" is crossed out. Drag any piece of the side to move: ink dots mark its
+			legal squares, a legal move is played and written on the sheet, and an illegal one slides back. Press Next move, or the board, and
+			the side to move replies from the position as it stands: its first capture, otherwise a knight or bishop stepping toward the
+			centre. Nothing ever replays from move one. Escape sets the board back.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -463,6 +681,63 @@ export default function ResumeAnatomy() @{
 			.piece[data-held='yes'] .cast {
 				transform: translate(7px, 3px);
 				opacity: 0.7;
+			}
+
+			.dots,
+			.aim {
+				fill: var(--sheet-ink);
+				opacity: 0.55;
+				pointer-events: none;
+			}
+
+			.aim {
+				opacity: 1;
+				stroke: var(--yellow);
+				stroke-width: 6;
+				paint-order: stroke;
+			}
+
+			.piece[data-gone='yes'] {
+				display: none;
+			}
+
+			.crossed {
+				font-size: 4.6px;
+			}
+
+			.strike {
+				fill: color-mix(in srgb, var(--pink) 70%, #e0603c);
+			}
+
+			.controls {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 0.9rem;
+				margin-top: 0.3rem;
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+			}
+
+			.turn {
+				font-size: 0.9rem;
+				opacity: 0.85;
+			}
+
+			.next {
+				padding: 0.2rem 0.9rem;
+				border: 1.5px solid var(--ink);
+				border-radius: 0.7rem;
+				background: var(--yellow);
+				color: oklch(24% 0.01 70);
+				font: inherit;
+				font-weight: 700;
+				box-shadow: 2px 2px 0 var(--ink);
+				cursor: pointer;
+			}
+
+			.next:active {
+				translate: 1px 1px;
+				box-shadow: 1px 1px 0 var(--ink);
 			}
 
 			.hover-caption {

@@ -1,4 +1,4 @@
-// A chess board left mid-game with three pieces and a score sheet: the next move lifts one piece, and nothing else moves.
+// A chess board left mid-game and a score sheet: the next move lifts one piece, and nothing else moves.
 import { centreOf, createCamera, ellipse, type P, type Point3, shadowOnDesk } from '../ink/desk.ts';
 import { clipTo, hatch, hull, line, outline, pathOf, pool, r1, stroke, wash } from '../ink/ink.ts';
 import { deskPlane, plane } from '../ink/plane.ts';
@@ -17,7 +17,7 @@ const BOARD = 8 * S;
 const camera = createCamera({
 	width: WIDTH,
 	height: HEIGHT - 26,
-	view: { azimuth: 94, elevation: 38, distance: 60, target: [9, 4.8, 0.8] },
+	view: { azimuth: 94, elevation: 50, distance: 60, target: [9, 4.8, 0.8] },
 	bounds: [
 		[-RIM - 0.6, -BACK - 0.4, 0],
 		[BOARD + RIM + 0.4, -BACK - 0.4, 0],
@@ -82,7 +82,7 @@ const KNIGHT_BASE: Profile = [[0, 0.56], [0.14, 0.56], [0.24, 0.44], [0.4, 0.4],
 const KNIGHT_HEAD: P[] = [[-0.45, 0.59], [0.43, 0.59], [0.28, 0.94], [0.38, 1.16], [0.78, 1.32], [0.98, 1.51], [0.83, 1.70], [0.40, 1.77], [0.25, 2.03], [0.00, 2.19], [-0.12, 2.03], [-0.45, 1.89], [-0.70, 1.56], [-0.70, 1.16], [-0.45, 0.90]];
 const KING_CROSS: P[] = [[-0.06, 1.84], [0.06, 1.84], [0.06, 1.96], [0.17, 1.96], [0.17, 2.06], [0.06, 2.06], [0.06, 2.2], [-0.06, 2.2], [-0.06, 2.06], [-0.17, 2.06], [-0.17, 1.96], [-0.06, 1.96]];
 
-const K = 1.75;
+const K = 1.45;
 
 function circleAt(cx: number, cy: number, z: number, r: number, n = 28): Point3[] {
 	z *= K;
@@ -179,17 +179,31 @@ function squaresArt() {
 	return out;
 }
 
+/** A small ink dot on every square, shown on the squares a lifted piece can move to. */
+function dotsArt() {
+	const top = plane(at, [0, 0, TOP], [1, 0, 0], [0, 1, 0]);
+	const out: Record<string, string> = {};
+	for (let f = 0; f < 8; f++)
+		for (let r = 1; r <= 8; r++) {
+			const square = FILES[f]! + r;
+			const [cx, cy] = squareCentre(square);
+			out[square] = pathOf(top.on(ellipse(cx, cy, 0.24, 0.24, 14)), true);
+		}
+	return out;
+}
+
 /** The score sheet beside the board: paper, ruled lines, and where each written move goes. */
 function sheetArt() {
 	const sheet = deskPlane(at, [BOARD + 4.2, 6.4], 4.4, 6.6, 0.05);
 	const body = sheet.on([[0, 0], [4.4, 0], [4.4, 6.6], [0, 6.6]]);
 	const cast = hull([...body.map(([x, y]) => [x + 3, y + 3] as P), ...body]);
-	const rows = [1.6, 3.1, 4.6, 6.1];
+	const rows = [1.4, 2.6, 3.8, 5.0];
 	return {
 		cast: wash(cast, 3500, 1, 2),
 		paper: pathOf(body, true),
 		ink: outline(body, { w: 1.1, heavy: 0.9, centre: centreOf(body), seed: 3501 }) + rows.map((v, i) => line(sheet.on([[0.35, v], [4.05, v]]), { w: 0.45, seed: 3510 + i, over: 0 })).join(''),
 		lines: rows.map((v) => sheet.matrix(0.5, v - 0.25, 0.1)),
+		crossed: { matrix: sheet.matrix(0.4, 6.05, 0.1), strike: line(sheet.on([[0.3, 5.82], [4.15, 5.7]]), { w: 0.8, seed: 3530, over: 0.3 }) },
 		spot: (() => {
 			const slot = sheet.on(ellipse(1.7, rows[0]! - 0.55, 1.4, 0.5, 26), 0.02);
 			return { wash: wash(slot, 3520, 1.2, 3), pool: wash(pool(slot, centreOf(slot), 0.55), 3521, 0.5, 2) };
@@ -222,6 +236,7 @@ export function drawing() {
 		board: boardArt(),
 		pieces: ordered.map((piece, i) => pieceArt(piece.id, piece.kind, piece.white, piece.square, 4000 + i * 100)),
 		squares: squaresArt(),
+		dots: dotsArt(),
 		sheet: sheetArt(),
 		note: noteArt(),
 		desk: hatch(projAll([[-3, BOARD + RIM + 0.4, 0], [BOARD + 3, BOARD + RIM + 0.4, 0], [BOARD + 3, BOARD + RIM + 2.6, 0], [-3, BOARD + RIM + 2.6, 0]]).map(([x, y]) => [x, y + lift] as P), -0.5, 2.6, 3700, { cluster: 5, skip: 0.35, trim: 0.5 }),
