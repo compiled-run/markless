@@ -5,24 +5,23 @@ import { deskPlane, pencil } from '../ink/plane.ts';
 import { hatch, hull, line, outline, pathOf, pool, r1, resample, wash } from '../ink/ink.ts';
 
 export const WIDTH = 680;
-export const HEIGHT = 420;
+export const HEIGHT = 600;
 
 export const CART_ROW = { u: 1.4, v: 11.3 };
 export const TOTAL_ROW = { u: 1.4, v: 13.3 };
 const BUTTON = { u0: 5, v0: 8.45, u1: 10.9, v1: 9.75 };
-const CARD = { c: [28.4, -4.6] as P, w: 12.4, h: 8.4, turn: -0.06 };
+const CARD = { c: [15.2, 11.6] as P, w: 16.6, h: 9.4, turn: -0.05 };
 /** The card's lines, in card units from its top left: the title, then the recipe's three steps. */
-export const CARD_LINES = [1.5, 3.4, 5.0, 6.7] as const;
+export const CARD_LINES = [1.9, 4.1, 6.0, 7.9] as const;
 
 const scene = createScene({
 	width: WIDTH,
 	height: HEIGHT,
 	extra: [
-		[CARD.c[0] + CARD.w / 2 + 1, CARD.c[1] - CARD.h / 2 - 0.6, 0],
-		[CARD.c[0] + CARD.w / 2 + 1, CARD.c[1] + CARD.h / 2 + 1, 0],
-		[CARD.c[0] - CARD.w / 2, CARD.c[1] - CARD.h / 2 - 0.6, 0],
+		[CARD.c[0] + CARD.w / 2 + 1, CARD.c[1] + CARD.h / 2 + 1.2, 0],
+		[CARD.c[0] - CARD.w / 2 - 0.4, CARD.c[1] + CARD.h / 2 + 1.2, 0],
 	],
-	target: [14.4, -2.6, 0.4],
+	target: [11, 2.6, 0.4],
 });
 const { proj, onSheet, sheetMatrix } = scene;
 const plane = deskPlane(proj, CARD.c, CARD.w, CARD.h, CARD.turn, 0.02);
@@ -51,11 +50,11 @@ function cardArt() {
 	const edgePts: P[] = jitter(resample([[0, 0], [w, 0], [w, h - 0.9], [w - 0.9, h], [0, h]], 0.3, true), 5100, 0.04);
 	const edge = plane.on(edgePts);
 	const ear = plane.on([[w, h - 0.9], [w - 0.75, h - 0.75], [w - 0.9, h]]);
-	const shadow = hull([...edge.map(([x, y]) => [x + 5, y + 6] as P), ...edge]);
-	const rules = CARD_LINES.slice(1).map((v, i) => line(plane.on([[0.4, v + 0.25], [w - 0.4, v + 0.25]]), { w: 0.45, seed: 5110 + i, over: 0 })).join('');
-	const margin = plane.on([[1.3, 0.2], [1.3, h - 0.2]]);
+	const shadow = hull([...edge.map(([x, y]) => [x + 6, y + 7] as P), ...edge]);
+	const rules = CARD_LINES.slice(1).map((v, i) => line(plane.on([[0.4, v + 0.35], [w - 0.4, v + 0.35]]), { w: 0.5, seed: 5110 + i, over: 0 })).join('');
+	const margin = plane.on([[1.4, 0.2], [1.4, h - 0.2]]);
 	const spot = (v: number, seed: number) => {
-		const poly = plane.on(ellipse(w - 1.35, v - 0.35, 1.2, 0.6, 26));
+		const poly = plane.on(ellipse(w - 1.95, v - 0.45, 1.7, 0.75, 26));
 		return { wash: wash(poly, seed, 1, 3), pool: wash(pool(poly, poly[0]!, 0.55), seed + 1, 0.5, 2) };
 	};
 	return {
@@ -66,8 +65,7 @@ function cardArt() {
 		rules,
 		margin: pathOf(margin),
 		pencil: pencil(plane.on([[-0.8, 0], [w + 1, 0]]), 5130) + pencil(plane.on([[0, -0.6], [0, h + 0.8]]), 5131),
-		lines: CARD_LINES.map((v) => plane.matrix(0.5, v, 0.1)),
-		values: CARD_LINES.map((v) => plane.matrix(w - 2.4, v, 0.1)),
+		lines: CARD_LINES.map((v) => plane.matrix(1.9, v, 0.1)),
 		spots: CARD_LINES.slice(1).map((v, i) => spot(v, 5140 + i * 3)),
 	};
 }
@@ -87,6 +85,6 @@ export function drawing() {
 			button: buttonArt(),
 		},
 		card: cardArt(),
-		note: scene.note(plane.on([[0.6, 0.6]])[0]!, 3970),
+		note: scene.note(plane.on([[0.3, CARD.h * 0.62]])[0]!, 3970, [4, HEIGHT - 26]),
 	};
 }

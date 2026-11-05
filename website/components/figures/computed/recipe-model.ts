@@ -14,6 +14,8 @@ export const totalOf = (cart: number) => subtotalOf(cart) + shippingOf(cart);
 export const bags = (cart: number) => (cart === 1 ? 'bag' : 'bags');
 export const money = (n: number) => '$' + n;
 export const flip = (beat: string) => (beat === 'odd' ? 'even' : 'odd');
+/** Where each recipe-card value ends, in text units along its line: values are right-aligned. */
+export const VALUE_END = 142;
 export const RECIPE_TOUR = ['add', 'rest', 'add', 'rest', 'add', 'rest', 'add'] as const;
 
 export function describeRecipe(cart: number, added: boolean): string {

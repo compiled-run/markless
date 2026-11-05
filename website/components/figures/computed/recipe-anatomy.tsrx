@@ -1,6 +1,6 @@
 // The shop page on the desk with its recipe card: Add to cart changes the cart, and the card works the total out again, one line after another.
 import { computed, state } from '@markless/core';
-import { add, bags, describeRecipe, flip, FREE_OVER, money, PRICE, PRODUCT, RECIPE_TOUR, SHOP, shippingOf, START, subtotalOf, totalOf } from './recipe-model.ts';
+import { add, bags, describeRecipe, flip, FREE_OVER, money, PRICE, PRODUCT, RECIPE_TOUR, SHOP, shippingOf, START, subtotalOf, totalOf, VALUE_END } from './recipe-model.ts';
 import { art } from './recipe.art.ts';
 
 export default function RecipeAnatomy() @{
@@ -114,7 +114,7 @@ export default function RecipeAnatomy() @{
 
 				<path class="card-paper" d={art.card.paper} />
 				<path class="card-margin" d={art.card.margin} />
-				<path class="jar-ink thin" d={art.card.rules} />
+				<path class="sheet-ink thin" d={art.card.rules} />
 				<path class="hatch light" d={art.card.ear} />
 				<path class="jar-ink" d={art.card.ink} />
 				@for (const spot of art.card.spots; key spot.wash) {
@@ -126,12 +126,17 @@ export default function RecipeAnatomy() @{
 				<text class="card-title" transform={art.card.lines[0]}>Recipe for total</text>
 				<g transform={art.card.lines[1]}>
 					<text class="card-hand">{cart} {unit} × ${PRICE}</text>
+					<text class="card-value live step-1" x={VALUE_END}>{subtotal}</text>
 				</g>
-				<text class="card-value live step-1" transform={art.card.values[1]}>{subtotal}</text>
-				<text class="card-hand" transform={art.card.lines[2]}>shipping, free over ${FREE_OVER}</text>
-				<text class="card-value live step-2" transform={art.card.values[2]}>{shipping}</text>
-				<text class="card-hand strong" transform={art.card.lines[3]}>total</text>
-				<text class="card-value live step-3" transform={art.card.values[3]}>{total}</text>
+				<g transform={art.card.lines[2]}>
+					<text class="card-hand">shipping</text>
+					<text class="card-aside" x="58">(free over ${FREE_OVER})</text>
+					<text class="card-value live step-2" x={VALUE_END}>{shipping}</text>
+				</g>
+				<g transform={art.card.lines[3]}>
+					<text class="card-hand strong">total</text>
+					<text class="card-value live step-3" x={VALUE_END}>{total}</text>
+				</g>
 
 				<path class="jar-ink" d={art.note.arrow} />
 				<text class="hand" x={art.note.x} y={art.note.y}>NOBODY WRITES THE TOTAL</text>
@@ -470,11 +475,7 @@ export default function RecipeAnatomy() @{
 			}
 
 			.card-paper {
-				fill: color-mix(in oklch, var(--paper) 70%, white);
-
-				html.dark & {
-					fill: color-mix(in oklch, var(--paper) 88%, var(--ink));
-				}
+				fill: var(--sheet);
 			}
 
 			.card-margin {
@@ -488,19 +489,27 @@ export default function RecipeAnatomy() @{
 			.card-hand,
 			.card-value {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
-				fill: oklch(32% 0.02 60);
+				fill: var(--sheet-ink);
 			}
 
 			.card-title {
 				font-family: 'Joy Elia', system-ui, sans-serif;
-				font-size: 9px;
+				font-size: 12px;
 				letter-spacing: 0.1em;
 				text-transform: uppercase;
 			}
 
 			.card-hand {
-				font-size: 7.5px;
+				font-size: 12px;
 				font-style: italic;
+			}
+
+			.card-aside {
+				font-family: 'Shantell Sans', system-ui, sans-serif;
+				font-size: 8px;
+				font-style: italic;
+				fill: var(--sheet-ink);
+				opacity: 0.7;
 			}
 
 			.strong {
@@ -508,8 +517,9 @@ export default function RecipeAnatomy() @{
 			}
 
 			.card-value {
-				font-size: 10px;
+				font-size: 15px;
 				font-weight: 800;
+				text-anchor: end;
 			}
 
 			.live {
@@ -523,7 +533,7 @@ export default function RecipeAnatomy() @{
 			}
 
 			.card-value.live {
-				stroke: oklch(32% 0.02 60);
+				stroke: var(--sheet-ink);
 			}
 
 			.scene[data-beat='odd'] {
