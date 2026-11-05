@@ -8,8 +8,8 @@
 				"docs /",
 				"executedChars"
 			],
-			"delta": 4582,
-			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"delta": 4568,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
 			"date": "2026-11-05"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 125836,
-			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"delta": 125620,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
 			"date": "2026-11-05"
 		},
 		{
@@ -32,8 +32,8 @@
 				"docs /concepts/state",
 				"executedChars"
 			],
-			"delta": 3789,
-			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"delta": 3722,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
 			"date": "2026-11-05"
 		},
 		{
@@ -44,8 +44,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": -8296,
-			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"delta": -8512,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
 			"date": "2026-11-05"
 		},
 		{
@@ -56,8 +56,8 @@
 				"docs /ui/accordion",
 				"executedChars"
 			],
-			"delta": 131,
-			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"delta": 132,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
 			"date": "2026-11-05"
 		},
 		{
@@ -68,8 +68,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 9868,
-			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so pages that start their runtime at load also bind that store",
+			"delta": 9652,
+			"reason": "the docs sidebar keeps the sections a reader opened in a page-scoped shared() store, so its pages load the store's binding and the bundler regroups chunks around it",
 			"date": "2026-11-05"
 		}
 	]

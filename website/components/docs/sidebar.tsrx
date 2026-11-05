@@ -134,15 +134,13 @@ const sidebarSections = shared(() => {
 	const sidebar = state({ opened: [] as string[], closedOn: '' });
 	return {
 		...sidebar,
-		// `page` is the pathname when the section is the one the reader's page is in.
-		keep(title: string, opened: boolean, page: string) {
-			const others = sidebar.opened.filter((other) => other !== title);
-			sidebar.opened = opened ? [...others, title] : others;
-			if (page) sidebar.closedOn = opened ? '' : page;
-		},
-		leave(here: string, page: string) {
-			if (here && sidebar.closedOn !== page && !sidebar.opened.includes(here))
-				sidebar.opened = [...sidebar.opened, here];
+		// Opening a section also keeps the reader's own section open, unless they closed it on this page.
+		keep(title: string, opened: boolean, here: string, page: string) {
+			const next = sidebar.opened.filter((other) => other !== title);
+			if (opened) next.push(title);
+			if (opened && here && sidebar.closedOn !== page && !next.includes(here)) next.push(here);
+			sidebar.opened = next;
+			if (title === here) sidebar.closedOn = opened ? '' : page;
 		},
 	};
 });
@@ -166,7 +164,7 @@ function SidebarBranch({
 	<tree.item
 		class={'branch stroke-' + (section.stroke ?? 'pink') + (section.current ? ' branch-current' : '')}
 		open={open}
-		onChange={(opened) => sidebar.keep(section.title, opened, section.current ? pathname : '')}
+		onChange={(opened) => sidebar.keep(section.title, opened, section.here, pathname)}
 		level={1}
 		aria-label={section.title}
 	>
@@ -196,7 +194,6 @@ function SidebarBranch({
 							class={entry.active ? 'sidebar-link page-link is-active' : 'sidebar-link page-link'}
 							href={entry.href}
 							tabindex={-1}
-							onClick={() => sidebar.leave(section.here, pathname)}
 							aria-current={entry.active ? 'page' : undefined}
 						>
 							<svg class="nav-icon" viewBox="0 0 108 108" aria-hidden="true">
