@@ -3,37 +3,38 @@ import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import DoughAnatomy from '../../components/figures/dough/dough-anatomy.tsrx';
+import BuildOutput from '../../components/figures/build-output/build-output-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Write once, then pick where it runs
+# Deploy your app
 
 <PageMeta time="2 min" assumes="routes" />
 
-<Subtitle text="One build turns your pages, endpoints and middleware into a Node server. A preset turns the same files into output for another host." />
+<Subtitle text="One build turns your app into an output folder, and a preset decides which host that folder is shaped for." />
 
-```bash
-npm run build
-PORT=3000 node .output/server/index.mjs
+```ts title="vite.config.ts"
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/router/vite';
+import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+	plugins: [markless(), router()],
+});
 ```
 
-That is the default: a Node server that reads its port from `PORT`. Run `npm run preview` to try the build first.
+**`router()`** builds your pages, endpoints and middleware into a server. **`markless()`** compiles each `.tsrx` file on the way.
 
-## Pick another host with a preset
+## The same code builds for any host
 
-The router builds on [Nitro](https://nitro.build), a server toolkit that writes output for many hosts. A *preset* names the host. Press the tin to switch it, or drag the dough in.
+The router builds on [Nitro](https://nitro.build), and a *preset* names the host the output is for. Flip the preset, then try to drag a file into the output.
 
-<DoughAnatomy />
+<BuildOutput />
 
-The dough never changes: your files stay the same, and only the output takes the host's shape.
-
-| Host | `NITRO_PRESET` | Output |
-| --- | --- | --- |
-| Node | none, the default | `.output/` |
-| Vercel | `vercel` | `.vercel/output/` |
-| Cloudflare Workers | `cloudflare-module` | `.output/` |
+- Node is the default, and needs no preset.
+- `NITRO_PRESET=vercel` writes `.vercel/output/`.
+- `NITRO_PRESET=cloudflare-module` writes a Worker into `.output/`.
 
 ```bash
 NITRO_PRESET=vercel npm run build
@@ -41,27 +42,26 @@ NITRO_PRESET=vercel npm run build
 
 These three are tested with Markless. Treat Nitro's other presets as untested, and try a preview deploy first.
 
-## What the build writes
+## Node runs the server you built
 
-| Path | What it holds |
-| --- | --- |
-| `.output/server/index.mjs` | the server you start |
-| `.output/public/build/` | the browser code, sent with long-lived cache headers |
-| `.output/markless/router/types/` | the route types your editor uses to check links |
+```bash
+npm run build
+PORT=3000 node .output/server/index.mjs
+```
 
-The starter's `.gitignore` already leaves `.output/` out of git.
+The server reads its port from `PORT`. Run `npm run preview` to try the build first. The starter's `.gitignore` already leaves `.output/` out of git.
 
-## Serve prerendered pages free on Cloudflare
+## Prerendered pages are free on Cloudflare
 
-Deploy with `npx wrangler deploy --config .output/server/wrangler.json`. Cloudflare serves files in `.output/public/` without running your Worker, so prerendered pages cost nothing:
+Deploy with `npx wrangler deploy --config .output/server/wrangler.json`. Cloudflare serves files in `.output/public/` without running your Worker:
 
-- Give the page `prerender: true` in its route rule, and give its `/_markless/fragment/...` path the same rule, so a click on a link to it is served from a file too.
+- Give a page `prerender: true` in its route rule, and give its `/_markless/fragment/...` path the same rule.
 - Pages that aren't prerendered render in the Worker and stream, so `@pending` content still shows first.
 - Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`.
 
-## Keep shared data out of memory
+## Memory isn't shared between servers
 
-A host runs many copies of your server, called *instances*, and each has its own memory. Put counters, sessions and carts in a database or a key-value store. For one copy per instance, such as a database pool, put it on `globalThis`:
+A host runs many copies of your server, called *instances*, and each has its own memory. Put sessions and carts in a database or a key-value store. For one copy per instance, such as a database pool, put it on `globalThis`:
 
 ```ts
 const pool = (globalThis.dbPool ??= createPool(process.env.DATABASE_URL));

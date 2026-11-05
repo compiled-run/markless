@@ -7,39 +7,53 @@ import VendingAnatomy from '../../components/figures/vending/vending-anatomy.tsr
 <SiteNavbar />
 <Sidebar />
 
-# Answer requests with API routes
+# API routes
 
 <PageMeta time="2 min" assumes="routes" />
 
-<Subtitle text="A file in api/ is an endpoint: a function that takes a request and returns a response, for JSON, webhooks or a health check." />
+<Subtitle text="An API route is a file in api/ that answers a request with data instead of a page." />
 
 ```ts title="api/users/[id].get.ts"
 import type { EndpointHttpContext } from '@markless/router';
-
-export const cache = { maxAge: 60 };
 
 export default function user({ params }: EndpointHttpContext<{ id: string }>) {
 	return Response.json({ id: params.id });
 }
 ```
 
-`GET /api/users/42` now answers `{"id":"42"}`. `export const cache = { maxAge: 60 }` lets the answer be cached for 60 seconds; leave it out to answer fresh every time.
+`GET /api/users/42` answers `{"id":"42"}`. The **path** gives the address, **`.get`** in the name gives the method, and the **default export** is the function that runs.
 
-## The path is the address, the name is the method
+## The file name picks the method
 
-`api/` sits at the app root, next to `pages/`. Press GET, then POST.
+An *endpoint* is one file in `api/`, at the app root next to `pages/`. Its name sets what it answers:
+
+- `[id]` is one part of the address, read as `params.id`.
+- `.get`, `.post`, `.put`, `.patch`, `.delete`, `.head`, `.options`, `.connect` or `.trace` picks one method.
+- No method in the name answers every method.
+
+Type an id, then drop the coin in GET or POST.
 
 <VendingAnatomy />
 
-`users/[id].get.ts` answers only `GET`, so a `POST` to `/api/users/42` gets nothing. A file name can end with `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `connect` or `trace`; with none, it answers every method.
+Only the file that matches both the method and the path answers. A `POST` to `/api/users/42` matches no file and gets a 404.
 
 ## One function gets the whole request
 
-It gets `request`, `url`, `params`, `locals` and `response`. Return a `Response`, or set headers on `response.headers`. Each file has one `export default` function; don't export one called `GET` or `POST`.
+The default export gets one object, the *context*:
 
-## Run code on every request with middleware
+- `request`, `url` and `params` describe what was asked.
+- `locals` holds what middleware set.
+- `response.headers` lets you add headers; or return your own `Response`.
 
-A file in `middleware/` runs for every request to your pages and endpoints. The full-stack starter ships this one:
+```ts title="api/users/[id].get.ts"
+export const cache = { maxAge: 60 };
+```
+
+That line lets the answer be cached for 60 seconds.
+
+## Middleware runs on every request
+
+A file in `middleware/` runs before every page and endpoint. The full-stack starter ships this one:
 
 ```ts title="middleware/request.ts"
 export default function request(http: import('@markless/router').MiddlewareHttpContext) {
@@ -47,11 +61,10 @@ export default function request(http: import('@markless/router').MiddlewareHttpC
 }
 ```
 
-That header shows up on your pages and your `/api/` answers.
-
 Keep in mind:
 
-- Files in `api/` and `middleware/` end in `.ts`. A `.tsrx` file there is not an endpoint.
-- Keep both folders at the app root, not inside `pages/`. A page in `pages/api/` is a page, so a reference page can live at `/api/` beside your endpoints.
+- Files in `api/` and `middleware/` end in `.ts`, and each has one `export default` function.
+- Don't export a function named `GET` or `POST`; the file name gives the method.
+- A page in `pages/api/` is still a page, so a reference page can live at `/api/` beside your endpoints.
 
 Ready to put it online? [Build and deploy your app](/router/deploying).

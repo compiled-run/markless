@@ -2,16 +2,16 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import CatalogueAnatomy from '../../components/figures/catalogue/catalogue-anatomy.tsrx';
+import RoutesAnatomy from '../../components/figures/routes/routes-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Make a file, get a URL
+# Pages
 
 <PageMeta time="2 min" assumes="components" />
 
-<Subtitle text="Each file in pages/ is one page of your app, and its path on disk is its address." />
+<Subtitle text="A page is a .tsrx file in pages/, and its path there is the address it answers." />
 
 ```tsrx title="pages/about.tsrx"
 export default function About() @{
@@ -19,26 +19,23 @@ export default function About() @{
 }
 ```
 
-Save that file, and `/about` shows **About the shop**. Every `npm create markless` starter includes `@markless/router`, which does this.
+The file's path, **`pages/about.tsrx`**, makes the address **`/about`**. Its **default export** is what the browser shows there.
 
-## The file name is the address
+## A file's path is its address
 
-Press the drawing to drop the address on the card.
+Each file in `pages/` is a *route*: one address your app answers.
 
-<CatalogueAnatomy />
+- `index.tsrx` answers `/`, and `about.tsrx` answers `/about` and `/about/`.
+- A folder adds a part: `blog/[slug].tsrx` answers `/blog/` plus one part.
+- An address with no file shows `404.tsrx`, with status 404.
 
-A bracket in a file name is a blank the address fills in. `blog/[slug].tsrx` answers `/blog/hello` with `slug` set to `hello`.
+Drag a file into `pages/`, then out again.
 
-| File in `pages/` | Address |
-| --- | --- |
-| `index.tsrx` | `/` |
-| `blog/[slug].tsrx` | `/blog/` plus one part |
-| `docs/[...slug].mdx` | `/docs/` plus one part or more |
-| `404.tsrx` | anything else, with status 404 |
+<RoutesAnatomy />
 
-A plain name beats `[param]`, and `[param]` beats `[...rest]`.
+## `[slug]` is a blank the address fills
 
-## Read the params
+A bracket in a file name is a *param*. Type a slug in the drawing's address bar to fill it.
 
 ```tsrx title="pages/blog/[slug].tsrx"
 import type { PageProps } from '@markless/router';
@@ -48,9 +45,13 @@ export default function Post({ params }: PageProps<{ slug: string }>) @{
 }
 ```
 
-Every page gets four props: `params`, `url`, `status` and `http`. A catch-all param is one string, like `guide/intro`.
+- `/blog/hello` shows **Post hello**.
+- `docs/[...slug].mdx` catches one part or more, as one string like `guide/intro`.
+- A plain name beats `[param]`, and `[param]` beats `[...rest]`.
 
-## Answer with a status
+## A page can answer with a status
+
+Every page gets four props: `params`, `url`, `status` and `http`. Set `http.response.status` to answer 404 for a missing invoice.
 
 ```tsrx title="pages/invoices/[id].tsrx"
 import type { PageProps } from '@markless/router';
@@ -64,12 +65,12 @@ export default function Invoice({ params, http }: PageProps<{ id: string }>) @{
 }
 ```
 
-Set the status before anything the page waits on. Changing it later throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
+Set it before anything the page waits on. Changing it later throws `MARKLESS_ROUTER_RESPONSE_COMMITTED`.
 
-Keep in mind:
+Not yet:
 
-- `document.tsrx` in the app root wraps every page, using `Html` from `@markless/router`. It can't hold event handlers.
 - Two files for one address stop the build, like `docs.tsrx` next to `docs.mdx`.
 - `http` exists only on the server. Reading it in a handler stops the build with `MARKLESS_SERVER_ONLY_PROP_BROWSER_READ`.
+- `document.tsrx` wraps every page, using `Html` from `@markless/router`, and can't hold event handlers.
 
-Next, [link between your pages](/router/links) so the build can check every link.
+Next, [link between your pages](/router/links) so the build checks every link.

@@ -44,7 +44,7 @@ describe('the door and its keys', () => {
 
 	it('is on the Links page under its own heading', () => {
 		expect(page).toContain("import RouteKey from '../../components/figures/route-key/route-key.tsrx';");
-		expect(page.indexOf('## The build checks every pattern')).toBeLessThan(page.indexOf('<RouteKey />'));
+		expect(page.indexOf('## The build checks every link')).toBeLessThan(page.indexOf('<RouteKey />'));
 	});
 });
 

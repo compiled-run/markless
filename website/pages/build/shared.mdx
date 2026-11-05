@@ -2,94 +2,109 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import BakeSaleDemo from '../../components/figures/shared/bake-sale-demo.tsrx';
-import WhiteboardAnatomy from '../../components/figures/whiteboard/whiteboard-anatomy.tsrx';
+import PlayerAnatomy from '../../components/figures/player/player-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Share one piece of state with `shared()`
+# Shared state
 
 <PageMeta time="3 min" assumes="state, components" />
 
-<Subtitle text="shared() gives state a name. Every component that calls the name gets the same value, with no props in between." />
+<Subtitle text="shared() is state with a name: every component that calls the name gets the same copy." />
 
-<Code steps={[{ label: 'Press Add to cart. The click runs in Shop, and the badge in CartBadge changes.', shows: 'Bags in the cart: 1' }, { label: 'Add a `remove()` method that runs `box.bags--`, and a button in `Shop` that calls it.', source: 'box.bags--' }]}>
-```tsrx title="cart.tsrx"
+```tsrx title="player.tsrx"
 import { shared, state } from '@markless/core';
 
-export const cart = shared(
+export const player = shared(() => {
+	const box = state({ track: 'Harbour Lights' });
+	return { ...box };
+});
+```
+
+**`shared()`** takes a function that makes the state, and names it `player`. Every component that calls **`player()`** gets the same `track`, with no props in between.
+
+## Two components read one copy
+
+A *shared definition* is the function you pass to `shared()`. Call it from any component, and:
+
+- every caller reads the same values
+- a change in one caller shows in all of them
+- no prop has to carry it
+
+Press play on either player, then turn one volume knob.
+
+<PlayerAnatomy />
+
+<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }]}>
+```tsrx title="player.tsrx"
+import { shared, state } from '@markless/core';
+
+export const player = shared(
 	() => {
-		const box = state({ bags: 0 });
+		const box = state({
+			track: 'Harbour Lights',
+			playing: false,
+		});
 		return {
 			...box,
-			add() {
-				box.bags++;
+			toggle() {
+				box.playing = !box.playing;
 			},
 		};
 	},
 	{ scope: 'page' },
 );
 
-function CartBadge() @{
-	const c = cart();
+function MiniPlayer() @{
+	const p = player();
 
-	<p>Bags in the cart: {c.bags}</p>
+	<p>
+		{p.playing ? 'Playing' : 'Paused'}: {p.track}
+	</p>
 }
 
-export default function Shop() @{
-	const c = cart();
+export default function NowPlaying() @{
+	const p = player();
 
 	<section>
-		<CartBadge />
-		<button onClick={() => c.add()}>
-			Add to cart
+		<MiniPlayer />
+		<h2>{p.track}</h2>
+		<button onClick={() => p.toggle()}>
+			{p.playing ? 'Pause' : 'Play'}
 		</button>
 	</section>
 }
 ```
 </Code>
 
-No prop connects `Shop` and `CartBadge`. Both call `cart()`, so both get the same `bags`.
+## The scope picks who shares a copy
 
-## One board, every desk reads it
-
-Press the pink `Shop` desk to write on the board. Hover either desk to see what it reads.
-
-<WhiteboardAnatomy />
-
-`CartBadge` has no board of its own. It reads the same `cart`, so it sees every write.
-
-## Pick who shares one copy
-
-The second argument to `shared()` picks who shares a copy. Press each stall's **Sell one**.
-
-<BakeSaleDemo />
-
-The day total is `'page'`, so every stall moves it. Each stall's count is `'widget'`, so it's its own.
+The second argument is the *scope*: who shares one copy.
 
 | Scope | Who shares one copy |
 | --- | --- |
 | `'page'`, the default | every component on the page |
 | `'request'` | the same as `'page'` in the browser |
 | `'container'` | one Markless app on the page |
-| `'widget'` | the pieces of one rendered widget, like one menu |
+| `'widget'` | the pieces of one rendered widget |
 
-A widget is the first component that calls the definition, plus everything inside it. The [UI components](/ui) use `'widget'`, so two menus open and close on their own.
+A widget is the first component that calls the definition, plus everything inside it. The volume knobs above are `'widget'`, and so are the [UI components](/ui), so two menus open and close on their own.
 
-## It lasts while the reader browses
+## A copy lasts until a reload
 
-- **On the server**, every request starts from the starting values.
-- **In the browser**, one copy lives as long as the document, through links, Back and Forward.
-- **A reload** starts again from the starting values.
+- On the server, every request starts from the starting values.
+- In the browser, one copy lives as long as the document, through links, Back and Forward.
+- A reload starts again from the starting values.
 
 ## Two apps on one page share by name
 
-When two separately built apps on one page call the same definition, they read and write one copy. The name is the definition's file plus its export, like `lib/cart.tsrx#cart`, so both must import it from the same place. If the value's shape differs, that app keeps its own copy and logs `MARKLESS_SHARED_SHAPE_MISMATCH`.
+Two separately built apps on one page that call the same definition read and write one copy. The name is the file plus its export, like `lib/player.tsrx#player`, so both must import it from the same place.
 
-Keep in mind:
+Not yet:
 
+- If one app's value has a different shape, it keeps its own copy and logs `MARKLESS_SHARED_SHAPE_MISMATCH`.
 - Two components in one file calling a definition with no scope get the warning `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`. Write the scope you mean.
-- Call a definition's methods from the file that defines it. From another file, `c.add()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`; change the field instead, `c.bags++`.
+- From another file, `p.toggle()` can stop the build with `MARKLESS_SHARED_METHOD_CROSS_MODULE`. Change the field instead: `p.playing = true`.
 
 Use `state()` when one component owns a value, and `shared()` when several need it. Next, [turn files into pages](/router/pages).

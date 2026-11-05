@@ -8,11 +8,11 @@ import RouteKey from '../../components/figures/route-key/route-key.tsrx';
 <SiteNavbar />
 <Sidebar />
 
-# Links the build can check
+# Links
 
 <PageMeta time="2 min" assumes="routes" />
 
-<Subtitle text="Link to a route pattern and pass its params. The build checks both, so a link with a typo never ships." />
+<Subtitle text="A link points at one of your pages, and the build checks that the page exists." />
 
 ```tsrx title="pages/index.tsrx"
 import { Link } from '@markless/router';
@@ -27,37 +27,51 @@ export default function Home() @{
 }
 ```
 
-`Link` renders a real `<a>`. The build writes the second one as `href="/blog/hello"`.
+**`Link`** renders a real `<a>`. **`params`** fills the brackets, so the build writes the second link as `href="/blog/hello"`.
 
-## The build checks every pattern
+## The build checks every link
 
-A link is a key cut for a route. Try both keys in the door.
-
-<RouteKey />
+`/blog/[slug]` is a *route pattern*: a file path in `pages/`, with brackets for the parts that change.
 
 - A pattern that matches no file in `pages/` stops the build.
 - A pattern without its `params` stops the build and names them.
-- A plain address like `/about` isn't checked by the build; your editor flags its typos.
+- A plain address like `/about` isn't checked by the build. Your editor flags its typos.
+
+Try both keys in the door.
+
+<RouteKey />
+
+The typo key is the build error you'd see:
+
+```txt
+Typed route error: /blgo/[slug] does not match any route in pages/.
+```
 
 ## A click swaps in only the page
+
+An *in-place navigation* keeps the page you're on and swaps in only its middle.
+
+- The address changes when the new middle lands, not at the click.
+- Back and Forward bring back each page and its scroll.
+- Plain `<a>` links to your pages do the same.
 
 Swap the sheet, then try to pull the clip off.
 
 <LinkAnatomy />
 
-The router fetches the next page's middle and swaps it in, and the address changes as it lands. Back and Forward restore each page and its scroll.
+## Early fetches are real requests
 
-## The next page is fetched early
-
-A pointer resting on a link, a focus or a press starts the fetch before the click. That fetch is a real `GET`, so turn it off for links that do something, like logging out:
+A pointer resting on a link, a focus or a press starts fetching the next page before the click. That fetch is a real `GET`, so turn it off for a link that does something:
 
 ```tsrx
 <Link href="/logout" prefetch={false}>Log out</Link>
 ```
 
-The router never fetches other sites, `/api/` paths, or links with `download`, a `target` or `rel="external"`.
+- The router never fetches other sites or `/api/` paths early.
+- Links with `download`, a `target` or `rel="external"` aren't fetched early either.
+- `router({ prefetch: false })` in `vite.config.ts` turns early fetches off everywhere.
 
-## Navigate from code
+## `navigate()` is a click from code
 
 ```tsrx title="checkout.tsrx"
 import { navigate } from '@markless/router';
@@ -74,12 +88,10 @@ export default function Checkout() @{
 }
 ```
 
-`navigate()` does what a click does, and resolves once the new page is in place.
+**`navigate()`** resolves once the new page is in place. **`replace`** swaps the current history entry instead of adding one, on `navigate()` and on `Link`.
 
-Keep in mind:
+Not yet:
 
-- `replace` swaps the current history entry, and `scroll={false}` keeps the scroll position. Both work on `Link` and `navigate()`.
 - `prefetch={false}` works on `Link`, a plain `<a>`, or a component that passes it to one. Anywhere else stops the build with `MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED`.
-- `router({ prefetch: false })` in `vite.config.ts` turns early fetches off everywhere.
 
 Pages often need data from somewhere slow. [Load it in the page](/router/data).

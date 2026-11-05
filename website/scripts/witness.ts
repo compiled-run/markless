@@ -2179,23 +2179,15 @@ try {
 
 		// A prop is a live read of the parent's value, and the child body runs once.
 		await page.goto(`${origin}/build/components`, { waitUntil: 'load' });
-		const cartBlock = liveBlock(0);
-		const badgeLine = cartBlock.locator('p').first();
-		await badgeLine.waitFor();
-		const ticketOf = async () => ((await badgeLine.textContent()) ?? '').match(/Badge #(\d+)/)?.[1] ?? '';
-		const ticketAtRest = await ticketOf();
-		check(
-			((await badgeLine.locator('strong').textContent()) ?? '').trim() === '0' && ticketAtRest !== '',
-			'the badge serves 0 bags and its ticket number',
-			((await badgeLine.textContent()) ?? '').trim(),
-		);
-		await cartBlock.getByRole('button', { name: 'Add a bag' }).click();
-		await settleText(badgeLine.locator('strong'), (text) => text === '1', 'the badge reads the parent bags live');
-		check(
-			(await ticketOf()) === ticketAtRest,
-			'the badge body did not run again, so its ticket number stayed',
-			`${ticketAtRest} then ${await ticketOf()}`,
-		);
+		const profileBlock = liveBlock(0);
+		const greeting = profileBlock.locator('p').first();
+		const tagLine = profileBlock.locator('p').nth(1);
+		await greeting.waitFor();
+		const tagAtRest = ((await tagLine.textContent()) ?? '').trim();
+		check(((await greeting.textContent()) ?? '').trim() === 'Hello, Ada', 'the name tag serves Ada', tagAtRest);
+		await profileBlock.getByRole('button', { name: 'Grace' }).click();
+		await settleText(greeting, (text) => text === 'Hello, Grace', 'the name tag reads the parent name live');
+		check(((await tagLine.textContent()) ?? '').trim() === tagAtRest, 'the tag body did not run again, so its tag number stayed', tagAtRest);
 		const hostBlock = liveBlock(1);
 		const hostLine = hostBlock.locator('p').first();
 		check(((await hostLine.textContent()) ?? '').trim() === 'Host: nobody', 'the host picker serves nobody');
@@ -2205,64 +2197,51 @@ try {
 
 		// The handle is the real node, so the check reads the browser's own focused element.
 		await page.goto(`${origin}/build/elements`, { waitUntil: 'load' });
-		const guestButton = page.getByRole('button', { name: 'Add guest' });
-		await guestButton.waitFor();
+		const searchBlock = liveBlock(0);
+		const focusButton = searchBlock.getByRole('button', { name: 'Focus search' });
+		await focusButton.waitFor();
 		const activeIsField = () =>
-			page.evaluate(() => {
-				const field = document.querySelector('.code-block [data-code-stage] input');
-				return Boolean(field) && document.activeElement === field;
-			});
+			searchBlock.locator('input').evaluate((field) => document.activeElement === field);
 		const settleFocus = async () => {
 			for (let attempt = 0; attempt < 40; attempt += 1) {
 				if (await activeIsField()) return;
 				await new Promise((done) => setTimeout(done, 100));
 			}
 		};
-		check(!(await activeIsField()), 'the field does not start out focused');
-		await guestButton.click();
+		check(!(await activeIsField()), 'the search field does not start out focused');
+		await focusButton.click();
 		await settleFocus();
-		check(await activeIsField(), 'pressing Add guest puts the caret in the field');
-		await settleText(liveBlock(0).locator('p').first(), (text) => text === 'Guests added: 1', 'the same press counts the guest');
-		await guestButton.focus();
-		await liveBlock(0).locator('label').click();
+		check(await activeIsField(), 'pressing Focus search puts the caret in the field');
+		await focusButton.focus();
+		await searchBlock.locator('label').click();
 		await settleFocus();
 		check(await activeIsField(), 'clicking the label focuses the field, because for={field} names it');
 		await page.screenshot({ path: `${shotsDir}/T006-elements-after.png`, fullPage: true });
 
-		// A storage() pick survives a reload, and is on <html> before the page shows.
+		// A storage() value survives a reload, and is on <html> before the page shows.
 		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
-		const drinkFigure = () => page.locator('.margin-notes').first();
-		const drinkHeading = () => drinkFigure().locator('.heading');
-		const drinkAttr = () => page.evaluate(() => document.documentElement.getAttribute('data-docs-drink'));
-		await drinkHeading().waitFor();
-		check((await drinkAttr()) === 'tea', 'the drink figure starts at tea on <html>', String(await drinkAttr()));
-		await drinkFigure().getByRole('button', { name: 'Coffee' }).click();
-		await settleInner(drinkHeading(), (text) => text.includes('Your usual: coffee'), 'picking a drink shows it');
-		check((await drinkAttr()) === 'coffee', 'picking a drink writes it onto <html>', String(await drinkAttr()));
+		const modeButton = () => liveBlock(0).getByRole('button');
+		const modeAttr = () => page.evaluate(() => document.documentElement.getAttribute('data-mode'));
+		await modeButton().waitFor();
+		check(((await modeButton().textContent()) ?? '').trim() === 'Mode: light', 'the mode switch serves its starting value');
+		await modeButton().click();
+		await settleText(modeButton(), (text) => text === 'Mode: dark', 'pressing the switch shows dark');
+		check((await modeAttr()) === 'dark', 'the write lands on <html>', String(await modeAttr()));
 		await page.reload({ waitUntil: 'load' });
-		check((await drinkAttr()) === 'coffee', 'the pick is on <html> again after a reload', String(await drinkAttr()));
-		await settleInner(drinkHeading(), (text) => text.includes('Your usual: coffee'), 'the pick survives a reload');
+		check((await modeAttr()) === 'dark', 'the value is on <html> again after a reload', String(await modeAttr()));
+		await settleText(modeButton(), (text) => text === 'Mode: dark', 'the value survives a reload');
 		await page.screenshot({ path: `${shotsDir}/T006-storage-after.png`, fullPage: true });
 		await page.evaluate(() => localStorage.clear());
-		await page.context().clearCookies({ name: 'markless-docs-drink' });
+		await page.context().clearCookies({ name: 'markless-mode' });
 
-		// shared() reaches a component with no prop, and its scope picks who shares a copy.
+		// shared() reaches a component with no prop: a press in one component shows in another.
 		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
-		const bagLine = liveBlock(0).locator('p').first();
-		await bagLine.waitFor();
-		check(((await bagLine.textContent()) ?? '').trim() === 'Bags in the cart: 0', 'the shared badge serves 0');
-		await liveBlock(0).getByRole('button', { name: 'Add to cart' }).click();
-		await settleText(bagLine, (text) => text === 'Bags in the cart: 1', 'a click in one component moves the badge in another');
-		const saleFigure = page.locator('.margin-notes').first();
-		await saleFigure.getByRole('button', { name: 'Sell one' }).first().click();
-		await settleInner(saleFigure.locator('.total'), (text) => text.includes('Sold today: 1'), "the 'page' total moves on a stall's press");
-		const stallCounts = async () =>
-			(await saleFigure.locator('.count span').allTextContents()).map((text) => text.trim()).join();
-		check(
-			(await stallCounts()) === 'Lemonade: 1 sold,Cookies: 0 sold',
-			"each 'widget' stall keeps its own count",
-			await stallCounts(),
-		);
+		const playerBlock = liveBlock(0);
+		const miniLine = playerBlock.locator('p').first();
+		await miniLine.waitFor();
+		check(((await miniLine.textContent()) ?? '').trim() === 'Paused: Harbour Lights', 'the mini player serves paused');
+		await playerBlock.getByRole('button', { name: 'Play' }).click();
+		await settleText(miniLine, (text) => text === 'Playing: Harbour Lights', 'a press in NowPlaying shows in MiniPlayer');
 		await page.screenshot({ path: `${shotsDir}/T006-shared-after.png`, fullPage: true });
 
 		// --- batch 5: the Router section, how it works, and the reference -------

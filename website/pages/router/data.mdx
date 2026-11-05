@@ -3,53 +3,90 @@ import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import TickerAnatomy from '../../components/figures/ticker/ticker-anatomy.tsrx';
+import StreamAnatomy from '../../components/figures/stream/stream-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Page data arrives in the same response
+# Load data for a page
 
 <PageMeta time="2 min" assumes="async, routes" />
 
-<Subtitle text="A page loads its data with an async computed() inside @try. The fast part shows first, and the data follows in the same response." />
+<Subtitle text="A page loads its data with async values inside @try, and the slow part arrives later in the same response." terms="values" />
 
-```tsrx title="pages/shops/[shop].tsrx"
+```tsrx title="pages/recipes/[name].tsrx"
 import { computed } from '@markless/core';
 import type { PageProps } from '@markless/router';
-import { recentOrders } from '../../src/orders.ts';
+import { reviews } from '../../src/db.ts';
 
-export default function Orders({ params }: PageProps<{ shop: string }>) @{
-	const orders = computed(async () => recentOrders(params.shop));
+export default function Recipe({ params }: PageProps<{ name: string }>) @{
+	const list = computed(async () => reviews(params.name));
 
 	<main>
-		<h1>Orders</h1>
+		<h1>{params.name}</h1>
 		@try {
-			<p>{orders.length} orders</p>
+			<p>{list.length} reviews</p>
 		} @pending {
-			<p>Loading…</p>
+			<p>Loading reviews…</p>
 		} @catch {
-			<p>Couldn't load the orders.</p>
+			<p>Couldn't load the reviews.</p>
 		}
 	</main>
 }
 ```
 
-There is no loader function. A page loads data the way any component does, as an [async value](/concepts/async).
+**`computed(async …)`** asks the database for the reviews. **`@try`** shows them when they arrive, and **`@pending`** holds their place until then. There is no loader function.
 
-## One response, in two parts
+## The slow part arrives in the same response
 
-Press the machine to print the page. Then tug the tape while it waits.
+The server sends a page as a *stream*: one response that keeps arriving in parts.
 
-<TickerAnatomy />
+- Everything outside `@try` goes out at once.
+- `@pending` holds the slow part's place.
+- When the data is ready, the same response carries the `@try` content.
 
-The heading and the `@pending` text go out first. When the orders are ready, the same response carries on with the `@try` content. The browser never asks twice, and fast data never sends `Loading…` at all.
+Reload the recipe, then turn the database dial towards the snail and reload again.
+
+<StreamAnatomy />
+
+<Code steps={[{ label: 'Wait for the review to replace Loading reviews…', shows: 'Lovely and lemony' }, { label: 'Change `1500` to `4000`. Loading reviews… stays for four seconds, and the heading never waits.', source: 'slowReview(4000)' }]}>
+```tsrx title="reviews.tsrx"
+import { computed } from '@markless/core';
+import { slowReview } from './slow.ts';
+
+export default function Reviews() @{
+	const text = computed(async () =>
+		slowReview(1500),
+	);
+
+	<section>
+		<h2>Reviews</h2>
+		@try {
+			<p>{text}</p>
+		} @pending {
+			<p>Loading reviews…</p>
+		} @catch {
+			<p>Couldn't load them.</p>
+		}
+	</section>
+}
+```
+
+```ts title="slow.ts"
+export function slowReview(ms: number) {
+	return new Promise<string>((done) => {
+		const review = 'Lovely and lemony';
+		setTimeout(() => done(review), ms);
+	});
+}
+```
+</Code>
 
 Keep in mind:
 
-- The call can read the page's props before or after an `await`, and Markless tracks both.
-- On the server, `fetch` needs a full address. Build it from the `url` prop: `new URL('/api/orders', url.href)`.
+- Data that is ready within a few milliseconds goes out with the rest, and `@pending` is never sent.
 - The router can't wait for all the data first. A slow `@try` always sends its `@pending` content first.
+- On the server, `fetch` needs a full address. Build it from the `url` prop: `new URL('/api/reviews', url.href)`.
 
 <Collapsible
 	sprite="star-badge"

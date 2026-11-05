@@ -2,57 +2,74 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import StencilAnatomy from '../../components/figures/stencil/stencil-anatomy.tsrx';
+import StickersAnatomy from '../../components/figures/stickers/stickers-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Props pass values down, and callbacks talk back
+# Components and props
 
 <PageMeta time="2 min" assumes="state, events" />
 
-<Subtitle text="A component is a function, and its props are its parameter. A prop is a live read of the parent's value, not a copy." />
+<Subtitle text="A component is a function that returns elements, and props are the values you hand it." terms="elements" />
 
-<Code steps={[{ label: 'Press Add a bag three times. The bag count goes up, and the ticket number stays.', shows: '3' }, { label: 'Under the badge, add `<CartBadge bags={bags * 2} />`. Press again, and both badges follow `bags`.', source: 'bags={bags * 2}' }]}>
-```tsrx title="cart.tsrx"
+```tsrx title="welcome.tsrx"
+function NameTag({ name }: { name: string }) @{
+	<p>Hello, {name}</p>
+}
+
+export default function Welcome() @{
+	<NameTag name="Ada" />
+}
+```
+
+**`NameTag`** is a component: you place it with `<NameTag />`. **`name="Ada"`** is a *prop*, and `{ name }` receives it, so the page shows `Hello, Ada`.
+
+## A prop is a live read
+
+A child runs once, and its props keep reading the parent's current value.
+
+- The parent changes its state.
+- Every child that reads it shows the new value.
+- No child is placed again.
+
+Drag a few `Avatar` stickers onto the page, then turn its `name` selector.
+
+<StickersAnatomy />
+
+<Code steps={[{ label: 'Press Grace. The greeting changes, and the tag number stays.', shows: 'Hello, Grace' }, { label: 'Under the tag, add `<NameTag name={name.toUpperCase()} />`. Press Linus, and both follow `name`.', source: 'name={name.toUpperCase()}' }]}>
+```tsrx title="profile.tsrx"
 import { state } from '@markless/core';
 
-function CartBadge({ bags }: { bags: number }) @{
+function NameTag({ name }: { name: string }) @{
 	const ticket =
 		Math.floor(Math.random() * 900) + 100;
 
-	<p>
-		<strong>{bags}</strong> bags in the cart.
-		Badge #{ticket}
-	</p>
+	<div>
+		<p>Hello, {name}</p>
+		<p>Tag #{ticket}</p>
+	</div>
 }
 
-export default function Cart() @{
-	let bags = state(0);
+export default function Profile() @{
+	let name = state('Ada');
 
 	<section>
-		<CartBadge bags={bags} />
-		<button onClick={() => bags++}>
-			Add a bag
+		<NameTag name={name} />
+		<button onClick={() => (name = 'Grace')}>
+			Grace
+		</button>
+		<button onClick={() => (name = 'Linus')}>
+			Linus
 		</button>
 	</section>
 }
 ```
 </Code>
 
-`CartBadge` takes `{ bags }`, and the parent writes `bags={bags}`. That is the whole connection.
+## A callback talks back
 
-## A child is cut once
-
-Press the paint pot for a new colour. Watch what changes on the `CartBadge` stencil.
-
-<StencilAnatomy />
-
-A child runs once, like a stencil cut once. A new value from the parent shows through where the child reads it.
-
-## Talk back with a callback
-
-A child can't change the parent's state. The parent hands it a function, and the child calls it.
+A child can't change the parent's state. The parent hands it a *callback*: a function the child calls.
 
 <Code steps={[{ label: 'Press Grace.', shows: 'Host: Grace' }, { label: 'Add a third guest, `<Guest name="Linus" onPick={choose} />`, and press it.', shows: 'Host: Linus' }]}>
 ```tsrx title="host-pick.tsrx"
@@ -82,17 +99,27 @@ export default function HostPick() @{
 ```
 </Code>
 
-## Put children where you want them
+## Children go where you put them
 
-Elements between a component's tags arrive as `children`, typed `Children` from `@markless/core`.
+Elements between a component's tags arrive as its `children` prop, typed `Children`.
 
+<Code steps={[{ label: 'Inside `Card`, under the first line, add `<p>Free delivery</p>`.', shows: 'Free delivery' }, { label: 'Wrap `{children}` in `<div class="inner">` and `</div>`. Both lines still show.', source: '<div class="inner">{children}</div>' }]}>
 ```tsrx title="card.tsrx"
 import type { Children } from '@markless/core';
 
-export default function Card({ children }: { children?: Children }) @{
+type CardProps = { children?: Children };
+
+function Card({ children }: CardProps) @{
 	<section class="card">{children}</section>
 }
+
+export default function Shop() @{
+	<Card>
+		<p>Fresh beans every Monday</p>
+	</Card>
+}
 ```
+</Code>
 
 Not yet:
 

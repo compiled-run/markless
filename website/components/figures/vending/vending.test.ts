@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ANSWER, describeVending, FILE, flip, VENDING_TOUR } from './model.ts';
+import { describeVend, flip, GET_FILE, GET_FN, getAnswer, keyed, MISS_STATUS, pathOf, POST_FILE, resolve } from './model.ts';
 import { drawing } from './vending.ts';
 
 const vendArt = drawing();
@@ -9,52 +9,60 @@ const page = readFileSync(new URL('../../../pages/router/api-routes.mdx', import
 const piece = readFileSync(new URL('./vending-anatomy.tsrx', import.meta.url), 'utf8');
 
 describe('the vending machine', () => {
-	it('drops the answer for GET and nothing for POST', () => {
-		expect(FILE).toBe('users/[id].get.ts');
-		expect(describeVending('GET')).toContain(ANSWER);
-		expect(describeVending('POST')).toContain('nothing dropped, and the coin came back');
-		expect(describeVending('none')).toBe('');
-		expect(VENDING_TOUR[0]).toBe('GET');
+	it('lets only the file that matches the method and path answer', () => {
+		expect(resolve('GET', '42')).toBe('get');
+		expect(resolve('POST', '')).toBe('post');
+		expect(resolve('POST', '42')).toBe('miss');
+		expect(resolve('GET', '')).toBe('miss');
+		expect(pathOf('42')).toBe('/api/users/42');
+		expect(pathOf('')).toBe('/api/users');
+		expect(getAnswer('42')).toBe('{"id":"42"}');
+	});
+
+	it('answers a POST with no matching file the way the router does: 404, not 405', () => {
+		expect(MISS_STATUS).toBe('404');
+		expect(describeVend('POST', '42', 'miss')).toContain('no file answers that');
+		expect(describeVend('GET', '42', 'get')).toContain(GET_FILE);
+		expect(describeVend('POST', '', 'post')).toContain(POST_FILE);
+	});
+
+	it('types the id on a real keypad', () => {
+		expect(keyed('4', '2')).toBe('42');
+		expect(keyed('42', 'Backspace')).toBe('4');
+		expect(keyed('42', 'C')).toBe('');
+		expect(keyed('1234', '5')).toBe('1234');
+		expect(keyed('42', 'x')).toBe('42');
 		expect(flip('odd')).toBe('even');
 	});
 
-	it('draws two buttons, one tray and one answer, and the reader can press either button', () => {
-		expect(piece.match(/class="press (get|post)"/g)).toHaveLength(2);
-		expect(piece.match(/aria-label="Press (GET|POST)"/g)).toHaveLength(2);
-		expect(piece.match(/class="answer"/g)).toHaveLength(1);
-		expect(piece.match(/class="wash yellow"/g)).toHaveLength(2);
+	it('labels each button with its file and shows the default export on hover', () => {
+		expect(piece).toContain('{GET_ROUTE}');
+		expect(piece).toContain('{GET_FILE}');
+		expect(piece).toContain('{POST_FILE}');
+		expect(GET_FN).toMatch(/^export default function /);
+		expect(piece).toContain('.scene:has(.file.get:hover, .file.get:focus-visible) .cap-get');
+		expect(piece).not.toContain('slip');
+		expect(piece.match(/class="key"/g)).toHaveLength(12);
 	});
 
-	it('keeps the text inside the drawing to the file name, two methods and the answer', () => {
-		const texts = [...piece.matchAll(/<(?:text|tspan)[^>]*>([^<]+)<\/(?:text|tspan)>/g)].map((m) => m[1]);
-		expect(texts).toEqual(['{FILE_PARTS[0]}', '{FILE_PARTS[1]}', '{FILE_PARTS[2]}', 'GET', 'POST', '{ANSWER}']);
-		expect(piece).not.toMatch(/cord|wire|parcel|pulse|crocodile/i);
-	});
-
-	it('is a toy: hover lifts each button, G and P press them, arrows move between them, POST rattles the coin back', () => {
-		expect(piece).toContain('.frame:has(.get-hit:hover) .get');
-		expect(piece).toContain("key === 'g' || key === 'p'");
-		expect(piece).toContain("key === 'arrowleft'");
-		expect(piece).toContain("animation: var(--rattle)");
-	});
-
-	it('stops its tour on touch, resets on Escape, snaps under reduced motion and speaks each press', () => {
-		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
-		expect(piece).toContain('if (!seen || touched) return;');
-		expect(piece).toContain("key === 'escape'");
+	it('moves only in answer to an action: no tour, no @if or @for, keys cancel only what they handle', () => {
+		expect(piece).not.toContain('setInterval');
+		expect(piece).not.toMatch(/@for|@if|cord|wire|parcel|pulse|crocodile/i);
+		expect(piece).toContain('setPointerCapture');
+		expect(piece).toContain("event.key === 'Escape'");
 		expect(piece).toContain('aria-live="polite"');
-		expect(piece).not.toMatch(/@for|@if/);
+		expect(piece).toContain('prefers-reduced-motion: reduce');
 	});
 
-	it('inks every part fully and draws the same scene every time', () => {
-		expect(vendArt.machine.ink.length).toBeGreaterThan(300);
-		expect(vendArt.get.place).toMatch(/^left:[\d.]+%;top:[\d.]+%$/);
+	it('inks every part fully and draws the same figure every time', () => {
+		expect(vendArt.cabinet.ink.length).toBeGreaterThan(300);
+		expect(vendArt.panel.keys).toHaveLength(12);
 		expect(JSON.stringify(drawing())).toBe(JSON.stringify(vendArt));
 	});
 
 	it('is on the API routes page under its own heading', () => {
 		expect(page).toContain("import VendingAnatomy from '../../components/figures/vending/vending-anatomy.tsrx';");
-		expect(page.indexOf('## The path is the address, the name is the method')).toBeLessThan(page.indexOf('<VendingAnatomy />'));
+		expect(page.indexOf('## The file name picks the method')).toBeLessThan(page.indexOf('<VendingAnatomy />'));
 	});
 });
 

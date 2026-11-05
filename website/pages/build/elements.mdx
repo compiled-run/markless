@@ -2,57 +2,84 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import CoatAnatomy from '../../components/figures/coat-check/coat-anatomy.tsrx';
+import SearchFormAnatomy from '../../components/figures/search-form/search-form-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Reach a real element with `element()`
+# Element handles
 
 <PageMeta time="2 min" assumes="state, events" />
 
-<Subtitle text="A handle is a name for one real element. A handler can use it once that element is on the page." />
+<Subtitle text="A handle is a name for one real element on the page." terms="elements" />
 
-<Code steps={[{ label: 'Press Add guest. The count goes up, and the cursor lands back in the field.', shows: 'Guests added: 1' }, { label: "Empty the field on each press: above `field?.focus()`, add `if (field) field.value = '';`.", source: "field.value = ''" }]}>
-```tsrx title="guest-form.tsrx"
-import { element, state } from '@markless/core';
+```tsrx title="search-box.tsrx"
+import { element } from '@markless/core';
 
-export default function GuestForm() @{
-	let added = state(0);
+export default function SearchBox() @{
+	const field = element<HTMLInputElement>();
+
+	<input el={field} type="search" />
+}
+```
+
+**`element()`** makes the handle `field`. **`el={field}`** binds it to the `<input>`, so a handler can reach that input.
+
+## Reach the real element
+
+A *handle* is not a copy: in a handler, `field` is the element itself, or `undefined` if it isn't on the page.
+
+- `field?.focus()` puts the cursor in the real input.
+- The `?.` covers the moment the input is gone.
+
+Press **Focus search**, then type, then flip the switch and press again.
+
+<SearchFormAnatomy />
+
+<Code steps={[{ label: 'Rename the label to `Find a recipe`.', shows: 'Find a recipe' }, { label: "Add a Clear button whose handler runs `if (field) field.value = '';` and then `field?.focus();`.", source: "field.value = ''" }]}>
+```tsrx title="search-box.tsrx"
+import { element } from '@markless/core';
+
+export default function SearchBox() @{
 	const field = element<HTMLInputElement>();
 
 	<section>
-		<label for={field}>Guest name</label>
-		<input el={field} />
-		<button
-			onClick={() => {
-				added++;
-				field?.focus();
-			}}
-		>
-			Add guest
+		<label for={field}>Search</label>
+		<input el={field} type="search" />
+		<button onClick={() => field?.focus()}>
+			Focus search
 		</button>
-		<p>Guests added: {added}</p>
 	</section>
 }
 ```
 </Code>
 
-`el={field}` binds the handle to the `<input>`. In a handler, `field` is that element, or `undefined` if it isn't on the page, hence `field?.focus()`.
+## A handle links elements without an id
 
-## A handle is a ticket
+Pass a handle where HTML wants an id, and Markless writes one id on both elements. It works in:
 
-Hand the ticket over: press it, drag it right, or press Enter.
+- `for`, so pressing the label focuses the field
+- `aria-labelledby`, `aria-describedby` and `aria-controls`
+- `popovertarget`
 
-<CoatAnatomy />
+<Code steps={[{ label: 'Change the hint to `Used for receipts only.`', shows: 'Used for receipts only.' }, { label: 'Rename the label to `Work email`, then press it.', shows: 'Work email' }]}>
+```tsrx title="email-field.tsrx"
+import { element } from '@markless/core';
 
-The component gets its ticket before the field exists. A handler hands it in and gets the real `<input>`, or `undefined` if the field has left the page.
+export default function EmailField() @{
+	const email = element<HTMLInputElement>();
+	const hint = element<HTMLParagraphElement>();
 
-## Point a label at a field without an id
+	<section>
+		<label for={email}>Email</label>
+		<input el={email} aria-describedby={hint} />
+		<p el={hint}>We never share it.</p>
+	</section>
+}
+```
+</Code>
 
-`for={field}` points the label at the field, so pressing **Guest name** puts the cursor there. Markless writes one id on both elements. A handle works the same in `aria-labelledby`, `aria-describedby`, `aria-controls` and `popovertarget`.
-
-## Run setup code with `attach`
+## `attach` runs setup code on the element
 
 `attach` hands the element to your function, for an observer or an outside library. Return a function, and Markless calls it when the element leaves.
 
@@ -62,11 +89,9 @@ The component gets its ticket before the field exists. A handler hands it in and
 
 On a server-rendered page, `attach` starts at the first of these:
 
-- a handler like `onClick`, on the element or inside it, just before it first runs
+- a handler like `onClick` on the element or inside it, just before it runs
 - `onVisible`, when the element scrolls into view
 - `onIdle`, once the page has loaded and the browser is idle
-
-An element the browser creates later, like the inside of an `@if`, runs `attach` straight away.
 
 Keep in mind:
 

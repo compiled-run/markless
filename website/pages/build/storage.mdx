@@ -2,59 +2,68 @@ import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import DrinkDemo from '../../components/figures/storage/drink-demo.tsrx';
-import BookmarkAnatomy from '../../components/figures/bookmark/bookmark-anatomy.tsrx';
+import ReloadAnatomy from '../../components/figures/reload/reload-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Keep a value across reloads with `storage()`
+# Storage
 
 <PageMeta time="2 min" assumes="state" />
 
-<Subtitle text="storage() is a string variable the browser keeps for the reader. Reload the page, and it still holds their choice." />
+<Subtitle text="storage() is a value the browser keeps for the reader, so a reload doesn't reset it." />
 
-## A reload keeps your place
-
-Press the pink reload button. Then turn a page, or drag the ribbon out, and reload again.
-
-<BookmarkAnatomy />
-
-The ribboned notebook is a `storage()` value, so it reopens where the reader left it. The plain one is `state()`, so it starts over.
-
-## Pick one and reload
-
-Pick a drink, then reload this page.
-
-<DrinkDemo />
-
-One write saved your pick in a cookie, in `localStorage`, and as `data-docs-drink` on `<html>`. The mark is plain CSS that reads that attribute.
-
-## Save it under a key
-
-```tsrx title="theme-switch.tsrx"
+```tsrx title="theme.tsrx"
 import { storage } from '@markless/core';
 
 let theme = storage('theme', 'light');
 
-export default function ThemeSwitch() @{
-	<button
-		onClick={() => {
-			theme = theme === 'light' ? 'dark' : 'light';
-		}}
-	>
-		Theme: {theme}
-	</button>
+export default function Theme() @{
+	<p>Theme: {theme}</p>
 }
 ```
 
-The first argument is the key; the second is the starting value. Each write saves `theme` in three places:
+**`storage()`** takes a **key**, `'theme'`, and a **starting value**, `'light'`. You read and write `theme` like any other variable.
 
-- a cookie named `markless-theme`, so the server renders it in the first byte
+## A reload keeps storage(), not state()
+
+A *reload* starts the page over from its code. `state()` starts over with it, and `storage()` doesn't.
+
+- The dark-mode switch is `storage()`: it stays dark.
+- The sidebar is `state()`: it closes again.
+- Clear the site data, and `storage()` starts over too.
+
+Flip the switch, open the sidebar, then press the reload arrow.
+
+<ReloadAnatomy />
+
+<Code steps={[{ label: 'Press the button until it says dark, then reload this page.', shows: 'Mode: dark' }, { label: "Change the key to `'look'`, and the saved choice is gone.", source: "storage('look'" }]}>
+```tsrx title="mode-switch.tsrx"
+import { storage } from '@markless/core';
+
+export default function ModeSwitch() @{
+	let mode = storage('mode', 'light');
+
+	<button
+		onClick={() => {
+			mode = mode === 'light' ? 'dark' : 'light';
+		}}
+	>
+		Mode: {mode}
+	</button>
+}
+```
+</Code>
+
+## Each write saves in three places
+
+- a cookie named `markless-theme`, so the server renders the value in the first byte
 - `localStorage`, under `theme`
 - `data-theme` on `<html>`, for your CSS
 
 A page that shows a `storage()` value answers `Cache-Control: private`, so a shared cache never hands one reader's page to another.
+
+## One argument names the key for you
 
 | Call | Saved under | Attribute on `<html>` |
 | --- | --- | --- |
@@ -63,11 +72,11 @@ A page that shows a `storage()` value answers `Cache-Control: private`, so a sha
 
 With one argument, the key comes from the variable name, so renaming the variable loses saved values. Pass the key yourself for anything you ship.
 
-Keep in mind:
+Not yet:
 
-- A prerendered page sets the `<html>` attribute from a small script before the content, so CSS is right from the first paint. It covers the page file and, on an `.mdx` page, the components it imports directly.
 - The key and starting value must be plain strings, or the build stops with `MARKLESS_STORAGE_KEY_STATIC`.
 - The value is always a string.
 - A `const` storage value is read-only (`MARKLESS_STATE_CONST_REASSIGNMENT`).
+- A prerendered page sets the `<html>` attribute from a small script before the content. It covers the page file and, on an `.mdx` page, the components it imports directly.
 
 When several components need one value, [share it with `shared()`](/build/shared).
