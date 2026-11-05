@@ -1,5 +1,5 @@
 import {
-	addressedHostNodeIds,
+	renderAddressedHostNodeIds,
 	foldInertHosts,
 } from '../../artifact-helpers/addressed-hosts.ts';
 import { parseModule } from '../../js-ast.ts';
@@ -69,7 +69,7 @@ export function collectPublicRenderComponentDefinitions(
 		),
 	);
 
-	const addressedHosts = addressedHostNodeIds(input.protocolView);
+	const addressedHosts = renderAddressedHostNodeIds(input);
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
 		const componentRoot = componentNode ? firstComponentRoot(componentNode) : null;

@@ -97,7 +97,6 @@ export async function prepareSharedSwap(input: {
 	}
 	const { state, view } = decoded;
 	if (!hasLiveSharedDefinitions(state)) return undefined;
-	const { createRuntimeGraph } = await runtimeModule();
 	const cells = [...(await decodeStateCells(state)), ...(await decodeServedComputedValues(state))];
 	const places = { document: input.document, container: input.container };
 	const { bound, differing } = bindDefinitions(places, state, cells, input.container ?? root, false);
@@ -107,18 +106,49 @@ export async function prepareSharedSwap(input: {
 		for (const id of binding.cellIds)
 			if (differing.has(id)) values.set(id, cloneValue(binding.instance.cells[id]));
 	const wake = readOutsideValueSlots(state, view, differing);
-	const loadSymbol = marklessInstanceScopedLoadSymbol(load as ResumeRuntimeInput['loadSymbol']);
+	const painted = await paintValues({ root, load, state, view, cells, values });
+	if (!painted) return { wake: true };
+	// A write that landed while this ran is newer than what was painted; the runtime catches up on it.
+	const moved = bound.some((binding) =>
+		binding.cellIds.some(
+			(id) => values.has(id) && !sameValue(binding.instance.cells[id], values.get(id)),
+		),
+	);
+	return { wake: wake || moved || painted.unpainted };
+}
+
+/**
+ * Writes `values` into a graph of the page `root` holds, off screen, and paints the texts and attributes
+ * that derive from them; `read` answers what the graph holds afterwards. Undefined when it cannot run.
+ */
+export async function paintValues(input: {
+	readonly root: ResumeDomElement;
+	readonly load: unknown;
+	readonly state: ProtocolStatePayload;
+	readonly view: ProtocolViewPayload;
+	readonly cells: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	readonly values: ReadonlyMap<string, unknown>;
+	// Called with each element just before a text or attribute is painted on it.
+	readonly touched?: (element: unknown) => void;
+}): Promise<
+	{ readonly unpainted: boolean; readonly read: (graphNodeId: string) => unknown } | undefined
+> {
+	const { root, state, view, values } = input;
+	const { createRuntimeGraph } = await runtimeModule();
+	const loadSymbol = marklessInstanceScopedLoadSymbol(
+		input.load as ResumeRuntimeInput['loadSymbol'],
+	);
 	let elements: Map<string, ResumeDomElement>;
 	try {
 		elements = materializeDomLocators(root, view.locators);
 	} catch {
-		return { wake: true };
+		return undefined;
 	} finally {
 		delete (root as { __marklessCensus?: unknown }).__marklessCensus;
 	}
 	const sync = state.computed.filter((record) => record.async === false);
 	const graph = createRuntimeGraph({
-		cells,
+		cells: [...input.cells],
 		computed: sync.map((record) => ({ ...record, dependencies: record.dependencies ?? [] })),
 		sharedDefinitions: state.sharedDefinitions,
 	});
@@ -138,7 +168,7 @@ export async function prepareSharedSwap(input: {
 		if (!domUpdate.symbolId || !element) continue;
 		releases.push(
 			graph.subscribe({
-				id: `shared-swap:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
+				id: `swap-paint:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
 				run: async (value) =>
@@ -157,20 +187,18 @@ export async function prepareSharedSwap(input: {
 		for (let pass = 0; pass < 8 && (pass === 0 || graph.hasPendingFlush?.()); pass++)
 			await graph.flush();
 	} catch {
-		return { wake: true };
+		return undefined;
 	} finally {
 		for (const release of releases) release();
 	}
 	const entries = graph.takeJournal();
 	const slots = entries.filter((entry) => entry.type === 'setText' || entry.type === 'setAttr');
+	for (const slot of slots) input.touched?.(elements.get(String(slot.locator)));
 	applyDirectJournalEntries(slots, (locator) => elements.get(locator));
-	// A write that landed while this ran is newer than what was painted; the runtime catches up on it.
-	const moved = bound.some((binding) =>
-		binding.cellIds.some(
-			(id) => values.has(id) && !sameValue(binding.instance.cells[id], values.get(id)),
-		),
-	);
-	return { wake: wake || moved || slots.length !== entries.length };
+	return {
+		unpainted: slots.length !== entries.length,
+		read: (graphNodeId) => graph.read(graphNodeId, []),
+	};
 }
 
 // Something other than a value slot reads a changed cell: an arm, a list, an async value or a behaviour.

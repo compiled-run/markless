@@ -9,7 +9,7 @@ const TAG = /<(ApiTable|AnatomyTable|KeyboardTable|Sidebar|SiteNavbar|PageMeta)(
 const BARE_SCENARIO = /\sscenario="([a-z0-9-]+)"/g;
 
 function routeOf(file: string): { pathname: string; stem: string } | undefined {
-	const at = file.indexOf(PAGES);
+	const at = file.lastIndexOf(PAGES);
 	if (at < 0 || !file.endsWith('.mdx')) return;
 	const rel = file.slice(at + PAGES.length, -'.mdx'.length);
 	const segments = rel.split('/');

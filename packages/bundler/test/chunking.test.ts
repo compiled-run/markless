@@ -25,6 +25,7 @@ const runtimeGroupNames = [
 	'markless-resume-handoff',
 	'markless-shared-instances',
 	'markless-shared-swap',
+	'markless-kept-swap',
 	'markless-resume-locators',
 	'markless-resume-errors',
 	'markless-resume-sync-computed',
