@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { drawing } from './coverage.ts';
 
 const sceneArt = drawing();
-const page = readFileSync(new URL('../../../pages/how-it-works/index.mdx', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./coverage-anatomy.tsrx', import.meta.url), 'utf8');
 
 describe('the index figure', () => {
@@ -32,7 +31,7 @@ describe('the index figure', () => {
 	});
 
 	it('is on the How it works index', () => {
-		expect(page).toContain("from '../../components/figures/how-index/coverage-anatomy.tsrx';");
+		expect(readFileSync(new URL('./race-anatomy.tsrx', import.meta.url), 'utf8')).toContain("from './coverage-anatomy.tsrx';");
 	});
 });
 

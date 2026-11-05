@@ -16,8 +16,7 @@ describe('the the-big-idea figure', () => {
 		expect(Object.keys(objects).length).toBeLessThanOrEqual(3);
 	});
 
-	it('has one margin note, a live region, a tour that stops on touch, and no wires', () => {
-		expect(piece.match(/class="note"/g)).toHaveLength(1);
+	it('has a live region, a tour that stops on touch, and no wires', () => {
 		expect(piece).toContain('early proof');
 		expect(piece).toContain('aria-live="polite"');
 		expect(piece).toContain('if (!seen || touched) return;');

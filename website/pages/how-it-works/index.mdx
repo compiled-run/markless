@@ -3,7 +3,7 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import CoverageAnatomy from '../../components/figures/how-index/coverage-anatomy.tsrx';
+import RaceAnatomy from '../../components/figures/how-index/race-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
@@ -36,13 +36,13 @@ The compiler's *analyzer*, built on yuku, reads every `.tsrx` file for its names
 
 ## The browser does less work
 
-Flip the switch, then press **Get Started**:
+Load both on a 3G phone, then press **Get Started** on each:
 
-<CoverageAnatomy />
+<RaceAnatomy />
 
-- The [shadcn/ui home page port](https://github.com/compiled-run/markless#migrate-an-existing-app) executes 131 kB of JavaScript at load, down from 1,403 kB.
+- The port executes 131 kB of JavaScript at load; the original executes 1,403 kB.
+- On a 3G phone, the port answers its first click at 3.9 s; the original at 14.6 s.
 - The original runs its components again in the browser to attach their events. Markless decided that at compile time.
-- On the compile-time side, a click adds one row: that button's own code, run only then.
 
 ## The page resumes instead of starting over
 

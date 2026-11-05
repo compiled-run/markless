@@ -172,6 +172,12 @@ export default function SeatAnatomy() @{
 				@for (const words of art.words; key words.key) {
 					<text class={words.cls} transform={words.matrix}>{words.text}</text>
 				}
+				<path class="link-dash" data-on={onBrowser ? 'yes' : 'no'} d={art.links.browser.dashed} />
+				<path class="ink link-ink" data-on={onBrowser ? 'yes' : 'no'} d={art.links.browser.ink} />
+				<path class="link-dash" data-on={onPhone ? 'yes' : 'no'} d={art.links.phone.dashed} />
+				<path class="ink link-ink" data-on={onPhone ? 'yes' : 'no'} d={art.links.phone.ink} />
+				<path class="link-dash" data-on={onTerminal ? 'yes' : 'no'} d={art.links.terminal.dashed} />
+				<path class="ink link-ink" data-on={onTerminal ? 'yes' : 'no'} d={art.links.terminal.ink} />
 				<path class="hit host-hit" data-key="browser" d={art.hosts.browser} />
 				<path class="hit host-hit" data-key="phone" d={art.hosts.phone} />
 				<path class="hit host-hit" data-key="terminal" d={art.hosts.terminal} />
@@ -201,8 +207,8 @@ export default function SeatAnatomy() @{
 				<text class="pencil-text waiting" data-on={onPhone ? 'yes' : 'no'} x={art.empty.phone.x} y={art.empty.phone.y}>waiting</text>
 				<g class="host" data-on={onTerminal ? 'yes' : 'no'}>
 					<text class="code term" x={art.terminalLines[0]!.x} y={art.terminalLines[0]!.y}>{'<section class="seats">'}</text>
-					<text class="code term" x={art.terminalLines[1]!.x} y={art.terminalLines[1]!.y}>{'  <button>A1</button><button>A2</button>'}</text>
-					<text class="code term" x={art.terminalLines[2]!.x} y={art.terminalLines[2]!.y}>{'  <button disabled>A3</button> …'}</text>
+					<text class="code term" x={art.terminalLines[1]!.x} y={art.terminalLines[1]!.y}>{'  <button>A1</button> …'}</text>
+					<text class="code term" x={art.terminalLines[2]!.x} y={art.terminalLines[2]!.y}>{'  <button disabled>A3</button>'}</text>
 					<text class="code term" x={art.terminalLines[3]!.x} y={art.terminalLines[3]!.y}>{'</section>'}</text>
 				</g>
 				<text class="pencil-text waiting" data-on={onTerminal ? 'yes' : 'no'} x={art.empty.terminal.x} y={art.empty.terminal.y}>waiting for the plan</text>
@@ -217,8 +223,6 @@ export default function SeatAnatomy() @{
 					</g>
 					<path class="hit" data-key="file" d={art.hosts.file} />
 				</g>
-				<path class="desk-ink" d={art.note.arrow} />
-				<text class="note" x={art.note.x} y={art.note.y}>WRITE IT ONCE</text>
 			</svg>
 		</button>
 		<p class="hover-caption" aria-hidden="true">{caption}</p>
@@ -478,18 +482,49 @@ export default function SeatAnatomy() @{
 				opacity: 0.8;
 			}
 
-			.term-paper {
-				fill: oklch(27% 0.012 60);
+			.scene .code.term {
+				font-size: 10px;
 			}
 
-			.scene .code.term,
-			.scene .term-title {
-				font-size: 11px;
-				fill: oklch(92% 0.03 85);
+			.link-dash {
+				fill: none;
+				stroke: var(--ink);
+				stroke-width: 1;
+				stroke-dasharray: 3 4;
+				opacity: 0.55;
+			}
+
+			.link-ink {
+				fill: var(--ink);
+				opacity: 0;
+				transition: opacity 400ms ease;
+			}
+
+			.link-ink[data-on='yes'] {
+				opacity: 1;
+			}
+
+			.link-dash[data-on='yes'] {
+				opacity: 0;
+			}
+
+			.scene .host-label {
+				font-size: 14px;
+				font-weight: 800;
+				fill: var(--ink);
+			}
+
+			.url {
+				font-size: 9px;
 			}
 
 			.scene .file-code {
-				font-size: 9px;
+				font-size: 8.5px;
+			}
+
+			.scene .file-name {
+				font-size: 10px;
+				font-weight: 700;
 			}
 
 			.scene .file-name {
@@ -523,11 +558,11 @@ export default function SeatAnatomy() @{
 			}
 
 			.scene .small {
-				font-size: 9px;
+				font-size: 8px;
 			}
 
 			.scene .early {
-				font-size: 12px;
+				font-size: 10px;
 			}
 
 			.host[data-on='no'] .seat {

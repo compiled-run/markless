@@ -2604,7 +2604,7 @@ try {
 
 		// Each How it works page opens on its ink figure; a press must change what its live line says.
 		for (const [path, said] of [
-			['', '131 kB executed at load'],
+			['', 'Two copies of the shadcn/ui docs home page'],
 			['the-big-idea', 'got the same plan'],
 			['compiler', 'three pieces'],
 			['payload', 'Booked March'],
