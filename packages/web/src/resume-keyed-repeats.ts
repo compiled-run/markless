@@ -598,14 +598,16 @@ type SlotRead = { readonly graphNodeId: string; readonly path?: ReadonlyArray<st
 const UNPAINTED = Symbol();
 // The row code can arrive after a gesture's write, so what the server painted is the state as wiring found it.
 function movedSinceWiring(graph: Pick<RuntimeGraph, 'read'>, repeats: ReadonlyArray<ResumeKeyedRepeatRecord>) {
-	// A value it cannot serialize counts as moved, so its slots are written again.
+	// An unserializable value compares by identity.
 	const text = (read: SlotRead): unknown => {
+		let value: unknown;
 		try {
-			return JSON.stringify(graph.read(read.graphNodeId, read.path), (_, value) =>
-				typeof value === 'bigint' ? `${value}n` : value instanceof Map || value instanceof Set ? [...value] : value,
+			value = graph.read(read.graphNodeId, read.path);
+			return JSON.stringify(value, (_, v) =>
+				typeof v === 'bigint' ? `${v}n` : v instanceof Map || v instanceof Set ? [...v] : v,
 			);
 		} catch {
-			return Symbol();
+			return value;
 		}
 	};
 	const served = new Map(repeats.flatMap(rowSlotReads).map((read) => [JSON.stringify(read), text(read)]));

@@ -37,6 +37,7 @@ type Node = {
 	removeAttribute(name: string): void;
 };
 
+let writes = 0;
 function el(tagName: string, children: Node[] = [], attributes: Record<string, string> = {}): Node {
 	const node: Node = {
 		nodeType: 1,
@@ -44,7 +45,10 @@ function el(tagName: string, children: Node[] = [], attributes: Record<string, s
 		childNodes: children,
 		attributes: new Map(Object.entries(attributes)),
 		getAttribute: (name) => node.attributes.get(name) ?? null,
-		setAttribute: (name, value) => void node.attributes.set(name, value),
+		setAttribute: (name, value) => {
+			writes++;
+			node.attributes.set(name, value);
+		},
 		removeAttribute: (name) => void node.attributes.delete(name),
 	};
 	for (const child of children) child.parentElement = node;
@@ -174,6 +178,16 @@ test('a write to a Map, Set or BigInt the rows read repaints them too', async ()
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(classes()).toEqual(['row s0', 'row s0 blocking', 'row s0']);
 	}
+});
+
+test('an unchanged value that cannot be serialized leaves the served rows untouched', async () => {
+	const cyclic: Record<string, unknown> = {};
+	cyclic.self = cyclic;
+	const { classes } = servedRows('000', cyclic);
+	writes = 0;
+	await rowCodeArrives();
+	expect(classes()).toEqual(['row s0', 'row s0', 'row s0']);
+	expect(writes).toBe(0);
 });
 
 test('rows with nothing written before the row code arrives are left as served', async () => {
