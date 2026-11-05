@@ -1,6 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import CardsDemo from '../../components/figures/styling/cards-demo.tsrx';
+import LaundryAnatomy from '../../components/figures/styling/laundry-anatomy.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
@@ -33,16 +33,13 @@ export default function PaperCard() @{
 The `<style>` block sits inside the component's elements. Its `.card` rule reaches this file's
 `<article>`, and no other file's.
 
-## Two cards, one class name
+## Same label, different tape
 
-Both cards below write `class="card"`, in two different files. Press **Show classes** to read the
-class each one really got.
+Both shirts are labelled `card`. Each file sews its own extra class into its elements, like a name tape. Press the drawing to dip them.
 
-<CardsDemo />
+<LaundryAnatomy />
 
-- Markless gives each file with a `<style>` block its own extra class, starting `mk-`.
-- It adds that class to every selector in the block and to every element the file renders.
-- So `.card` from one file becomes `.card.mk-…`, and can't match the other file's card.
+Only the shirt with the `paper-card.tsrx` tape takes the dye. The other file's `.card` stays untouched.
 
 ## Style both cards
 

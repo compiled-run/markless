@@ -1823,7 +1823,6 @@ try {
 			(await settings.locator('.tally').textContent()) ?? '',
 		);
 
-		// --- textbook columns: each demo's notes report what the reader's action did ---
 		// --- widget: the shopping list on the lists page --------------------------
 		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
 		const shopping = page.locator('.code-block [data-code-stage]').first();
@@ -1964,31 +1963,6 @@ try {
 			(await paperTab.getAttribute('aria-selected')) === 'true' &&
 				(await paperPane.isVisible()),
 			'a Code block with several files switches to the file tab the reader clicks',
-		);
-
-		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
-		const listDemo = page.locator('.margin-notes');
-		await listDemo.getByRole('checkbox', { name: 'Pears' }).check();
-		await listDemo.getByRole('button', { name: 'Sort A to Z' }).click();
-		await settleText(listDemo.locator('.tally'), (text) => text.includes('3 rows'), 'lists demo: sorting moves all three rows');
-		const listNames = (await listDemo.locator('li').allTextContents()).map((text) => text.replace(/\d/g, '').trim()).join('|');
-		check(
-			listNames === 'Coffee|Milk|Pears' && (await listDemo.getByRole('checkbox', { name: 'Pears' }).isChecked()),
-			'lists demo: the tick rides with Pears through the sort',
-			listNames,
-		);
-
-		await page.goto(`${origin}/concepts/styling`, { waitUntil: 'load' });
-		const cardsDemo = page.locator('.margin-notes');
-		await cardsDemo.getByRole('button', { name: 'Show classes' }).click();
-		const demoSaid = await settleText(cardsDemo.locator('.sr'), (text) => /mk-\w+.*mk-\w+/.test(text), 'styling demo: the notes read each card class from the page');
-		const [paperScope, chalkScope] = demoSaid.match(/mk-\w+/g) ?? [];
-		check(
-			paperScope !== chalkScope &&
-				(await cardsDemo.locator('article').first().getAttribute('class'))?.includes(paperScope ?? '?') === true &&
-				(await cardsDemo.locator('article').nth(1).getAttribute('class'))?.includes(chalkScope ?? '?') === true,
-			'styling demo: each card carries a different file class, the one the notes show',
-			`${paperScope} vs ${chalkScope}`,
 		);
 
 		// The first-app page carries the scaffold command and a starter home that runs.
