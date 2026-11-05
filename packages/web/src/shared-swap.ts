@@ -119,8 +119,7 @@ export async function prepareSharedSwap(input: {
 
 /**
  * Writes `values` into a graph of the page `root` holds, off screen, and paints the texts and attributes
- * that derive from them; `read` answers what the graph holds afterwards, `restore` puts back what it painted
- * over. Undefined when it cannot run.
+ * that derive from them; `read` answers what the graph holds afterwards. Undefined when it cannot run.
  */
 export async function paintValues(input: {
 	readonly root: ResumeDomElement;
@@ -129,13 +128,10 @@ export async function paintValues(input: {
 	readonly view: ProtocolViewPayload;
 	readonly cells: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 	readonly values: ReadonlyMap<string, unknown>;
+	// Called with each element just before a text or attribute is painted on it.
+	readonly touched?: (element: unknown) => void;
 }): Promise<
-	| {
-			readonly unpainted: boolean;
-			readonly read: (graphNodeId: string) => unknown;
-			readonly restore: () => void;
-	  }
-	| undefined
+	{ readonly unpainted: boolean; readonly read: (graphNodeId: string) => unknown } | undefined
 > {
 	const { root, state, view, values } = input;
 	const { createRuntimeGraph } = await runtimeModule();
@@ -197,30 +193,11 @@ export async function paintValues(input: {
 	}
 	const entries = graph.takeJournal();
 	const slots = entries.filter((entry) => entry.type === 'setText' || entry.type === 'setAttr');
-	const before = new Map<
-		Element,
-		readonly [Array<readonly [string, string]>, Array<readonly [ChildNode, string | null]>]
-	>();
-	for (const slot of slots) {
-		const element = elements.get(String(slot.locator)) as unknown as Element | undefined;
-		if (element && !before.has(element))
-			before.set(element, [
-				[...element.attributes].map((attribute) => [attribute.name, attribute.value] as const),
-				[...element.childNodes].map((node) => [node, node.nodeType === 3 ? (node as Text).data : null]),
-			]);
-	}
+	for (const slot of slots) input.touched?.(elements.get(String(slot.locator)));
 	applyDirectJournalEntries(slots, (locator) => elements.get(locator));
 	return {
 		unpainted: slots.length !== entries.length,
 		read: (graphNodeId) => graph.read(graphNodeId, []),
-		restore: () => {
-			for (const [element, [attributes, children]] of before) {
-				for (const name of element.getAttributeNames()) element.removeAttribute(name);
-				for (const [name, value] of attributes) element.setAttribute(name, value);
-				for (const [node, data] of children) if (data !== null) (node as Text).data = data;
-				element.replaceChildren(...children.map(([node]) => node));
-			}
-		},
 	};
 }
 

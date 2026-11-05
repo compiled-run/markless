@@ -89,8 +89,34 @@ export async function carryKeptParts(input: {
 		: undefined;
 	const load = route?.loadSymbol ?? route?.default?.loadSymbol;
 	if (typeof load !== 'function') return undefined;
-	const painted = await paintValues({ root, load, ...arriving, cells, values });
-	if (!painted) return undefined;
+	const before = new Map<
+		Element,
+		readonly [Array<readonly [string, string]>, Array<readonly [ChildNode, string | null]>]
+	>();
+	const restore = () => {
+		for (const [element, [attributes, children]] of before) {
+			for (const name of element.getAttributeNames()) element.removeAttribute(name);
+			for (const [name, value] of attributes) element.setAttribute(name, value);
+			for (const [node, data] of children) if (data !== null) (node as Text).data = data;
+			element.replaceChildren(...children.map(([node]) => node));
+		}
+	};
+	const touched = (element: unknown) => {
+		if ((element as Node | undefined)?.nodeType !== 1 || before.has(element as Element)) return;
+		const host = element as Element;
+		before.set(host, [
+			[...host.attributes].map((attribute) => [attribute.name, attribute.value] as const),
+			[...host.childNodes].map((node) => [
+				node,
+				node.nodeType === 3 ? (node as Text).data : null,
+			]),
+		]);
+	};
+	const painted = await paintValues({ root, load, ...arriving, cells, values, touched });
+	if (!painted) {
+		restore();
+		return undefined;
+	}
 	// A handler's first read of a computed answers from the served value, which the carried state made stale.
 	const adopted = new Map(values);
 	const servedNext = new Map(cells.map((cell) => [cell.graphNodeId, cell.value]));
@@ -105,7 +131,7 @@ export async function carryKeptParts(input: {
 		install: (container) => {
 			(container as LiveValues).__marklessEventOnlyGraph = adopted;
 		},
-		restore: painted.restore,
+		restore,
 	};
 }
 
