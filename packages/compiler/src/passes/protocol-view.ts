@@ -19,11 +19,13 @@ import type {
 } from '../artifacts.ts';
 import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
 import {
+	constantInBrowser,
 	expressionSlotValue,
 	mintableSlotValue,
 	payloadRecordHosts,
 	resolveRowChunkMint,
 	resolveRowComponentMint,
+	stepsAfterNestedRows,
 	type RowComponentMint,
 } from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
@@ -936,29 +938,6 @@ function nestedRepeatMints(
 	return template !== undefined;
 }
 
-// A nested list's rows stand in front of what follows its anchor, so a patch counts those steps from the parent's end; lists on both sides leave no count.
-function stepsAfterNestedRows(
-	chunk: SemanticMarkupChunk,
-	path: ReadonlyArray<number>,
-	text: boolean,
-): number[] | null {
-	const anchors = chunk.slots.flatMap((slot) =>
-		slot.kind === 'repeat' ? [slot.coordinate.path] : [],
-	);
-	const fromEnd: number[] = [];
-	for (let depth = 1; depth < path.length - (text ? 1 : 0); depth++) {
-		const siblings = anchors.filter(
-			(anchor) =>
-				anchor.length === depth + 1 &&
-				anchor.slice(0, depth).every((step, at) => step === path[at]),
-		);
-		const before = siblings.some((anchor) => anchor[depth]! < path[depth]!);
-		if (before && siblings.some((anchor) => anchor[depth]! > path[depth]!)) return null;
-		if (before) fromEnd.push(depth);
-	}
-	return fromEnd;
-}
-
 // A list the browser never adds rows to only patches them, so rows inside them that only the server renders stay as served.
 function servedOnlyNestedRepeat(
 	input: ProtocolViewPayloadInput,
@@ -979,32 +958,6 @@ function servedOnlyNestedRepeat(
 	)
 		return false;
 	return constantInBrowser(graph, chunk.componentName, enclosing.collectionGraphNodeId);
-}
-
-function constantInBrowser(
-	graph: NonNullable<ProtocolViewPayloadInput['semanticGraph']>,
-	component: string,
-	graphNodeId: string,
-	seen = new Set<string>(),
-): boolean {
-	if (seen.has(graphNodeId)) return true;
-	seen.add(graphNodeId);
-	const binding = graph.graphBindings.find(
-		(candidate) =>
-			candidate.id === graphNodeId && (candidate.componentName ?? component) === component,
-	);
-	if (
-		!binding ||
-		binding.kind !== 'computed' ||
-		binding.storage ||
-		binding.async ||
-		binding.asyncCapable ||
-		binding.sharedDefinitionId !== undefined
-	)
-		return false;
-	return (binding.dependencies ?? []).every((dependency) =>
-		constantInBrowser(graph, component, dependency.graphNodeId, seen),
-	);
 }
 
 /**

@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 303,
+	total: 304,
 	guided: 47,
 	groups: [
 		{
@@ -375,6 +375,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
 					kind: 'compile error',
 					guided: false,
 				},

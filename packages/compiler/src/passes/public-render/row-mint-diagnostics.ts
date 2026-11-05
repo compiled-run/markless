@@ -14,12 +14,14 @@ import type {
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
 import {
+	constantInBrowser,
 	expressionSlotValue,
 	isLoweredStyleObject,
 	mintableSlotValue,
 	resolveRowChunkMint,
 	resolveRowComponentMint,
 	rowBranchMints,
+	stepsAfterNestedRows,
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
 import { staticTemplateReadDiagnostic } from '../state-lowering.ts';
@@ -33,8 +35,10 @@ import {
 	keyedRepeatRowMintUnsupportedDiagnostic,
 	keyedRepeatRowNotOneElementDiagnostic,
 	keyedRepeatRowsUnplacedDiagnostic,
+	keyedRepeatRowValueUnpaintedDiagnostic,
 	rowBranchFlipUnsupportedDiagnostic,
 	type KeyedRepeatRowMintRefusal,
+	type KeyedRepeatRowValueUnpaintedCause,
 } from './diagnostics.ts';
 
 /**
@@ -124,6 +128,16 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			});
 			return;
 		}
+		const unpainted = unpaintedRowValues(repeat, input.semanticGraph);
+		for (const value of unpainted)
+			diagnostics.push(
+				keyedRepeatRowValueUnpaintedDiagnostic({
+					itemName: repeat.itemName,
+					...value,
+					node,
+					filename: input.filename,
+				}),
+			);
 		const refusal = rowMintRefusal({
 			chunks: input.semanticGraph.markup.chunks,
 			componentEdges: input.semanticGraph.componentEdges,
@@ -168,6 +182,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			});
 		for (const read of input.semanticGraph.templateReads) {
 			if (read.keyedRepeatId !== repeat.id) continue;
+			if (unpainted.some((value) => value.source === read.source)) continue;
 			const stale = staticTemplateReadDiagnostic(input.semanticGraph, read);
 			if (stale) diagnostics.push(stale);
 		}
@@ -206,6 +221,65 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 }
 
 type Repeat = SemanticGraphArtifact['keyedRepeats'][number];
+
+// Mirrors the protocol view's two row-template refusals that leave a page-state read with nothing to repaint it.
+function unpaintedRowValues(
+	repeat: Repeat,
+	graph: SemanticGraphArtifact,
+): Array<{
+	readonly source: string;
+	readonly attributeName?: string;
+	readonly cause: KeyedRepeatRowValueUnpaintedCause;
+}> {
+	const chunk = graph.markup.chunks.find(
+		(candidate) => candidate.id === `repeat:${repeat.id}:row`,
+	);
+	const component = chunk?.componentName;
+	if (!chunk || !component) return [];
+	const rowNames = new Set(
+		[repeat.itemName, repeat.indexName].filter((name): name is string => name !== undefined),
+	);
+	const servedOnly = chunk.slots.flatMap((slot) => {
+		if (slot.kind !== 'repeat') return [];
+		const nested = graph.keyedRepeats.find((candidate) => candidate.id === slot.repeatId);
+		return nested && !nested.collectionGraphNodeId && !nested.enclosingItemPath ? [nested] : [];
+	});
+	const servedOnlyRefused =
+		servedOnly.length > 0 &&
+		!!repeat.collectionGraphNodeId &&
+		(!constantInBrowser(graph, component, repeat.collectionGraphNodeId) ||
+			chunk.slots.some(
+				(slot) =>
+					slot.kind === 'branch' ||
+					(slot.kind === 'text' && slot.residue.kind !== 'repeat-item'),
+			));
+	const values = [];
+	for (const slot of chunk.slots) {
+		if (slot.kind !== 'text' && slot.kind !== 'attribute') continue;
+		const value =
+			mintableSlotValue(slot) ?? expressionSlotValue(slot, graph, component, rowNames);
+		if (!value || 'itemPath' in value) continue;
+		const reads = 'graphNodeId' in value ? [value] : (value.reads ?? []);
+		if (reads.every((read) => constantInBrowser(graph, component, read.graphNodeId))) continue;
+		const cause: KeyedRepeatRowValueUnpaintedCause | null =
+			stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null
+				? { kind: 'between-lists' }
+				: servedOnlyRefused
+					? { kind: 'served-only-list', listSource: servedOnly[0]!.collectionSource }
+					: null;
+		if (!cause) continue;
+		values.push({
+			source:
+				'source' in value
+					? value.source
+					: (graph.graphBindings.find((binding) => binding.id === value.graphNodeId)
+							?.name ?? value.graphNodeId),
+			...(slot.kind === 'attribute' ? { attributeName: slot.name } : {}),
+			cause,
+		});
+	}
+	return values;
+}
 
 // A row's @if test that reads only its row items, module values and props.
 function testDecidedBy(
@@ -413,6 +487,8 @@ function rowMintRefusal(input: {
 	}
 	for (const slot of chunk.slots) {
 		if (slot.kind === 'text' || slot.kind === 'attribute') {
+			if (stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null)
+				return { kind: 'between-lists' };
 			// The mint fills a text or attribute slot from the item or from the page's
 			// graph, so what is left is a value only the render can produce.
 			if (mintableSlotValue(slot)) continue;
