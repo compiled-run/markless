@@ -147,16 +147,18 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				inlined.foreignBodies,
 				input.semanticGraph.moduleImports,
 			);
-			const reads = eventReads(
-				input.stateLowering?.reads,
-				[
-					prop.sourceSpan,
-					...inlined.spans,
-					...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
-				],
-				source,
-				semanticsReader,
-			);
+			const reads = prop.relayedRead
+				? [prop.relayedRead]
+				: eventReads(
+						input.stateLowering?.reads,
+						[
+							prop.sourceSpan,
+							...inlined.spans,
+							...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
+						],
+						source,
+						semanticsReader,
+					);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',

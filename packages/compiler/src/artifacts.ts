@@ -128,6 +128,8 @@ export type SemanticComponentPropBinding =
 			readonly sourceSpan?: SourceSpan;
 			// Body-local definitions spliced into a callback `source`; their reads are its too.
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
+			// A callback the compiler wrote around a prop its composer received through a props spread: the read no authored span holds.
+			readonly relayedRead?: LoweredStateRead;
 			// An opaque prop that is plain constant data: the render still runs the
 			// expression, and browser code reads this value instead.
 			readonly buildTimeValue?: { readonly value: unknown };
@@ -377,6 +379,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly constructReach?: ModuleGraphInterfaceConstructReach;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
+			/** Props this component files into a widget callback slot. */
+			readonly callbackSlotProps?: ReadonlyArray<string>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
