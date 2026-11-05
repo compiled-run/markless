@@ -1,4 +1,7 @@
-import { attributeText, spellsBooleans } from '@markless/serializer/attribute-text';
+import {
+	ENUMERATED_BOOLEAN_ATTRIBUTE,
+	marklessAttributeValue as attributeText,
+} from '@markless/web/dom-attribute';
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -1371,7 +1374,7 @@ function staticAttributeValue(
 	value: AnyNode | undefined,
 	expression: AnyNode | undefined,
 ): { readonly value: unknown } | null {
-	if (!value) return { value: spellsBooleans(name) ? true : '' };
+	if (!value) return { value: ENUMERATED_BOOLEAN_ATTRIBUTE.test(name) ? true : '' };
 	if (value.type === 'Literal' && typeof value.value !== 'object') return { value: value.value };
 	if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
 		return { value: expression.value };

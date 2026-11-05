@@ -36,6 +36,7 @@
 	},
 	"dependencies": {
 		"@markless/serializer": "workspace:*",
+		"@markless/web": "workspace:*",
 		"@tsrx/yuku": "0.8.0",
 		"yuku-css": "0.1.0"
 	}

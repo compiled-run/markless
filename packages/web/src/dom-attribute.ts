@@ -1,6 +1,12 @@
-import { attributeText } from '@markless/serializer/attribute-text';
+// null, undefined and false mean absent and true is bare, except aria-/data- names (true reads "true") and the enumerated ones, which spell both words.
+export const ENUMERATED_BOOLEAN_ATTRIBUTE = /^(draggable|contenteditable|spellcheck)$/;
 
-export { attributeText as marklessAttributeValue };
+export function marklessAttributeValue(name: string, value: unknown): string | null {
+	if (value == null || (value === false && !ENUMERATED_BOOLEAN_ATTRIBUTE.test(name))) return null;
+	return value !== true || ENUMERATED_BOOLEAN_ATTRIBUTE.test(name) || /^(aria|data)-/.test(name)
+		? String(value)
+		: '';
+}
 
 type AttributeTarget = {
 	setAttribute?(name: string, value: string): void;

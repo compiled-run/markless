@@ -34,7 +34,7 @@ import {
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolElementHandleReadId,
 } from '@markless/serializer';
-import { attributeText } from '@markless/serializer/attribute-text';
+import { marklessAttributeValue as attributeText } from '@markless/web/dom-attribute';
 import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
 import type { SourceSpan } from '../diagnostics.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';

@@ -102,20 +102,12 @@ const buildOrder: PackUserConfig[] = [
 		packageName: 'serializer',
 		entry: {
 			index: './src/index.ts',
-			'attribute-text': './src/attribute-text.ts',
 			decode: './src/value-decode.ts',
 			'decode-client': './src/value-decode-client.ts',
 			protocol: './src/protocol.ts',
 			'protocol-validation': './src/protocol-validation-storage.ts',
 			'record-templates': './src/protocol-record-templates.ts',
 			'render-data-hosts': './src/render-data-hosts.ts',
-		},
-	}),
-	marklessPack({
-		packageName: 'compiler',
-		entry: {
-			index: './src/index.ts',
-			'type-service': './src/type-service.ts',
 		},
 	}),
 	marklessPack({
@@ -130,6 +122,7 @@ const buildOrder: PackUserConfig[] = [
 		packageName: 'web',
 		entry: {
 			index: './src/index.ts',
+			'dom-attribute': './src/dom-attribute.ts',
 			'dom-journal': './src/dom-journal.ts',
 			'dom-update': './src/dom-update.ts',
 			'event-only-resume': './src/event-only-resume.ts',
@@ -146,6 +139,13 @@ const buildOrder: PackUserConfig[] = [
 			...webFnsEntries,
 			'resume-storage-free': './src/payload-full-storage-free.ts',
 			'shared-swap': './src/shared-swap.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'compiler',
+		entry: {
+			index: './src/index.ts',
+			'type-service': './src/type-service.ts',
 		},
 	}),
 	marklessPack({

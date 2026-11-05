@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { attributeText } from '../src/attribute-text.ts';
+import { marklessAttributeValue as attributeText } from '../src/dom-attribute.ts';
 
 test('draggable, contenteditable and spellcheck spell a boolean as the word', () => {
 	for (const name of ['draggable', 'contenteditable', 'spellcheck']) {
