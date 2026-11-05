@@ -1,3 +1,7 @@
+import {
+	ENUMERATED_BOOLEAN_ATTRIBUTE,
+	marklessAttributeValue as attributeText,
+} from '@markless/web/dom-attribute';
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -574,9 +578,9 @@ function emitNode(
 			if (styleCss !== '') append(builder, ` style="${escapeAttribute(styleCss)}"`);
 			continue;
 		}
-		const literal = staticAttributeValue(value, expression);
+		const literal = staticAttributeValue(name, value, expression);
 		if (literal) {
-			const text = staticAttributeText(name, literal.value);
+			const text = attributeText(name, literal.value);
 			if (text !== null)
 				append(
 					builder,
@@ -642,9 +646,9 @@ function emitTextareaValue(
 ): void {
 	const value = attribute.value as AnyNode | undefined;
 	const expression = unwrapExpressionContainer(value);
-	const literal = staticAttributeValue(value, expression);
+	const literal = staticAttributeValue('value', value, expression);
 	if (literal) {
-		const text = staticAttributeText('value', literal.value);
+		const text = attributeText('value', literal.value);
 		if (text !== null) append(builder, escapeHtml(text));
 		return;
 	}
@@ -957,9 +961,9 @@ function emitDynamicHost(
 			if (styleCss !== '') staticAttributes[name] = styleCss;
 			continue;
 		}
-		const literal = staticAttributeValue(value, expression);
+		const literal = staticAttributeValue(name, value, expression);
 		if (literal) {
-			const text = staticAttributeText(name, literal.value);
+			const text = attributeText(name, literal.value);
 			if (text !== null) staticAttributes[name] = text;
 			continue;
 		}
@@ -1364,11 +1368,13 @@ function markupStyleConstResolver(context: CollectionContext): StyleConstResolve
 
 // A bare attribute is already the present-with-no-value form, so it reports the
 // empty string rather than the boolean a `{true}` value would.
+// A bare attribute is true; names that do not spell their booleans keep the empty value pages already select on.
 function staticAttributeValue(
+	name: string,
 	value: AnyNode | undefined,
 	expression: AnyNode | undefined,
 ): { readonly value: unknown } | null {
-	if (!value) return { value: '' };
+	if (!value) return { value: ENUMERATED_BOOLEAN_ATTRIBUTE.test(name) ? true : '' };
 	if (value.type === 'Literal' && typeof value.value !== 'object') return { value: value.value };
 	if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
 		return { value: expression.value };
@@ -1387,12 +1393,4 @@ function isAlwaysPresentValue(expression: AnyNode): boolean {
 			(typeof node.value === 'string' || typeof node.value === 'number')
 		);
 	});
-}
-
-// The compile-time half of the presence rule marklessAttributeValue owns for
-// values only the runtime sees; both halves must agree.
-export function staticAttributeText(name: string, value: unknown): string | null {
-	if (value === null || value === undefined || value === false) return null;
-	if (value === true) return name.startsWith('aria-') || name.startsWith('data-') ? 'true' : '';
-	return String(value);
 }

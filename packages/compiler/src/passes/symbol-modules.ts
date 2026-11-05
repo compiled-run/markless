@@ -34,9 +34,9 @@ import {
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolElementHandleReadId,
 } from '@markless/serializer';
+import { marklessAttributeValue as attributeText } from '@markless/web/dom-attribute';
 import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
 import type { SourceSpan } from '../diagnostics.ts';
-import { staticAttributeText } from './semantic-graph/collect-markup.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
 	armChildDescent,
@@ -288,7 +288,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		...(branchArms.escalationCandidates.length > 0
 			? { armEscalationCandidates: branchArms.escalationCandidates }
 			: {}),
-		...(branchArms.propDecided.length > 0 ? { propDecidedBranches: branchArms.propDecided } : {}),
+		...(branchArms.propDecided.length > 0
+			? { propDecidedBranches: branchArms.propDecided }
+			: {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
@@ -1396,7 +1398,12 @@ function renderBranchArms(
 } {
 	const renderData = input.renderData;
 	if (!renderData)
-		return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [], propDecided: [] };
+		return {
+			armsBySite: new Map(),
+			diagnostics: [],
+			escalationCandidates: [],
+			propDecided: [],
+		};
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
 	const escalationCandidates: ArmEscalationCandidate[] = [];
@@ -1478,7 +1485,9 @@ function renderBranchArms(
 						branchSiteId: branch.branchSiteId,
 						symbolId: symbol.id,
 					});
-					diagnostics.push(branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id));
+					diagnostics.push(
+						branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id),
+					);
 				}
 			}
 			continue;
@@ -1519,7 +1528,9 @@ function rowListDeciders(
 	const row = semanticGraph.markup.chunks.find(
 		(chunk) =>
 			/^repeat:.*:row$/.test(chunk.id) &&
-			chunk.slots.some((slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId),
+			chunk.slots.some(
+				(slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId,
+			),
 	);
 	const repeat = row
 		? semanticGraph.keyedRepeats.find((candidate) => row.id === `repeat:${candidate.id}:row`)
@@ -1623,7 +1634,10 @@ function renderBoundaryArms(
 				(candidate): candidate is string => candidate !== undefined,
 			);
 			const arms = chunkIds.map((chunkId) =>
-				renderChunkParts({ renderData, asyncComputedNodeIds, rowAttributes: true }, chunkId),
+				renderChunkParts(
+					{ renderData, asyncComputedNodeIds, rowAttributes: true },
+					chunkId,
+				),
 			);
 			if (arms.some((arm) => arm === null)) return [];
 			return [
@@ -1762,7 +1776,8 @@ function renderChunkParts(
 							rowAttributes &&
 							rowSlot.kind === 'attribute' &&
 							!rowSlot.directClassMatch &&
-							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')
+							(rowSlot.residue.kind === 'repeat-item' ||
+								rowSlot.residue.kind === 'graph-read')
 						) {
 							rowParts.push({
 								attribute: {
@@ -1779,7 +1794,9 @@ function renderChunkParts(
 													),
 												},
 											}),
-									...(rowSlot.alwaysPresent ? { alwaysPresent: true as const } : {}),
+									...(rowSlot.alwaysPresent
+										? { alwaysPresent: true as const }
+										: {}),
 								},
 							});
 							continue;
@@ -2008,7 +2025,7 @@ function scopedPropConstant(
 }
 
 function constantAttributeHtml(name: string, value: unknown, alwaysPresent: boolean): string {
-	const text = staticAttributeText(name, value);
+	const text = attributeText(name, value);
 	if (text === null) return '';
 	const escaped = armTextEscape(text).replaceAll('"', '&quot;');
 	return alwaysPresent ? escaped : ` ${name}="${escaped}"`;
@@ -4639,7 +4656,13 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		),
 		armTextEscaperFunctionNode('marklessBranchText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBranchText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBranchText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 	];
 
@@ -4779,7 +4802,13 @@ export function buildAsyncBoundaryUpdateEmission(
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBoundaryText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBoundaryText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 		...(records && rowsShiftLocators ? [boundaryArmRecordsFunctionNode()] : []),
 	];
@@ -4920,7 +4949,9 @@ function armsHaveRowAttributeParts(
 	arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArms['arms'][number][number]>>,
 ): boolean {
 	return arms.some((arm) =>
-		arm.some((part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row)),
+		arm.some(
+			(part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row),
+		),
 	);
 }
 
@@ -5132,7 +5163,11 @@ function branchRowsFunctionNode(
 				callNode(identifierNode('marklessAttributeHtml'), [
 					memberChainNode('row.attribute.name'),
 					conditionalNode(
-						binaryNode('!==', memberChainNode('row.attribute.itemPath'), identifierNode('undefined')),
+						binaryNode(
+							'!==',
+							memberChainNode('row.attribute.itemPath'),
+							identifierNode('undefined'),
+						),
 						walkItem('row.attribute.itemPath'),
 						callNode(memberChainNode('graph.read'), [
 							memberChainNode('row.attribute.read.graphNodeId'),

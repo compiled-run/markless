@@ -111,13 +111,6 @@ const buildOrder: PackUserConfig[] = [
 		},
 	}),
 	marklessPack({
-		packageName: 'compiler',
-		entry: {
-			index: './src/index.ts',
-			'type-service': './src/type-service.ts',
-		},
-	}),
-	marklessPack({
 		packageName: 'runtime',
 		entry: {
 			index: './src/index.ts',
@@ -129,6 +122,7 @@ const buildOrder: PackUserConfig[] = [
 		packageName: 'web',
 		entry: {
 			index: './src/index.ts',
+			'dom-attribute': './src/dom-attribute.ts',
 			'dom-journal': './src/dom-journal.ts',
 			'dom-update': './src/dom-update.ts',
 			'event-only-resume': './src/event-only-resume.ts',
@@ -145,6 +139,13 @@ const buildOrder: PackUserConfig[] = [
 			...webFnsEntries,
 			'resume-storage-free': './src/payload-full-storage-free.ts',
 			'shared-swap': './src/shared-swap.ts',
+		},
+	}),
+	marklessPack({
+		packageName: 'compiler',
+		entry: {
+			index: './src/index.ts',
+			'type-service': './src/type-service.ts',
 		},
 	}),
 	marklessPack({
