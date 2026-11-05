@@ -11,29 +11,63 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="2 min" assumes="state, computed, events" />
 
-<Subtitle text="The state graph is a list, written at compile time, of which values each spot on the page reads." terms="state values" />
+<Subtitle text="The state graph is a map, written at compile time, of which values each spot on the page reads." terms="state values" />
 
 ```tsrx title="player.tsrx"
-import { state } from '@markless/core';
+import { computed, state } from '@markless/core';
+
+const SONGS = ['Harbour Lights', 'Slow Train', 'Northbound'];
 
 export default function Player() @{
 	let playing = state('Harbour Lights');
+	let liked = state(new Set<string>());
+	let volume = state(6);
+	const isLiked = computed(() => liked.has(playing));
+	const title = computed(() => playing.toUpperCase());
+	const cover = computed(() => '/covers/' + playing + '.jpg');
 
-	<p>Now playing: {playing}</p>
+	<section>
+		<h2>{title}</h2>
+		<button
+			class={isLiked ? 'heart on' : 'heart'}
+			onClick={() => (liked = new Set([...liked, playing]))}
+		>
+			♥
+		</button>
+		<ul>
+			@for (const song of SONGS; key song) {
+				<li
+					class={song === playing ? 'row on' : 'row'}
+					onClick={() => (playing = song)}
+				>
+					{song}
+				</li>
+			}
+		</ul>
+		<img src={cover} alt="" />
+		<label>
+			Volume {volume}
+			<input
+				type="range"
+				max="10"
+				onInput={(e) => (volume = Number(e.target.value))}
+			/>
+		</label>
+	</section>
 }
 ```
 
-**`playing`** is a value the page watches. **`{playing}`** is a spot that reads it, so the compiler draws an edge from one to the other. A spot that reads nothing gets no edge.
+**`playing`**, **`liked`** and **`volume`** are values the page watches. **`isLiked`** reads two of them, and **`title`** and **`cover`** read one. Each spot in the markup that reads a value gets an edge from it, so one value can feed many spots, and one spot can depend on many values.
 
 ## You build the graph by building the page
 
-The compiler turns each `state()` into a *node*, and each spot that reads one into a *subscription*, drawn as an edge. Drag pieces onto the page, then pick a song:
+The compiler turns each `state()` and `computed()` into a *node*, and each spot that reads one into a *subscription*, drawn as an edge. Drag pieces onto the page, then pick a song, like it, or turn the volume:
 
 <GraphAnatomy />
 
-- The label and the cover read `playing`, so each one inks an edge as it lands.
-- The heading reads nothing, so it never gets an edge.
-- Drag a reader off again: its edge is erased, and one write makes fewer updates.
+- Each piece brings its computed value and its spot, with edges from every value they read. The heart brings `isLiked`, which reads both `liked` and `playing`.
+- The heading reads nothing, so it never gets a node.
+- A write travels only its own branch: liking a song never touches the header or the cover. Drag a reader off again and a song pick reaches fewer spots.
 
 ## A write runs only its own path
 

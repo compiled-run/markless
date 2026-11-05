@@ -1,39 +1,68 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { compileTsrxModule } from '../../../../packages/compiler/src/index.ts';
 import { drawing } from './inspector.ts';
+import { EDGES, NODES, type NodeKey, PLAYER_SOURCE, reachOf, shownNodes } from './model.ts';
 
 const sceneArt = drawing();
 const page = readFileSync(new URL('../../../pages/how-it-works/state-graph.mdx', import.meta.url), 'utf8');
 const piece = readFileSync(new URL('./graph-anatomy.tsrx', import.meta.url), 'utf8');
+const compiled = await compileTsrxModule({ filename: '/player.tsrx', source: PLAYER_SOURCE, symbols: [] });
+
+describe('the state-graph figure draws the real graph', () => {
+	it('compiles player.tsrx cleanly', () => {
+		const errors = [compiled.semanticGraph.diagnostics, compiled.captureAnalysis.diagnostics, compiled.publicRenderModule.diagnostics].flat().filter((d) => d?.severity === 'error');
+		expect(errors).toEqual([]);
+	});
+
+	it('has exactly the edges the compiler records, and no invented ones', () => {
+		const graph = compiled.semanticGraph;
+		const keyOfId = (id: string) => (Object.keys(NODES) as NodeKey[]).find((key) => NODES[key].id === id);
+		const bindings = graph.graphBindings.filter((b) => b.kind === 'state' || b.kind === 'computed');
+		const real = new Set<string>();
+		for (const binding of bindings)
+			for (const dep of (binding as { dependencies?: { graphNodeId: string }[] }).dependencies ?? []) {
+				const from = keyOfId(dep.graphNodeId);
+				const to = keyOfId(binding.id);
+				if (from && to) real.add(from + '-' + to);
+			}
+		for (const read of graph.templateReads) {
+			const reader = keyOfId(read.hostNodeId + ' ' + ((read.target as { name?: string }).name ?? read.target.kind));
+			if (!reader) continue;
+			for (const binding of bindings) if (new RegExp(`\\b${binding.name}\\b`).test(read.source)) real.add(keyOfId(binding.id) + '-' + reader);
+		}
+		expect([...real].sort()).toEqual(EDGES.map((edge) => edge.key).sort());
+	});
+
+	it('branches: one state feeds several nodes, and one computed reads two states', () => {
+		expect(EDGES.filter((edge) => edge.from === 'playing')).toHaveLength(4);
+		expect(EDGES.filter((edge) => edge.to === 'isLiked').map((edge) => edge.from).sort()).toEqual(['liked', 'playing']);
+		const all = shownNodes({ header: true, heart: true, cover: true, knob: true, heading: true });
+		expect(reachOf('playing', all)).toBe(4);
+		expect(reachOf('liked', all)).toBe(1);
+		expect(reachOf('volume', all)).toBe(1);
+		expect(reachOf('playing', shownNodes({ header: false, heart: false, cover: false, knob: false, heading: true }))).toBe(1);
+	});
+});
 
 describe('the state-graph figure', () => {
-	it('draws the same scene every time, with enough ink to read', () => {
+	it('draws the same scene every time, laid out in three columns', () => {
 		expect(JSON.stringify(drawing())).toBe(JSON.stringify(sceneArt));
-		const objects = (sceneArt as { objects?: Record<string, { layers: { d: string }[] }> }).objects ?? {};
-		const all = [...sceneArt.layers, ...Object.values(objects).flatMap((o) => o.layers)];
-		expect(all.length).toBeGreaterThan(8);
-		expect(all.map((layer) => layer.d).join('').length).toBeGreaterThan(8000);
-		expect(Object.keys(objects).length).toBeLessThanOrEqual(3);
+		expect(new Set(sceneArt.nodes.map((node) => node.column))).toEqual(new Set([0, 1, 2]));
+		expect(sceneArt.edges).toHaveLength(EDGES.length);
 	});
 
-	it('has one margin note, a live region, a tour that stops on touch, and no wires', () => {
-		expect(piece).toContain('updatesFor');
+	it('has a live region, keys and Escape, and no counters', () => {
 		expect(piece).toContain('aria-live="polite"');
-		expect(piece).toContain('if (!seen || touched) return;');
 		expect(piece).not.toMatch(/bags|counter/i);
-		expect(piece).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
 		expect(piece).toContain("event.key === 'Escape'");
-		expect(piece).not.toMatch(/\b(cord|crocodile|wire)s?\b/i);
-	});
-
-	it('answers the pointer: hover names what each piece reads', () => {
 		expect(piece).toContain('onPointerover');
 		expect(piece).toContain('describeDrop');
-		expect(piece).toContain('hover = key');
 	});
 
-	it('is on the State graph page', () => {
+	it('is on the State graph page, which shows the same player.tsrx', () => {
 		expect(page).toContain("from '../../components/figures/state-graph/graph-anatomy.tsrx';");
+		expect(page).toContain('const isLiked = computed(() => liked.has(playing));');
 	});
 });
 
