@@ -9,9 +9,11 @@ describe('accordion anatomy', () => {
 		for (const layer of drawn.layers) expect(layer.texts.filter((t) => t.cls === 'name').map((t) => t.text)).toEqual(['accordion.' + layer.part]);
 	});
 
-	it('tags each layer with one short word', () => {
+	it('prints the trigger question faintly on the heading, and tags each layer with one short word', () => {
 		const tags = drawn.layers.flatMap((l) => l.texts).filter((t) => t.cls.startsWith('tag')).map((t) => t.text);
 		expect(tags).toEqual(['root', 'item', 'heading', 'panel', 'trigger']);
+		const heading = drawn.layers.find((l) => l.part === 'itemlabel')!;
+		expect(heading.texts.find((t) => t.cls.includes('ghost-text'))?.text).toBe('Do you ship overseas?');
 	});
 
 	it('draws the same every time', () => {

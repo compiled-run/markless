@@ -51,6 +51,8 @@ export function drawing() {
 	mark('itemlabel');
 	s.paper(48, 48, 412, 92, 8);
 	tint(48, 48, 412, 92, 'itemlabel');
+	s.pen([...roundRect(56, 54, 404, 86, 7), [63, 54]], 0, 'pen ghost-slot');
+	s.text(94, 76, 'Do you ship overseas?', 'ui ghost-text');
 	tag('itemlabel', 64, 412);
 
 	mark('itemcontent');

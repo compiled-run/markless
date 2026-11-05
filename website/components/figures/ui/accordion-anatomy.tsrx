@@ -331,6 +331,15 @@ export default function AccordionAnatomy() @{
 				opacity: 0.75;
 			}
 
+			.ghost-slot {
+				stroke-dasharray: 3 4;
+				opacity: 0.4;
+			}
+
+			.ghost-text {
+				opacity: 0.3;
+			}
+
 			.name {
 				font-family: 'Recursive', ui-monospace, monospace;
 				font-size: 18px;
