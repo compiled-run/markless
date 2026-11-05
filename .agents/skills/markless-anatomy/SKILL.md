@@ -36,6 +36,12 @@ Core rules:
   shadow cannot be moved on its own, as a computed value cannot be set). Otherwise draw the
   concept literally.
 - **No metaphor repeats across the site.** Wires, cords, clips and jars stay on State only.
+- **Draw the real thing when one exists.** When the idea has a real object (a keyboard, a
+  terminal, an editor, a PR checks box, a folder tree, the component itself), draw that object
+  faithfully in ink, with craft, and make it playable. Use a metaphor only when no real object
+  shows the idea. The owner's verdicts so far: the chess board, awesome; the links key that only
+  fits doors that exist, pretty good; the Computed paper tiles, ok; the CI boarding pass with
+  stamps and a bare wireframe parts anatomy, rejected.
 
 1. **The one thing the reader must believe.** One sentence. State: "the cart count is wired to
    the two spots that show it, and nothing else on the page moves".
@@ -70,6 +76,8 @@ Rejected by the owner, do not repeat:
 - The first Computed figure: a whole shop page around a small idea, with a three-line recipe card
   ("too much going on, too much to explain"). No recipe card of several steps.
 - Wires and pipes on every page ("why is everything just wires and pipes?").
+- The CI boarding pass with stamps: a forced metaphor where a real object existed.
+- A bare wireframe anatomy of the parts.
 
 ## 2. The State figure's own scene
 
@@ -161,6 +169,8 @@ These came from failures while building State. Walkthrough in `references/walkth
   `drawing()` are identical.
 - **Text on the paper is real `<text>`** placed with a precomputed SVG `matrix(...)` that maps
   page millimetres onto the sheet in perspective.
+- **Never put `Ring` or any imported component inside an `@if` arm or `@for` row.** Draw it
+  inline. Doing so pulled 151 KB into the docs home page's prefetch.
 - **No keyed `@for` over a computed list.** It broke resume with
   `MARKLESS_MDX_RENDER_DATA_ROOT_MISSING`. Loop over frozen art, and pick per-value pieces with
   `computed()` indexing into that art.
