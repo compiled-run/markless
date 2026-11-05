@@ -262,7 +262,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'balance',
 				number: '1',
 				description:
-					'Markless decides every update at compile time for any environment and resumes the page on interaction: the design, what it costs, and how it compares.',
+					'Markless decides how each page works when you compile it, so the browser runs less: the shadcn/ui home page executes 131 kB at load instead of 1,403 kB.',
 			},
 			{
 				title: 'The big idea',
@@ -270,7 +270,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'bulb',
 				number: '2',
 				description:
-					'Markless reads a component while it builds, so one plan renders it in the browser, on a server and in tests.',
+					'One component, written once and worked out at compile time, drawn by a browser, a server and an early native proof.',
 			},
 			{
 				title: 'The compiler',
@@ -278,7 +278,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'gear',
 				number: '3',
 				description:
-					'The real output the compiler writes for a small cart: its passes, its symbols, its view record and its two render modules.',
+					'What the compiler writes for a .tsrx file: its state nodes and symbols, each tied to a source line, compiled live in the browser.',
 			},
 			{
 				title: 'The payload',
@@ -286,7 +286,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'envelope',
 				number: '4',
 				description:
-					'What a server adds to its HTML so the browser can carry on: the state values, which element does what, and a small script that waits for the first interaction.',
+					'What a server adds to a rendered page: finished HTML plus two small blocks of data, markless/state and markless/view.',
 			},
 			{
 				title: 'Resuming',
@@ -294,7 +294,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'play',
 				number: '5',
 				description:
-					'Who hears the first click on each of the three paths a page can take: a direct browser module, the general browser path, or a server-rendered page.',
+					'How the browser picks up a page that was worked out ahead of time: the first press runs one handler, and nothing starts over.',
 			},
 			{
 				title: 'The state graph',
@@ -302,7 +302,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'graph',
 				number: '6',
 				description:
-					'The compiler writes down who reads what before the page exists, so one write changes only the text that reads it.',
+					'The graph the compiler writes of which values each spot reads, so a write reaches only its readers.',
 			},
 			{
 				title: 'Lazy chunks',
@@ -310,7 +310,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'puzzle',
 				number: '7',
 				description:
-					'Click code downloads with the page and runs only on the first press: symbols, packing, and what a symbol can reach.',
+					'Click code downloads with the page and runs only on its own click: symbols, packing, and what a symbol can reach.',
 			},
 			{
 				title: 'Native targets',
@@ -318,7 +318,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'phone',
 				number: '8',
 				description:
-					'Two hand-written proofs where a Markless component drives real iOS and macOS buttons. The compiler does not write native output yet.',
+					'The early iOS and macOS proofs: real native views, no web view, and a plan the compiler does not write yet.',
 			},
 		],
 	},

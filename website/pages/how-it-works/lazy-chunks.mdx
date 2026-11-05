@@ -7,15 +7,33 @@ import GalleryAnatomy from '../../components/figures/lazy-chunks/gallery-anatomy
 <SiteNavbar />
 <Sidebar />
 
-# Click code downloads early and runs late
+# Lazy chunks
 
-<PageMeta time="2 min" assumes="state, events, elements" />
+<PageMeta time="3 min" assumes="state, events, elements" />
 
-<Subtitle text="Downloading code and running it are two different costs, and Markless pays them at different times." />
+<Subtitle text="Each chunk of click code downloads with the page, and runs only when its own click happens." terms="chunk" />
+
+```tsrx title="gallery.tsrx"
+import { state } from '@markless/core';
+
+export default function Gallery() @{
+	let open = state('');
+
+	<button onClick={() => (open = 'Bay')}>Bay</button>
+}
+```
+
+**`onClick`** becomes a small function of its own. It downloads while the page loads, and **runs** only when someone presses **Bay**.
+
+## Downloading is not running
+
+Open a photo or press Share, and watch the network panel:
 
 <GalleryAnatomy />
 
-Open a photo or press Share. Both files were downloaded when the page loaded; each one runs only on its own click, and the network panel never fetches anything new.
+- Both click files arrived with the page.
+- Each one runs only on its own click.
+- Nothing new downloads when you press.
 
 ## What a small page pays
 

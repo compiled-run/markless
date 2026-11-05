@@ -7,17 +7,39 @@ import ResumeAnatomy from '../../components/figures/resuming/resume-anatomy.tsrx
 <SiteNavbar />
 <Sidebar />
 
-# The first click, on each path
+# Resuming
 
 <PageMeta time="2 min" assumes="state, events" />
 
-<Subtitle text="Markless works the page out ahead of time, so your first press picks up mid-game instead of running your components again." />
+<Subtitle text="Markless works the page out ahead of time, so the browser can resume mid-game on your first press instead of running your components again." terms="resume" />
+
+```tsrx title="like.tsrx"
+import { state } from '@markless/core';
+
+export default function Like() @{
+	let liked = state(false);
+
+	<button onClick={() => (liked = !liked)}>
+		{liked ? 'Liked' : 'Like'}
+	</button>
+}
+```
+
+**`liked`** arrives with the page as data, and **`onClick`** arrives as a name, not as code. The first press loads just that handler and runs it. `Like()` itself never runs again.
+
+## The page arrives mid-game
+
+Press the board for the next move, or drag a piece:
 
 <ResumeAnatomy />
 
-Press the board for the next move, or drag a piece yourself. The position was worked out ahead of time, so the browser only makes the next move: on a real page, a press runs one handler, and only the text it changes is redrawn.
+- The position was worked out ahead of time, so the next move is the only work.
+- Nothing is set up again from move one.
+- An illegal move slides back, the way a handler only does what its code says.
 
 ## Three ways in
+
+Who hears the first press depends on how the page was made:
 
 | | Browser, direct module | Browser, general path | Server-rendered page |
 | --- | --- | --- | --- |
@@ -27,13 +49,22 @@ Press the board for the next move, or drag a piece yourself. The position was wo
 
 ## On a server-rendered page
 
-- Each element with a handler carries an `m:on` attribute. The inline resumer reads it off the pressed element and imports no app code until then.
-- The press loads the page's *resume module*. If the compiler replaced the page's event and text-update records with specialized code, as for the cart, the full runtime never starts.
-- A press during loading is replayed in order. A pointer or focus landing on a handler imports the module early, once.
+- Each element with a handler carries an `m:on` attribute. A tiny inline script reads it off the pressed element.
+- The press loads the page's *resume module*. If the compiler specialized the page's events and text updates, the full runtime never starts.
+- A press during loading is replayed in order, and a pointer or focus landing on a handler loads its code early.
 
-## In the browser alone
+<Code steps={[{ label: 'Start with `liked` set to `true`.', source: 'state(true)' }, { label: "Change `'Liked'` to `'Liked ♥'` and press the button.", shows: 'Liked ♥' }]}>
+```tsrx title="like.tsrx"
+import { state } from '@markless/core';
 
-- The [direct module](/how-it-works/compiler) puts a listener on the button and keeps state in a `Map`. After the handler, it rewrites only the text that changed.
-- The general path, for props, child components, a scoped `<style>` or a `computed()`, listens on the container and starts the full runtime on the first matching event.
+export default function Like() @{
+	let liked = state(false);
 
-[The state graph](/how-it-works/state-graph) shows how one write finds the text that reads it.
+	<button onClick={() => (liked = !liked)}>
+		{liked ? 'Liked' : 'Like'}
+	</button>
+}
+```
+</Code>
+
+[The state graph](/how-it-works/state-graph) shows how one write finds the spots that read it.

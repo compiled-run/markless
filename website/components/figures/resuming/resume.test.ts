@@ -50,9 +50,9 @@ describe('the chess toy', () => {
 		expect(JSON.stringify(drawing())).toBe(JSON.stringify(boardArt));
 	});
 
-	it('opens the Resuming page, before its first section', () => {
+	it('sits on the Resuming page under its heading', () => {
 		expect(page).toContain("import ResumeAnatomy from '../../components/figures/resuming/resume-anatomy.tsrx';");
-		expect(page.indexOf('<ResumeAnatomy />')).toBeLessThan(page.indexOf('## '));
+		expect(page.indexOf('## The page arrives mid-game')).toBeLessThan(page.indexOf('<ResumeAnatomy />'));
 	});
 });
 
