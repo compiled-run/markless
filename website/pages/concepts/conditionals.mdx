@@ -1,6 +1,7 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
-import NoteAnatomy from '../../components/figures/conditionals/note-anatomy.tsrx';
+import PauseNoteAnatomy from '../../components/figures/conditionals/pause-note-anatomy.tsrx';
+import StatusAnatomy from '../../components/figures/conditionals/status-anatomy.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
@@ -9,72 +10,203 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 # Conditionals
 
-<PageMeta time="2 min" assumes="state, events" />
+<PageMeta time="4 min" assumes="state, events" />
 
 <Subtitle text="@if shows its elements while a condition is true, and removes them when it isn't." terms="elements" />
 
-```tsrx title="note-field.tsrx"
+```tsrx title="video.tsrx"
 import { state } from '@markless/core';
 
-export default function NoteField() @{
-	let open = state(true);
+export default function Video() @{
+	let playing = state(false);
 
-	@if (open) {
-		<textarea placeholder="write here" />
-	}
+	<section>
+		@if (playing) {
+			<p>Now playing</p>
+		} @else {
+			<p>Paused</p>
+		}
+		<button onClick={() => (playing = !playing)}>
+			Play or pause
+		</button>
+	</section>
 }
 ```
 
-**`@if (open)`** builds the `<textarea>` while `open` is true. When `open` turns false, everything inside the **`@if`** leaves the page.
+**`@if (playing)`** builds `<p>Now playing</p>` while `playing` is true. **`@else`** holds what goes there instead. One of the two is on the page; the other isn't there at all.
 
 ## A closed `@if` is gone, not covered
 
-A *condition* is the true-or-false value in `@if ( )`. When it turns false, the part inside isn't hidden with CSS; it's removed, and built fresh next time.
+A *condition* is the true-or-false value in `@if ( )`. When it turns false, the elements inside aren't hidden with CSS. They're removed, and built new the next time it's true.
 
+- Exactly one side is on the page at a time.
 - Closing removes the elements and what you typed in them.
 - Opening builds new, empty ones.
-- A value declared above the `@if` outlives it.
 
-Write on the note, then drag it to the bin. Click the sheet to open a note again.
+Type a note under the paused video, then press play. Pause again.
 
-<NoteAnatomy />
+<PauseNoteAnatomy />
 
-<Code steps={[{ label: 'Press Show or hide the note, and type a note longer than 20 letters.', shows: 'That is a long note.' }, { label: 'Close the note and open it again. Your text is still there, because `note` lives above the `@if`.', source: "let note = state('')" }, { label: "Try breaking it: inside the `@if`, wrap the label in `@{ let draft = state(''); … }`. The build stops, because state made inside an `@if` would leave with it.", fails: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE' }]}>
-```tsrx title="note-panel.tsrx"
-import { computed, state } from '@markless/core';
+<Code steps={[{ label: 'Press Play or pause.', shows: 'Now playing' }, { label: 'Change `Paused` to `Press play`, and press the button twice.', source: 'Press play' }, { label: 'Try breaking it: delete the `@` in `@else`. The build stops, because `else` belongs to the `@if` and needs its `@`.', fails: 'MARKLESS_BRANCH_ELSE_SPELLING' }]}>
+```tsrx title="video.tsrx"
+import { state } from '@markless/core';
 
-export default function NotePanel() @{
-	let open = state(false);
-	let note = state('');
-	const long = computed(() => note.length > 20);
+export default function Video() @{
+	let playing = state(false);
 
 	<section>
-		<button onClick={() => (open = !open)}>
-			Show or hide the note
-		</button>
-		@if (open) {
-			<label>
-				Note
-				<input
-					value={note}
-					onInput={(event) =>
-						(note = event.currentTarget.value)
-					}
-				/>
-			</label>
-		}
-		@if (long) {
-			<p>That is a long note.</p>
+		@if (playing) {
+			<p>Now playing</p>
 		} @else {
-			<p>Short and sweet.</p>
+			<p>Paused</p>
 		}
+		<button onClick={() => (playing = !playing)}>
+			Play or pause
+		</button>
 	</section>
 }
 ```
 </Code>
 
-## `@else` and `@switch` pick one of several
+## A side holds one element
 
-`@else` shows what to put there when the condition is false, and `@switch` picks one `@case` from several. Put `@if` blocks side by side; one can't sit inside another yet.
+Each side of an `@if` holds one element. For more, wrap them in `<>` and `</>`:
 
-[Lists](/concepts/lists) shows rows that keep their own state when the list moves.
+```tsrx
+@if (playing) {
+	<>
+		<p>Now playing</p>
+		<button>Pause</button>
+	</>
+}
+```
+
+## `@else if` asks the next condition
+
+Conditions are asked top to bottom. The first true one wins, and `@else` catches the rest.
+
+<Code steps={[{ label: 'Press Louder until it reads Loud.', shows: 'Loud' }, { label: 'Press Mute.', shows: 'Muted' }, { label: "Add `@else if (volume > 80) { <p>Very loud</p> }` above the `@else`, and press Louder until it shows.", source: 'volume > 80' }]}>
+```tsrx title="volume.tsrx"
+import { state } from '@markless/core';
+
+export default function Volume() @{
+	let volume = state(40);
+
+	<section>
+		@if (volume === 0) {
+			<p>Muted</p>
+		} @else if (volume < 50) {
+			<p>Quiet</p>
+		} @else {
+			<p>Loud</p>
+		}
+		<button onClick={() => (volume = Math.min(volume + 20, 100))}>
+			Louder
+		</button>
+		<button onClick={() => (volume = 0)}>Mute</button>
+	</section>
+}
+```
+</Code>
+
+## `@switch` picks one case
+
+When one value can be one of several things, `@switch` compares it with each `@case` in order and shows the first that matches. `@default` shows when none does.
+
+Press play, then drag the knob to the end of the timeline. Hover the card to see which case it came from.
+
+<StatusAnatomy />
+
+<Code steps={[{ label: 'Press Play.', shows: 'Now playing' }, { label: "Add `@case 'ended': { <p>Replay?</p> }` above `@default`, and a button that sets `status = 'ended'`.", source: "'ended'" }]}>
+```tsrx title="status.tsrx"
+import { state } from '@markless/core';
+
+export default function Status() @{
+	let status = state('loading');
+
+	<section>
+		@switch (status) {
+			@case 'loading': {
+				<p>Loading the video</p>
+			}
+			@case 'playing': {
+				<p>Now playing</p>
+			}
+			@default: {
+				<p>Paused</p>
+			}
+		}
+		<button onClick={() => (status = 'playing')}>Play</button>
+		<button onClick={() => (status = 'paused')}>Pause</button>
+	</section>
+}
+```
+</Code>
+
+## `@switch (true)` picks the first condition that holds
+
+Write `true` as the value, and each `@case` becomes a condition. It reads like the `@else if` chain above, one case per line:
+
+```tsrx
+@switch (true) {
+	@case volume === 0: {
+		<p>Muted</p>
+	}
+	@case volume < 50: {
+		<p>Quiet</p>
+	}
+	@default: {
+		<p>Loud</p>
+	}
+}
+```
+
+## Keep a value by declaring it above
+
+Where you declare a value decides how long it lives. The field under the paused video had nothing behind it, so its text went with it. Declared above the `@if`, `note` lasts as long as the component, and the field comes back with the note still in it.
+
+<Code steps={[{ label: 'Type `Great shot`, then press Play or pause. The field goes; the line stays.', shows: 'Great shot' }, { label: 'Add `<p>{note.length} letters</p>` under the line.', source: '{note.length}' }]}>
+```tsrx title="note-kept.tsrx"
+import { state } from '@markless/core';
+
+export default function NoteKept() @{
+	let playing = state(false);
+	let note = state('');
+
+	<section>
+		<button onClick={() => (playing = !playing)}>
+			Play or pause
+		</button>
+		@if (!playing) {
+			<input
+				placeholder="Add a note"
+				value={note}
+				onInput={(event) =>
+					(note = event.currentTarget.value)
+				}
+			/>
+		}
+		<p>{note}</p>
+	</section>
+}
+```
+</Code>
+
+## Show or hide without removing
+
+When an element should stay on the page, with its scroll position and its typed text, toggle an attribute instead of wrapping it in `@if`:
+
+```tsrx
+<input hidden={playing} placeholder="Add a note" />
+<button aria-pressed={playing} onClick={() => (playing = !playing)}>
+	Play
+</button>
+```
+
+Not yet:
+
+- An `@if` inside another `@if` stops following its condition once the outer one has closed and opened again. Put them side by side for now.
+- A `state()` written inside a side keeps its value when the side comes back, instead of starting fresh. Declare state above the `@if`.
+- A `computed()` can't be written inside a side; declare it above.
+
+[Lists](/concepts/lists) draws one row per item, and keeps each row's state with its row.

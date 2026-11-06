@@ -1735,45 +1735,40 @@ try {
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
 		check(
-			conditionalsText.includes("can't sit inside another"),
-			'/concepts/conditionals answers the nested @if question',
+			conditionalsText.includes('Put them side by side for now'),
+			'/concepts/conditionals says what to do instead of nesting an @if',
 		);
 		check(
-			conditionalsText.includes('MARKLESS_STATE_CREATION_SITE_UNSTABLE'),
-			'/concepts/conditionals names the error the build stops with',
+			conditionalsText.includes('Where you declare a value decides how long it lives'),
+			'/concepts/conditionals states the rule for what outlives a branch',
 		);
 
-		// --- widget: the note panel on the conditionals page ---------------------
+		// --- widget: the kept note on the conditionals page ---------------------
 		// The page's claim: the field leaves the page with the branch, and the note
 		// survives because it is declared above the branch.
-		const notePanel = page.locator('.code-block [data-code-stage]').first();
-		const noteToggle = notePanel.getByRole('button', { name: 'Show or hide the note' });
+		const noteBlock = page.locator('.code-block', { hasText: 'note-kept.tsrx' }).first();
+		const notePanel = noteBlock.locator('[data-code-stage]').first();
+		const noteToggle = notePanel.getByRole('button', { name: 'Play or pause' });
 		const noteField = notePanel.locator('input');
-		const noteVerdict = notePanel.locator('p').first();
+		const noteLine = notePanel.locator('p').first();
 		await noteToggle.waitFor();
-		check((await noteField.count()) === 0, 'the note field is not in the page while closed');
-		await noteToggle.click();
-		await noteField.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-		const longNote = 'A note longer than twenty letters';
-		await noteField.fill(longNote);
-		await settleText(
-			noteVerdict,
-			(text) => text === 'That is a long note.',
-			'the computed under the field follows the note',
-		);
+		check((await noteField.count()) === 1, 'the note field is in the page while paused');
+		const keptNote = 'Great shot';
+		await noteField.fill(keptNote);
+		await settleText(noteLine, (text) => text === keptNote, 'the line under the field shows the note');
 		await noteToggle.click();
 		await noteField.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-		check((await noteField.count()) === 0, 'closing the panel takes the field out of the page');
+		check((await noteField.count()) === 0, 'pressing play takes the field out of the page');
 		check(
-			((await noteVerdict.textContent()) ?? '').trim() === 'That is a long note.',
+			((await noteLine.textContent()) ?? '').trim() === keptNote,
 			'the note outlives the branch, because it is declared above it',
-			((await noteVerdict.textContent()) ?? '').trim(),
+			((await noteLine.textContent()) ?? '').trim(),
 		);
 		await noteToggle.click();
 		await noteField.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 		check(
-			(await noteField.inputValue()) === longNote,
-			'opening the panel again shows the note that was typed',
+			(await noteField.inputValue()) === keptNote,
+			'pausing again shows the field with the note still in it',
 			await noteField.inputValue(),
 		);
 		await page.screenshot({ path: `${shotsDir}/T013-note-panel-after.png`, fullPage: true });
