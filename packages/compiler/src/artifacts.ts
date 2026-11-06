@@ -828,6 +828,8 @@ export type SemanticEvent = {
 	readonly id: string;
 	readonly hostNodeId: string;
 	readonly eventName: string;
+	// The component whose markup wrote the handler, so its names resolve to that component's bindings.
+	readonly componentName?: string;
 	// One handler per event attribute; absent when the attribute carries no value.
 	readonly handlerSource?: string;
 	readonly handlerSpan?: SourceSpan;
@@ -1059,6 +1061,9 @@ export type SemanticTemplateRead = {
 	// The branch site whose arm body holds this read directly, with no host of
 	// its own. Such a read drives the arm's range, never the enclosing element.
 	readonly armScopeBranchSiteId?: string;
+	// The async boundary whose arm body holds this read directly, with no host of
+	// its own; the arm re-renders on refresh instead of writing the enclosing element.
+	readonly armScopeBoundaryId?: string;
 	// The component edge whose children hold this read directly. It is projected
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;

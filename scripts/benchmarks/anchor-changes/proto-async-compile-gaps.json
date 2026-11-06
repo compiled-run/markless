@@ -1,0 +1,26 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 432,
+			"reason": "escalated @if in a child of the page: the owner's render places bound reads and keeps bound ids at the module root",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 432,
+			"reason": "escalated @if in a child of the page: the owner's render places bound reads and keeps bound ids at the module root",
+			"date": "2026-11-05"
+		}
+	]
+}

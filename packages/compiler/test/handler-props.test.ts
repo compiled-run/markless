@@ -209,3 +209,62 @@ export function Seeded({ value }) @{
 `);
 	expect(handlerProps(compiled)).toEqual({ Seeded: [] });
 });
+
+const SLOT_PART = `import { shared, state } from '@markless/core';
+export const pickState = shared(
+	() => {
+		const pick = state({ on: false });
+		return {
+			...pick,
+			onFlip: undefined as ((on: boolean) => void) | undefined,
+			flip() {
+				pick.on = pick.on !== true;
+				pick.onFlip?.(pick.on);
+			},
+		};
+	},
+	{ scope: 'widget' },
+);
+export function PickRoot({ onFlip, tone, children }) @{
+	const pick = pickState();
+	pick.onFlip = onFlip;
+	<div data-tone={tone}>{children}</div>
+}
+export function PickTrigger({ children }) @{
+	const pick = pickState();
+	<button onClick={() => pick.flip()}>{children}</button>
+}
+`;
+
+test('a prop a part puts in its shared callback slot is a prop a handler reads', async () => {
+	expect(handlerProps(await compile(SLOT_PART, undefined, 'src/pick.tsrx'))).toEqual({
+		PickRoot: ['onFlip'],
+		PickTrigger: [],
+	});
+});
+
+test('a module-constant list goes on the graph when a row component hands its item to a part callback slot', async () => {
+	const part = await compile(SLOT_PART, undefined, 'src/pick.tsrx');
+	const compiled = await compile(
+		`import { state } from '@markless/core';
+import { PickRoot, PickTrigger } from './pick.tsrx';
+const shelves = [{ title: 'east' }, { title: 'west' }];
+function Shelf({ shelf }) @{
+	const seen = state({ text: '' });
+	<PickRoot onFlip={() => (seen.text = shelf.title)} tone="t">
+		<PickTrigger>{shelf.title}</PickTrigger>
+	</PickRoot>
+}
+export default function Page() @{
+	<main>
+		@for (const shelf of shelves; key shelf.title) {
+			<Shelf shelf={shelf} />
+		}
+	</main>
+}
+`,
+		{ './pick.tsrx': part.moduleGraphInterface },
+	);
+	expect(handlerProps(compiled)).toEqual({ Shelf: ['shelf'], Page: [] });
+	expect(collections(compiled)).toEqual([expect.stringContaining('templateExpression')]);
+});

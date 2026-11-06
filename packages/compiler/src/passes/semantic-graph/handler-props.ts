@@ -8,6 +8,7 @@ import {
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import { resolveImportedChildComponent } from './collect-components.ts';
+import { resolveSharedCall, sharedCallbackSlotNames } from './collect-shared.ts';
 import { resolvedSymbolAt } from './collect-expressions.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
 import type { WalkState } from './types.ts';
@@ -82,6 +83,13 @@ export function moduleHandlerProps(state: WalkState): ReadonlyMap<string, Readon
 					passed.push({ ...childTarget(child!), attributeName: name, propNames });
 			}
 		});
+		for (const value of callbackSlotFills(component.node.body as AnyNode | undefined, state)) {
+			const handler = handlerFunction(value, semantic);
+			const handled = handler
+				? capturedProps(handler, props, semantic)
+				: propReadsIn(value, props, semantic);
+			for (const prop of handled) reads.add(prop);
+		}
 		own.set(component.name, reads);
 		forwards.set(component.name, passed);
 	}
@@ -175,6 +183,28 @@ function propBindings(component: AnyNode, semantic: ModuleSemantics): ReadonlyMa
 			);
 	}
 	return bindings;
+}
+
+// `item.onChange = onChange`: a shared instance's callback slot runs when a part's handler calls it.
+function callbackSlotFills(body: AnyNode | undefined, state: WalkState): ReadonlyArray<AnyNode> {
+	const semantic = state.semantic();
+	const fills: AnyNode[] = [];
+	const visit = (node: AnyNode | undefined): void => {
+		if (!node || isFunction(node) || node.type === 'FunctionDeclaration') return;
+		const target = node.type === 'AssignmentExpression' ? (node.left as AnyNode) : undefined;
+		const instance = target?.type === 'MemberExpression' && target.computed !== true
+			? (target.object as AnyNode)
+			: undefined;
+		const binding = instance?.type === 'Identifier' ? semantic.referenceOf(instance as never)?.binding : null;
+		const init = binding ? localDefinition(binding, semantic) : null;
+		const slot = getIdentifierName(target?.property as AnyNode | undefined);
+		const definition = init?.type === 'CallExpression' ? resolveSharedCall(init, state)?.definition : null;
+		if (slot && definition && sharedCallbackSlotNames(definition).includes(slot))
+			fills.push(node.right as AnyNode);
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(body);
+	return fills;
 }
 
 // Every markup element under a component body.

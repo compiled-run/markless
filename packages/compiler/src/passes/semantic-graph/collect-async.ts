@@ -43,6 +43,7 @@ export function collectAsyncBoundary(
 	const boundaryId = `boundary:${state.nextBoundaryId++}`;
 	const previousBoundaryId = state.currentAsyncBoundaryId;
 	const previousArm = state.currentAsyncBoundaryArm;
+	const previousArmHost = state.currentAsyncArmHostNodeId;
 	// Arm index inside this boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	const armByNode = new Map<unknown, number>([
 		[node.block, 0],
@@ -65,6 +66,7 @@ export function collectAsyncBoundary(
 			: {}),
 	});
 	state.currentAsyncBoundaryId = boundaryId;
+	state.currentAsyncArmHostNodeId = state.currentHostNodeId;
 	const resetParam = handler?.resetParam as AnyNode | null | undefined;
 	if (resetParam?.type === 'Identifier' && typeof resetParam.start === 'number')
 		state.catchResetBoundaries.set(resetParam.start, boundaryId);
@@ -76,6 +78,7 @@ export function collectAsyncBoundary(
 
 	state.currentAsyncBoundaryId = previousBoundaryId;
 	state.currentAsyncBoundaryArm = previousArm;
+	state.currentAsyncArmHostNodeId = previousArmHost;
 }
 
 export function propagateAsyncComputedCapability(graph: MutableSemanticGraphArtifact): void {

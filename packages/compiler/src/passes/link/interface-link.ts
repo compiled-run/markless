@@ -340,7 +340,7 @@ function linkedRenderDataSymbolPreamble(
 			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
 			'importSource' in route
 				? `\t\treturn import(${JSON.stringify(linkedRenderDataSymbolRouteSource(route.importSource))}).then((module) => module.loadSymbol(symbolId.slice(${route.prefix.length})));`
-				: `\t\treturn marklessLoadLocalSymbol(symbolId.slice(${route.prefix.length}));`,
+				: `\t\treturn marklessLoadLinkedSymbol(symbolId.slice(${route.prefix.length}));`,
 			'\t}',
 		]),
 		'\treturn marklessLoadLocalSymbol(symbolId);',

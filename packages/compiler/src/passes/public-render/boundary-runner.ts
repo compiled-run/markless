@@ -132,11 +132,23 @@ function coveringGateRead(
 function collectBoundaryGateReads(
 	semanticGraph: SemanticGraphArtifact,
 ): ReadonlyMap<string, BoundaryGateReads> {
-	const bindings = graphBindingMap(semanticGraph);
 	const bindingsById = new Map(
 		semanticGraph.graphBindings.map((binding) => [binding.id, binding]),
 	);
-	const aliases = semanticAliasMap(semanticGraph);
+	// A boundary's names are its own component's: same-file components may each declare one.
+	const scopes = new Map<string | undefined, ReturnType<typeof scopeOf>>();
+	const scopeOf = (componentName: string | undefined) => ({
+		bindings: graphBindingMap(semanticGraph, undefined, componentName),
+		aliases: semanticAliasMap(semanticGraph, undefined, componentName),
+	});
+	const scoped = (componentName: string | undefined) => {
+		let scope = scopes.get(componentName);
+		if (!scope) scopes.set(componentName, (scope = scopeOf(componentName)));
+		return scope;
+	};
+	const boundaryComponent = new Map(
+		semanticGraph.asyncBoundaries.map((boundary) => [boundary.id, boundary.componentName]),
+	);
 	type GateRead = {
 		readonly source: string;
 		readonly asyncBoundaryId?: string | undefined;
@@ -147,7 +159,12 @@ function collectBoundaryGateReads(
 	};
 	const boundaryReads: ReadonlyArray<GateRead> = [
 		...semanticGraph.templateReads.flatMap((read): ReadonlyArray<GateRead> =>
-			read.asyncGateReads && !resolveGraphPath(read.source, bindings, aliases)
+			read.asyncGateReads &&
+			!resolveGraphPath(
+				read.source,
+				scoped(boundaryComponent.get(read.asyncBoundaryId ?? '')).bindings,
+				scoped(boundaryComponent.get(read.asyncBoundaryId ?? '')).aliases,
+			)
 				? read.asyncGateReads.map((gate) => ({
 						source: gate.source,
 						asyncBoundaryId: read.asyncBoundaryId,
@@ -181,6 +198,7 @@ function collectBoundaryGateReads(
 
 	return new Map(
 		semanticGraph.asyncBoundaries.map((boundary) => {
+			const { bindings, aliases } = scoped(boundary.componentName);
 			const reads: BoundaryRunnerRead[] = [];
 			const unresolvedSources: string[] = [];
 			const seenGraphNodeIds = new Set<string>();

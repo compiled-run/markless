@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 155,
+			"reason": "a @try that settles by re-rendering its module reads from where the module root stands, so a row component's boundary settles in a client render",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a @try that settles by re-rendering its module reads from where the module root stands, so a row component's boundary settles in a client render",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 155,
+			"reason": "a @try that settles by re-rendering its module reads from where the module root stands, so a row component's boundary settles in a client render",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "a @try that settles by re-rendering its module reads from where the module root stands, so a row component's boundary settles in a client render",
+			"date": "2026-11-05"
+		}
+	]
+}

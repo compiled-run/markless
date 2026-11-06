@@ -651,7 +651,7 @@ function asyncArmField(
 	return {};
 }
 
-// Rows the browser cannot build (a row holding two components, or an @if over page state around one) re-render the arm on refresh.
+// Rows the browser cannot build (a row holding two components, or an @if over page state around one), and text written straight into the arm, re-render the arm on refresh.
 function rerendersOnRefreshField(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,
@@ -666,7 +666,10 @@ function rerendersOnRefreshField(
 		const record = keyedRepeats.find((candidate) => candidate.id === slot.repeatId);
 		return !(record && (('rowTemplate' in record && record.rowTemplate) || ('rowComponent' in record && record.rowComponent)));
 	});
-	return stale ? { rerendersOnRefresh: true } : {};
+	const armText = input.semanticGraph?.templateReads.some(
+		(read) => read.armScopeBoundaryId === boundaryId,
+	);
+	return stale || armText ? { rerendersOnRefresh: true } : {};
 }
 
 // A nested record's own parent renders once per enclosing row, so it names the outermost

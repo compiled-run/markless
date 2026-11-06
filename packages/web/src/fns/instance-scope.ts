@@ -7,6 +7,7 @@ import { marklessCodedError } from '../coded-error.ts';
 import {
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP,
 	PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS,
+	protocolBoundSymbolBase,
 } from '../../../serializer/src/protocol-constants.ts';
 import { marklessSettled, marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
@@ -1059,7 +1060,9 @@ function composedBoundaryPrefixes(
 			: '';
 	const prefix = local ? boundary.id.slice(0, local.index - drawn.length) : '';
 	if (!prefix) return undefined;
-	const composedSymbols = boundary.composedSymbolPrefix;
+	// A served boundary's update symbol was spelled through the composing edges' symbol prefixes.
+	const composedSymbols =
+		boundary.composedSymbolPrefix ?? (marklessInstancePath(boundary.updateSymbolId) || undefined);
 	const symbols =
 		symbolPrefix ??
 		(composedSymbols?.endsWith(drawn)
@@ -1083,6 +1086,8 @@ function composedBoundaryArmRecords(
 	graph?: RuntimeGraph,
 	symbolPrefix?: string,
 	renderedBoundaryId?: string,
+	// Set for an escalated @if render rooted at its owner: bound ids stay spelled from the module root.
+	moduleRootPath?: string,
 ): ResumeArmRecordSet {
 	const exhaustive = {
 		locators: true,
@@ -1101,6 +1106,9 @@ function composedBoundaryArmRecords(
 	const instancePath = marklessInstancePath(symbols);
 	const registry = marklessGraphWidgetRegistry(graph);
 	const routes = boundary.composedGraphProps ?? [];
+	const symbol = (symbolId: string) =>
+		(moduleRootPath !== undefined && protocolBoundSymbolBase(symbolId) ? moduleRootPath : symbols) +
+		symbolId;
 	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
 		...record,
 		hostNodeId: prefix + record.hostNodeId,
@@ -1153,18 +1161,18 @@ function composedBoundaryArmRecords(
 		locators: set.locators.map(prefixHost),
 		events: set.events.map((event) => ({
 			...prefixHost(event),
-			symbolIds: event.symbolIds.map((symbolId) => symbols + symbolId),
+			symbolIds: event.symbolIds.map((symbolId) => symbol(symbolId)),
 		})),
 		domUpdates: set.domUpdates?.map((update) => ({
 			...prefixHost(qualifyRead(update)),
-			...(update.symbolId ? { symbolId: symbols + update.symbolId } : {}),
+			...(update.symbolId ? { symbolId: symbol(update.symbolId) } : {}),
 		})),
 		behaviors: set.behaviors.map((behavior) => ({
 			...prefixHost(behavior),
 			...(behavior.inputGraphReads
 				? { inputGraphReads: behavior.inputGraphReads.map(qualifyRead) }
 				: {}),
-			...(behavior.symbolId ? { symbolId: symbols + behavior.symbolId } : {}),
+			...(behavior.symbolId ? { symbolId: symbol(behavior.symbolId) } : {}),
 		})),
 		elementHandles: set.elementHandles.map((handle) => ({
 			...prefixHost(handle),
@@ -1186,7 +1194,7 @@ function composedBoundaryArmRecords(
 			...(repeat.rowTemplate && { rowTemplate: qualifyRowTemplate(repeat.rowTemplate) }),
 			rowEvents: repeat.rowEvents.map((event) => ({
 				...event,
-				symbolIds: event.symbolIds.map((symbolId) => symbols + symbolId),
+				symbolIds: event.symbolIds.map((symbolId) => symbol(symbolId)),
 			})),
 		})),
 		...(set.branches
@@ -1198,7 +1206,7 @@ function composedBoundaryArmRecords(
 						...(contentReadsOf(branch)
 							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
 							: {}),
-						...(branch.symbolId ? { symbolId: symbols + branch.symbolId } : {}),
+						...(branch.symbolId ? { symbolId: symbol(branch.symbolId) } : {}),
 						...(branch.armRecords
 							? {
 									armRecords: branch.armRecords.map((arm) => ({
@@ -1206,13 +1214,13 @@ function composedBoundaryArmRecords(
 										events: (arm.events ?? []).map((event) => ({
 											...event,
 											symbolIds: (event.symbolIds ?? []).map(
-												(symbolId) => symbols + symbolId,
+												(symbolId) => symbol(symbolId),
 											),
 										})),
 										domUpdates: (arm.domUpdates ?? []).map((update) => ({
 											...qualifyLooseRead(update),
 											...(update.symbolId
-												? { symbolId: symbols + update.symbolId }
+												? { symbolId: symbol(String(update.symbolId)) }
 												: {}),
 										})),
 									})),
@@ -1231,18 +1239,38 @@ function composedBoundaryArmRecords(
 					runnerGraphNodeId:
 						nested.runnerGraphNodeId &&
 						marklessComposedGraphNodeId(nested.runnerGraphNodeId, instancePath, registry),
-					...(nested.updateSymbolId && { updateSymbolId: symbols + nested.updateSymbolId }),
+					...(nested.updateSymbolId && { updateSymbolId: symbol(nested.updateSymbolId) }),
 					asyncReads: nested.asyncReads.map((read) => ({
 						...qualifyRead(read),
-						...(read.runnerSymbolId && { runnerSymbolId: symbols + read.runnerSymbolId }),
+						...(read.runnerSymbolId && { runnerSymbolId: symbol(read.runnerSymbolId) }),
 					})),
 					...(routes.length > 0 && {
 						composedInstancePath: instancePath,
 						composedGraphProps: routes,
 					}),
+					// The owner's render spelled the nested boundary's own routes in its space.
+					...(moduleRootPath !== undefined &&
+						nested.composedGraphProps && {
+							composedInstancePath: instancePath + (nested.composedInstancePath ?? ''),
+							composedGraphProps: nested.composedGraphProps.map((route) => ({
+								...route,
+								...qualifyRead({ graphNodeId: route.graphNodeId, path: route.path ?? [] }),
+							})),
+						}),
 					...(symbols !== prefix && { composedSymbolPrefix: symbols }),
+					...(moduleRootPath !== undefined &&
+						nested.updateSymbolId && {
+							composedSymbolPrefix: symbols + marklessInstancePath(nested.updateSymbolId),
+						}),
 					...(armRecords && {
-						armRecords: composedBoundaryArmRecords({ ...boundary, id }, armRecords, graph, symbols),
+						armRecords: composedBoundaryArmRecords(
+							{ ...boundary, id },
+							armRecords,
+							graph,
+							symbols,
+							undefined,
+							moduleRootPath,
+						),
 					}),
 				};
 			}),
@@ -1253,6 +1281,7 @@ function composedBoundaryArmRecords(
 type ComposedUpdate = {
 	readonly armRecords: ResumeArmRecordSet;
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	readonly moduleRootPath?: string;
 	readonly computed?: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly deriveSymbolId?: string | null;
@@ -1271,7 +1300,14 @@ function composedBranchUpdate<U extends ComposedUpdate>(
 	if (!symbolPrefix) return update;
 	return composedUpdateNodes(branch, update, graph, symbolPrefix, {
 		...update,
-		armRecords: composedBoundaryArmRecords(branch, update.armRecords, graph, symbolPrefix),
+		armRecords: composedBoundaryArmRecords(
+			branch,
+			update.armRecords,
+			graph,
+			symbolPrefix,
+			undefined,
+			update.moduleRootPath,
+		),
 	});
 }
 
@@ -1313,7 +1349,12 @@ function composedUpdateNodes<U extends ComposedUpdate>(
 			computed: update.computed.map((computed) => ({
 				...computed,
 				graphNodeId: node(computed.graphNodeId),
-				...(computed.deriveSymbolId && { deriveSymbolId: symbolPrefix + computed.deriveSymbolId }),
+				...(computed.deriveSymbolId && {
+					deriveSymbolId:
+						(update.moduleRootPath !== undefined && protocolBoundSymbolBase(computed.deriveSymbolId)
+							? update.moduleRootPath
+							: symbolPrefix) + computed.deriveSymbolId,
+				}),
 				...(computed.dependencies && { dependencies: computed.dependencies.map(read) }),
 			})),
 		}),
