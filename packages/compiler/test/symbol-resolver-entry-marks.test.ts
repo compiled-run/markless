@@ -76,3 +76,70 @@ export function App() @{
 `);
 	expect(symbols).toEqual([{ eventName: 'click', entryMarks: undefined }]);
 });
+
+// A handler authored on a component's prop (`<Button onClick={...}>`) is a `callback-prop`
+// symbol, not an `event-handler` one; it carries the same writes and needs the same mark.
+async function callbackPropEntryMarksOf(source: string) {
+	const semanticGraph = await buildSemanticGraph({ filename: 'src/App.tsrx', source });
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const plan = planSymbolResolver({ semanticGraph, payloadArena, stateLowering });
+	return plan.symbols
+		.filter((symbol) => symbol.kind === 'callback-prop')
+		.map((symbol) => ({ propName: symbol.propName, entryMarks: symbol.entryMarks }));
+}
+
+test('a handler passed as a callback prop to a component that forwards it gets an entry mark', async () => {
+	const symbols = await callbackPropEntryMarksOf(`
+import { state, computed } from '@markless/core';
+function Button({ onClick, children }) @{
+	<button type="button" onClick={onClick}>{children}</button>
+}
+export function App() @{
+	let reload = state(0);
+	const balance = computed(async () => { reload; return 1; });
+	<>
+		<Button onClick={async () => { await Promise.resolve(); reload++; }}>Save</Button>
+		<p>{balance}</p>
+	</>
+}
+`);
+	expect(symbols).toEqual([{ propName: 'onClick', entryMarks: ['computed:balance'] }]);
+});
+
+test('a handler passed as a callback prop to a component that spreads it onto a host gets an entry mark', async () => {
+	const symbols = await callbackPropEntryMarksOf(`
+import { state, computed } from '@markless/core';
+function Button({ children, ...rest }) @{
+	<button type="button" {...rest}>{children}</button>
+}
+export function App() @{
+	let reload = state(0);
+	const balance = computed(async () => { reload; return 1; });
+	<>
+		<Button onClick={async () => { await Promise.resolve(); reload++; }}>Save</Button>
+		<p>{balance}</p>
+	</>
+}
+`);
+	expect(symbols).toEqual([{ propName: 'onClick', entryMarks: ['computed:balance'] }]);
+});
+
+test('a callback prop that writes a state no async value\'s key reads gets no entry mark', async () => {
+	const symbols = await callbackPropEntryMarksOf(`
+import { state, computed } from '@markless/core';
+function Button({ onClick, children }) @{
+	<button type="button" onClick={onClick}>{children}</button>
+}
+export function App() @{
+	let reload = state(0);
+	let note = state('idle');
+	const balance = computed(async () => { reload; return 1; });
+	<>
+		<Button onClick={async () => { await Promise.resolve(); note = 'noted'; }}>Note</Button>
+		<p>{balance}</p>
+	</>
+}
+`);
+	expect(symbols).toEqual([{ propName: 'onClick', entryMarks: undefined }]);
+});

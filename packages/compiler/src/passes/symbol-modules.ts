@@ -6206,7 +6206,10 @@ export function buildEventHandlerEmission(
 	const source = projection?.source ?? symbol.source;
 
 	const shownReads = symbol.kind === 'event-handler' ? symbol.shownReads : undefined;
-	const entryMarks = symbol.kind === 'event-handler' ? symbol.entryMarks : undefined;
+	// A callback-prop symbol carries the same field: whichever component ends up invoking this
+	// handler (a forwarded attribute, a spread, or a call from the component's own handler body),
+	// the mark belongs to the symbol module that owns the body doing the writing.
+	const entryMarks = symbol.entryMarks;
 	const scalarLeaf =
 		input.captureSlots.length === 0 && !shownReads && !entryMarks
 			? eventHandlerScalarLeafStatements(input, projection)

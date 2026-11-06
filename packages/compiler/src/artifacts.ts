@@ -1941,6 +1941,9 @@ export type PlannedSymbol =
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+			// Same mark as an event-handler symbol's: a callback prop's body is wherever it is
+			// authored, however many components forward it before it reaches a native listener.
+			readonly entryMarks?: ReadonlyArray<string>;
 	  }
 	| {
 			readonly id: string;

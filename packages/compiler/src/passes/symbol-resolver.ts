@@ -181,6 +181,12 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 						source,
 						semanticsReader,
 					);
+			const callbackWrites = eventWrites(source, input.stateLowering?.writes, [
+				prop.sourceSpan,
+				...inlined.spans,
+				...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
+			]);
+			const callbackEntryMarks = entryMarksOf(callbackWrites);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
@@ -192,11 +198,8 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				...(crossModuleInline ? { crossModuleInline } : {}),
 				reads,
-				writes: eventWrites(source, input.stateLowering?.writes, [
-					prop.sourceSpan,
-					...inlined.spans,
-					...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
-				]),
+				writes: callbackWrites,
+				...(callbackEntryMarks ? { entryMarks: callbackEntryMarks } : {}),
 				elementHandleReads: handleReadsOf(reads),
 			});
 		}

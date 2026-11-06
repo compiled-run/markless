@@ -57,6 +57,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly reconcile?: Pick<DerivedReconcilePlane, 'publishAsync'>;
 	/** No handler statement follows an async answer, so what it dirties lands in the pass, past the write observers. */
 	readonly landWithoutObservers: (land: () => void) => void;
+	/** Runs the flush now, ignoring any `holdFlush` in effect; only `markEntry`/`endEntry` use it, to stay visible through a held dispatch. */
+	readonly flush?: () => Promise<void>;
 };
 
 /** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
@@ -556,6 +558,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			asyncComputed: input.asyncComputed,
 			reconcile: plane,
 			landWithoutObservers,
+			// `flush()` itself ignores a hold (only the scheduled/automatic path respects
+			// `flushHolds`), so an entry mark's own transient publish can force itself visible
+			// even while a held dispatch (a callback prop invoked through capture-slot
+			// dispatch) is batching everything else.
+			flush: () => flush(),
 		});
 		if (held) asyncPlane!.holdInputs(held);
 		if (asyncComputed) asyncPlane!.define(asyncComputed);

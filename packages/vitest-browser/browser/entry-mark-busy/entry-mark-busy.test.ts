@@ -1,11 +1,18 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
+import { ChildCallsProp } from './child-calls-prop.tsrx';
 import { EarlyReturn } from './early-return.tsrx';
 import { FailingSave } from './failing-save.tsrx';
+import { NestedWrappers } from './nested-wrappers.tsrx';
 import { SubmitMark } from './submit-mark.tsrx';
 import { SyncKeyInput } from './sync-key-input.tsrx';
 import { TwoClicks } from './two-clicks.tsrx';
 import { UnrelatedWrite } from './unrelated-write.tsrx';
+import { WrapperEarlyReturn } from './wrapper-early-return.tsrx';
+import { WrapperFailingSave } from './wrapper-failing-save.tsrx';
+import { WrapperImported } from './wrapper-imported.tsrx';
+import { WrapperSameFile } from './wrapper-same-file.tsrx';
+import { WrapperSpread } from './wrapper-spread.tsrx';
 
 // The compiler marks a visible async value busy from the moment a handler that writes one of its
 // key's inputs starts, not from the write itself (goals/async-error-states/submit-quiet-design.md
@@ -206,4 +213,109 @@ test('CSR: two clicks during the same wait both land, and the mark never drops b
 
 test('SSR: two clicks during the same wait both land, and the mark never drops between them', async () => {
 	await twoClicksScenario(await renderSSR(TwoClicks));
+});
+
+// The handler is authored on a component's prop rather than directly on the native element; the
+// mark has to start at the click regardless of how many components forward it on the way down.
+test('CSR: a handler forwarded through a same-file wrapper component is marked from the click', async () => {
+	await submitMarkScenario(await render(WrapperSameFile));
+});
+
+test('SSR: a handler forwarded through a same-file wrapper component is marked from the click', async () => {
+	await submitMarkScenario(await renderSSR(WrapperSameFile));
+});
+
+test('CSR: a handler forwarded through an imported wrapper component is marked from the click', async () => {
+	await submitMarkScenario(await render(WrapperImported));
+});
+
+test('SSR: a handler forwarded through an imported wrapper component is marked from the click', async () => {
+	await submitMarkScenario(await renderSSR(WrapperImported));
+});
+
+test('CSR: a handler reaching the native element only through a props spread is marked from the click', async () => {
+	await submitMarkScenario(await render(WrapperSpread));
+});
+
+test('SSR: a handler reaching the native element only through a props spread is marked from the click', async () => {
+	await submitMarkScenario(await renderSSR(WrapperSpread));
+});
+
+test('CSR: a handler a child calls from its own click handler is marked from the click', async () => {
+	await submitMarkScenario(await render(ChildCallsProp));
+});
+
+test('SSR: a handler a child calls from its own click handler is marked from the click', async () => {
+	await submitMarkScenario(await renderSSR(ChildCallsProp));
+});
+
+test('CSR: a handler forwarded through two nested wrapper components is marked from the click', async () => {
+	await submitMarkScenario(await render(NestedWrappers));
+});
+
+test('SSR: a handler forwarded through two nested wrapper components is marked from the click', async () => {
+	await submitMarkScenario(await renderSSR(NestedWrappers));
+});
+
+async function wrapperEarlyReturnScenario(screen: Screen) {
+	const container = await mounted(screen);
+	await expect.poll(() => text(container, '[data-total]'), poll).toBe('10');
+
+	click(container, '[data-toggle]'); // ok = false
+	click(container, '[data-save]');
+	await expect.poll(() => busy(container, '[data-total]'), poll).toBe(true);
+	expect(text(container, '[data-total]')).toBe('10');
+	await expect.poll(() => busy(container, '[data-total]'), poll).toBe(false);
+	expect(text(container, '[data-total]')).toBe('10');
+
+	// The write path still works once the handler actually reaches it.
+	click(container, '[data-toggle]'); // ok = true
+	click(container, '[data-save]');
+	await expect.poll(() => busy(container, '[data-total]'), poll).toBe(true);
+	await expect.poll(() => text(container, '[data-total]'), poll).toBe('11');
+	await expect.poll(() => busy(container, '[data-total]'), poll).toBe(false);
+}
+
+test('CSR: a forwarded handler that returns before writing clears the mark and refetches nothing', async () => {
+	await wrapperEarlyReturnScenario(await render(WrapperEarlyReturn));
+});
+
+test('SSR: a forwarded handler that returns before writing clears the mark and refetches nothing', async () => {
+	await wrapperEarlyReturnScenario(await renderSSR(WrapperEarlyReturn));
+});
+
+async function wrapperFailingSaveScenario(screen: Screen) {
+	const reasons: unknown[] = [];
+	const onRejection = (event: PromiseRejectionEvent) => {
+		reasons.push(event.reason);
+		event.preventDefault();
+	};
+	const onError = (event: ErrorEvent) => {
+		reasons.push(event.error);
+		event.preventDefault();
+	};
+	window.addEventListener('unhandledrejection', onRejection);
+	window.addEventListener('error', onError);
+	try {
+		const container = await mounted(screen);
+		await expect.poll(() => text(container, '[data-total]'), poll).toBe('20');
+
+		click(container, '[data-save]');
+		await expect.poll(() => busy(container, '[data-total]'), poll).toBe(true);
+		await expect.poll(() => reasons.length, poll).toBeGreaterThan(0);
+		await expect.poll(() => busy(container, '[data-total]'), poll).toBe(false);
+		expect(text(container, '[data-total]')).toBe('20');
+		expect(container.querySelector('[data-failed]')).toBeNull();
+	} finally {
+		window.removeEventListener('unhandledrejection', onRejection);
+		window.removeEventListener('error', onError);
+	}
+}
+
+test('CSR: a forwarded handler whose save fails clears the mark with no refresh', async () => {
+	await wrapperFailingSaveScenario(await render(WrapperFailingSave));
+});
+
+test('SSR: a forwarded handler whose save fails clears the mark with no refresh', async () => {
+	await wrapperFailingSaveScenario(await renderSSR(WrapperFailingSave));
 });

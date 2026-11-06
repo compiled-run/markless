@@ -269,6 +269,12 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		const version = ++node.version;
 		node.entryHold = { version, previous };
 		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
+		// A handler reached through the runtime's capture-slot dispatch runs its whole body
+		// under a held flush (resume-events.ts's `invokeSymbol`), so the scheduled flush above
+		// would otherwise wait for that hold to release - by then `endEntry` may already have
+		// restored the prior snapshot, and the mark was never observably shown. `flush()` itself
+		// ignores a hold, so forcing it here makes the mark visible immediately either way.
+		void internals.flush?.();
 	};
 
 	// The handler that set the hold is done: a real run already replaced it (`node.version`
@@ -280,6 +286,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		node.entryHold = undefined;
 		if (node.version !== hold.version) return;
 		publish(node, hold.previous);
+		void internals.flush?.();
 	};
 
 	return {
