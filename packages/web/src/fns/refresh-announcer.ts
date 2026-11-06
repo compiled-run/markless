@@ -76,8 +76,6 @@ export function refreshChanged(
 	say(text, MARKLESS_REVEAL_TRAIN_CADENCE_MS);
 }
 
-// A quiet refresh (a timer, a socket, any write outside a user action) never says "Updating…" and
-// never joins a burst, but a failure is worth knowing about regardless, so it always speaks on its own.
 export function announceQuietFailure(hosts: Iterable<object>): void {
 	const shown = [...hosts] as Host[];
 	const document = shown[0]?.ownerDocument;

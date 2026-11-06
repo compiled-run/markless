@@ -1046,13 +1046,7 @@ function servedDefinition(
 	);
 }
 
-// The first edge to declare a given component name claims that name in
-// `imports`, matching the name a module with several components already
-// answers by (`Root`/`Trigger`/`Lab` from one import share one entry, however
-// many edges place them). A LATER edge whose own module happens to declare a
-// same-named component keeps its own import-source entry as the only way in:
-// giving it the name too would make a bare-name lookup answer for whichever
-// edge iterated first, exactly the collision this module's own key is for.
+// The first edge to use a name also answers by it, for walks that only know a name; a later same-named one does not.
 function bareNameImportAliases(
 	edges: ReadonlyArray<{ readonly childComponentName: string; readonly importSource?: string }>,
 	importedComponents: ReadonlyMap<string, { readonly source: string; readonly local: string }>,
@@ -1076,9 +1070,7 @@ async function prerenderDataModuleSource(
 	moduleId: string,
 	served?: ServedRenderDataArtifact,
 ): Promise<string> {
-	// Keyed by import source, not by the imported component's declared name:
-	// two different modules can declare a same-named component, and the name
-	// alone cannot tell their imports apart.
+	// Keyed by import source: two modules can declare a same-named component.
 	const importedComponents = new Map<
 		string,
 		{ readonly source: string; readonly local: string }
@@ -1282,11 +1274,6 @@ async function prerenderDataModuleSource(
 		`\trootComponentName: ${JSON.stringify(compiled.renderData.root?.componentName ?? null)},`,
 		'\trenderData: marklessRenderData,',
 		'\tcomponents: marklessPrerenderComponents,',
-		// Keyed by import source first, so two edges whose modules declare a
-		// same-named component resolve to their own import rather than each
-		// other's. Also keyed by the first edge's declared name claiming it, for
-		// callers that still look an import up by name alone - the walks that have
-		// not yet learned an edge's import source and so cannot disambiguate.
 		`\timports: {${[...importedComponents, ...bareNameImportAliases(compiled.semanticGraph.componentEdges, importedComponents)].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
 		'};',
 	].join('\n');

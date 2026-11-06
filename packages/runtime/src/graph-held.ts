@@ -68,9 +68,7 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 		return inputs;
 	};
 
-	// Every ancestor's inputs, stepping back through its kept answers where another ancestor's
-	// current answer disagrees, until every ancestor agrees on one answer each: the newest inputs
-	// they have all answered (Kept answers). `false` when no such answer exists, even with history.
+	// The newest inputs every ancestor has answered, stepping back through kept answers; `false` when none agree.
 	const resolveAncestors = (
 		ancestors: ReadonlySet<RuntimeAsyncComputedNode>,
 	):
@@ -125,8 +123,6 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 		const chosen = new Map<RuntimeAsyncComputedNode, unknown>();
 		const contributedBy = new Map<string, RuntimeAsyncComputedNode[]>();
 		if (!assign(0, pins, chosen, contributedBy)) return false;
-		// A failed refresh that is over keeps the pin for a reader that reads it exactly, but
-		// justifies no broader, conservative hold on its own: a sibling still in flight or kept does.
 		const rejectedOnly = new Set(
 			[...contributedBy]
 				.filter(([, contributors]) => contributors.every((ancestor) => ancestor.snapshot.status === 'rejected'))

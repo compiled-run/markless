@@ -94,9 +94,6 @@ export function collectPublicRenderComponentDefinitions(
 				),
 				id: edge.id,
 				childComponentName: edge.childComponentName,
-				// Distinct modules can declare a component of the same name; the
-				// surface this edge composes is chosen by its import, not by that
-				// name alone, so edges crossing a module boundary carry it.
 				...(edge.importSource ? { importSource: edge.importSource } : {}),
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
 				hostPrefix: componentEdgeHostSegment(edge, input.semanticGraph.componentEdges),

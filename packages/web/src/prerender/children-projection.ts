@@ -214,11 +214,7 @@ export function staticProjectionChildren(
 	return projectionTextContent(projection.statics);
 }
 
-// The surface that publishes a placed child: its own module when the child is
-// declared there, otherwise the module it was imported from. Two modules can
-// declare a component of the same name, so a child reached through an edge
-// that crossed a module boundary is looked up by that edge's import, not by
-// the bare name (see `childEdgeSurface` in evaluator.ts, the edge-shaped twin).
+// The surface that publishes a placed child: its own module, else the import its edge names.
 export function childSurfaceOf(
 	surface: PrerenderDataSurface,
 	componentName: string,

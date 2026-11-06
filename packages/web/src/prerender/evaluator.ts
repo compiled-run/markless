@@ -102,9 +102,7 @@ export type PrerenderDataDefinition = {
 	readonly edges?: ReadonlyArray<{
 		readonly id: string;
 		readonly childComponentName: string;
-		// Present only when this edge crosses a module boundary: which import
-		// answers for it in `surface.imports`, since two modules may declare a
-		// same-named component and `childComponentName` alone cannot tell them apart.
+		// Set when the edge crosses a module boundary: its key in `surface.imports`.
 		readonly importSource?: string;
 		readonly asyncBoundaryId?: string;
 		readonly hostPrefix: string;
@@ -196,11 +194,6 @@ export type PrerenderDataSurface = {
 	readonly imports: Readonly<Record<string, PrerenderDataSurface>>;
 };
 
-/**
- * The key an edge that crosses a module boundary answers through in
- * `surface.imports`. Two modules may declare a component of the same name, so
- * the lookup is keyed by the edge's import rather than by that name.
- */
 export function surfaceImportKey(edge: {
 	readonly childComponentName: string;
 	readonly importSource?: string;
@@ -208,8 +201,6 @@ export function surfaceImportKey(edge: {
 	return edge.importSource ?? edge.childComponentName;
 }
 
-/** The surface that publishes a composed edge's child: its own module when
- * declared there, otherwise the module its import names. */
 export function childEdgeSurface(
 	surface: PrerenderDataSurface,
 	edge: { readonly childComponentName: string; readonly importSource?: string },

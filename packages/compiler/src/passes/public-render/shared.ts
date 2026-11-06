@@ -424,10 +424,7 @@ export type ComponentReference = {
 	readonly localName: string;
 };
 
-// Two edges share one import only when they name the same component of the
-// same module: a name alone can repeat across unrelated modules (two files
-// each declaring a component called the same thing), and the import that
-// answers for an edge is chosen by its source, not by that name.
+// A component name can repeat across modules, so an import is keyed by name and source.
 export function componentReferenceKey(componentName: string, importSource?: string): string {
 	return `${importSource ?? ''}\0${componentName}`;
 }

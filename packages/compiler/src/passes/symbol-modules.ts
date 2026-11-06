@@ -6206,13 +6206,7 @@ export function buildEventHandlerEmission(
 	const source = projection?.source ?? symbol.source;
 
 	const shownReads = symbol.kind === 'event-handler' ? symbol.shownReads : undefined;
-	// A callback-prop symbol carries the same field: whichever component ends up invoking this
-	// handler (a forwarded attribute, a spread, or a call from the component's own handler body),
-	// the mark belongs to the symbol module that owns the body doing the writing.
 	const entryMarks = symbol.entryMarks;
-	// A callback-prop symbol gets the same wrap as an event-handler, for the same reason as
-	// `entryMarks` above: its own open/close around its own body tags its write loud regardless
-	// of forwarding hops or module-load timing. Only a real `attach` lifecycle call is excluded.
 	const markUserAction = symbol.kind !== 'event-handler' || symbol.eventName !== 'attach';
 	const scalarLeaf =
 		input.captureSlots.length === 0 && !shownReads && !entryMarks
@@ -7810,8 +7804,6 @@ function userActionCallStatement(fnName: string): EmissionNode {
 	};
 }
 
-// The handler's own body wrapped so a write it never reaches (an early return, a thrown error)
-// still runs the end call: the mark it opened at entry closes instead of sticking forever.
 function tryFinallyNode(
 	body: ReadonlyArray<EmissionNode>,
 	finalizer: ReadonlyArray<EmissionNode>,

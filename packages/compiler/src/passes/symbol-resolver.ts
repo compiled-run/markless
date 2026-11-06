@@ -1095,9 +1095,7 @@ function resetOrder(
 	return order;
 }
 
-// A visible async value whose key reads a symbol a handler writes, directly or through a sync
-// computed: marking it starts at the handler's own entry, not when the write lands (submit-quiet-
-// design.md Q1 option 1). No runtime guessing — the key's inputs are read off the dependency graph.
+// Async values whose key reads, directly or through sync computeds, a symbol the handler writes.
 function entryMarksResolver(
 	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],
 ): (writes: ReadonlyArray<LoweredStateWrite>) => ReadonlyArray<string> | undefined {

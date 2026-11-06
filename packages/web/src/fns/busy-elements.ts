@@ -47,8 +47,7 @@ function armBindings(startAnchor: object | undefined): Array<readonly [BusyNode,
 const busyByRange = new WeakMap<object, BoundaryBusy>();
 
 // Marks follow the reads still running while the block shows settled content; a first load marks nothing.
-// A quiet refresh (submit-quiet-design.md Q2: a write outside a user action) never joins `busy.pending`,
-// so it never marks busy and never announces — except a failure, which always speaks (recommended default).
+// A quiet refresh never marks busy; only its failure is announced.
 function note(
 	boundary: BusyBoundary,
 	graphNodeId: string,

@@ -169,14 +169,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		const controller = new AbortController();
 		const version = ++node.version;
 		node.controller = controller;
-		// Captured synchronously, in the same turn as the write that triggered this run
-		// (markDirtyComputedDependencies calls `invalidate` before the write returns). A run a
-		// plain read demanded — a first load, or a resumed boundary's server-deferred fetch
-		// continuing on the client — is never quiet: nothing a user did or didn't do triggered
-		// it, so the "a first load marks nothing" rule applies the same way. Nor is a run that
-		// starts while a handler's own entry hold on this node is still open: that hold only ever
-		// opens from a handler's entry (submit-quiet-design.md Q1), so it already proves a
-		// handler, not a timer, is why this node is refreshing.
+		// Read in the writing turn: only a write outside a user action, with no entry hold open, is quiet.
 		node.quiet =
 			!node.entryHold && !!fromWrite && (context.isUserAction ? !context.isUserAction() : false);
 		// A re-run keeps the last good value addressable while pending and after a
@@ -189,7 +182,6 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			const landed = snapshot.status !== 'rejected';
 			if (landed) {
 				if (inputs) {
-					// A source a pinned value still reads keeps the answer it had for the inputs it was fetched with (Kept answers); bounded so a run of switches can't grow it without limit.
 					if (node.valueInputs)
 						node.priorAnswers = [
 							{ value: (node.snapshot as { readonly value?: unknown }).value, inputs: node.valueInputs },
@@ -268,45 +260,28 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 	};
 
 	// A payload-planned pending snapshot still needs its runner started on
-	// first demand; otherwise only idle computeds start. A demanded run is never
-	// write-triggered (submit-quiet-design.md Q2): `invalidate` passes its own
-	// `fromWrite` down for the node a write actually dirtied.
+	// first demand; otherwise only idle computeds start.
 	const demand = (node: RuntimeAsyncComputedNode, fromWrite?: boolean): void => {
 		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node, fromWrite);
 	};
 
-	// Marks a settled node pending before the write that will really refresh it: the key is
-	// unchanged, so `advance()` still runs the real fetch once the write lands, replacing this
-	// snapshot with its own pending one at the same node and leaving the busy mark unbroken.
+	// Same key, so the real run the write starts replaces this pending snapshot with no gap.
 	const markEntry = (node: RuntimeAsyncComputedNode): void => {
 		if (node.entryHold || node.snapshot.status === 'idle' || node.snapshot.status === 'pending')
 			return;
 		const previous = node.snapshot;
 		const version = ++node.version;
 		node.entryHold = { version, previous };
-		// This hold only ever starts from a handler's own entry (submit-quiet-design.md Q1),
-		// which is always a user action; a stale `quiet` left by an earlier, unrelated run must
-		// not leak onto this one, or the busy mark it exists to show would never appear.
 		node.quiet = false;
 		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
-		// A handler reached through the runtime's capture-slot dispatch runs its whole body
-		// under a held flush (resume-events.ts's `invokeSymbol`), so the scheduled flush above
-		// would otherwise wait for that hold to release - by then `endEntry` may already have
-		// restored the prior snapshot, and the mark was never observably shown. `flush()` itself
-		// ignores a hold, so forcing it here makes the mark visible immediately either way.
+		// A callback prop runs under a held flush (resume-events.ts `invokeSymbol`); flush past it.
 		void internals.flush?.();
 	};
 
-	// The handler that set the hold is done: a real run already replaced it (`node.version`
-	// moved on), so its own settle clears the mark; otherwise nothing reached the write, so the
-	// hold is undone and the node answers exactly what it did before it was marked.
 	const endEntry = (node: RuntimeAsyncComputedNode): void => {
 		const hold = node.entryHold;
 		if (!hold) return;
-		// A write this handler made may still be cascading through a flush a cell-backed
-		// computed's own deferred recompute needs (graph.ts's `markUserActionEnd` latches
-		// `isUserAction()` across that same flush): `node.version` has not moved yet, but it is
-		// not safe to conclude the write never reached anything until that flush drains.
+		// A cell-backed computed between the write and this key only recomputes in the next flush.
 		if (node.version === hold.version && internals.hasPendingFlush?.()) {
 			void internals.flush?.().then(() => {
 				if (node.entryHold === hold) endEntry(node);

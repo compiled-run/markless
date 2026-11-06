@@ -59,7 +59,7 @@ export type AsyncComputedPlaneInternals = {
 	readonly landWithoutObservers: (land: () => void) => void;
 	/** Runs the flush now, ignoring any `holdFlush` in effect; only `markEntry`/`endEntry` use it, to stay visible through a held dispatch. */
 	readonly flush?: () => Promise<void>;
-	/** True while an event handler's own synchronous turn (start through its awaited continuations) is running (submit-quiet-design.md Q2). */
+	/** True while an event handler's own turn, through its awaited continuations, is running. */
 	readonly isUserAction?: () => boolean;
 	/** True while a write's dirty paths are still queued or being processed; `endEntry` waits on this before concluding a handler's write never reached anything. */
 	readonly hasPendingFlush?: () => boolean;
@@ -73,7 +73,7 @@ export type AsyncComputedPlane = {
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
 	/** Re-runs a rejected async value with the key it already has; false when it is not rejected. */
 	readonly rerun: (graphNodeId: string) => boolean;
-	/** Marks a settled value busy ahead of the write that will really refresh it (submit-quiet-design.md Q1). */
+	/** Marks a settled value busy ahead of the write that will really refresh it. */
 	readonly markEntry: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
 	readonly endEntry: (graphNodeId: string) => void;
@@ -126,7 +126,7 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly value?: unknown;
 			/** The key `value` was fetched for; present only when a settled value exists. */
 			readonly valueKey?: unknown;
-			/** This run started outside a user action: no busy mark, no announcement (submit-quiet-design.md Q2). */
+			/** This run started outside a user action: no busy mark, no announcement. */
 			readonly quiet?: boolean;
 	  }
 	| {
@@ -358,11 +358,11 @@ export type RuntimeGraph = {
 	) => boolean;
 	/** Re-runs a rejected async value with the key it already has; false or undefined when it is not rejected. */
 	readonly rerun?: (graphNodeId: string) => boolean | undefined;
-	/** Marks a settled value busy ahead of the write that will really refresh it (submit-quiet-design.md Q1). */
+	/** Marks a settled value busy ahead of the write that will really refresh it. */
 	readonly markEntry?: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
 	readonly endEntry?: (graphNodeId: string) => void;
-	/** An event handler's own turn started: a write made before the matching `markUserActionEnd` starts a loud refresh (submit-quiet-design.md Q2). Nests, so a resumed continuation inside another handler's wait still counts. */
+	/** An event handler's own turn started: a write made before the matching `markUserActionEnd` starts a loud refresh. Nests, so a resumed continuation inside another handler's wait still counts. */
 	readonly markUserActionStart?: () => void;
 	/** Ends the turn `markUserActionStart` opened; a write made once every opener has ended starts a quiet refresh. */
 	readonly markUserActionEnd?: () => void;
@@ -405,14 +405,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	let flushing = false;
 	// Nests: a handler whose own wait overlaps another handler's stays counted until both end.
 	let userActionDepth = 0;
-	// Set only when a handler's own end finds its own write still unprocessed (a cell-backed
-	// computed's cascade a reconcile plane defers to `recomputeSubscribed`, not synchronous with
-	// the write); cleared once that one flush pass resolves, so an unrelated later write never
-	// inherits it once that bounded grace period ends.
+	// A handler ended with its writes still queued: they stay loud for that one flush pass only.
 	let flushUserAction = false;
 	let notifyingWrite = false;
 	let activeFlush: Promise<void> | undefined;
 	let flushHolds = 0;
+	const hasPendingFlush = () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined;
 
 	for (const cell of input.cells) {
 		cells.set(cell.graphNodeId, cell.value);
@@ -577,13 +575,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			asyncComputed: input.asyncComputed,
 			reconcile: plane,
 			landWithoutObservers,
-			// `flush()` itself ignores a hold (only the scheduled/automatic path respects
-			// `flushHolds`), so an entry mark's own transient publish can force itself visible
-			// even while a held dispatch (a callback prop invoked through capture-slot
-			// dispatch) is batching everything else.
 			flush: () => flush(),
 			isUserAction: () => userActionDepth > 0 || flushUserAction,
-			hasPendingFlush: () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined,
+			hasPendingFlush,
 		});
 		if (held) asyncPlane!.holdInputs(held);
 		if (asyncComputed) asyncPlane!.define(asyncComputed);
@@ -766,9 +760,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		markUserActionStart: () => void userActionDepth++,
 		markUserActionEnd: () => {
 			userActionDepth = Math.max(0, userActionDepth - 1);
-			// The handler's own write(s) may still be queued (or mid-cascade) for a cell-backed
-			// computed's deferred recompute; keep `isUserAction()` true only for that one flush
-			// pass, not indefinitely, so a later, unrelated write never rides along.
 			if (userActionDepth === 0 && (flushScheduled || flushing || dirtyPaths.length > 0)) {
 				flushUserAction = true;
 				void flush().then(() => {
@@ -813,7 +804,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				if (index >= 0) writeObservers.splice(index, 1);
 			};
 		},
-		hasPendingFlush: () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined,
+		hasPendingFlush,
 		holdFlush() {
 			flushHolds++;
 			return () => {

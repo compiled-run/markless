@@ -1918,8 +1918,7 @@ export type PlannedSymbol =
 				readonly graphNodeId: string;
 				readonly path: ReadonlyArray<string>;
 			}>;
-			// Async values whose key reads a symbol this handler writes: marked busy from the
-			// handler's own entry (goals/async-error-states/submit-quiet-design.md Q1 option 1).
+			// Async values whose key reads a symbol this handler writes, marked busy from its entry.
 			readonly entryMarks?: ReadonlyArray<string>;
 			// `@catch (error, reset)` names the handler calls, each with the async values its block
 			// reads, upstream first, every one followed by the async values it reads itself.
@@ -1941,8 +1940,7 @@ export type PlannedSymbol =
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
-			// Same mark as an event-handler symbol's: a callback prop's body is wherever it is
-			// authored, however many components forward it before it reaches a native listener.
+			// Async values whose key reads a symbol this callback writes, marked busy from its entry.
 			readonly entryMarks?: ReadonlyArray<string>;
 	  }
 	| {

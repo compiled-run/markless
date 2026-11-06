@@ -5,7 +5,7 @@ type ScopedGraph = RuntimeGraph & {
 	readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 };
 
-/** A handler writing an input of a visible async value's key marks it busy from the moment it starts, not from the write (submit-quiet-design.md Q1 option 1). */
+/** Marks each async value busy from the handler's entry, ahead of the write that refreshes it. */
 export function marklessEntryMarkStart(
 	context: EntryMarkContext,
 	graphNodeIds: ReadonlyArray<string>,
