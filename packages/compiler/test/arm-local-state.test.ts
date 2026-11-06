@@ -1,10 +1,7 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph, compileTsrxModule } from '../src/index.ts';
 
-// Spec 01 "Conditional identity": a state() written directly in an @if or @switch
-// arm body is a cell of that arm. It is planned like any cell, and the branch
-// record carries its starting value so the flip writes it back each time the arm
-// opens. A starting value only the component could compute keeps the refusal.
+// Spec 01 "Conditional identity": a literal-valued state() in an arm body is seeded back to its starting value each time the arm opens.
 
 const panelSource = `
 import { state } from '@markless/core';

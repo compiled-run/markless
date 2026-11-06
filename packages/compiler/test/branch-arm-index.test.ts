@@ -1,10 +1,7 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph, compileTsrxModule } from '../src/index.ts';
 
-// An `@else if` chain and a `@switch` whose case tests are expressions are ONE
-// branch site each, picked by arm index: one computed asks every test in order,
-// and the flip module rebuilds the chosen arm from compiled markup without
-// escalating to a browser re-render of the page.
+// An `@else if` chain and a condition-case `@switch` are one branch site each, picked by arm index and rebuilt from markup without escalating.
 
 const chainSource = `
 import { state } from '@markless/core';
