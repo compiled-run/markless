@@ -761,11 +761,108 @@ export function docRules(keys: readonly string[], root: string): string {
 		.join('\n\n');
 }
 
+
+/** The preview's skin: the `<Code>` block's binder frame and paper, with dashed rules between its bands. */
+function binder(card: string): string {
+	return `			${card} {
+				--pg-band: color-mix(in oklch, var(--ink) 70%, transparent);
+				border: 2px solid transparent;
+				border-image: url('/notebook/frame-plain.png') 40 47 50 72 / 28.6px 33.6px 35.7px 51.4px / 7.1px 14.3px 19.3px 17.9px round;
+				border-radius: 0;
+				box-shadow: none;
+				background: var(--paper);
+				padding: 0.25rem 1.1rem 0.4rem 2.6rem;
+			}
+
+			html.dark ${card} {
+				--paper: var(--raised);
+				border-image-source: url('/notebook/frame-dark-plain.png');
+			}
+
+			@media (max-width: 600px) {
+				${card} {
+					border-radius: 0;
+					box-shadow: none;
+					padding-left: 1.5rem;
+				}
+			}
+
+			${card}::before {
+				position: absolute;
+				inset-block: 0;
+				inset-inline-start: -2px;
+				width: 51.4px;
+				background: url('/notebook/frame-ring.png') 0 6% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 20% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 35% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 50% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 65% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 80% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				content: '';
+				pointer-events: none;
+			}
+
+			html.dark ${card}::before {
+				background: url('/notebook/frame-dark-ring.png') 0 6% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 20% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 35% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 50% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 65% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 80% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+			}
+
+			@media (max-width: 600px) {
+				${card}::before {
+					background: url('/notebook/frame-ring.png') 0 8% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 30% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 52% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 74% / 51.4px 41.4px no-repeat, url('/notebook/frame-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				}
+
+				html.dark ${card}::before {
+					background: url('/notebook/frame-dark-ring.png') 0 8% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 30% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 52% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 74% / 51.4px 41.4px no-repeat, url('/notebook/frame-dark-ring.png') 0 94% / 51.4px 41.4px no-repeat;
+				}
+			}
+
+			${card} .pg-controls {
+				border-block-end: 2px dashed var(--pg-band);
+			}
+
+			${card} .pg-rest {
+				padding-block-start: 0.9em;
+				border-block-start: 0;
+			}
+
+			${card} :is(.pg-quick, .pg-rest) {
+				gap: 0.9em 2em;
+			}
+
+
+
+			${card} .pg-clamp {
+				border-block-start: 2px dashed var(--pg-band);
+				border-radius: 0;
+			}
+
+			${card} .pg-tab {
+				border: 2px solid var(--ink);
+				border-block-end: 0;
+				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
+				background: color-mix(in oklch, var(--ink) 9%, var(--paper));
+			}
+
+			${card} .pg-tab[ui-selected] {
+				background: var(--paper);
+				font-weight: 700;
+			}
+
+			${card} .pg-tab + .pg-tab {
+				margin-inline-start: -0.3rem;
+			}
+
+			${card} .pg-fade {
+				background: linear-gradient(to bottom, transparent, var(--paper) 80%);
+			}
+
+			${card} .pg-expand {
+				background: var(--paper);
+			}`;
+}
+
 export const CHROME_CSS = `${CONTROLS_CSS}
 
 ${STAGE_CSS}
 
 ${CODE_CSS}
+
+${binder('.pg')}
 
 ${docCss('.pg')}`;
 
