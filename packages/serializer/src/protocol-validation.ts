@@ -541,6 +541,11 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 			assertNonNegativeIntegerField(repeat, 'rowStartOffset', context);
 		if (repeat.rowEndOffset !== undefined)
 			assertNonNegativeIntegerField(repeat, 'rowEndOffset', context);
+		if (repeat.rowRange !== undefined && repeat.rowRange !== true)
+			throw invalidPayloadShapeError(
+				'markless/view',
+				`Invalid ${context}: expected rowRange true when present.`,
+			);
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
 		assertOptionalStringField(repeat, 'indexName', context);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);

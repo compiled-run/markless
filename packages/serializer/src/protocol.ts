@@ -571,6 +571,15 @@ export type ProtocolViewPayload = {
 		 */
 		readonly rowEndOffset?: number;
 		/**
+		 * Each row renders between a pair of row comments, because its top level is
+		 * not exactly one element: a fragment, text, a bare `@try`, or a component
+		 * whose template is one of those. The browser finds, moves, adds and removes
+		 * a row as everything between its comments; offsets still count only the
+		 * elements outside every row, and `hostPath`s are row-relative from the
+		 * first node inside the comments. Pay-per-use: one-element rows omit it.
+		 */
+		readonly rowRange?: true;
+		/**
 		 * The browser can never change these rows: the collection and every value a
 		 * row shows are fixed once the page is served, so the record carries no row
 		 * markup and resume neither follows the collection nor loads row-building

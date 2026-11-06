@@ -2,6 +2,8 @@ import {
 	PROTOCOL_BLOCK_START_COMMENT,
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
+	PROTOCOL_ROW_END_COMMENT,
+	PROTOCOL_ROW_START_COMMENT,
 } from '../../serializer/src/protocol-page-markers.ts';
 import type { ResumeDomComment, ResumeDomElement, ResumeDomNode } from './resume-types.ts';
 
@@ -11,6 +13,12 @@ export function isArmBranchAnchorComment(comment: ResumeDomComment): boolean {
 	const text = comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
 	return text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:');
 }
+
+// Page anchor indexes skip arm-branch anchors and the row comments a list adds per row.
+export const isUncountedComment = (comment: ResumeDomComment): boolean =>
+	isArmBranchAnchorComment(comment) ||
+	comment.data === PROTOCOL_ROW_START_COMMENT ||
+	comment.data === PROTOCOL_ROW_END_COMMENT;
 
 // The page's children: between the markers an author's element as the container carries.
 export function pageNodes<N extends { nodeType?: number }>(root: {
@@ -31,7 +39,7 @@ export function pageCommentCensus(root: ResumeDomNode, live?: boolean): ResumeDo
 	const comments: ResumeDomComment[] = [];
 	(function visit(nodes: ArrayLike<ResumeDomNode>): void {
 		for (const node of Array.from(nodes)) {
-			if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+			if (node.nodeType === 8 && !isUncountedComment(node as ResumeDomComment))
 				comments.push(node as ResumeDomComment);
 			visit(node.childNodes ?? []);
 		}

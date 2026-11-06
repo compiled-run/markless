@@ -772,8 +772,8 @@ test('the interface entry grows only the fields this component needs', async () 
 	]);
 });
 
-// A row moves as its one element, so a @try standing beside that element keeps the row from minting.
-test('an imported row component whose top level is a @try ships no identity', async () => {
+// A bare @try IS the row, so the row renders between row comments and moves as everything between them.
+test('an imported row component whose top level is a @try ships identity and a ranged row', async () => {
 	const bareTry = `import { computed } from '@markless/core';
 export function Row({ item }) @{
 	const details = computed(async () => ({ title: item.id }));
@@ -783,7 +783,9 @@ export function Row({ item }) @{
 	const child = await buildSemanticGraph({ filename: 'src/row.tsrx', source: bareTry });
 	expect(child.moduleGraphInterface.render.components[0]?.rootBoundary).toBe(true);
 	const view = await viewOfImportedRow(bareTry, importingApp);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+	expect(view.keyedRepeats?.[0]?.rowRange).toBe(true);
+	expect(view.keyedRepeats?.[0]?.rowComponent).not.toHaveProperty('slotPath');
 });
 
 test('the same top-level @try inside a row element still mints the row', async () => {
@@ -804,7 +806,7 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-test('a component whose top level renders a child with a top-level @try carries the fact up', async () => {
+test('a component whose top level renders a child with a top-level @try carries its ranged root up', async () => {
 	const leaf = await buildSemanticGraph({
 		filename: 'src/leaf.tsrx',
 		source: `import { computed } from '@markless/core';
@@ -829,6 +831,8 @@ export function Row({ item }) @{
 		source: importingApp,
 		importedModuleInterfaces: { './row.tsrx': middle.moduleGraphInterface },
 	});
+	expect(middle.moduleGraphInterface.render.components[0]?.rangeRoot).toBe(true);
 	const view = viewFrom(semanticGraph, { './row.tsrx': middle.moduleGraphInterface });
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+	expect(view.keyedRepeats?.[0]?.rowRange).toBe(true);
 });

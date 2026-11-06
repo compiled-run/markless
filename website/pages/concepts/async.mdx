@@ -338,23 +338,20 @@ the old row goes away and the new one starts from its `@pending` block:
 }
 ```
 
-Each row of a list must be one element, so `Feed` wraps its `@try` in one:
+`Feed` can be its `@try` and nothing else. A row that is not one element sits between two comment
+markers on the page, and the browser moves, adds and removes everything between them:
 
 ```tsrx
 export default function Feed({ topic }: { topic: string }) @{
 	const posts = computed(async () => await loadPosts(topic));
 
-	<section>
-		@try {
-			<p>{posts.length} posts about {topic}</p>
-		} @pending {
-			<p>Loading...</p>
-		}
-	</section>
+	@try {
+		<p>{posts.length} posts about {topic}</p>
+	} @pending {
+		<p>Loading...</p>
+	}
 }
 ```
-
-Without the `<section>`, the build stops with `MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT`.
 
 ## Read state before or after an await
 
@@ -378,7 +375,7 @@ These shapes stop the build:
 | A read of the async value outside every `@try` | [`MARKLESS_ASYNC_BOUNDARY_REQUIRED`](/errors/MARKLESS_ASYNC_BOUNDARY_REQUIRED) |
 | `@pending` written after `@catch` | [`MARKLESS_ASYNC_ARM_ORDER`](/errors/MARKLESS_ASYNC_ARM_ORDER) |
 | `@catch` after an element instead of a `@try` | [`MARKLESS_ASYNC_CATCH_WITHOUT_TRY`](/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY) |
-| A `@for` row that is not one element | [`MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT`](/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT) |
+| A `@for` row that is not one element and holds an `@if`, another `@for`, an `element()` handle or a behavior | [`MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT`](/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT) |
 | A lookup keyed by the answer, like `shelf[(await loadPick()).id]` | [`MARKLESS_ASYNC_POST_AWAIT_READ`](/errors/MARKLESS_ASYNC_POST_AWAIT_READ) |
 
 [`MARKLESS_ASYNC_INPUT_BESIDE_VALUE`](/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE) is a warning, not

@@ -10,6 +10,7 @@ import type {
 	SymbolResolverPlan,
 } from '../../artifacts.ts';
 import { resolveBoundaryRunners } from '../public-render/boundary-runner.ts';
+import { rowRangeRefusal } from '../row-range.ts';
 import { repeatRowSiblingElements } from './row-position.ts';
 
 // The link-stage half of this pass: what an emitted render-data module carries
@@ -301,6 +302,10 @@ function repeatRecord(
 		rowStartOffset === 'unknown' && repeat.projectedElementsBefore === undefined
 			? repeatRowEndOffset(chunks, repeat.id)
 			: undefined;
+	const rowRange =
+		repeat.rowRange &&
+		repeat.collectionGraphNodeId !== undefined &&
+		rowRangeRefusal(semanticGraph, repeat.id) === null;
 	const payloadRepeat = payloadArena?.view.keyedRepeats.find((item) => item.id === repeat.id);
 	const rowElementHandles = payloadRepeat?.rowElementHandles?.flatMap((handle) => {
 		const hostPath = rowHostPaths.get(handle.hostNodeId);
@@ -343,6 +348,7 @@ function repeatRecord(
 		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
 		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,
+		...(rowRange ? { rowRange: true as const } : {}),
 		...(rowStartOffset === 0 ? {} : { rowStartOffset }),
 		...(typeof rowEndOffset === 'number' ? { rowEndOffset } : {}),
 		...(parent ? { parentPath: relativePath(parent.coordinate.path) } : {}),
@@ -351,6 +357,6 @@ function repeatRecord(
 		...(rowElementHandles && rowElementHandles.length > 0 ? { rowElementHandles } : {}),
 		...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
 		directSupported:
-			repeat.indexName === undefined && repeat.collectionGraphNodeId !== undefined,
+			!rowRange && repeat.indexName === undefined && repeat.collectionGraphNodeId !== undefined,
 	};
 }

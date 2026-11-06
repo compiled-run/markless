@@ -41,8 +41,8 @@ test.each([
 	],
 	['@catch after an element', '<p>x</p> @catch { <p>y</p> }', 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY'],
 	[
-		'a keyed row of two elements',
-		'@try { <ul>@for (const row of report.rows; key row.id) { <><li>a</li><li>b</li></> }</ul> } @pending { <p>…</p> }',
+		'a keyed row of two nodes that holds an @if',
+		'@try { <ul>@for (const row of report.rows; key row.id) { <>@if (row.id) { <li>a</li> } @else { <li>c</li> }<li>b</li></> }</ul> } @pending { <p>…</p> }',
 		'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
 	],
 ])('%s stops the build', async (_name, body, code) => {

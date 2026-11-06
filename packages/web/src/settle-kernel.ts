@@ -94,6 +94,7 @@ type SurfaceLike = {
 			readonly repeatId: string;
 			readonly collectionGraphNodeId?: string;
 			readonly collectionPath?: ReadonlyArray<string>;
+			readonly rowRange?: true;
 		}>;
 	};
 	readonly components: Readonly<Record<string, ComponentLike>>;
@@ -360,6 +361,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 				throw new SettleKernelUnsupportedError(
 					`repeat collection missing: ${slot.repeatId}`,
 				);
+			if (record.rowRange) throw new SettleKernelUnsupportedError(`ranged rows: ${slot.repeatId}`);
 			const collection = readAuthored(
 				record.collectionGraphNodeId,
 				record.collectionPath ?? [],

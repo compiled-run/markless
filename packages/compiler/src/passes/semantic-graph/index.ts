@@ -89,7 +89,7 @@ import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
 import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
 import { collectAsyncInputBesideValueDiagnostics } from './async-refresh-facts.ts';
-import { templateHasBareTryRoot } from '../row-mint.ts';
+import { chunkRootIsOneElement } from '../row-range.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -253,6 +253,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 			? { importedModuleInterfaces: input.importedModuleInterfaces }
 			: {}),
 	};
+	for (const [at, repeat] of graph.keyedRepeats.entries())
+		if (!chunkRootIsOneElement(constructReachInput, `repeat:${repeat.id}:row`))
+			graph.keyedRepeats[at] = { ...repeat, rowRange: true };
 	// Published for a module that routes a roster count into one of these props:
 	// the count is a placeholder until the page composes, and only this module
 	// knows what its own components do with the value once it lands.
@@ -321,7 +324,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),
-						...(templateHasBareTryRoot(root) ? { bareTryRoot: true as const } : {}),
+						...(chunkRootIsOneElement(constructReachInput, root.id) ? {} : { rangeRoot: true as const }),
 						...(propSpends.get(component.name)?.length
 							? { propSpends: propSpends.get(component.name)! }
 							: {}),

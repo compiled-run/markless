@@ -58,7 +58,7 @@ import { rawElementText } from '../../ast/raw-text.ts';
 import { aliasedItemPath, repeatItemBinding, type RepeatItemAlias } from './repeat-item-binding.ts';
 
 // HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
-const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
+export const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
 	'area',
 	'base',
 	'br',

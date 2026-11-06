@@ -412,8 +412,8 @@ export type ModuleGraphInterfaceArtifact = {
 			 * rows need the container as their parent.
 			 */
 			readonly containerRepeat?: true;
-			/** Present when the template's top level is an @try with no element around it. */
-			readonly bareTryRoot?: true;
+			/** Present when the template's top level is not exactly one element: a fragment, text, or an @try with no element around it. */
+			readonly rangeRoot?: true;
 			/**
 			 * Present when this component's tree holds a keyed repeat whose rows fill
 			 * expression slots through a render-data reader, so a page placing it
@@ -759,6 +759,8 @@ export type SemanticKeyedRepeat = {
 	readonly enclosingRepeatId?: string;
 	// Set when the collection is a path on the enclosing row item (`group.items`).
 	readonly enclosingItemPath?: ReadonlyArray<string>;
+	// Set when a row's top level is not exactly one element: the browser tracks each row between row comments.
+	readonly rowRange?: true;
 };
 
 // A reactive branch site (@if or @switch) sharing the unified document-order
@@ -1539,6 +1541,8 @@ export type RenderDataRepeat = {
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
 	readonly rowElementCount: number;
+	// Each row renders between a pair of row comments: its top level is not exactly one element.
+	readonly rowRange?: true;
 	// How many element children of the parent the rows start after. Absent is the
 	// ordinary case - the rows start the parent - so it costs nothing to say.
 	// 'unknown' means the prefix holds a sibling whose element count is not a
