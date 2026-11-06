@@ -685,13 +685,7 @@ function findDirectReturnArgument(body: AnyNode | undefined): AnyNode | undefine
 	return undefined;
 }
 
-/**
- * The arm a state() belongs to when it is written directly in an @if/@switch
- * arm body with a starting value the compiler can read. The arm's flip writes
- * that value back each time the arm opens, so the cell starts fresh (spec 01,
- * "Conditional identity"). Any other site, or a starting value only the
- * component could compute, keeps the creation-site refusal.
- */
+// A state() written directly in an arm body with a starting value the compiler can read restarts each time the arm opens.
 function armLocalStateScope(
 	declaration: AnyNode,
 	init: AnyNode,

@@ -134,12 +134,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 	}
 }
 
-/**
- * An `@if ... @else if ... @else` chain is one site whose arm is an INDEX: one
- * synthetic computed asks the tests in order and answers the first that holds,
- * or the final arm's index (the `@else`, or the empty arm standing in for it).
- * `armTests` lists every arm's index so the switch-site picker selects by it.
- */
+// An `@else if` chain is one site picked by index; a missing final `@else` is an empty last arm.
 function collectIfChainSite(node: AnyNode, state: WalkState): void {
 	const chain = ifChainOf(node);
 	for (const test of chain.tests)
@@ -172,12 +167,7 @@ function collectIfChainSite(node: AnyNode, state: WalkState): void {
 	});
 }
 
-/**
- * A `@switch` whose case tests are not all literals (`@switch (true) { @case
- * charge > 50: ... }`) also selects its arm by index: the computed compares the
- * discriminant with each case test in order, the way `switch` does, and answers
- * the `@default` arm's index (or one past the last arm) when none is equal.
- */
+// A `@switch` with non-literal case tests is picked by index, comparing like `switch`; no match answers the `@default` arm or one past the last.
 function switchArmIndexTest(
 	node: AnyNode,
 	state: WalkState,

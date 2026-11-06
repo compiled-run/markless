@@ -1,11 +1,6 @@
 import { asNodes, type AnyNode } from '../../ast/nodes.ts';
 
-/**
- * One `@if ... @else if ... @else` chain, read off the parser's nesting: the
- * parser hands `@else if` back as a JSXIfExpression in the previous link's
- * `alternate`. The chain is ONE branch site with one arm per link plus the
- * final `@else` (an empty arm when there is none), never a site nested in an arm.
- */
+// The parser nests each `@else if` in the previous link's `alternate`; the whole chain is one branch site.
 export type IfChain = {
 	readonly tests: ReadonlyArray<AnyNode>;
 	// `tests.length + 1` entries; the last is the final @else or undefined.

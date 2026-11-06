@@ -768,10 +768,7 @@ export type SemanticBranchSite = {
 	// site tests THAT node; `testSource` stays the authored text so a diagnostic
 	// quotes what the file says rather than a generated name.
 	readonly testComputedGraphNodeId?: string;
-	// Set when the arm is picked by INDEX rather than by the test's value: an
-	// `@else if` chain, or a `@switch` whose case tests are not all literals. The
-	// expression answers the arm index from the authored tests in order, and
-	// `armTests` lists every arm's index. Evaluated wherever `testSource` would be.
+	// An `@else if` chain or a non-literal-case `@switch` answers its arm index here, evaluated in place of `testSource`.
 	readonly armIndexSource?: string;
 	// The test reads an enclosing row's item, whose name shadows a graph binding.
 	readonly testReadsRowItem?: true;

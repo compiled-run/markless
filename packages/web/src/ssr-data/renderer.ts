@@ -171,8 +171,7 @@ export type SsrRenderData = {
 		// The authored test, for an arm the compiler could not reduce to one graph
 		// read: the browser answers it through the component's compiled reader.
 		readonly testSource?: string;
-		// An index-picked arm (`@else if` chain, condition-case `@switch`): the
-		// expression answering the arm index, read in place of `testSource`.
+		// An `@else if` chain or condition-case `@switch` answers its arm index here, read in place of `testSource`.
 		readonly armIndexSource?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
 	}>;
