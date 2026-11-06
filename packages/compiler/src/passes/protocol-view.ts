@@ -31,6 +31,7 @@ import {
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 import { addressedHostNodeIds } from '../artifact-helpers/addressed-hosts.ts';
 import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
+import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
 	if (!input.renderData) {
@@ -832,11 +833,7 @@ function mintableRowTemplate(
 			? {
 					graph: input.semanticGraph,
 					componentName: chunk.componentName,
-					rowNames: new Set(
-						[semanticRepeat.itemName, semanticRepeat.indexName].filter(
-							(name): name is string => name !== undefined,
-						),
-					),
+					rowNames: new Set(rowBoundNames(semanticRepeat)),
 				}
 			: undefined;
 	const slotValue = (slot: SemanticMarkupSlot) =>
@@ -1156,9 +1153,7 @@ function rowComponentMint(
 	if (mintableRowTemplate(input, render, null).rowTemplate) return null;
 	return resolveRowChunkMint({
 		...rowMintInput,
-		rowNames: [render.itemName, semanticRepeat?.indexName].filter(
-			(name): name is string => name !== undefined,
-		),
+		rowNames: semanticRepeat ? rowBoundNames(semanticRepeat) : [render.itemName],
 	});
 }
 

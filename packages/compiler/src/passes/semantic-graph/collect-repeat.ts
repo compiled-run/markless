@@ -22,14 +22,11 @@ import {
 	repeatFrozenRowsDiagnostic,
 	repeatKeyIsIndexDiagnostic,
 	repeatKeyRequiredDiagnostic,
+	repeatItemPatternUnsupportedDiagnostic,
 	repeatKeyUnstableDiagnostic,
 	repeatRowHandlersUnwiredDiagnostic,
 } from './diagnostics.ts';
-import {
-	firstReactiveCollectionRead,
-	firstReactiveRowRead,
-	repeatRowNames,
-} from './repeat-reactivity.ts';
+import { firstReactiveCollectionRead, firstReactiveRowRead } from './repeat-reactivity.ts';
 import {
 	enclosingKeyedRepeat,
 	enclosingRowItemPath,
@@ -37,13 +34,32 @@ import {
 	liftStaticCollection,
 	nestedRowHandlers,
 } from './static-repeat-lift.ts';
+import {
+	aliasedItemPath,
+	repeatItemBinding,
+	repeatItemPattern,
+	rowBoundNames,
+} from './repeat-item-binding.ts';
 import type { WalkState } from './types.ts';
 
 export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | null {
-	const itemName = repeatItemName(node);
+	const binding = repeatItemBinding(node);
 	const collectionNode = node.right as AnyNode | undefined;
 	const keyNode = node.key as AnyNode | undefined;
-	if (!itemName || !collectionNode) return null;
+	if (!binding) {
+		const pattern = repeatItemPattern(node);
+		if (pattern && collectionNode)
+			state.graph.diagnostics.push(
+				repeatItemPatternUnsupportedDiagnostic({
+					pattern,
+					patternSource: expressionSource(pattern, state.source) ?? '',
+					filename: state.filename,
+				}),
+			);
+		return null;
+	}
+	const { itemName, aliases } = binding;
+	if (!collectionNode) return null;
 
 	const collectionSource = expressionSource(collectionNode, state.source);
 	// No readable source means no graph path can resolve from it either, so the
@@ -74,7 +90,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	if (!keySource) return null;
 
 	const indexName = getIdentifierName(node.index as AnyNode | undefined);
-	const keyPath = itemKeyPath(itemName, keySource);
+	const keyPath = itemKeyPath(itemName, keySource) ?? aliasedItemPath(aliases, keySource);
 	const isIndexKey = Boolean(indexName && keySource === indexName);
 	if (!keyPath && !isIndexKey) {
 		state.graph.diagnostics.push(
@@ -189,7 +205,17 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	// rows are static. Once a row reads something a later write can move, the
 	// collection is lifted onto the graph so those rows reconcile like any other.
 	if (!collection && !enclosingItemPath) {
-		const reactiveRead = firstReactiveRowRead(node, state, repeatRowNames(itemName, indexName));
+		const reactiveRead = firstReactiveRowRead(
+			node,
+			state,
+			new Set(
+				rowBoundNames({
+					itemName,
+					itemAliases: aliases,
+					...(indexName ? { indexName } : {}),
+				}),
+			),
+		);
 		// A collection that itself reads movable state changes which rows exist, so it is lifted too.
 		const movesRows =
 			!reactiveRead && !enclosing && firstReactiveCollectionRead(collectionNode, state);
@@ -223,6 +249,13 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 			(state.currentProjectionScope ? '' : PROTOCOL_CONTAINER_HOST_NODE_ID),
 		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
 		itemName,
+		...(aliases.length
+			? {
+					itemAliases: aliases,
+					itemPattern:
+						expressionSource(repeatItemPattern(node)!, state.source) ?? itemName,
+				}
+			: {}),
 		...(indexName ? { indexName } : {}),
 		collectionSource,
 		...(collection
@@ -349,16 +382,6 @@ function staticRootIdentifier(node: AnyNode): AnyNode | null {
 	return current?.type === 'Identifier' ? current : null;
 }
 
-function repeatItemName(node: AnyNode): string | null {
-	const left = node.left as AnyNode | undefined;
-	if (!left) return null;
-
-	if (left.type !== 'VariableDeclaration') return getIdentifierName(left);
-
-	const [declaration] = asNodes(left.declarations);
-	return getIdentifierName(declaration?.id as AnyNode | undefined);
-}
-
 function itemKeyPath(itemName: string, keySource: string): ReadonlyArray<string> | null {
 	const segments = splitStaticGraphPath(keySource);
 	if (segments[0] !== itemName) return null;
@@ -390,8 +413,10 @@ export function repeatRowBindsName(source: string, state: WalkState): boolean {
 		const repeat = state.graph.keyedRepeats.find((candidate) => candidate.id === scopeId);
 		if (!repeat) return false;
 
-		return [repeat.itemName, repeat.indexName].some(
-			(name) => name !== undefined && (source === name || source.startsWith(`${name}.`)),
+		return (
+			[repeat.itemName, repeat.indexName].some(
+				(name) => name !== undefined && (source === name || source.startsWith(`${name}.`)),
+			) || aliasedItemPath(repeat.itemAliases, source) !== null
 		);
 	});
 }

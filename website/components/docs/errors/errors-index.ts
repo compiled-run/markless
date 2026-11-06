@@ -469,6 +469,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
 					kind: 'compile warning',
 					guided: true,

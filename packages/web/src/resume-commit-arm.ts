@@ -174,7 +174,10 @@ export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
 	boundary: ResumeArmRange,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'moved'>,
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'moved'> & {
+		// A minted row has no anchors around it, so it hands over the comments its @try records count in.
+		readonly comments?: ReadonlyArray<ResumeDomComment>;
+	},
 	eventTypesInstalled?: boolean,
 ) {
 	const exhaustive = {
@@ -247,9 +250,10 @@ export async function registerArmRecordSet(
 		await registerNestedAsyncBoundaries(
 			deps,
 			installEventType,
-			boundary,
+			update.comments ?? commentsBetween(boundary.startAnchor, boundary.endAnchor),
 			update.armRecords.asyncBoundaries,
 			update.computed,
+			!update.comments,
 		);
 	return materialized;
 }
@@ -464,21 +468,19 @@ function armCommitRendererMissingError(boundary: ResumeArmRange): Error {
 }
 
 // @try blocks a settled arm rendered inside itself: their own arm records, the async
-// computeds of components that render created, then live boundary wiring. A row built
-// in the browser passes no range: its records already hold their live anchors.
-export async function registerNestedAsyncBoundaries(
+// computeds of components that render created, then live boundary wiring.
+async function registerNestedAsyncBoundaries(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
-	range: ResumeArmRange | undefined,
+	census: ReadonlyArray<ResumeDomComment>,
 	records: NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
 	computed: ArmCommitUpdate['computed'],
+	inArm: boolean,
 ): Promise<void> {
 	const wiring = await deps.asyncBoundaryWiring?.();
 	if (!wiring || !deps.graph || !deps.loadSymbol)
 		throw new Error('Markless nested async boundary registration is unavailable.');
-	const census = range ? commentsBetween(range.startAnchor, range.endAnchor) : [];
 	const boundaries: ResumeAsyncBoundaryRecord[] = records.map((record) => {
-		if (!range) return record as unknown as ResumeAsyncBoundaryRecord;
 		const startAnchor = census[record.startAnchor.index];
 		const endAnchor = census[record.endAnchor.index];
 		if (!startAnchor || !endAnchor)
@@ -530,7 +532,7 @@ export async function registerNestedAsyncBoundaries(
 	);
 	for (const nested of boundaries) {
 		// A refresh that lands in place commits nothing, so rows written straight into this fresh range follow it now.
-		if (range) announceArm(deps.root, nested, nested.initiallyServedArm);
+		if (inArm) announceArm(deps.root, nested, nested.initiallyServedArm);
 		wiring.add(nested, shown);
 	}
 }

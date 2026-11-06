@@ -31,7 +31,7 @@ import { spreadHostsField } from './spread-hosts.ts';
 import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callback-relays.ts';
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
-import { componentConstructReach } from '../construct-reach.ts';
+import { componentConstructReach, componentRootBoundary } from '../construct-reach.ts';
 import { componentEdgeReads, pairedAsyncValues } from '../paired-async-values.ts';
 import {
 	chunkElementCount,
@@ -306,6 +306,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							}),
 						),
 						constructReach: componentConstructReach(constructReachInput, root.id),
+						...(componentRootBoundary(constructReachInput, root.id)
+							? { rootBoundary: true as const }
+							: {}),
 						...spreadHostsField(chunks),
 						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
 						...projectionPlacementFields({
@@ -607,7 +610,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			state.currentArmGuards = [];
 			withArmScope(state, null, () => {
 				for (const child of childNodes(node)) {
-					walk(child, state);
+					if (child === node.body)
+						withCreationSite(state, 'row', () => walk(child, state));
+					else walk(child, state);
 				}
 			});
 			state.currentArmGuards = outerGuards;

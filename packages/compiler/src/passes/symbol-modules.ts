@@ -2216,31 +2216,59 @@ function componentEdgeSpan(
 
 const emptyLocalNames = new Set<string>();
 
+// A name a destructured @for binds is a row local read at its path on the row item.
+type RowLocalNames = ReadonlySet<string> & {
+	readonly itemPaths?: ReadonlyMap<string, ReadonlyArray<string>>;
+};
+
+function rowLocalPath(localNames: ReadonlySet<string>, name: string): ReadonlyArray<string> {
+	return (localNames as RowLocalNames).itemPaths?.get(name) ?? [name];
+}
+
 function rowLocalNamesBySymbol(
 	renderData: RenderDataArtifact | undefined,
 	semanticGraph?: SemanticGraphArtifact,
 	symbolResolver?: SymbolResolverPlan,
 ): ReadonlyMap<string, ReadonlySet<string>> {
-	const localNamesBySymbol = new Map<string, Set<string>>();
-	const addLocal = (symbolId: string, itemName: string): void => {
+	const localNamesBySymbol = new Map<
+		string,
+		Set<string> & { itemPaths?: Map<string, ReadonlyArray<string>> }
+	>();
+	const addLocal = (
+		symbolId: string,
+		itemName: string,
+		aliases: SemanticGraphArtifact['keyedRepeats'][number]['itemAliases'] = [],
+	): void => {
 		let localNames = localNamesBySymbol.get(symbolId);
 		if (!localNames) {
 			localNames = new Set();
 			localNamesBySymbol.set(symbolId, localNames);
 		}
 		localNames.add(itemName);
+		localNames.itemPaths?.delete(itemName);
+		for (const alias of aliases) {
+			localNames.add(alias.name);
+			(localNames.itemPaths ??= new Map()).set(alias.name, [itemName, ...alias.path]);
+		}
+	};
+	// Outer rows first, so an inner row's names win over an outer row's of the same spelling.
+	const depth = (repeatId: string): number => {
+		const repeat = semanticGraph?.keyedRepeats.find((candidate) => candidate.id === repeatId);
+		return repeat?.enclosingRepeatId ? 1 + depth(repeat.enclosingRepeatId) : 0;
 	};
 	if (renderData) {
-		for (const repeat of renderData.repeats) {
+		for (const repeat of [...renderData.repeats].sort(
+			(left, right) => depth(left.repeatId) - depth(right.repeatId),
+		)) {
 			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);
-			const indexName = semanticGraph?.keyedRepeats.find(
+			const semanticRepeat = semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === repeat.repeatId,
-			)?.indexName;
+			);
 			for (const interaction of renderData.interactions) {
 				if (!rowHostIds.has(interaction.hostNodeId)) continue;
 				for (const symbolId of interaction.symbolIds) {
-					addLocal(symbolId, repeat.itemName);
-					if (indexName) addLocal(symbolId, indexName);
+					addLocal(symbolId, repeat.itemName, semanticRepeat?.itemAliases);
+					if (semanticRepeat?.indexName) addLocal(symbolId, semanticRepeat.indexName);
 				}
 			}
 		}
@@ -2252,7 +2280,8 @@ function rowLocalNamesBySymbol(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		for (const repeat of semanticGraph?.keyedRepeats ?? [])
-			if (edge?.keyedRepeatScopeIds.includes(repeat.id)) addLocal(symbol.id, repeat.itemName);
+			if (edge?.keyedRepeatScopeIds.includes(repeat.id))
+				addLocal(symbol.id, repeat.itemName, repeat.itemAliases);
 	}
 	return localNamesBySymbol;
 }
@@ -5655,7 +5684,10 @@ function localValueNode(text: string, localNames: ReadonlySet<string>): Emission
 	if (!path || path.length < 2) return null;
 	if (!localNames.has(path[0] ?? '')) return null;
 
-	return optionalPathNode(memberChainNode('context.locals'), path);
+	return optionalPathNode(memberChainNode('context.locals'), [
+		...rowLocalPath(localNames, path[0]!),
+		...path.slice(1),
+	]);
 }
 
 /** The band-local twin of `staticSourcePath`, which reaches the scanner band. */
@@ -5678,11 +5710,12 @@ function staticDottedPath(text: string): ReadonlyArray<string> | null {
 function optionalPathNode(base: EmissionNode, path: ReadonlyArray<string>): EmissionNode {
 	let expression = base;
 	for (const part of path) {
+		const named = VALUE_IDENTIFIER_PATTERN.test(part);
 		expression = {
 			type: 'MemberExpression',
 			object: expression,
-			property: identifierNode(part),
-			computed: false,
+			property: named ? identifierNode(part) : literalNode(part),
+			computed: !named,
 			optional: true,
 		};
 	}
@@ -5965,7 +5998,10 @@ function rewriteGraphReadsAndLocals(
 		typeof node.name === 'string' &&
 		input.localNames.has(node.name)
 	) {
-		return optionalPathNode(memberChainNode('context.locals'), [node.name]);
+		return optionalPathNode(
+			memberChainNode('context.locals'),
+			rowLocalPath(input.localNames, node.name),
+		);
 	}
 
 	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
@@ -6851,10 +6887,12 @@ function localNamesVisibleIn(fn: AnyNode, localNames: ReadonlySet<string>): Read
 	if (isNode(fn.body)) collectOwnScopeBindingNames(fn.body, bound);
 	if (bound.size === 0) return localNames;
 
-	const visible = new Set<string>();
+	const visible: Set<string> & { itemPaths?: RowLocalNames['itemPaths'] } = new Set<string>();
 	for (const name of localNames) {
 		if (!bound.has(name)) visible.add(name);
 	}
+	const itemPaths = (localNames as RowLocalNames).itemPaths;
+	if (itemPaths) visible.itemPaths = itemPaths;
 
 	return visible.size === localNames.size ? localNames : visible;
 }

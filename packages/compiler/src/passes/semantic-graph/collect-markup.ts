@@ -50,11 +50,12 @@ import {
 	type StyleConstResolver,
 } from './style-object.ts';
 import { componentMarkupRoot } from '../public-render/component-markup-root.ts';
-import { collectStyleScopes } from '../public-render/style-scopes.ts';
+import { collectStyleScopes, takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 import { rawElementText } from '../../ast/raw-text.ts';
+import { aliasedItemPath, repeatItemBinding, type RepeatItemAlias } from './repeat-item-binding.ts';
 
 // HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
 const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
@@ -72,6 +73,12 @@ const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
 	'track',
 	'wbr',
 ]);
+
+type RowNames = {
+	readonly id: string;
+	readonly itemName: string;
+	readonly aliases: ReadonlyArray<RepeatItemAlias>;
+};
 
 type CollectionContext = {
 	readonly source: string;
@@ -323,7 +330,8 @@ function emitNode(
 	}
 
 	if (node.type === 'JSXForExpression') {
-		const itemName = repeatItemName(node) ?? 'item';
+		const binding = repeatItemBinding(node);
+		const itemName = binding?.itemName ?? 'item';
 		const collection = node.right as AnyNode | undefined;
 		const key = node.key as AnyNode | undefined;
 		const semanticRepeat = context.graph.keyedRepeats.find(
@@ -338,10 +346,8 @@ function emitNode(
 		const repeatId = semanticRepeat?.id ?? `markup-repeat:${node.start ?? 'unknown'}`;
 		const rowTemplateId = `repeat:${repeatId}:row`;
 		const rowBuilder = createChunk(rowTemplateId, 'repeat-row', builder.componentName);
-		emitNodes(asNodes((node.body as AnyNode | undefined)?.body), [0], rowBuilder, context, {
-			id: repeatId,
-			itemName,
-		});
+		const row: RowNames = { id: repeatId, itemName, aliases: binding?.aliases ?? [] };
+		emitNodes(asNodes((node.body as AnyNode | undefined)?.body), [0], rowBuilder, context, row);
 		context.chunks.push(finishChunk(rowBuilder));
 
 		const emptyNodes = asNodes((node.empty as AnyNode | undefined)?.body);
@@ -455,6 +461,8 @@ function emitNode(
 		});
 	}
 
+	const moduleScopeClass = context.styleScopeClass;
+	if (!takesStyleScopeClass(tagName)) context.styleScopeClass = null;
 	append(builder, `<${tagName}`);
 	let classSeen = false;
 	const elementAttributes = getElementAttributes(node);
@@ -630,6 +638,7 @@ function emitNode(
 			append(builder, '"');
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
+	context.styleScopeClass = moduleScopeClass;
 	append(builder, '>');
 	if (textareaValue) emitTextareaValue(textareaValue, path, builder, context, repeat);
 	else if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);
@@ -1134,7 +1143,7 @@ function sourceResidue(
 	source: string,
 	span: SourceSpan | undefined,
 	context: CollectionContext,
-	repeat: { readonly id: string; readonly itemName: string } | null,
+	repeat: RowNames | { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
 	loweredStyle = false,
 ): SemanticMarkupResidue {
@@ -1145,6 +1154,9 @@ function sourceResidue(
 			return { kind: 'repeat-item', repeatId: repeat.id, path };
 		}
 	}
+	const aliased = repeat && 'aliases' in repeat ? aliasedItemPath(repeat.aliases, source) : null;
+	if (repeat && aliased && aliased.every((part) => /^[\w$]+$/.test(part)))
+		return { kind: 'repeat-item', repeatId: repeat.id, path: aliased };
 	const memberPath = optionalMemberReadSource(source);
 	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(memberPath)
 		? // Component scope only: a factory local and a component's shared-instance
@@ -1321,14 +1333,6 @@ function branchArms(node: AnyNode): AnyNode[][] {
 		});
 	}
 	return asNodes(node.cases).map((switchCase) => asNodes(switchCase.consequent));
-}
-
-function repeatItemName(node: AnyNode): string | null {
-	const left = node.left as AnyNode | undefined;
-	if (!left) return null;
-	if (left.type !== 'VariableDeclaration') return getIdentifierName(left);
-	const [declaration] = asNodes(left.declarations);
-	return getIdentifierName(declaration?.id as AnyNode | undefined);
 }
 
 // A literal-only style object owes the browser nothing: its CSS text is known

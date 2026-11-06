@@ -103,6 +103,7 @@ export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE =
  */
 export type KeyedRepeatRowMintRefusal =
 	| { readonly kind: 'component'; readonly componentName: string }
+	| { readonly kind: 'component-root-boundary'; readonly componentName: string }
 	| { readonly kind: 'nested-construct'; readonly label: string }
 	| { readonly kind: 'attribute'; readonly attributeName: string }
 	| { readonly kind: 'style-object' }
@@ -296,8 +297,13 @@ function refusalCause(
 	switch (refusal.kind) {
 		case 'component':
 			return {
-				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders either reaches a @try or could not be seen from here - and a @try settles against bookkeeping the page took only for the rows the server sent.`,
-				suggestion: `Keep <${refusal.componentName}> and everything it renders free of @try - and make sure the module declaring it is part of this build - or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
+				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders could not be seen from here, so a row built in the browser would not know what to register.`,
+				suggestion: `Make sure the module declaring <${refusal.componentName}> is part of this build, or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
+			};
+		case 'component-root-boundary':
+			return {
+				message: `This @for row is <${refusal.componentName}>, and <${refusal.componentName}> renders a @try at its top level, outside every element. The browser adds and moves a row as one element, so the @try's place in the page would be left behind.`,
+				suggestion: `Put the @try inside an element in <${refusal.componentName}>, such as \`<li>@try { ... } @pending { ... }</li>\`, or wrap <${refusal.componentName}> in an element in the row.`,
 			};
 		case 'nested-construct':
 			return {

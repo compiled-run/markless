@@ -172,7 +172,7 @@ export type WalkState = {
 	// The enclosing host at the current boundary's entry, the async twin of `currentArmScope.hostNodeId`.
 	currentAsyncArmHostNodeId: string | null;
 	currentSharedDefinitionId: string | null;
-	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
+	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | 'row' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
