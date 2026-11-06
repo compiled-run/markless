@@ -81,7 +81,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 	const homepage = pathname === '/';
 
 	<div class="nav-shade">
-		<navbar.root class="nav-pill navbar-edge" aria-label="Main">
+		<navbar.root class="nav-pill navbar-edge" aria-label="Main" delay={0}>
 			<div class="nav-tools">
 				<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage} aria-label="Markless home">
 					<Brand />
@@ -125,7 +125,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				pointer-events: none;
 				background: color-mix(in oklch, var(--ink) 52%, transparent);
 				opacity: 0;
-				transition: opacity 325ms ease-in-out;
+				transition: opacity 150ms ease-out;
 
 				html.dark & {
 					background: color-mix(in oklch, black 58%, transparent);
@@ -134,6 +134,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 
 			.nav-shade:has([ui-open])::before {
 				opacity: 1;
+				transition: none;
 			}
 
 			.nav-pill {
@@ -286,7 +287,7 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				translate: -50% 0;
 			}
 
-			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. */
+			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. Opening and switching are instant; only closing fades. */
 			.nav-box {
 				z-index: 59;
 				display: none;
@@ -295,19 +296,13 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				opacity: 0;
 				transition:
 					opacity 150ms ease,
-					translate var(--spring-slide-ms) var(--spring-slide),
 					display 150ms allow-discrete;
 			}
 
-			/* Opening from closed drops the box a few pixels and settles it; it never slides sideways. */
 			.nav-pill[ui-open] .nav-box {
 				display: block;
 				opacity: 1;
-
-				@starting-style {
-					opacity: 0;
-					translate: -50% -0.5rem;
-				}
+				transition: none;
 			}
 
 			.nav-panel {
@@ -319,63 +314,23 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				padding: 1rem;
 				overflow: clip;
 				opacity: 1;
-				transition:
-					opacity 150ms ease,
-					translate var(--spring-slide-ms) var(--spring-slide),
-					display 150ms allow-discrete;
-
-				@starting-style {
-					opacity: 0;
-					translate: -50% -0.5rem;
-				}
 			}
 
 			.nav-panel[hidden] {
 				display: none;
 				opacity: 0;
-			}
-
-			/* Switching: the cards slide solid, a whole panel's width, on the slide spring. Transitions, not keyframes: a switch mid-slide carries on from where the cards are. */
-			.nav-panel[ui-from] {
-				@starting-style {
-					opacity: 1;
-					translate: -50% 0;
-				}
+				transition:
+					opacity 150ms ease,
+					display 150ms allow-discrete;
 			}
 
 			.nav-panel[hidden][ui-to] {
-				opacity: 1;
-				transition: display var(--spring-slide-ms) allow-discrete;
-			}
-
-			@media (prefers-reduced-motion: no-preference) {
-				.nav-panel > .card {
-					transition: translate var(--spring-slide-ms) var(--spring-slide);
-				}
-
-				.nav-panel[ui-from='end'] > .card {
-					@starting-style {
-						translate: 37.5rem 0;
-					}
-				}
-
-				.nav-panel[ui-from='start'] > .card {
-					@starting-style {
-						translate: -37.5rem 0;
-					}
-				}
-
-				.nav-panel[hidden][ui-to='start'] > .card {
-					translate: -37.5rem 0;
-				}
-
-				.nav-panel[hidden][ui-to='end'] > .card {
-					translate: 37.5rem 0;
-				}
+				transition: none;
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.nav-panel {
+				.nav-box,
+				.nav-panel[hidden] {
 					transition: none;
 				}
 			}
