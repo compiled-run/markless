@@ -41,6 +41,7 @@ export default function FilesAnatomy() @{
 							aria-valuetext={NAMES[c0]}
 							style={'--paint: ' + COLOURS[c0]}
 							onPointerDown={(event) => {
+								if (shared) return;
 								capture(event);
 								scrubbing = 0;
 								fromX = event.clientX;
@@ -60,13 +61,13 @@ export default function FilesAnatomy() @{
 								scrubbing = -1;
 							}}
 							onClick={() => {
-								if (moved) return;
+								if (shared || moved) return;
 								c0 = nextColour(c0);
 								said = describeRepaint(0, c0);
 							}}
 							onKeyDown={(event) => {
-								if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight') c0 = nextColour(c0);
-								else if (event.key === 'ArrowLeft') c0 = (c0 + COLOURS.length - 1) % COLOURS.length;
+								if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (shared) return;if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight' || event.key === 'ArrowUp') c0 = nextColour(c0);
+								else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') c0 = (c0 + COLOURS.length - 1) % COLOURS.length;
 								else return;
 								said = describeRepaint(0, c0);
 							}}
@@ -95,6 +96,7 @@ export default function FilesAnatomy() @{
 							aria-valuetext={NAMES[c1]}
 							style={'--paint: ' + COLOURS[c1]}
 							onPointerDown={(event) => {
+								if (shared) return;
 								capture(event);
 								scrubbing = 1;
 								fromX = event.clientX;
@@ -114,13 +116,13 @@ export default function FilesAnatomy() @{
 								scrubbing = -1;
 							}}
 							onClick={() => {
-								if (moved) return;
+								if (shared || moved) return;
 								c1 = nextColour(c1);
 								said = describeRepaint(1, c1);
 							}}
 							onKeyDown={(event) => {
-								if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight') c1 = nextColour(c1);
-								else if (event.key === 'ArrowLeft') c1 = (c1 + COLOURS.length - 1) % COLOURS.length;
+								if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (shared) return;if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight' || event.key === 'ArrowUp') c1 = nextColour(c1);
+								else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') c1 = (c1 + COLOURS.length - 1) % COLOURS.length;
 								else return;
 								said = describeRepaint(1, c1);
 							}}
@@ -153,8 +155,8 @@ export default function FilesAnatomy() @{
 									said = describeRepaint('global', cg);
 								}}
 								onKeyDown={(event) => {
-									if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight') cg = nextColour(cg);
-									else if (event.key === 'ArrowLeft') cg = (cg + COLOURS.length - 1) % COLOURS.length;
+									if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight' || event.key === 'ArrowUp') cg = nextColour(cg);
+									else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') cg = (cg + COLOURS.length - 1) % COLOURS.length;
 									else return;
 									said = describeRepaint('global', cg);
 								}}

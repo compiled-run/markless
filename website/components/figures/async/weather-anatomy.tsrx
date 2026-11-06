@@ -47,6 +47,10 @@ export default function WeatherAnatomy() @{
 		touched = true;
 		pick(index);
 	};
+	const step = (from: EventTarget | null, index: number) => {
+		touch(index);
+		(from as SVGGElement).ownerSVGElement?.querySelectorAll<SVGGElement>('.tab')[index]?.focus();
+	};
 
 	<figure
 		class="anatomy weather"
@@ -64,8 +68,8 @@ export default function WeatherAnatomy() @{
 				aria-selected={picked === 0}
 				onClick={() => touch(0)}
 				onKeyDown={(event) => {
-					if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'ArrowRight') touch((0 + 1) % 3);
-					else if (event.key === 'ArrowLeft') touch((0 + 2) % 3);
+					if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'ArrowRight') step(event.currentTarget, (0 + 1) % 3);
+					else if (event.key === 'ArrowLeft') step(event.currentTarget, (0 + 2) % 3);
 					else if (event.key === 'Enter' || event.key === ' ') touch(0);
 					else return;
 				}}
@@ -82,8 +86,8 @@ export default function WeatherAnatomy() @{
 				aria-selected={picked === 1}
 				onClick={() => touch(1)}
 				onKeyDown={(event) => {
-					if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'ArrowRight') touch((1 + 1) % 3);
-					else if (event.key === 'ArrowLeft') touch((1 + 2) % 3);
+					if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'ArrowRight') step(event.currentTarget, (1 + 1) % 3);
+					else if (event.key === 'ArrowLeft') step(event.currentTarget, (1 + 2) % 3);
 					else if (event.key === 'Enter' || event.key === ' ') touch(1);
 					else return;
 				}}
@@ -100,8 +104,8 @@ export default function WeatherAnatomy() @{
 				aria-selected={picked === 2}
 				onClick={() => touch(2)}
 				onKeyDown={(event) => {
-					if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'ArrowRight') touch((2 + 1) % 3);
-					else if (event.key === 'ArrowLeft') touch((2 + 2) % 3);
+					if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === ' ') event.preventDefault();if (event.key === 'ArrowRight') step(event.currentTarget, (2 + 1) % 3);
+					else if (event.key === 'ArrowLeft') step(event.currentTarget, (2 + 2) % 3);
 					else if (event.key === 'Enter' || event.key === ' ') touch(2);
 					else return;
 				}}

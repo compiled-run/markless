@@ -28,13 +28,18 @@ export default function NoteAnatomy() @{
 			const host = event.target as Element;
 			const listen = (pressed: KeyboardEvent) => {
 				if (!open || pressed.repeat || ignoredKey(pressed, document.activeElement, host)) return;
-				keep(pressed);
 				if (pressed.key === 'Delete' || pressed.key === 'Escape') {
+					keep(pressed);
 					open = false;
 					binned = binned + 1;
 					said = describeNote('binned');
-				} else if (pressed.key === 'Backspace') text = text.slice(0, -1);
-				else if (pressed.key.length === 1 && text.length < MAX_TEXT) text = addLetter(text, pressed.key);
+				} else if (pressed.key === 'Backspace') {
+					keep(pressed);
+					text = text.slice(0, -1);
+				} else if (pressed.key.length === 1 && text.length < MAX_TEXT) {
+					keep(pressed);
+					text = addLetter(text, pressed.key);
+				}
 			};
 			let on = false;
 			const watcher = new IntersectionObserver(
@@ -63,12 +68,18 @@ export default function NoteAnatomy() @{
 				onClick={() => {
 					if (open) return;
 					open = true;
+					dragging = false;
+					dragX = 0;
+					dragY = 0;
 					text = '';
 					said = describeNote('open');
 				}}
 				onKeyDown={(event) => {
 					if (event.key === 'Enter' && !open) {
 						open = true;
+						dragging = false;
+						dragX = 0;
+						dragY = 0;
 						text = '';
 						said = describeNote('open');
 					}
@@ -132,6 +143,11 @@ export default function NoteAnatomy() @{
 						dragX = 0;
 						dragY = 0;
 					}}
+					onPointerCancel={() => {
+						dragging = false;
+						dragX = 0;
+						dragY = 0;
+					}}
 					onTouchMove={(event) => event.preventDefault()}
 					onFocus={() => {
 						focused = true;
@@ -145,7 +161,7 @@ export default function NoteAnatomy() @{
 							binned = binned + 1;
 							said = describeNote('binned');
 						} else if (event.key === 'Backspace') text = text.slice(0, -1);
-						else if (event.key.length === 1 && text.length < MAX_TEXT) text = addLetter(text, event.key);
+						else if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1 && text.length < MAX_TEXT) text = addLetter(text, event.key);
 					}}
 				>
 					<path class="note-paper" d={art.note.paper} />

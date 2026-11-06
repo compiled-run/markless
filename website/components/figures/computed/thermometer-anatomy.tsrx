@@ -27,7 +27,11 @@ export default function ThermometerAnatomy() @{
 	}
 	function refuse() {
 		shake = flip(shake);
+		swing = 'rest';
 		said = REFUSED;
+	}
+	function settle(event: AnimationEvent) {
+		if (event.animationName.startsWith('refuse')) shake = 'rest';
 	}
 
 	<figure class="anatomy thermometer">
@@ -51,6 +55,9 @@ export default function ThermometerAnatomy() @{
 					setTo(dial(fromValue, fromY, event.clientY));
 				}}
 				onPointerUp={() => {
+					dragging = false;
+				}}
+				onPointerCancel={() => {
 					dragging = false;
 				}}
 				onTouchMove={(event) => event.preventDefault()}
@@ -85,7 +92,7 @@ export default function ThermometerAnatomy() @{
 				<text class="reading" x="156" y={top + 6}>{celsius}°C</text>
 			</g>
 			<path class="ink desk" d={art.tag.string} />
-			<g class="tag" tabindex="0" role="img" aria-label={fahrenheit + '°F, worked out from °C'} onPointerDown={refuse} onKeyDown={(event) => {
+			<g class="tag" tabindex="0" role="img" aria-label={fahrenheit + '°F, worked out from °C'} onPointerDown={refuse} onAnimationEnd={settle} onKeyDown={(event) => {
 				if (event.key === ' ' || event.key === 'Enter') {
 					event.preventDefault();
 					refuse();
@@ -98,7 +105,7 @@ export default function ThermometerAnatomy() @{
 				<text class="value" x={art.tag.textX} y={art.tag.textY}>{fahrenheit}°F</text>
 			</g>
 			<path class="ink desk" d={art.sign.hook} />
-			<g class="sign" tabindex="0" role="img" aria-label={'sign: ' + advice + ', worked out from °F'} onPointerDown={refuse} onKeyDown={(event) => {
+			<g class="sign" tabindex="0" role="img" aria-label={'sign: ' + advice + ', worked out from °F'} onPointerDown={refuse} onAnimationEnd={settle} onKeyDown={(event) => {
 				if (event.key === ' ' || event.key === 'Enter') {
 					event.preventDefault();
 					refuse();

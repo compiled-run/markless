@@ -44,14 +44,19 @@ export default function JCardAnatomy() @{
 		const song = songs.pop();
 		mark(before, 'Removed ' + song);
 	}
+	function moveFocus(from: EventTarget | null, a: number, b: number) {
+		move(a, b);
+		(from as SVGGElement).ownerSVGElement?.querySelectorAll<SVGGElement>('.row')[b]?.focus();
+	}
 	function move(from: number, to: number) {
 		const before = [...songs];
 		const [song] = songs.splice(from, 1);
 		songs.splice(to, 0, song!);
 		mark(before, 'Moved ' + song);
 	}
-	function drag(clientY: number) {
-		if (held < 0) return;
+	function drag(event: PointerEvent) {
+		if (held < 0 || !event.isPrimary) return;
+		const clientY = event.clientY;
 		const dy = (clientY - fromY) * scale;
 		const to = landing(held, dy, songs.length);
 		if (to !== held) {
@@ -61,7 +66,8 @@ export default function JCardAnatomy() @{
 		}
 		dragY = (clientY - fromY) * scale;
 	}
-	function drop() {
+	function drop(event: PointerEvent) {
+		if (!event.isPrimary) return;
 		held = -1;
 		dragY = 0;
 	}
@@ -95,14 +101,14 @@ export default function JCardAnatomy() @{
 					role="listitem"
 					aria-label={'track 1, ' + (songs[0] ?? 'empty') + '. Drag, or use the up and down arrows, to move it.'}
 					onPointerDown={(event) => {
-						if (songs.length <= 0) return;
+						if (songs.length <= 0 || held >= 0 || !event.isPrimary) return;
 						capture(event);
 						held = 0;
 						fromY = event.clientY;
 						dragY = 0;
 						scale = art.width / (event.currentTarget.ownerSVGElement?.getBoundingClientRect().width ?? art.width);
 					}}
-					onPointerMove={(event) => drag(event.clientY)}
+					onPointerMove={drag}
 					onPointerUp={drop}
 					onPointerCancel={drop}
 					onTouchMove={(event) => event.preventDefault()}
@@ -110,7 +116,7 @@ export default function JCardAnatomy() @{
 						if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
 						event.preventDefault();
 						if (event.key === 'ArrowUp') return;
-						else if (0 < songs.length - 1) move(0, 1);
+						else if (0 < songs.length - 1) moveFocus(event.currentTarget, 0, 1);
 					}}
 				>
 					<rect class="grab" x="64" y={art.rows[0].y - 30} width="246" height="40" />
@@ -131,22 +137,22 @@ export default function JCardAnatomy() @{
 					role="listitem"
 					aria-label={'track 2, ' + (songs[1] ?? 'empty') + '. Drag, or use the up and down arrows, to move it.'}
 					onPointerDown={(event) => {
-						if (songs.length <= 1) return;
+						if (songs.length <= 1 || held >= 0 || !event.isPrimary) return;
 						capture(event);
 						held = 1;
 						fromY = event.clientY;
 						dragY = 0;
 						scale = art.width / (event.currentTarget.ownerSVGElement?.getBoundingClientRect().width ?? art.width);
 					}}
-					onPointerMove={(event) => drag(event.clientY)}
+					onPointerMove={drag}
 					onPointerUp={drop}
 					onPointerCancel={drop}
 					onTouchMove={(event) => event.preventDefault()}
 					onKeyDown={(event) => {
 						if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
 						event.preventDefault();
-						if (event.key === 'ArrowUp') move(1, 0);
-						else if (1 < songs.length - 1) move(1, 2);
+						if (event.key === 'ArrowUp') moveFocus(event.currentTarget, 1, 0);
+						else if (1 < songs.length - 1) moveFocus(event.currentTarget, 1, 2);
 					}}
 				>
 					<rect class="grab" x="64" y={art.rows[1].y - 30} width="246" height="40" />
@@ -167,22 +173,22 @@ export default function JCardAnatomy() @{
 					role="listitem"
 					aria-label={'track 3, ' + (songs[2] ?? 'empty') + '. Drag, or use the up and down arrows, to move it.'}
 					onPointerDown={(event) => {
-						if (songs.length <= 2) return;
+						if (songs.length <= 2 || held >= 0 || !event.isPrimary) return;
 						capture(event);
 						held = 2;
 						fromY = event.clientY;
 						dragY = 0;
 						scale = art.width / (event.currentTarget.ownerSVGElement?.getBoundingClientRect().width ?? art.width);
 					}}
-					onPointerMove={(event) => drag(event.clientY)}
+					onPointerMove={drag}
 					onPointerUp={drop}
 					onPointerCancel={drop}
 					onTouchMove={(event) => event.preventDefault()}
 					onKeyDown={(event) => {
 						if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
 						event.preventDefault();
-						if (event.key === 'ArrowUp') move(2, 1);
-						else if (2 < songs.length - 1) move(2, 3);
+						if (event.key === 'ArrowUp') moveFocus(event.currentTarget, 2, 1);
+						else if (2 < songs.length - 1) moveFocus(event.currentTarget, 2, 3);
 					}}
 				>
 					<rect class="grab" x="64" y={art.rows[2].y - 30} width="246" height="40" />
@@ -203,22 +209,22 @@ export default function JCardAnatomy() @{
 					role="listitem"
 					aria-label={'track 4, ' + (songs[3] ?? 'empty') + '. Drag, or use the up and down arrows, to move it.'}
 					onPointerDown={(event) => {
-						if (songs.length <= 3) return;
+						if (songs.length <= 3 || held >= 0 || !event.isPrimary) return;
 						capture(event);
 						held = 3;
 						fromY = event.clientY;
 						dragY = 0;
 						scale = art.width / (event.currentTarget.ownerSVGElement?.getBoundingClientRect().width ?? art.width);
 					}}
-					onPointerMove={(event) => drag(event.clientY)}
+					onPointerMove={drag}
 					onPointerUp={drop}
 					onPointerCancel={drop}
 					onTouchMove={(event) => event.preventDefault()}
 					onKeyDown={(event) => {
 						if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
 						event.preventDefault();
-						if (event.key === 'ArrowUp') move(3, 2);
-						else if (3 < songs.length - 1) move(3, 4);
+						if (event.key === 'ArrowUp') moveFocus(event.currentTarget, 3, 2);
+						else if (3 < songs.length - 1) moveFocus(event.currentTarget, 3, 4);
 					}}
 				>
 					<rect class="grab" x="64" y={art.rows[3].y - 30} width="246" height="40" />
@@ -239,22 +245,22 @@ export default function JCardAnatomy() @{
 					role="listitem"
 					aria-label={'track 5, ' + (songs[4] ?? 'empty') + '. Drag, or use the up and down arrows, to move it.'}
 					onPointerDown={(event) => {
-						if (songs.length <= 4) return;
+						if (songs.length <= 4 || held >= 0 || !event.isPrimary) return;
 						capture(event);
 						held = 4;
 						fromY = event.clientY;
 						dragY = 0;
 						scale = art.width / (event.currentTarget.ownerSVGElement?.getBoundingClientRect().width ?? art.width);
 					}}
-					onPointerMove={(event) => drag(event.clientY)}
+					onPointerMove={drag}
 					onPointerUp={drop}
 					onPointerCancel={drop}
 					onTouchMove={(event) => event.preventDefault()}
 					onKeyDown={(event) => {
 						if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
 						event.preventDefault();
-						if (event.key === 'ArrowUp') move(4, 3);
-						else if (4 < songs.length - 1) move(4, 5);
+						if (event.key === 'ArrowUp') moveFocus(event.currentTarget, 4, 3);
+						else if (4 < songs.length - 1) moveFocus(event.currentTarget, 4, 5);
 					}}
 				>
 					<rect class="grab" x="64" y={art.rows[4].y - 30} width="246" height="40" />

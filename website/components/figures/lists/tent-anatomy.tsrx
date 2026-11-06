@@ -49,6 +49,11 @@ export default function TentAnatomy() @{
 				onPointerMove={(event) => {
 					if (dragging === 'grace') dragX = (event.clientX - fromX) * scale;
 				}}
+				onPointerCancel={() => {
+					if (dragging !== 'grace') return;
+					dragging = '';
+					dragX = 0;
+				}}
 				onPointerUp={() => {
 					if (dragging !== 'grace') return;
 					dragging = '';
@@ -56,7 +61,7 @@ export default function TentAnatomy() @{
 					else {
 						const from = slotOf(order, 'grace');
 						prev = order;
-						order = swap(order, from, slotAt(art.slots[from]! + dragX, art.slots, CARD_W));
+						order = swap(order, from, slotAt(art.slots[from]! + CARD_W / 2 + dragX, art.slots, CARD_W));
 						beat = beat === 'odd' ? 'even' : 'odd';
 					}
 					dragX = 0;
@@ -114,6 +119,11 @@ export default function TentAnatomy() @{
 				onPointerMove={(event) => {
 					if (dragging === 'linus') dragX = (event.clientX - fromX) * scale;
 				}}
+				onPointerCancel={() => {
+					if (dragging !== 'linus') return;
+					dragging = '';
+					dragX = 0;
+				}}
 				onPointerUp={() => {
 					if (dragging !== 'linus') return;
 					dragging = '';
@@ -121,7 +131,7 @@ export default function TentAnatomy() @{
 					else {
 						const from = slotOf(order, 'linus');
 						prev = order;
-						order = swap(order, from, slotAt(art.slots[from]! + dragX, art.slots, CARD_W));
+						order = swap(order, from, slotAt(art.slots[from]! + CARD_W / 2 + dragX, art.slots, CARD_W));
 						beat = beat === 'odd' ? 'even' : 'odd';
 					}
 					dragX = 0;
@@ -179,6 +189,11 @@ export default function TentAnatomy() @{
 				onPointerMove={(event) => {
 					if (dragging === 'ada') dragX = (event.clientX - fromX) * scale;
 				}}
+				onPointerCancel={() => {
+					if (dragging !== 'ada') return;
+					dragging = '';
+					dragX = 0;
+				}}
 				onPointerUp={() => {
 					if (dragging !== 'ada') return;
 					dragging = '';
@@ -186,7 +201,7 @@ export default function TentAnatomy() @{
 					else {
 						const from = slotOf(order, 'ada');
 						prev = order;
-						order = swap(order, from, slotAt(art.slots[from]! + dragX, art.slots, CARD_W));
+						order = swap(order, from, slotAt(art.slots[from]! + CARD_W / 2 + dragX, art.slots, CARD_W));
 						beat = beat === 'odd' ? 'even' : 'odd';
 					}
 					dragX = 0;

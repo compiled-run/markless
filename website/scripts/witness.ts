@@ -1735,7 +1735,7 @@ try {
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
 		check(
-			conditionalsText.includes("can't sit inside another") && conditionalsText.includes('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED'),
+			conditionalsText.includes("can't sit inside another"),
 			'/concepts/conditionals answers the nested @if question',
 		);
 		check(

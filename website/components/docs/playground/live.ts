@@ -122,5 +122,6 @@ export function bootLive(box: HTMLElement): void {
 	box.addEventListener('input', checkSource);
 	const problems = box.querySelector('[data-code-problems]');
 	if (problems) new MutationObserver(checkFails).observe(problems, { childList: true, subtree: true, attributes: true });
+	checkFails();
 	checkSource();
 }

@@ -1,6 +1,6 @@
 // A weather card drawn in ink: its card edge, three city tabs, and a sun, a cloud and a rain cloud for the forecasts.
 import { ellipse, jitter, roundRect } from '../ink/desk.ts';
-import { hatch, line, outline, pathOf, resample, wash } from '../ink/ink.ts';
+import { hatch, line, outline, pathOf, r1, resample, wash } from '../ink/ink.ts';
 import type { P } from '../ink/ink.ts';
 
 export const WIDTH = 600;
@@ -31,7 +31,9 @@ function sun(cx: number, cy: number, r: number, seed: number) {
 	const disc = ellipse(cx, cy, r, r, 28);
 	const rays = Array.from({ length: 10 }, (_, i) => {
 		const a = (i / 10) * Math.PI * 2 + 0.2;
-		return line([[cx + Math.cos(a) * (r + 5), cy + Math.sin(a) * (r + 5)], [cx + Math.cos(a) * (r + 13 + (i % 2) * 5), cy + Math.sin(a) * (r + 13 + (i % 2) * 5)]], { w: 1.6, seed: seed + i, over: 0.2 });
+		// Rounded endpoints: a ray's exact length lands on a resample step, and sin/cos differ by an ulp between CPUs.
+		const at = (d: number): P => [r1(cx + Math.cos(a) * d), r1(cy + Math.sin(a) * d)];
+		return line([at(r + 5), at(r + 13 + (i % 2) * 5)], { w: 1.6, seed: seed + i, over: 0.2 });
 	}).join('');
 	return { wash: wash(disc, seed + 20, 1.5, 2.5), ink: outline(disc, { w: 1.7, heavy: 1.2, seed: seed + 21 }) + rays, shade: hatch(disc.filter(([x, y]) => x + y > cx + cy), 0.8, 2, seed + 22, { cluster: 3 }) };
 }
