@@ -1,4 +1,9 @@
-import type { AsyncPlaneContext, RuntimeAsyncComputedNode, RuntimeAsyncInput } from './graph-async.ts';
+import type {
+	AsyncPlaneContext,
+	RuntimeAsyncAnswer,
+	RuntimeAsyncComputedNode,
+	RuntimeAsyncInput,
+} from './graph-async.ts';
 import { readPath } from './graph-core.ts';
 import { isAsyncSnapshotMetaKey } from './graph-scheduler.ts';
 import type {
@@ -18,6 +23,8 @@ export type HeldInputsPlane = {
 	readonly shownRead: (
 		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
 	) => RuntimeGraphRead | false | undefined;
+	/** Kept answers: after `node` lands, keeps the answer it superseded and drops old ones while and once no pinned value reads them. */
+	readonly keep: (node: RuntimeAsyncComputedNode, superseded: RuntimeAsyncAnswer | undefined) => void;
 };
 
 export type HeldInputsPlaneFactory = (context: AsyncPlaneContext) => HeldInputsPlane;
@@ -147,6 +154,9 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 			else for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? []) visit(dependency.graphNodeId);
 		};
 		for (const dependency of dependencies) visit(dependency.graphNodeId);
+		if (ancestors.size > 1)
+			for (const ancestor of ancestors)
+				for (const other of ancestors) if (other !== ancestor) (ancestor.readWith ??= new Set()).add(other);
 
 		const resolution = resolveAncestors(ancestors);
 		if (!resolution) return false;
@@ -212,7 +222,41 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 		if (node.snapshot.key == null) node.servedKey = { key: node.key(peek) };
 	};
 
+	// `true` when two input lists share an input and agree on all they share, `false` when they
+	// differ on one, `undefined` when they share none.
+	const agreement = (
+		left: ReadonlyArray<RuntimeAsyncInput>,
+		right: ReadonlyArray<RuntimeAsyncInput>,
+	): boolean | undefined => {
+		let shared: boolean | undefined;
+		for (const input of left) {
+			const other = right.find((candidate) => inputId(candidate) === inputId(input));
+			if (!other) continue;
+			if (!Object.is(other.value, input.value)) return false;
+			shared = true;
+		}
+		return shared;
+	};
+	// A value read beside this one still answers the old inputs and not the current ones, so a reader pinned to them reads this answer.
+	const stillRead = (node: RuntimeAsyncComputedNode, answer: RuntimeAsyncAnswer): boolean =>
+		[...(node.readWith ?? [])].some(
+			(sibling) =>
+				!!sibling.valueInputs &&
+				agreement(answer.inputs, sibling.valueInputs) === true &&
+				agreement(node.valueInputs ?? [], sibling.valueInputs) === false,
+		);
+	const release = (node: RuntimeAsyncComputedNode): void => {
+		if (!node.priorAnswers) return;
+		const kept = node.priorAnswers.filter((answer) => stillRead(node, answer));
+		node.priorAnswers = kept.length > 0 ? kept : undefined;
+	};
+
 	return {
+		keep(node, superseded) {
+			if (superseded) node.priorAnswers = [superseded, ...(node.priorAnswers ?? [])];
+			release(node);
+			for (const sibling of node.readWith ?? []) release(sibling);
+		},
 		capture: (node, read) => keyInputs(node.dependencies, read),
 		seed,
 		shownRead,

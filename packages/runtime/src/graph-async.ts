@@ -9,15 +9,14 @@ import { readPath } from './graph-core.ts';
 import { isAsyncSnapshotMetaKey } from './graph-scheduler.ts';
 import type { HeldInputsPlane } from './graph-held.ts';
 
-// Kept answers: how many a source that outruns the slowest of its siblings may hold for a pinned value to still read.
-const KEPT_ANSWERS_CAP = 4;
-
 /** One input a key read, with the value it had when the run started. */
 export type RuntimeAsyncInput = {
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 	readonly value: unknown;
 };
+
+export type RuntimeAsyncAnswer = { readonly value: unknown; readonly inputs: ReadonlyArray<RuntimeAsyncInput> };
 
 export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	controller?: AbortController;
@@ -26,8 +25,10 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	version: number;
 	/** The inputs the shown value was fetched with; only a held-inputs plane captures them. */
 	valueInputs?: ReadonlyArray<RuntimeAsyncInput>;
-	/** Answers a newer one superseded, newest first, each still addressable while a pinned value reads its inputs; bounded ring buffer (Kept answers). */
-	priorAnswers?: ReadonlyArray<{ readonly value: unknown; readonly inputs: ReadonlyArray<RuntimeAsyncInput> }>;
+	/** Answers a newer one superseded, newest first, each kept only while a pinned value still reads it (Kept answers). */
+	priorAnswers?: ReadonlyArray<RuntimeAsyncAnswer>;
+	/** Async values some reader reads beside this one. */
+	readWith?: Set<RuntimeAsyncComputedNode>;
 	/** A reader read an input as `valueInputs` holds it, so the landing must reach that reader. */
 	pinned?: boolean;
 	/** The key a served value was fetched with; its snapshot carries none. */
@@ -189,13 +190,12 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			const landed = snapshot.status !== 'rejected';
 			if (landed) {
 				if (inputs) {
-					// A source a pinned value still reads keeps the answer it had for the inputs it was fetched with (Kept answers); bounded so a run of switches can't grow it without limit.
-					if (node.valueInputs)
-						node.priorAnswers = [
-							{ value: (node.snapshot as { readonly value?: unknown }).value, inputs: node.valueInputs },
-							...(node.priorAnswers ?? []),
-						].slice(0, KEPT_ANSWERS_CAP);
+					const superseded = node.valueInputs && {
+						value: (node.snapshot as { readonly value?: unknown }).value,
+						inputs: node.valueInputs,
+					};
 					node.valueInputs = inputs;
+					context.held?.keep(node, superseded);
 				}
 				node.servedKey = undefined;
 				if (waiting) node.gate = 2;
@@ -346,6 +346,15 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			node.gate = 1;
 			advance(node);
 			return true;
+		},
+		failHandler(graphNodeId, error) {
+			const node = nodes.get(graphNodeId);
+			if (!node) return;
+			node.controller?.abort();
+			node.controller = undefined;
+			const version = ++node.version;
+			const key = (node.snapshot as { readonly key?: unknown }).key;
+			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot) });
 		},
 		holdInputs(factory) {
 			if (context.held) return;

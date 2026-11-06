@@ -55,7 +55,8 @@ export function resolveBoundaryRunners(
 				{
 					authored,
 					runnerGraphNodeId: authored?.graphNodeId ?? null,
-					reads,
+					// An async gate is the boundary's own: it is watched so a handler's rejection shows.
+					reads: joined?.async ? [...reads, authored!] : reads,
 					derivedGraphNodeIds,
 					unresolvedSources,
 				},
@@ -79,9 +80,12 @@ export function mintAsyncBoundaryGates(
 		semanticGraph.graphBindings.map((binding) => [binding.id, binding]),
 	);
 	const gateReads = collectBoundaryGateReads(semanticGraph);
+	const handlerTargets = handlerCatchBoundaryIds(semanticGraph);
 	semanticGraph.asyncBoundaries = semanticGraph.asyncBoundaries.map((boundary) => {
 		const { reads } = gateReads.get(boundary.id)!;
-		if (reads.length < 2 || coveringGateRead(reads, bindingsById)) return boundary;
+		// A handler's rejection fails the boundary's own gate, never a value other blocks read too.
+		const ownGate = handlerTargets.has(boundary.id) && reads.length > 0;
+		if (!ownGate && (reads.length < 2 || coveringGateRead(reads, bindingsById))) return boundary;
 		const gates = reads.flatMap((read) => {
 			const binding = bindingsById.get(read.graphNodeId);
 			return binding ? [binding] : [];
@@ -94,9 +98,9 @@ export function mintAsyncBoundaryGates(
 			name: `marklessAsyncGate${index}`,
 			kind: 'computed',
 			writable: false,
-			async: false,
+			async: ownGate,
 			asyncCapable: true,
-			functionSource: `() => [${gates.map((gate) => gate.name).join(', ')}]`,
+			functionSource: `${ownGate ? 'async ' : ''}() => [${gates.map((gate) => gate.name).join(', ')}]`,
 			dependencies: gates.map((gate) => ({
 				source: gate.name,
 				graphNodeId: gate.id,
@@ -106,6 +110,19 @@ export function mintAsyncBoundaryGates(
 		});
 		return { ...boundary, gateGraphNodeId: graphNodeId };
 	});
+}
+
+/** Boundaries whose `@catch` an async event handler or callback prop inside their @try arm rejects into. */
+export function handlerCatchBoundaryIds(
+	semanticGraph: Pick<SemanticGraphArtifact, 'events' | 'componentEdges'>,
+): ReadonlySet<string> {
+	const ids = new Set<string>();
+	for (const event of semanticGraph.events)
+		if (event.handlerCatchBoundaryId) ids.add(event.handlerCatchBoundaryId);
+	for (const edge of semanticGraph.componentEdges)
+		for (const prop of edge.props)
+			if ('catchBoundaryId' in prop && prop.catchBoundaryId) ids.add(prop.catchBoundaryId);
+	return ids;
 }
 
 // One read settles the boundary alone when every other read is in its dependency closure.

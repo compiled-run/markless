@@ -1201,7 +1201,7 @@ function collectAttribute(
 			const relayed = handler ? receivedHandlerRelay(handler.node, state) : undefined;
 			const inlined =
 				handler && !relayed
-					? inlineHandlerRenderLocals(handler.node, state, attributeName, true)
+					? inlineHandlerRenderLocals(handler.node, state, attributeName)
 					: null;
 			// A handler named by a body function reads at its definition, which the attribute walk never visits.
 			if (handler && !relayed && handler.node !== entry) collectDefinitionReads(handler.node, state);
@@ -1226,6 +1226,9 @@ function collectAttribute(
 								boundaryId,
 							})),
 						}
+					: {}),
+				...(handler && !relayed && handler.node.async === true && state.currentCatchBoundaryId
+					? { handlerCatchBoundaryId: state.currentCatchBoundaryId }
 					: {}),
 				handlerParameters: relayed
 					? [relayed.parameter]

@@ -47,7 +47,7 @@ import {
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
 import { asyncKeyInputs, asyncReach } from './paired-async-values.ts';
-import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
+import { handlerCatchBoundaryIds, resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 import { forwardedSpreadAttributeUpdates } from './spread-forwarding.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
@@ -84,6 +84,20 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	// files each symbol inside that record's single `symbolIds` list.
 	const eventHandlerOrder = new Map<string, number>();
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
+	const handlerTargets = handlerCatchBoundaryIds(input.semanticGraph);
+	const catchRunnerFor = (boundaryId: string | undefined) =>
+		(boundaryId ? boundaryRunners.get(boundaryId)?.runnerGraphNodeId : undefined) ?? undefined;
+	// A boundary a handler can fail also re-runs its own gate, after every value it reads.
+	const boundaryResets = (boundaryId: string): ReadonlyArray<ReadonlyArray<string>> => {
+		const resets = resetOrder(
+			(boundaryRunners.get(boundaryId)?.reads ?? []).map((read) => read.graphNodeId),
+			input.semanticGraph.graphBindings,
+		);
+		const runner = catchRunnerFor(boundaryId);
+		return handlerTargets.has(boundaryId) && runner && !resets.some(([id]) => id === runner)
+			? [...resets, [runner, ...resets.map(([id]) => id!)]]
+			: resets;
+	};
 	for (const event of input.payloadArena.view.events) {
 		if (event.handlerSource === undefined) continue;
 
@@ -116,6 +130,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		]);
 		const shownReads = handlerShownReads(reads, writes, input.semanticGraph);
 		const entryMarks = entryMarksOf(ownTurnWrites(source, writes));
+		const catchRunnerGraphNodeId = catchRunnerFor(event.handlerCatchBoundaryId);
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -138,15 +153,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				? {
 						catchResets: event.handlerCatchResets.map((reset) => ({
 							name: reset.name,
-							resets: resetOrder(
-								(boundaryRunners.get(reset.boundaryId)?.reads ?? []).map(
-									(read) => read.graphNodeId,
-								),
-								input.semanticGraph.graphBindings,
-							),
+							resets: boundaryResets(reset.boundaryId),
 						})),
 					}
 				: {}),
+			...(catchRunnerGraphNodeId ? { catchRunnerGraphNodeId } : {}),
 		});
 	}
 
@@ -187,6 +198,9 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
 			]);
 			const callbackEntryMarks = entryMarksOf(ownTurnWrites(source, callbackWrites));
+			const catchRunnerGraphNodeId = catchRunnerFor(
+				'catchBoundaryId' in prop ? prop.catchBoundaryId : undefined,
+			);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
@@ -201,6 +215,15 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				writes: callbackWrites,
 				...(callbackEntryMarks ? { entryMarks: callbackEntryMarks } : {}),
 				elementHandleReads: handleReadsOf(reads),
+				...(prop.catchResets?.length
+					? {
+							catchResets: prop.catchResets.map((reset) => ({
+								name: reset.name,
+								resets: boundaryResets(reset.boundaryId),
+							})),
+						}
+					: {}),
+				...(catchRunnerGraphNodeId ? { catchRunnerGraphNodeId } : {}),
 			});
 		}
 	}

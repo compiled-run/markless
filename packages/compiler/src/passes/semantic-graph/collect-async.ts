@@ -45,6 +45,7 @@ export function collectAsyncBoundary(
 	const previousBoundaryId = state.currentAsyncBoundaryId;
 	const previousArm = state.currentAsyncBoundaryArm;
 	const previousArmHost = state.currentAsyncArmHostNodeId;
+	const previousCatchBoundaryId = state.currentCatchBoundaryId;
 	// Arm index inside this boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	const armByNode = new Map<unknown, number>([
 		[node.block, 0],
@@ -74,6 +75,8 @@ export function collectAsyncBoundary(
 
 	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;
+		state.currentCatchBoundaryId =
+			handler && child === node.block ? boundaryId : previousCatchBoundaryId;
 		placeAsyncArmText(node, child, state);
 		walk(child, state);
 	}
@@ -81,6 +84,7 @@ export function collectAsyncBoundary(
 	state.currentAsyncBoundaryId = previousBoundaryId;
 	state.currentAsyncBoundaryArm = previousArm;
 	state.currentAsyncArmHostNodeId = previousArmHost;
+	state.currentCatchBoundaryId = previousCatchBoundaryId;
 }
 
 export function propagateAsyncComputedCapability(graph: MutableSemanticGraphArtifact): void {

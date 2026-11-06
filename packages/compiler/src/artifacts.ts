@@ -128,6 +128,10 @@ export type SemanticComponentPropBinding =
 			readonly sourceSpan?: SourceSpan;
 			// Body-local definitions spliced into a callback `source`; their reads are its too.
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
+			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
+			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
+			readonly catchBoundaryId?: string;
 			// A callback the compiler wrote around a prop its composer received through a props spread: the read no authored span holds.
 			readonly relayedRead?: LoweredStateRead;
 			// An opaque prop that is plain constant data: the render still runs the
@@ -846,6 +850,8 @@ export type SemanticEvent = {
 	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
 	// `@catch (error, reset)` reset names the handler calls, with the boundary each resets.
 	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+	// An async handler's rejection renders in this boundary's `@catch`: the nearest one whose @try arm holds the element.
+	readonly handlerCatchBoundaryId?: string;
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
@@ -1927,6 +1933,8 @@ export type PlannedSymbol =
 				readonly name: string;
 				readonly resets: ReadonlyArray<ReadonlyArray<string>>;
 			}>;
+			// A rejection from this handler publishes the runner of its nearest `@catch` boundary as failed.
+			readonly catchRunnerGraphNodeId?: string;
 	  }
 	| {
 			readonly id: string;
@@ -1944,6 +1952,13 @@ export type PlannedSymbol =
 			// Same mark as an event-handler symbol's: a callback prop's body is wherever it is
 			// authored, however many components forward it before it reaches a native listener.
 			readonly entryMarks?: ReadonlyArray<string>;
+			// `@catch (error, reset)` names this callback prop's own source calls, each with the
+			// async values its block reads, upstream first, every one followed by its own reads.
+			readonly catchResets?: ReadonlyArray<{
+				readonly name: string;
+				readonly resets: ReadonlyArray<ReadonlyArray<string>>;
+			}>;
+			readonly catchRunnerGraphNodeId?: string;
 	  }
 	| {
 			readonly id: string;

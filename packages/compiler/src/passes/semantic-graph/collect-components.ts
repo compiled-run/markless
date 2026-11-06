@@ -44,7 +44,7 @@ import {
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
-import { inlineHandlerRenderLocals, liftArmRenderLocalValue } from './render-local-inline.ts';
+import { inlineHandlerRenderLocals, liftArmRenderLocalValue, resetRelay } from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -237,6 +237,22 @@ function componentPropBindings(
 		const callback =
 			expression && isCallbackExpression(expression) ? expression : namedCallback;
 
+		// `onRetry={reset}` names no local function, so it becomes a callback whose source is `reset`.
+		if (!callback && expression) {
+			const relayedReset = resetRelay(expression, state);
+			if (relayedReset) {
+				props.push({
+					name,
+					source: relayedReset.name,
+					kind: 'callback',
+					parameters: [],
+					sourceSpan: span,
+					catchResets: [{ name: relayedReset.name, boundaryId: relayedReset.boundaryId }],
+				});
+				continue;
+			}
+		}
+
 		if (callback && isCallbackExpression(callback)) {
 			const parameterNodes = asNodes(callback.params);
 			const unsupportedParameterReason = callbackParameterUnsupportedReason(parameterNodes);
@@ -294,6 +310,17 @@ function componentPropBindings(
 				sourceSpan: sourceSpan(callback, state.filename),
 				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
 				...(syncPolicy ? { syncPolicy } : {}),
+				...(callback.async === true && state.currentCatchBoundaryId
+					? { catchBoundaryId: state.currentCatchBoundaryId }
+					: {}),
+				...(inlined?.catchResets.size
+					? {
+							catchResets: [...inlined.catchResets].map(([resetName, boundaryId]) => ({
+								name: resetName,
+								boundaryId,
+							})),
+						}
+					: {}),
 			});
 			continue;
 		}
