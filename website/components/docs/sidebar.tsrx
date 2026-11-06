@@ -147,72 +147,74 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				<use href={marks + 'sidebar-panel'} />
 			</svg>
 		</button>
-		<div class="sidebar-head">
-			<ModeSelect mode={here.key} />
-			<button
-				id="sidebar-close"
-				type="button"
-				class="sidebar-toggle sidebar-close"
-				aria-label="Close sidebar"
-				title="Close sidebar"
-				aria-expanded="true"
-				aria-controls="docs-sidebar"
-				onClick={() => {
-					shown = 'closed';
-					setTimeout(() => document.getElementById('sidebar-open')?.focus(), 0);
-				}}
-			>
-				<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
-					<use href={marks + 'sidebar-panel'} />
-				</svg>
-			</button>
-		</div>
-		<details class="sidebar-disclosure">
-			<summary class="sidebar-summary">Browse pages</summary>
-			<tree.root class="page-tree" aria-label="Documentation pages">
-				<div role="none">
-					@for (const section of sections; key section.title) {
-						<tree.item
-							class={'branch stroke-' + (section.stroke ?? 'pink')}
-							open={section.expanded}
-							level={1}
-							aria-label={section.title}
-						>
-							<tree.itemtrigger class="branch-trigger">
-								<tree.itemindicator class="branch-indicator" aria-hidden="true">
-									<svg class="branch-node" viewBox="0 0 24 24" fill="none">
-										<circle cx="12" cy="12" r="9" fill="currentColor" />
-										<path class="node-chevron" d="m10 8 4 4-4 4" />
+		<div class="sidebar-scroll">
+			<div class="sidebar-head">
+				<ModeSelect mode={here.key} />
+				<button
+					id="sidebar-close"
+					type="button"
+					class="sidebar-toggle sidebar-close"
+					aria-label="Close sidebar"
+					title="Close sidebar"
+					aria-expanded="true"
+					aria-controls="docs-sidebar"
+					onClick={() => {
+						shown = 'closed';
+						setTimeout(() => document.getElementById('sidebar-open')?.focus(), 0);
+					}}
+				>
+					<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
+						<use href={marks + 'sidebar-panel'} />
+					</svg>
+				</button>
+			</div>
+			<details class="sidebar-disclosure">
+				<summary class="sidebar-summary">Browse pages</summary>
+				<tree.root class="page-tree" aria-label="Documentation pages">
+					<div role="none">
+						@for (const section of sections; key section.title) {
+							<tree.item
+								class={'branch stroke-' + (section.stroke ?? 'pink')}
+								open={section.expanded}
+								level={1}
+								aria-label={section.title}
+							>
+								<tree.itemtrigger class="branch-trigger">
+									<tree.itemindicator class="branch-indicator" aria-hidden="true">
+										<svg class="branch-node" viewBox="0 0 24 24" fill="none">
+											<circle cx="12" cy="12" r="9" fill="currentColor" />
+											<path class="node-chevron" d="m10 8 4 4-4 4" />
+										</svg>
+									</tree.itemindicator>
+									<tree.itemlabel class="branch-title">{section.title}</tree.itemlabel>
+									<svg class="branch-connector path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
+										<path d="M12 1 C11 14 13 34 12 47" />
 									</svg>
-								</tree.itemindicator>
-								<tree.itemlabel class="branch-title">{section.title}</tree.itemlabel>
-								<svg class="branch-connector path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M12 1 C11 14 13 34 12 47" />
-								</svg>
-							</tree.itemtrigger>
-							<tree.itemcontent class="branch-content">
-								<svg class="branch-elbow path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M1 1 V28 Q1 47 23 47" />
-								</svg>
-								<div role="none">
-									@for (const entry of section.entries; key entry.href) {
-										<tree.item leaf level={2} class="page-node" aria-label={entry.title} data-page-href={entry.href}>
-											<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
-												<path d="M12 1 V23" />
-											</svg>
-											<PageLink entry={entry} />
-										</tree.item>
-									}
-								</div>
-								<svg class="branch-return path-line" viewBox="0 0 40 32" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M39 1 C39 26 1 6 1 31" />
-								</svg>
-							</tree.itemcontent>
-						</tree.item>
-					}
-				</div>
-			</tree.root>
-		</details>
+								</tree.itemtrigger>
+								<tree.itemcontent class="branch-content">
+									<svg class="branch-elbow path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
+										<path d="M1 1 V28 Q1 47 23 47" />
+									</svg>
+									<div role="none">
+										@for (const entry of section.entries; key entry.href) {
+											<tree.item leaf level={2} class="page-node" aria-label={entry.title} data-page-href={entry.href}>
+												<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
+													<path d="M12 1 V23" />
+												</svg>
+												<PageLink entry={entry} />
+											</tree.item>
+										}
+									</div>
+									<svg class="branch-return path-line" viewBox="0 0 40 32" preserveAspectRatio="none" aria-hidden="true">
+										<path d="M39 1 C39 26 1 6 1 31" />
+									</svg>
+								</tree.itemcontent>
+							</tree.item>
+						}
+					</div>
+				</tree.root>
+			</details>
+		</div>
 
 		<style>
 			/* The nav list is inside a <details> with no `open` attribute, so a phone gets
@@ -258,51 +260,46 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 			}
 
+			/* The nav slides as one piece; the list inside it scrolls, so nothing the slide moves is clipped. */
 			.sidebar {
 				position: fixed;
 				left: var(--space-s-l);
 				top: calc(var(--header-height) + var(--space-s));
 				width: 16rem;
-				max-height: calc(100vh - var(--header-height) - var(--space-s));
-				overflow-y: auto;
-				overscroll-behavior: contain;
-				/* The rail scrolls, but its track is not part of the drawing: the fade at the
-				   bottom (T017) is what says there is more list under the fold. */
-				scrollbar-width: none;
-				padding-block: var(--space-s);
 				font-size: var(--step--1);
 			}
 
-			.sidebar::-webkit-scrollbar {
-				display: none;
+			.sidebar-scroll {
+				max-height: calc(100vh - var(--header-height) - var(--space-s));
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				scrollbar-width: none;
+				padding-block: 0.5rem 1rem;
 			}
 
-			@media (min-width: 70.01rem) and (max-height: 62rem) {
-				.sidebar {
-					mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
-				}
+			.sidebar-scroll::-webkit-scrollbar {
+				display: none;
 			}
 
 			@media (max-width: 70rem) {
 				.sidebar {
 					position: static;
 					width: auto;
-					max-height: none;
 					max-width: 68ch;
 					margin-inline: auto;
+				}
+
+				.sidebar-scroll {
+					max-height: none;
+					overflow: visible;
 					padding-block: var(--space-s) 0;
 				}
 			}
 
-			.sidebar {
-				padding-block: 0.5rem 1rem;
-				mask-image: none;
-			}
-
 			.page-tree {
-				--branch-height: 2.25rem;
-				--branch-gap: 0rem;
-				--page-height: 2.25rem;
+				--branch-height: 2.5rem;
+				--branch-gap: 0.375rem;
+				--page-height: 2.5rem;
 				--path-ink: var(--muted-ink);
 				font-size: 1rem;
 				line-height: 1.3;
@@ -420,7 +417,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				display: block;
 				inset-inline-start: -0.625rem;
 				width: 1.775rem;
-				height: calc(0.5rem + var(--branch-height) / 2);
+				height: calc(1.7rem + var(--branch-height) / 2);
 				margin-block-start: 0.1rem;
 				margin-block-end: calc(0.7rem - var(--branch-gap) - var(--branch-height) / 2);
 			}
@@ -486,47 +483,40 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				overflow: visible;
 			}
 
-			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. */
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The reopen button rides the nav's right edge out and stays at the page edge. */
 			@media (min-width: 70.01rem) {
 				.sidebar-close {
 					display: inline-flex;
 				}
 
+				.sidebar {
+					transition:
+						translate var(--sidebar-slide),
+						visibility 0s;
+				}
+
 				.sidebar-open {
-					position: fixed;
-					inset-inline-start: var(--space-s-l);
-					inset-block-start: calc(var(--header-height) + var(--space-s) + 0.5rem);
-					z-index: 20;
+					position: absolute;
+					inset-inline-start: calc(100% + var(--space-s-l));
+					inset-block-start: 0.5rem;
+				}
+
+				html[data-sidebar='closed'] .sidebar {
+					translate: calc(-100% - var(--space-s-l)) 0;
+					visibility: hidden;
+					transition:
+						translate var(--sidebar-slide),
+						visibility 0s var(--sidebar-slide-ms);
 				}
 
 				html[data-sidebar='closed'] .sidebar-open {
 					display: inline-flex;
-				}
-
-				.sidebar {
-					transition: visibility 0s;
-				}
-
-				html[data-sidebar='closed'] .sidebar {
-					visibility: hidden;
-					transition: visibility 0s 160ms;
-				}
-
-				html[data-sidebar='closed'] .sidebar-open {
 					visibility: visible;
-				}
-
-				:is(.sidebar-head, .sidebar-disclosure) {
-					transition: translate 160ms ease;
-				}
-
-				html[data-sidebar='closed'] :is(.sidebar-head, .sidebar-disclosure) {
-					translate: -110% 0;
 				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				:is(.sidebar, .sidebar-head, .sidebar-disclosure),
+				.sidebar,
 				html[data-sidebar='closed'] .sidebar {
 					transition: none;
 				}
