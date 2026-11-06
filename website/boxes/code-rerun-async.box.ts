@@ -1,7 +1,7 @@
 import { box } from '@async/witness';
 import { chromium, expect } from '@playwright/test';
 
-const SLOW_SOURCE = `export function loadMugFact(ms: number) {
+const SLOW_SOURCE = `export function loadForecast(ms: number) {
 	return new Promise<string>((done) => {
 		setTimeout(() => done('Lovely and lemony'), ms);
 	});
@@ -9,10 +9,10 @@ const SLOW_SOURCE = `export function loadMugFact(ms: number) {
 `;
 
 const REVIEWS = `import { computed } from '@markless/core';
-import { loadMugFact } from './mug-facts.ts';
+import { loadForecast } from './forecast.ts';
 
 export default function Reviews() @{
-	const text = computed(async () => loadMugFact(1500));
+	const text = computed(async () => loadForecast(1500));
 
 	<section>
 		<h2>Reviews</h2>
@@ -55,12 +55,12 @@ export default box(
 			const runAgain = block.getByRole('button', { name: 'Run again' });
 			await runAgain.click();
 			const result = page.frameLocator('iframe.code-frame').first();
-			await expect(result.locator('body')).toContainText('Tall mug', { timeout: 60_000 });
+			await expect(result.locator('body')).toContainText('Oslo: rain, 4°', { timeout: 60_000 });
 
-			await block.getByRole('tab', { name: 'mug-facts.ts', exact: true }).click();
-			await block.getByRole('textbox', { name: /^mug-facts\.ts,/ }).fill(SLOW_SOURCE);
-			await block.getByRole('tab', { name: 'mug-facts.tsrx', exact: true }).click();
-			await block.getByRole('textbox', { name: /^mug-facts\.tsrx,/ }).fill(REVIEWS);
+			await block.getByRole('tab', { name: 'forecast.ts', exact: true }).click();
+			await block.getByRole('textbox', { name: /^forecast\.ts,/ }).fill(SLOW_SOURCE);
+			await block.getByRole('tab', { name: 'forecast-card.tsrx', exact: true }).click();
+			await block.getByRole('textbox', { name: /^forecast-card\.tsrx,/ }).fill(REVIEWS);
 			await expect(result.locator('body')).toContainText('Lovely and lemony', { timeout: 30_000 });
 
 			for (const wait of [300, 400, 500]) {
