@@ -186,7 +186,7 @@ async function renderCsr(
 	}
 
 	// Set only by a compiled module serving async values: seeded boundaries settle before the root mounts.
-	const settleSeeds = await (globalThis as ResumeCacheHost).__mResume?.(output);
+	const settleSeeds = await (globalThis as ResumeCacheHost).__mSeed?.(output);
 	const container = await startCsrRuntime(output);
 	await settleSeeds?.(container);
 	if ((await options.beforeMount?.(container)) === false) {

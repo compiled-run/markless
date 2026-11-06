@@ -192,7 +192,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 							if (!claim()) return;
 							input.settleTracker?.markSettled(boundary.id);
 							(asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, false);
-							asyncPlanes.cache?.(input, boundary, (snapshot as { readonly status: 'fulfilled' | 'rejected' }).status);
+							settledCache(input, boundary, snapshot);
 						}
 						return boundaryRangeJournal(boundary.id, {
 							type: 'async-boundary-snapshot',

@@ -2,6 +2,7 @@ import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client
 import type { ProtocolStatePayload, ProtocolStreamedArmPatch } from '@markless/serializer';
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import type { ResumeDomOwnerDocument } from './resume-types.ts';
+import { RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE } from './resume-cache-storage-key.ts';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
 // swapped settled arm content into the boundary's anchor range pre-runtime;
@@ -49,7 +50,7 @@ export function adoptStreamedArmPatches(
 	// Patches the resume cache seeded, until a streamed patch for the same block supersedes them.
 	const seeded = new Set<string>();
 	for (const script of scripts) {
-		const cached = script.getAttribute('data-seeded') !== null;
+		const cached = script.getAttribute(RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE) !== null;
 		// Cache entries are written by the browser, not the compiler: one that does not parse is a miss.
 		let parsed: unknown;
 		try {

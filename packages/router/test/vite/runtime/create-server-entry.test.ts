@@ -3,33 +3,9 @@ import { servedLinkBridge } from '../../support/link-bridge.ts';
 import { MarklessCompileError, serializeMarklessDevError } from '@markless/bundler/dev-error';
 import { ASYNC_BOUNDARY_ARM } from '../../../../serializer/src/index.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
-import { createServerEntry, resumeCacheScope } from '../../../src/vite/runtime/create-server-entry.ts';
+import { createServerEntry } from '../../../src/vite/runtime/create-server-entry.ts';
 import { INLINE_RESUMER_PAGE_TOKEN } from '@markless/web/inline/resumer';
 import { decodeProtocolPayloadLists } from '../../../../serializer/src/protocol-record-templates.ts';
-
-describe('resume cache scope token', () => {
-	// A digest of the cookie header looks like a per-session scope, but a server can revoke, switch
-	// tenant, or log a visitor out without rewriting the cookie: identical bytes can name two people
-	// over time (goals/continuity/notes/T020-failsafe-scope-attack.md). The safe default never derives
-	// a token from a cookie at all.
-	it('gives a cookieless request the one constant token a page without sessions needs', async () => {
-		expect(await resumeCacheScope(null)).toBe('0');
-	});
-
-	it('gives a request carrying any cookie no scope, so the cache disables itself for it', async () => {
-		expect(await resumeCacheScope('sid=abc')).toBeUndefined();
-		expect(await resumeCacheScope('sid=abc; other=1')).toBeUndefined();
-	});
-
-	it('never derives the same non-empty token for two different cookie headers', async () => {
-		// Regression pin: an earlier draft hashed the cookie header into a token, which cannot
-		// rotate on a server-side-only revocation or account switch that leaves the cookie alone.
-		const a = await resumeCacheScope('sid=A');
-		const b = await resumeCacheScope('sid=B');
-		expect(a).toBeUndefined();
-		expect(b).toBeUndefined();
-	});
-});
 
 describe('server entry rendering', () => {
 	it('renders matched Markless page artifacts inside an HTML document', async () => {

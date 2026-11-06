@@ -21,9 +21,27 @@ export function deferred<T>() {
 	return { promise, resolve, reject };
 }
 
-// The resume cache's entries in this tab; the bare prefix key is its write order, not an entry.
+// Each test file keeps its own scope token: files share the tab's session storage and may run at once.
+let scope = '';
+export function useScope(token: string): string {
+	return (scope = token);
+}
+
+// This file's resume cache entries; the bare prefix key is the cache's write order, not an entry.
 export function entries(): string[] {
-	return Object.keys(sessionStorage).filter((key) => key.startsWith('markless:resume:'));
+	return Object.keys(sessionStorage).filter((key) => key.startsWith(`markless:resume:${scope}:`));
+}
+
+// A capture runs at idle after its settle, so a test that ended can still write one: let it land, then clear.
+export async function drainEntries(): Promise<void> {
+	for (let round = 0; round < 2; round++)
+		await new Promise((resolve) => requestIdleCallback(() => setTimeout(resolve, 50)));
+	clearEntries();
+}
+
+export function clearEntries(): void {
+	for (const key of Object.keys(sessionStorage))
+		if (key.startsWith(`markless:resume:${scope}`)) sessionStorage.removeItem(key);
 }
 
 // Every element that showed a @pending arm while the test watched, in any frame or mutation.

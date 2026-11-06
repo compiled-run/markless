@@ -18,7 +18,7 @@ type Node = { readonly nodeType?: number; readonly nextSibling?: Node | null } &
 export type ResumeCacheSeed = (
 	output: CsrRenderOutput,
 ) => Promise<((container: CsrRenderContainer) => Promise<void>) | undefined> | undefined;
-export type ResumeCacheHost = { __mResume?: ResumeCacheSeed };
+export type ResumeCacheHost = { __mSeed?: ResumeCacheSeed };
 
 export type ResumeCacheContext = {
 	readonly exclude: ReadonlyArray<string>;
@@ -38,15 +38,14 @@ export function installMarklessResumeCache(excluded?: ReadonlyArray<string>): vo
 	if (excluded) exclude = excluded;
 	if (asyncPlanes.cache) return;
 	asyncPlanes.cache = settled;
-	(globalThis as ResumeCacheHost).__mResume = seed;
+	(globalThis as ResumeCacheHost).__mSeed = seed;
 	// A page the browser restores from its back-forward cache never boots again, so it revalidates here.
 	addEventListener('pageshow', (event) => {
 		if (!event.persisted) return;
+		prune();
 		for (const wiring of live)
-			if (!(wiring.root as { readonly isConnected?: boolean }).isConnected) live.delete(wiring);
-			else
-				for (const boundary of wiring.asyncBoundariesById.values())
-					for (const read of boundary.asyncReads) wiring.graph.rerun?.(read.graphNodeId, true);
+			for (const boundary of wiring.asyncBoundariesById.values())
+				for (const read of boundary.asyncReads) wiring.graph.rerun?.(read.graphNodeId, true);
 	});
 }
 
@@ -58,9 +57,12 @@ function storage(): Storage | undefined {
 	}
 }
 
-// The token travels in the document the server rendered; a client mount reads the one its page was served with.
+// The token travels in the document the server rendered; a client mount after its container left keeps this document's last one.
 function scope(): string | null | undefined {
-	return document.querySelector(`[${RESUME_CACHE_SCOPE_ATTRIBUTE}]`)?.getAttribute(RESUME_CACHE_SCOPE_ATTRIBUTE);
+	const held = document as Document & { __mScope?: string | null };
+	return (held.__mScope =
+		document.querySelector(`[${RESUME_CACHE_SCOPE_ATTRIBUTE}]`)?.getAttribute(RESUME_CACHE_SCOPE_ATTRIBUTE) ??
+		held.__mScope);
 }
 
 // A container's route is the path it booted on, so a capture that lands after a navigation keys the page it came from.
@@ -81,6 +83,7 @@ const context: ResumeCacheContext = {
 };
 
 function seed(output: CsrRenderOutput): ReturnType<ResumeCacheSeed> {
+	if (!scope()) return undefined;
 	const hits = (output.view?.asyncBoundaries ?? []).flatMap((boundary) => {
 		const name = key(output.root, output.state?.buildHash, boundary.id);
 		let raw: string | null | undefined;
@@ -102,8 +105,20 @@ export function whenSeeded(root: object, boundaryId: string): Promise<void> {
 	});
 }
 
+// A page a navigation replaced keeps nothing alive here.
+function prune(): void {
+	for (const wiring of live)
+		if (!(wiring.root as { readonly isConnected?: boolean }).isConnected) live.delete(wiring);
+}
+
 function settled(wiring: Wiring, boundary: Boundary, status: 'fulfilled' | 'rejected'): void {
-	live.add(wiring);
+	// A document without a scope token keeps nothing, and nothing in it was seeded.
+	const name = context.key(wiring, boundary.id);
+	if (!name) return;
+	if (!live.has(wiring)) {
+		prune();
+		live.add(wiring);
+	}
 	if (boundary.seeded && !revalidating.has(boundary)) {
 		revalidating.add(boundary);
 		if (status === 'fulfilled') {
@@ -115,8 +130,6 @@ function settled(wiring: Wiring, boundary: Boundary, status: 'fulfilled' | 'reje
 		}
 	}
 	if (boundary.seeded) mark(boundary, false);
-	const name = context.key(wiring, boundary.id);
-	if (!name) return;
 	if (status === 'rejected') {
 		// Seeded content never outlives a failing source.
 		try {

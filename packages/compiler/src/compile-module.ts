@@ -442,6 +442,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 								symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							}),
 							sourceInput(inputs.source).source,
+							sourceInput(inputs.source).importedModuleInterfaces,
 						),
 					};
 				},

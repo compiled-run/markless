@@ -8,6 +8,7 @@ import type { SerializedGraphPayload } from '../../../serializer/src/value-decod
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import { derivedReconcilePlane, installDerivedReconcilePlane } from '../reconcile-plane-slot.ts';
 import { PROTOCOL_STREAM_OPEN_PROPERTY } from '../../../serializer/src/protocol-stream-open.ts';
+import { RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE } from '../resume-cache-storage-key.ts';
 
 // A runtime that wakes while the server still streams an @pending boundary's arm
 // runs every event at once and adopts the arm when it lands: the boundary's runner
@@ -61,8 +62,9 @@ type Internals = {
 	readonly scheduleFlush: () => void;
 };
 
-const ARM_RECORDS = 'script[type="markless/arm"]';
-const STATE_PATCH = 'script[type="markless/state-patch"]';
+// A resume cache seed is what the tab saw last time, never the stream's answer.
+const ARM_RECORDS = `script[type="markless/arm"]:not([${RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE}])`;
+const STATE_PATCH = `script[type="markless/state-patch"]:not([${RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE}])`;
 
 export function marklessStreamedArms<Load extends SymbolLoader>(
 	root: StreamRoot,

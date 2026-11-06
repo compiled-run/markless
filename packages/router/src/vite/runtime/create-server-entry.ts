@@ -83,8 +83,6 @@ import type { FragmentPreload } from '../entries/fragment-entry.ts';
 
 export interface ServerEntryOptions {
 	readonly dev?: boolean;
-	// false: pages carry no session scope token, so the browser keeps no resume cache.
-	readonly resumeCache?: boolean;
 	// The app's public base path; the shared link bridge module sits under it.
 	readonly base?: string;
 	readonly navigationEntryPath?: string;
@@ -468,7 +466,6 @@ export function createServerEntry(options: ServerEntryOptions) {
 		};
 		const renderOptions = {
 			cookie,
-			...(options.resumeCache !== false && { resumeScope: await resumeCacheScope(cookie) }),
 			props: pageProps,
 			resumeModuleUrl: options.resumeEntryPath ?? baseArtifact?.resumeModuleUrl,
 			modulePreloads: (html: string, resumes: boolean) =>
@@ -1415,15 +1412,4 @@ function headContentStart(html: string): number {
 	return charset && (headEnd === -1 || afterHead + charset.index < headEnd)
 		? afterHead + charset.index + charset[0].length
 		: afterHead;
-}
-
-// A token hashed from the cookie header looked like a safe per-session scope, but it is not: a
-// server can revoke, switch tenant, or log a visitor out without rewriting the cookie, so the same
-// bytes can name two different people over time (goals/continuity/notes/T020-failsafe-scope-attack.md).
-// No cookie at all has no such transition to miss, so a cookieless request shares the one constant
-// token a page without sessions needs; a request that carries any cookie gets no scope at all
-// (the cache disables itself for it, same as the spec's "no derivable token" case) until an app
-// supplies its own authoritative scope — deferred, not yet wired, and owner-level when it lands.
-export async function resumeCacheScope(cookie: string | null): Promise<string | undefined> {
-	return cookie ? undefined : '0';
 }

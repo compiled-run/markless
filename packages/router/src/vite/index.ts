@@ -258,6 +258,9 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	];
 }
 
+// The server entry mints no session scope token yet (spec 13: the default derivation awaits the owner), so no page could keep anything.
+const SERVER_MINTS_RESUME_SCOPE = false;
+
 // Client modules serving async values install the resume cache unless the app turned it off.
 function resumeCachePlugin(options: MarklessRouterOptions): Plugin {
 	return {
@@ -277,7 +280,9 @@ function resumeCachePlugin(options: MarklessRouterOptions): Plugin {
 				  }
 				| undefined;
 			markless?.api.declareResumeCache(
-				options.resumeCache === false ? false : { exclude: options.resumeCache?.exclude ?? [] },
+				options.resumeCache === false || !SERVER_MINTS_RESUME_SCOPE
+					? false
+					: { exclude: options.resumeCache?.exclude ?? [] },
 			);
 		},
 	};
@@ -1435,7 +1440,6 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  fragmentNavigationSource: ${JSON.stringify(minifiedFragmentNavigationSource())},`,
 		`  fragmentNavigationRunSource: ${JSON.stringify(minifiedFragmentNavigationSource(runFragmentNavigation))},`,
 		...(options.prefetch === false ? ['  prefetch: false,'] : []),
-		...(options.resumeCache === false ? ['  resumeCache: false,'] : []),
 		`  routeModulePreloads,`,
 		`  routeSsrModulePreloads,`,
 		`  routeResumeModules,`,

@@ -16,7 +16,12 @@ declare const __MARKLESS_DEV_ENABLED__: boolean;
 type CacheHook = NonNullable<typeof asyncPlanes.cache>;
 type Wiring = Parameters<CacheHook>[0];
 type Boundary = Parameters<CacheHook>[1];
-type Snapshot = { readonly status?: unknown; readonly key?: unknown; readonly value?: unknown };
+type Snapshot = {
+	readonly status?: unknown;
+	readonly key?: unknown;
+	readonly value?: unknown;
+	readonly action?: boolean;
+};
 
 // Byte pressure, not freshness: one entry may take this much, and every entry together this much.
 export const RESUME_CACHE_ENTRY_CHARS = 64 * 1024;
@@ -54,6 +59,8 @@ async function captureBoundary(
 	const snapshots = records.map((record) => wiring.graph.read(record.graphNodeId, []) as Snapshot);
 	// Only settled, fulfilled values are kept; a revalidation in flight leaves the previous entry in place.
 	if (snapshots.some((snapshot) => snapshot?.status !== 'fulfilled')) return undefined;
+	// A reload must never replay what a click asked for, such as a save.
+	if (snapshots.some((snapshot) => snapshot.action)) return 'a user action fetched it';
 	const k = resumeCacheDependencyKey(state, boundary.asyncReads, (graphNodeId, path) =>
 		wiring.graph.read(graphNodeId, path),
 	);
@@ -69,10 +76,12 @@ async function captureBoundary(
 		});
 	}
 	const arm = await settledArm(wiring, boundary);
+	if (typeof arm === 'string') return arm;
 	const entry: ResumeCacheEntry = {
 		k,
 		s: { cells: [], computed } as unknown as ResumeCacheEntry['s'],
-		...(arm && { h: arm.html, a: arm.armRecords }),
+		h: arm.html,
+		a: arm.armRecords,
 	};
 	const json = JSON.stringify(entry);
 	if (json.length > RESUME_CACHE_ENTRY_CHARS) return `over the ${RESUME_CACHE_ENTRY_CHARS}-character entry cap`;
@@ -80,19 +89,17 @@ async function captureBoundary(
 }
 
 // The settled @try arm a served page fills its pending range with, rendered the way a settle commit renders it.
+// Only an arm that is plain markup over the page's own values is kept: one with async blocks or state of its own has no proven seed.
 async function settledArm(
 	wiring: Wiring,
 	boundary: Boundary,
-): Promise<{ readonly html: string; readonly armRecords: unknown } | undefined> {
-	if (boundary.composedGraphProps || boundary.composedInstancePath) return undefined;
+): Promise<{ readonly html: string; readonly armRecords: unknown } | string> {
+	if (boundary.composedGraphProps || boundary.composedInstancePath) return 'its arm is composed from a parent';
 	if (wiring.commitArm && wiring.renderAsyncBoundary) {
 		const rendered = await wiring.renderAsyncBoundary(boundary.id, 'fulfilled', wiring.graph);
-		const armRecords = boundaryArmRecordSet(rendered.armRecords);
-		return armRecords && typeof rendered.html === 'string' && ownsNoState(wiring, rendered)
-			? { html: rendered.html, armRecords }
-			: undefined;
+		return plainArm(wiring, rendered.html, boundaryArmRecordSet(rendered.armRecords), rendered);
 	}
-	if (!boundary.updateSymbolId) return undefined;
+	if (!boundary.updateSymbolId) return 'it has no settle renderer';
 	const update = (await (await wiring.loadSymbol(boundary.updateSymbolId))({
 		graph: wiring.graph,
 		status: 'fulfilled',
@@ -106,13 +113,20 @@ async function settledArm(
 		readonly cells?: ReadonlyArray<unknown>;
 		readonly computed?: ReadonlyArray<{ readonly graphNodeId?: string }>;
 	} | null;
-	const armRecords = boundaryArmRecordSet(update?.armRecords);
-	return update?.arm === ASYNC_BOUNDARY_ARM.try &&
-		typeof update.html === 'string' &&
-		armRecords &&
-		ownsNoState(wiring, update)
-		? { html: update.html, armRecords }
-		: undefined;
+	if (update?.arm !== ASYNC_BOUNDARY_ARM.try) return 'it settles to another arm';
+	return plainArm(wiring, update.html, boundaryArmRecordSet(update.armRecords), update);
+}
+
+function plainArm(
+	wiring: Wiring,
+	html: unknown,
+	armRecords: ReturnType<typeof boundaryArmRecordSet>,
+	update: Parameters<typeof ownsNoState>[1],
+): { readonly html: string; readonly armRecords: unknown } | string {
+	if (typeof html !== 'string' || !armRecords) return 'its arm did not render';
+	if (armRecords.asyncBoundaries?.length) return 'its arm holds async blocks of its own';
+	if (!ownsNoState(wiring, update)) return 'its arm brings state of its own';
+	return { html, armRecords };
 }
 
 // An arm whose components bring their own state needs that state in the seed too, so a served page does not fill it.

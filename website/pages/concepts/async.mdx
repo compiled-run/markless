@@ -312,6 +312,49 @@ The bare `reload;` line is the read: it is what makes a change to `reload` run t
 Adding one is a refresh like any other: the list stays on the page, marked busy, until the new one
 arrives.
 
+## A reload shows what you last saw
+
+A reload normally starts every block over, so the page flashes its `@pending` content for answers
+the visitor was looking at a second ago. Markless can keep each block's last answer in the tab's
+session storage and show it straight away on the next load of that page, in the same tab:
+
+- The kept answer paints with the page. There is no `@pending` frame and nothing moves.
+- The recipe still runs, every time. When the new answer arrives, the text on the page changes in
+  place: the same elements stay, and focus stays where it was. This refresh is quiet, like a
+  [background refresh](#a-background-refresh-stays-quiet): no busy mark, no "Updating…".
+- If the recipe fails, the kept answer stays and `@catch` opens after it, like any
+  [failed refresh](#try-again). The kept answer is then thrown away, so it never outlives a failing
+  source.
+- Going back to a page you already visited in this tab works the same way.
+
+You write nothing for this. A few things are never kept:
+
+- An answer a click asked for. If a click ran the recipe, for example a save in a row the click
+  added, a reload never shows that answer or runs that recipe again.
+- An answer fetched with different inputs. If the recipe reads a state that has a different value
+  on the next load, the kept answer is skipped and `@pending` shows as usual.
+- Anything from another build of the page, or from another visitor session.
+- Values you list in `exclude`, by the name of the async value (a trailing `*` matches every name
+  that starts with the rest). A name that matches nothing stops the build, so a rename cannot
+  quietly start keeping something:
+
+```ts
+router({ resumeCache: { exclude: ['balance', 'ticker*'] } });
+router({ resumeCache: false }); // ships no code for it at all
+```
+
+A region showing a kept answer carries a `data-markless-seeded` attribute until its new answer
+lands, so you can spot it in the browser's element inspector or leave it out of analytics. If a
+kept region changes often and matters to screen reader users, give it `aria-live="polite"` so the
+quiet update is still heard. To clear what a tab kept, remove the session storage keys that start
+with `markless:resume`.
+
+<Callout
+	kind="warning"
+	title="Not on in router apps yet"
+	text="Showing a kept answer is only safe when the next load comes from the same visitor session, and Markless has not settled how the server tells one session from the next. Until it does, the router keeps nothing and a reload shows @pending as before."
+/>
+
 ## One block per row
 
 To give each row of a list its own wait, put the async value in a component and render that

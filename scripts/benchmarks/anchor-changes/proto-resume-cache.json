@@ -7,8 +7,8 @@
 				"@fixtures/vite-csr",
 				"runtime/graph"
 			],
-			"delta": 22,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"delta": 24,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -18,8 +18,8 @@
 				"@fixtures/vite-csr",
 				"web/render"
 			],
-			"delta": 92,
-			"reason": "resume cache: optional asyncPlanes.cache hook + seeded-boundary wiring in web/resume-async-wiring (spec 13); re-anchored against the pre-rebase base, will redo against proto/async-final-3 after the rebase",
+			"delta": 90,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -29,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-async-wiring"
 			],
-			"delta": 437,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"delta": 423,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -41,7 +41,7 @@
 				"web/resume-resettle-hold"
 			],
 			"delta": 19,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -52,7 +52,7 @@
 				"web/resume-runtime-start"
 			],
 			"delta": 30,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -63,8 +63,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 37,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"delta": 21,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -74,8 +74,8 @@
 				"@fixtures/vite-plus",
 				"runtime/graph"
 			],
-			"delta": 22,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"delta": 24,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -85,8 +85,8 @@
 				"@fixtures/vite-plus",
 				"web/render"
 			],
-			"delta": 92,
-			"reason": "resume cache: optional asyncPlanes.cache hook + seeded-boundary wiring in web/resume-async-wiring (spec 13); re-anchored against the pre-rebase base, will redo against proto/async-final-3 after the rebase",
+			"delta": 90,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -96,8 +96,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-async-wiring"
 			],
-			"delta": 437,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"delta": 423,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -108,7 +108,7 @@
 				"web/resume-resettle-hold"
 			],
 			"delta": 19,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -119,7 +119,7 @@
 				"web/resume-runtime-start"
 			],
 			"delta": 30,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -130,8 +130,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -1,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"delta": 2,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		},
 		{
@@ -142,8 +142,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 26,
-			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"delta": 23,
+			"reason": "resume cache hooks every async app carries (spec 13): settle and seed slots in wiring and render, the seeded hold skip, quiet revalidation and user-action marks in the graph",
 			"date": "2026-11-06"
 		}
 	]

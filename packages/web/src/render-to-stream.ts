@@ -32,9 +32,16 @@ import {
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import { runResumeCacheSeed } from './inline/resume-seed.ts';
+import { INLINE_MODULE_LOADER_SOURCE } from './inline/resumer.ts';
 import { resumeCacheDependencyKey } from './resume-cache-key.ts';
-import { RESUME_CACHE_KEY_PREFIX, RESUME_CACHE_SEEDED_ATTRIBUTE } from './resume-cache-storage-key.ts';
+import {
+	RESUME_CACHE_KEY_PREFIX,
+	RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE,
+	RESUME_CACHE_SEEDED_ATTRIBUTE,
+} from './resume-cache-storage-key.ts';
 import { deserializeGraphValue, type SerializedGraphPayload } from '../../serializer/src/value.ts';
+
+declare const __MARKLESS_DEV_ENABLED__: boolean;
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -396,10 +403,13 @@ function resumeCacheSeedScripts(
 		state.buildHash,
 		ASYNC_BOUNDARY_ARM.try,
 		RESUME_CACHE_SEEDED_ATTRIBUTE,
+		RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE,
 		items,
+		resumeModuleUrl ?? null,
+		typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__,
 	]
 		.map((value) => escapeScriptJson(JSON.stringify(value)))
-		.join(',')});`;
+		.join(',')},${INLINE_MODULE_LOADER_SOURCE});`;
 	// Lands inside the container (assembleSsrContainer's extraContainerParts), never appended after
 	// the shell string: splitSsrContainer requires the shell to end with the container's own </div>.
 	return (
