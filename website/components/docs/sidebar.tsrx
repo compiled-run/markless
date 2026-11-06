@@ -1,4 +1,4 @@
-import { computed, state } from '@markless/core';
+import { computed, state, storage } from '@markless/core';
 import { tree } from '@markless/ui';
 import { Link } from '@markless/core/router';
 import ModeSelect from './mode-select.tsrx';
@@ -89,6 +89,7 @@ function PageLink({ entry }: { readonly entry: SidebarEntry }) @{
 			.page-link {
 				grid-template-columns: 1.8rem minmax(0, 1fr);
 				gap: 0.5rem;
+				box-sizing: border-box;
 				min-height: var(--page-height);
 				padding: 0.15rem 0.25rem;
 				border: 0;
@@ -115,7 +116,28 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 		...section,
 		expanded: section.entries.some((entry) => entry.active),
 	}));
+	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
+	let shown = storage('sidebar', 'open');
+	const marks = asset(INK_MARKS) + '#';
 
+	<>
+	<button
+		id="sidebar-open"
+		type="button"
+		class="sidebar-toggle sidebar-open"
+		aria-label="Open sidebar"
+		title="Open sidebar"
+		aria-expanded="false"
+		aria-controls="docs-sidebar"
+		onClick={() => {
+			shown = 'open';
+			setTimeout(() => document.getElementById('sidebar-close')?.focus(), 0);
+		}}
+	>
+		<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
+			<use href={marks + 'sidebar-panel'} />
+		</svg>
+	</button>
 	<nav
 		id="docs-sidebar"
 		class="sidebar"
@@ -126,7 +148,26 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			if (row.hasAttribute('data-page-href')) row.querySelector<HTMLAnchorElement>('a')?.click();
 		}}
 	>
-		<ModeSelect mode={here.key} />
+		<div class="sidebar-head">
+			<ModeSelect mode={here.key} />
+			<button
+				id="sidebar-close"
+				type="button"
+				class="sidebar-toggle sidebar-close"
+				aria-label="Close sidebar"
+				title="Close sidebar"
+				aria-expanded="true"
+				aria-controls="docs-sidebar"
+				onClick={() => {
+					shown = 'closed';
+					setTimeout(() => document.getElementById('sidebar-open')?.focus(), 0);
+				}}
+			>
+				<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
+					<use href={marks + 'sidebar-panel'} />
+				</svg>
+			</button>
+		</div>
 		<details class="sidebar-disclosure">
 			<summary class="sidebar-summary">Browse pages</summary>
 			<tree.root class="page-tree" aria-label="Documentation pages">
@@ -260,16 +301,18 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			}
 
 			.page-tree {
-				--branch-height: 2.75rem;
-				--page-height: 2.5rem;
+				--branch-height: 2.25rem;
+				--branch-gap: 0rem;
+				--page-height: 2.25rem;
 				--path-ink: var(--muted-ink);
 				font-size: 1rem;
+				line-height: 1.3;
 				padding: 0.2rem;
 			}
 
 			.branch {
 				position: relative;
-				padding-block-end: 0.5rem;
+				padding-block-end: var(--branch-gap);
 			}
 
 			.branch-trigger {
@@ -280,7 +323,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				gap: 0.65rem;
 				width: 100%;
 				min-height: var(--branch-height);
-				padding: 0.35rem 0.25rem;
+				padding: 0.2rem 0.25rem;
 				border: 0;
 				border-radius: 5px;
 				background: transparent;
@@ -338,7 +381,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				inset-inline-start: 0.25rem;
 				inset-block-start: calc(50% + 0.7rem);
 				width: 1.25rem;
-				height: calc(100% - 0.9rem);
+				height: calc(100% + var(--branch-gap) - 1.4rem);
 			}
 
 			.branch[ui-open] > .branch-trigger .branch-connector,
@@ -375,11 +418,12 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 
 			.branch-return {
 				position: relative;
+				display: block;
 				inset-inline-start: -0.625rem;
 				width: 1.775rem;
-				height: calc(1.05rem + var(--branch-height) / 2);
+				height: calc(0.5rem + var(--branch-height) / 2);
 				margin-block-start: 0.1rem;
-				margin-block-end: calc(0.2rem - var(--branch-height) / 2);
+				margin-block-end: calc(0.7rem - var(--branch-gap) - var(--branch-height) / 2);
 			}
 
 			.page-node {
@@ -388,9 +432,9 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 
 			.page-connector {
 				inset-inline-start: 0.25rem;
-				inset-block-start: calc(50% + 1rem);
+				inset-block-start: calc(50% + 0.8rem);
 				width: 1.8rem;
-				height: calc(100% - 2rem);
+				height: calc(100% - 1.6rem);
 			}
 
 			.branch-trigger:hover,
@@ -405,9 +449,80 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				outline: none;
 			}
 
-			@media (max-width: 70rem) {
-				.page-tree {
-					--page-height: 2.75rem;
+			.sidebar-head {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				margin-bottom: var(--space-s);
+				padding-inline-end: 0.5rem;
+			}
+
+			.sidebar-toggle {
+				display: none;
+				align-items: center;
+				justify-content: center;
+				flex: none;
+				inline-size: 2.25rem;
+				block-size: 2.25rem;
+				padding: 0;
+				color: var(--ink);
+				background: none;
+				border: 0;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+
+			.sidebar-toggle:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.sidebar-toggle:focus-visible {
+				outline: 2px dashed var(--ink);
+				outline-offset: 2px;
+			}
+
+			.sidebar-toggle-icon {
+				inline-size: 1.5rem;
+				block-size: 1.5rem;
+				overflow: visible;
+			}
+
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. */
+			@media (min-width: 70.01rem) {
+				.sidebar-close {
+					display: inline-flex;
+				}
+
+				.sidebar-open {
+					position: fixed;
+					inset-inline-start: var(--space-s-l);
+					inset-block-start: calc(var(--header-height) + var(--space-s) + 0.5rem);
+					z-index: 20;
+				}
+
+				html[data-sidebar='closed'] .sidebar-open {
+					display: inline-flex;
+				}
+
+				.sidebar {
+					transition:
+						translate 160ms ease,
+						visibility 0s;
+				}
+
+				html[data-sidebar='closed'] .sidebar {
+					translate: calc(-100% - 2 * var(--space-s-l)) 0;
+					visibility: hidden;
+					transition:
+						translate 160ms ease,
+						visibility 0s 160ms;
+				}
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.sidebar,
+				html[data-sidebar='closed'] .sidebar {
+					transition: none;
 				}
 			}
 
@@ -418,4 +533,5 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			}
 		</style>
 	</nav>
+	</>
 }

@@ -70,6 +70,12 @@ export default function Document({
 					}
 				}
 
+				@media (min-width: 70.01rem) and (max-width: 96rem) {
+					html[data-sidebar='closed'] .site-shell:has(#docs-sidebar) {
+						padding-left: calc(11rem + 2 * var(--space-s-l));
+					}
+				}
+
 				@media (max-width: 70rem) {
 					.site-shell {
 						padding-inline: var(--space-s-l);

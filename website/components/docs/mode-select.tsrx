@@ -11,8 +11,7 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				position: relative;
 				box-sizing: border-box;
 				inline-size: 100%;
-				padding-inline-end: 0.5rem;
-				margin-bottom: var(--space-s);
+				min-inline-size: 0;
 				z-index: 25;
 				--select-wash: color-mix(in srgb, var(--purple) 22%, var(--paper));
 			}
@@ -33,8 +32,8 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				justify-content: space-between;
 				gap: 0.8em;
 				inline-size: 100%;
-				min-block-size: 3rem;
-				padding: 0.5em 0.8em;
+				min-block-size: 2.5rem;
+				padding: 0.3em 0.75em;
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: var(--step-0);
 				font-weight: 400;
@@ -43,7 +42,7 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				background: var(--paper);
 				border: 1.5px solid var(--ink);
 				border-radius: 6px;
-				box-shadow: 4px 4px 0 var(--select-shadow);
+				box-shadow: 3px 3px 0 var(--select-shadow);
 				cursor: pointer;
 				transition: box-shadow 160ms ease;
 			}
@@ -75,7 +74,7 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				background: var(--paper);
 				border: 1.5px solid var(--ink);
 				border-radius: 6px;
-				box-shadow: 4px 4px 0 var(--select-shadow);
+				box-shadow: 3px 3px 0 var(--select-shadow);
 			}
 
 			.mode-select-content[hidden] {
