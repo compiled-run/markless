@@ -120,24 +120,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	let shown = storage('sidebar', 'open');
 	const marks = asset(INK_MARKS) + '#';
 
-	<>
-	<button
-		id="sidebar-open"
-		type="button"
-		class="sidebar-toggle sidebar-open"
-		aria-label="Open sidebar"
-		title="Open sidebar"
-		aria-expanded="false"
-		aria-controls="docs-sidebar"
-		onClick={() => {
-			shown = 'open';
-			setTimeout(() => document.getElementById('sidebar-close')?.focus(), 0);
-		}}
-	>
-		<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
-			<use href={marks + 'sidebar-panel'} />
-		</svg>
-	</button>
 	<nav
 		id="docs-sidebar"
 		class="sidebar"
@@ -148,6 +130,23 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			if (row.hasAttribute('data-page-href')) row.querySelector<HTMLAnchorElement>('a')?.click();
 		}}
 	>
+		<button
+			id="sidebar-open"
+			type="button"
+			class="sidebar-toggle sidebar-open"
+			aria-label="Open sidebar"
+			title="Open sidebar"
+			aria-expanded="false"
+			aria-controls="docs-sidebar"
+			onClick={() => {
+				shown = 'open';
+				setTimeout(() => document.getElementById('sidebar-close')?.focus(), 0);
+			}}
+		>
+			<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
+				<use href={marks + 'sidebar-panel'} />
+			</svg>
+		</button>
 		<div class="sidebar-head">
 			<ModeSelect mode={here.key} />
 			<button
@@ -505,22 +504,29 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 
 				.sidebar {
-					transition:
-						translate 160ms ease,
-						visibility 0s;
+					transition: visibility 0s;
 				}
 
 				html[data-sidebar='closed'] .sidebar {
-					translate: calc(-100% - 2 * var(--space-s-l)) 0;
 					visibility: hidden;
-					transition:
-						translate 160ms ease,
-						visibility 0s 160ms;
+					transition: visibility 0s 160ms;
+				}
+
+				html[data-sidebar='closed'] .sidebar-open {
+					visibility: visible;
+				}
+
+				:is(.sidebar-head, .sidebar-disclosure) {
+					transition: translate 160ms ease;
+				}
+
+				html[data-sidebar='closed'] :is(.sidebar-head, .sidebar-disclosure) {
+					translate: -110% 0;
 				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.sidebar,
+				:is(.sidebar, .sidebar-head, .sidebar-disclosure),
 				html[data-sidebar='closed'] .sidebar {
 					transition: none;
 				}
@@ -533,5 +539,4 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			}
 		</style>
 	</nav>
-	</>
 }
