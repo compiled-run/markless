@@ -40,7 +40,7 @@ import { planPayloadArena } from './passes/payload-arena.ts';
 import { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
 import { emitPublicRenderModule } from './passes/public-render/module.ts';
 import { planPublicRender } from './passes/public-render/plan.ts';
-import { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
+import { createProtocolStatePayloadFromArena, withBuildHash } from './passes/protocol-state.ts';
 import { createProtocolViewPayload } from './passes/protocol-view.ts';
 import { createRenderData } from './passes/render-data/index.ts';
 import {
@@ -435,11 +435,14 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				...pass,
 				run({ inputs }) {
 					return {
-						protocolState: createProtocolStatePayloadFromArena({
-							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
-							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
-							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
-						}),
+						protocolState: withBuildHash(
+							createProtocolStatePayloadFromArena({
+								semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+								payloadArena: inputs.payloadArena as PayloadArenaArtifact,
+								symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+							}),
+							sourceInput(inputs.source).source,
+						),
 					};
 				},
 			};

@@ -339,10 +339,10 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			nodes.set(node.graphNodeId, node);
 			context.held?.seed(node);
 		},
-		rerun(graphNodeId) {
+		rerun(graphNodeId, fulfilled) {
 			const node = nodes.get(graphNodeId);
-			if (node?.snapshot.status !== 'rejected') return false;
-			// A reset re-runs a rejected value even though its key has not changed.
+			if (node?.snapshot.status !== (fulfilled ? 'fulfilled' : 'rejected')) return false;
+			// A reset re-runs a rejected value, and a seeded value revalidates, though the key has not changed.
 			node.gate = 1;
 			advance(node);
 			return true;

@@ -46,7 +46,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'protocol-state',
 		description: 'Create the serializable protocol state payload.',
-		consumes: ['semanticGraph', 'payloadArena', 'symbolResolver'],
+		consumes: ['source', 'semanticGraph', 'payloadArena', 'symbolResolver'],
 		produces: ['protocolState'],
 	},
 	{

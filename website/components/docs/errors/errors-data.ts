@@ -8177,6 +8177,25 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_RESUME_CACHE_EXCLUDE_UNMATCHED',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_RESUME_CACHE_EXCLUDE_UNMATCHED: resumeCache.exclude entry "<pattern>" matches no async computed in this build<near>. Name an async computed (computed(async () => ...)) declared in a page or component, or remove the entry.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/resume-cache-excludes.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/resume-cache-excludes.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_RESUME_DISPATCH_EXPORT_MISSING',
 		packageName: '@markless/bundler',
 		stage: 'build',

@@ -46,14 +46,25 @@ export function adoptStreamedArmPatches(
 	);
 	const armPatchesByBoundary = new Map<string, ProtocolStreamedArmPatch>();
 	const deltas = new Map<string, StreamedStateDelta>();
+	// Patches the resume cache seeded, until a streamed patch for the same block supersedes them.
+	const seeded = new Set<string>();
 	for (const script of scripts) {
+		const cached = script.getAttribute('data-seeded') !== null;
+		// Cache entries are written by the browser, not the compiler: one that does not parse is a miss.
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(script.textContent as string);
+		} catch (error) {
+			if (!cached) throw error;
+			continue;
+		}
 		const boundaryId = script.getAttribute('data-boundary');
 		if (boundaryId) {
-			if (!uncommittedBoundaryIds.has(boundaryId))
-				armPatchesByBoundary.set(
-					boundaryId,
-					JSON.parse(script.textContent as string) as ProtocolStreamedArmPatch,
-				);
+			if (!uncommittedBoundaryIds.has(boundaryId)) {
+				armPatchesByBoundary.set(boundaryId, parsed as ProtocolStreamedArmPatch);
+				if (cached) seeded.add(boundaryId);
+				else seeded.delete(boundaryId);
+			}
 			continue;
 		}
 		const graphNodeId = script.getAttribute('data-graph-node') ?? '';
@@ -61,10 +72,7 @@ export function adoptStreamedArmPatches(
 			(candidate) => candidate.runnerGraphNodeId === graphNodeId,
 		);
 		if (!boundary || uncommittedBoundaryIds.has(boundary.id)) continue;
-		const delta = decodeProtocolPayloadLists(
-			'markless/state',
-			JSON.parse(script.textContent as string) as StreamedStateDelta | null,
-		);
+		const delta = decodeProtocolPayloadLists('markless/state', parsed as StreamedStateDelta | null);
 		if (delta) deltas.set(graphNodeId, delta);
 	}
 	const cells = mergeStateRecords(decoded.state.cells, deltas.values(), 'cells');
@@ -88,6 +96,7 @@ export function adoptStreamedArmPatches(
 						'markless/view',
 						armPatch[1],
 					) as (typeof boundary)['armRecords'],
+					...(seeded.has(boundary.id) && { seeded: true as const }),
 				};
 			}),
 		},

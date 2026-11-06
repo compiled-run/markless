@@ -71,8 +71,8 @@ export type AsyncComputedPlane = {
 	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
-	/** Re-runs a rejected async value with the key it already has; false when it is not rejected. */
-	readonly rerun: (graphNodeId: string) => boolean;
+	/** Re-runs a rejected async value with the key it already has, or a fulfilled one when `fulfilled` is set; false otherwise. */
+	readonly rerun: (graphNodeId: string, fulfilled?: boolean) => boolean;
 	/** Marks a settled value busy ahead of the write that will really refresh it (submit-quiet-design.md Q1). */
 	readonly markEntry: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
@@ -356,8 +356,8 @@ export type RuntimeGraph = {
 		plane: AsyncComputedPlaneFactory,
 		held?: HeldInputsPlaneFactory,
 	) => boolean;
-	/** Re-runs a rejected async value with the key it already has; false or undefined when it is not rejected. */
-	readonly rerun?: (graphNodeId: string) => boolean | undefined;
+	/** Re-runs a rejected async value with the key it already has, or a fulfilled one when `fulfilled` is set. */
+	readonly rerun?: (graphNodeId: string, fulfilled?: boolean) => boolean | undefined;
 	/** Marks a settled value busy ahead of the write that will really refresh it (submit-quiet-design.md Q1). */
 	readonly markEntry?: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
@@ -760,7 +760,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
 		shownRead: (dependencies) => asyncPlane?.shownRead(dependencies),
-		rerun: (graphNodeId) => asyncPlane?.rerun(graphNodeId),
+		rerun: (graphNodeId, fulfilled) => asyncPlane?.rerun(graphNodeId, fulfilled),
 		markEntry: (graphNodeId) => asyncPlane?.markEntry(graphNodeId),
 		endEntry: (graphNodeId) => asyncPlane?.endEntry(graphNodeId),
 		markUserActionStart: () => void userActionDepth++,

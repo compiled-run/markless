@@ -320,3 +320,17 @@ function protocolReturnProperty(
 		path: property.path,
 	};
 }
+
+// The resume cache keys entries by this, so an entry written by another build of the module never seeds this one.
+export function withBuildHash(state: ProtocolStatePayload, source: string): ProtocolStatePayload {
+	if (!state.computed.some((computed) => computed.async)) return state;
+	let high = 0x811c9dc5;
+	let low = 0x2545f491;
+	for (const text of [source, JSON.stringify(state)])
+		for (let at = 0; at < text.length; at++) {
+			const code = text.charCodeAt(at);
+			high = Math.imul(high ^ code, 0x01000193);
+			low = Math.imul(low ^ code, 0x5bd1e995);
+		}
+	return { ...state, buildHash: (high >>> 0).toString(36) + (low >>> 0).toString(36) };
+}

@@ -85,6 +85,7 @@ test('can disable Nitro for route-only fixtures and apps', () => {
 		'markless-router:typegen',
 		'markless-router:anchors',
 		'markless-router:html',
+		'markless-router:resume-cache',
 		'markless-router:routes',
 	]);
 	expect(names).not.toContain('markless-router:vite');

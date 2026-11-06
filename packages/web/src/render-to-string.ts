@@ -65,6 +65,7 @@ import {
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
+import { RESUME_CACHE_SCOPE_ATTRIBUTE } from './resume-cache-storage-key.ts';
 import { servedElementTree, servedLocatorPaths, withElementAttributes } from './locator-paths.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
@@ -128,6 +129,11 @@ export type RenderToStringOptions = {
 	// Build-computed settled-arm templates plus their fill plan. Inert markup:
 	// it sits after the rendered page so no page element or comment index moves.
 	readonly armEmission?: string;
+	/**
+	 * The visitor's session scope token. A page with async blocks carries it, and the browser keeps their
+	 * settled content under it; a new token (a login, a logout, another user) reaches none of the old entries.
+	 */
+	readonly resumeScope?: string;
 };
 
 export type ModulePreloadInput =
@@ -186,6 +192,9 @@ export async function assembleSsrContainer(
 	component: SsrRenderable,
 	output: SsrRenderOutput,
 	options: RenderToStringOptions,
+	// Markup that must land INSIDE the container (splitSsrContainer requires the shell to end with
+	// the container's own closing tag, so nothing may follow it): the streaming resume-cache seed.
+	extraContainerParts?: ReadonlyArray<string | undefined>,
 ): Promise<string> {
 	const hasPayload = !!output.state || !!output.view;
 	const { state, view } = await prepareSsrResumeRecords(output);
@@ -320,8 +329,10 @@ export async function assembleSsrContainer(
 				payloadScripts?.viewScript,
 				renderSyncPolicyTableScript(policyTable.policies),
 				resumerScript,
+				...(extraContainerParts ?? []),
 			],
 			resumerScript ? servedView.locators : [],
+			resumeCacheScope(options, state, view),
 		),
 	]
 		.filter(Boolean)
@@ -1081,12 +1092,25 @@ function renderContainer(
 	containerId: string | undefined,
 	parts: ReadonlyArray<string | undefined>,
 	locators: ProtocolViewPayload['locators'],
+	scope?: string,
 ): string {
 	const inner = parts.filter(Boolean).join('');
 	const paths = servedLocatorPaths(inner, locators);
 	const id = containerId ? `="${escapeAttribute(containerId)}"` : '';
 	const located = paths ? ` ${PROTOCOL_LOCATOR_PATHS_ATTRIBUTE}="${paths}"` : '';
-	return `${CONTAINER_OPEN}${id}${located}>${inner}${CONTAINER_CLOSE}`;
+	const scoped = scope ? ` ${RESUME_CACHE_SCOPE_ATTRIBUTE}="${escapeAttribute(scope)}"` : '';
+	return `${CONTAINER_OPEN}${id}${located}${scoped}>${inner}${CONTAINER_CLOSE}`;
+}
+
+// Only a page whose async blocks the cache can key carries the token.
+export function resumeCacheScope(
+	options: Pick<RenderToStringOptions, 'resumeScope'>,
+	state: Pick<ProtocolStatePayload, 'buildHash'> | undefined,
+	view: Pick<ProtocolViewPayload, 'asyncBoundaries'> | undefined,
+): string | undefined {
+	return options.resumeScope && state?.buildHash && view?.asyncBoundaries.length
+		? options.resumeScope
+		: undefined;
 }
 
 const CONTAINER_OPEN = `<div ${CONTAINER_ATTRIBUTE}`;

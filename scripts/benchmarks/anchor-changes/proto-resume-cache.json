@@ -1,0 +1,150 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 22,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render"
+			],
+			"delta": 92,
+			"reason": "resume cache: optional asyncPlanes.cache hook + seeded-boundary wiring in web/resume-async-wiring (spec 13); re-anchored against the pre-rebase base, will redo against proto/async-final-3 after the rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 437,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": 19,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 30,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 37,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 22,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render"
+			],
+			"delta": 92,
+			"reason": "resume cache: optional asyncPlanes.cache hook + seeded-boundary wiring in web/resume-async-wiring (spec 13); re-anchored against the pre-rebase base, will redo against proto/async-final-3 after the rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 437,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": 19,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 30,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 26,
+			"reason": "resume cache: optional asyncPlanes.cache hook + buildHash stamping (spec 13); pinned to the actual branch base, will redo against proto/async-final-3 after rebase",
+			"date": "2026-11-06"
+		}
+	]
+}

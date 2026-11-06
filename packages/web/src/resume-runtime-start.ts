@@ -216,6 +216,7 @@ export async function startResumeRuntime(input: {
 				storeContainerSubscription,
 				commitArm: input.commitArm,
 				demandOnStart: runtimeInput.demandAsyncBoundaries === true,
+				state: runtimeInput.state,
 			});
 			settleTracker = started.settleTracker;
 			return started;
