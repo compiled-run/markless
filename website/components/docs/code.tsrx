@@ -8,10 +8,11 @@ import sessionUrl from 'virtual:code-session-url';
 import liveUrl from 'virtual:code-live-url';
 import CodeFiles, { CodeTabs } from './code-files.tsrx';
 
+// A block runs nothing at load: no idle or on-sight trigger. Hover downloads what boot needs; the first press or focus boots.
 // A URL the bundler cannot follow keeps the editor out of preloads.
-function boot(event: { readonly target: unknown }, files: readonly CodeFile[], onSight = false): void {
+function boot(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
 	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
-	if (!box || (onSight && !bootsOnSight(box))) return;
+	if (!box) return;
 	// Keys typed before the editor attaches stay in the textarea; the session compiles them.
 	for (const input of box.querySelectorAll<HTMLTextAreaElement>('[data-code-input]')) input.readOnly = false;
 	void (import(/* @vite-ignore */ sessionUrl) as Promise<typeof import('./code/session.ts')>).then(
@@ -28,17 +29,6 @@ function boot(event: { readonly target: unknown }, files: readonly CodeFile[], o
 function prefetch(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
 	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
 	if (box) prefetchCodeBlock(box, files);
-}
-
-// Mirrors session.ts: `markless-code:editor` and `markless-code:<path>:<block index>:<hash>`.
-function bootsOnSight(box: HTMLElement): boolean {
-	try {
-		const connection = (navigator as { connection?: { saveData?: boolean } }).connection;
-		if (localStorage.getItem('markless-code:editor') && !connection?.saveData) return true;
-		const prefix = `markless-code:${location.pathname}:${[...document.querySelectorAll('.code-block')].indexOf(box)}:`;
-		for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i)?.startsWith(prefix)) return true;
-	} catch {}
-	return false;
 }
 
 export default function Code({
@@ -91,13 +81,8 @@ export default function Code({
 		class="code-block"
 		data-code="idle"
 		data-code-live={live ? '' : undefined}
-		onVisible={(event) => {
-			prefetch(event, files);
-			boot(event, files, true);
-		}}
-		onIdle={(event) => prefetch(event, files)}
-		onPointerenter={(event) => boot(event, files)}
-		onTouchstart={(event) => boot(event, files)}
+		onPointerenter={(event) => prefetch(event, files)}
+		onPointerdown={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
 		<header class="bar">
