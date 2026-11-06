@@ -1089,8 +1089,6 @@ function renderContainer(
 	return `${CONTAINER_OPEN}${id}${located}>${inner}${CONTAINER_CLOSE}`;
 }
 
-const EARLY_EVENT_CAPTURE_START = `>${escapeInlineScript(createEarlyEventCaptureSource([]).slice(0, -'[]);'.length))}`;
-
 /**
  * Splits the early-event capture script off the front of the html that precedes the container.
  * A document host serves it ahead of its stylesheets: a classic script waits for every stylesheet
@@ -1100,7 +1098,9 @@ export function splitEarlyEventCapture(head: string): {
 	readonly capture: string;
 	readonly rest: string;
 } {
-	const start = head.startsWith('<script') ? head.indexOf(EARLY_EVENT_CAPTURE_START) : -1;
+	// Built here, not at module scope, so a bundle that never splits drops this function whole.
+	const captureStart = `>${escapeInlineScript(createEarlyEventCaptureSource([]).slice(0, -'[]);'.length))}`;
+	const start = head.startsWith('<script') ? head.indexOf(captureStart) : -1;
 	if (start === -1 || head.lastIndexOf('<', start) !== 0) return { capture: '', rest: head };
 	const end = head.indexOf('</script>', start) + '</script>'.length;
 	return { capture: head.slice(0, end), rest: head.slice(end) };
