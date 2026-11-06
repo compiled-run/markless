@@ -179,10 +179,10 @@ async function syncKeyInputScenario(screen: Screen) {
 	assertNoGap(stop());
 }
 
-// CSR-only landmine (see goals/handoffs/async-w35.md): this fixture's async node sometimes
-// settles on a stale value from a mount-time double-run race unrelated to entry marking, which a
-// restored entry hold can then surface. SSR seeds the node from a real server run, so it does not
-// hit that race; it is the proof for this scenario pending a fix to the CSR seeding path.
+test('CSR: a key reached through a sync computed is still marked from the click', async () => {
+	await syncKeyInputScenario(await render(SyncKeyInput));
+});
+
 test('SSR: a key reached through a sync computed is still marked from the click', async () => {
 	await syncKeyInputScenario(await renderSSR(SyncKeyInput));
 });

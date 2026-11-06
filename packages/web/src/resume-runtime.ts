@@ -117,7 +117,7 @@ export function createResumeRuntime(
 			registeredComputedRefreshIds.add(record.graphNodeId);
 			graphNodeIds?.add(record.graphNodeId);
 		}
-		(
+		await (
 			await import('./resume-sync-demand.ts')
 		).wireSyncComputedDemandRecordsWithoutLoadingCapability({
 			graph: input.graph,

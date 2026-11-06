@@ -29,8 +29,8 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
-}): void {
-	wireSyncComputedDemandRecordsWithoutLoadingCapability({
+}): Promise<void> {
+	return wireSyncComputedDemandRecordsWithoutLoadingCapability({
 		...input,
 		computed: input.state?.computed ?? [],
 		sharedSeeds: input.state?.sharedSeeds,
@@ -46,7 +46,7 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
-}): void {
+}): Promise<void> {
 	const records = [
 		...input.computed.filter(
 			(record) => record.async === false && typeof record.deriveSymbolId === 'string',
@@ -83,4 +83,29 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 			);
 		}
 	}
+	// A CSR mount serves no snapshot for a sync computed only an async value's key
+	// reads: nothing write-triggered has run yet, so its first demand would read
+	// it unresolved. Derive it once now, the same way a dependency write would.
+	const asyncKeyGraphNodeIds = new Set(
+		all.flatMap((record) => (record.async ? (record.dependencies ?? []).map((d) => d.graphNodeId) : [])),
+	);
+	return Promise.all(
+		records
+			.filter(
+				(computed) =>
+					asyncKeyGraphNodeIds.has(computed.graphNodeId) &&
+					graph.read(computed.graphNodeId, []) === undefined,
+			)
+			.map(async (computed) => {
+				const module = (syncComputedModule ??= await import('./resume-sync-computed.ts'));
+				await module.refreshSyncComputed({
+					computed,
+					records: all,
+					graph,
+					root: input.root,
+					loadSymbol: input.loadSymbol,
+					elementHandles: input.elementHandles,
+				});
+			}),
+	).then(() => undefined);
 }
