@@ -97,7 +97,7 @@ export const errorIndex: ErrorIndex = {
 					chip: 'error',
 					kind: 'compile error',
 					guided: true,
-					words: 'state() is created inside a branch, loop or handler markless_state_creation_site_unstable state() or computed() is created inside an @if, a loop, a handler, or another computed.',
+					words: 'state() is created inside a branch, loop or handler markless_state_creation_site_unstable state() or computed() is created in a loop, a handler, another computed, or an @if arm it cannot start from.',
 				},
 				{
 					code: 'MARKLESS_STATE_MODULE_SCOPE',
