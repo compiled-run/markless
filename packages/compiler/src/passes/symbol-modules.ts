@@ -6206,8 +6206,9 @@ export function buildEventHandlerEmission(
 	const source = projection?.source ?? symbol.source;
 
 	const shownReads = symbol.kind === 'event-handler' ? symbol.shownReads : undefined;
+	const entryMarks = symbol.kind === 'event-handler' ? symbol.entryMarks : undefined;
 	const scalarLeaf =
-		input.captureSlots.length === 0 && !shownReads
+		input.captureSlots.length === 0 && !shownReads && !entryMarks
 			? eventHandlerScalarLeafStatements(input, projection)
 			: null;
 	if (scalarLeaf) {
@@ -6314,6 +6315,20 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
+			...(entryMarks
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: ENTRY_MARK_START_FN,
+							source: '@markless/web/fns/entry-mark',
+						}),
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: ENTRY_MARK_END_FN,
+							source: '@markless/web/fns/entry-mark',
+						}),
+					]
+				: []),
 			...imports.map((moduleImport) =>
 				moduleImportNode({
 					kind: moduleImport.kind,
@@ -6327,7 +6342,14 @@ export function buildEventHandlerEmission(
 				eventHandlerFunctionNode(exportName, isAsync, [
 					...(shownReads ? [shownReadsStatement(shownReads)] : []),
 					...(importedReference ? [] : eventHandlerParameterStatements(input)),
-					...bodyStatements,
+					...(entryMarks
+						? [
+								entryMarkCallStatement(ENTRY_MARK_START_FN, entryMarks),
+								tryFinallyNode(bodyStatements, [
+									entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks),
+								]),
+							]
+						: bodyStatements),
 				]),
 			),
 		]),
@@ -7726,6 +7748,8 @@ function valuesChangingBetweenSettles(semanticGraph: SymbolModulesInput['semanti
 	);
 }
 const SHOWN_READS_FN = 'marklessShownReads';
+const ENTRY_MARK_START_FN = 'marklessEntryMarkStart';
+const ENTRY_MARK_END_FN = 'marklessEntryMarkEnd';
 
 function shownReadsStatement(
 	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
@@ -7741,6 +7765,30 @@ function shownReadsStatement(
 				jsonValueNode(reads.map(({ graphNodeId, path }) => ({ graphNodeId, path }))),
 			]),
 		},
+	};
+}
+
+function entryMarkCallStatement(fnName: string, graphNodeIds: ReadonlyArray<string>): EmissionNode {
+	return {
+		type: 'ExpressionStatement',
+		expression: callNode(identifierNode(fnName), [
+			identifierNode('context'),
+			stringArrayNode(graphNodeIds),
+		]),
+	};
+}
+
+// The handler's own body wrapped so a write it never reaches (an early return, a thrown error)
+// still runs the end call: the mark it opened at entry closes instead of sticking forever.
+function tryFinallyNode(
+	body: ReadonlyArray<EmissionNode>,
+	finalizer: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	return {
+		type: 'TryStatement',
+		block: { type: 'BlockStatement', body: [...body] },
+		handler: null,
+		finalizer: { type: 'BlockStatement', body: [...finalizer] },
 	};
 }
 

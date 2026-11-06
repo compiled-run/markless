@@ -67,6 +67,10 @@ export type AsyncComputedPlane = {
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
 	/** Re-runs a rejected async value with the key it already has; false when it is not rejected. */
 	readonly rerun: (graphNodeId: string) => boolean;
+	/** Marks a settled value busy ahead of the write that will really refresh it (submit-quiet-design.md Q1). */
+	readonly markEntry: (graphNodeId: string) => void;
+	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
+	readonly endEntry: (graphNodeId: string) => void;
 	/** Installs matched values, from `@markless/runtime/graph-held`. */
 	readonly holdInputs: (factory: HeldInputsPlaneFactory) => void;
 	readonly shownRead: (
@@ -344,6 +348,10 @@ export type RuntimeGraph = {
 	) => boolean;
 	/** Re-runs a rejected async value with the key it already has; false or undefined when it is not rejected. */
 	readonly rerun?: (graphNodeId: string) => boolean | undefined;
+	/** Marks a settled value busy ahead of the write that will really refresh it (submit-quiet-design.md Q1). */
+	readonly markEntry?: (graphNodeId: string) => void;
+	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
+	readonly endEntry?: (graphNodeId: string) => void;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -725,6 +733,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
 		shownRead: (dependencies) => asyncPlane?.shownRead(dependencies),
 		rerun: (graphNodeId) => asyncPlane?.rerun(graphNodeId),
+		markEntry: (graphNodeId) => asyncPlane?.markEntry(graphNodeId),
+		endEntry: (graphNodeId) => asyncPlane?.endEntry(graphNodeId),
 		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;
