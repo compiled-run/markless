@@ -828,8 +828,13 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 										context,
 									)
 								: [],
-					(items): Awaitable<RenderedPart> => {
-						if (!Array.isArray(items) || items.length === 0)
+					(collection): Awaitable<RenderedPart> => {
+						const items = Array.isArray(collection)
+							? collection
+							: typeof (collection as Iterable<unknown> | null)?.[Symbol.iterator] === 'function'
+								? [...(collection as Iterable<unknown>)]
+								: [];
+						if (items.length === 0)
 							return slot.emptyTemplateId
 								? renderChunk(slot.emptyTemplateId, {})
 								: { html: '', tokens: [] };

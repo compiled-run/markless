@@ -31,8 +31,8 @@ import {
 import {
 	marklessComposedGraphNodeId,
 	marklessInstancePath,
-	marklessRowSegment,
 	marklessWidgetHandleId,
+	marklessRowPath,
 } from './instance-scope.ts';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
@@ -463,20 +463,21 @@ export async function marklessSsrRenderChild(
 	return output.html ?? '';
 }
 /**
- * The runtime instance segment one `@for` row contributes. A KEYED row has an
- * identity of its own, so everything composed inside it — payload entries,
- * seeds, minted ids, event routes — hangs off `r:<key>:`. An unkeyed row has no
- * identity to carry and contributes nothing.
+ * The runtime instance segments the `@for` rows around a placed child contribute.
+ * A KEYED row has an identity of its own, so everything composed inside it -
+ * payload entries, seeds, minted ids, event routes - hangs off `r:<key>:`, one
+ * segment per enclosing row. Undefined when one of those rows is UNKEYED: it has
+ * no identity to carry, so its interactive output refuses.
  */
-export function marklessSsrRowSegment(repeatKey: unknown): string {
-	return repeatKey === undefined ? '' : marklessRowSegment(repeatKey);
+export function marklessSsrRowSegment(context: Parameters<typeof marklessRowPath>[0]): string | undefined {
+	return marklessRowPath(context);
 }
 
-/** Places a composed child inside its row: the row segment leads the edge's own prefixes. */
+/** Places a composed child inside its rows: the row segments lead the edge's own prefixes. */
 export function marklessSsrRowPlacement<
 	T extends { readonly hostPrefix: string; readonly symbolPrefix: string },
->(child: T, repeatKey: unknown): T {
-	const segment = marklessSsrRowSegment(repeatKey);
+>(child: T, context: Parameters<typeof marklessRowPath>[0]): T {
+	const segment = marklessRowPath(context);
 	if (!segment) return child;
 	return {
 		...child,

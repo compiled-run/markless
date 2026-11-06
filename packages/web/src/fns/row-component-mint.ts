@@ -830,11 +830,11 @@ function placeMintedRow(input: ComponentRowInput, render: RenderedComponentRow):
 	const { rendered, rowSegment } = render;
 	assertRowWidgetsResolved(input.repeat, rendered.state);
 	const childNodes = parseRowNodes(input.parent, input.repeat, rendered.html);
-	assertMintableRowRecords(input.repeat, rendered.view);
 	// The child's locators and branch anchors index its OWN fragment, so they
 	// resolve against the child's nodes whether or not a wrapper holds them.
 	const elementsByHostId = resolveRowHosts(input.repeat, childNodes, rendered.view);
-	const branches = resolveRowBranches(input.repeat, childNodes, rendered.view);
+	const comments = rowComments(childNodes);
+	const branches = resolveRowBranches(input.repeat, comments, rendered.view);
 	const placed = rowComponent.slotPath
 		? placeInWrapper(input, childNodes, rowComponent.slotPath)
 		: { nodes: childNodes, rowRoot: childNodes.find((node) => node.nodeType === 1) };
@@ -851,6 +851,7 @@ function placeMintedRow(input: ComponentRowInput, render: RenderedComponentRow):
 		commit: () =>
 			commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat, {
 				branches,
+				comments,
 				rowKey: input.rowKey,
 				rowSegment,
 				...(row.replaced ? { replaced: row.replaced } : {}),
@@ -902,6 +903,7 @@ async function commitMintedRow(
 	repeat: ResumeKeyedRepeatRecord,
 	row: {
 		readonly branches: ReadonlyArray<ResumeArmBranchRecord>;
+		readonly comments: ReadonlyArray<ResumeDomComment>;
 		readonly rowKey: unknown;
 		readonly rowSegment: string;
 		readonly replaced?: ResumeDomElement;
@@ -917,6 +919,12 @@ async function commitMintedRow(
 			? { keyedRepeats: rendered.view.keyedRepeats as ResumeArmRecordSet['keyedRepeats'] }
 			: {}),
 		...(row.branches.length ? { branches: row.branches } : {}),
+		...(rendered.view.asyncBoundaries.length
+			? {
+					asyncBoundaries: rendered.view
+						.asyncBoundaries as ResumeArmRecordSet['asyncBoundaries'],
+				}
+			: {}),
 	};
 	const deps = await registration.armRegistrationDeps(armRecords);
 	// A row built again under its key releases every host its old row registered.
@@ -931,7 +939,12 @@ async function commitMintedRow(
 		deps,
 		registration.installArmEventType,
 		mintedRowBoundary(repeat, row.rowKey),
-		{ armRecords, elementsByHostId, computed: rendered.state.computed },
+		{
+			armRecords,
+			elementsByHostId,
+			computed: rendered.state.computed,
+			comments: row.comments,
+		},
 	);
 }
 
@@ -1212,19 +1225,11 @@ function resolveRowHosts(
  */
 function resolveRowBranches(
 	repeat: ResumeKeyedRepeatRecord,
-	nodes: ReadonlyArray<ResumeDomNode>,
+	comments: ReadonlyArray<ResumeDomComment>,
 	view: ProtocolViewPayload,
 ): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = view.branches ?? [];
 	if (!records.length) return [];
-	const comments: ResumeDomComment[] = [];
-	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
-		for (const node of list) {
-			if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
-				comments.push(node as ResumeDomComment);
-			visit(node.childNodes ?? []);
-		}
-	})(nodes);
 	const anchorAt = (index: number, name: string, id: string): ResumeDomComment => {
 		const comment = comments[index];
 		if (!comment)
@@ -1245,18 +1250,17 @@ function resolveRowBranches(
 	);
 }
 
-// A boundary inside a minted row settles against bookkeeping the page took once,
-// at boot, for the rows it served, so registering it would register half a row.
-function assertMintableRowRecords(
-	repeat: ResumeKeyedRepeatRecord,
-	view: ProtocolViewPayload,
-): void {
-	if (!view.asyncBoundaries.length) return;
-	throw rowComponentError(
-		repeat,
-		'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
-		'builds a row containing @try, which a minted row cannot register yet.',
-	);
+// The row's comment census, which its branch and @try records count their anchors in.
+function rowComments(nodes: ReadonlyArray<ResumeDomNode>): ReadonlyArray<ResumeDomComment> {
+	const comments: ResumeDomComment[] = [];
+	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
+		for (const node of list) {
+			if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+				comments.push(node as ResumeDomComment);
+			visit(node.childNodes ?? []);
+		}
+	})(nodes);
+	return comments;
 }
 
 // A minted row is not an arm; it borrows the registrar's boundary slot to name

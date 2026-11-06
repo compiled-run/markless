@@ -764,6 +764,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'this @for collection reaches no cell on its shared instance markless_repeat_collection_unreadable this @for collection reaches no cell on its shared instance: a markless build error.',
 				},
 				{
+					code: 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+					title: 'This @for loop name cannot be destructured this way',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this @for loop name cannot be destructured this way markless_repeat_item_pattern_unsupported this @for loop name cannot be destructured this way: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_REPEAT_ROWS_FROZEN',
 					title: 'This @for renders its rows once and never updates them',
 					chip: 'error',
@@ -1674,14 +1682,6 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a new list row has nothing to render with markless_repeat_row_mint_renderer_missing a markless runtime error from @markless/web.',
-				},
-				{
-					code: 'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
-					title: 'A new list row holds @try',
-					chip: 'error',
-					kind: 'runtime error',
-					guided: false,
-					words: 'a new list row holds @try markless_repeat_row_component_unsupported a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_REPEAT_ROW_MINT_EMPTY',

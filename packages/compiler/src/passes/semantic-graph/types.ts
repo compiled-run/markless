@@ -164,7 +164,7 @@ export type WalkState = {
 	// Arm index inside the current boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	currentAsyncBoundaryArm: number | null;
 	currentSharedDefinitionId: string | null;
-	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
+	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | 'row' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];

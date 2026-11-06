@@ -377,6 +377,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly addressSteps?: ModuleGraphInterfaceElementCount;
 			// Absent on an interface built before this field existed, which reads as 'unknown'.
 			readonly constructReach?: ModuleGraphInterfaceConstructReach;
+			/** A @try stands at the component's top level, outside every element it renders. */
+			readonly rootBoundary?: true;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			/** Props this component files into a widget callback slot. */
@@ -729,6 +731,13 @@ export type SemanticKeyedRepeat = {
 	readonly asyncBoundaryId?: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
+	// A destructured header (`const [key, value]`): each name it binds and its path on the item `itemName` names.
+	readonly itemAliases?: ReadonlyArray<{
+		readonly name: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	// The destructuring as written, which diagnostics show in place of the compiler's item name.
+	readonly itemPattern?: string;
 	readonly indexName?: string;
 	readonly collectionSource: string;
 	readonly collectionGraphNodeId?: string;
@@ -901,6 +910,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_REQUIRED'
 		| 'MARKLESS_REPEAT_KEY_IS_INDEX'
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
+		| 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED'
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_REPEAT_ROWS_FROZEN'
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'
@@ -1997,6 +2007,16 @@ export type SymbolResolverPlan = {
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
 };
 
+/** One keyed row on the way to a row item: its collection, read off the graph or off the enclosing row's item, and the key path its rows are named by. */
+export type RowLocalStep = {
+	readonly rowIndex: number;
+	readonly keyPath: ReadonlyArray<string>;
+	readonly indexKey?: true;
+	readonly graphNodeId?: string;
+	readonly collectionPath?: ReadonlyArray<string>;
+	readonly itemPath?: ReadonlyArray<string>;
+};
+
 export type BoundSymbolCaptureRoute = Exclude<
 	CaptureSlotRoute,
 	{ readonly kind: 'unsupported-opaque' }
@@ -2099,6 +2119,8 @@ export type CaptureSlotRoute =
 			readonly callbackSymbolId: string;
 			/** The instance path of the component whose callback this is, when it is not the module root. */
 			readonly composerPath?: string;
+			// The callback names its own keyed bound row, which places itself by this many of the dispatching row's pieces.
+			readonly callbackRowPieces?: number;
 	  }
 	| {
 			// A widget part invokes a callback slot on its shared instance. The family
@@ -2145,6 +2167,11 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly itemName: string;
 			readonly path: ReadonlyArray<string>;
+			// An edge in nested rows finds the item by the keys its dispatching record's path spells, outermost row first.
+			readonly rows?: ReadonlyArray<RowLocalStep>;
+			// The edge whose rows those are; a bound row replaces it with that edge's place on its path.
+			readonly rowEdgeId?: string;
+			readonly rowPiece?: number;
 	  }
 	| {
 			readonly kind: 'unsupported-opaque';
