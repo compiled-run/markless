@@ -100,10 +100,16 @@ export default function Volume() @{
 		} @else {
 			<p>Loud</p>
 		}
-		<button onClick={() => (volume = Math.min(volume + 20, 100))}>
+		<button
+			onClick={() =>
+				(volume = Math.min(volume + 20, 100))
+			}
+		>
 			Louder
 		</button>
-		<button onClick={() => (volume = 0)}>Mute</button>
+		<button onClick={() => (volume = 0)}>
+			Mute
+		</button>
 	</section>
 }
 ```
@@ -136,8 +142,12 @@ export default function Status() @{
 				<p>Paused</p>
 			}
 		}
-		<button onClick={() => (status = 'playing')}>Play</button>
-		<button onClick={() => (status = 'paused')}>Pause</button>
+		<button onClick={() => (status = 'playing')}>
+			Play
+		</button>
+		<button onClick={() => (status = 'paused')}>
+			Pause
+		</button>
 	</section>
 }
 ```
