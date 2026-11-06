@@ -234,19 +234,20 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 					blocked = dependency;
 					if (!dependency.valueInputs) shown = false;
 					demand(dependency, fromWrite);
-				} else if (!blocked && dependency.snapshot.status === 'rejected') blocked = dependency;
+				} else if (!blocked && dependency.snapshot.status === 'rejected') {
+					blocked = dependency;
+					if (!dependency.valueInputs) shown = false;
+				}
 				return;
 			}
 			for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? [])
 				visit(dependency.graphNodeId);
 		};
 		for (const dependency of node.dependencies) visit(dependency.graphNodeId);
-		if (
-			blocked?.snapshot.status === 'pending' &&
-			shown &&
-			context.held?.startOnShownInputs(node)
-		)
-			return;
+		// A rejected blocker with a pinnable last-good value pins like a pending one (graph-held.ts `rejectedOnly`).
+		if (blocked && shown && context.held?.startOnShownInputs(node)) return;
+		// A sibling's failed refresh never rejects a reader whose pinned key did not move.
+		if (blocked?.snapshot.status === 'rejected' && shown) return;
 		if (blocked) {
 			commitDependencyBlock(
 				node,

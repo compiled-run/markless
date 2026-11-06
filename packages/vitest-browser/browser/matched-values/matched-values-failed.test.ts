@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { asked, fail, hold, release, reset } from './gates.ts';
 import { Disagreement } from './disagreement.tsrx';
+import { FailCatch } from './failcatch.tsrx';
 import { Revenue } from './revenue.tsrx';
 import { Share } from './share.tsrx';
 
@@ -152,6 +153,25 @@ each(
 		release('dis-revenue:20d');
 		await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1500');
 		await expect.poll(() => text(container, '[data-profit]')).toBe('20000');
+	},
+);
+
+each(
+	'Errors UC22: a catch-all cannot swallow a failed input',
+	{ csr: () => render(FailCatch), ssr: () => renderSSR(FailCatch) },
+	async (container) => {
+		await expect.poll(() => text(container, '[data-heading]'), { timeout: 5_000 }).toBe('12 past orders in A');
+		hold('fc-orders:B');
+		click(container, '[data-store-b]');
+		await expect.poll(() => text(container, '[data-picked]')).toBe('B');
+		fail('fc-orders:B', 'offline');
+		await settle();
+		click(container, '[data-cup]');
+		await settle();
+		expect(asked, 'the search runs after the failure, on the orders shown').toContain('fc-past:a1,a2:cup');
+		expect(text(container, '[data-heading]'), 'the swallow-catch never ran').not.toBe('-1 past orders in B');
+		expect(text(container, '[data-heading]')).toBe('12 past orders in A');
+		expect(container.querySelector('[data-error]')).toBe(null);
 	},
 );
 
