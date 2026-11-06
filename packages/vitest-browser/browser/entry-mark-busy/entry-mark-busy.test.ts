@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
+import { commands } from 'vitest/browser';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { ChildCallsProp } from './child-calls-prop.tsrx';
 import { EarlyReturn } from './early-return.tsrx';
@@ -19,6 +20,7 @@ import { WrapperSpread } from './wrapper-spread.tsrx';
 // Q1 option 1). The mark stays unbroken until the refresh that write causes lands or fails, and
 // clears with no refresh when the handler never reaches the write.
 afterEach(() => cleanup());
+afterEach(() => commands.throttleCpu(1));
 
 const poll = { timeout: 5_000, interval: 5 };
 
@@ -43,20 +45,23 @@ function click(container: ParentNode, selector: string): void {
 	button.click();
 }
 
-// Samples a selector's busy state every frame, so a drop between two marked moments is caught
-// even though `expect.poll` alone would only ever see the two ends.
+// Reconstructs every `aria-busy` value a selector held, from the mutation that set it rather
+// than a frame sample: a frame-rate poll can miss the whole window on a loaded main thread
+// (goals/handoffs/async-w39.md), while every attribute mutation is still recorded even when the
+// callback that reports it is delayed.
 function sampleBusy(container: ParentNode, selector: string) {
-	const seen: boolean[] = [];
-	let running = true;
-	const tick = () => {
-		if (!running) return;
-		seen.push(busy(container, selector));
-		requestAnimationFrame(tick);
-	};
-	requestAnimationFrame(tick);
-	return () => {
-		running = false;
-		return seen;
+	const target = container.querySelector(selector);
+	if (!target) throw new Error(`Expected ${selector} in the rendered DOM.`);
+	const priorValues: Array<string | null> = [];
+	const observer = new MutationObserver((mutations) => {
+		for (const mutation of mutations) priorValues.push(mutation.oldValue);
+	});
+	observer.observe(target, { attributes: true, attributeFilter: ['aria-busy'], attributeOldValue: true });
+	return (): boolean[] => {
+		for (const mutation of observer.takeRecords()) priorValues.push(mutation.oldValue);
+		observer.disconnect();
+		const isBusy = (value: string | null) => value === 'true';
+		return [...priorValues.map(isBusy), isBusy(target.getAttribute('aria-busy'))];
 	};
 }
 
@@ -186,11 +191,15 @@ async function syncKeyInputScenario(screen: Screen) {
 	assertNoGap(stop());
 }
 
+// Throttled on purpose: the busy window here is short enough (one 25ms handler delay plus a
+// 10ms recipe) that a loaded main thread is what exposed the dropped-sample flake this guards.
 test('CSR: a key reached through a sync computed is still marked from the click', async () => {
+	await commands.throttleCpu(6);
 	await syncKeyInputScenario(await render(SyncKeyInput));
 });
 
 test('SSR: a key reached through a sync computed is still marked from the click', async () => {
+	await commands.throttleCpu(6);
 	await syncKeyInputScenario(await renderSSR(SyncKeyInput));
 });
 
