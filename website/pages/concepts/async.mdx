@@ -2,95 +2,430 @@ import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import WeatherAnatomy from '../../components/figures/async/weather-anatomy.tsrx';
+import BoardAnatomy from '../../components/figures/async/board-anatomy.tsrx';
+import PostcardsAnatomy from '../../components/figures/async/postcards-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
 # Async values
 
-<PageMeta time="2 min" assumes="state, computed, conditionals" />
+<PageMeta time="7 min" assumes="state, computed, conditionals" />
 
-<Subtitle text="An async computed is a value that arrives later, and @try shows it once it's there." terms="values" />
+<Subtitle text="An async computed is a value that arrives later, and @try shows it once it's there." terms="computed" />
 
 ```tsrx title="forecast.tsrx"
-const forecast = computed(async () => loadForecast(city));
-
-@try {
-	<p>{forecast.text}</p>
-} @pending {
-	<p>Checking the sky…</p>
-}
-```
-
-**`computed(async …)`** makes a value that arrives later. **`@try`** shows it once it's ready, and **`@pending`** holds the spot until then.
-
-## Only the slow spot waits
-
-An *async* value is one that arrives later. It can only be shown inside `@try`, and everything outside `@try` is on the page straight away.
-
-- `@try` holds what you show once the value is ready.
-- `@pending` holds what you show before the first answer.
-- `@catch` holds what you show if loading it fails. Write the three in that order.
-
-Pick a city, then try picking two quickly.
-
-<WeatherAnatomy />
-
-<Code steps={[{ label: 'Press Lisbon and wait. The Oslo forecast stays until the new one lands.', shows: 'Lisbon: sunny, 19°' }, { label: 'Press Atlantis. The `@catch` block takes over.', shows: 'No forecast for that city.' }, { label: 'Try breaking it: move `<p>{forecast.text}</p>` above `@try`. The build stops, because an async value can only be shown inside `@try`.', fails: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED' }]}>
-```tsrx title="forecast-card.tsrx"
 import { computed, state } from '@markless/core';
 import { loadForecast } from './forecast.ts';
 
-export default function ForecastCard() @{
-	let city = state('Oslo');
-	const forecast = computed(async () => {
-		return { text: await loadForecast(city) };
-	});
+export default function Forecast() @{
+	let city = state('Austin');
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
 
 	<section>
-		<button onClick={() => (city = 'Oslo')}>
-			Oslo
-		</button>
-		<button onClick={() => (city = 'Lisbon')}>
-			Lisbon
-		</button>
-		<button onClick={() => (city = 'Atlantis')}>
-			Atlantis
-		</button>
+		<h2>{city}</h2>
 		@try {
-			<p>{forecast.text}</p>
+			<p>{forecast.summary}</p>
 		} @pending {
-			<p>Checking the sky…</p>
+			<p>Checking the sky</p>
 		} @catch {
-			<p>No forecast for that city.</p>
+			<p>No forecast for {city}</p>
+		}
+		<button onClick={() => (city = 'Boston')}>Boston</button>
+	</section>
+}
+```
+
+**`computed(async …)`** makes `forecast` a value that arrives later. **`@try`** shows it once it's ready, **`@pending`** holds the spot until then, and **`@catch`** takes over if loading fails. The heading and the button are on the page straight away.
+
+## Only the slow spot waits
+
+An *async* value is one the page doesn't have yet. It can only be shown inside `@try`, and nothing else waits for it.
+
+- `@try` holds what you show once the value is ready. Read it directly, as in `forecast.summary`.
+- `@pending` holds what you show before the first answer.
+- `@catch` holds what you show if loading fails. Write the three in that order.
+
+Press a key. The city flips at once; only the temperature flaps wait.
+
+<BoardAnatomy />
+
+<Code steps={[{ label: 'Press Boston. The heading changes at once, and the forecast follows.', shows: 'Cloudy, 12°' }, { label: 'In forecast.ts, change `1200` to `4000`. Press Austin, then Boston: only the forecast line waits.', source: '4000' }, { label: 'Try breaking it: move `<p>{forecast.summary}</p>` above `@try`. The build stops, because an async value can only be shown inside `@try`.', fails: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED' }]}>
+```tsrx title="forecast.tsrx"
+import { computed, state } from '@markless/core';
+import { loadForecast } from './forecast.ts';
+
+export default function Forecast() @{
+	let city = state('Austin');
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
+
+	<section>
+		<h2>{city}</h2>
+		@try {
+			<p>{forecast.summary}</p>
+		} @pending {
+			<p>Checking the sky</p>
+		} @catch {
+			<p>No forecast for {city}</p>
+		}
+		<button onClick={() => (city = 'Austin')}>
+			Austin
+		</button>
+		<button onClick={() => (city = 'Boston')}>
+			Boston
+		</button>
+	</section>
+}
+```
+
+```ts title="forecast.ts"
+const skies: Record<string, [string, number]> = {
+	Austin: ['Sunny, 31°', 0],
+	Boston: ['Cloudy, 12°', 1200],
+};
+
+export function loadForecast(city: string) {
+	const sky = skies[city];
+	return new Promise<{ summary: string }>(
+		(resolve, reject) => {
+			if (!sky) {
+				reject(new Error('Unknown ' + city));
+				return;
+			}
+			const [summary, wait] = sky;
+			setTimeout(() => {
+				resolve({ summary });
+			}, wait);
+		},
+	);
+}
+```
+</Code>
+
+`loadForecast` stands in for a `fetch`: it answers after a short wait, and rejects for a city it doesn't know.
+
+## Read the error in `@catch`
+
+Name the error after `@catch`, and the block can show it:
+
+```tsrx
+@catch (error) {
+	<p>{error.message}</p>
+}
+```
+
+## Try again by changing what the computed reads
+
+There is no reload call. An async computed runs again when a value it reads changes, so keep one for the attempt and change it.
+
+<Code steps={[{ label: 'Press Try again. The second attempt answers.', shows: 'Sunny, 31°' }, { label: 'Change `attempt === 0` to `attempt < 2`. Now it takes two presses.', source: 'attempt < 2' }]}>
+```tsrx title="retry.tsrx"
+import { computed, state } from '@markless/core';
+import { loadForecast } from './forecast.ts';
+
+export default function Retry() @{
+	let attempt = state(0);
+	const forecast = computed(async () =>
+		loadForecast('Austin', attempt),
+	);
+
+	<section>
+		@try {
+			<p>{forecast.summary}</p>
+		} @pending {
+			<p>Checking the sky</p>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+		<button onClick={() => attempt++}>
+			Try again
+		</button>
+	</section>
+}
+```
+
+```ts title="forecast.ts"
+export function loadForecast(
+	city: string,
+	attempt: number,
+) {
+	return new Promise<{ summary: string }>(
+		(resolve, reject) => {
+			if (attempt === 0) {
+				reject(new Error('Service timed out.'));
+				return;
+			}
+			setTimeout(() => {
+				resolve({ summary: 'Sunny, 31°' });
+			}, 1200);
+		},
+	);
+}
+```
+</Code>
+
+## The old answer stays until the new one is ready
+
+Once a forecast is on the page, picking another city keeps it there while the new one loads. The element around the block gets `aria-busy="true"` meanwhile, so you can style the wait. `@pending` only comes back if the newest request has waited more than five seconds.
+
+When two requests are in flight, the latest one wins. An older answer that lands late is dropped, so the page never shows the wrong city.
+
+Drag a postcard nearer or farther, then press **Post both**. Whichever lands first, Denver ends up on the board.
+
+<PostcardsAnatomy />
+
+<Code steps={[{ label: 'Press Boston. The old forecast fades until the new one lands.', shows: 'Cloudy, 12°' }, { label: 'Press Boston, then Denver straight away. Denver lands, and Boston’s late answer is dropped.', shows: 'Snow, -3°' }]}>
+```tsrx title="race.tsrx"
+import { computed, state } from '@markless/core';
+import { loadForecast } from './forecast.ts';
+
+export default function Race() @{
+	let city = state('Austin');
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
+
+	<section>
+		<style>
+			[aria-busy='true'] {
+				opacity: 0.4;
+			}
+		</style>
+		<h2>{city}</h2>
+		@try {
+			<p>{forecast.summary}</p>
+		} @pending {
+			<p>Checking the sky</p>
+		}
+		<button onClick={() => (city = 'Boston')}>
+			Boston
+		</button>
+		<button onClick={() => (city = 'Denver')}>
+			Denver
+		</button>
+	</section>
+}
+```
+
+```ts title="forecast.ts"
+const skies: Record<string, [string, number]> = {
+	Austin: ['Sunny, 31°', 0],
+	Boston: ['Cloudy, 12°', 3000],
+	Denver: ['Snow, -3°', 800],
+};
+
+export function loadForecast(city: string) {
+	const [summary, wait] = skies[city]!;
+	return new Promise<{ summary: string }>(
+		(resolve) => {
+			setTimeout(() => {
+				resolve({ summary });
+			}, wait);
+		},
+	);
+}
+```
+</Code>
+
+## Cancel stale work with `signal`
+
+The recipe gets a `signal`. Pass it to `fetch`, and a request that a newer one has replaced is aborted instead of finishing for nothing.
+
+```tsrx
+const forecast = computed(async ({ signal }) => {
+	const response = await fetch(`/api/forecast?city=${city}`, { signal });
+	return response.json();
+});
+```
+
+## Two slow spots wait on their own
+
+Each `@try` settles by itself. Give every slow value its own block, and the fast one shows first.
+
+<Code steps={[{ label: 'Press Boston. The sky lands first, the air a second later.', shows: 'Air: good' }]}>
+```tsrx title="two-spots.tsrx"
+import { computed, state } from '@markless/core';
+import {
+	loadAir,
+	loadForecast,
+} from './forecast.ts';
+
+export default function TwoSpots() @{
+	let city = state('Austin');
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
+	const air = computed(async () => loadAir(city));
+
+	<section>
+		<h2>{city}</h2>
+		@try {
+			<p>{forecast.summary}</p>
+		} @pending {
+			<p>Checking the sky</p>
+		}
+		@try {
+			<p>Air: {air.quality}</p>
+		} @pending {
+			<p>Checking the air</p>
+		}
+		<button onClick={() => (city = 'Boston')}>
+			Boston
+		</button>
+	</section>
+}
+```
+
+```ts title="forecast.ts"
+function after<T>(ms: number, value: T) {
+	return new Promise<T>((resolve) => {
+		setTimeout(() => resolve(value), ms);
+	});
+}
+
+export function loadForecast(city: string) {
+	if (city === 'Austin') {
+		return after(0, { summary: 'Sunny, 31°' });
+	}
+	return after(800, { summary: 'Cloudy, 12°' });
+}
+
+export function loadAir(city: string) {
+	if (city === 'Austin') {
+		return after(0, { quality: 'fair' });
+	}
+	return after(2000, { quality: 'good' });
+}
+```
+</Code>
+
+## One async value can wait on another
+
+An async computed can read another one. The second waits for the first, and if the first fails, the failure lands in the second's `@catch`.
+
+<Code steps={[{ label: 'Type `bos` and wait. The city is found first, then its forecast.', shows: 'Cloudy, 12°' }, { label: 'Type `zzz`. Finding the city fails, so the forecast fails too.', shows: 'No city matches zzz' }]}>
+```tsrx title="lookup.tsrx"
+import { computed, state } from '@markless/core';
+import {
+	findCity,
+	loadForecast,
+} from './forecast.ts';
+
+export default function Lookup() @{
+	let query = state('aus');
+	const place = computed(async () =>
+		findCity(query),
+	);
+	const forecast = computed(async () =>
+		loadForecast(place.id),
+	);
+
+	<section>
+		<input
+			value={query}
+			onInput={(event) =>
+				(query = event.currentTarget.value)
+			}
+		/>
+		@try {
+			<p>{forecast.summary}</p>
+		} @pending {
+			<p>Looking it up</p>
+		} @catch (error) {
+			<p>{error.message}</p>
 		}
 	</section>
 }
 ```
 
 ```ts title="forecast.ts"
-const skies: Record<string, string> = {
-	Oslo: 'Oslo: rain, 4°',
-	Lisbon: 'Lisbon: sunny, 19°',
-};
+const cities = [
+	{
+		id: 'atx',
+		name: 'Austin',
+		sky: 'Sunny, 31°',
+		wait: 0,
+	},
+	{
+		id: 'bos',
+		name: 'Boston',
+		sky: 'Cloudy, 12°',
+		wait: 600,
+	},
+];
 
-export function loadForecast(
-	city: string,
-): Promise<string> {
-	return new Promise((resolve, reject) => {
-		setTimeout(() => {
-			const sky = skies[city];
-			if (sky) resolve(sky);
-			else reject(new Error(city));
-		}, 1200);
+function after<T>(ms: number, value: T) {
+	return new Promise<T>((resolve) => {
+		setTimeout(() => resolve(value), ms);
 	});
+}
+
+export async function findCity(query: string) {
+	const q = query.toLowerCase();
+	const city = cities.find((c) =>
+		c.name.toLowerCase().startsWith(q),
+	);
+	if (!city) {
+		throw new Error('No city matches ' + query);
+	}
+	return after(city.wait, { id: city.id });
+}
+
+export async function loadForecast(id: string) {
+	const city = cities.find((c) => c.id === id)!;
+	return after(city.wait, { summary: city.sky });
 }
 ```
 </Code>
 
-## The old answer stays while a new one loads
+## State you read after an `await` counts too
 
-Picking again keeps the last answer on the page until the new one lands. The element around the block gets `aria-busy="true"` meanwhile, so you can style the wait.
+Every state the recipe reads is tracked, before or after an `await`. Change any of them and the recipe runs again.
+
+<Code steps={[{ label: 'Press °F. The forecast is worked out again in Fahrenheit.', shows: 'Sunny, 88°F' }]}>
+```tsrx title="units.tsrx"
+import { computed, state } from '@markless/core';
+import { loadForecast } from './forecast.ts';
+
+export default function Units() @{
+	let unit = state('C');
+	const forecast = computed(async () => {
+		const sky = await loadForecast('Austin');
+		if (unit === 'F') {
+			const f = Math.round(sky.high * 1.8 + 32);
+			return `${sky.summary}, ${f}°F`;
+		}
+		return `${sky.summary}, ${sky.high}°C`;
+	});
+
+	<section>
+		@try {
+			<p>{forecast}</p>
+		} @pending {
+			<p>Checking the sky</p>
+		}
+		<button onClick={() => (unit = 'C')}>
+			°C
+		</button>
+		<button onClick={() => (unit = 'F')}>
+			°F
+		</button>
+	</section>
+}
+```
+
+```ts title="forecast.ts"
+type Sky = { summary: string; high: number };
+
+export async function loadForecast(city: string) {
+	const sky: Sky = { summary: 'Sunny', high: 31 };
+	return sky;
+}
+```
+</Code>
 
 [Styling](/concepts/styling) shows how two components can both call something `.card`.
