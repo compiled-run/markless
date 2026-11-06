@@ -585,7 +585,7 @@ try {
 			const codePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 			await codePage.goto(`${origin}/concepts/state`, { waitUntil: 'networkidle' });
 			const block = codePage.locator('.code-block');
-			// A block runs nothing at load: hover downloads its boot, the first press or focus boots it.
+			// A block runs nothing at load: prefetch links in the page download its boot, the first press or focus boots it.
 			const states = await codePage
 				.locator('[data-code]')
 				.evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement).dataset.code));

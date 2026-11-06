@@ -1,14 +1,15 @@
 import type { Children } from '@markless/core';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
-import { prefetchCodeBlock } from './code/prefetch.ts';
+import { codeBlockKey } from './code/prefetch-key.ts';
 import { labelPieces, type CodeStep } from './playground/checklist.ts';
 import { lucide, resizable } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
 import liveUrl from 'virtual:code-live-url';
+import prefetchManifest from 'virtual:code-prefetch';
 import CodeFiles, { CodeTabs } from './code-files.tsrx';
 
-// A block runs nothing at load: no idle or on-sight trigger. Hover downloads what boot needs; the first press or focus boots.
+// A block runs nothing at load: no idle or on-sight trigger. Prefetch links in the served page download what boot needs; the first press or focus boots.
 // A URL the bundler cannot follow keeps the editor out of preloads.
 function boot(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
 	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
@@ -24,11 +25,6 @@ function boot(event: { readonly target: unknown }, files: readonly CodeFile[]): 
 				).then((live) => live.bootLive(box));
 		},
 	);
-}
-
-function prefetch(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
-	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
-	if (box) prefetchCodeBlock(box, files);
 }
 
 export default function Code({
@@ -76,15 +72,25 @@ export default function Code({
 	).toString(36);
 	const codePane = `code-pane-${key}`;
 	const resultPane = `result-pane-${key}`;
+	const prefetches = [
+		...new Set([
+			...prefetchManifest.session,
+			...(live ? prefetchManifest.live : []),
+			...prefetchManifest.cache,
+			...(prefetchManifest.blocks[codeBlockKey(files)] ?? []),
+		]),
+	];
 
 	<figure
 		class="code-block"
 		data-code="idle"
 		data-code-live={live ? '' : undefined}
-		onPointerenter={(event) => prefetch(event, files)}
 		onPointerdown={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
+		@for (const href of prefetches; key href) {
+			<link rel="prefetch" as={href.endsWith('.html') ? 'document' : undefined} href={href} />
+		}
 		<header class="bar">
 			<span class="title">{title ?? 'Playground'}</span>
 			<span class="restored">
