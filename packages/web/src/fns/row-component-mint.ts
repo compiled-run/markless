@@ -14,6 +14,7 @@ import { isArmBranchAnchorComment } from '../resume-anchor-census.ts';
 import { spliceCensus } from '../resume-census.ts';
 import { marklessOwningSurface } from '../prerender/owning-surface.ts';
 import { marklessSsrRowQualifiedView } from './row-qualified-view.ts';
+import { marklessBoundSymbolId, marklessDomUpdateSymbolId } from './bound-symbol.ts';
 import { readKeyedRepeatCollection } from '../resume-keyed-repeats.ts';
 import {
 	focusPath,
@@ -30,6 +31,7 @@ import {
 } from './row-mint.ts';
 import { marklessRowSlotReader, type RowSlotReader } from './row-slot-mint.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS } from '../../../serializer/src/protocol-constants.ts';
+import { PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP } from '../../../serializer/src/protocol-prop-prefix.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -485,7 +487,9 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 				instancePath !== undefined &&
 				instancePath === input.enclosing.instancePath &&
 				instancePath.length > found.symbolPrefix.length &&
-				instancePath.startsWith(found.symbolPrefix)
+				(instancePath.startsWith(found.symbolPrefix) ||
+					// An owner a row placed: its instance holds the row segments the edge walk cannot spell.
+					instanceScopeModule?.marklessRowFreeSymbolId(instancePath, instancePath) === found.symbolPrefix)
 					? { ...found, symbolPrefix: instancePath }
 					: found;
 			// The owner's prefix already names its own instance; the key carries only what it does not.
@@ -530,16 +534,7 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 				(rendered) => ({
 					// Page space, like the widget ids the row files: an island prefix belongs in front.
 					rowSegment: owner.symbolPrefix + rowSegment,
-					rendered: {
-						...rendered,
-						view: ownerRecordsInPageSpace(
-							rendered.view,
-							owner.symbolPrefix,
-							hostPrefix,
-							instanceScopeModule,
-							input.graph,
-						),
-					},
+					rendered: ownerRecordsInPageSpace(rendered, owner, hostPrefix, instanceScopeModule, input.graph),
 				}),
 			);
 		},
@@ -801,21 +796,26 @@ function ownerProjectionView(
 }
 
 // A minted row has no render above it to qualify ids spelled in its owner's module, so they take its prefix here.
-function ownerRecordsInPageSpace(
-	view: ProtocolViewPayload,
-	ownerSymbolPrefix: string,
+function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload }>(
+	rendered: R,
+	owner: { readonly symbolPrefix: string; readonly edge?: OwningSurfaceEdge; readonly edgePrefix?: string },
 	ownerHostPrefix: string,
 	instanceScope: InstanceScopeModule | undefined,
 	graph: RuntimeGraph,
-): ProtocolViewPayload {
-	if (!ownerSymbolPrefix || !instanceScope) return view;
-	const host = <R extends { readonly hostNodeId: string }>(record: R): R =>
+): R {
+	const ownerSymbolPrefix = owner.symbolPrefix;
+	if (!ownerSymbolPrefix || !instanceScope) return rendered;
+	const { view, state } = rendered;
+	const host = <H extends { readonly hostNodeId: string }>(record: H): H =>
 		ownerHostPrefix ? { ...record, hostNodeId: ownerHostPrefix + record.hostNodeId } : record;
 	const registry = instanceScope.marklessGraphWidgetRegistry(graph);
 	const own = (id: string) => !instanceScope.marklessInstancePath(id);
-	const symbol = (symbolId: string) => (own(symbolId) ? ownerSymbolPrefix + symbolId : symbolId);
+	// A symbol the owner's own edge binds is the composer's, exactly as composition spells it for a served row.
+	const edge = { symbolPrefix: ownerSymbolPrefix, boundSymbols: owner.edge?.boundSymbols };
+	const symbol = (symbolId: string) => (own(symbolId) ? marklessBoundSymbolId(edge, symbolId) : symbolId);
+	const updateSymbol = (symbolId: string) => (own(symbolId) ? marklessDomUpdateSymbolId(edge, symbolId) : symbolId);
 	const graphNode = (graphNodeId: string): string => {
-		if (graphNodeId.startsWith('prop:'))
+		if (graphNodeId.startsWith(PROP))
 			throw new Error(
 				`MARKLESS_PRERENDER_PROJECTED_PROP_READ: a row projects an element reading its owner's prop through ${graphNodeId}, which a row built in the browser cannot follow.`,
 			);
@@ -823,41 +823,80 @@ function ownerRecordsInPageSpace(
 			? instanceScope.marklessComposedGraphNodeId(graphNodeId, ownerSymbolPrefix, registry)
 			: graphNodeId;
 	};
+	// The row forwards an owner's prop: it lives where the owner's own edge took it from.
+	const route = <T extends { readonly graphNodeId: string; readonly path?: ReadonlyArray<string> }>(read: T): T => {
+		if (!own(read.graphNodeId)) return read;
+		if (!read.graphNodeId.startsWith(PROP)) return { ...read, graphNodeId: graphNode(read.graphNodeId) };
+		const [name, ...rest] =
+			read.graphNodeId === PROPS ? (read.path ?? []) : [read.graphNodeId.slice(PROP.length), ...(read.path ?? [])];
+		const prop = owner.edge?.props.find((candidate) => candidate.name === name);
+		return prop?.kind === 'graph-reference' && prop.graphNodeId
+			? {
+					...read,
+					graphNodeId: (owner.edgePrefix ?? '') + prop.graphNodeId,
+					path: [...(prop.path ?? []), ...rest],
+				}
+			: { ...read, graphNodeId: ownerSymbolPrefix + read.graphNodeId };
+	};
 	return {
-		...view,
-		locators: view.locators.map(host),
-		elementHandles: view.elementHandles.map(host),
-		events: view.events.map((event) => ({ ...host(event), symbolIds: event.symbolIds.map(symbol) })),
-		domUpdates: view.domUpdates.map((update) => ({
-			...host(update),
-			graphNodeId: graphNode(update.graphNodeId),
-			...(update.symbolId ? { symbolId: symbol(update.symbolId) } : {}),
-		})),
-		behaviors: view.behaviors.map((behavior) => ({
-			...host(behavior),
-			...(behavior.symbolId ? { symbolId: symbol(behavior.symbolId) } : {}),
-			...(behavior.inputGraphReads
+		...rendered,
+		state: {
+			...state,
+			computed: state.computed.map((computed) =>
+				computed.dependencies ? { ...computed, dependencies: computed.dependencies.map(route) } : computed,
+			),
+		},
+		view: {
+			...view,
+			locators: view.locators.map(host),
+			elementHandles: view.elementHandles.map(host),
+			events: view.events.map((event) => ({ ...host(event), symbolIds: event.symbolIds.map(symbol) })),
+			domUpdates: view.domUpdates.map((update) => ({
+				...host(update),
+				graphNodeId: graphNode(update.graphNodeId),
+				...(update.symbolId ? { symbolId: updateSymbol(update.symbolId) } : {}),
+			})),
+			behaviors: view.behaviors.map((behavior) => ({
+				...host(behavior),
+				...(behavior.symbolId ? { symbolId: symbol(behavior.symbolId) } : {}),
+				...(behavior.inputGraphReads
+					? {
+							inputGraphReads: behavior.inputGraphReads.map((read) => ({
+								...read,
+								graphNodeId: graphNode(read.graphNodeId),
+							})),
+						}
+					: {}),
+			})),
+			// The settle path qualifies a boundary's arm records from its id, so the id names the owner too.
+			asyncBoundaries: view.asyncBoundaries.map((boundary) => {
+				const id = ownerHostPrefix + boundary.id;
+				const symbols = instanceScope.marklessInstancePath(boundary.updateSymbolId);
+				const { composedGraphProps } = boundary;
+				return {
+					...boundary,
+					id,
+					asyncReads: boundary.asyncReads.map((read) =>
+						read.runnerSymbolId ? { ...read, runnerSymbolId: symbol(read.runnerSymbolId) } : read,
+					),
+					...(composedGraphProps && { composedGraphProps: composedGraphProps.map(route) }),
+					...(symbols && symbols !== instanceScope.marklessInstancePath(id) && { composedSymbolPrefix: symbols }),
+				};
+			}),
+			...(view.keyedRepeats
 				? {
-						inputGraphReads: behavior.inputGraphReads.map((read) => ({
-							...read,
-							graphNodeId: graphNode(read.graphNodeId),
+						keyedRepeats: view.keyedRepeats.map((repeat) => ({
+							...repeat,
+							id: ownerHostPrefix + repeat.id,
+							parentHostNodeId: ownerHostPrefix + repeat.parentHostNodeId,
+							rowEvents: repeat.rowEvents.map((event) => ({
+								...event,
+								symbolIds: event.symbolIds.map(symbol),
+							})),
 						})),
 					}
 				: {}),
-		})),
-		...(view.keyedRepeats
-			? {
-					keyedRepeats: view.keyedRepeats.map((repeat) => ({
-						...repeat,
-						id: ownerHostPrefix + repeat.id,
-						parentHostNodeId: ownerHostPrefix + repeat.parentHostNodeId,
-						rowEvents: repeat.rowEvents.map((event) => ({
-							...event,
-							symbolIds: event.symbolIds.map(symbol),
-						})),
-					})),
-				}
-			: {}),
+		},
 	};
 }
 
@@ -1192,7 +1231,18 @@ async function seedMintedGraphNodes(
 		// census never heard of, and a minted row's nodes are born after it.
 		deps.graphNodeIds?.add?.(cell.graphNodeId);
 	}
-	for (const computed of state.computed) deps.graphNodeIds?.add?.(computed.graphNodeId);
+	for (const computed of state.computed) {
+		deps.graphNodeIds?.add?.(computed.graphNodeId);
+		// A served-style value, which a keyed @for in the row reads before any dependency moves.
+		if (computed.async || (computed.directValue === undefined && computed.value === undefined)) continue;
+		graph.write({
+			graphNodeId: computed.graphNodeId,
+			value:
+				computed.directValue !== undefined
+					? computed.directValue
+					: await deserializeGraphValue(computed.value as SerializedGraphPayload),
+		});
+	}
 	// A widget-scoped definition owns nodes the row's cells never list - the ones
 	// its parts reach only through the definition - and the census counts those too.
 	for (const definition of state.sharedDefinitions ?? [])

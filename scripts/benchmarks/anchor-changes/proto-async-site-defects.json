@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 179,
+			"reason": "a failed refresh over shown @try content keeps it, and a composed @try arm's cells and computeds take its page prefix",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": -48,
+			"reason": "a failed refresh over shown @try content keeps it, and a composed @try arm's cells and computeds take its page prefix",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a failed refresh over shown @try content keeps it, and a composed @try arm's cells and computeds take its page prefix",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 179,
+			"reason": "a failed refresh over shown @try content keeps it, and a composed @try arm's cells and computeds take its page prefix",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": -48,
+			"reason": "a failed refresh over shown @try content keeps it, and a composed @try arm's cells and computeds take its page prefix",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a failed refresh over shown @try content keeps it, and a composed @try arm's cells and computeds take its page prefix",
+			"date": "2026-11-05"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 7,
+			"reason": "a failed refresh over shown @try content keeps it, and a composed @try arm's cells and computeds take its page prefix",
+			"date": "2026-11-05"
+		}
+	]
+}

@@ -444,7 +444,9 @@ function republishedClaimInputs(
 		// A render symbol's forwarded prop reads compose through the edge's graph props already.
 		const extracted = captureMetadata.extractedSymbols.find(
 			(symbol) =>
-				(symbol.kind === 'event-handler' || symbol.kind === 'sync-computed-derive') &&
+				(symbol.kind === 'event-handler' ||
+					symbol.kind === 'sync-computed-derive' ||
+					symbol.kind === 'async-computed-runner') &&
 				(row.loaderSymbolId
 					? symbol.loaderSymbolId === row.loaderSymbolId
 					: !symbol.loaderSymbolId && symbol.symbolId === row.baseSymbolId) &&

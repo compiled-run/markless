@@ -75,8 +75,10 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 			if (seen.has(graphNodeId)) return;
 			seen.add(graphNodeId);
 			const asyncNode = asyncComputedNodes.get(graphNodeId);
-			if (asyncNode) ancestors.add(asyncNode);
-			else for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? []) visit(dependency.graphNodeId);
+			// A failed refresh is over: its kept value holds no reader at the inputs it was fetched with.
+			if (asyncNode) {
+				if (asyncNode.snapshot.status !== 'rejected') ancestors.add(asyncNode);
+			} else for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? []) visit(dependency.graphNodeId);
 		};
 		for (const dependency of dependencies) visit(dependency.graphNodeId);
 

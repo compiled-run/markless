@@ -276,6 +276,13 @@ export type ComposedArmRecordQualifier = ((
 		update: U,
 		graph: RuntimeGraph | undefined,
 	) => U;
+	/** A composed part's settled arm, its records, cells and computeds re-spelled in page space. */
+	readonly boundaryUpdate?: <U extends { readonly armRecords: ResumeArmRecordSet }>(
+		boundary: ComposedBoundary,
+		update: U,
+		graph: RuntimeGraph | undefined,
+		renderedBoundaryId?: string,
+	) => U;
 };
 
 export type ResumeArmRecordSet = {

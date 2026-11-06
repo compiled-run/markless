@@ -239,3 +239,56 @@ test('a value that reads no async value is never held', async () => {
 	expect(read).toBeUndefined();
 	expect(graph.shownRead!([{ graphNodeId: 'state:range', path: [] }])).toBeUndefined();
 });
+
+test('after a refresh fails, a value reading the whole input object follows it again', async () => {
+	for (const [cell, field, other] of [
+		['state:view', 'page', 'usd'],
+		['state:filters', 'offset', 'dense'],
+	] as const) {
+		const list = scripted();
+		const graph = createRuntimeGraph({
+			cells: [{ graphNodeId: cell, value: { [field]: 1, [other]: false } }],
+			computed: [
+				{
+					graphNodeId: 'computed:label',
+					dependencies: [
+						{ graphNodeId: 'computed:list', path: ['rows'] },
+						{ graphNodeId: cell, path: [] },
+					],
+					compute: (read) => {
+						const shown = read(cell) as Record<string, unknown>;
+						return `${(read('computed:list', ['rows']) as string[] | undefined)?.join(',')} ${shown[other] ? 'on' : 'off'}`;
+					},
+				},
+			],
+			asyncComputed: [
+				{
+					graphNodeId: 'computed:list',
+					dependencies: [{ graphNodeId: cell, path: [field] }],
+					key: (read) => read(cell, [field]),
+					run: list.run,
+				},
+			],
+		} as never);
+		graph.read('computed:label');
+		list.runs[0]!.resolve({ rows: ['a', 'b'] });
+		await tick();
+		expect(graph.read('computed:label')).toBe('a,b off');
+
+		graph.write({ graphNodeId: cell, path: [field], value: 2 });
+		await graph.flush();
+		graph.write({ graphNodeId: cell, path: [other], value: true });
+		await graph.flush();
+		expect(graph.read('computed:label')).toBe('a,b off');
+
+		list.runs[1]!.resolve(Promise.reject(new Error('offline')));
+		await tick();
+		await graph.flush();
+		expect(graph.read('computed:list', ['status'])).toBe('rejected');
+		expect(graph.read('computed:label')).toBe('a,b on');
+
+		graph.write({ graphNodeId: cell, path: [other], value: false });
+		await graph.flush();
+		expect(graph.read('computed:label')).toBe('a,b off');
+	}
+});
