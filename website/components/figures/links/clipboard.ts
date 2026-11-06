@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: a click keeps the page; only the middle and its address change.
-// Objects: the board with its clip (the page that stays), the sheet (the swapped middle), the label on the clip (the address).
-// Action: swap the sheet (press, drag it away, or arrow keys). Change: a new sheet under the clip, and the label re-inks. Unchanged: the clip.
-// Prevents: "a click throws the page away and loads a new one". Surprise: pull the clip and it snaps back shut.
+// What the figure shows: a click keeps the page; only the middle and its address change.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, stroke, wash } from '../ink/ink.ts';
 

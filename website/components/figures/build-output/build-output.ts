@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: the same source builds into a different output folder for each host.
-// Objects: the source tree (locked, never changes), the terminal with its preset switch, the output tree.
-// Action: flip the preset. Change: the terminal re-runs and the output tree redraws in that host's real shape.
-// Prevents: "deploying somewhere else means changing my code". Surprise: drag a source file into the output and it slides back.
+// What the figure shows: the same source builds into a different output folder for each host.
 import { roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, stroke, wash } from '../ink/ink.ts';
 

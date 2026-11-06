@@ -3,7 +3,7 @@ import { centreOf, ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, pathOf, stroke, wash } from '../ink/ink.ts';
 import { desk, type DeskArt, type Item, type P, type SheetSpec, type TextItem } from '../ink/sheets.ts';
 
-/** The checks as GitHub lists them for a website pull request on CI: job name, real duration on PR #471, whether branch protection requires it, and what it runs. */
+/** The checks as GitHub lists them for a website pull request on CI: job name, real duration on a website pull request, whether branch protection requires it, and what it runs. */
 export const CHECKS = [
 	{ job: 'agent-files', took: '12s', required: true, fast: true, runs: '`ruler apply`, then fails if the agent files changed' },
 	{ job: 'typecheck', took: '39s', required: true, fast: true, runs: '`pnpm typecheck` and `vp check --no-fmt`' },

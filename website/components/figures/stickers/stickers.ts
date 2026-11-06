@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: a child is placed once, and reads its props from the parent live.
-// Objects (3): the sticker sheet = Avatar; the page = the parent; the page's name selector = name. Each placed sticker is one Avatar.
-// Action and change: turn the selector; every placed sticker's name changes at once. Unchanged: the stickers stay where they were stuck.
-// Prevents: "a new prop value places the child again". Surprise: write on a sticker and the ink beads off.
+// What the figure shows: a child is placed once, and reads its props from the parent live.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, r1, stroke, wash } from '../ink/ink.ts';
 

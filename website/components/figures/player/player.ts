@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: two components that call one shared() name show the same track, live.
-// Objects: the page with the MiniPlayer in its header, the NowPlaying card. Action: press play (or scrub) on either.
-// Change: both progress bars move together. Unchanged: each player's volume knob (widget scope, its own copy).
-// Prevents: "each player keeps its own copy, so they drift apart". Surprise: turn one knob and only that one turns.
+// What the figure shows: two components that call one shared() name show the same track, live.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, r1, stroke, wash } from '../ink/ink.ts';
 
