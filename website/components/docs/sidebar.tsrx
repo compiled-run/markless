@@ -14,7 +14,10 @@ function glide(article: HTMLElement | null, from: number | undefined) {
 	if (article === null || from === undefined || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 	requestAnimationFrame(() => {
 		const shift = from - article.getBoundingClientRect().left;
-		if (shift !== 0) article.animate([{ left: `${shift}px` }, { left: '0px' }], SLIDE);
+		if (shift === 0) return;
+		article.style.position = 'relative';
+		const move = article.animate([{ left: `${shift}px` }, { left: '0px' }], SLIDE);
+		void move.finished.finally(() => article.style.removeProperty('position'));
 	});
 }
 

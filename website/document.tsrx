@@ -62,10 +62,6 @@ export default function Document({
 					padding-block-start: var(--navbar-clear);
 				}
 				.example-shell { width:100%; margin:0; padding:0; }
-				/* The sidebar toggle glides the article by its offset. */
-				.prose {
-					position: relative;
-				}
 
 				@media (max-width: 96rem) {
 					.site-shell {
