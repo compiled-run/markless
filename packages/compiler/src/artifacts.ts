@@ -1918,6 +1918,9 @@ export type PlannedSymbol =
 				readonly graphNodeId: string;
 				readonly path: ReadonlyArray<string>;
 			}>;
+			// Async values whose key reads a symbol this handler writes: marked busy from the
+			// handler's own entry (goals/async-error-states/submit-quiet-design.md Q1 option 1).
+			readonly entryMarks?: ReadonlyArray<string>;
 			// `@catch (error, reset)` names the handler calls, each with the async values its block
 			// reads, upstream first, every one followed by the async values it reads itself.
 			readonly catchResets?: ReadonlyArray<{

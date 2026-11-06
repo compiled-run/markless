@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 130,
+			"reason": "entry-mark busy wiring adds markEntry/endEntry to the async plane (goals/async-error-states submit-quiet-design Q1)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 7,
+			"reason": "entry-mark busy wiring adds markEntry/endEntry to the async plane (goals/async-error-states submit-quiet-design Q1)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 130,
+			"reason": "entry-mark busy wiring adds markEntry/endEntry to the async plane (goals/async-error-states submit-quiet-design Q1)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "entry-mark busy wiring adds markEntry/endEntry to the async plane (goals/async-error-states submit-quiet-design Q1)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "entry-mark busy wiring adds markEntry/endEntry to the async plane (goals/async-error-states submit-quiet-design Q1)",
+			"date": "2026-11-06"
+		}
+	]
+}

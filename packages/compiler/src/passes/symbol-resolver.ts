@@ -46,7 +46,7 @@ import {
 	resolveSharedInstanceGraphPath,
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
-import { asyncReach } from './paired-async-values.ts';
+import { asyncKeyInputs, asyncReach } from './paired-async-values.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 import { forwardedSpreadAttributeUpdates } from './spread-forwarding.ts';
 
@@ -77,6 +77,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
 		elementHandleReads(reads, handlesByGraphNodeId);
+	const entryMarksOf = entryMarksResolver(input.semanticGraph.graphBindings);
 
 	// `onClick={[a, b]}` is several records on one host and event name. Their
 	// authored order is the order they run, and `order` is where the view payload
@@ -114,6 +115,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			...(event.handlerDefinitionSpans ?? []),
 		]);
 		const shownReads = handlerShownReads(reads, writes, input.semanticGraph);
+		const entryMarks = entryMarksOf(writes);
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -129,6 +131,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			reads,
 			writes,
 			...(shownReads ? { shownReads } : {}),
+			...(entryMarks ? { entryMarks } : {}),
 			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
 			elementHandleReads: handleReadsOf(reads),
 			...(event.handlerCatchResets?.length
@@ -1087,6 +1090,28 @@ function resetOrder(
 	};
 	for (const read of reads) for (const value of isAsync(read) ? [read] : asyncInputs(read)) place(value);
 	return order;
+}
+
+// A visible async value whose key reads a symbol a handler writes, directly or through a sync
+// computed: marking it starts at the handler's own entry, not when the write lands (submit-quiet-
+// design.md Q1 option 1). No runtime guessing — the key's inputs are read off the dependency graph.
+function entryMarksResolver(
+	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],
+): (writes: ReadonlyArray<LoweredStateWrite>) => ReadonlyArray<string> | undefined {
+	const bindingMap = new Map(bindings.map((binding) => [binding.id, binding]));
+	const keyInputsOf = asyncKeyInputs(bindingMap);
+	const asyncIds = bindings
+		.filter((binding) => binding.kind === 'computed' && binding.async === true)
+		.map((binding) => binding.id);
+	return (writes) => {
+		if (writes.length === 0) return undefined;
+		const written = new Set(writes.map((write) => write.graphNodeId));
+		const marks = asyncIds.filter((asyncId) => {
+			for (const input of keyInputsOf(asyncId)) if (written.has(input)) return true;
+			return false;
+		});
+		return marks.length > 0 ? marks : undefined;
+	};
 }
 
 // Reads a handler pairs with an async-backed value; an input it writes stays live so a second click builds on the first.

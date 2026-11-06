@@ -34,6 +34,8 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	servedKey?: { readonly key: unknown };
 	/** The key of the run on held inputs, in flight or landed, while its async inputs still refresh. */
 	waitingFor?: { readonly key: unknown };
+	/** A handler that writes one of this node's key inputs marked it busy before running; cleared on `endEntry`, or left for the real run to clear once it lands. */
+	entryHold?: { readonly version: number; readonly previous: RuntimeGraphAsyncSnapshot };
 };
 
 /** What the async plane shares with the held-inputs plane. */
@@ -257,6 +259,29 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node);
 	};
 
+	// Marks a settled node pending before the write that will really refresh it: the key is
+	// unchanged, so `advance()` still runs the real fetch once the write lands, replacing this
+	// snapshot with its own pending one at the same node and leaving the busy mark unbroken.
+	const markEntry = (node: RuntimeAsyncComputedNode): void => {
+		if (node.entryHold || node.snapshot.status === 'idle' || node.snapshot.status === 'pending')
+			return;
+		const previous = node.snapshot;
+		const version = ++node.version;
+		node.entryHold = { version, previous };
+		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
+	};
+
+	// The handler that set the hold is done: a real run already replaced it (`node.version`
+	// moved on), so its own settle clears the mark; otherwise nothing reached the write, so the
+	// hold is undone and the node answers exactly what it did before it was marked.
+	const endEntry = (node: RuntimeAsyncComputedNode): void => {
+		const hold = node.entryHold;
+		if (!hold) return;
+		node.entryHold = undefined;
+		if (node.version !== hold.version) return;
+		publish(node, hold.previous);
+	};
+
 	return {
 		nodes,
 		read(node, path) {
@@ -264,6 +289,14 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			return peek(node, path);
 		},
 		invalidate: (node) => void (node.snapshot.status !== 'idle' && advance(node)),
+		markEntry(graphNodeId) {
+			const node = nodes.get(graphNodeId);
+			if (node) markEntry(node);
+		},
+		endEntry(graphNodeId) {
+			const node = nodes.get(graphNodeId);
+			if (node) endEntry(node);
+		},
 		define(asyncComputed) {
 			const node = createNode(asyncComputed);
 			nodes.set(node.graphNodeId, node);
