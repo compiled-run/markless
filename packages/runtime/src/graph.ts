@@ -362,10 +362,13 @@ export type RuntimeGraph = {
 	readonly markEntry?: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
 	readonly endEntry?: (graphNodeId: string) => void;
-	/** An event handler's own turn started: a write made before the matching `markUserActionEnd` starts a loud refresh (submit-quiet-design.md Q2). Nests, so a resumed continuation inside another handler's wait still counts. */
+	/** Code running inside a real DOM event's dispatch started: a write made before the matching `markUserActionEnd` starts a loud refresh (submit-quiet-design.md Q2). */
 	readonly markUserActionStart?: () => void;
-	/** Ends the turn `markUserActionStart` opened; a write made once every opener has ended starts a quiet refresh. */
+	/** Ends the turn `markUserActionStart` opened. */
 	readonly markUserActionEnd?: () => void;
+	/** Code outside any DOM dispatch started: a write made before the matching `markQuietEnd` is quiet even while an unrelated user action is open. */
+	readonly markQuietStart?: () => void;
+	readonly markQuietEnd?: () => void;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -410,6 +413,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	// the write); cleared once that one flush pass resolves, so an unrelated later write never
 	// inherits it once that bounded grace period ends.
 	let flushUserAction = false;
+	let quietDepth = 0;
 	let notifyingWrite = false;
 	let activeFlush: Promise<void> | undefined;
 	let flushHolds = 0;
@@ -582,7 +586,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			// even while a held dispatch (a callback prop invoked through capture-slot
 			// dispatch) is batching everything else.
 			flush: () => flush(),
-			isUserAction: () => userActionDepth > 0 || flushUserAction,
+			isUserAction: () => quietDepth === 0 && (userActionDepth > 0 || flushUserAction),
 			hasPendingFlush: () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined,
 		});
 		if (held) asyncPlane!.holdInputs(held);
@@ -776,6 +780,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				});
 			}
 		},
+		markQuietStart: () => void quietDepth++,
+		markQuietEnd: () => void (quietDepth = Math.max(0, quietDepth - 1)),
 		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;

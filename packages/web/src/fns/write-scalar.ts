@@ -14,10 +14,13 @@ type ScalarWriteGraph = {
 	}) => unknown;
 	readonly markUserActionStart?: () => void;
 	readonly markUserActionEnd?: () => void;
+	readonly markQuietStart?: () => void;
+	readonly markQuietEnd?: () => void;
 };
 
 type ScalarWriteContext = {
 	readonly graph?: ScalarWriteGraph;
+	readonly userActionToken?: { readonly open: boolean };
 };
 
 type ScalarWriteInput =
@@ -42,9 +45,10 @@ export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWr
 		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_CELL_MISSING', 'write-cell');
 	}
 	context.graph.read?.(input.graphNodeId, []);
-	// A scalar leaf's one write is still a user action (submit-quiet-design.md Q2), whichever
-	// symbol kind it belongs to.
-	context.graph.markUserActionStart?.();
+	// The scalar leaf has no user-action wrap of its own, so it decides loud or quiet here (submit-quiet-design.md Q2).
+	const loud = context.userActionToken?.open === true;
+	if (loud) context.graph.markUserActionStart?.();
+	else context.graph.markQuietStart?.();
 	try {
 		if ('update' in input) {
 			return context.graph.update({
@@ -57,7 +61,8 @@ export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWr
 		context.graph.write({ graphNodeId: input.graphNodeId, path: [], value: input.value });
 		return input.value;
 	} finally {
-		context.graph.markUserActionEnd?.();
+		if (loud) context.graph.markUserActionEnd?.();
+		else context.graph.markQuietEnd?.();
 	}
 }
 

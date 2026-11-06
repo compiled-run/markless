@@ -1,0 +1,130 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 157,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/write-scalar"
+			],
+			"delta": 153,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 277,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 51,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-ssr",
+				"web/fns/write-scalar"
+			],
+			"delta": 153,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 157,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 277,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 45,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 47,
+			"reason": "only a real DOM dispatch opens a user action: a token rides the symbol context and a quiet override keeps timer and socket callbacks quiet",
+			"date": "2026-11-06"
+		}
+	]
+}

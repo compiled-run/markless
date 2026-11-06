@@ -180,17 +180,20 @@ across all three cases:
   is loud — marked and announced as above — including a write the handler
   makes after an `await`: the compiler wraps the whole handler body, start
   to its eventual return or throw, in one mark, so a write anywhere in that
-  body is loud regardless of which statement made it. The mark is a nesting
-  counter on the graph, not a per-statement decision, so it travels with
-  whichever code is synchronously running, not with the async value: the
-  same value is quiet when a poll bumps its key and loud when a button does.
-  Known gap, not yet closed: because the mark spans the handler's whole
-  `await`, a second, unrelated quiet write (a timer or socket) that happens
-  to fire while that handler is still waiting on its own `await` is wrongly
-  counted loud too, since the mark does not narrow to the handler's own
-  synchronous turns around each `await`. No shipped test depends on that
-  narrower behavior; closing it needs the compiler to rewrap each `await`
-  rather than just the function body.
+  body is loud regardless of which statement made it. Only a real DOM
+  event's dispatch opens a user action, and it reaches other code through
+  an explicit token the dispatch hands to every symbol it runs, not through
+  wall-clock nesting: a callback prop the handler calls (directly, through
+  any number of wrapper components, or fired and forgotten) inherits it at
+  the moment of the call and keeps it for its whole body, awaits included;
+  the same callback called by a timer or socket message after the dispatch
+  ended carries a closed token and is quiet, even while an unrelated click
+  is still open. So the same value is quiet when a poll bumps its key and
+  loud when a button does. Known gap, not yet closed: JavaScript carries no
+  context across an `await` by itself, so plain (non-symbol) code such as
+  a timer callback that writes directly, firing while some handler is still
+  waiting on its own `await`, is counted loud too. Closing it needs the
+  compiler to rewrap each `await`, or a platform async context.
 - Matched values during a re-settle (2026-11-04, async-error-states): the
   held content keeps showing pairs that belong together. A binding in the
   arm that reads the refreshing value beside an input of its key shows that

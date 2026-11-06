@@ -88,3 +88,18 @@ test('nested marks (two concurrent handlers) only clear once the outer one ends'
 	expect(graph.read('computed:orders', []) as { quiet?: boolean }).not.toHaveProperty('quiet');
 	graph.markUserActionEnd!();
 });
+
+test('a write inside markQuietStart/End is quiet even while an unrelated user action is open', async () => {
+	const runs = scriptedRuns();
+	const graph = pollGraph(runs.run);
+	graph.read('computed:orders', ['status']);
+	runs.settles[0]!.resolve({ rows: [] });
+	await tick();
+
+	graph.markUserActionStart!();
+	graph.markQuietStart!();
+	graph.write({ graphNodeId: 'state:reload', value: 1 });
+	graph.markQuietEnd!();
+	expect(graph.read('computed:orders', []) as object).toMatchObject({ status: 'pending', quiet: true });
+	graph.markUserActionEnd!();
+});
