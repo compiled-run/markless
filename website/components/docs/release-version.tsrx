@@ -4,6 +4,6 @@ import corePackage from '../../../packages/core/package.json' with { type: 'json
 export default function ReleaseVersion() @{
 	<p>
 		These pages follow Markless <strong>{corePackage.version}</strong>. Every package in the
-		first two tables is on npm at that version.
+		first two groups below is on npm at that version, except <code>@markless/ui</code>.
 	</p>
 }
