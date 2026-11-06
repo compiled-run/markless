@@ -6210,6 +6210,12 @@ export function buildEventHandlerEmission(
 	// handler (a forwarded attribute, a spread, or a call from the component's own handler body),
 	// the mark belongs to the symbol module that owns the body doing the writing.
 	const entryMarks = symbol.entryMarks;
+	// Only a real DOM event binds here (`callback-prop` is a plain function passed to a child
+	// component, so it inherits whatever user-action context its caller is already running in;
+	// marking it again here would double-count or wrongly force it loud). `attach` is a synthetic
+	// eventName for element-lifecycle setup code, not a user gesture, so it is excluded too. The
+	// scalar-leaf shape below marks its own one write in `write-scalar.ts` instead of building this wrap.
+	const markUserAction = symbol.kind === 'event-handler' && symbol.eventName !== 'attach';
 	const scalarLeaf =
 		input.captureSlots.length === 0 && !shownReads && !entryMarks
 			? eventHandlerScalarLeafStatements(input, projection)
@@ -6332,6 +6338,20 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
+			...(markUserAction
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: USER_ACTION_START_FN,
+							source: '@markless/web/fns/user-action',
+						}),
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: USER_ACTION_END_FN,
+							source: '@markless/web/fns/user-action',
+						}),
+					]
+				: []),
 			...imports.map((moduleImport) =>
 				moduleImportNode({
 					kind: moduleImport.kind,
@@ -6345,11 +6365,13 @@ export function buildEventHandlerEmission(
 				eventHandlerFunctionNode(exportName, isAsync, [
 					...(shownReads ? [shownReadsStatement(shownReads)] : []),
 					...(importedReference ? [] : eventHandlerParameterStatements(input)),
-					...(entryMarks
+					...(markUserAction
 						? [
-								entryMarkCallStatement(ENTRY_MARK_START_FN, entryMarks),
+								userActionCallStatement(USER_ACTION_START_FN),
+								...(entryMarks ? [entryMarkCallStatement(ENTRY_MARK_START_FN, entryMarks)] : []),
 								tryFinallyNode(bodyStatements, [
-									entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks),
+									...(entryMarks ? [entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks)] : []),
+									userActionCallStatement(USER_ACTION_END_FN),
 								]),
 							]
 						: bodyStatements),
@@ -7753,6 +7775,8 @@ function valuesChangingBetweenSettles(semanticGraph: SymbolModulesInput['semanti
 const SHOWN_READS_FN = 'marklessShownReads';
 const ENTRY_MARK_START_FN = 'marklessEntryMarkStart';
 const ENTRY_MARK_END_FN = 'marklessEntryMarkEnd';
+const USER_ACTION_START_FN = 'marklessUserActionStart';
+const USER_ACTION_END_FN = 'marklessUserActionEnd';
 
 function shownReadsStatement(
 	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
@@ -7778,6 +7802,13 @@ function entryMarkCallStatement(fnName: string, graphNodeIds: ReadonlyArray<stri
 			identifierNode('context'),
 			stringArrayNode(graphNodeIds),
 		]),
+	};
+}
+
+function userActionCallStatement(fnName: string): EmissionNode {
+	return {
+		type: 'ExpressionStatement',
+		expression: callNode(identifierNode(fnName), [identifierNode('context')]),
 	};
 }
 

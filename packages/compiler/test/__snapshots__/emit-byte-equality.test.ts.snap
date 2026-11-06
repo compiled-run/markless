@@ -1037,11 +1037,18 @@ async function marklessRenderSsr(marklessSsrProps = {}, marklessSsrRenderContext
 	};
 }",
     "symbolModules": "symbol:0
+import { marklessUserActionStart } from "@markless/web/fns/user-action";
+import { marklessUserActionEnd } from "@markless/web/fns/user-action";
 export function symbol_0(context) {
-  if (context.graph.read("state:count") > 2) return;
-  context.graph.update({ graphNodeId: "state:count", path: [], returnValue: "next", update(value) {
-    return Number(value) + 1;
-  } });
+  marklessUserActionStart(context);
+  try {
+    if (context.graph.read("state:count") > 2) return;
+    context.graph.update({ graphNodeId: "state:count", path: [], returnValue: "next", update(value) {
+      return Number(value) + 1;
+    } });
+  } finally {
+    marklessUserActionEnd(context);
+  }
 }
 
 symbol:1

@@ -167,6 +167,30 @@ across all three cases:
   requires seeded content to stay visible. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
+- Quiet re-settle (2026-11-06, async-error-states, submit-quiet-design.md
+  Q2): a refresh starts quiet when the write that changed the async value's
+  key did not happen inside an event handler's own turn — a `setInterval`/
+  `setTimeout` callback, a socket or `EventSource` message, or a promise
+  continuation no handler started. A quiet refresh gets neither the busy
+  mark above nor the announcement (`refresh-announcer.ts`); it still swaps
+  in the new content the moment it lands, and a quiet refresh that rejects
+  still follows the failed-refresh rule below (the kept content stays, the
+  `@catch` arm opens right after it) and still announces, because a silent
+  failure is worse than an unexpected one. A write inside an event handler
+  is loud — marked and announced as above — including a write the handler
+  makes after an `await`: the compiler wraps the whole handler body, start
+  to its eventual return or throw, in one mark, so a write anywhere in that
+  body is loud regardless of which statement made it. The mark is a nesting
+  counter on the graph, not a per-statement decision, so it travels with
+  whichever code is synchronously running, not with the async value: the
+  same value is quiet when a poll bumps its key and loud when a button does.
+  Known gap, not yet closed: because the mark spans the handler's whole
+  `await`, a second, unrelated quiet write (a timer or socket) that happens
+  to fire while that handler is still waiting on its own `await` is wrongly
+  counted loud too, since the mark does not narrow to the handler's own
+  synchronous turns around each `await`. No shipped test depends on that
+  narrower behavior; closing it needs the compiler to rewrap each `await`
+  rather than just the function body.
 - Matched values during a re-settle (2026-11-04, async-error-states): the
   held content keeps showing pairs that belong together. A binding in the
   arm that reads the refreshing value beside an input of its key shows that

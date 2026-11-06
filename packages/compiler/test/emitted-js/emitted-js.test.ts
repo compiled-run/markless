@@ -142,9 +142,19 @@ export function Root() @{
 }
 `);
 	expect(errors(compiled)).toEqual([]);
+	// Wrapped in the user-action mark (submit-quiet-design.md Q2): the write's
+	// right-hand side is a binary expression, not a bare literal or local, so this
+	// handler misses the scalar-leaf gate and takes the general, wrapped path.
 	expect(moduleOfKind(compiled, 'event-handler')).toBe(
-		`export function symbol_0(context) {
-  context.graph.write({ graphNodeId: "state:count", path: [], value: context.graph.read("state:count") + 1 });
+		`import { marklessUserActionStart } from "@markless/web/fns/user-action";
+import { marklessUserActionEnd } from "@markless/web/fns/user-action";
+export function symbol_0(context) {
+  marklessUserActionStart(context);
+  try {
+    context.graph.write({ graphNodeId: "state:count", path: [], value: context.graph.read("state:count") + 1 });
+  } finally {
+    marklessUserActionEnd(context);
+  }
 }`,
 	);
 });

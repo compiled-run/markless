@@ -1,9 +1,20 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
 
+// A `data:` URL import resolves no bare specifier, so the module-wide
+// `@markless/web/fns/user-action` import every event-handler now carries
+// (submit-quiet-design.md Q2) is stubbed rather than left to fail; this test
+// only cares about the write the handler makes, not the user-action mark.
+function stubUserActionImport(source: string): string {
+	return `const marklessUserActionStart = () => {}, marklessUserActionEnd = () => {};\n${source.replace(
+		/^import \{[^}]*\} from ['"]@markless\/web\/fns\/user-action['"];\n?/gm,
+		'',
+	)}`;
+}
+
 async function load(source: string) {
 	const loaded = await import(
-		'data:text/javascript;base64,' + Buffer.from(source).toString('base64')
+		'data:text/javascript;base64,' + Buffer.from(stubUserActionImport(source)).toString('base64')
 	);
 	return Object.values(loaded)[0] as (context: unknown) => unknown;
 }

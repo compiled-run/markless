@@ -193,6 +193,50 @@ element turns the message off.
 In the editor, hover `@try` or an async value to see what happens there on a refresh: which input
 starts it, which elements are marked busy, and which input the shown text stays matched to.
 
+## A background refresh stays quiet
+
+Not every refresh is something the person on the page asked for. A page that polls for new orders
+every 30 seconds, or updates a figure when a message arrives over a socket, refreshes the block
+without anyone clicking anything. Markless tells these apart by where the write that changed the
+answer came from, not by anything you write:
+
+```tsrx
+import { computed, state } from '@markless/core';
+import { fetchOrders } from './orders.ts';
+
+export default function Orders() @{
+	let poll = state(0);
+	const orders = computed(() => {
+		const key = poll;
+		return fetchOrders();
+	});
+
+	setInterval(() => poll = poll + 1, 30_000);
+
+	<button onClick={() => poll = poll + 1}>Refresh now</button>
+	@try {
+		<ul>{orders.rows.map((row) => <li>{row.title}</li>)}</ul>
+	} @pending {
+		<p>Loading orders</p>
+	}
+}
+```
+
+The timer bumps `poll` every 30 seconds, and the button bumps the same state when someone clicks
+it. Markless watches where the write happens, not which state it touches:
+
+- A write inside an event handler — the button's `onClick`, including anything it does after an
+  `await` — marks the block busy and says "Updating…", exactly as the rest of this page describes.
+- A write anywhere else — a `setInterval`/`setTimeout` callback, a socket or `EventSource`
+  message, a promise that no handler started — refreshes the block quietly: no `aria-busy`, no
+  announcement, and the list on the page still never flickers back to "Loading orders" while the
+  old one is replaced in place.
+
+A quiet refresh that fails is the one exception: Markless still says "Update failed", because a
+poll that silently stopped working is worse than one that occasionally speaks up. The list itself
+follows the same [failed-refresh rule](#try-again) either way — it keeps showing the last good
+orders, and `@catch` opens right after them.
+
 ## Try again
 
 Name a second value in `@catch` and you get a function that runs the failed recipes of that block
