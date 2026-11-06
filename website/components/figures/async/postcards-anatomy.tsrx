@@ -128,6 +128,11 @@ export default function PostcardsAnatomy() @{
 				<path class="hatch grain" d={art.board.grain} />
 				<path class="ink" d={art.board.ink} />
 				<path class="ink lane" d={art.lane.ink} />
+				<path class="paper" d={art.lane.slot.plate} />
+				<path class="slit" d={art.lane.slot.slit} />
+				<path class="hatch" d={art.lane.slot.slitHatch} />
+				<path class="ink" d={art.lane.slot.ink} />
+				<text class="slot-label" x={art.lane.slot.labelX} y={art.lane.slot.labelY}>post slot</text>
 				<path class="paper" d={art.bin.paper} />
 				<path class="hatch" d={art.bin.hatch} />
 				<path class="ink" d={art.bin.ink} />
@@ -228,7 +233,7 @@ export default function PostcardsAnatomy() @{
 		</div>
 		<p class="caption" aria-hidden="true">{caption === '' ? 'drag a postcard, or hover one' : caption}</p>
 		<figcaption class="sr">
-			A corkboard with Austin's postcard pinned on it, and two postcards on a lane leading to the board: Boston, sent first, and Denver,
+			A corkboard with Austin's postcard pinned on it, a post slot at the left, and two postcards on the lane from the slot to the board: Boston, sent first, and Denver,
 			sent second and nearer the board. Drag a card along the lane, or focus it and use the arrow keys, to change how far it has to travel.
 			Press Post both: both cards travel to the board. Whichever arrives first, Denver ends up pinned, and the other cards are stamped
 			VOID and dropped in the bin, because only the latest request's answer is shown. Escape or Start over puts everything back.
@@ -316,6 +321,16 @@ export default function PostcardsAnatomy() @{
 
 			.desk .paper {
 				fill: var(--bin);
+			}
+
+			.slit {
+				fill: color-mix(in oklch, var(--ink) 85%, var(--paper));
+			}
+
+			.slot-label {
+				font: 600 11px 'Shantell Sans', system-ui, sans-serif;
+				fill: var(--ink);
+				opacity: 0.8;
 			}
 
 			.card .ink {

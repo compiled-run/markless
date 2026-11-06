@@ -7,6 +7,9 @@ import { BOARD_X, LANE } from './postcards-model.ts';
 export const WIDTH = 680;
 export const HEIGHT = 330;
 export const CARD = { w: 150, h: 100 };
+/** The widest city name ends here at the card's own 18 px lettering, measured in Chromium; the postmark starts right of it. */
+export const NAME_RIGHT = 77;
+export const POSTMARK_LEFT = CARD.w - 56;
 /** Where a card's top-left sits: on the lane, pinned on the board, and in the bin. */
 export const PLACES = {
 	laneY: 128,
@@ -18,14 +21,14 @@ const BIN = { x: 548, y: 262, w: 86, h: 60 };
 
 const pct = (n: number, of: number) => Math.round((n / of) * 1000) / 10 + '%';
 
-/** One postcard: its edge, a stamp box in the corner, a postmark, the divider and two address lines, plus the VOID stamp it may get. */
+/** One postcard: its edge, a stamp box in the corner, a postmark clear of the city name, the divider and two address lines, plus the VOID stamp it may get. */
 function cardArt(seed: number) {
 	const { w, h } = CARD;
 	const edge = jitter(resample(roundRect(0, 0, w, h, 3), 6, true), seed, 0.9);
 	const shadow = jitter(resample(roundRect(6, 8, w + 6, h + 8, 3), 7, true), seed + 1, 1);
-	const stamp = jitter(resample(roundRect(w - 34, 8, w - 8, 36, 2), 4, true), seed + 2, 0.8);
-	const mark = [0, 1, 2].map((i) => line([[w - 62, 14 + i * 7], [w - 40, 12 + i * 7]], { w: 0.6, seed: seed + 10 + i, over: 0 })).join('');
-	const ring = outline(ellipse(w - 50, 22, 10, 10, 18), { w: 0.7, seed: seed + 3 });
+	const stamp = jitter(resample(roundRect(w - 30, 8, w - 8, 34, 2), 4, true), seed + 2, 0.8);
+	const mark = [0, 1, 2].map((i) => line([[POSTMARK_LEFT, 13 + i * 6], [w - 36, 11 + i * 6]], { w: 0.6, seed: seed + 10 + i, over: 0 })).join('');
+	const ring = outline(ellipse(w - 44, 19, 8, 8, 18), { w: 0.7, seed: seed + 3 });
 	const divider = line([[w / 2 + 6, 44], [w / 2 + 6, h - 10]], { w: 0.7, seed: seed + 4, over: 0 });
 	const lines = [0, 1].map((i) => line([[w / 2 + 16, 62 + i * 14], [w - 12, 63 + i * 14]], { w: 0.6, seed: seed + 20 + i, over: 0 })).join('');
 	const voidRing = jitter(ellipse(w / 2, h / 2, 54, 24, 30), seed + 5, 1.4);
@@ -64,9 +67,18 @@ function laneArt() {
 	const road = resample([[LANE.min - 10, y], [BOARD_X - 6, y + 1]], 12);
 	const dashes = road.slice(0, -1).filter((_, i) => i % 2 === 0).map((p, i) => line([p, [p[0] + 7, p[1]]], { w: 1.3, seed: 8200 + i, over: 0 })).join('');
 	const arrows = [LANE.min + 60, LANE.min + 180, LANE.min + 300].map((ax, i) => line([[ax - 6, y - 6], [ax, y], [ax - 6, y + 6]], { w: 1.3, seed: 8220 + i, over: 0 })).join('');
-	const slot = jitter(resample(roundRect(14, PLACES.laneY - 6, 30, PLACES.laneY + CARD.h + 6, 4), 6, true), 8230, 0.8);
+	const plate = jitter(resample(roundRect(4, PLACES.laneY - 10, 32, PLACES.laneY + CARD.h + 10, 5), 6, true), 8230, 0.9);
+	const slit = jitter(resample(roundRect(13, PLACES.laneY + 4, 23, PLACES.laneY + CARD.h - 4, 2), 5, true), 8233, 0.5);
 	return {
-		ink: dashes + arrows + outline(slot, { w: 1.2, seed: 8231 }) + hatch(slot, 1.2, 2.4, 8232, { cluster: 2, skip: 0.3 }),
+		ink: dashes + arrows,
+		slot: {
+			plate: pathOf(plate, true),
+			slit: pathOf(slit, true),
+			slitHatch: hatch(slit, 1.4, 2, 8234, { cluster: 2, skip: 0.2 }),
+			ink: outline(plate, { w: 1.4, heavy: 1, seed: 8231 }) + outline(slit, { w: 1, seed: 8232 }),
+			labelX: 4,
+			labelY: PLACES.laneY + CARD.h + 34,
+		},
 	};
 }
 

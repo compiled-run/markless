@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BOARD_X, clampLane, describeCard, describeRace, lands, START, travelMs } from './postcards-model.ts';
-import { drawing } from './postcards.ts';
+import { drawing, NAME_RIGHT, POSTMARK_LEFT } from './postcards.ts';
 
 const raceArt = drawing();
 const page = readFileSync(new URL('../../../pages/concepts/async.mdx', import.meta.url), 'utf8');
@@ -36,8 +36,11 @@ describe('the postcard race', () => {
 		expect(piece).toContain('class="caption"');
 	});
 
-	it('draws the same scene every time', () => {
+	it('draws the same scene every time, with the postmark clear of the city name and a labelled post slot', () => {
 		expect(Object.keys(raceArt.cards)).toEqual(['austin', 'boston', 'denver']);
+		expect(POSTMARK_LEFT).toBeGreaterThan(NAME_RIGHT + 10);
+		expect(piece).toContain('post slot');
+		expect(raceArt.lane.slot.plate.length).toBeGreaterThan(50);
 		expect(raceArt.board.cork.length).toBeGreaterThan(100);
 		expect(JSON.stringify(drawing())).toBe(JSON.stringify(raceArt));
 	});
