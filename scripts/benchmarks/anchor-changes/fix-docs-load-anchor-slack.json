@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": -6266,
-			"reason": "re-anchor to the measurement: #461 and #463 accepted +4,684 B and +3,048 B for docs / against stale mains while their own effect was about +170 B, and #471 added about +913 B unrecorded, leaving the 0 B download ceiling 6,272 B loose; main e38f0077b's merge-queue run 42260913018 measured 1,673,262 B against the anchor 1,679,534 B, and #520's merge-queue run 42270521040 then measured 1,673,268 B (+6 B: the playground compile worker the page prefetches carries the compiler)",
+			"delta": -6219,
+			"reason": "re-anchor to the measurement: #461 and #463 accepted +4,684 B and +3,048 B for docs / against stale mains while their own effect was about +170 B, and #471 added about +913 B unrecorded, leaving the 0 B download ceiling 6,272 B loose (main e38f0077b's merge-queue run 42260913018: 1,673,262 B against the anchor 1,679,534 B); the compiler fixes #520 and #521 then added +6 B and +47 B through the playground compile worker the page prefetches, measured 1,673,315 B in #521's merge-queue run 42273631151",
 			"date": "2026-11-06"
 		},
 		{
